@@ -1268,7 +1268,13 @@ class ESMLProject():
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+        print("save silver, before to_parquet: ", dataframe.iloc[0].WKReservationDate_UTC)
+        
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False) #,allow_truncated_timestamps=False)
+        #dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True) #,allow_truncated_timestamps=False)
+
+        df2 = pd.read_parquet(local_path)
+        print("save silver, AFTER to_parquet: ", df2.iloc[0].WKReservationDate_UTC)
 
         esml_dataset.upload_and_register_pandas_silver(file_name,srs_folder, target_path)
         return esml_dataset.Silver
