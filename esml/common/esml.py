@@ -721,7 +721,7 @@ class ESMLProject():
 
             local_path = '{}{}'.format(srs_folder,file_name)
             ESMLProject.create_folder_if_not_exists(srs_folder)
-            scored_result.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+            scored_result.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
             self.LakeAccess.upload(file_name, srs_folder, unique_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2
 
             print("Saved SCORED data in LAKE, as file '{}'".format(file_name))
@@ -761,7 +761,7 @@ class ESMLProject():
             file_name = "to_score_{}.parquet".format(caller_guid) # HERE ....who is this scoring about?
             local_path = '{}{}'.format(srs_folder,file_name)
             ESMLProject.create_folder_if_not_exists(srs_folder)
-            pandas_X_test.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+            pandas_X_test.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
             self.LakeAccess.upload(file_name, srs_folder, unique_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2 
 
@@ -776,7 +776,7 @@ class ESMLProject():
 
             local_path = '{}{}'.format(srs_folder,file_name)
             ESMLProject.create_folder_if_not_exists(srs_folder)
-            scored_result.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+            scored_result.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
             self.LakeAccess.upload(file_name, srs_folder, unique_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2
 
             print("Saved SCORED data in LAKE, as file '{}'".format(file_name))
@@ -808,7 +808,7 @@ class ESMLProject():
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
         ds = None
         if(self.rnd): # No versioning & overwrite
@@ -833,7 +833,7 @@ class ESMLProject():
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
         ds = None
         if(self.rnd): # No versioning & overwrite
@@ -855,7 +855,7 @@ class ESMLProject():
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
         ds = None
         if(self.rnd): # No versioning & overwrite
@@ -877,7 +877,7 @@ class ESMLProject():
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
         ds = None
         if(self.rnd): # No versioning & overwrite
@@ -1268,7 +1268,7 @@ class ESMLProject():
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
         esml_dataset.upload_and_register_pandas_silver(file_name,srs_folder, target_path)
         return esml_dataset.Silver
@@ -1284,22 +1284,22 @@ class ESMLProject():
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
            
-        dataframe.to_parquet(local_path, engine='pyarrow', index=False,allow_truncated_timestamps=False)
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
         esml_dataset.upload_and_register_pandas_bronze(file_name,srs_folder, target_path)
         return esml_dataset.Bronze
 
 
     @staticmethod 
-    def pandas_to_parquet_date_safe(esml_dataset,local_path):
-        print("trying to save parquet from Pandas manually since Azure ML Dataset failed casting timestamp via Parquet")
+    def _z_pandas_to_parquet_date_safe(esml_dataset,local_path):
+        print("trying to save parquet from Pandas (csv) manually since Azure ML Dataset failed casting timestamp via Parquet")
 
         pd_df = esml_dataset.to_pandas_dataframe()
         csv_name = local_path + ".csv"
         pd_df.to_csv(csv_name,index=False)
 
         df = pd.read_csv(csv_name)
-        df.to_parquet(local_path, engine='pyarrow', index=False) # resave
+        df.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
     @staticmethod
     def create_folder_if_not_exists(new_folder):
