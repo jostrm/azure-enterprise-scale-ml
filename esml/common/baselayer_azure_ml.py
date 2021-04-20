@@ -1156,16 +1156,17 @@ class AutoMLFactory(metaclass=Singleton):
 
         return all_metrics
 
+# AutoML Supported value(s): 'accuracy, precision_score_weighted, norm_macro_recall, AUC_weighted, average_precision_score_weighted'.
 class azure_metric_classification():
     AUC = "AUC_weighted"
     Accuracy = "accuracy"
     Precision = "precision_score_weighted"
     Precision_avg = "average_precision_score_weighted"
-    Recall = "recall"
-    F1_score = "f1_score_weighted"
-    Log_loss = "log_loss"
+    Recall = "norm_macro_recall"
+    #F1_score = "f1_score_weighted"
+    #Log_loss = "log_loss"
 
-#  'normalized_mean_absolute_error, normalized_root_mean_squared_error, spearman_correlation, r2_score'
+# AutoML Supported value(s):  'normalized_mean_absolute_error, normalized_root_mean_squared_error, spearman_correlation, r2_score'
 class azure_metric_regression():
     MAE = "normalized_mean_absolute_error"
     RMSE = "normalized_root_mean_squared_error"
