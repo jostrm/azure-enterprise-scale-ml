@@ -7,7 +7,7 @@
 - It has the `ESML as submodule`, and MLops template ready to run, but you need to run the following command to see the files (not just an empty folder)
 - Open GIT command prompt, go to your local root folder for the code, run below: 
 
-> $ git submodule update --init --recursive
+> git submodule update --init --recursive
 
 # 2 (Alt B) EXISTING Azure Devops project - "link" ESML (GIT subclassing)
 -  Add ESML as a GIT Submodule "linked" to your GIT repo
