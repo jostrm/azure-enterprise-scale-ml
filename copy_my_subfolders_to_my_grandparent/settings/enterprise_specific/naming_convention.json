@@ -1,0 +1,27 @@
+{
+    "adgroup_common" : "msft-{esmlcmn}-owner",
+    "adgroup_project" : "msft-{esmlprj001}-contributor",
+    "cmn_sp": "sp-{esmlcmn}",
+    "project_sp": "sp-{esmlprj001}",
+
+    "rg_all_caps" : true,
+    "rg_common" : "msft-{esmlcmn}-weu-{dev}-rg",
+    "cmn_storage_account" : "sa{esmlcmn}weu{dev}001",
+    "cmn_service_datafactory" : "adf-{esmlcmn}-weu-{dev}-001",
+    "cmn_keyvault" : "kv-{esmlcmn}-weu-{dev}",
+    "cmn_admin_keyvault" : "kv-{esmladm}-weu-{dev}",
+
+    "cmn_vnet" : "vnet-{esmlcmn}-weu-{dev}-001",
+    "cmn_subnet" : "snet-{esmlcmn}-001",
+
+    "rg_project" : "msft-esml-{prj001}-weu-{dev}-rg",
+
+    "service_azurem_ml" : "aml-{esmlprj001}-weu-{dev}-001",
+    "service_azurem_ml_keyvault" : "kv-{esmlprj001}-weu-{dev}001",
+    "service_azurem_ml_storage_account" : "sa{esmlprj001}weu{dev}001",
+    "service_azurem_ml_appliction_insights" : "ai-{esmlprj001}-weu-{dev}",
+    "service_datafactory" : "adf-{esmlprj001}-weu-{dev}-001",
+    "project_subnet" : "snet-{esmlprj001}-001",
+    "project_subnet_dbx_pub" : "snet-{esmlprj001}-dbxpub-001",
+    "project_subnet_dbx_priv" : "snet-{esmlprj001}-dbxpriv-001"
+}

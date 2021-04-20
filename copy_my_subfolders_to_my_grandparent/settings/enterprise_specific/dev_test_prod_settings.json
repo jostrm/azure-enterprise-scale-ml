@@ -1,0 +1,22 @@
+{
+    "override_enterprise_settings_with_model_specific": true,
+    "tenant": "72f988bf-86f1-41af-91ab-2d7cd011db47",
+    "dev_subscription": "ca0a8c40-b06a-4e4e-8434-63c03a1dee34",
+    "test_subscription": "ca0a8c40-b06a-4e4e-8434-63c03a1dee34",
+    "prod_subscription": "ca0a8c40-b06a-4e4e-8434-63c03a1dee34",
+    "lake_name": "lake",
+    "lake_design_version": "3",
+    
+    "common_rg_name": "MSFT-WEU-EAP_CMN_AI-{}-RG",
+    "common_vnet_name": "msft-weu-{}-cmnai-vnet",
+    "common_subnet_name": "msft-weu-{}-cmnai-sn-aml",
+
+    "project_number_XX_or_XXX": 2,
+    "project_location": "westeurope",
+    
+    "project_resource_group": "MSFT-WEU-EAP_PROJECT{}_AI-{}-RG",
+    "convention_project_resource_group_env_first":false,
+
+    "project_workspace_name": "msft-weu-{}-eap-proj{}_ai-amls",
+    "convention_project_workspace_name_env_first":true
+}

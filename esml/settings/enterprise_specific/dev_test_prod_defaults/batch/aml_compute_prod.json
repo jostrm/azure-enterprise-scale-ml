@@ -1,0 +1,8 @@
+{
+    "aml_cluster_name": "prj{}-m{}-prod",
+    "aml_training_vm_size": "STANDARD_D3_V2",
+    "vm_priority":"dedicated",
+    "aml_training_nodes":8,
+    "idle_seconds_before_scaledown": 120,
+    "min_nodes": 0
+}

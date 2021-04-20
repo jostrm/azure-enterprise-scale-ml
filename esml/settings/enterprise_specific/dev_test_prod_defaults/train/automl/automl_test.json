@@ -1,0 +1,16 @@
+{
+    "debug_always_promote_model": true,
+    "enable_voting_ensemble":true,
+    "enable_stack_ensemble":true,
+    "model_explainability":true,
+    "experiment_timeout_hours":24,
+    "iteration_timeout_minutes":480,
+    "n_cross_validations": 9,
+    "iterations": 1000,
+    "enable_early_stopping":true,
+    "featurization":"auto",
+    "path":"./logs/",
+    "debug_log": "azure_automl_debug_test.log",
+    "allowed_models": ["LightGBM"],
+    "blocked_models":["GradientBoosting","XGBoostRegressor","ExtremeRandomTrees","LassoLars","RandomForest","ElasticNet", "AutoArima"]
+}

@@ -1,0 +1,16 @@
+{
+    "debug_always_promote_model": true,
+    "enable_voting_ensemble":false,
+    "enable_stack_ensemble":false,
+    "model_explainability":false,
+    "experiment_timeout_hours":0.25,
+    "iteration_timeout_minutes":2,
+    "n_cross_validations": 2,
+    "iterations": 100,
+    "enable_early_stopping":true,
+    "featurization":"auto",
+    "path":"./logs/",
+    "debug_log": "azure_automl_debug_dev.log",
+    "allowed_models": ["LightGBM"],
+    "blocked_models": []
+}

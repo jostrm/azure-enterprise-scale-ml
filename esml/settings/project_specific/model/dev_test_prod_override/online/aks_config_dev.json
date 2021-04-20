@@ -1,0 +1,37 @@
+{
+  "aks_dev_test": true,
+  "num_replicas":1,
+  "aks_name": "esml-dev-prj{}",
+  "aks_name_override": "",
+  "aks_service_name": "esml-dev-p{}-m{}-aksapi",
+  "image_name": "esml-dev-p{}-m{}-img",
+
+  "aks_api_url": "esml-dev-p{}-m{}-api",
+  "kv_aks_api_secret": "esml-dev-p{}-m{}-apisecret",
+  "kv_aks_model_version": "esml-dev-p{}-m{}-modelversion",
+  "aks_endpoint_ab": "esmldevp{}m{}aksendpoint",
+  "autoscale_enabled":false,
+  "autoscale_target_utilization":60,
+  "autoscale_min_replicas":1,
+  "autoscale_max_replicas":4,
+  "autoscale_refresh_seconds":1,
+
+  "aks_agent_count": 1,
+  "aks_vm_size": "Standard_DS13-2_v2",
+  "location": "westeurope",
+  "ssl_cert_pem_file": "",
+  "ssl_key_pem_file": "",
+  "ssl_cname": "",
+  "leaf_domain_label": "esmlcmn",
+  "service_cidr": "",
+  "dns_service_ip": "",
+  
+  "collect_model_data": false,
+  "key_auth_enabled": true,
+  "token_auth_enabled": false,
+  "aks_cpu_cores": 1,
+  "aks_memory_gb": 8,
+  "enable_app_insights": false,
+  "description": "AKS webserice in DEV environment.",
+  "tags": "{'environment': 'dev'}"
+}

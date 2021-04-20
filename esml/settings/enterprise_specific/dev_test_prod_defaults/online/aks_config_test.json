@@ -1,0 +1,37 @@
+{
+  "aks_dev_test": false,
+  "aks_name": "esml-test-prj{}",
+  "aks_name_override": "",
+  "aks_service_name": "esml-test-prj{}-aks-api",
+  "image_name": "esml-dev-prj{}-image",
+  
+  "aks_api_url": "esml-test-p{}-m{}-api",
+  "kv_aks_api_secret": "esml-test-p{}-m{}-apisecret",
+  "kv_aks_model_version": "esml-test-p{}-m{}-modelversion",
+  "aks_endpoint_ab": "esmltestp{}m{}aksendpoint",
+  "autoscale_enabled":true,
+  "autoscale_target_utilization":60,
+  "autoscale_min_replicas":1,
+  "autoscale_max_replicas":4,
+  "autoscale_refresh_seconds":1,
+
+  "aks_agent_count": 3,
+  "aks_vm_size": "Standard_DS3_v2",
+  "location": "westeurope",
+  "ssl_cert_pem_file": "",
+  "ssl_key_pem_file": "",
+  "ssl_cname": "",
+  "leaf_domain_label": "esmlcmn",
+  "service_cidr": "",
+  "dns_service_ip": "",
+
+  "collect_model_data": false,
+  "key_auth_enabled": true,
+  "token_auth_enabled": false,
+  "num_replicas":2,
+  "aks_cpu_cores": 0.5,
+  "aks_memory_gb": 4,
+  "enable_app_insights": true,
+  "description": "AKS webserice in TEST environment.",
+  "tags": "{'environment': 'test'}"
+}

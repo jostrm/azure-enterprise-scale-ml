@@ -1,0 +1,114 @@
+# Variable 'esml_environment' was defined in the Variables tab
+# Variable 'ipAddr' was defined in the Variables tab
+# Variable 'kvName' was defined in the Variables tab
+# Variable 'kvRG' was defined in the Variables tab
+jobs:
+- job: Job_1
+  displayName: Project002_M03
+  pool:
+    vmImage: ubuntu-18.04
+  steps:
+  - checkout: self
+    submodules: true
+  - task: UsePythonVersion@0
+    displayName: Use Python 3.6
+    inputs:
+      versionSpec: 3.6
+  - task: PowerShell@2
+    displayName: 01-Azure Devops as whitelist for Keyvault - Get Client IP from Trusted REST API Service
+    inputs:
+      targetType: inline
+      script: >-
+        $resp = Invoke-RestMethod -Uri 'https://api.ipify.org/'
+                Write-Host $resp
+                Write-Host "##vso[task.setvariable variable=ipAddr]$resp"
+                $ipAddr = $resp
+                Write-Host ipAddr is: $ipAddr
+  - task: AzureCLI@2
+    displayName: 01-Azure Devops as whitelist for Keyvault - Firewall rules
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >
+        az keyvault network-rule add --resource-group $(kvRG) --name $(kvName) --ip-address $(ipAddr)
+
+        echo "1_Currentd dir:" $PWD
+
+        ls -l
+  - task: ShellScript@2
+    displayName: Bash Script - Install Azure AutoML via Conda
+    inputs:
+      scriptPath: azure-enterprise-scale-ml/environment_setup/automl_setup_linux.sh
+  - task: AzureCLI@2
+    displayName: 10-get_environment
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl
+
+        python mlops/demo_project02_m03/10-get_environment.py --esml_environment "test"
+      cwd: azure-enterprise-scale-ml
+  - task: AzureCLI@2
+    displayName: 21-Bronze_Silver_Gold - GEN 2 lake and ESML Datasets
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl
+
+        python mlops/demo_project02_m03/21-bronze_2_gold.py --esml_environment "test"
+      cwd: azure-enterprise-scale-ml
+  - task: AzureCLI@2
+    displayName: 22-Train AutoML Remote
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl
+
+        python mlops/demo_project02_m03/22-train_automl.py --esml_environment "test"
+      cwd: azure-enterprise-scale-ml
+  - task: AzureCLI@2
+    displayName: 23-compare scoring -  register if better than model in TARGET env
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl
+
+        python mlops/demo_project02_m03/23-compare_scoring_register.py --esml_environment "test"
+      cwd: azure-enterprise-scale-ml
+  - task: AzureCLI@2
+    displayName: '01- Finally:Remove Firewall rule: ContinueOnError'
+    condition: succeededOrFailed()
+    continueOnError: True
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: az keyvault network-rule remove --resource-group $(kvRG) --name $(kvName) --ip-address $(ipAddr)
+      cwd: azure-enterprise-scale-ml
+  - task: CopyFiles@2
+    displayName: Copy Files (Source-2-Staging)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)
+      TargetFolder: $(Build.ArtifactStagingDirectory)
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: mlops-build'
+    inputs:
+      ArtifactName: mlops-build
+...
