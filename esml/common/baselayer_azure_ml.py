@@ -101,7 +101,7 @@ class ComputeFactory():
     vm_size = "STANDARD_D3_V2"
     vm_prio = "dedicated"
     vm_maxnodes=4
-    vm_minnodes=0
+    min_nodes = 0
     idle_seconds_before_scaledown = 120
 
     # INFERENCE - Online
@@ -199,11 +199,11 @@ class ComputeFactory():
         self.vm_size = config['aml_training_vm_size']
         self.vm_prio = config['vm_priority']
         self.vm_maxnodes = int(config['aml_training_nodes'])
-        self.vm_minnodes = int(config['min_nodes'])
+        self.min_nodes = int(config['min_nodes'])
 
-        if(self.vm_minnodes > 0):
+        if(self.min_nodes > 0):
             print("WARNING - This cluster will not autoscale down, since you override 'min_nodes' to"\
-                "be greater than 0. Contact your IT / Core team to validate that it is OK with cost of {} min_nodes".format(self.vm_minnodes))
+                "be greater than 0. Contact your IT / Core team to validate that it is OK with cost of {} min_nodes".format(self.min_nodes))
 
         self.idle_seconds_before_scaledown = int(config['idle_seconds_before_scaledown'])
 
