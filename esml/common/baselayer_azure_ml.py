@@ -27,6 +27,7 @@ import os
 import json
 import datetime
 import time
+import uuid
 
 #pipeline & read model inference
 import pickle
@@ -513,11 +514,15 @@ class ComputeFactory():
         #https://github.com/Azure/MachineLearningNotebooks/blob/master/how-to-use-azureml/manage-azureml-service/authentication-in-azureml/authentication-in-azureml.ipynb
         return azure_ml_run.get_secret(name=self.kv_aks_api_secret) #azure_ml_run = Run.get_context()
 
-    def get_training_aml_compute(self,dev_test_prod,override_enterprise_settings_with_model_specific=False, projNr="000", modelNr="00"):
+    def get_training_aml_compute(self,dev_test_prod,override_enterprise_settings_with_model_specific=False, projNr="000", modelNr="00", create_cluster_with_suffix=None):
         self.LoadConfiguration(self.project,dev_test_prod,override_enterprise_settings_with_model_specific, projNr, modelNr)
 
         try:
-            cpu_cluster = AmlCompute(workspace=self.ws, name=self.aml_cluster_name)
+            if (create_cluster_with_suffix is not None):
+                name = self.aml_cluster_name + create_cluster_with_suffix
+                cpu_cluster = AmlCompute(workspace=self.ws, name=name)
+            else:
+                cpu_cluster = AmlCompute(workspace=self.ws, name=self.aml_cluster_name)
             print('Found existing cluster {} for project and environment, using it.'.format(self.aml_cluster_name))
         except ComputeTargetException:
             print('Creating new cluster - ' + self.aml_cluster_name)

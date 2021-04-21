@@ -372,15 +372,15 @@ class ESMLProject():
         return self.datastore
     
 
-    def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False):
+    def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix=None):
         self.initComputeFactory(ws)
 
         if(use_non_model_specific_cluster):
             print("Using a non model specific cluster, yet environment specific")
-            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString)
+            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix)
         else:
             print("Using a model specific cluster, per configuration in project specific settings, (the integer of 'model_number' is the base for the name)")
-            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString)
+            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix)
 
     '''
     def get_latest_model(self, ws):
