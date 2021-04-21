@@ -518,19 +518,21 @@ class ComputeFactory():
         self.LoadConfiguration(self.project,dev_test_prod,override_enterprise_settings_with_model_specific, projNr, modelNr)
 
         try:
+            name = None
             if (create_cluster_with_suffix is not None):
                 name = self.aml_cluster_name + create_cluster_with_suffix
                 cpu_cluster = AmlCompute(workspace=self.ws, name=name)
             else:
+                name = self.aml_cluster_name
                 cpu_cluster = AmlCompute(workspace=self.ws, name=self.aml_cluster_name)
-            print('Found existing cluster {} for project and environment, using it.'.format(self.aml_cluster_name))
+            print('Found existing cluster {} for project and environment, using it.'.format(name))
         except ComputeTargetException:
-            print('Creating new cluster - ' + self.aml_cluster_name)
+            print('Creating new cluster - ' + name)
             compute_config = AmlCompute.provisioning_configuration(vm_size=self.vm_size,
                                                                 vm_priority=self.vm_prio,  # 'dedicated', 'lowpriority'
                                                                 min_nodes=self.min_nodes,
                                                                 max_nodes=self.vm_maxnodes)
-            cpu_cluster = ComputeTarget.create(self.ws, self.aml_cluster_name, compute_config)
+            cpu_cluster = ComputeTarget.create(self.ws, name, compute_config)
 
         # Can poll for a minimum number of nodes and for a specific timeout.
         # If min_node_count=None is provided, it will use the scale settings for the cluster instead
