@@ -328,7 +328,25 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 
 ![](./esml/images/esml-settings.png)
 
-## `Datalake - Inference Get scoring in Datalake`: FILTERS
+## DEPLOY to AKS - realtime & batch scoring
+- You can deploy a model to AKS with 2 lines of code. 
+- Then use this endpoint to inference, for a single row or batches of rows (that will be saved in the lake). See other inmages.
+![](./esml/images/deploy-to-aks.png)
+
+## Scoring - ONLINE or BATCH scoring, with same serving (AKS)
+- `ONLINE/REALTIME`: Since you can deploy a model in ESML with 2 lines of code, it is easy to serve a model. Also it will use performance config for the environment you are targeting (DEV,TEST, PROD)
+- `BATCH SCORING`: As an alternative of using an additional Azure ML pipeline to BATCH score, you can also use the AKS/Realtime endpoint for batch scoring
+    - This, since ESML (defaults, but optionally) saves scored data to the datalake for you, as a GOLD_SCORED dataset, you can easily batch score data also
+        - It saves scored data so you can retrieve it with FILTERs: `ByDate, ByCaller, By Model_version_used_that_day_for_scoring`
+
+    - Note: Azure ML Pipelines are better for massive batchessince we can use PARALLELL RUNSTEP, to have 10 000 rows in 10 batches sored in parallell. It can also be more cost effective (since compute goes up & down to zero after scoring pipeline is done). 
+        - Tip: BUT, If you want to achieve same principle of "parallell runstep" batches, you can of course as a caller just split the data into batches of 1000 rows each, and make 10 calls to the AKS online endpoint. AKS can handle parallell calls, and are great at auto-scaling. (But you need to handle the merge when getting the 10 results back)
+
+- Here is an example how you can "BATCH SCORE", and tracking a CALLER_ID, using a specifi model_version to score with:
+
+> ![](./esml/images/scoring-batch-or-online.png)
+
+## `AutoLake - Inference Get scoring in Datalake`: FILTERS
 - Get the data from `current environment (dev,test pr prod)`, p.dev_test_prod = "dev"
 
 ![](./esml/images/esml-get-scoring.png)

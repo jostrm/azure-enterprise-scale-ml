@@ -8,6 +8,7 @@
     "n_cross_validations": 9,
     "iterations": 1000,
     "enable_early_stopping":true,
+    "max_cores_per_iteration": -1,
     "featurization":"auto",
     "path":"./logs/",
     "debug_log": "azure_automl_debug_test.log",

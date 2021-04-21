@@ -523,6 +523,7 @@ class ComputeFactory():
             print('Creating new cluster - ' + self.aml_cluster_name)
             compute_config = AmlCompute.provisioning_configuration(vm_size=self.vm_size,
                                                                 vm_priority=self.vm_prio,  # 'dedicated', 'lowpriority'
+                                                                min_nodes=self.min_nodes,
                                                                 max_nodes=self.vm_maxnodes)
             cpu_cluster = ComputeTarget.create(self.ws, self.aml_cluster_name, compute_config)
 
@@ -593,6 +594,7 @@ class AutoMLFactory(metaclass=Singleton):
     model_name_automl = "AutoML_Generated_Name"
     active_model_config = None
     debug_always_promote_model = False
+    max_cores_per_iteration = -1
 
     #Pipeline Run
     metrics_output_name = 'metrics_output'
@@ -666,6 +668,11 @@ class AutoMLFactory(metaclass=Singleton):
         self.automl_log_location = config['debug_log']
         self.automl_path = config['path']
 
+        if('max_cores_per_iteration' in config):
+            self.max_cores_per_iteration = int(config['max_cores_per_iteration'])
+        else:
+            self.max_cores_per_iteration = -1
+
     def get_automl_performance_config(self,dev_test_prod, use_black_or_allow_list_from_config=True, override_enterprise_settings_with_model_specific=False):
 
         self.LoadConfiguration(dev_test_prod,override_enterprise_settings_with_model_specific)
@@ -678,6 +685,7 @@ class AutoMLFactory(metaclass=Singleton):
             ,'n_cross_validations':self.n_cross_validations  #Minimum=2
             ,'enable_early_stopping':  self.enable_early_stopping  #Default=False....early? No early stopping for first 20 iterations (landmarks). looks every 10th iteration.
             ,'iterations': self.iterations
+            ,'max_cores_per_iteration': self.max_cores_per_iteration # Equal to 1, the default. if equal to -1, which means to use all the possible cores per iteration per child-run.
         }
 
         if(use_black_or_allow_list_from_config): #LOGIC: Allowed - Blocked
