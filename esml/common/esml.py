@@ -377,10 +377,10 @@ class ESMLProject():
         
         if(create_cluster_with_suffix_char==True):
             print("Using a non model specific cluster (enterprice policy cluster), yet environment specific")
-            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix)
+            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
         else:
             print("Using a model specific cluster, per configuration in project specific settings, (the integer of 'model_number' is the base for the name)")
-            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix)
+            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
 
     '''
     def get_latest_model(self, ws):
