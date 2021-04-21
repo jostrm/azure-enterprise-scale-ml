@@ -372,12 +372,10 @@ class ESMLProject():
         return self.datastore
     
 
-    def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix=None):
+    def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix_char=None):
         self.initComputeFactory(ws)
-
-        print("Create_cluster_with_suffix: ", create_cluster_with_suffix)
         
-        if(use_non_model_specific_cluster==True):
+        if(create_cluster_with_suffix_char==True):
             print("Using a non model specific cluster (enterprice policy cluster), yet environment specific")
             return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix)
         else:

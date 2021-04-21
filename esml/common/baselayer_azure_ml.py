@@ -520,7 +520,7 @@ class ComputeFactory():
         try:
             name = None
             if (create_cluster_with_suffix is not None):
-                name = self.aml_cluster_name + create_cluster_with_suffix
+                name = self.aml_cluster_name + "-"+create_cluster_with_suffix
                 cpu_cluster = AmlCompute(workspace=self.ws, name=name)
             else:
                 name = self.aml_cluster_name
