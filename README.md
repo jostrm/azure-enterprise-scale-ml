@@ -119,6 +119,8 @@ ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio:
 - `1 lake-design`: Lake design do evolve. We need backward conpatibility and versioning 
     - Example: ”Upgrade my project to `lake v5` from `lake v2` (ADF is used)
 - `Physical LINEAGE` from IN-data to GOLD
+- `META: If I don't have a Data Catalog (Azure Purview)- what metadata does AutoLake provide?` 
+![](./esml/images/esml-autolake-meta.png)
 # `CONTEXT`: ESML is more than this SDK with mlops & autolake. Also...
 ## ESML is also architecture to scale across 1-1000 PROJECTS
 - `Avoid Technical quota` roofs in Azure (IP ranges, compute cores).
