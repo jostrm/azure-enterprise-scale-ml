@@ -792,7 +792,7 @@ class AutoMLFactory(metaclass=Singleton):
         print("Start training run...")
 
         if (p.multi_output is not None): # Multi output support.
-            if (p.multi_output == True):
+            if (len(p.multi_output) > 0):
                 name = experiment_name +"_"+ automl_config.user_settings['label_column_name']
             else:
                 name = experiment_name
