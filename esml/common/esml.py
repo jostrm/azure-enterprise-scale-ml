@@ -137,6 +137,7 @@ class ESMLProject():
     compute_factory = None
     automl_factory = None
     demo_mode = True
+    multi_output = None
     
     def __init__(self,inFolderDate=None, projectNumber=None,inferenceModelVersion=None,modelShortAliasPrefix=None, *datasetFolderNames):  # **datasetNameKey_PathValue
 
