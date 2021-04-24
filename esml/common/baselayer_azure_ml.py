@@ -791,8 +791,11 @@ class AutoMLFactory(metaclass=Singleton):
         print("Azure ML Studio Workspace: {}".format(ws.name))
         print("Start training run...")
 
-        if (p.multi_output is not None):
-            name = experiment_name +"_"+ automl_config.user_settings['label_column_name']
+        if (p.multi_output is not None): # Multi output support.
+            if (p.multi_output == True):
+                name = experiment_name +"_"+ automl_config.user_settings['label_column_name']
+            else:
+                name = experiment_name
             experiment = Experiment(ws, name)
         else:
             experiment = Experiment(ws, experiment_name)
