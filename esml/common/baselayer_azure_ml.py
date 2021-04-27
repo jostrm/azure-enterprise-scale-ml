@@ -782,15 +782,24 @@ class AutoMLFactory(metaclass=Singleton):
         #aml_run_config.target = p.get_training_aml_compute(p.ws)
         #automl_config.run_configuration  = aml_run_config
         p = self.project
-        return self.train(self.project.ws,automl_config,p.experiment_name,p.dev_test_prod)
 
-    def train(self,ws,automl_config,experiment_name,dev_test_prod):
+        return self.train(self.project.ws,automl_config,p.experiment_name,p.dev_test_prod, p)
+
+    def train(self,ws,automl_config,experiment_name,dev_test_prod, p):
 
         print("Experiment name: {}".format(experiment_name))
         print("Azure ML Studio Workspace: {}".format(ws.name))
         print("Start training run...")
 
-        experiment = Experiment(ws, experiment_name)
+        if (p.multi_output is not None): # Multi output support.
+            if (len(p.multi_output) > 0):
+                name = experiment_name +"_"+ automl_config.user_settings['label_column_name']
+            else:
+                name = experiment_name
+            experiment = Experiment(ws, name)
+        else:
+            experiment = Experiment(ws, experiment_name)
+
         remote_run = experiment.submit(automl_config, show_output = True)
         remote_run.wait_for_completion()
         best_run, fitted_model = remote_run.get_output()

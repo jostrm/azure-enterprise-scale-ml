@@ -137,6 +137,7 @@ class ESMLProject():
     compute_factory = None
     automl_factory = None
     demo_mode = True
+    multi_output = None
     
     def __init__(self,inFolderDate=None, projectNumber=None,inferenceModelVersion=None,modelShortAliasPrefix=None, *datasetFolderNames):  # **datasetNameKey_PathValue
 
@@ -1495,12 +1496,19 @@ class ESMLDataset():
 
     @InData.setter
     def InData(self, in_azure_dataset):
+
+        df_csv = self.InData.to_pandas_dataframe() 
+        if ( 'Unnamed: 0' in df_csv): # Fix crap savings of CSV (using Spark CSV-driver or Excel, forgetting Index=False at save etc) 
+            df_csv = df_csv.drop('Unnamed: 0', axis=1)
+            df_csv.reset_index(drop=True, inplace=True)
+
         if (self.inferenceModelVersion >0): # Inference path
             self._in_inference = in_azure_dataset
-            self.Bronze = self._project.save_bronze_pandas_as_azure_dataset(self, self.InData.to_pandas_dataframe()) # Auto-set BRONZE
+
+            self.Bronze = self._project.save_bronze_pandas_as_azure_dataset(self, df_csv) # Auto-set BRONZE
         else:
             self._in_train = in_azure_dataset
-            self.Bronze = self._project.save_bronze_pandas_as_azure_dataset(self, self.InData.to_pandas_dataframe()) # Auto-set BRONZE
+            self.Bronze = self._project.save_bronze_pandas_as_azure_dataset(self, df_csv) # Auto-set BRONZE
 
 # SAVE DATA - 
     def upload_and_register_pandas_bronze(self,file_name, srs_folder, target_path,new_version=False):
