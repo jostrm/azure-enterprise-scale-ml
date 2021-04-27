@@ -371,6 +371,9 @@ class ESMLProject():
            self.datastore = self.lake_access.GetLakeAsDatastore()
         return self.datastore
     
+    def get_best_model(self, ws,pipeline_run=False):
+        self.initAutoMLFactory()
+        return self.automl_factory.get_best_model(self,pipeline_run)
 
     def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix_char=None):
         self.initComputeFactory(ws)

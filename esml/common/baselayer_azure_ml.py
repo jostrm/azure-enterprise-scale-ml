@@ -903,6 +903,12 @@ class AutoMLFactory(metaclass=Singleton):
             return "prod"
         elif(p.dev_test_prod == "prod"):
             return "prod"
+    
+    def get_best_model(self, p,pipeline_run=False):
+        remote_run, experiment = self._get_active_model_run_and_experiment(p.ws, p.dev_test_prod, p.override_enterprise_settings_with_model_specific, pipeline_run)
+        best_run, source_fitted_model = remote_run.get_output()
+        return best_run, source_fitted_model
+
     '''
      if (target_environment == "dev" & p.dev_test_prod = "dev") -> compare againt  stage "dev" -> Should be same if no difference is made
      if (target_environment== "test" & p.dev_test_prod = "dev") -> compare againt next stage "test" -> should always be better in TEST, since longer traininng run
