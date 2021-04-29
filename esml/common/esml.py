@@ -226,7 +226,7 @@ class ESMLProject():
         
     #Register - at Initiation, and when saving
     def create_dataset_names(self, datasetName):
-        self._in_name_azure = self.ModelAlias +"_"+datasetName+"_IN_CSV"
+        self._in_name_azure = self.ModelAlias +"_"+datasetName+"_IN"
         self._bronze_name_azure = self.ModelAlias +"_"+datasetName+"_BRONZE"
         self._silver_name_azure = self.ModelAlias +"_"+datasetName+"_SILVER"
         return self._in_name_azure, self._bronze_name_azure, self._silver_name_azure
@@ -1194,7 +1194,7 @@ class ESMLProject():
 
                 # IN folder / Azure dataset
                 dstore_paths = [(lakestore,  ds.InPath + "*.csv")]
-                desc_in =  "IN_CSV: " + dataset_description
+                desc_in =  "IN: " + dataset_description
                 try:
                     in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths) # create the Tabular dataset with 
                     try:
@@ -1203,7 +1203,7 @@ class ESMLProject():
                     except UserErrorException as e:
                         print("Datasets already intiated with name {} in Azure, with description: {}. Inner exception:\n{} ".format(ds.Name,desc_in,e))
                 except Exception as e2: # Try .parquet instead - Else just throw exception
-                    print("IN_CSV coult not be initiated  for dataset {} with description {}. Trying as .parquet instead.".format(ds.Name,desc_in))
+                    print("IN (.csv or .parquet) coult not be initiated  for dataset {} with description {}. Trying as .parquet instead.".format(ds.Name,desc_in))
                     dstore_paths = [(lakestore,  ds.InPath + "*.parquet")]
                     desc_in =  "IN_PQ: " + dataset_description
                     in_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths) # create the Tabular dataset with 
@@ -1253,7 +1253,7 @@ class ESMLProject():
             for listItem in exists_dictionary[k]:
                 print(" - "+ listItem)
         print("")
-        print("2) Registered each Dataset with suffixes (_IN_CSV, _BRONZE, _SILVER) \n Tip: Use ESMLProject.Datasets list or .DatasetByName(myDatasetName) to read/write")
+        print("2) Registered each Dataset with suffixes (_IN, _BRONZE, _SILVER) \n Tip: Use ESMLProject.Datasets list or .DatasetByName(myDatasetName) to read/write")
         print("#######")
         return lakestore
 
