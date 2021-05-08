@@ -126,6 +126,7 @@ class naming_convention():
 
 
         if(print_output): # TENANT LEVEL
+            print("")
             print("TENANT level - AuthN/AuthZ ############## used for ALL environments(dev,test,prod)")
             print("")
             print("COMMON")

@@ -100,9 +100,10 @@ class ESMLProject():
     model_folder_name = "kalle"
     dataset_folder_names = None
     dataset_list = []
-    _train_gold_path = "master/1_projects/{}/{}/train/gold/{}/"
-    _inference_gold_path = "master/1_projects/{}/{}/inference/{}/gold/{}/"
-    _inference_scored_path = "master/1_projects/{}/{}/inference/{}/scored/{}/" # TODO: Scoring after batch
+    _proj_start_path = "projects" # = v4  (v3= master/1_projects )
+    _train_gold_path = _proj_start_path+"/{}/{}/train/gold/{}/"
+    _inference_gold_path = _proj_start_path+"/{}/{}/inference/{}/gold/{}/"
+    _inference_scored_path = _proj_start_path+"/{}/{}/inference/{}/scored/{}/" # TODO: Scoring after batch
     _projectNoXXX="000"
     _projectNoXX="00"
     _project_number_XX_or_XXX = 3
@@ -1371,13 +1372,14 @@ class ESMLDataset():
 
     # Lake folders -  master/1_projects/project002/03_diabetes_model_reg/train/ds01_diabetes/out/bronze/
     # TODO: To include files in subfolders, append '/**' after the folder name like so: '{Folder}/**'.
-    _train_path_template = "master/1_projects/{}/{}/train/{}/{}/{}/{}/"
+    #_train_path_template = "master/1_projects/{}/{}/train/{}/{}/{}/{}/"
+    _train_path_template = "{}/{}/{}/train/{}/{}/{}/{}/"
     _in_path_train = ""
     _in_path_inference = ""
     _bronze_path_train = ""
     _silver_path_train = ""
 
-    _inference_path_template = "master/1_projects/{}/{}/inference/{}/{}/{}/{}/{}/"
+    _inference_path_template = "{}/{}/{}/inference/{}/{}/{}/{}/{}/"
     _bronze_path_inference = ""
     _silver_path_inference= ""
 
@@ -1387,6 +1389,7 @@ class ESMLDataset():
       
     def __init__(self,project, inferenceModelVersion, project_folder_name,model_folder_name,ds01_name): 
         self._project = project
+
         self.inferenceModelVersion = inferenceModelVersion
         self.project_folder_name = project_folder_name 
         self.model_folder_name = model_folder_name
@@ -1394,15 +1397,15 @@ class ESMLDataset():
 
         # Lake - physical folders paths
             # IN
-        self._in_path_inference = self._inference_path_template.format(self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",project.dev_test_prod,project.InDateFolder)
-        self._in_path_train = self._train_path_template.format(self.project_folder_name,self.model_folder_name,self.ds_name ,"in",project.dev_test_prod, project.InDateFolder)
+        self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path, self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",project.dev_test_prod,project.InDateFolder)
+        self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in",project.dev_test_prod, project.InDateFolder)
             
             # OUT
-        self._bronze_path_inference = self._inference_path_template.format(self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"out","bronze",project.dev_test_prod)
-        self._silver_path_inference = self._inference_path_template.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion,self.ds_name  , "out","silver",project.dev_test_prod)
+        self._bronze_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"out","bronze",project.dev_test_prod)
+        self._silver_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.inferenceModelVersion,self.ds_name  , "out","silver",project.dev_test_prod)
 
-        self._bronze_path_train = self._train_path_template.format(self.project_folder_name,self.model_folder_name,self.ds_name ,"out", "bronze",project.dev_test_prod)
-        self._silver_path_train = self._train_path_template.format(self.project_folder_name,self.model_folder_name,self.ds_name ,"out", "silver",project.dev_test_prod)
+        self._bronze_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"out", "bronze",project.dev_test_prod)
+        self._silver_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"out", "silver",project.dev_test_prod)
 
 # Get methods
     def get_bronze_version(self,ds_version): 
@@ -1573,22 +1576,22 @@ class ESMLDataset():
     @property
     def InPath(self):
         if(self.inferenceModelVersion >0): 
-            self._in_path_inference = self._inference_path_template.format(self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",self._project.dev_test_prod,self._project.InDateFolder)
+            self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",self._project.dev_test_prod,self._project.InDateFolder)
             return self._in_path_inference
         else:
-            self._in_path_train = self._train_path_template.format(self.project_folder_name,self.model_folder_name,self.ds_name ,"in",self._project.dev_test_prod,self._project.InDateFolder)
+            self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in",self._project.dev_test_prod,self._project.InDateFolder)
             return self._in_path_train
     @property
     def BronzePath(self):
         if(self.inferenceModelVersion >0):
-            self._bronze_path_inference = self._inference_path_template.format(self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"out","bronze",self._project.dev_test_prod)
+            self._bronze_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"out","bronze",self._project.dev_test_prod)
             return self._bronze_path_inference
         else:
             return self._bronze_path_train
     @property
     def SilverPath(self):
         if(self.inferenceModelVersion >0):
-            self._silver_path_inference = self._inference_path_template.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion,self.ds_name ,"out", "silver",self._project.dev_test_prod)
+            self._silver_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.inferenceModelVersion,self.ds_name ,"out", "silver",self._project.dev_test_prod)
             return self._silver_path_inference
         else:
             return self._silver_path_train
