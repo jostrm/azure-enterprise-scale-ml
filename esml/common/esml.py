@@ -430,7 +430,7 @@ class ESMLProject():
         return scored_result
     
     #TODO batch score
-    def batch_score(self,ws, date_folder, unique_folder,specific_file_guid=None,use_spark_compute=False,firstRowOnly=False,inference_model_version=None, reload_config=True, ):
+    def batch_score(self,ws, date_folder, unique_folder,specific_file_guid=None,use_spark_compute=False,firstRowOnly=False,inference_model_version=None, reload_config=True ):
         self.initComputeFactory(ws,reload_config)
        
         if(inference_model_version is not None): # user override, not reading from keyvault

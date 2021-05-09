@@ -212,8 +212,8 @@ class ComputeFactory():
     def batch_score(self, datefolder_or_uniquesubfolder, file_or_filetype="*.parquet" ,firstRowOnly=False):
         # 1) creates a batch-scoring pipeline "if not exists"
             #self.get_or_create_aml_batch_pipeline()
-        # ?2a) scores data, and saves it to lake directly VS
-        # ?2b) scores data, and return PANDAS dataframe
+        # 2a) scores data, and saves it to lake directly VS
+        # Fire and forget VS return "sample" of scoring
         #return df_result,model_version 
         pass
 

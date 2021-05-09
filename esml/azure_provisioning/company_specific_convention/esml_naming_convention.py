@@ -92,8 +92,7 @@ class naming_convention():
                 print(" {}".format(cmn_admin_keyvault))
                 print(" {}".format(cmn_vnet))
                 print(" {}".format(cmn_subnet))
-
-                
+               
                 print("")
                 print("PROJECT SPECIFIC")
                 print("{}".format(rg_project))
@@ -139,6 +138,22 @@ class naming_convention():
 
             print("")
             print ("TENANT level - END")
+
+            print("")
+            print("PE: Private Endpoint example names:")
+            print(" - mlcmn - ")
+            print("esmlcmn-lake-storage-blob-to-vnt-cmn-pe")
+            print("esmlcmn-lake-storage-dfs-to-vnt-cmn-pe")
+            print("esmlcmn-lake-storage-file-to-vnt-cmn-pe")
+            print("esmlcmn-adm-keyvault-to-vnt-cmn-pe")
+            print(" - project - ")
+            print("esmlprj001-aml-to-vnt-cmn-pe")
+            print("esmlproj01-aml-acr-to-vnt-cmn-pe")
+            print("esmlproj01-aml-keyvault-to-vnt-cmn-pe")
+            print("esmlproj01-aml-default-storage-blob-to-vnt-cmn-pe")
+            print("esmlproj01-aml-default-storage-file-to-vnt-cmn-pe")
+            
+            print("")
 
     @property
     def environment_dictionary(self):
