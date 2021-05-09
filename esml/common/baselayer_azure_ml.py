@@ -537,7 +537,7 @@ class ComputeFactory():
         # Can poll for a minimum number of nodes and for a specific timeout.
         # If min_node_count=None is provided, it will use the scale settings for the cluster instead
         cpu_cluster.wait_for_completion(show_output=True, min_node_count=None, timeout_in_minutes=30)
-        return cpu_cluster
+        return cpu_cluster, name
 
 # DELETE
 

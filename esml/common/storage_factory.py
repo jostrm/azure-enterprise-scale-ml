@@ -120,7 +120,9 @@ class LakeAccess():
                                                             account_name=lake_name,
                                                             tenant_id=tenantId,
                                                             client_id=secret_bundle1.value,
-                                                            client_secret=secret_bundle2.value)
+                                                            client_secret=secret_bundle2.value,
+                                                            grant_workspace_access=True,
+                                                            skip_validation=True)
         if(setAsDefault):
             self.ws.set_default_datastore(datastore)
         self.datastore = datastore
@@ -154,7 +156,9 @@ class LakeAccess():
                                                             container_name=container_name,  # = data_store
                                                             account_name=account_name,
                                                             account_key=saKey,
-                                                            create_if_not_exists=False)
+                                                            create_if_not_exists=False,
+                                                            grant_workspace_access=True,
+                                                            skip_validation=True)
         if(setAsDefault):
             self.ws.set_default_datastore(datastore)
         self.datastore = datastore

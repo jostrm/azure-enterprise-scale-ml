@@ -128,6 +128,7 @@ class ESMLProject():
     common_rg_name = ""
     common_vnet_name = ""
     common_subnet_name = ""
+    use_aml_cluster_to_build_images = False
     resource_group = ""
     workspace_name = ""
     location = ""
@@ -224,6 +225,7 @@ class ESMLProject():
         print("-", self.common_rg_name)
         print("-", self.common_vnet_name)
         print("-",self.common_subnet_name)
+        print("-",self.use_aml_cluster_to_build_images)
         
     #Register - at Initiation, and when saving
     def create_dataset_names(self, datasetName):
@@ -331,6 +333,7 @@ class ESMLProject():
         self.common_rg_name = self.env_config['common_rg_name'].format(self.dev_test_prod.upper())
         self.common_vnet_name = self.env_config['common_vnet_name'].format(self.dev_test_prod)
         self.common_subnet_name = self.env_config['common_subnet_name'].format(self.dev_test_prod)
+        self.use_aml_cluster_to_build_images = self.env_config['use_aml_cluster_to_build_images']
 
         self._project_number_XX_or_XXX = self.env_config["project_number_XX_or_XXX"]
         self._projectNoString = self.project_int_to_string()
@@ -382,10 +385,15 @@ class ESMLProject():
         
         if(use_non_model_specific_cluster==True):
             print("Using a non model specific cluster (enterprice policy cluster), yet environment specific")
-            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            compute,name = self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            self.use_compute_cluster_to_build_images(ws, name)
+            return compute
+
         else:
             print("Using a model specific cluster, per configuration in project specific settings, (the integer of 'model_number' is the base for the name)")
-            return self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            compute,name = self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            self.use_compute_cluster_to_build_images(ws, name)
+            return compute
 
     '''
     def get_latest_model(self, ws):
@@ -430,6 +438,14 @@ class ESMLProject():
         scored_result = self._batch_score_aml_pipeline(model_version,date_folder,unique_folder,specific_file_guid,firstRowOnly)
         return scored_result
 
+    def use_compute_cluster_to_build_images(self,ws,name):
+        if(self.use_aml_cluster_to_build_images):
+            print("image_build_compute = {}".format(name))
+            ws.update(image_build_compute = name)
+        else: # To switch back to using ACR to build (if ACR is not in the VNet):
+            ws.update(image_build_compute = '')
+            print("image_build_compute = ACR")
+
     # Returns [service,api_uri, self.kv_aks_api_secret] - the api_secret is stored in your keyvault
     def deploy_automl_model_to_aks(self, model,inference_config, overwrite_endpoint=True,deployment_config=None):
 
@@ -441,6 +457,7 @@ class ESMLProject():
         target_workspace = self.get_other_workspace(self.dev_test_prod)
         self.initComputeFactory(target_workspace)
 
+        self.use_compute_cluster_to_build_images(target_workspace,self.compute_factory.aml_cluster_name)
         if(overwrite_endpoint):
             self.compute_factory.delete_aks_endpoint(target_workspace)
         return self.compute_factory.deploy_online_on_aks(self,model,inference_config, self.dev_test_prod,deployment_config, self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
@@ -648,7 +665,7 @@ class ESMLProject():
     def ScoredPath(self): # TODO: Load LATEST version folder
         return self._inference_scored_path.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion, self.dev_test_prod)
 
-    def get_workspace_from_config(self,cli_auth=None):
+    def get_workspace_from_config(self,cli_auth=None, vNetACR=True):
         try:
             if(cli_auth is None):
                 return Workspace.from_config(path="../../../", _file_name= self.get_workspace_configname())
