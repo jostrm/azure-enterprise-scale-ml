@@ -1,3 +1,7 @@
+## Tip: Use an Azure Data science Virtual Machine, to install the ESML SDK on.
+- You have an easy way of "governance" for onboarding consultants easy - all is preinstalled
+  - You can have AAD login (Virtual Machine Administrator Login or Virtual Machine User Login)
+  - VM inside of vNet already (no point-2-site gateway setup needed, no personal laptops to join to AAD)
 # 1) Install ESML Python SDK that includes Azure ML with AutoML
 - Install MiniConda (>v 4.7), and open the MiniConda command prompt on your computer
   - Windows computer:  [environment_setup/user_dev_env_install/automl_setup.cmd](./environment_setup/user_dev_env_install/automl_setup.cmd)
