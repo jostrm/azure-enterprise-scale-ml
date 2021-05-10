@@ -70,6 +70,7 @@ class LakeAccess():
 
             with open("{}../settings/project_specific/security_config.json".format(user_settings)) as f:
                 self.storage_config = json.load(f)
+            
         except Exception as e:
             print(e)
             print("LakeAccess.ReloadConfiguration - could not open security_config.json ")
@@ -85,15 +86,20 @@ class LakeAccess():
         tenant = self.storage_config['tenant']
         url = self.storage_config['external_keyvault_url']
 
+        sa_name, rg_name, sub_id = self.project.getLakeForActiveEnvironment()
+
         if(self.suppress_logging==False):
             print("GetLakeAsDatastore: ws.name", self.ws.name)
             print("GetLakeAsDatastore: tenant", tenant)
             print("GetLakeAsDatastore: sp_id_key", sp_id_key)
-            print("GetLakeAsDatastore: sp_secret_key", sp_secret_key)
+            #print("GetLakeAsDatastore: sp_secret_key", sp_secret_key)
             print("GetLakeAsDatastore: get_external_keyvault", url)
+            print("GetLakeAsDatastore: sa_name", sa_name)
+            print("GetLakeAsDatastore: rg_name", rg_name)
+            print("GetLakeAsDatastore: sub_id", sub_id)
+
 
         external_kv, tenantId = AzureBase.get_external_keyvault(self.ws, sp_id_key, sp_secret_key, tenant, url)
-        lake_name = self.storage_config['lake_name']
         file_system_name = self.storage_config['lake_fs']
 
         if(self.suppress_logging==False):
@@ -102,7 +108,7 @@ class LakeAccess():
         # 1) API to WRITE
         secret_bundle1 = external_kv.get_secret(self.storage_config['esml-common-sp-id'], "")
         secret_bundle2 = external_kv.get_secret(self.storage_config['esml-common-sp-secret'], "")
-        self.service_client = AzureBase.initialize_storage_account_ad(lake_name, secret_bundle1.value, secret_bundle2.value, tenantId)
+        self.service_client = AzureBase.initialize_storage_account_ad(sa_name, secret_bundle1.value, secret_bundle2.value, tenantId)
         
         try:
             ds = Datastore(self.ws, datastore_name)  # Return if already exists
@@ -114,15 +120,17 @@ class LakeAccess():
             print(ex)
         
         #2 API to READ 
+
         datastore = Datastore.register_azure_data_lake_gen2(workspace=self.ws,
                                                             datastore_name=datastore_name,
                                                             filesystem=file_system_name,
-                                                            account_name=lake_name,
+                                                            account_name=sa_name,
                                                             tenant_id=tenantId,
                                                             client_id=secret_bundle1.value,
                                                             client_secret=secret_bundle2.value,
                                                             grant_workspace_access=True,
-                                                            skip_validation=True)
+                                                            subscription_id=sub_id, 
+                                                            resource_group=rg_name)
         if(setAsDefault):
             self.ws.set_default_datastore(datastore)
         self.datastore = datastore
@@ -142,7 +150,7 @@ class LakeAccess():
         except:
             print("No datastore with name {} exists, creating one...".format(datastore_name))
     
-        account_name = self.storage_config['temp_blob_name']
+        sa_name, rg_name, sub_id = self.project.getLakeForActiveEnvironment()
         container_name = self.storage_config['lake_fs']
 
         #2 Get SECRET from KeyVault - accesst to TEMP storage account
@@ -150,15 +158,18 @@ class LakeAccess():
         temp_blob_secret_key = self.storage_config['temp_blob_secret_key']
         saKey = keyvault.get_secret(name=temp_blob_secret_key)
 
-
+        rg_name = self.project.common_rg_name
+        subscription_id = self.project._subscriptionId
         datastore = Datastore.register_azure_blob_container(workspace=self.ws,
                                                             datastore_name=datastore_name,  # ....usually =  my_blob_name
                                                             container_name=container_name,  # = data_store
-                                                            account_name=account_name,
+                                                            account_name=sa_name,
                                                             account_key=saKey,
                                                             create_if_not_exists=False,
                                                             grant_workspace_access=True,
-                                                            skip_validation=True)
+                                                            skip_validation=True,
+                                                            subscription_id=sub_id, 
+                                                            resource_group=rg_name)
         if(setAsDefault):
             self.ws.set_default_datastore(datastore)
         self.datastore = datastore

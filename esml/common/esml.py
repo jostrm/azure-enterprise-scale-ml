@@ -45,45 +45,6 @@ from collections import defaultdict
 from azureml.core.authentication import ServicePrincipalAuthentication
 import argparse
 
-#sys.path.append(os.path.abspath("."))  # NOQA: E402
-#import repackage
-#repackage.up()
-#from baselayer_python import MultipleMeta
-
-#master/1_projects/project002/03_diabetes_model_reg/train/ds01_diabetes/out/bronze&recursive=true&resource=filesystem'. Server not found.
-#master/1_projects/project002/03_diabetes_model_reg/train/ds01_diabetes/out/bronze/
-#diabetes.parquet
-
-'''
-# Datalake design - convention
-
-## Train model
-1)Data ingestion team: Lands raw in-data, and transform to .parquet in bronze. (Not included in MLOps. Use "Azure data factory / Biztalk / Logic apps".
--  master/1_projects/project002/03_diabetes_model_reg/`train`/ds01_diabetes/`in`/2020/01/01/
-
-2) `Bronze->Silver->Gold`
--  master/1_projects/project002/03_diabetes_model_reg/`train`/ds01_diabetes/out/bronze/
--  master/1_projects/project002/03_diabetes_model_reg/`train`/ds01_diabetes/out/silver/
--  master/1_projects/project002/03_diabetes_model_reg/`train`/gold/
-
-## Inference: Batch scoring
-1) Data ingestion
-- master/1_projects/project002/03_diabetes_model_reg/`inference/1/`ds01_diabetes/in/2020/01/01/
-
-2) `Bronze->Silver->Gold`
-- master/1_projects/project002/03_diabetes_model_reg/`inference/1/`ds01_diabetes/out/bronze/
-- master/1_projects/project002/03_diabetes_model_reg/`inference/1/`ds01_diabetes/out/silver/
-- master/1_projects/project002/03_diabetes_model_reg/`inference/1/`gold/
-
-Notes: Inference ONLINE scoring (AKS)
-- `inference/1/` = Model version
-- inference/1/ds01_diabetes/in/2020/01/01/`17/30/58/00` Can be used for Online AKS scenario - save scoring history on blob storage, down to `millisecond` (ms)
-    - Save individual calls as Guid.parquet in `17/30/58/00` folder
-- Pipeline logic `Bronze->Silver->Gold` = Can be used for Online AKS scenario to process raw input before calling `model.predict()` in the [run(raw_data)] method
-
-'''
-
-#class ESMLProject(metaclass=Singleton):
 class ESMLProject():
     ws = None
     datastore = None
@@ -306,6 +267,20 @@ class ESMLProject():
     def parseEnvConfig(self, env_config):
         self.overrideEnvConfig(env_config['active_dev_test_prod'],env_config) # Sets ACTIVE subscription also
 
+    def getLakeForActiveEnvironment(self):
+        sa_name, rg_name, sub_id = None,None,None
+
+        if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod
+            sa_name = self.dev_sa
+            rg_name = self.env_config['common_rg_name'].format("DEV")
+            sub_id = self.dev_subscription
+        elif (self.lake_storage_accounts > 1): # (dev + test_prod) or (dev,test,prod)
+            sa_name = self.active_sa
+            rg_name = self.common_rg_name
+            sub_id = self._subscriptionId
+
+        return sa_name, rg_name, sub_id
+
     def overrideEnvConfig(self, dev_test_prod_to_activate,env_config): 
         self._dev_test_prod = dev_test_prod_to_activate
         
@@ -340,6 +315,18 @@ class ESMLProject():
 
         convention_order_env_first_rg = self.env_config['convention_project_resource_group_env_first']
         convention_order_env_first_ws = self.env_config['convention_project_workspace_name_env_first']
+        
+        self.lake_storage_accounts = int(self.env_config['lake_storage_accounts'])
+        self.dev_sa = self.env_config['dev_sa']
+        self.test_sa = self.env_config['test_sa']
+        self.prod_sa = self.env_config['prod_sa']
+
+        if(self._dev_test_prod == "dev"):
+            self.active_sa = self.dev_sa
+        elif(self._dev_test_prod == "test"):
+            self.active_sa = self.test_sa
+        elif(self._dev_test_prod == "prod"):
+            self.active_sa = self.prod_sa
 
 #NAMING CONVENTION - ORDER (prj vs ENV)
         if(convention_order_env_first_rg == True):
