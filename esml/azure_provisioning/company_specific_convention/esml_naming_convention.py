@@ -79,16 +79,18 @@ class naming_convention():
             service_azurem_ml_keyvault = self.config["service_azurem_ml_keyvault"].replace("{esmlprj001}", "{}").replace("{dev}", "{}").format(esmlprj001, e)
             service_azurem_ml_storage_account = self.config["service_azurem_ml_storage_account"].replace("{esmlprj001}", "{}").replace("{dev}", "{}").format(esmlprj001, e)
             service_azurem_ml_appliction_insights = self.config["service_azurem_ml_appliction_insights"].replace("{esmlprj001}", "{}").replace("{dev}", "{}").format(esmlprj001, e)
+            #service_container_registry = self.config["service_container_registry"].replace("{esmlprj001}", "{}").replace("{dev}", "{}").format(esmlprj001, e)
             service_datafactory = self.config["service_datafactory"].replace("{esmlprj001}", "{}").replace("{dev}", "{}").format(esmlprj001, e)
+
 
             if(print_output):
                 print("Azure naming convention:")
                 print("")
                 print("ESML COMMON:")
                 print("{}".format(rg_common))
-                print(" {}".format(cmn_storage_account))
+                print(" {}".format(cmn_storage_account)) # saesmlprj02aiweuprod001
                 print(" {}".format(cmn_service_datafactory))
-                print(" {}".format(cmn_keyvault))
+                print(" {}".format(cmn_keyvault)) # kvesmlprj02aiweuprod001
                 print(" {}".format(cmn_admin_keyvault))
                 print(" {}".format(cmn_vnet))
                 print(" {}".format(cmn_subnet))
@@ -99,11 +101,16 @@ class naming_convention():
                 print(" {}".format(service_azurem_ml))
                 print(" {}".format(service_azurem_ml_keyvault))
                 print(" {}".format(service_azurem_ml_storage_account))
-                print(" {}".format(service_azurem_ml_appliction_insights))
+                print(" {}".format(service_azurem_ml_appliction_insights)) # appiesmlprj02aiweuprod001
+                #print(" {}".format(service_container_registry))  # acresmlprj02aiweuprod
                 print(" {}".format(service_datafactory))
                 print(" {}".format(project_subnet))
                 print(" {}".format(project_subnet_dbx_pub))
                 print(" {}".format(project_subnet_dbx_priv))
+
+                #esml-project005-sp
+                #esml-project005-sp-id
+                #esml-esmlprj005-sp-secret
 
             self.env_dict.setdefault(e, []).append(rg_common)
             self.env_dict.setdefault(e, []).append(cmn_service_datafactory)
@@ -137,6 +144,15 @@ class naming_convention():
             print(" Service principle=",project_sp)
 
             print("")
+            # esml-common-sp
+            # esml-common-sp-id
+            # esml-common-sp-secret
+
+            #esml-project005-sp
+            #esml-project005-sp-id
+            #esml-esmlprj005-sp-secret
+            
+            
             print ("TENANT level - END")
 
             print("")
@@ -147,13 +163,15 @@ class naming_convention():
             print("esmlcmn-lake-storage-file-to-vnt-cmn-pe")
             print("esmlcmn-adm-keyvault-to-vnt-cmn-pe")
             print(" - project - ")
-            print("esmlprj001-aml-to-vnt-cmn-pe")
-            print("esmlproj01-aml-acr-to-vnt-cmn-pe")
-            print("esmlproj01-aml-keyvault-to-vnt-cmn-pe")
-            print("esmlproj01-aml-default-storage-blob-to-vnt-cmn-pe")
-            print("esmlproj01-aml-default-storage-file-to-vnt-cmn-pe")
+            print("esmlprj001-aml-to-vnt-cmn-pe") # esmlprj002-aml-to-vnt-cmn-prod-pe
+            print("esmlproj001-aml-acr-to-vnt-cmn-pe")
+            print("esmlproj001-aml-keyvault-to-vnt-cmn-pe")
+            print("esmlproj001-aml-default-storage-blob-to-vnt-cmn-pe")
+            print("esmlproj001-aml-default-storage-file-to-vnt-cmn-pe")
             
-            print("")
+            print(" - DSVM naming eaxmple")
+            print("esmlcmn-dsvm-to-vnt-cmn-001")
+            print("esmlproj001-dsvm-to-vnt-cmn-001")
 
     @property
     def environment_dictionary(self):
