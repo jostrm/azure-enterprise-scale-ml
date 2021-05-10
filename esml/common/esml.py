@@ -267,6 +267,20 @@ class ESMLProject():
     def parseEnvConfig(self, env_config):
         self.overrideEnvConfig(env_config['active_dev_test_prod'],env_config) # Sets ACTIVE subscription also
 
+    def vNetForActiveEnvironment(self):
+        rg_name,vnet_name, subnet_name = None,None,None
+
+        if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod
+            vnet_name = self.env_config['common_vnet_name'].format("dev")
+            rg_name = self.env_config['common_rg_name'].format("dev")
+            subnet_name = self.common_subnet_name
+        elif (self.lake_storage_accounts > 1): # (dev + test_prod) or (dev,test,prod)
+            vnet_name = self.common_vnet_name
+            rg_name = self.common_rg_name
+            subnet_name = self.common_subnet_name
+
+        return rg_name, vnet_name, subnet_name
+        
     def getLakeForActiveEnvironment(self):
         sa_name, rg_name, sub_id = None,None,None
 
@@ -307,7 +321,7 @@ class ESMLProject():
 
         self.common_rg_name = self.env_config['common_rg_name'].format(self.dev_test_prod.upper())
         self.common_vnet_name = self.env_config['common_vnet_name'].format(self.dev_test_prod)
-        self.common_subnet_name = self.env_config['common_subnet_name'].format(self.dev_test_prod)
+        self.common_subnet_name = self.env_config['common_subnet_name']
         self.use_aml_cluster_to_build_images = self.env_config['use_aml_cluster_to_build_images']
 
         self._project_number_XX_or_XXX = self.env_config["project_number_XX_or_XXX"]

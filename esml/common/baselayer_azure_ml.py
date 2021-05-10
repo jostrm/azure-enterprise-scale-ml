@@ -528,10 +528,23 @@ class ComputeFactory():
             print('Found existing cluster {} for project and environment, using it.'.format(name))
         except ComputeTargetException:
             print('Creating new cluster - ' + name)
-            compute_config = AmlCompute.provisioning_configuration(vm_size=self.vm_size,
-                                                                vm_priority=self.vm_prio,  # 'dedicated', 'lowpriority'
-                                                                min_nodes=self.min_nodes,
-                                                                max_nodes=self.vm_maxnodes)
+
+            rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
+
+            if((len(subnet_name) > 0)):
+                compute_config = AmlCompute.provisioning_configuration(vm_size=self.vm_size,
+                                                                        vm_priority=self.vm_prio,  # 'dedicated', 'lowpriority'
+                                                                        min_nodes=self.min_nodes,
+                                                                        max_nodes=self.vm_maxnodes,
+                                                                        vnet_resourcegroup_name=rg_name,
+                                                                        vnet_name=vnet_name,
+                                                                        subnet_name=subnet_name)
+            else:
+                compute_config = AmlCompute.provisioning_configuration(vm_size=self.vm_size,
+                                                                    vm_priority=self.vm_prio,  # 'dedicated', 'lowpriority'
+                                                                    min_nodes=self.min_nodes,
+                                                                    max_nodes=self.vm_maxnodes)
+
             cpu_cluster = ComputeTarget.create(self.ws, name, compute_config)
 
         # Can poll for a minimum number of nodes and for a specific timeout.
