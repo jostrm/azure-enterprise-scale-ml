@@ -5,8 +5,5 @@
     "model_number": 3,
     "model_folder_name": "03_diabetes_model_reg",
     "model_short_alias": "M03",
-    "dataset_folder_names": ["ds01_diabetes","ds02_other"],
-
-    "inference_model_version": "0",
-    "in_folder_date": "2020-01-01 15:35:01.243860"
+    "dataset_folder_names": ["ds01_diabetes","ds02_other"]
 }
