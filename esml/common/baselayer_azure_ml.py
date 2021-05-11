@@ -392,12 +392,21 @@ class ComputeFactory():
                 #aks_target = AksCompute(target_workspace,self.aks_name)
                 
                 print('Creating AKS cluster {} in aks-mode DevTest={}'.format(self.aks_name ,self.aks_dev_test))
+
                 prov_config = AksCompute.provisioning_configuration(
-                        cluster_purpose=self.cluster_purpose, # AksCompute.ClusterPurpose.DEV_TEST
-                        vm_size=self.aks_config['aks_vm_size'],
-                        agent_count=self.aks_config['aks_agent_count'],
-                        location=self.aks_config['location']
-                    )
+                            cluster_purpose=self.cluster_purpose, # AksCompute.ClusterPurpose.DEV_TEST
+                            vm_size=self.aks_config['aks_vm_size'],
+                            agent_count=self.aks_config['aks_agent_count'],
+                            location=self.aks_config['location']
+                        )
+                rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
+                if((len(subnet_name) > 0)):
+                    prov_config.vnet_resourcegroup_name = rg_name
+                    prov_config.vnet_name = vnet_name
+                    prov_config.subnet_name = subnet_name
+                    prov_config.service_cidr = self.aks_config['service_cidr']
+                    prov_config.dns_service_ip = self.aks_config['dns_service_ip']
+                    prov_config.docker_bridge_cidr = self.aks_config['docker_bridge_cidr']
                 
                 prov_config.enable_ssl(leaf_domain_label=self.aks_config['leaf_domain_label'])
                 aks_target = ComputeTarget.create(workspace=target_workspace, name=self.aks_name, provisioning_configuration=prov_config)

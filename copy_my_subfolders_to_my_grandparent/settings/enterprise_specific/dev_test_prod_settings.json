@@ -9,7 +9,7 @@
     
     "common_rg_name": "MSFT-WEU-EAP_CMN_AI-{}-RG",
     "common_vnet_name": "msft-weu-{}-cmnai-vnet",
-    "common_subnet_name": "msft-weu-{}-cmnai-sn-aml",
+    "common_subnet_name": "",
     "use_aml_cluster_to_build_images": true,
 
     "project_number_XX_or_XXX": 2,
