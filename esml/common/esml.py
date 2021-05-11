@@ -74,6 +74,7 @@ class ESMLProject():
     _projectNoString ="00"
     inferenceModelVersion = 0
     _in_folder_date = "2020/01/01"
+    _in_scoring_folder_date = "2020/01/01"
     _rndPhase = False
     _dev_test_prod = "dev"
     _suppress_logging = True
@@ -102,45 +103,19 @@ class ESMLProject():
     demo_mode = True
     multi_output = None
     
-    def __init__(self,inFolderDate=None, projectNumber=None,inferenceModelVersion=None,modelShortAliasPrefix=None, *datasetFolderNames):  # **datasetNameKey_PathValue
-
-        if(inFolderDate is not None and inFolderDate == False):
-            self.demo_mode = False
-            return # Empty constructor, dont init anything
+    def __init__(self, dev_test_prod=None):
+        self.demo_mode = False # dont change this
         
-        if(inFolderDate is not None and inFolderDate == True):
-            self.demo_mode = True
+        if(dev_test_prod is not None): # Override config with esml_environment parameter (for MLOps)
+            if (dev_test_prod in ["dev","test","prod"]):
+                self.ReloadConfiguration() # from config
+                self.dev_test_prod = dev_test_prod # overrides config
+                self.initDatasets(self.inferenceModelVersion, self.project_folder_name,self.model_folder_name,self.dataset_folder_names) 
+            else:
+                raise Exception("dev_test_prod parameter, must be either [dev,test,prod]")
+        else: # Load from config
             self.ReloadConfiguration()
             self.initDatasets(self.inferenceModelVersion, self.project_folder_name,self.model_folder_name,self.dataset_folder_names)
-            return # Empty constructor, dont init anything
-
-        if(inFolderDate is None): # 0 parameters: Read from 3 config internally
-            self.demo_mode = False
-            self.ReloadConfiguration()
-        elif(self.is_json(inFolderDate) and self.is_json(projectNumber) and self.is_json(projectNumber)): # 3 JSON config is provided
-            self.parseConfig(inFolderDate)
-            self.parseEnvConfig(projectNumber)
-            self.security_config = inferenceModelVersion
-        else: # LOAD config AND overwirte (since Non empty constructor least 1 parameter 'inFolderDate' and it should be a DATETIME)
-            self.demo_mode = False
-            self.ReloadConfiguration() #1) Load config file - project specific & model (1-to-1) TODO: 1-M models in same project
-            if type(inFolderDate) is not datetime.datetime:
-                raise TypeError('arg must be a datetime.date, not a %s' % type(inFolderDate))
-            self._in_folder_date = inFolderDate.strftime('%Y/%m/%d') # inFolderDate.strftime('%Y-%m-%d_%H-%M-%S')
-
-            # Overwride SETTINGS "lake_settings.json", with arguments!=None
-            if(inferenceModelVersion is not None):
-                self.inferenceModelVersion = int(inferenceModelVersion)
-            if(modelShortAliasPrefix is not None):
-                self._model_short_alias = modelShortAliasPrefix
-
-            self.projectNumberToFoldername(projectNumber)
-
-            if(datasetFolderNames and len(datasetFolderNames)>0):
-                self.dataset_folder_names= datasetFolderNames
-
-        # Gets args set to from ReloadConfiguration() OR via constructor, who overwrites
-        self.initDatasets(self.inferenceModelVersion, self.project_folder_name,self.model_folder_name,self.dataset_folder_names)
 
     def project_int_to_string(self):
         self._projectNoXXX= '{0:03}'.format(self.projectNumber)
@@ -209,12 +184,10 @@ class ESMLProject():
 
             old_loc = os.getcwd()
             os.chdir(os.path.dirname(__file__))
-            
-            user_settings = ""
-            if(self.demo_mode == False):
-                user_settings = "../../"
-            
+
+            user_settings = "../../"
             lake_settings_path = "{}../settings/project_specific/model/lake_settings.json".format(user_settings)
+
             with open(lake_settings_path) as f: # Project number:  "project002", Model prefix "M03", "03"
                 self.parseConfig(json.load(f))
             with open("{}../settings/active_dev_test_prod.json".format(user_settings)) as f2: # Enterprise: MSFT-WEU-EAP_PROJECT{}_AI-{}-RG
@@ -225,6 +198,13 @@ class ESMLProject():
                 self.parseEnvConfig(all_env)
             with open("{}../settings/project_specific/security_config.json".format(user_settings)) as f2: # Project service principles, etc
                 self.security_config = json.load(f2)
+
+            with open("{}../settings/project_specific/model/date_in_folder.json".format(user_settings)) as f2: # where to read data to train on
+                json_date_in_folder = json.load(f2)
+            with open("{}../settings/project_specific/model/date_scoring_folder.json".format(user_settings)) as f2: # where to read data to score
+                json_date_scoring_folder = json.load(f2)
+
+            self.parseDateFolderConfig(json_date_in_folder,json_date_scoring_folder)
              
         except Exception as e:
             raise Exception("ESML ReloadConfiguration - could not load SETTINGS from {} ".format(lake_settings_path)) from e
@@ -256,13 +236,18 @@ class ESMLProject():
         self._modelNrString = self.model_int_to_string()
         self.model_folder_name = self.lake_config['model_folder_name'] #2_prod/1_projects/project005/00_titanic_model/train/ds01_titanic/out/bronze/
         self.dataset_folder_names = self.lake_config['dataset_folder_names'] 
-        self.inferenceModelVersion = int(self.lake_config['inference_model_version'])
         self._model_short_alias = self.lake_config['model_short_alias']
         self._model_number = self.lake_config['model_number']
- 
-        date_string = self.lake_config["in_folder_date"] # String in DateTime format
+
+    def parseDateFolderConfig(self, date_in_folder, scoring):
+        date_string = date_in_folder["in_folder_date"] # String in DateTime format
         date_infolder = datetime.datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S.%f') # DateTime
         self._in_folder_date = date_infolder.strftime('%Y/%m/%d') #  String 2020/01/01
+
+        date_str = scoring["scoring_folder_date"] # String in DateTime format
+        date_scoring_folder = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f') # DateTime
+        self._in_scoring_folder_date = date_infolder.strftime('%Y/%m/%d') #  String 2020/01/01
+        self.inferenceModelVersion = int(scoring['inference_model_version'])
 
     def parseEnvConfig(self, env_config):
         self.overrideEnvConfig(env_config['active_dev_test_prod'],env_config) # Sets ACTIVE subscription also
@@ -1355,14 +1340,10 @@ class ESMLProject():
         args = parser.parse_args()
         esml_environment = args.esml_environment
 
-        p = ESMLProject(False)
+        p = None
         if(esml_environment is not None):
-            #print("The Azure Devops variable 'esml_environment ' (dev, test or prod) is set to: {}".format(esml_environment))
-            #print("- Alt A (used in this DEMO): You can use this Azure Devops variable to set 'ESMProject.dev_test_prod = args.esml_environment', in a pipeline dynamically")
-            p.ReloadConfiguration() # fro config
-            p.dev_test_prod = esml_environment # overrides concig
-            p.initDatasets(p.inferenceModelVersion, p.project_folder_name,p.model_folder_name,p.dataset_folder_names) # init
-            #print("- Alt B: Or use 3 branches in GIT (DEV, TEST, PROD) with ESML static setting as 'active_dev_test_prod: dev' for DEV branch")
+            print("The argparse (Azure Devops) variable 'esml_environment ' (dev, test or prod) is set to: {}".format(esml_environment))
+            p = ESMLProject(esml_environment)
         else:
             p = ESMLProject()
             print("args.esml_environment is None. Reading environment from config-files")
