@@ -1227,8 +1227,3 @@ class azure_metric_regression():
     #MAPE = "mean_absolute_percentage_error"  # Not supported in AutoML training
     #R2oob = "explained_variance"
     #Recall = "recall"
-
-
-
-
-
