@@ -62,6 +62,9 @@ class ESMLProject():
     dataset_folder_names = None
     dataset_list = []
     _proj_start_path = "projects" # = v4  (v3= master/1_projects )
+    _project_train_path = _proj_start_path+"/{}/{}/train/"
+    _project_inference_path = _proj_start_path+"/{}/{}/inference/"
+
     _train_gold_path = _proj_start_path+"/{}/{}/train/gold/{}/"
     _inference_gold_path = _proj_start_path+"/{}/{}/inference/{}/gold/{}/"
     _inference_scored_path = _proj_start_path+"/{}/{}/inference/{}/scored/{}/" # TODO: Scoring after batch
@@ -199,9 +202,9 @@ class ESMLProject():
             with open("{}../settings/project_specific/security_config.json".format(user_settings)) as f2: # Project service principles, etc
                 self.security_config = json.load(f2)
 
-            with open("{}../settings/project_specific/model/date_in_folder.json".format(user_settings)) as f2: # where to read data to train on
+            with open("{}../settings/project_specific/model/active/active_in_folder.json".format(user_settings)) as f2: # where to read data to train on
                 json_date_in_folder = json.load(f2)
-            with open("{}../settings/project_specific/model/date_scoring_folder.json".format(user_settings)) as f2: # where to read data to score
+            with open("{}../settings/project_specific/model/active/active_scoring_in_folder.json".format(user_settings)) as f2: # where to read data to score
                 json_date_scoring_folder = json.load(f2)
 
             self.parseDateFolderConfig(json_date_in_folder,json_date_scoring_folder)
@@ -240,14 +243,74 @@ class ESMLProject():
         self._model_number = self.lake_config['model_number']
 
     def parseDateFolderConfig(self, date_in_folder, scoring):
-        date_string = date_in_folder["in_folder_date"] # String in DateTime format
+        date_string = date_in_folder["{}_in_folder_date".format(self.dev_test_prod)] # String in DateTime format
         date_infolder = datetime.datetime.strptime(date_string, '%Y-%m-%d %H:%M:%S.%f') # DateTime
         self._in_folder_date = date_infolder.strftime('%Y/%m/%d') #  String 2020/01/01
 
-        date_str = scoring["scoring_folder_date"] # String in DateTime format
+        date_str = scoring["{}_scoring_folder_date".format(self.dev_test_prod)] # String in DateTime format
         date_scoring_folder = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f') # DateTime
-        self._in_scoring_folder_date = date_infolder.strftime('%Y/%m/%d') #  String 2020/01/01
-        self.inferenceModelVersion = int(scoring['inference_model_version'])
+        self._in_scoring_folder_date = date_scoring_folder.strftime('%Y/%m/%d') #  String 2020/01/01
+        self.inferenceModelVersion = int(scoring['{}_inference_model_version'.format(self.dev_test_prod)])
+
+    def checkLakeCompatability(self):
+        try:
+            lake_paths = [(self.Lakestore, "active")]
+            ds_train_json = Dataset.Tabular.from_json_lines_files(lake_paths, validate=False, include_path=False, set_column_types=None, partition_format=None, invalid_lines='error', encoding='utf8')
+            df = ds_train_json.to_pandas_dataframe()
+
+            df_version = df.iloc[0]["lake_design_version"]
+            df_name = df.iloc[0]["lake_name"]
+
+            if (df_version!= self.lake_design_version): 
+                print("ESML WARNING - Possible incompatible datalake design:"\
+                    "lake_design_version={} in ESML SDK, but lake_design_version={} in storage account, at 'container/active/esml_lake_version.json'".format(self.lake_design_version,df_version))
+            if (df_name!= self.lake_name): 
+                print("ESML WARNING - Possible incompatible datalake desgin:"\
+                    "lake_name={} in ESML SDK, but lake_name={} in storage account, at 'container/active/esml_lake_version.json'".format(self.lake_name,df_name))
+        except Exception as e:
+            raise UserErrorException("Could not Check ESML DataLake Compatability") from e
+
+    def readActiveDatesFromLake(self):
+        train_conf = self._project_train_path.format(self.project_folder_name,self.model_folder_name) + "active" # = _proj_start_path+"/{}/{}/train/"
+        inf_conf = self._project_inference_path.format(self.project_folder_name,self.model_folder_name) + "active"  # = _proj_start_path+"/{}/{}/inference/"
+        train_paths = [(self.Lakestore, train_conf)]
+        inf_paths = [(self.Lakestore, inf_conf)]
+
+        try:
+            old_loc = os.getcwd()
+            os.chdir(os.path.dirname(__file__))
+
+            # JSON directly? Naae..jsonlines is not JSON
+            #ds_train_json = Dataset.Tabular.from_json_lines_files(train_paths, validate=False, include_path=False, set_column_types=None, partition_format=None, invalid_lines='error', encoding='utf8')
+            #df = ds_train_json.to_pandas_dataframe()
+            #print(df.head())
+
+            print("Searching for setting in ESML datalake...")
+            # 1 - Train (Overwrite local json files)
+            save_train = "../../../settings/project_specific/model/active" # active_in_folder.json"
+            ds1 = Dataset.File.from_files(path=train_paths,validate=False)
+            train_file = ds1.download(target_path=save_train, overwrite=True)
+
+            # 2 - Inference (ovverwrite local json)
+            save_inf = "../../../settings/project_specific/model/active" #active_scoring_in_folder.json"
+            ds2 = Dataset.File.from_files(path=inf_paths,validate=False)
+            inf_file = ds2.download(target_path=save_inf, overwrite=True)
+
+            # Load from FILE again 
+            print("ESML in-folder settings override = TRUE \n - Found settings in the ESML AutoLake  [active_in_folder.json,active_scoring_in_folder.json], to override ArgParse/GIT config with.")
+            with open("../../../settings/project_specific/model/active/active_in_folder.json") as f2: # where to read data to train on
+                json_date_in_folder = json.load(f2)
+            with open("../../../settings/project_specific/model/active/active_scoring_in_folder.json") as f2: # where to read data to score
+                json_date_scoring_folder = json.load(f2)
+
+            self.parseDateFolderConfig(json_date_in_folder,json_date_scoring_folder)
+            print (" - TRAIN in date: ", self._in_folder_date)
+            print (" - INFERENCE in date: {} and ModelVersion to score with: {}{}".format(self._in_scoring_folder_date,self.inferenceModelVersion, " (0=latest)"))
+           
+        except Exception as e:
+            print("ESML in-folder settings override = FALSE. [active_in_folder.json,active_scoring_in_folder.json] not found. \n - Using [active_in_folder.json,active_scoring_in_folder.json] from ArgParse or GIT. No override from datalake settings")
+        finally:
+            os.chdir(old_loc) # Switch back to callers "working dir"
 
     def parseEnvConfig(self, env_config):
         self.overrideEnvConfig(env_config['active_dev_test_prod'],env_config) # Sets ACTIVE subscription also
@@ -1169,7 +1232,7 @@ class ESMLProject():
 
     def automap_and_register_aml_datasets(self, ws, dataset_name = "", dataset_description_in=""):
         self.ws = ws
-        
+
         temp_folder = './common/temp_data/{}/'.format(self.project_folder_name)
         #print("Cleaning local temp for project at: {}".format(temp_folder))
         ESMLProject.clean_temp(self.project_folder_name)
@@ -1178,8 +1241,11 @@ class ESMLProject():
         if(self._suppress_logging == False):
             print("Register ES-ML Datastore...")
         lakestore = self.set_lake_as_datastore(ws)
-        if(self._suppress_logging == False):
-            print("Register Datasets....")
+        self.readActiveDatesFromLake()
+        self.checkLakeCompatability()
+
+        print("")
+        print("Load data as Datasets....")
 
         exists_dictionary = defaultdict(list)
         # VERISONS samename  "ds01_diabetes". Specify `create_new_version=True` to register the dataset as a new version. 
