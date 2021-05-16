@@ -309,6 +309,7 @@ class ESMLProject():
            
         except Exception as e:
             print("ESML in-folder settings override = FALSE. [active_in_folder.json,active_scoring_in_folder.json] not found. \n - Using [active_in_folder.json,active_scoring_in_folder.json] from ArgParse or GIT. No override from datalake settings")
+            print(e.message)
         finally:
             os.chdir(old_loc) # Switch back to callers "working dir"
 
