@@ -93,6 +93,7 @@ class ESMLProject():
     common_rg_name = ""
     common_vnet_name = ""
     common_subnet_name = ""
+    active_common_subnet_name = ""
     use_aml_cluster_to_build_images = False
     resource_group = ""
     workspace_name = ""
@@ -163,7 +164,7 @@ class ESMLProject():
         print("-",self.location)
         print("-", self.common_rg_name)
         print("-", self.common_vnet_name)
-        print("-",self.common_subnet_name)
+        print("-",self.active_common_subnet_name)
         print("-",self.use_aml_cluster_to_build_images)
         
     #Register - at Initiation, and when saving
@@ -322,11 +323,11 @@ class ESMLProject():
         if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod
             vnet_name = self.env_config['common_vnet_name'].format("dev")
             rg_name = self.env_config['common_rg_name'].format("dev")
-            subnet_name = self.common_subnet_name
+            subnet_name = self.active_common_subnet_name
         elif (self.lake_storage_accounts > 1): # (dev + test_prod) or (dev,test,prod)
             vnet_name = self.common_vnet_name
             rg_name = self.common_rg_name
-            subnet_name = self.common_subnet_name
+            subnet_name = self.active_common_subnet_name
 
         return rg_name, vnet_name, subnet_name
         
@@ -370,7 +371,14 @@ class ESMLProject():
 
         self.common_rg_name = self.env_config['common_rg_name'].format(self.dev_test_prod.upper())
         self.common_vnet_name = self.env_config['common_vnet_name'].format(self.dev_test_prod)
-        self.common_subnet_name = self.env_config['common_subnet_name']
+        self.common_subnet_name = self.env_config['dev_common_subnet_name']
+
+        if((len(self.common_subnet_name) > 0)): # At least DEV is set
+            if ("{}" in self.common_subnet_name):
+                self.active_common_subnet_name = self.common_subnet_name.format(self.dev_test_prod)
+            else:
+                self.active_common_subnet_name = self.common_subnet_name
+        
         self.use_aml_cluster_to_build_images = self.env_config['use_aml_cluster_to_build_images']
 
         self._project_number_XX_or_XXX = self.env_config["project_number_XX_or_XXX"]

@@ -84,7 +84,7 @@ class LakeAccess():
         sp_id_key = self.storage_config['kv-secret-esml-projectXXX-sp-id']
         sp_secret_key = self.storage_config['kv-secret-esml-projectXXX-sp-secret']
         tenant = self.storage_config['tenant']
-        url = self.storage_config['external_keyvault_url']
+        url = self.storage_config['external_keyvault_url'].format(self.project.dev_test_prod)
 
         sa_name, rg_name, sub_id = self.project.getLakeForActiveEnvironment()
 
