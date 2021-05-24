@@ -88,7 +88,7 @@ class LakeAccess():
 
         sa_name, rg_name, sub_id = self.project.getLakeForActiveEnvironment()
 
-        if(self.suppress_logging==False):
+        if(self.project.verbose_logging == True):
             print("GetLakeAsDatastore: ws.name", self.ws.name)
             print("GetLakeAsDatastore: tenant", tenant)
             print("GetLakeAsDatastore: sp_id_key", sp_id_key)

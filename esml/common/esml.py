@@ -81,6 +81,7 @@ class ESMLProject():
     _rndPhase = False
     _dev_test_prod = "dev"
     _suppress_logging = True
+    _verbose_logging = False
     #_in_folder_date_string='2000-01-01 15:35:01.243860'
 
     tenant = ""
@@ -163,9 +164,11 @@ class ESMLProject():
         
         print("-",self.location)
         print("-", self.common_rg_name)
-        print("-", self.common_vnet_name)
-        print("-",self.active_common_subnet_name)
-        print("-",self.use_aml_cluster_to_build_images)
+
+        rg_name, vnet_name, subnet_name = self.vNetForActiveEnvironment()
+        print("Active vNet:", vnet_name)
+        print("Active SubNet -",subnet_name)
+        print("AML for docker:",self.use_aml_cluster_to_build_images)
         
     #Register - at Initiation, and when saving
     def create_dataset_names(self, datasetName):
@@ -583,6 +586,14 @@ class ESMLProject():
             self.dev_test_prod = current_env
 
         return other_ws
+
+    @property
+    def verbose_logging(self):
+        return self._verbose_logging
+
+    @verbose_logging.setter
+    def verbose_logging(self, enable_verbose_logging):
+        self._verbose_logging = enable_verbose_logging
 
     @property
     def ComputeFactory(self):

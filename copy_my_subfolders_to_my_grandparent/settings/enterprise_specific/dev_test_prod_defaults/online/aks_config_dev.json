@@ -22,11 +22,11 @@
   "ssl_cert_pem_file": "",
   "ssl_key_pem_file": "",
   "ssl_cname": "",
-  "leaf_domain_label": "esmlcmn",
-  "service_cidr": "10.0.0.0/21",
-  "dns_service_ip": "10.0.0.10",
+  "leaf_domain_label": "esmlcmndev",
+  "service_cidr": "10.50.0.0/21",
+  "dns_service_ip": "10.50.0.10",
   "docker_bridge_cidr":"172.17.0.1/16",
-  
+    
   "collect_model_data": false,
   "key_auth_enabled": true,
   "token_auth_enabled": false,
