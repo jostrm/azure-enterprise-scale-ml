@@ -355,11 +355,11 @@ class ESMLProject():
                 self.active_common_subnet_name = self.common_subnet_name.format(self.dev_test_prod)
             else:
                 if (self.dev_test_prod == "dev"):
-                    self.active_common_subnet_name = self.dev_common_subnet_name
+                    self.active_common_subnet_name = self.env_config['dev_common_subnet_name'] 
                 elif (self.dev_test_prod == "test"):
-                    self.active_common_subnet_name = self.test_common_subnet_name
+                    self.active_common_subnet_name = self.env_config['test_common_subnet_name'] 
                 elif (self.dev_test_prod == "prod"):
-                    self.active_common_subnet_name = self.prod_common_subnet_name
+                    self.active_common_subnet_name = self.env_config['prod_common_subnet_name'] 
 
     def overrideEnvConfig(self, dev_test_prod_to_activate,env_config): 
         self._dev_test_prod = dev_test_prod_to_activate
