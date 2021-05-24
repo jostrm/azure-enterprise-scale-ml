@@ -324,7 +324,7 @@ class ESMLProject():
         rg_name,vnet_name, subnet_name = None,None,None
         self.set_active_common_subnet_name()
 
-        if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod
+        if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod. 
             vnet_name = self.env_config['common_vnet_name'].format("dev")
             rg_name = self.env_config['common_rg_name'].format("dev")
             subnet_name = self.active_common_subnet_name
