@@ -322,7 +322,7 @@ class ESMLProject():
 
     def vNetForActiveEnvironment(self):
         rg_name,vnet_name, subnet_name = None,None,None
-        self.self.set_active_common_subnet_name()
+        self.set_active_common_subnet_name()
 
         if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod
             vnet_name = self.env_config['common_vnet_name'].format("dev")
@@ -350,7 +350,7 @@ class ESMLProject():
         return sa_name, rg_name, sub_id
 
     def set_active_common_subnet_name(self):
-        if((len(self.common_subnet_name) > 0)): # At least DEV is set
+        if((len(self.common_subnet_name) > 0)): # At least DEV is set.
             if ("{}" in self.common_subnet_name): # by convention
                 self.active_common_subnet_name = self.common_subnet_name.format(self.dev_test_prod)
             else:
