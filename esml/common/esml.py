@@ -205,6 +205,7 @@ class ESMLProject():
                 self.parseEnvConfig(all_env)
             with open("{}../settings/project_specific/security_config.json".format(user_settings)) as f2: # Project service principles, etc
                 self.security_config = json.load(f2)
+                self.lake_name = self.security_config["lake_fs"]
 
             with open("{}../settings/project_specific/model/active/active_in_folder.json".format(user_settings)) as f2: # where to read data to train on
                 json_date_in_folder = json.load(f2)
@@ -382,7 +383,6 @@ class ESMLProject():
         elif(self._dev_test_prod == "prod"):
             self._subscriptionId = self.prod_subscription
 
-        self.lake_name = self.env_config['lake_name']
         self.lake_design_version = self.env_config['lake_design_version']
 
         self.common_rg_name = self.env_config['common_rg_name'].format(self.dev_test_prod.upper())
