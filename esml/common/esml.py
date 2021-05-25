@@ -271,7 +271,7 @@ class ESMLProject():
             except Exception as e1:
                 print("Error: checkLakeCompatability, lake_paths: " + lake_paths)
                 print("Error: checkLakeCompatability, to_pandas_dataframe() failed, from JSON: " + ds_train_json)
-                raise UserErrorException("Could not Check ESML DataLake Compatability") from e1
+                raise e1
 
             df_version = df.iloc[0]["lake_design_version"]
             df_name = df.iloc[0]["lake_name"]
