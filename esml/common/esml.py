@@ -265,7 +265,13 @@ class ESMLProject():
         try:
             lake_paths = [(self.Lakestore, "active")]
             ds_train_json = Dataset.Tabular.from_json_lines_files(lake_paths, validate=False, include_path=False, set_column_types=None, partition_format=None, invalid_lines='error', encoding='utf8')
-            df = ds_train_json.to_pandas_dataframe()
+            
+            try:
+                df = ds_train_json.to_pandas_dataframe()
+            except Exception as e1:
+                print("Error: checkLakeCompatability, lake_paths: " + lake_paths)
+                print("Error: checkLakeCompatability, to_pandas_dataframe() failed, from JSON: " + ds_train_json)
+                raise UserErrorException("Could not Check ESML DataLake Compatability") from e1
 
             df_version = df.iloc[0]["lake_design_version"]
             df_name = df.iloc[0]["lake_name"]
