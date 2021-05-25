@@ -167,7 +167,11 @@ class ESMLProject():
 
         rg_name, vnet_name, subnet_name = self.vNetForActiveEnvironment()
         print("Active vNet:", vnet_name)
-        print("Active SubNet -",subnet_name)
+        print("Active SubNet:",subnet_name)
+
+        sa_name, rg_name, sub_id = self.getLakeForActiveEnvironment()
+        print("Active Lake (storage account) ",sa_name)
+
         print("AML for docker:",self.use_aml_cluster_to_build_images)
         
     #Register - at Initiation, and when saving
