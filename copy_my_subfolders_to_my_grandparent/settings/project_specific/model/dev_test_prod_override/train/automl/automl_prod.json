@@ -4,7 +4,7 @@
     "enable_stack_ensemble":true,
     "model_explainability":true,
     "experiment_timeout_hours":192,
-    "iteration_timeout_minutes":43200,
+    "iteration_timeout_minutes":1152,
     "n_cross_validations": 9,
     "iterations": 1000,
     "enable_early_stopping":true,

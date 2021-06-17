@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from math import sqrt
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score,recall_score,average_precision_score,f1_score,roc_auc_score,accuracy_score,roc_curve,confusion_matrix
 import matplotlib.pyplot as plt
 
 def APE(actual, pred):
@@ -60,4 +60,32 @@ def get_4_regression_metrics(test_set, label,fitted_model):
     plt.title("R^2={}".format(r2))
 
     return rmse, r2, mean_abs_percent_error,accuracy,plt
+
+
+def get_7_classification_metrics(test_set, label,fitted_model):
+    X_test = test_set # X_test
+    y_test = X_test.pop(label).to_frame() # y_test (true labels)
+    y_predict = fitted_model.predict(X_test) # y_predict (predicted labels)
+    y_predict_proba = fitted_model.predict_proba(X_test) # y_predict (predicted probabilities)
+
+    predict_proba = y_predict_proba[:, 1] # Positive values only
+    auc = roc_auc_score(y_test, predict_proba)
+    fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
+    
+    accuracy, precision, recall, f1, matrix = \
+    accuracy_score(y_test, y_predict),\
+    average_precision_score(y_test, y_predict),\
+    recall_score(y_test, y_predict),\
+    f1_score(y_test,y_predict), \
+    confusion_matrix(y_test, y_predict)
+
+    plt.plot(fpr, tpr, color='blue', label='AUC='+str(auc))
+    plt.plot([0, 1], [0, 1], color='darkblue', linestyle='--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend()
+    #plt.show()
+    
+    return auc,accuracy,f1, precision,recall,matrix, plt
 

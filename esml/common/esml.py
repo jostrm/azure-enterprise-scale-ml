@@ -27,10 +27,9 @@ import json
 import sys
 import os
 import math
-from typing import SupportsComplex
 from azureml.core.dataset import Dataset 
 from azureml.core import Workspace
-from azureml.core import Datastore
+from azureml.core.model import Model
 from azureml.exceptions import UserErrorException
 from azureml.exceptions import ProjectSystemException
 from storage_factory import LakeAccess
@@ -44,18 +43,23 @@ import shutil
 from collections import defaultdict
 from azureml.core.authentication import ServicePrincipalAuthentication
 import argparse
+from azureml.train.automl.exceptions import NotFoundException
 
 class ESMLProject():
     ws = None
     datastore = None
     lake_config = None
     env_config = None
+    _inference_mode = False
+    _best_model = None
     
     _gold_dataset = None
     _gold_train = None
     _gold_validate = None
     _gold_test = None
     _gold_scored = None
+    _gold_to_score = None
+    dataset_inference_suffix = "_TO_SCORE"
         
     project_folder_name = "project"
     model_folder_name = "kalle"
@@ -78,6 +82,7 @@ class ESMLProject():
     inferenceModelVersion = 0
     _in_folder_date = "2020/01/01"
     _in_scoring_folder_date = "2020/01/01"
+    date_scoring_folder = None # Datetime
     _rndPhase = False
     _dev_test_prod = "dev"
     _suppress_logging = True
@@ -103,24 +108,53 @@ class ESMLProject():
     lake_access = None # Singelton
     _recreate_datastore = False
     override_enterprise_settings_with_model_specific = False
-    compute_factory = None
+    _compute_factory = None
     automl_factory = None
     demo_mode = True
     multi_output = None
+    inference_use_top_version = True
     
-    def __init__(self, dev_test_prod=None):
+    # , param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None
+    def __init__(self, dev_test_prod=None, param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None):
         self.demo_mode = False # dont change this
         
-        if(dev_test_prod is not None): # Override config with esml_environment parameter (for MLOps)
+        if(dev_test_prod is not None and ((param_train_in_folder_date is not None) or (param_scoring_folder_date is not None))): # Scenario 01: SCORING or RETRAINING pipeline
+            if (dev_test_prod in ["dev","test","prod"]):
+                self.ReloadConfiguration() # from config (config from LAKE -> JSONLINES)
+
+                #1) Override JSONLINES & update date_time_folders
+                self.update_json_files(dev_test_prod,param_inference_model_version,param_scoring_folder_date,param_train_in_folder_date) # A only update/override .jsonlines
+                
+                #3) set ENV and init Datasets
+                self.initDatasets(self.inferenceModelVersion, self.project_folder_name,self.model_folder_name,self.dataset_folder_names) 
+            else:
+                raise Exception("dev_test_prod parameter, must be either [dev,test,prod]")    
+        elif(dev_test_prod is not None): # Scenario 02: MLOps from Azure Devops "GIT checkin" scenario -> retrain with same "data" (same "date_folders" as datalake config.
             if (dev_test_prod in ["dev","test","prod"]):
                 self.ReloadConfiguration() # from config
                 self.dev_test_prod = dev_test_prod # overrides config
                 self.initDatasets(self.inferenceModelVersion, self.project_folder_name,self.model_folder_name,self.dataset_folder_names) 
             else:
                 raise Exception("dev_test_prod parameter, must be either [dev,test,prod]")
-        else: # Load from config
+        else: # Scenario 03: Manual - just load "as-is" in configuration
             self.ReloadConfiguration()
             self.initDatasets(self.inferenceModelVersion, self.project_folder_name,self.model_folder_name,self.dataset_folder_names)
+
+        self.set_inference_mode_and_version(self.inferenceModelVersion) # Mode: Inference  (model_version>0) VS Training (model_version<0)
+
+    # Mode: Inference  (model_version>0) VS Training (model_version<0) 
+    def set_inference_mode_and_version(self,param_inference_model_version):
+        if(param_inference_model_version is None):
+            self.inference_mode = False
+        else:
+            self.inferenceModelVersion = int(param_inference_model_version)
+            if (self.inferenceModelVersion <0):
+                self.inference_mode = False
+            elif(self.inferenceModelVersion == 0): # Use highest model_version
+                self.inference_mode = True
+                self.inference_use_top_version = True
+            else: 
+                self.inference_mode = True
 
     def project_int_to_string(self):
         self._projectNoXXX= '{0:03}'.format(self.projectNumber)
@@ -151,12 +185,40 @@ class ESMLProject():
             print(d.InPath)
             print(d.BronzePath)
             print(d.SilverPath)
+            #print(d.InPath_Scoring)
 
-        print("Training GOLD \n")
+        print(" \n")
+        print("Training GOLD (p.GoldPath)")
         print(self.GoldPath)
         print(" \n")
+        
+        to_score_folder, scored_folder, date_folder = self.get_gold_scored_unique_path()
+        print("[A) USAGE]: to_score_folder, scored_folder, date_folder = p.get_gold_scored_unique_path()")
 
-        print("ENVIRONMENT - DEV, TEST, or PROD?")
+        print("A)INFERENCE ONLINE: GOLD to score (example if realtime - today)")
+        print(to_score_folder)
+        print(" \n")
+        print("A)INFERENCE ONLINE: GOLD scored (example if realtime today)")
+        print(scored_folder)
+        print(" \n")
+
+        print("[B) USAGE]: to_score_folder_batch, scored_folder, date_folder = p.get_gold_scored_unique_path(p.date_scoring_folder)")
+        to_score_folder_batch, scored_folder, date_folder = self.get_gold_scored_unique_path(self.date_scoring_folder)
+
+        print("B)INFERENCE BATCH: GOLD to score (example batch, datetime from config)")
+        print(to_score_folder_batch) # + self.date_scoring_folder.strftime('%Y_%m_%d') + '/')
+        print(" \n")
+        print("B)INFERENCE BATCH: GOLD scored (example batch, datetime from config)")
+        print(scored_folder) 
+        print(" \n")
+
+        print("C) INFERENCE BATCH (SCENARIO 2): TODAY I scored data from X days AGO  (second datefolder from config - X days ago)")
+        print(to_score_folder_batch + self.date_scoring_folder.strftime('%Y_%m_%d') + '/')
+        print(scored_folder + self.date_scoring_folder.strftime('%Y_%m_%d') + '/')
+         
+        print(" \n") 
+ 
+        print("ENVIRONMENT - DEV, TEST, or PROD?  [USAGE: p.dev_test_prod]")
         print("ACTIVE ENVIRONMENT = {}".format(self.dev_test_prod))
         print("ACTIVE subscription = {}".format(self.subscription_id))
         print("-",self.resource_group)
@@ -168,17 +230,25 @@ class ESMLProject():
         rg_name, vnet_name, subnet_name = self.vNetForActiveEnvironment()
         print("Active vNet:", vnet_name)
         print("Active SubNet:",subnet_name)
+        print ("[USAGE] for the above: p.vNetForActiveEnvironment()")
 
         sa_name, rg_name, sub_id = self.getLakeForActiveEnvironment()
         print("Active Lake (storage account) ",sa_name)
+        print ("[USAGE] for the above: p.getLakeForActiveEnvironment()")
 
         print("AML for docker:",self.use_aml_cluster_to_build_images)
         
     #Register - at Initiation, and when saving
     def create_dataset_names(self, datasetName):
-        self._in_name_azure = self.ModelAlias +"_"+datasetName+"_IN"
-        self._bronze_name_azure = self.ModelAlias +"_"+datasetName+"_BRONZE"
-        self._silver_name_azure = self.ModelAlias +"_"+datasetName+"_SILVER"
+        if(self.inference_mode):
+            self._in_name_azure = self.ModelAlias +"_"+datasetName+"_inference_IN"
+            self._bronze_name_azure = self.ModelAlias +"_"+datasetName+"_inference_BRONZE"
+            self._silver_name_azure = self.ModelAlias +"_"+datasetName+"_inference_SILVER"
+        else:
+            self._in_name_azure = self.ModelAlias +"_"+datasetName+"_train_IN"
+            self._bronze_name_azure = self.ModelAlias +"_"+datasetName+"_train_BRONZE"
+            self._silver_name_azure = self.ModelAlias +"_"+datasetName+"_train_SILVER"
+
         return self._in_name_azure, self._bronze_name_azure, self._silver_name_azure
     
     def initDatasets(self, inferenceModelVersion,project_folder_name,model_folder_name, DatasetFolderNamesIn):  # **datasetNameKey_PathValue
@@ -257,8 +327,8 @@ class ESMLProject():
         self._in_folder_date = date_infolder.strftime('%Y/%m/%d') #  String 2020/01/01
 
         date_str = scoring["{}_scoring_folder_date".format(self.dev_test_prod)] # String in DateTime format
-        date_scoring_folder = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f') # DateTime
-        self._in_scoring_folder_date = date_scoring_folder.strftime('%Y/%m/%d') #  String 2020/01/01
+        self.date_scoring_folder = datetime.datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f') # DateTime
+        self._in_scoring_folder_date = self.date_scoring_folder.strftime('%Y/%m/%d') #  String 2020/01/01
         self.inferenceModelVersion = int(scoring['{}_inference_model_version'.format(self.dev_test_prod)])
 
     def checkLakeCompatability(self):
@@ -285,6 +355,60 @@ class ESMLProject():
         except Exception as e:
             raise UserErrorException("Could not Check ESML DataLake Compatability") from e
 
+    #import jsonlines
+    def update_json_files(self, param_esml_env,param_inference_model_version,param_scoring_folder_date,param_train_in_folder_date):
+        save_train = "../../../settings/project_specific/model/active" # /active_in_folder.json"
+        save_inf = "../../../settings/project_specific/model/active" # /active_scoring_in_folder.json"
+        local_path_train = save_train + '/active_in_folder.json'
+        local_path_scoring = save_inf+ '/active_scoring_in_folder.json'
+
+        key_train_date = "{}_in_folder_date".format(param_esml_env)
+        key_inf_date = "{}_scoring_folder_date".format(param_esml_env)
+        key_inf_scoring = "{}_inference_model_version".format(param_esml_env)
+
+        try:
+            old_loc = os.getcwd()
+            os.chdir(os.path.dirname(__file__))
+
+            # 1 Load from files
+
+            with open(local_path_train) as f2: # where to read data to train on
+                json_train = json.load(f2)
+            with open(local_path_scoring) as f2: # where to read data to score
+                json_inf = json.load(f2)
+
+            # 2 UPDATE values
+            json_inf[key_inf_scoring] = str(param_inference_model_version)
+            json_inf[key_inf_date] = param_scoring_folder_date
+            json_train[key_train_date] = param_train_in_folder_date
+
+            # 3a - WRITE JSONLINES - Train (Overwrite local json files)
+            with open(local_path_train, 'w') as outfile:
+                json.dump(json_train, outfile, indent=2)
+
+            # 3b - WRITE JSONLINES - Inference
+            with open(local_path_scoring, 'w') as outfile:
+                json.dump(json_inf, outfile, indent=2)
+
+            # 4) Load from FILE again 
+            with open(local_path_train) as f2: # where to read data to train on
+                json_date_in_folder = json.load(f2)
+            with open(local_path_scoring) as f2: # where to read data to score
+                json_date_scoring_folder = json.load(f2)
+
+            # 5) Update "in memory" to be consistent
+            print("json_date_in_folder",json_date_in_folder)
+            print("json_date_scoring_folder", json_date_scoring_folder)
+            self.parseDateFolderConfig(json_date_in_folder,json_date_scoring_folder)
+            self.inferenceModelVersion = int(param_inference_model_version)
+            self.dev_test_prod = param_esml_env # overrides config
+           
+        except Exception as e:
+            print("ESML Write from ArgParse to local .jsonlines files failed [active_in_folder.json,active_scoring_in_folder.json]  \n - Using [active_in_folder.json,active_scoring_in_folder.json] from DataLake.")
+            print(e)
+        finally:
+            os.chdir(old_loc) # Switch back to callers "working dir"
+        
     def readActiveDatesFromLake(self):
         train_conf = self._project_train_path.format(self.project_folder_name,self.model_folder_name) + "active" # = _proj_start_path+"/{}/{}/train/"
         inf_conf = self._project_inference_path.format(self.project_folder_name,self.model_folder_name) + "active"  # = _proj_start_path+"/{}/{}/inference/"
@@ -324,7 +448,8 @@ class ESMLProject():
            
         except Exception as e:
             print("ESML in-folder settings override = FALSE. [active_in_folder.json,active_scoring_in_folder.json] not found. \n - Using [active_in_folder.json,active_scoring_in_folder.json] from ArgParse or GIT. No override from datalake settings")
-            print(e.message)
+            if("The specified path does not exist" not in e.message):
+                print(e.message)
         finally:
             os.chdir(old_loc) # Switch back to callers "working dir"
 
@@ -374,11 +499,7 @@ class ESMLProject():
 
     def overrideEnvConfig(self, dev_test_prod_to_activate,env_config): 
         self._dev_test_prod = dev_test_prod_to_activate
-        
-        #if (self.dev_test_prod != dev_test_prod_to_activate): # ONLY set this again, IF different...otherwise "loop of infintiy"
-        #    print("self.dev_test_prod != dev_test_prod_to_activate")
-        #    self.dev_test_prod = dev_test_prod_to_activate  # Sets ACTIVE subscription also
-
+       
         self.env_config = env_config
         self.override_enterprise_settings_with_model_specific = self.env_config['override_enterprise_settings_with_model_specific']
         self.tenant = self.env_config['tenant']
@@ -465,13 +586,13 @@ class ESMLProject():
         
         if(use_non_model_specific_cluster==True):
             print("Using a non model specific cluster (enterprice policy cluster), yet environment specific")
-            compute,name = self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            compute,name = self._compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
             self.use_compute_cluster_to_build_images(ws, name)
             return compute
 
         else:
             print("Using a model specific cluster, per configuration in project specific settings, (the integer of 'model_number' is the base for the name)")
-            compute,name = self.compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            compute,name = self._compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
             self.use_compute_cluster_to_build_images(ws, name)
             return compute
 
@@ -482,15 +603,23 @@ class ESMLProject():
         return self.automl_factory.get_latest_model(ws)
     '''
 
-    def initComputeFactory(self,ws,reload_config=False):
-        if(reload_config==True): # Force recreate, reload config
-            self.compute_factory = ComputeFactory(self,ws,self.dev_test_prod,self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
+    @property
+    def compute_factory(self):
+        if(self._compute_factory is None):
+            self.initComputeFactory(self.ws)
+        return self._compute_factory 
 
-        if (self.compute_factory is not None): #Only switch to a new FACTORY is existing, and if ws changed.
+
+    def initComputeFactory(self,ws,reload_config=False):
+
+        if(reload_config==True): # Force recreate, reload config
+            self._compute_factory = ComputeFactory(self,ws,self.dev_test_prod,self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
+
+        if (self._compute_factory is not None): #Only switch to a new FACTORY is existing, and if ws changed.
            if (self.ws is not None and self.ws != ws): # If WORKSPACE switches, "create a new ComputeFactory"
-                self.compute_factory = ComputeFactory(self,ws,self.dev_test_prod,self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
+                self._compute_factory = ComputeFactory(self,ws,self.dev_test_prod,self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
         else: # Just create a factory
-            self.compute_factory = ComputeFactory(self,ws,self.dev_test_prod,self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
+            self._compute_factory = ComputeFactory(self,ws,self.dev_test_prod,self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
 
     @staticmethod
     def call_webservice_own_url(pandas_X_test, api_uri,api_key,firstRowOnly=True):
@@ -502,7 +631,7 @@ class ESMLProject():
     def call_webservice(self,ws, pandas_X_test,user_id=None, firstRowOnly=False,inference_model_version=None, reload_config=True):
         self.initComputeFactory(ws,reload_config)
 
-        df_result,model_version = self.compute_factory.call_webservice(pandas_X_test,firstRowOnly) # TODO: Use inference_model_version to pick webservice/model version, other than the "single one & latest"
+        df_result,model_version = self._compute_factory.call_webservice(pandas_X_test,firstRowOnly) # TODO: Use inference_model_version to pick webservice/model version, other than the "single one & latest"
         
         if(inference_model_version is not None): # user override, not reading from keyvault
             model_version = inference_model_version 
@@ -526,6 +655,10 @@ class ESMLProject():
             ws.update(image_build_compute = '')
             print("image_build_compute = ACR")
 
+    def get_deploy_config_aks(self):
+        self.initComputeFactory(self.get_other_workspace(self.dev_test_prod))
+        deploy_config = self._compute_factory.get_deploy_config(self, self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
+        return deploy_config
     # Returns [service,api_uri, self.kv_aks_api_secret] - the api_secret is stored in your keyvault
     def deploy_automl_model_to_aks(self, model,inference_config, overwrite_endpoint=True,deployment_config=None):
 
@@ -537,18 +670,24 @@ class ESMLProject():
         target_workspace = self.get_other_workspace(self.dev_test_prod)
         self.initComputeFactory(target_workspace)
 
-        self.use_compute_cluster_to_build_images(target_workspace,self.compute_factory.aml_cluster_name)
+        self.use_compute_cluster_to_build_images(target_workspace,self._compute_factory.aml_cluster_name)
         if(overwrite_endpoint):
-            self.compute_factory.delete_aks_endpoint(target_workspace)
-        return self.compute_factory.deploy_online_on_aks(self,model,inference_config, self.dev_test_prod,deployment_config, self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
+            self._compute_factory.delete_aks_endpoint(target_workspace)
+        return self._compute_factory.deploy_online_on_aks(self,model,inference_config, self.dev_test_prod,deployment_config, self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
 
     def initAutoMLFactory(self):
         if(self.automl_factory is None):
             self.automl_factory = AutoMLFactory(self)
 
-    def get_active_model_inference_config(self, ws):
+    def get_active_model_inference_config(self, ws_in = None):
+        ws = None
+        if (ws_in is None):
+            ws = self.ws # use its own default WS
+        else:
+            ws = ws_in
+
         self.initAutoMLFactory()
-        if(self.compute_factory is None):
+        if(self._compute_factory is None):
             self.initComputeFactory(ws)
 
         target_workspace = self.get_other_workspace(self.dev_test_prod)
@@ -607,6 +746,14 @@ class ESMLProject():
         return other_ws
 
     @property
+    def inference_mode(self):
+        return self._inference_mode
+
+    @inference_mode.setter
+    def inference_mode(self, inference_mode):
+        self._inference_mode = inference_mode
+
+    @property
     def verbose_logging(self):
         return self._verbose_logging
 
@@ -617,7 +764,7 @@ class ESMLProject():
     @property
     def ComputeFactory(self):
         self.initComputeFactory(self.ws, reload_config=True)
-        return self.compute_factory
+        return self._compute_factory
     @property
     def experiment_name(self):
         return self.model_folder_name
@@ -668,6 +815,9 @@ class ESMLProject():
         return self.ModelAlias+"_GOLD_SCORED"
 
     @property
+    def dataset_gold_to_score_name_azure(self):
+        return self.ModelAlias+"_GOLD" + self.dataset_inference_suffix
+    @property
     def rnd(self):
         return self._rndPhase
     @rnd.setter
@@ -693,6 +843,41 @@ class ESMLProject():
         self._gold_scored = ds
         dataset_gold_scored_name_azure
     '''
+
+    def get_gold_scored_unique_path(self, batch_datetime_from_config = None, unique_uuid4 = None, same_guid_folder=True):
+        to_score_unique_folder = ""
+        scored_unique_folder = ""
+        date_folder = ""
+
+        try:
+            if (batch_datetime_from_config is not None): 
+               date_folder=batch_datetime_from_config.strftime('%Y_%m_%d')
+            else: # realtime = "todays datetime"
+                now = datetime.datetime.now()
+                date_folder = now.strftime('%Y_%m_%d') 
+
+            if(same_guid_folder):
+                if(unique_uuid4 is not None): 
+                    same_guid_folder = unique_uuid4
+                else:
+                    same_guid_folder = uuid.uuid4().hex
+                to_score_unique_folder = self.GoldPathScoring + date_folder + '/'+same_guid_folder + "/"
+                scored_unique_folder = self.ScoredPath + date_folder + '/'+ same_guid_folder + "/"
+            else: # If you want to save "latest" version, or only 1 version that day (p.call_webservice uses both, both uniqe per day, and the latest)
+                to_score_unique_folder = self.GoldPathScoring + date_folder + '/'
+                scored_unique_folder = self.ScoredPath + date_folder + '/'
+        finally:
+            pass
+        return to_score_unique_folder, scored_unique_folder, date_folder
+    
+    @property
+    def BestModel(self):
+        if (self._best_model is None): # Lazy load 1st version 
+            source_best_run, fitted_model, experiment = self.get_best_model(self.ws)
+            model_name = source_best_run.properties['model_name']
+            self._best_model = Model(self.ws, model_name)
+        return self._best_model
+
     @property
     def GoldScored(self): 
         try:
@@ -730,29 +915,62 @@ class ESMLProject():
         except UserErrorException as e1:
             if("Cannot load any data from the specified path" in e1.message):
                 raise UserErrorException("ESML GoldTest seems to be empty? Have you splitted data?  [project.split_gold_3]") from e1
+    @property
+    def GoldToScore(self): 
+        try:
+            if (self._gold_to_score is None): # Lazy load 1st version 
+                self._gold_to_score = Dataset.get_by_name(self.ws, name=self.dataset_gold_to_score_name_azure)
+            return self._gold_to_score # Latest version
+        except UserErrorException as e1:
+            if("Cannot load any data from the specified path" in e1.message):
+                raise UserErrorException("ESML GoldTest seems to be empty? Have you splitted data?  [project.split_gold_3]") from e1
 
     @property
     def Gold(self): 
         # TODO: Load LATEST version folder. Solution: Singelton...always have in memory
         # TODO: To include files in subfolders, append '/**' after the folder name like so: '{Folder}/**'.
         try:
-            if (self._gold_dataset is None): # Lazy load 1st version 
-                #self._gold_dataset = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath + "*.parquet")])
-                self._gold_dataset = Dataset.get_by_name(self.ws, name=self.dataset_gold_name_azure)
-            return self._gold_dataset # Latest version
+            if(self.inference_mode):
+                if (self._gold_to_score is None): # Lazy load 1st version 
+                    self._gold_to_score = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath)])  # If not registered, fetch from LAKE
+                    # self._gold_to_score = Dataset.get_by_name(self.ws, name=self.dataset_gold_inference_name_azure)
+                return self._gold_to_score # Latest version
+            else:
+                if (self._gold_dataset is None): # Lazy load 1st version 
+                    self._gold_dataset = Dataset.get_by_name(self.ws, name=self.dataset_gold_name_azure)
+                return self._gold_dataset # Latest version
         except UserErrorException as e1:
             if("Cannot load any data from the specified path" in e1.message):
                 raise UserErrorException("ESML GOLD dataset seems to be empty? Have you saved any data yet? use ESMLProject.save_gold_pandas_as_azure_dataset(df)") from e1
     @property
-    def GoldPath(self): # TODO: Load LATEST version folder
-         if(self.inferenceModelVersion > 0):
+    def GoldPath(self):
+        if(self.inference_mode):
             return self._inference_gold_path.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion, self.dev_test_prod)
-         else:
+        else:
             return self._train_gold_path.format(self.project_folder_name,self.model_folder_name, self.dev_test_prod)
     @property
-    def ScoredPath(self): # TODO: Load LATEST version folder
+    def ScoredPath(self): # TODO: Default to LATEST version folder
         return self._inference_scored_path.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion, self.dev_test_prod)
 
+# Used just for "DESCRIBE" purpose, during creating the Scoring pipline "GoldPath" is used, and will return self.inference_mode
+    @property
+    def GoldPathScoring(self): 
+        active_mode = self.inference_mode
+        gold_path = ""
+        try:
+            self.inference_mode = True 
+            gold_path = self.GoldPath
+        finally:
+            self.inference_mode = active_mode
+        return gold_path
+   
+    @property
+    def GoldPathToScoreBatch(self):
+        date_folder_str = self.date_scoring_folder.strftime('%Y_%m_%d')
+        target_path = self.GoldPathScoring + date_folder_str +'/'
+        return target_path
+
+# Used for DESCRIBE
     def get_workspace_from_config(self,cli_auth=None, vNetACR=True):
         try:
             if(cli_auth is None):
@@ -805,8 +1023,8 @@ class ESMLProject():
             ESMLProject.clean_temp(self.project_folder_name)
 
             # 1) To score: Generate LAKE-path, what to READ, what to SCORE?
-            day_folder = self.GoldPath + date_folder + '/'
-            unique_folder = self.GoldPath + date_folder + '/'+unique_folder + "/"
+            day_folder = self.GoldPathScoring + date_folder + '/'
+            unique_folder = self.GoldPathScoring + date_folder + '/'+unique_folder + "/"
             srs_folder = './common/temp_data/{}/inference/{}/Gold/'.format(self.project_folder_name,v_str)
             local_path = '{}{}'.format(srs_folder,file_name_to_score)
             ESMLProject.create_folder_if_not_exists(srs_folder)
@@ -814,8 +1032,8 @@ class ESMLProject():
             # 2) Score ComputeFactory + PipelineFactory
             pandas_X = None
             df_result = None
-            df_result,model_version = self.compute_factory.batch_score(unique_folder, file_name_to_score) # A unique folder, a day
-            df_result,model_version = self.compute_factory.batch_score(day_folder, file_name_to_score) # A datetime folder (usually a day, hour, minute)
+            df_result,model_version = self._compute_factory.batch_score(unique_folder, file_name_to_score) # A unique folder, a day
+            df_result,model_version = self._compute_factory.batch_score(day_folder, file_name_to_score) # A datetime folder (usually a day, hour, minute)
 
             # 3) Save scored result
             scored_result = pandas_X.join(df_result)
@@ -860,40 +1078,42 @@ class ESMLProject():
         else:
             caller_guid = user_id
         try:
-            now = datetime.datetime.now()
-            date_folder = now.strftime('%Y_%m_%d') 
-            same_guid_folder = uuid.uuid4().hex
-            ESMLProject.clean_temp(self.project_folder_name)
 
+            ESMLProject.clean_temp(self.project_folder_name) # clean temp
             # 2) Save pandas_X_test to goldpath
-            unique_folder = self.GoldPath + date_folder + '/'+same_guid_folder + "/"
+
+            to_score_folder, scored_folder, date_folder = self.get_gold_scored_unique_path()
+            to_score_folder_latest, scored_folder_latest, date_folder_latest = self.get_gold_scored_unique_path(batch_datetime_from_config = None, unique_uuid4 = None, same_guid_folder=False)
+
             srs_folder = './common/temp_data/{}/inference/{}/Gold/'.format(self.project_folder_name,v_str)
             file_name = "to_score_{}.parquet".format(caller_guid) # HERE ....who is this scoring about?
             local_path = '{}{}'.format(srs_folder,file_name)
             ESMLProject.create_folder_if_not_exists(srs_folder)
             pandas_X_test.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
-            self.LakeAccess.upload(file_name, srs_folder, unique_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2 
+            self.LakeAccess.upload(file_name, srs_folder, to_score_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2 
+            self.LakeAccess.upload(file_name, srs_folder, to_score_folder_latest, overwrite=True,use_dataset_factory = False) # Also upload LATEST to "date_folder root"
 
             print("")
             print("Saved DATA to score successfully in LAKE, as file '{}'".format(file_name))
 
             # 3) Save scored_results, to unique folder, for the day 
             # Note: Here we can save also, which CALLER/User-Guid it is about. We cab have a User_id_GUID as a "feature/column"
-            unique_folder = self.ScoredPath + date_folder + '/'+ same_guid_folder + "/"
+
             srs_folder = './common/temp_data/{}/inference/{}/Scored/'.format(self.project_folder_name,v_str)
             file_name = "scored_{}.parquet".format(caller_guid) # HERE ....who is this scoring about?
 
             local_path = '{}{}'.format(srs_folder,file_name)
             ESMLProject.create_folder_if_not_exists(srs_folder)
             scored_result.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-            self.LakeAccess.upload(file_name, srs_folder, unique_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2
-
+            self.LakeAccess.upload(file_name, srs_folder, scored_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2
+            self.LakeAccess.upload(file_name, srs_folder, scored_folder_latest, overwrite=True,use_dataset_factory = False) # LATEST to "date_folder root"
+            
             print("Saved SCORED data in LAKE, as file '{}'".format(file_name))
 
-            # Needed?
+            # Optional o register 
             try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, unique_folder + "*.parquet")],validate=False)
+                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, scored_folder + "*.parquet")],validate=False)
                 description = "Scored gold data with model version {}".format(v_str)
                 self.registerGoldScored(ds,description,date_folder, v_str,caller_guid,self.rnd)
             except Exception as e2:
@@ -907,13 +1127,15 @@ class ESMLProject():
         return scored_result
 
     def save_gold(self,dataframe, new_version=True):
-        return self.save_gold_pandas_as_azure_dataset(dataframe,new_version)
+        if(self.inference_mode):
+            return self.save_gold_inference_pandas_as_azure_dataset(dataframe,new_version)
+        else:
+            return self.save_gold_pandas_as_azure_dataset(dataframe,new_version)
 
     def save_gold_pandas_as_azure_dataset(self,dataframe, new_version=True):
         srs_folder = './common/temp_data/{}/Gold/'.format(self.project_folder_name)
         target_path = self.GoldPath
         file_name = "gold.parquet"
-        #file_name = uuid.uuid4().hex
         local_path = '{}{}'.format(srs_folder,file_name)
         #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
@@ -922,17 +1144,17 @@ class ESMLProject():
 
         ds = None
         if(self.rnd): # No versioning & overwrite
-            #self.Lakestore.upload(src_dir=srs_folder, target_path=target_path, overwrite=self.rnd) # BLOB
             self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
             ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath + "*.parquet")],validate=False)
-        else: # Version folder + don't overwrite
+        else: # Version folder (don't overwrite) AND LatestVersion at "root", where we overwrite   #NB - This can be optimizes later, if we dont want to double write GOLD
+            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=True) # Save 1 - Latest GOLD, overwrite
+
             version_folder = self.GoldPath + uuid.uuid4().hex + "/"
-            #self.Lakestore.upload(src_dir=srs_folder, target_path=version_folder, overwrite=False) # BLOB
-            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # BLOB or GEN 2
+            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # Save 2 - versioning
             ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
 
         # Set and return "LATEST" version
-        return self.registerGold(ds, "GOLD.parquet merged from all datasets. Source to be splitted (Train,Validate,Test)",new_version)
+        return self.registerGold(ds, self.model_folder_name+": GOLD.parquet merged from all datasets. Source to be splitted (Train,Validate,Test)",new_version)
 
  #TRAIN, VALIDATE, TEST   
     def save_gold_train_pandas_as_azure_dataset(self,dataframe,split_percentage,label, new_version=True):
@@ -955,7 +1177,34 @@ class ESMLProject():
             ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
 
         # Set and return "LATEST" version
-        return self.registerGoldTrain(ds, "GOLD_TRAIN.parquet from splitted Train, Validate, Test",split_percentage,label,new_version)
+        return self.registerGoldTrain(ds, self.model_folder_name+"GOLD_TRAIN.parquet from splitted Train, Validate, Test",split_percentage,label,new_version)
+
+    def save_gold_inference_pandas_as_azure_dataset(self,dataframe, new_version=True, label=None):
+        target_path = self.GoldPathToScoreBatch
+        srs_folder = './common/temp_data/{}/Gold/Inference/'.format(self.project_folder_name)
+        file_name = "gold_to_score.parquet"
+        file_name_latest = "latest_gold_to_score.parquet"
+        local_path = '{}{}'.format(srs_folder,file_name)
+        #ESMLProject.clean_temp(self.project_folder_name)
+        ESMLProject.create_folder_if_not_exists(srs_folder)
+
+        dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+
+        ds = None
+        if(self.rnd): # No versioning & overwrite
+            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
+            ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + "*.parquet")],validate=False)
+        else: # Version folder + don't overwrite
+            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=True) # Save 1: Latest - Also save "latest", NB: Optimize potential 
+
+            version_folder = target_path + uuid.uuid4().hex + "/"
+            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # Save2: unique per day (support multiple scorings per day)
+            ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
+
+        # Set and return "LATEST" version
+        version_string = str(self.inferenceModelVersion)
+        date_folder = self.date_scoring_folder.strftime('%Y_%m_%d')
+        return self.registerGoldToScore(ds, self.model_folder_name+": GOLD_to_score.parquet",date_folder,version_string,new_version), version_folder
 
     def save_gold_validate_pandas_as_azure_dataset(self,dataframe,split_percentage,label, new_version=True):
         srs_folder = './common/temp_data/{}/Gold/Validate/'.format(self.project_folder_name)
@@ -977,7 +1226,7 @@ class ESMLProject():
             ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
 
         # Set and return "LATEST" version
-        return self.registerGoldValidate(ds, "GOLD_VALIDATE.parquet from splitted Train, Validate, Test",split_percentage,label, new_version)
+        return self.registerGoldValidate(ds, self.model_folder_name+": GOLD_VALIDATE.parquet from splitted Train, Validate, Test",split_percentage,label, new_version)
 
     def save_gold_test_pandas_as_azure_dataset(self,dataframe, split_percentage,label, new_version=True):
         srs_folder = './common/temp_data/{}/Gold/Test/'.format(self.project_folder_name)
@@ -999,11 +1248,29 @@ class ESMLProject():
             ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
 
         # Set and return "LATEST" version
-        return self.registerGoldTest(ds, "GOLD_TEST.parquet from splitted Train, Validate, Test",split_percentage,label,new_version)
+        return self.registerGoldTest(ds, self.model_folder_name+": GOLD_TEST.parquet from splitted Train, Validate, Test",split_percentage,label,new_version)
 
 #TRAIN, VALIDATE, TEST
 
     def split_gold_3(self,train_percentage=0.6, label=None,new_version=True, seed=42):
+
+        df = self.Gold.to_pandas_dataframe()
+        whats_left_for_both = round(1-train_percentage,1)  # 0.4 ...0.3 if 70%
+        left_per_set = round((whats_left_for_both / 2),2) # 0.2  ...0.15
+        validate_and_test = round((1-left_per_set),2) # 0.8 ....0.75
+
+        train, validate, test = \
+              np.split(df.sample(frac=1, random_state=seed), 
+                       [int(train_percentage*len(df)), int(validate_and_test*len(df))])
+
+        self.save_gold_train_pandas_as_azure_dataset(train,train_percentage,label, new_version)
+        self.save_gold_validate_pandas_as_azure_dataset(validate,left_per_set,label,new_version)
+        self.save_gold_test_pandas_as_azure_dataset(test,left_per_set,label,new_version)
+    
+        return train,validate,test
+    
+    #TODO
+    def split_gold_3_groupBy(self,train_percentage=0.6, label=None, groupBy=None, new_version=True, seed=42):
 
         df = self.Gold.to_pandas_dataframe()
         whats_left_for_both = round(1-train_percentage,1)  # 0.4 ...0.3 if 70%
@@ -1025,7 +1292,9 @@ class ESMLProject():
 
         if(self.rnd == False): # Always NEW_VERSION if Production phase
             new_version = True
-        ds = azure_dataset.register(workspace=self.ws,name=self.dataset_gold_name_azure, description=description,create_new_version=new_version)
+    
+        t={"model":self.model_folder_name}
+        ds = azure_dataset.register(workspace=self.ws,name=self.dataset_gold_name_azure, tags=t, description=description,create_new_version=new_version)
         self._gold_dataset = ds
         return self.Gold
 
@@ -1036,7 +1305,7 @@ class ESMLProject():
         if(self.rnd == False): # Always NEW_VERSION if Production phase
             new_version = True
         
-        t={"split_percentage": split_percentage, "label": label}
+        t={"split_percentage": split_percentage, "label": label, "model":self.model_folder_name}
         ds = azure_dataset.register(workspace=self.ws,name=self.dataset_gold_train_name_azure, description=description,tags=t,create_new_version=new_version)
         self._gold_train = ds
         return self.GoldTrain
@@ -1046,7 +1315,7 @@ class ESMLProject():
 
         if(self.rnd == False): # Always NEW_VERSION if Production phase
             new_version = True
-        t={"split_percentage": split_percentage, "label": label}
+        t={"split_percentage": split_percentage, "label": label,"model":self.model_folder_name}
         ds = azure_dataset.register(workspace=self.ws,name=self.dataset_gold_validate_name_azure, description=description,tags=t,create_new_version=new_version)
         self._gold_validate = ds
         return self.GoldValidate
@@ -1056,7 +1325,7 @@ class ESMLProject():
 
         if(self.rnd == False): # Always NEW_VERSION if Production phase
             new_version = True
-        t={"split_percentage": split_percentage, "label": label}
+        t={"split_percentage": split_percentage, "label": label ,"model":self.model_folder_name}
         ds = azure_dataset.register(workspace=self.ws,name=self.dataset_gold_test_name_azure, description=description,tags=t,create_new_version=new_version)
         self._gold_test= ds
         return self.GoldTest
@@ -1066,10 +1335,20 @@ class ESMLProject():
 
         if(self.rnd == False): # Always NEW_VERSION if Production phase
             new_version = True
-        t={"date_time_folder":date_time_folder, "caller_id":caller_id, "model_version": model_version}
+        t={"date_time_folder":date_time_folder, "caller_id":caller_id, "model_version": model_version ,"model":self.model_folder_name}
         ds = azure_dataset.register(workspace=self.ws,name=self.dataset_gold_scored_name_azure, description=description,tags=t,create_new_version=new_version)
         self._gold_scored = ds
         return self.GoldScored
+
+    def registerGoldToScore(self, azure_dataset, description, date_time_folder, model_version, new_version=True):
+        ESMLDataset.unregister_if_rnd(self.ws,self.rnd,self.dataset_gold_to_score_name_azure)
+
+        if(self.rnd == False): # Always NEW_VERSION if Production phase
+            new_version = True
+        t={"date_time_folder":date_time_folder, "model_version": model_version,"model":self.model_folder_name}
+        ds = azure_dataset.register(workspace=self.ws,name=self.dataset_gold_to_score_name_azure, description=description,tags=t,create_new_version=new_version)
+        self._gold_to_score = ds
+        return self.GoldToScore
 
 #TRAIN, VALIDATE, TEST
    
@@ -1200,7 +1479,13 @@ class ESMLProject():
         print("y_test ",y_test.shape)
         return X_test, y_test, gt.tags
 
-    def init(self,ws):
+    def init(self,ws_in = None):
+        ws = None
+        if (ws_in is None):
+            ws = self.ws # use its own default WS
+        else:
+            ws = ws_in
+
         if(ws != self.ws): # Connect to other DatatStore - even if its the same physical lake
             self._recreate_datastore = True
         self._suppress_logging = True
@@ -1209,6 +1494,16 @@ class ESMLProject():
 
     def unregister_all_datasets(self,ws):
         self.set_lake_as_datastore(ws)
+        old_mode = self.inference_mode
+        try:
+            self.unregister_all(ws)
+            self.inference_mode = not self.inference_mode
+            self.unregister_all(ws)
+        finally:
+            self.inference_mode = old_mode
+
+
+    def unregister_all(self, ws):
         try:
             for ds in self.dataset_list:
                 print("Unregister Azure ML dataset for ESML dataset {}".format(ds.Name))
@@ -1228,7 +1523,8 @@ class ESMLProject():
                     d1.unregister_all_versions()
                 except Exception as e:
                      if("Invalid tuple for path" not in e.message):
-                         pass #raise e
+                         #raise e
+                         pass 
 
                 print("- Silver name: {}".format(silver_name))
                 try:
@@ -1236,7 +1532,8 @@ class ESMLProject():
                     d1.unregister_all_versions()
                 except Exception as e:
                     if("Invalid tuple for path" not in e.message):
-                        pass #raise e
+                        #raise e
+                        pass
 
             print("Gold name: {} ".format(self.dataset_gold_name_azure))
             try:
@@ -1252,6 +1549,9 @@ class ESMLProject():
                 d1 = Dataset.get_by_name(ws, self.dataset_gold_validate_name_azure)
                 d1.unregister_all_versions()
                 d1 = Dataset.get_by_name(ws, self.dataset_gold_test_name_azure)
+                d1.unregister_all_versions()
+
+                d1 = Dataset.get_by_name(ws, self.dataset_gold_to_score_name_azure)
                 d1.unregister_all_versions()
             except Exception as e:
                  if("Invalid tuple for path" not in e.message):
@@ -1284,12 +1584,13 @@ class ESMLProject():
         self.checkLakeCompatability()
 
         print("")
+        print("Inference mode (False = Training mode):", self.inference_mode)
         print("Load data as Datasets....")
 
         exists_dictionary = defaultdict(list)
         # VERISONS samename  "ds01_diabetes". Specify `create_new_version=True` to register the dataset as a new version. 
         # Use `update`, `add_tags`, or `remove_tags` to change only the description or tags.
-
+        error_path = ""
         try:
             for ds in self.dataset_list:
                 print(ds.Name)
@@ -1302,35 +1603,39 @@ class ESMLProject():
                 #name = dataset_name
 
                 # IN folder / Azure dataset
+                error_path = ""
                 dstore_paths = [(lakestore,  ds.InPath + "*.csv")]
                 desc_in =  "IN: " + dataset_description
                 try:
+                    error_path = ds.InPath
                     in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
                     try:
                         exists_dictionary.setdefault(ds.Name, []).append("IN_Folder_has_files")
                         ds.registerIn(in_ds,desc_in,False)
                     except UserErrorException as e:
-                        print("Datasets already intiated with name {} in Azure, with description: {}. Inner exception:\n{} ".format(ds.Name,desc_in,e))
+                        print("Wrong path | OR wrong format (if .csv conversion to .parquet will be made) | OR error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{} ".format(ds.Name,desc_in,e))
                 except Exception as e2: # Try .parquet instead - Else just throw exception
                     print("IN (.csv or .parquet) coult not be initiated  for dataset {} with description {}. Trying as .parquet instead.".format(ds.Name,desc_in))
                     dstore_paths = [(lakestore,  ds.InPath + "*.parquet")]
                     desc_in =  "IN_PQ: " + dataset_description
                     in_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
                     ds.registerIn(in_ds,desc_in,False)
-
+                         
                     if("Cannot load any data from the specified path" not in e2.message):
                         raise e2
+                    
 
                 # BRONZE folder / Azure dataset
                 dstore_paths = [(lakestore,  ds.BronzePath + "*.parquet")]
                 desc_bronze =  "BRONZE: " + dataset_description
                 try:
+                    error_path = ds.BronzePath
                     bronze_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with 'state' and 'date' as virtual columns 
                     try:
                         exists_dictionary.setdefault(ds.Name, []).append("BRONZE_Folder_has_files")
                         #ds.registerBronze(bronze_ds,desc_bronze,False)
                     except UserErrorException as e:
-                        print("Datasets already intiated with name {} in Azure, with description: {}. Inner exception:\n{}".format(ds.name,desc_bronze,e))
+                        print("Wrong path / or error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{}".format(ds.name,desc_bronze,e))
                 except UserErrorException as e2:
                     if("Cannot load any data from the specified path" not in e2.message):
                         raise e2
@@ -1339,18 +1644,26 @@ class ESMLProject():
                 dstore_paths = [(lakestore,  ds.SilverPath + "*.parquet")]
                 desc_silver =  "SILVER: " + dataset_description
                 try:
+                    error_path = ds.SilverPath
                     ds_silver = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with 'state' and 'date' as virtual columns 
                     try:
                         exists_dictionary.setdefault(ds.Name, []).append("SILVER_Folder_has_files")
                         ds.registerSilver(ds_silver,desc_silver,False)
                     except UserErrorException as e:
-                        print("Datasets already intiated with name {} in Azure, with description: {}. Inner exception:\n{}".format(ds.name,desc_silver,e))
+                        print("Wrong path / or error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{}".format(ds.name,desc_silver,e))
                 except UserErrorException as e2:
                     if("Cannot load any data from the specified path" not in e2.message):
                         raise e2
         except Exception as e2:
             if("Cannot load any data from the specified path" not in e2.message):
-                raise UserErrorException("Error! Please check that Dataset name you provied in ESMLProject contructor also matches datalake-folder-names setup by your ESML core team") from e2
+                if(self.inference_mode):
+                    str_1 = "to IN-folder is successful. Check in lake if: correct model_version={} and correct date_folder".format(self.inferenceModelVersion)
+                    str_2 = "\n Tip_2: Maybe data is deleted in lake? But dataset is still registered? Check here in the datalake with Storage Explorer: {}".format(error_path)
+
+                    raise UserErrorException("Error! Please check that Dataset name you provied in ESMLProject contructor also matches datalake-folder-names setup by your ESML core team" \
+                    ". \n Tip_1: Since INFERENCE MODE=TRUE, check that your Ingestion-pipeline (Azure Data factory) " + str_1 + str_2) from e2
+                else:
+                    raise UserErrorException("Error! Please check that Dataset name you provied in ESMLProject contructor also matches datalake-folder-names setup by your ESML core team") from e2
 
         print("")
         print("####### Automap & Autoregister - SUCCESS!")
@@ -1442,24 +1755,46 @@ class ESMLProject():
     def get_project_from_env_command_line():
         parser = argparse.ArgumentParser()
         parser.add_argument('--esml_environment', type=str, help='ESML target environment: dev,test,prod')
+        parser.add_argument('--esml_inference_model_version', type=str, help='Model VERSION to score with')
+        parser.add_argument('--esml_scoring_in_datetime', type=str, help='IN folder, datetype:datetime - the data to SCORE, same datetime as prestep Bronze2Gold pipeline')
+        parser.add_argument('--esml_train_in_datetime', type=str, help='IN folder. datetype:datetime - the data to RETRAIN model on, same datetime as prestep Bronze2Gold pipeline')
+        
         args = parser.parse_args()
         esml_environment = args.esml_environment
+        inference_model_version = args.esml_inference_model_version
+        scoring_folder_date = args.esml_scoring_in_datetime
+        train_in_folder_date = args.esml_train_in_datetime
 
         p = None
-        if(esml_environment is not None):
-            print("The argparse (Azure Devops) variable 'esml_environment ' (dev, test or prod) is set to: {}".format(esml_environment))
+        if((esml_environment is not None) and (inference_model_version is None)):
+            print("Scenario 01: MLOPS - RETRAIN on same data, code changed - The argparse (Azure Devops) variable 'esml_environment ' (dev, test or prod) is set to: {}".format(esml_environment))
             p = ESMLProject(esml_environment)
-        else:
+        elif((esml_environment is not None) and (inference_model_version is not None) and (scoring_folder_date is not None)):
+            inf_int = int(inference_model_version)
+            if (inf_int <0):
+                raise UserErrorException("If Scenario 02: SCORING pipeline with dynamic data - inference_model_version must be set, and 0 or positive. It is now {}".format(inference_model_version))
+
+            print("Scenario 02: SCORING pipeline with dynamic data.  Env:{} | Version: {} | Scoring data: {}".format(esml_environment,inference_model_version,scoring_folder_date))
+            p = ESMLProject(esml_environment,inference_model_version,scoring_folder_date,train_in_folder_date)
+        elif((esml_environment is not None) and (train_in_folder_date is not None) and (inference_model_version is not None)):  # inference_model_version <0
+            inf_int = int(inference_model_version)
+            if (inf_int >=0):
+                raise UserErrorException("If Scenario 03: RETRAINING pipeline with dynamic data - inference_model_version must be set, and negative. It is now {}".format(inference_model_version))
+
+            print("Scenario 03: RETRAINING pipeline with dynamic data. Env:{} | Version: {} | Train data: {}".format(esml_environment,inference_model_version,train_in_folder_date))
+            p = ESMLProject(esml_environment,inference_model_version,scoring_folder_date,train_in_folder_date)
+        else: # Default 
             p = ESMLProject()
             print("args.esml_environment is None. Reading environment from config-files")
         return p
-           
+
 class ESMLDataset():
     #Defaults - project specicfic examples
     project_folder_name = "project002"
     model_folder_name = "03_diabetes_model_reg"
     model_aml_dataset_prefix = "M01"
     ds_name = "ds01_diabetes_ASDF"
+    dataset_inference_suffix = "_inference_"
 
     # AZURE Datasets
     _in_train = None
@@ -1501,7 +1836,7 @@ class ESMLDataset():
 
         # Lake - physical folders paths
             # IN
-        self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path, self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",project.dev_test_prod,project.InDateFolder)
+        self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path, self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",project.dev_test_prod,project.date_scoring_folder.strftime('%Y_%m_%d'))
         self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in",project.dev_test_prod, project.InDateFolder)
             
             # OUT
@@ -1530,14 +1865,13 @@ class ESMLDataset():
 # GET/SET
 
 # TODO: Same as GOLD, if versioning needed for this. For now - save storage
+
     @property
     def Bronze(self):
         try:
-            if (self.inferenceModelVersion >0): # Inference path
+            if(self._project.inference_mode):
                 if (self._bronze_inference is None): #Lazy load
-                    # TODO: Same as GOLD, if versioning needed for this. For now - save storage
                     self._bronze_inference = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.BronzePath + "*.parquet")],validate=False)
-
                 return self._bronze_inference # return cached. 
             else:
                 if (self._bronze_train is None): # Lazy load
@@ -1552,68 +1886,61 @@ class ESMLDataset():
 
     @Bronze.setter
     def Bronze(self, bronze_azure_dataset):
-        if (self.inferenceModelVersion >0): # Inference path
-             #print("Bronze.set INFERENCE")
-             self._bronze_inference = bronze_azure_dataset
+        if(self._project.inference_mode):
+            self._bronze_inference = bronze_azure_dataset
         else:
-            #print("Bronze.set")
             self._bronze_train = bronze_azure_dataset
-
-# TODO: Same as GOLD, if versioning needed for this. For now - save storage
     @property
     def Silver(self):
-        if (self.inferenceModelVersion >0): # Inference path
+        if(self._project.inference_mode):
             if (self._silver_inference is None): #Lazy load - only 1 version supported. Always overwrite
                 self._silver_inference = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "*.parquet")],validate=False)
-            return self._silver_inference # return cached. 
+            return self._silver_inference
         else:
             if (self._silver_train is None): # Lazy load
                 self._silver_train = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "*.parquet")],validate=False)
-            
             return self._silver_train
    
     @Silver.setter
     def Silver(self, silver_azure_dataset):
-        if (self.inferenceModelVersion >0): # Inference path
-            #print("Silver.set INFERENCE")
+        if(self._project.inference_mode): # Inference path
             self._silver_inference = silver_azure_dataset
         else:
-            #print("Silver.set")
             self._silver_train = silver_azure_dataset
 
     @property
     def InData(self):
-        if (self.inferenceModelVersion >0): # Inference path  
-            if (self._in_inference is None): #Lazy load
+        if(self._project.inference_mode): # Inference path
+             if (self._in_inference is None): #Lazy load
                 try:
                     self._in_inference = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False)
                 except Exception as e:
-                    print("ESML Note: Could not read InData as .CSV - Now trying as .PARQUET instead.")
+                    print("ESML Note: Could not read InData (Scoring) as .CSV - Now trying as .PARQUET instead.")
                     self._in_inference = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.InPath + "*.parquet")],validate=False)
-
-            return self._in_inference
+             return self._in_inference
         else:
-             if (self._in_train is None): # Lazy load
+            if (self._in_train is None): # Lazy load
                 try:
                     self._in_train = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False)
                 except Exception as e:
                     print("ESML Note: Could not read InData as .CSV - Now trying as .PARQUET instead.")
                     self._in_train = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.InPath + "*.parquet")],validate=False)
-             return self._in_train
+            return self._in_train
 
     @InData.setter
     def InData(self, in_azure_dataset):
-
-        df_csv = self.InData.to_pandas_dataframe() 
-        if ( 'Unnamed: 0' in df_csv): # Fix crap savings of CSV (using Spark CSV-driver or Excel, forgetting Index=False at save etc) 
-            df_csv = df_csv.drop('Unnamed: 0', axis=1)
-            df_csv.reset_index(drop=True, inplace=True)
-
-        if (self.inferenceModelVersion >0): # Inference path
+        if(self._project.inference_mode):
+            df_csv = self.InData.to_pandas_dataframe() 
+            if ( 'Unnamed: 0' in df_csv): # Fix crap savings of CSV (using Spark CSV-driver or Excel, forgetting Index=False at save etc) 
+                df_csv = df_csv.drop('Unnamed: 0', axis=1)
+                df_csv.reset_index(drop=True, inplace=True)
             self._in_inference = in_azure_dataset
-
             self.Bronze = self._project.save_bronze_pandas_as_azure_dataset(self, df_csv) # Auto-set BRONZE
         else:
+            df_csv = self.InData.to_pandas_dataframe() 
+            if ( 'Unnamed: 0' in df_csv): # Fix crap savings of CSV (using Spark CSV-driver or Excel, forgetting Index=False at save etc) 
+                df_csv = df_csv.drop('Unnamed: 0', axis=1)
+                df_csv.reset_index(drop=True, inplace=True)
             self._in_train = in_azure_dataset
             self.Bronze = self._project.save_bronze_pandas_as_azure_dataset(self, df_csv) # Auto-set BRONZE
 
@@ -1635,7 +1962,10 @@ class ESMLDataset():
 
 
     def registerIn(self,azure_dataset, description,new_version=True):
-        self._in_name_azure = self._project.ModelAlias +"_"+self.ds_name+"_IN"
+        if(self._project.inference_mode):
+            self._in_name_azure = self._project.ModelAlias +"_"+self.ds_name+self.dataset_inference_suffix + "IN"
+        else:
+            self._in_name_azure = self._project.ModelAlias +"_"+self.ds_name+"_train_IN"
         ESMLDataset.unregister_if_rnd(self._project.ws,self._project.rnd,self._in_name_azure )
         
         if(self._project.rnd == False):
@@ -1644,7 +1974,12 @@ class ESMLDataset():
         self.InData = ds_in
 
     def registerBronze(self,azure_dataset, description,new_version=True):
-        self._bronze_name_azure = self._project.ModelAlias +"_"+self.ds_name+"_BRONZE"
+        
+        if(self._project.inference_mode):
+            self._bronze_name_azure = self._project.ModelAlias +"_"+self.ds_name+self.dataset_inference_suffix + "BRONZE"
+        else: 
+            self._bronze_name_azure = self._project.ModelAlias +"_"+self.ds_name+"_train_BRONZE"
+
         ESMLDataset.unregister_if_rnd(self._project.ws,self._project.rnd,self._bronze_name_azure)
         if(self._project.rnd == False):
             new_version = True # yes, if not..There is already a dataset registered under name
@@ -1652,10 +1987,13 @@ class ESMLDataset():
         self.Bronze = ds
 
     def registerSilver(self,azure_dataset, desc_silver,new_version=True):
-        self._silver_name_azure = self._project.ModelAlias +"_"+self.ds_name+"_SILVER"
+        if(self._project.inference_mode):
+            self._silver_name_azure = self._project.ModelAlias +"_"+self.ds_name+self.dataset_inference_suffix + "SILVER"
+        else:    
+            self._silver_name_azure = self._project.ModelAlias +"_"+self.ds_name+"_train_SILVER"
         ESMLDataset.unregister_if_rnd(self._project.ws,self._project.rnd,self._silver_name_azure)
         if(self._project.rnd == False):
-            new_version = True # # yes, if not..error
+            new_version = True # # yes, if not..error, need to use UPDATE 
         ds_silver = azure_dataset.register(workspace=self._project.ws,name=self._silver_name_azure, description=desc_silver,create_new_version=new_version)
         self.Silver = ds_silver
 
@@ -1677,28 +2015,45 @@ class ESMLDataset():
 
 
 #READ ONLY- with logic of "Version folder for inference"
+
     @property
     def InPath(self):
-        if(self.inferenceModelVersion >0): 
-            self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",self._project.dev_test_prod,self._project.InDateFolder)
+        if(self._project.inference_mode):
+            self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",self._project.dev_test_prod,self._project.date_scoring_folder.strftime('%Y/%m/%d'))
             return self._in_path_inference
         else:
             self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in",self._project.dev_test_prod,self._project.InDateFolder)
             return self._in_path_train
     @property
     def BronzePath(self):
-        if(self.inferenceModelVersion >0):
+        if(self._project.inference_mode):
             self._bronze_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"out","bronze",self._project.dev_test_prod)
             return self._bronze_path_inference
-        else:
+        else: 
             return self._bronze_path_train
+        
     @property
     def SilverPath(self):
-        if(self.inferenceModelVersion >0):
+        if(self._project.inference_mode):
             self._silver_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.inferenceModelVersion,self.ds_name ,"out", "silver",self._project.dev_test_prod)
             return self._silver_path_inference
         else:
             return self._silver_path_train
+
+    # Helper method, for "descrbibe"
+    @property
+    def InPath_Scoring(self):
+        active_mode = self._project.inference_mode
+        in_path = ""
+        try:
+            self._project.inference_mode = True
+            in_path = self.InPath
+        finally:
+            self._project.inference_mode = active_mode
+        return in_path
+
+    # Helper method, end
+
        
     @property
     def DatasetFolderName(self):

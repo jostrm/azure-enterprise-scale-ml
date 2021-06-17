@@ -207,26 +207,7 @@ class ComputeFactory():
 
         self.idle_seconds_before_scaledown = int(config['idle_seconds_before_scaledown'])
 
-#Logic in PipelineFactory, lazy load PipelineFactory
 
-    def batch_score(self, datefolder_or_uniquesubfolder, file_or_filetype="*.parquet" ,firstRowOnly=False):
-        # 1) creates a batch-scoring pipeline "if not exists"
-            #self.get_or_create_aml_batch_pipeline()
-        # 2a) scores data, and saves it to lake directly VS
-        # Fire and forget VS return "sample" of scoring
-        #return df_result,model_version 
-        pass
-
-    def get_or_create_aml_batch_pipeline(self,esml_project,model,inference_config, target_dev_test_prod,override_enterprise_settings_with_model_specific=False, projNr="000", modelNr="00"):
-        # 1) Get suitable compute: 
-        self.get_batch_compute(self)
-        
-        # 2) Lazy-load PipelineFactory
-        pass # TODO: return pipeline
-
-    def get_batch_compute(self):
-        pass
-#Logic in  PipelineFactory
     @staticmethod
     def allowSelfSignedHttps(allowed):
         # bypass the server certificate verification on client side
@@ -247,12 +228,13 @@ class ComputeFactory():
 
         headers = {'Content-Type':'application/json', 'Authorization': 'Bearer ' + api_key}
         resp = requests.post(api_uri, X_test_json_works , headers=headers)
-        res_dict = json.loads(resp.text)
-        res_dict_ast = ast.literal_eval(res_dict)
-        return pd.read_json(res_dict) # to pandas
+        #res_dict = json.loads(resp.text)
+        #res_dict_ast = ast.literal_eval(res_dict)
+        #return pd.read_json(res_dict) # to pandas
+        
+        return resp # json
 
-
-    def call_webservice(self, X_test, firstRowOnly=True, api_uri=None,api_key="auto from keyvault"):
+    def call_webservice(self, X_test, firstRowOnly=True,pandas_result=True, api_uri=None,api_key="auto from keyvault"):
         ComputeFactory.allowSelfSignedHttps(True) # this line is needed if you use self-signed certificate in your scoring service.
 
         if(firstRowOnly==True):
@@ -281,10 +263,15 @@ class ComputeFactory():
                 "Make sure you have deployd the model to a webservice in Azure ML Studio, and that the API URL in keyvault matches this webservice.".format(api_uri))
 
         res_dict = json.loads(resp.text)
-        res_dict_ast = ast.literal_eval(res_dict)
-        #print("result", res_dict_ast['result'])
         
-        df_results = pd.read_json(res_dict) # to pandas
+        
+        if (pandas_result):
+            df_results = pd.read_json(res_dict) # to pandas
+        else:
+            #res_dict_ast = ast.literal_eval(res_dict)
+            #print("result", res_dict_ast['result'])
+            df_results = res_dict
+
         return df_results,int(model_version) #, res_dict_ast
 
 # //END - AKS TEST CALL  
@@ -328,14 +315,14 @@ class ComputeFactory():
         keyvault.set_secret(name=self.kv_aks_model_version, value = model.version) #,expires_on=expires_on_utc_date, content_type="esml generated. Model verision used in AKS webservice.")
 
         print("Deployed AKS Webservice: {} \nWebservice Uri: {} "\
-            "\nWebservice API_key are stored in keyvault with name: {} "\
+            "\nWebservice API_Secret are stored in keyvault with name: {} "\
             "\nWebservice API_URI are stored in keyvault with name: {} "\
-            "\nWebservice Swagger Uri: {}".format(service.name, service.scoring_uri, self.aks_api_url,self.aks_api_url, service.swagger_uri))
+            "\nWebservice Swagger Uri: {}".format(service.name, service.scoring_uri, self.kv_aks_api_secret,self.aks_api_url, service.swagger_uri))
         return service,api_uri, self.kv_aks_api_secret
 
-    def get_deploy_config(self,esml_project, target_dev_test_prod,override_enterprise_settings_with_model_specific, projNr, modelNr):
-        self.LoadConfiguration(esml_project,target_dev_test_prod,override_enterprise_settings_with_model_specific, projNr, modelNr)
-        return self._get_deploy_config(target_dev_test_prod)
+    def get_deploy_config(self,esml_project,override_enterprise_settings_with_model_specific, projNr, modelNr):
+        self.LoadConfiguration(esml_project,esml_project.dev_test_prod,override_enterprise_settings_with_model_specific, projNr, modelNr)
+        return self._get_deploy_config(esml_project.dev_test_prod)
 
     def _get_deploy_config(self, target_dev_test_prod):
         aks_deploy_config = None
@@ -592,6 +579,137 @@ class ComputeFactory():
             print('Not found cluster - {}'.format(self.aml_cluster_name))
 #PUBLIC END
 
+#OLD
+#Logic in PipelineFactory, lazy load PipelineFactory
+
+    def batch_score(self, datefolder_or_uniquesubfolder, file_or_filetype="*.parquet" ,firstRowOnly=False):
+        # 1) creates a batch-scoring pipeline "if not exists"
+            #self.get_or_create_aml_batch_pipeline()
+        # 2a) scores data, and saves it to lake directly VS
+        # Fire and forget VS return "sample" of scoring
+        #return df_result,model_version 
+        pass
+
+    def get_or_create_aml_batch_pipeline(self,esml_project,model,inference_config, target_dev_test_prod,override_enterprise_settings_with_model_specific=False, projNr="000", modelNr="00"):
+        # 1) Get suitable compute: 
+        self.get_batch_compute(self)
+        
+        # 2) Lazy-load PipelineFactory
+        pass # TODO: return pipeline
+
+    def get_batch_compute(self):
+        pass
+#Logic in  PipelineFactory
+
+#OLD
+# START - PIPELINES - SCORING & TRAINING & INFERENCE
+import sys
+import os
+sys.path.append(os.path.abspath("."))  # NOQA: E402
+from baselayer_ml import get_4_regression_metrics,get_7_classification_metrics
+class ESMLPipelineFactory(metaclass=Singleton):
+    project = None
+
+    def __init__(self,project):
+        self.project = project
+
+    def get_test_scoring_4_regression(self, label):
+        p = self.project
+        source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
+        test_set_pd =  p.GoldTest.to_pandas_dataframe()
+        rmse, r2, mean_abs_percent_error,accuracy,plt = get_4_regression_metrics(test_set_pd, label,fitted_model)
+
+        p.GoldTest.tags["RMSE"] = rmse
+        p.GoldTest.tags["R2"] = r2
+        p.GoldTest.tags["MAPE"] = mean_abs_percent_error
+        p.GoldTest.tags["Accuracy"] = accuracy
+        ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
+
+        model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
+        model = Model(p.ws, model_name)
+        model.tags["test_set_RMSE"] = str(rmse)
+        model.tags["test_set_R2"] = str(r2)
+        model.tags["test_set_MAPE"] = str(mean_abs_percent_error)
+        model.tags["test_set_Accuracy"] = str(accuracy)
+
+        model.add_tags(tags = model.tags)
+        return rmse, r2, mean_abs_percent_error,accuracy,plt
+    
+    def get_test_scoring_7_classification(self, label):
+        p = self.project
+        source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
+        test_set_pd =  p.GoldTest.to_pandas_dataframe()
+        auc,accuracy,f1, precision,recall,matrix, plt = get_7_classification_metrics(test_set_pd, label,fitted_model)
+
+        p.GoldTest.tags["ROC_AUC"] = auc
+        p.GoldTest.tags["Accuracy"] = accuracy
+        p.GoldTest.tags["F1_Score"] = f1
+        p.GoldTest.tags["Precision"] = precision
+        p.GoldTest.tags["Recall"] = recall
+        #p.GoldTest.tags["Confusion_Matrix"] = matrix
+
+        model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
+        model = Model(p.ws, model_name)
+        model.tags["test_set_ROC_AUC"] = str(auc)
+        model.tags["test_set_Accuracy"] = str(accuracy)
+        model.tags["test_set_F1_Score"] = str(f1)
+        model.tags["test_set_Precision"] = str(precision)
+        model.tags["test_set_Recall"] = str(precision)
+        #model.tags["test_set_CM"] = str(matrix)
+
+        model.add_tags(tags = model.tags)
+        ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
+        return auc,accuracy, f1, precision,recall,matrix, plt
+
+    #TODO prio:high
+    def create_batch_scoring_pipeline(self, remote_compute):
+        p = self.project
+        # to score (ACTIVE ENV + active DATE-FOLDER)
+        source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
+
+    #TODO prio:low
+    def get_testset_scoring_via_pipeline(self, remote_compute):
+        p = self.project
+        source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
+
+        test_experiment = Experiment(p.ws, experiment.name + "_test")
+
+    def get_pipeline_run_info_automl(self,pipeline_run,script_step_name, train_pipelinedata_out_name):
+        split_step = pipeline_run.find_step_run(script_step_name)[0]
+        train_split = ESMLPipelineFactory.fetch_df(split_step, train_pipelinedata_out_name)
+        return train_split
+        #display(train_split.describe()
+        #display(train_split.head(5))
+
+    def get_automl_run(self,pipeline_run,experiment):
+        # workaround to get the automl run as its the last step in the pipeline,  get_steps() returns the steps from latest to first
+        for step in pipeline_run.get_steps():
+            automl_step_run_id = step.id
+            print(step.name)
+            print(automl_step_run_id)
+            break # latest step found
+        automl_run = AutoMLRun(experiment = experiment, run_id=automl_step_run_id)
+
+
+    # STATIC - functions to download output to local and fetch as dataframe
+    # https://github.com/Azure/MachineLearningNotebooks/blob/master/how-to-use-azureml/machine-learning-pipelines/nyc-taxi-data-regression-model-building/nyc-taxi-data-regression-model-building.ipynb
+
+    # PARQUET in pipelines, 
+    @staticmethod
+    def get_download_path(download_path, output_name):
+        output_folder = os.listdir(download_path + '/azureml')[0]
+        path =  download_path + '/azureml/' + output_folder + '/' + output_name
+        return path
+    @staticmethod
+    def fetch_df(current_step, output_name):
+        output_data = current_step.get_output_data(output_name)    
+        download_path = './outputs/' + output_name
+        output_data.download(download_path, overwrite=True)
+        df_path = ESMLPipelineFactory.get_download_path(download_path, output_name) + '/processed.parquet' #  inputs=[cleansed_green_data.parse_parquet_files(),
+        return pd.read_parquet(df_path)
+
+# END - PIPELINES - SCORING & TRAINING & INFERENCE
+
 import azureml.core
 from azureml.core.experiment import Experiment
 from azureml.core.workspace import Workspace
@@ -601,9 +719,6 @@ from azureml.core import Dataset
 from azureml.core import Model
 from azureml.train.automl.run import AutoMLRun
 from azureml.core.authentication import AzureCliAuthentication
-"""
-COMMON - AutoML config
-"""
 class AutoMLFactory(metaclass=Singleton):
    
     ws = None
@@ -938,7 +1053,7 @@ class AutoMLFactory(metaclass=Singleton):
     def get_best_model(self, p,pipeline_run=False):
         remote_run, experiment = self._get_active_model_run_and_experiment(p.ws, p.dev_test_prod, p.override_enterprise_settings_with_model_specific, pipeline_run)
         best_run, source_fitted_model = remote_run.get_output()
-        return best_run, source_fitted_model
+        return best_run, source_fitted_model,experiment
 
     '''
      if (target_environment == "dev" & p.dev_test_prod = "dev") -> compare againt  stage "dev" -> Should be same if no difference is made
@@ -1090,9 +1205,14 @@ class AutoMLFactory(metaclass=Singleton):
             raise UserErrorException("Current ESML version can only register a model in same azure ml workspace (test->test), you need to retrain in new workspace if going from dev->test")
 
         self.LoadConfiguration(target_env,p.override_enterprise_settings_with_model_specific)
-        target_workspace = p.get_other_workspace(target_env)
+        
         source_env = p.dev_test_prod
         source_ws_name = p.ws.name #target_workspace.name
+        if (source_env == "prod"):
+            target_workspace = p.ws # Last stop. Prod->Prod
+        else:
+            target_workspace = p.get_other_workspace(target_env)
+
         return self._register_model(source_env,source_ws_name, target_workspace,self.model_name_automl, target_env, p.override_enterprise_settings_with_model_specific)
 
     def _get_active_model_run_and_experiment(self, target_workspace, target_env, override_enterprise_settings_with_model_specific, pipeline_run=False):
