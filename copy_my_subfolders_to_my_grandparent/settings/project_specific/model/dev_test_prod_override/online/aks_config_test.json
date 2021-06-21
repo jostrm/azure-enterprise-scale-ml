@@ -34,5 +34,8 @@
   "aks_memory_gb": 4,
   "enable_app_insights": true,
   "description": "AKS webserice in TEST environment.",
-  "tags": "{'environment': 'test'}"
+  "tags": "{'environment': 'test'}",
+  "scoring_timeout_ms": 300000,
+  "max_request_wait_time": 10000,
+  "timeout_seconds": 1
 }

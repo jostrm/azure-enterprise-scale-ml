@@ -31,6 +31,7 @@ from esml import ESMLProject
 print("SDK Version:", azureml.core.VERSION)
 
 p = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
+p.inference_mode = True # We want "INFERENCE" mode
 p.describe()
 
 cli_auth = AzureCliAuthentication()

@@ -37,6 +37,7 @@ p.describe()
 
 cli_auth = AzureCliAuthentication()
 ws = p.get_workspace_from_config(cli_auth) # Reads the current environment (dev,test, prod)config.json | Use CLI auth if MLOps
+p.inference_mode = False # We want "TRAIN" mode
 p.init(ws) # Automapping from datalake to Azure ML datasets, prints status
 
 target_env = "dev" # if not set, NEXT environment will be the TARGET automatically

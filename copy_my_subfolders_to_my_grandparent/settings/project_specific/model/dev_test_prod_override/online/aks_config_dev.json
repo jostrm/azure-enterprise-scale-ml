@@ -34,5 +34,8 @@
   "aks_memory_gb": 8,
   "enable_app_insights": false,
   "description": "AKS webserice in DEV environment.",
-  "tags": "{'environment': 'dev'}"
+  "tags": "{'environment': 'dev'}",
+  "scoring_timeout_ms": 300000,
+  "max_request_wait_time": 10000,
+  "timeout_seconds": 1
 }

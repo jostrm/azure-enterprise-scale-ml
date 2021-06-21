@@ -577,6 +577,10 @@ class ESMLProject():
            self.datastore = self.lake_access.GetLakeAsDatastore()
         return self.datastore
     
+    def get_run_and_task_type(self, run_id=None):
+        self.initAutoMLFactory()
+        return self.automl_factory.get_run_and_task_type(run_id)
+
     def get_best_model(self, ws,pipeline_run=False):
         self.initAutoMLFactory()
         return self.automl_factory.get_best_model(self,pipeline_run)
@@ -609,7 +613,9 @@ class ESMLProject():
             self.initComputeFactory(self.ws)
         return self._compute_factory 
 
-
+    def connect_to_lake(self):
+        self.lakestore = self.set_lake_as_datastore(self.ws) # only needed if NOT p.init() is done
+        
     def initComputeFactory(self,ws,reload_config=False):
 
         if(reload_config==True): # Force recreate, reload config
@@ -974,17 +980,18 @@ class ESMLProject():
     def get_workspace_from_config(self,cli_auth=None, vNetACR=True):
         try:
             if(cli_auth is None):
-                return Workspace.from_config(path="../../../", _file_name= self.get_workspace_configname())
+                self.ws = Workspace.from_config(path="../../../", _file_name= self.get_workspace_configname())
             else:
-                return Workspace.from_config(path="../../../", auth=cli_auth, _file_name= self.get_workspace_configname())
+                self.ws = Workspace.from_config(path="../../../", auth=cli_auth, _file_name= self.get_workspace_configname())
         except:
             try:
                 if(cli_auth is None):
-                    return Workspace.from_config(path="../../", _file_name= self.get_workspace_configname())
+                    self.ws = Workspace.from_config(path="../../", _file_name= self.get_workspace_configname())
                 else:
-                    return Workspace.from_config(path="../../", auth=cli_auth, _file_name= self.get_workspace_configname())
+                    self.ws = Workspace.from_config(path="../../", auth=cli_auth, _file_name= self.get_workspace_configname())
             except Exception as e:
                 raise UserErrorException("Config could not be found neither 3 or 2 folders, via: Workspace.from_config(path=../../, auth=cli_auth, _file_name= self.get_workspace_configname())") from e
+        return self.ws
 
     def authenticate_workspace_and_write_config(self, auth=None):
         if(auth is None):

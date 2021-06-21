@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
 from math import sqrt
-from sklearn.metrics import mean_squared_error, r2_score,recall_score,average_precision_score,f1_score,roc_auc_score,accuracy_score,roc_curve,confusion_matrix
+from sklearn.metrics import mean_squared_error, r2_score,recall_score,average_precision_score,f1_score,roc_auc_score,accuracy_score,roc_curve,confusion_matrix,mean_absolute_error, matthews_corrcoef
 import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
 
 def APE(actual, pred):
     """
@@ -32,6 +33,8 @@ def get_4_regression_metrics(test_set, label,fitted_model):
     # Calculate root-mean-square error
     y_actual = y_test.values.flatten().tolist()
     rmse = sqrt(mean_squared_error(y_actual, y_predict))
+    mae = mean_absolute_error(y_actual, y_predict)
+    spearman_correlation, p = spearmanr(y_actual, y_predict)
 
     # Calculate mean-absolute-percent error and model accuracy 
     sum_actuals = sum_errors = 0
@@ -45,7 +48,6 @@ def get_4_regression_metrics(test_set, label,fitted_model):
         sum_actuals = sum_actuals + actual_val
 
     mean_abs_percent_error = sum_errors / sum_actuals
-    accuracy = 1 - mean_abs_percent_error
     
     # Calculate the R2 score by using the predicted and actual 
     y_test_actual = y_test[label]
@@ -54,12 +56,12 @@ def get_4_regression_metrics(test_set, label,fitted_model):
     plt.style.use('ggplot')
     plt.figure(figsize=(10, 7))
     plt.scatter(y_test_actual,y_predict)
-    plt.plot([np.min(y_test_actual), np.max(y_test_actual)], [np.min(y_test_actual), np.max(y_test_actual)], color='lightblue')
+    plt.plot([np.min(y_test_actual), np.max(y_test_actual)], [np.min(y_test_actual), np.max(y_test_actual)], color='lightblue', label="R^2={}".format(r2))
     plt.xlabel("Actual")
     plt.ylabel("Predicted")
-    plt.title("R^2={}".format(r2))
+    plt.title("Actual VS Predicted (R^2={} )".format(r2))
 
-    return rmse, r2, mean_abs_percent_error,accuracy,plt
+    return rmse, r2, mean_abs_percent_error,mae, spearman_correlation,plt
 
 
 def get_7_classification_metrics(test_set, label,fitted_model):
@@ -72,12 +74,13 @@ def get_7_classification_metrics(test_set, label,fitted_model):
     auc = roc_auc_score(y_test, predict_proba)
     fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
     
-    accuracy, precision, recall, f1, matrix = \
+    accuracy, precision, recall, f1, matrix, matthews = \
     accuracy_score(y_test, y_predict),\
     average_precision_score(y_test, y_predict),\
     recall_score(y_test, y_predict),\
     f1_score(y_test,y_predict), \
-    confusion_matrix(y_test, y_predict)
+    confusion_matrix(y_test, y_predict), \
+    matthews_corrcoef(y_test, y_predict)  # Matthews Correlation Coefficient is The Best Classification Metric You’ve Never Heard Of...
 
     plt.plot(fpr, tpr, color='blue', label='AUC='+str(auc))
     plt.plot([0, 1], [0, 1], color='darkblue', linestyle='--')
@@ -87,5 +90,5 @@ def get_7_classification_metrics(test_set, label,fitted_model):
     plt.legend()
     #plt.show()
     
-    return auc,accuracy,f1, precision,recall,matrix, plt
+    return auc,accuracy,f1, precision,recall,matrix,matthews, plt
 

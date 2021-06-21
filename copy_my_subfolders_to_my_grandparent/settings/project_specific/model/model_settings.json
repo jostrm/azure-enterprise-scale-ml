@@ -1,0 +1,21 @@
+{
+    "classification_compare_metrics": ["AUC_promote_weight","Accuracy_promote_weight","F1_promote_weight", "Matthews_promote_weight2"],
+    "AUC_promote_weight": 0.02,
+    "Accuracy_promote_weight": -0.0001,
+    "Precision_promote_weight": 0.0,
+    "Recall_promote_weight": 0.0,
+    "F1_promote_weight": -0.0001,
+    "Log_loss_weight": 0.0,
+    "Matthews_promote_weight": 0.0,
+
+    "regression_compare_metrics": ["RMSE_promote_weight","R2_promote_weight","Spearman_promote_weight"],
+    "RMSE_promote_weight": 0.02,
+    "MAPE_promote_weight": 0.0,
+    "MAE_promote_weight": 0.0,
+    "R2_promote_weight": -0.001,
+    "Spearman_promote_weight": -0.001,
+
+    "docs1": "AUC_promote_weight= 0.2 meaning: new trained model must be 0.2 BETTER, to win the game.",
+    "docs2": "AUC_promote_weight= -0.2 meaning: new trained model can be 0.2 WORSE...but will still win the game, be promoted",
+    "docs3": "If same scoring, no promotion will be done, A < B is the behaviour. If you want to force promotion, use WEIGHTS, or env-flag, dev_test_prod_override/train/.../debug_always_promote_model=True"
+}

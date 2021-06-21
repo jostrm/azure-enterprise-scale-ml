@@ -35,6 +35,7 @@ p.describe()
 
 cli_auth = AzureCliAuthentication()
 ws, config_name = p.authenticate_workspace_and_write_config(cli_auth) # Authenticat to the current environment (dev,test, prod) and WRITES config.json | Use CLI auth if MLOps
+p.inference_mode = False # We want "TRAIN" mode
 p.init(ws) # Automapping from datalake to Azure ML datasets, prints status
 
 print("DEMO MLOPS FOLDER settings - remove this after you copies this folder)") # remove this after you copies this folder

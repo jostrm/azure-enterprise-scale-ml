@@ -34,5 +34,8 @@
   "aks_memory_gb": 14,
   "enable_app_insights": true,
   "description": "AKS webserice in prod environment.",
-  "tags": "{'environment': 'prod'}"
+  "tags": "{'environment': 'prod'}",
+  "scoring_timeout_ms": 300000,
+  "max_request_wait_time": 10000,
+  "timeout_seconds": 1
 }

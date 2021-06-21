@@ -36,6 +36,7 @@ p.describe()
 
 cli_auth = AzureCliAuthentication()
 ws = p.get_workspace_from_config(cli_auth) # Reads the current environment (dev,test, prod)config.json | Use CLI auth if MLOps
+p.inference_mode = True # We want "INFERENCE" mode
 p.init(ws) # Automapping from datalake to Azure ML datasets, prints status
 
 print("Environment:")
