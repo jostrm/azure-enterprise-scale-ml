@@ -1,10 +1,10 @@
 # azure-enterprise-scale-ml (ESML)
-Enterprise Scale ML (ESML) - on Azure
+Enterprise Scale ML (ESML) - AI Factory on Azure
+- A solution accelerator, for `Enterprise Scale Machine Learning` & `MLOps`, based on best & proven practices for organizational scale, across projects.
+- Read more: https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#mlops-at-organizational-scale-ai-factories
 
-*A solution accelerator, for enterprise scale Machine Learning projects*
-
-If you are looking for *`AutoLake™ - Data Mesh/Featurestore @ Azure`* and turnkey `MLOps` with `AutoML`?
- - Yes, this is the repo and solution accelerator including this (and some more)
+ Q:Looking for ESML AI Factory, with *`AutoLake™ - Data Mesh/Featurestore @ Azure`* and turnkey `MLOps` with `AutoML`?
+ - Yes, this is the repo and solution accelerator including this
 
 ![](./esml/images/esml-turnkey.png)
 
@@ -49,17 +49,42 @@ If you are looking for *`AutoLake™ - Data Mesh/Featurestore @ Azure`* and turn
 - A: With that said. ESML has a <ins>*ML first*</ins> approach, the most <ins>accelerators</ins> are ML-specific.
 
 **Q: How was this accelerator born, and what is it based on? It this for me?**
- - A:Working with multiple enterprise customers (aviation, manufacturing, energy and retail industry), we noticed common `non-industry-specific` challenges, to scale across projects, that ESML solves. 
+ - A:Working with multiple enterprise customers (aviation, manufacturing, space, energy and retail industry), we noticed common `non-industry-specific` challenges, to scale across projects, that ESML solves - an organizational scalability.
  
-    * [X] ESML `extends` Azure Machine Learning via accelerators, organizational agnostic. 
+    * [X] ESML `extends` Azure Machine Learning via accelerators, organizational agnostic - since the `project/teams` concept in ESML.
     * [X] It extends at specific purposes: `data refinement/datalake/machine learning` to build faster. 
-    * [X] Also adds `enterprise grade solution design & scalability` (dev,test, prod) - across subscriptions. 
+    * [X] Also adds `enterprise grade solution design & scalability` (dev,test, prod environments) - across subscriptions. 
 
-Note: You can use this for any `enterprise grade` solution in need of multi-subscription solutions, with an `enterprise datalake` need.
+Note: You can use this for any `enterprise grade` solution in need of single or multi-subscription solutions, with an `enterprise datalake` need, `DEV only` need, or `DEV->TEST->PROD` need.
 - ESML was born out of these needs. Based on both Microsoft `best practices` and customer `proven practices`
 - ESML accelerates common things a ML-solution from A-Z needs, and focus on `reusage of code and refined data` across projects, at an enterprise. To be more efficient. 
 Contains both "must-have" to "nice-to-have" capabilities.
 - Disclaimer:Although this have accelerated others, there is no guarantee it will accelerate your situtation. Read the MIT LICENCE file & Happy coding.
+
+**Q6 ESML AI Factory: Can I just use the Azure ML SDK directly? Instead of the ESML SDK?** 
+- Yes, You can bypass ESML SDK 100%  (the 4th ingredience) and only take advantage of the 3 other ingredients: part: 1,2,3
+    - part 1) `Azure services glued together securely` (ARM / Provisioing / Networking / Infra)
+    - part 2) `Azure Devops template, for MLOps` (BUILD and RELEASE pipelines / Networking / Security & Glue) 
+    - part 3) `The enterprise datalake design` (ADLS Gen2 storage account, with a folder structure)
+    
+- That said, to get the `accelerator power` - use the `EMSL SDK`. See benefits listed below ( and look at this full README feature list for all benefits)
+    - `4 out of the 7 steps/pipelines of a ML application`: There is `always at least 6 steps you need to create`, step 7 is optional.
+    - ESML gives you 4 of these automatically. Not the asterix (*) ones, but the `gold ones` (3,4,5a,7)
+        - *1) Ingest from source
+            - Azure Data Factory: This is too specific for EMSL. A COPY Activity from your source (DW/Database) to the IN-folder in ADLS Gen2, Datalake)
+        - *2) FeatureEngineering "Bronze2Gold"
+            - Azure ML Pipeline: Too specific for ESML. You need yo create your own Azure ML Pipleine)
+        - `3) TrainModel` (AutoML pipeline - you can also create your own manual Training Azure ML Pipeline)
+            - Inclusing TEST_SET scoring...which is not included in Azure ML Studio funcionality.
+        - `4) CompareScoringDrift & DataDrift` - Should be promote & Deploy the newly trained model? Needed to refit model to real world changes.
+        - `5a) Deploy AKS Scoring endpoint - Online/Batch (Only up to 5min REST call for BATCH)`
+        - *5b) Deploy Scoring endpoint - Batch
+            - Azure ML Pipeline: You need to create an AML batch pipline if `5a`  ONLINE/BATCH does not work..limited to 5min BATCHes...you can always to `5min looping`)
+        - *6) `ConsumeScoring` & WriteBack (Azure Data Factory: This is too specific for EMSL. 
+            - But ESML has already written the data to the Datalake, you you jsut need a simple COPY ACTIVITY from ADLS Gen2, to your `Target/DW/Database`)
+            - Hence, the `ConsumeScoring` ESML also provide - where you can `filter` scored data, on `datetime`, or `caller_id`, etc
+        - `7)ShareBackPipeline` (Write back refined project SILVER data, to MASTER datalake, for others to use
+            - ¤¤= This STEP/Pipeline, is of course NOT important if you don't need refined data, reused in your organization.
 
 # WHAT is ESML?
 `ESML` is an `accelerator` , 1 part is this `ESML SDK`- accelerator code and a auto-datalake to `code ML faster`, abstract away `Azure ML Studio` (datasets/versioning/experiments) - automated creation of artifacts.  
@@ -228,6 +253,34 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 - A: True. BUT - since you have versioning built in (both for data and changing schema) in `AutoLake`, you may utilize this: first save the scored data/analytics to the datalake, then to database as `cache`
     - The pro's of this is that you can use the build in versioning to create your Database tables from the dataset-version: A "version-table" in your DB, and use INFERENCE version in ESML and "GOLD_SCORED" schema.
 
+**Q9: If I only want to REFINE DATA for a Power BI report?** 
+`Besides the 6-step "ML application" process` above ↑ The ESML SDK gives a data engieer / Data scientists / Power BI ninja, also these benefits, on a `DETAILED level`
+- `Datalake aware`: ESML knows the lake structure. You never need to rememeber any paths. Just work with BRONZE, SILVER, GOLD concept + ML Concepts (TRAIN vs INFERENCE)
+- `Datasets`: Autoregisters Azure ML Datasets in correct workspace, with naming convention + tags of scoring, split, versioning, and a UI to browse data
+    - Datasets does not need to be used for Machine learning. Seet this as a `feature store` for your project. The `model_folder` in the lake, can be `Power BI report datasets`
+    - If you just want to `REFINE data for a Power BI report`, you can leverage the same BRONZE,SILVER, GOLD concept and the `AutoLake`
+- `Deploy application/code` across 3 environments/3 subscriptions: Dev,Test, Prod
+    - 1-liner DEPLOY a model to online AKS webservice in DEV or to TEST or PROD, but anything can be deployed...
+    - What we deploy, can be a WebApplication, does not need to be a ML-model in the AKS Webservice.
+- `Governance`: ENTERPRISE SPECIFIC settings, global for all projects, and `PROJECT SPECIFIC` settings
+    - `DEV, TEST, PROD SETTINGS`: Settings for: Performance & Compute (Train, Inference), Training time, 
+    - `DEV,TEST,PROD PROJECTS `: A project has a `set of Azure PaaS services` that can talk, due to ESML SDK glue:
+        - `Azure Databricks` -> (can talk & read/write) to the `Datalake`, due to the ESML mount/mappings & built in security/Networking
+        - `Azure Databricks` -> (can talk & read/write) to `Azure ML Studio` (and vice versa) due to the ESML settings & built security & built in security/Networking
+        - `Azure Datafactory` -> (can talk) to `Datalake` and `Azure Databricks` and `Azure ML Studio` 
+            - Due to ESML built in security/Networking (also bootstrap piplines for `WriteBackToMaster`)
+        - `Azure Devops` can be used due to security/Networking
+        - `Dev->Test->Prod`: `DEV` services can only talk to DEV (Networking/Security), and the neighbour TEST, but never jump `DEV` to talk or deploy directly to `PROD` services
+- `Security`: Networking & Identity & Security (ESML SDK knows how to speak with vNets and Private link, and Keyvaults)
+    - `Dev->Test->Prod`: `DEV` services can only talk to DEV (Networking/Security), and the neighbour TEST, but never jump `DEV` to talk or deploy directly to `PROD` services
+    - `Private Link (Azure backbone)` is the default EMSL networking setup, when services talk to each other.
+        - Exceptions of private link: Sometimes Azure DAtabricks is only vNet injected. (Azure Devops build agent is on same vNet only)
+-  (Plus the ML parts in detail)
+    - `ML`: Test_Set scoring with a 1-liner, registers this as TAGS on GOLD_TEST set in Azure ML Studio, and TAGS on best MODEL at run. (`once and only once` to calcuate scoring)
+    - `Azure ML pipeline: Train`: AutoML training with a 2-liner
+    - `MLOps pipline`: All 6 steps `for FREE` when using ESML, including `SCORING DRIFT` and Dev,Test,Prod aware when comparing `SCORING DRIFT`
+    - `MLOps:Scoring drift` across 3 environments, a 1-liner, `promotes` the model to correct ENVIRONMENT (dev,test, prod) if `better` (gets promoted)
+
 **Q: What are the limitations in ESML v0.2 ?**
 - A: An accelerator has a purposed `edge` and `ease of use` - also purposely less flexible and more `standardized`.
     - All data is saves automatically as `.parquet` in the datalake (Bronz, Silver, Gold). The `IN` data folder should be either .csv or .parquet
@@ -325,15 +378,41 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 ## `MLOps` - Example: compare model in DEV subscription with TEST subscription
 
 ![](./esml/images/esml-mlops-2.png)
+
+## `TEST_SET Scoring` to Azure ML Studio, as TAGS
+- ![](./esml/images/01_setup_model_9.png)
+ 
+## `Scoring Drift / Concept Drift` to promote newly trained model (also as step in ESML MLOps pipeline)
+- We can adjust WEIGHTS, and definition of what a BETTER model is, scoring wise.
+- Example below, the newly trained model in DEV SCORED worse, than TARGET model in TEST environment, Promote=False.
+- ![](./esml/images/01_setup_model_10.png)
+
 ## `Settings`
 - Besides there green circles, you have a config per environment (dev,test,prod) for COMPUTE power & and HYPERPARAMETER tuning needed (e.g. in DEV you might wanna have cheaper training runs)
 
 ![](./esml/images/esml-settings.png)
+### Project/Model settings
+![](./l/esml/images/01_setup_model_1.png)
+#### Lake settings
+![](./esml/images/01_setup_model_2.png)
+
+##### Model_settings
+- Purpose: For SCORING-DRIFT to know what metrics to use when COMPARING `compare_metrics` that YOU control, and can put `WEIGHTs` on also.
+- See also the `"docs1"`, `"docs2"`,`"docs3"` text in image
+- All else, you can set to 0.0 to have no `WEIGHTS` when comparing scoring for model A and B, to see if we want ot promote model A
+- ![](./esml/images/01_setup_model_3.png)
+
+##### DATA: CONFIGURE `Date_Folder for DATA to use` (demo data is already configured)
+- Per `ENVIRONMENT (dev,test,prod)` and per `TRAINING` and `INFERENCE` you can have different data, you can also `choose what MODEL_VERSION to score with`, at INFERENCE
+- These .JSON files can be overridden by ESMLProject Constructor, and/or by putting these file in the ESML AutoLake's `active` folder
+- ![](./esml/images/01_setup_model_4.png)
+- ![](./esml/images/01_setup_model_5.png)
 
 ## DEPLOY to AKS - realtime & batch scoring
 - You can deploy a model to AKS with 2 lines of code. 
 - Then use this endpoint to inference, for a single row or batches of rows (that will be saved in the lake). See other inmages.
 ![](./esml/images/deploy-to-aks.png)
+
 
 ## Scoring - ONLINE or BATCH scoring, with same serving (AKS)
 - `ONLINE/REALTIME`: Since you can deploy a model in ESML with 2 lines of code, it is easy to serve a model. Also it will use performance config for the environment you are targeting (DEV,TEST, PROD)
