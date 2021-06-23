@@ -1265,6 +1265,10 @@ class AutoMLFactory(metaclass=Singleton):
         print("New trained model & cached RUN, has TASK_TYPE: {} and Best_Run_id: {}".format(source_task_type,source_best_run.id))
         print("Target model & RUN, in Azure ML Studio workspace to compare with, has TASK_TYPE: {} and Best_Run_id: ".format(target_task_type,target_best_run.id))
 
+        if(target_best_run.id !=None): # 1st run, 1st model...just promote
+            print("This is the first model. No target to compare with, hence we will PROMOTE")
+            return True
+
         if (source_task_type != target_task_type): 
             print("Error: Cannot compare models of different machine learning task_type: {} != {} , or target_task_type is none (promote_new_model is returned as True)".format(source_task_type,target_task_type))
             print(" - Example: Cannot compare REGRESSION with CLASSIFICATION...")
