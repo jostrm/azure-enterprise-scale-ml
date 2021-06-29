@@ -1,7 +1,9 @@
 # azure-enterprise-scale-ml (ESML)
 Enterprise Scale ML (ESML) - AI Factory on Azure
-- A solution accelerator, for `Enterprise Scale Machine Learning` & `MLOps`, based on best & proven practices for organizational scale, across projects.
-- Read more: https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#mlops-at-organizational-scale-ai-factories
+- A solution accelerator, for `Enterprise Scale Machine Learning` & `MLOps`, based on best & proven practices for organizational scale, across projects. 
+- Read more about Enterprise Scale ML best practices here: https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#mlops-at-organizational-scale-ai-factories
+- ESML has a default scaling from 25-250 ESMLprojects. That said, but you can start with just 1. The roof is on IP-plan. (e.g. allocated IP-ranges for min 25 projects, you can adjust this default)
+-
 
  Q:Looking for ESML AI Factory, with *`AutoLake™ - Data Mesh/Featurestore @ Azure`* and turnkey `MLOps` with `AutoML`?
  - Yes, this is the repo and solution accelerator including this
