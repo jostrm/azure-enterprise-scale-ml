@@ -125,7 +125,7 @@ ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio:
 # ESMLPipelineFactory
 - This scoring pipeline is automatically ESML-generated, via only `2 lines of code`!! (This is possible due to the 4 ingrediences in ESML)
 - If you have your data in IN in "GOLD" state, it will work `as-is`, but probably : ) you want to add your `data wrangling` per `IN_TO_SILVER` step, in the 1-M auto-generated `ds_name_by_config.py` scripts
-![](./azure-enterprise-scale-ml/esml/images/aml-pipeline_batch_ppt-3.png)
+![](./esml/images/aml-pipeline_batch_ppt-3.png)
 
 
 # WHAT is ESML Autolake™ ( Azure Datalake Storage GEN2 accelerator)
