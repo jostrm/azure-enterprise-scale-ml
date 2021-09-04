@@ -7,7 +7,7 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
  Q:Looking for ESML *`AutoLake™ - (supports: Data Mesh/Featurestore/DeltaLake) @ Azure`* and `ESML AI Factory` with turnkey `MLOps` with `AutoML`?
  - Yes, this is the repo and solution accelerator including this.
  - Yes, ESML are using `Azure Datalake GEN 2` 100%. Also for Azure ML Pipelines/Datastore (using the GA Storage SDK to upload files, since Azure ML SDK has only experimental status). No blob storage needed. 
- - Yes, `ESML supports DeltaLake` for MASTER data. How does that work since Azure ML does not support .delta ? A: When ESML autogenerates Azure ML pipelines, the .parquet file of .delta is used.
+ - Yes, `ESML supports DeltaLake` for MASTER data. How does that work since Azure ML does not support .delta yet? A: When ESML autogenerates Azure ML pipelines, a .parquet representation is used in the PROJECTS structure.
 
 ![](./esml/images/esml-turnkey.png)
 ## ESML Dashboard - Dev,Test,Prod environments
