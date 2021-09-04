@@ -83,8 +83,8 @@ Contains both "must-have" to "nice-to-have" capabilities.
     - part 3) `The enterprise datalake design` (ADLS Gen2 storage account, with a folder structure)
     
 - That said, to get the `accelerator power` - use the `EMSL SDK`. See benefits listed below ( and look at this full README feature list for all benefits)
-    - `4 out of the 7 steps/pipelines of a ML application`: There is `always at least 6 steps you need to create`, step 7 is optional.
-    - ESML gives you 4 of these automatically. Not the asterix (*) ones, but the `gold ones` (3,4,5a,7)
+    - `5.5 out of the 7 steps/pipelines of a ML application`: There is `always at least 6 steps you need to create`, step 7 is optional.
+    - ESML gives you 5 (or 5 and a half) of these automatically. Not the asterix (*) ones, but the `bold ones` (3,4,5a,5b,6,7)
         - *1) Ingest from source
             - Azure Data Factory: This is too specific for EMSL. A COPY Activity from your source (DW/Database) to the IN-folder in ADLS Gen2, Datalake)
         - *2) FeatureEngineering "Bronze2Gold"
@@ -92,12 +92,14 @@ Contains both "must-have" to "nice-to-have" capabilities.
         - `3) TrainModel` (AutoML pipeline - you can also create your own manual Training Azure ML Pipeline)
             - Inclusing TEST_SET scoring...which is not included in Azure ML Studio funcionality.
         - `4) CompareScoringDrift & DataDrift` - Should be promote & Deploy the newly trained model? Needed to refit model to real world changes.
-        - `5a) Deploy AKS Scoring endpoint - Online/Batch (Only up to 5min REST call for BATCH)`
-        - *5b) Deploy Scoring endpoint - Batch
-            - Azure ML Pipeline: You need to create an AML batch pipline if `5a`  ONLINE/BATCH does not work..limited to 5min BATCHes...you can always to `5min looping`)
-        - *6) `ConsumeScoring` & WriteBack (Azure Data Factory: This is too specific for EMSL. 
-            - But ESML has already written the data to the Datalake, you you jsut need a simple COPY ACTIVITY from ADLS Gen2, to your `Target/DW/Database`)
-            - Hence, the `ConsumeScoring` ESML also provide - where you can `filter` scored data, on `datetime`, or `caller_id`, etc
+        - `5a) ONLINE scoring: Deploy AKS Scoring endpoint - Online/Batch (Only up to 5min REST call for BATCH)`
+        - `5b) BATCH scoring: Create & Publish  Scoring endpoint`
+            - Azure ML Pipeline: See ESMLPipelineFactory. 
+        - `6) Scoring  & *Writeback`  (Azure Data Factory) - See `ESMLPipelineFactory`
+            - To get data to score from SOURCE and *WriteBack* is of course specific for EMSL to automate, but 4 Azure datafactory TEMPLATE pipelines is given,with parameters, working end-to-end from SOURCE SQL Database:
+                - Since ESML has already has created the Azure ML Pipline, it knows how to score and what parameters to set. 
+                - Since ESML written the scored result data to the Datalake, it knows how to WriteBack from ADLS Gen2 to your `Target/DW/Database`)
+                - ESML also provide - where you can `filter` scored data, on `datetime`, or `caller_id`, etc
         - `7)ShareBackPipeline` (Write back refined project SILVER data, to MASTER datalake, for others to use
             - ¤¤= This STEP/Pipeline, is of course NOT important if you don't need refined data, reused in your organization.
 
