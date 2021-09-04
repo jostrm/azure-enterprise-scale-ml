@@ -78,7 +78,7 @@ class LakeAccess():
             os.chdir(old_loc)
 
 # ACL vs RBAC - https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-access-control-model
-    def GetLakeAsDatastore(self, setAsDefault=False):
+    def GetLakeAsDatastore(self, setAsDefault=True):
         datastore_name = self.storage_config['lake_datastore_name']
 
         sp_id_key = self.storage_config['kv-secret-esml-projectXXX-sp-id']
@@ -97,6 +97,7 @@ class LakeAccess():
             print("GetLakeAsDatastore: sa_name", sa_name)
             print("GetLakeAsDatastore: rg_name", rg_name)
             print("GetLakeAsDatastore: sub_id", sub_id)
+            print("GetLakeAsDatastore.setAsDefault: setAsDefault: {}".format(setAsDefault))
 
 
         external_kv, tenantId = AzureBase.get_external_keyvault(self.ws, sp_id_key, sp_secret_key, tenant, url)
@@ -114,6 +115,8 @@ class LakeAccess():
             ds = Datastore(self.ws, datastore_name)  # Return if already exists
             self.datastore = ds
             if(ds != None):
+                if(setAsDefault):
+                    ds.set_as_default()
                 return ds
         except Exception as ex:
             print("Datastore to common lake does not exists in AMLS workspace {}, creating it...{}".format(self.ws.name, datastore_name))
@@ -131,10 +134,9 @@ class LakeAccess():
                                                             grant_workspace_access=True,
                                                             subscription_id=sub_id, 
                                                             resource_group=rg_name)
-        if(setAsDefault):
-            self.ws.set_default_datastore(datastore)
+        if(setAsDefault == True):
+            datastore.set_as_default()
         self.datastore = datastore
-
         return datastore
 
     def GetBlobAsDatastore(self,setAsDefault=False):

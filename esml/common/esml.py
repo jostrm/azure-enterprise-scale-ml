@@ -44,6 +44,7 @@ from collections import defaultdict
 from azureml.core.authentication import ServicePrincipalAuthentication
 import argparse
 from azureml.train.automl.exceptions import NotFoundException
+from azureml.core import Experiment
 
 class ESMLProject():
     ws = None
@@ -113,6 +114,7 @@ class ESMLProject():
     demo_mode = True
     multi_output = None
     inference_use_top_version = True
+    _cpu_gpu_databricks = "cpu" # gpu, databricks
     
     # , param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None
     def __init__(self, dev_test_prod=None, param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None):
@@ -575,6 +577,8 @@ class ESMLProject():
             self.datastore = self.lake_access.GetBlobAsDatastore()
         else:
            self.datastore = self.lake_access.GetLakeAsDatastore()
+           #self.datastore.set_as_default()
+           self.lakestore = self.datastore
         return self.datastore
     
     def get_run_and_task_type(self, run_id=None):
@@ -584,6 +588,40 @@ class ESMLProject():
     def get_best_model(self, ws,pipeline_run=False):
         self.initAutoMLFactory()
         return self.automl_factory.get_best_model(self,pipeline_run)
+
+    def get_best_model_via_experiment_name(self,filter_on_version = None):
+        latest_model = None
+
+        ex1 = Experiment(self.ws, self.experiment_name)
+        tag_model_name = None
+        tag_model_version = None
+        if (ex1.tags is not None):
+            tag_model_name = ex1.tags["model_name"]
+            tag_model_version = ex1.tags["best_model_version"]
+        
+            if (filter_on_version is not None):
+                latest_model = Model(self.ws, name=tag_model_name, version=filter_on_version)
+                print ("found model via REMOTE FILTER + VersionFilter as input")
+            else:
+                latest_model = Model(self.ws, name=tag_model_name, version=tag_model_version)
+                print ("found model via REMOTE FILTER: Experiment TAGS: model name and version")
+        else:
+            for m in Model.list(self.ws):
+                if(m.experiment_name == self.experiment_name):
+                    if(filter_on_version is not None):
+                        if(filter_on_version == m.version):
+                            latest_model = m
+                            break
+                    else:
+                        latest_model = m
+                    break
+            print ("found model via looping all in experiment on CLIENT")
+            if (latest_model is not None): # Update Experiment tag
+                ex = Experiment(self.ws, self.experiment_name)
+                tags = {'model_name':latest_model.name, 'best_model_version':m.version}
+                ex.set_tags(tags)
+
+        return latest_model
 
     def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix_char=None):
         self.initComputeFactory(ws)
@@ -615,7 +653,7 @@ class ESMLProject():
 
     def connect_to_lake(self):
         self.lakestore = self.set_lake_as_datastore(self.ws) # only needed if NOT p.init() is done
-        
+        return self.lakestore
     def initComputeFactory(self,ws,reload_config=False):
 
         if(reload_config==True): # Force recreate, reload config
@@ -724,6 +762,13 @@ class ESMLProject():
             self.dev_test_prod = old_state # switch back
         return conf
 
+    def get_authenticaion_header_sp(self):
+        kv = self.ws.get_default_keyvault() # Get "current" workspace, either CLI Authenticated if MLOps, or in DEMO/DEBUG Interactive
+        sp = ServicePrincipalAuthentication(tenant_id=kv.get_secret(name=self.security_config["tenant"]), # tenantID
+                                                service_principal_id=kv.get_secret(self.security_config["kv-secret-esml-projectXXX-sp-id"]), # clientId
+                                                service_principal_password=kv.get_secret(self.security_config["kv-secret-esml-projectXXX-sp-secret"])) # clientSecret
+        return sp
+
     def get_other_workspace(self, dev_test_prod):
         kv = self.ws.get_default_keyvault() # Get "current" workspace, either CLI Authenticated if MLOps, or in DEMO/DEBUG Interactive
         other_ws = None
@@ -750,6 +795,14 @@ class ESMLProject():
             self.dev_test_prod = current_env
 
         return other_ws
+
+    @property
+    def cpu_gpu_databricks(self):
+        return self._cpu_gpu_databricks
+    
+    @cpu_gpu_databricks.setter
+    def cpu_gpu_databricks(self, cpu_gpu_databricks):
+        self._cpu_gpu_databricks = cpu_gpu_databricks
 
     @property
     def inference_mode(self):
@@ -821,6 +874,13 @@ class ESMLProject():
         return self.ModelAlias+"_GOLD_SCORED"
 
     @property
+    def dataset_gold_scored_runinfo_name_azure(self):
+        return self.ModelAlias+"_GOLD_SCORED_RUNINFO"
+    @property
+    def dataset_active_name_azure(self):
+        return self.ModelAlias+"_ACTIVE_FOLDER"
+
+    @property
     def dataset_gold_to_score_name_azure(self):
         return self.ModelAlias+"_GOLD" + self.dataset_inference_suffix
     @property
@@ -850,7 +910,44 @@ class ESMLProject():
         dataset_gold_scored_name_azure
     '''
 
-    def get_gold_scored_unique_path(self, batch_datetime_from_config = None, unique_uuid4 = None, same_guid_folder=True):
+    def path_gold_to_score_template(self, date_folder=False,id_folder=False):
+        to_score_template = ""
+        baseline = self._inference_gold_path.format(self.project_folder_name,self.model_folder_name,"{model_version}", self.dev_test_prod)
+
+        if(date_folder):
+            to_score_template = baseline+ "{date_folder}" + "/"
+        else:
+            to_score_template = baseline
+
+        if (id_folder):
+            to_score_template = to_score_template + "{id_folder}" + "/"
+        
+        return to_score_template
+    
+    def path_gold_scored_template(self, date_folder=False,id_folder=False):
+        to_score_template = "" 
+        baseline = self._inference_scored_path.format(self.project_folder_name,self.model_folder_name,"{model_version}", self.dev_test_prod)
+
+        if(date_folder):
+            to_score_template = baseline+ "{date_folder}" + "/"
+        else:
+            to_score_template = baseline
+
+        if (id_folder):
+            to_score_template = to_score_template + "{id_folder}" + "/"
+
+        return to_score_template
+
+    @property
+    def path_inference_active(self):
+        inference_active_meta = self._project_inference_path.format(self.project_folder_name,self.model_folder_name) + "active"
+        return inference_active_meta
+    @property
+    def path_inference_gold_scored_runinfo(self):
+        inference_gold_scored_info = self._project_inference_path.format(self.project_folder_name,self.model_folder_name) + "active/gold_scored_runinfo"
+        return inference_gold_scored_info
+
+    def get_gold_scored_unique_path(self, batch_datetime_from_config = None, same_guid_folder=True,unique_uuid4 = None):
         to_score_unique_folder = ""
         scored_unique_folder = ""
         date_folder = ""
@@ -1090,7 +1187,7 @@ class ESMLProject():
             # 2) Save pandas_X_test to goldpath
 
             to_score_folder, scored_folder, date_folder = self.get_gold_scored_unique_path()
-            to_score_folder_latest, scored_folder_latest, date_folder_latest = self.get_gold_scored_unique_path(batch_datetime_from_config = None, unique_uuid4 = None, same_guid_folder=False)
+            to_score_folder_latest, scored_folder_latest, date_folder_latest = self.get_gold_scored_unique_path(batch_datetime_from_config = None, same_guid_folder=False,unique_uuid4 = None)
 
             srs_folder = './common/temp_data/{}/inference/{}/Gold/'.format(self.project_folder_name,v_str)
             file_name = "to_score_{}.parquet".format(caller_guid) # HERE ....who is this scoring about?
@@ -1169,7 +1266,6 @@ class ESMLProject():
         target_path = self.GoldPath + 'Train/'
         file_name = "gold_train.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
-        #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
         dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
@@ -1218,7 +1314,7 @@ class ESMLProject():
         target_path = self.GoldPath + 'Validate/'
         file_name = "gold_validate.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
-        #ESMLProject.clean_temp(self.project_folder_name)
+        
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
         dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
@@ -1240,7 +1336,6 @@ class ESMLProject():
         target_path = self.GoldPath + 'Test/'
         file_name = "gold_test.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
-        #ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
 
         dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
@@ -1276,7 +1371,7 @@ class ESMLProject():
     
         return train,validate,test
     
-    #TODO
+    
     def split_gold_3_groupBy(self,train_percentage=0.6, label=None, groupBy=None, new_version=True, seed=42):
 
         df = self.Gold.to_pandas_dataframe()
@@ -1811,6 +1906,7 @@ class ESMLDataset():
     _silver_train = None
     _silver_inference = None
     #Names 
+    _nameAzurePrefix = None
     _silver_name_azure = ""
     _bronze_name_azure = ""
     _in_name_azure = ""
@@ -1828,6 +1924,15 @@ class ESMLDataset():
     _inference_path_template = "{}/{}/{}/inference/{}/{}/{}/{}/{}/"
     _bronze_path_inference = ""
     _silver_path_inference= ""
+
+    # Compute power
+    _cpu_gpu_databricks = "cpu"
+    _runconfig = None # Can be set manually, if None default is set
+
+    # Script names
+    _in2bronze_prefix = "in2bronze"
+    _bronze2silver_prefix = "bronze2silver"
+    _in2silver_prefix = "in2silver"
 
     # GLOBAL
     inferenceModelVersion = 0
@@ -1871,8 +1976,40 @@ class ESMLDataset():
             version = ds_version)
 # GET/SET
 
-# TODO: Same as GOLD, if versioning needed for this. For now - save storage
+    @property
+    def in2bronze_filename(self):
+        return self._in2bronze_prefix +"_"+ self.Name + ".py"
+    @property
+    def bronze2silver_filename(self):
+        return self._bronze2silver_prefix +"_"+ self.Name + ".py"
+    @property
+    def in2silver_filename(self):
+        return self._in2silver_prefix +"_"+ self.Name + ".py"
 
+    @property
+    def runconfig(self):
+        return self._runconfig
+    
+    @runconfig.setter
+    def runconfig(self, runconfig):
+        self._runconfig = runconfig
+
+    @property
+    def cpu_gpu_databricks(self):
+        return self._cpu_gpu_databricks
+    @cpu_gpu_databricks.setter
+    def cpu_gpu_databricks(self, cpu_gpu_databricks):
+        self._cpu_gpu_databricks = cpu_gpu_databricks
+
+# TODO: Same as GOLD, if versioning needed for this. For now - save storage
+    @property
+    def NameAzurePrefix(self):
+        if(self._project.inference_mode):
+            self._nameAzurePrefix = self._project.ModelAlias +"_"+self.ds_name+self.dataset_inference_suffix
+        else:    
+            self._nameAzurePrefix = self._project.ModelAlias +"_"+self.ds_name+"_train_"
+        return self._nameAzurePrefix
+    
     @property
     def Bronze(self):
         try:
@@ -2024,6 +2161,26 @@ class ESMLDataset():
 #READ ONLY- with logic of "Version folder for inference"
 
     @property
+    def AzureName_IN(self):
+        return self.NameAzurePrefix + "IN"
+    @property
+    def AzureName_Bronze(self):
+        return self.NameAzurePrefix + "BRONZE"
+
+    @property
+    def AzureName_Silver(self):
+        return self.NameAzurePrefix + "SILVER"
+
+    @property
+    def InPathTemplate(self):
+        if(self._project.inference_mode):
+            self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, "{inference_model_version}",self.ds_name  ,"in","{dev_test_prod}","{scoring_folder_date}")
+            return self._in_path_inference
+        else:
+            self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in","{dev_test_prod}","{in_folder_date}")
+            return self._in_path_train
+
+    @property
     def InPath(self):
         if(self._project.inference_mode):
             self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, self.inferenceModelVersion,self.ds_name  ,"in",self._project.dev_test_prod,self._project.date_scoring_folder.strftime('%Y/%m/%d'))
@@ -2031,6 +2188,15 @@ class ESMLDataset():
         else:
             self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in",self._project.dev_test_prod,self._project.InDateFolder)
             return self._in_path_train
+   
+    @property
+    def BronzePathTemplate(self):
+        if(self._project.inference_mode):
+            self._bronze_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, "{inference_model_version}",self.ds_name  ,"out","bronze","{dev_test_prod}")
+            return self._bronze_path_inference
+        else:
+            return self._bronze_path_train
+
     @property
     def BronzePath(self):
         if(self._project.inference_mode):

@@ -3,12 +3,22 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
 - A solution accelerator, for `Enterprise Scale Machine Learning` & `MLOps`, based on best & proven practices for organizational scale, across projects. 
 - Read more about Enterprise Scale ML best practices here: https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#mlops-at-organizational-scale-ai-factories
 - ESML has a default scaling from 25-250 ESMLprojects. That said, but you can start with just 1. The roof is on IP-plan. (e.g. allocated IP-ranges for min 25 projects, you can adjust this default)
--
 
- Q:Looking for ESML AI Factory, with *`AutoLake™ - Data Mesh/Featurestore @ Azure`* and turnkey `MLOps` with `AutoML`?
- - Yes, this is the repo and solution accelerator including this
+ Q:Looking for ESML *`AutoLake™ - (supports: Data Mesh/Featurestore/DeltaLake) @ Azure`* and `ESML AI Factory` with turnkey `MLOps` with `AutoML`?
+ - Yes, this is the repo and solution accelerator including this.
+ - Yes, ESML are using `Azure Datalake GEN 2` 100%. Also for Azure ML Pipelines/Datastore (using the GA Storage SDK to upload files, since Azure ML SDK has only experimental status). No blob storage needed. 
+ - Yes, `ESML supports DeltaLake` for MASTER data. How does that work since Azure ML does not support .delta ? A: When ESML autogenerates Azure ML pipelines, the .parquet file of .delta is used.
 
 ![](./esml/images/esml-turnkey.png)
+## ESML Dashboard - Dev,Test,Prod environments
+- Easy to provision a new ESMLProject for Dev,Test,Prod with easy cost followup, since its own PROJECT resource groups.
+
+![](./esml/images/esml-dash-small.png)
+
+- Can optionally integrate with ITSM system as a "ticket" in ServiceNow/Remedy/JIRA Service Desk. The below info is needed for the ESML provisioning:
+![](./esml/images/esml-project-ticket.png)
+## ESML Architecture - "Modern data analytics platform"
+![](./esml/images/esml-arch-small.png)
 
 # INTRO - Is this for you?
 **Q1:I want to use Azure AutoML, with MLOps ready to be `turned ON`** , with datalake design automatically generated for me, including `BRONZE, SILVER, GOLD` concept
@@ -27,12 +37,13 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
 - A: With that said, ESML has a *`AutoML` first* approach.
     - Using this accelerates more, and enables easier & cheaper governance (unattended retraining with auto-hyperparameter tuning)
     
-**Q4:Does ESML support <ins>`BIG DATA` use cases? </ins>?** - Can I still get use ESML, which is Python based, no PySpark?
-- A: **First**. `What is BIG DATA?` I asked my collegeus on the Databricks team: 
+**Q4:Does ESML support <ins>`BIG DATA` use cases? </ins>?** - Can I still get use ESML, which is Python focused, no PySpark?
+- A: ESML are an accelerator to `DEFINE` Azure ML Pipelines, which can have a `Synapse Spark step` or `DataBricksStep`, where you can wrhite `PySpark`
+- A: **But, first**. `What is BIG DATA?` I asked my collegeus on the Databricks team:
 
-    - Q: If you have data below 8-10TB, No, but this is a grey zone here. 
-    - Q: If <1TB - definetely not BIG data.
-    - Q: Above 10TB - Yes. Here you need a spark cluster. Azure ML CPU clusters is not a good tool here.
+    - A: -Well, If you have data below 8-10TB, No, but this is a grey zone here.
+    - A: ..If <1TB - definetely not BIG data.
+    - A: ...Above 10TB - Yes. Here you need a spark cluster. Azure ML CPU clusters is not a good tool here.
     - AND: Looking at my own recent experience (past 2 years) - helping customers in 13 ML projects. 
 
         - None of the 13 ML-projects (models) was close to being BIG DATA (e.g. well below 1TB)
@@ -41,13 +52,15 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
         - Some was <15 MB
     - Hence, ESML has a `<1TB` first approach, you might call it: *Small->Large Data* first approach. 
         - This is per model. The `AutoLake` is `PETA byte` scalable.
-- A: **Second**: `You CAN support BIG DATA in ESML`. The parts/step in the pipeline that do requires BIG DATA crunching performance, you can use an Synapse Spark step, or Azure Databricks notebook setp - Spark clusters, in the Azure ML Pipeline, in ESML.
-    - Tip: If you mount the BRONZE,SILVER,GOLD folders and process data with Databricks there - the data will be automaticaly read & registered as Datasets by ESML in Azure ML Studio - ready for training.
+- A: **Second**: `You CAN support BIG DATA in ESML`. The parts/step in the pipeline that do requires BIG DATA crunching performance, you can use an Synapse Spark step, or Azure Databricks notebook setp - Spark clusters, in the Azure ML Pipeline, in ESML. 
+    - You will get mounted IN, BRONZE,SILVER per dateaset, and GOLD folder ablet to process data with Databricks - data will be automaticaly read & registered as Datasets by ESML in Azure ML Studio - ready for training.
     - With that said, ESML is Python first, and has no <ins>accelerators</ins> build on top of PySpark yet (but it would be a good feature)
 
 **Q5:I <ins>DO NOT</ins> want to do ML** just `traditional data wrangling/analtyics` - Can I still use ESML, for just quick DEV & AutoLake for my project?
 - A: Yes. ESML or Azure ML is not tied to machine learning. Its all about "crunching data with cloud compute, and saving results (into a datalake in this case)"
-    - ESML puts a `project` , `enterprise`, `Autolake` concept on top of Azure ML - the excact workload/analysis can be `ML, MILP, Multivariate`, or just a `Hello world counter`.
+    - ESML even has predefined Azure ML Pipline templates to `ONLY` process data to `GOLD`, for you to use in your `Power BI` report, rather than having a `SCORE` step at the end.
+        - See `ESMLPipelinefactory`
+    - ESML puts a `project` , `enterprise`, `Autolake` concept on top of Azure compute power - the exact workload/analysis can be `ML, MILP, Multivariate`, or just a `Hello world counter`.
 - A: With that said. ESML has a <ins>*ML first*</ins> approach, the most <ins>accelerators</ins> are ML-specific.
 
 **Q: How was this accelerator born, and what is it based on? It this for me?**
@@ -97,6 +110,7 @@ It `glues (networking, identity,security)` Azure services together, to get a mor
 ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio: 
 - EMSL enables `enterprise CONCEPTS` (Project/Model/Dev_Test_Prod)` - able to scale across Azure subscriptions in DEV, TEST, PROD for a model.
 - ESML includes `accelerators for data refinement, with CONCEPTS`: Bronze, Silver, Gold, able to `share refined data ACROSS projects` & models
+- ESML Pipeline factory `automatically` generates `Azure ML pipelines` of 3 types, with the data model `IN->Bronze->Silver-Gold` (we will refer to this as `IN_2_GOLD`)
 - ESML includes *nice-to-have* `accelerators for ML CONCEPTS` such as `Split to TRAIN,VALIDATE, TEST` (X_test, y_test to auto-generate charting). 
     - But Not only *nice-to-have*, also *must-have* for *lineage* of an ML model.
 - ESML `marries` `MLOps` with `AutoML` - you get working MLOps template with support for Azure AutoML.
@@ -106,8 +120,15 @@ ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio:
  - These datasets are automapped/autogenerated by ESML at `p.split_to_gold()` 
  - Same thing at feature engineering, at `p.Bronze.Save(dataframe_state)` - the Bronze dataset will be created, and a new version (if not p.rnd=True) is created for you.
 
+# ESMLPipelineFactory
+- This scoring pipeline is automatically ESML-generated, via only `2 lines of code`!! (This is possible due to the 4 ingrediences in ESML)
+- If you have your data in IN in "GOLD" state, it will work `as-is`, but probably : ) you want to add your `data wrangling` per `IN_TO_SILVER` step, in the 1-M auto-generated `ds_name_by_config.py` scripts
+![](../azure-enterprise-scale-ml/esml/images/aml-pipeline_batch_ppt-3.png)
+
+
 # WHAT is ESML Autolake™ ( Azure Datalake Storage GEN2 accelerator)
-- It is based on Azure Datalake Storage GEN2, but includes a turnkey lake-design "skeleton" with concepts for ML (train, inference) and data refinement (Bronze, Silver, Gold), and enterprise scale concepts (incremental load, versioning, dev/test/prod)
+- It is based on Azure Datalake Storage GEN2, but includes a turnkey lake-design "skeleton" with concepts for ML (train, inference) and data refinement (Bronze, Silver, Gold), and enterprise scale concepts (incremental load, versioning, dev/test/prod). 
+- It also has MASTER vs PROJECT concept, able to support both `DeltaLake` on Azure datalake GEN2 and `Azure ML pipelines with Azure Datalake GEN 2` Datastore.
 - It is also automated for Azure ML Studio, to automatically register data as Azure ML Studio Datasets
     - Connected "per project & model". You see only your projects data.
 - And it contains automated enterprise security ( uses Azure keyvault for secrets for you etc)

@@ -614,12 +614,99 @@ class ComputeFactory():
 #Logic in  PipelineFactory
 
 #OLD
+
 # START - PIPELINES - SCORING & TRAINING & INFERENCE
+from azureml.core import Run
+from azureml.core import Workspace
+from azureml.core.model import Model as AMLModel
+class ESMLRunHelper(metaclass=Singleton):
+    @staticmethod
+    def get_current_workspace() -> Workspace:
+        run = Run.get_context(allow_offline=False)
+        experiment = run.experiment
+        return experiment.workspace
+
+    @staticmethod
+    def get_model_offline(p, model_version: int = None) -> AMLModel:
+        model = None
+        if model_version is not None:
+            # TODO(tcare): Finding a specific version currently expects exceptions
+            # to propagate in the case we can't find the model. This call may
+            # result in a WebserviceException that may or may not be due to the
+            # model not existing.
+            model = AMLModel(
+                p.ws,
+                name=model_name,
+                version=model_version,
+                tags=tags)
+        else:
+            models = AMLModel.list(
+                aml_workspace, name=model_name, tags=tags, latest=True)
+            if len(models) == 1:
+                model = models[0]
+            elif len(models) > 1:
+                raise Exception("Expected only one model")
+
+
+    @staticmethod
+    def get_model(
+        model_name: str,
+        model_version: int = None,  # If none, return latest model
+        tag_name: str = None,
+        tag_value: str = None,
+        aml_workspace: Workspace = None) -> AMLModel:
+        """
+        Retrieves and returns a model from the workspace by its name
+        and (optional) tag.
+        Parameters:
+        aml_workspace (Workspace): aml.core Workspace that the model lives.
+        model_name (str): name of the model we are looking for
+        (optional) model_version (str): model version. Latest if not provided.
+        (optional) tag (str): the tag value & name the model was registered under.
+        Return:
+        A single aml model from the workspace that matches the name and tag, or
+        None.
+        """
+        if aml_workspace is None:
+            print("No workspace defined - using current experiment workspace.")
+            aml_workspace = ESMLRunHelper().get_current_workspace()
+
+        tags = None
+        if tag_name is not None or tag_value is not None:
+            # Both a name and value must be specified to use tags.
+            if tag_name is None or tag_value is None:
+                raise ValueError(
+                    "model_tag_name and model_tag_value should both be supplied"
+                    + "or excluded"  # NOQA: E501
+                )
+            tags = [[tag_name, tag_value]]
+
+        model = None
+        if model_version is not None:
+            # TODO(tcare): Finding a specific version currently expects exceptions
+            # to propagate in the case we can't find the model. This call may
+            # result in a WebserviceException that may or may not be due to the
+            # model not existing.
+            model = AMLModel(
+                aml_workspace,
+                name=model_name,
+                version=model_version,
+                tags=tags)
+        else:
+            models = AMLModel.list(
+                aml_workspace, name=model_name, tags=tags, latest=True)
+            if len(models) == 1:
+                model = models[0]
+            elif len(models) > 1:
+                raise Exception("Expected only one model")
+
+        return model
+
 import sys
 import os
 sys.path.append(os.path.abspath("."))  # NOQA: E402
 from baselayer_ml import get_4_regression_metrics,get_7_classification_metrics
-class ESMLPipelineFactory(metaclass=Singleton):
+class ESMLTestScoringFactory(metaclass=Singleton):
     project = None
 
     def __init__(self,project):
@@ -695,55 +782,6 @@ class ESMLPipelineFactory(metaclass=Singleton):
         #source_best_run.tag("ESML TEST_SET Scoring", "Yes, including plot: ROC")
         source_best_run.log_image("ESML_GOLD_TestSet_ROC", plot=plt)
         return auc,accuracy, f1, precision,recall,matrix,matthews, plt
-
-    #TODO prio:high
-    def create_batch_scoring_pipeline(self, remote_compute):
-        p = self.project
-        # to score (ACTIVE ENV + active DATE-FOLDER)
-        source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
-
-    #TODO prio:low
-    def get_testset_scoring_via_pipeline(self, remote_compute):
-        p = self.project
-        source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
-
-        test_experiment = Experiment(p.ws, experiment.name + "_test")
-
-    def get_pipeline_run_info_automl(self,pipeline_run,script_step_name, train_pipelinedata_out_name):
-        split_step = pipeline_run.find_step_run(script_step_name)[0]
-        train_split = ESMLPipelineFactory.fetch_df(split_step, train_pipelinedata_out_name)
-        return train_split
-        #display(train_split.describe()
-        #display(train_split.head(5))
-
-    def get_automl_run(self,pipeline_run,experiment):
-        # workaround to get the automl run as its the last step in the pipeline,  get_steps() returns the steps from latest to first
-        for step in pipeline_run.get_steps():
-            automl_step_run_id = step.id
-            print(step.name)
-            print(automl_step_run_id)
-            break # latest step found
-        automl_run = AutoMLRun(experiment = experiment, run_id=automl_step_run_id)
-
-
-    # STATIC - functions to download output to local and fetch as dataframe
-    # https://github.com/Azure/MachineLearningNotebooks/blob/master/how-to-use-azureml/machine-learning-pipelines/nyc-taxi-data-regression-model-building/nyc-taxi-data-regression-model-building.ipynb
-
-    # PARQUET in pipelines, 
-    @staticmethod
-    def get_download_path(download_path, output_name):
-        output_folder = os.listdir(download_path + '/azureml')[0]
-        path =  download_path + '/azureml/' + output_folder + '/' + output_name
-        return path
-    @staticmethod
-    def fetch_df(current_step, output_name):
-        output_data = current_step.get_output_data(output_name)    
-        download_path = './outputs/' + output_name
-        output_data.download(download_path, overwrite=True)
-        df_path = ESMLPipelineFactory.get_download_path(download_path, output_name) + '/processed.parquet' #  inputs=[cleansed_green_data.parse_parquet_files(),
-        return pd.read_parquet(df_path)
-
-# END - PIPELINES - SCORING & TRAINING & INFERENCE
 
 from azureml.core import Experiment
 from azureml.core import Model
@@ -982,7 +1020,7 @@ class AutoMLFactory(metaclass=Singleton):
 
         if(test_set is not None):
             if(is_classification):
-                auc,accuracy,f1, precision,recall,matrix,matthews, plt = ESMLPipelineFactory(p).get_test_scoring_7_classification(label,best_run,fitted_model)
+                auc,accuracy,f1, precision,recall,matrix,matthews, plt = ESMLTestScoringFactory(p).get_test_scoring_7_classification(label,best_run,fitted_model)
                 best_run.log(name="test_set_AUC", value = auc)
                 best_run.log(name="test_set_Accuracy", value = accuracy)
                 best_run.log(name="test_set_F1_Score", value = f1)
@@ -992,7 +1030,7 @@ class AutoMLFactory(metaclass=Singleton):
                 #best_run.log(name="test_set CM matrix", value = matrix)
                 best_run.log_image("ESML_GOLD_TestSet_ROC",  plot=plt)
             if(is_regression):
-                rmse, r2, mean_abs_percent_error,mae,spearman_corr,plt = ESMLPipelineFactory(p).get_test_scoring_4_regression(label,best_run,fitted_model)
+                rmse, r2, mean_abs_percent_error,mae,spearman_corr,plt = ESMLTestScoringFactory(p).get_test_scoring_4_regression(label,best_run,fitted_model)
                 best_run.log(name="test_set_RMSE", value = rmse)
                 best_run.log(name="test_set_R2", value = r2)
                 best_run.log(name="test_set_MAPE", value = mean_abs_percent_error)
@@ -1391,7 +1429,7 @@ class AutoMLFactory(metaclass=Singleton):
 
     def register_active_model_in_ws(self, target_workspace, target_env):
         self.LoadConfiguration(target_env,self.project.override_enterprise_settings_with_model_specific)
-        return self._register_model(target_env,target_workspace.name, target_workspace,self.model_name_automl, target_env)
+        return self._register_model(target_env,target_workspace.name, target_workspace,self.model_name_automl, target_env, self.project.GoldTrain)
 
     def register_active_model(self,target_env):
 
@@ -1408,7 +1446,7 @@ class AutoMLFactory(metaclass=Singleton):
         else:
             target_workspace = p.get_other_workspace(target_env)
 
-        return self._register_model(source_env,source_ws_name, target_workspace,self.model_name_automl, target_env, p.override_enterprise_settings_with_model_specific)
+        return self._register_model(source_env,source_ws_name, target_workspace,self.model_name_automl, target_env, p.override_enterprise_settings_with_model_specific,p.GoldTrain)
 
     def _get_active_model_run_and_experiment(self, target_workspace, target_env, override_enterprise_settings_with_model_specific, pipeline_run=False):
         self.LoadConfiguration(target_env, override_enterprise_settings_with_model_specific)
@@ -1426,7 +1464,7 @@ class AutoMLFactory(metaclass=Singleton):
         remote_run = AutoMLRun(experiment=experiment, run_id=run_id)
         return remote_run, experiment
 
-    def _register_model(self,source_env,source_ws_name, target_workspace,model_name, target_env, override_enterprise_settings_with_model_specific):
+    def _register_model(self,source_env,source_ws_name, target_workspace,model_name, target_env, override_enterprise_settings_with_model_specific, train_dataset=None):
         remote_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific)
         run_id = remote_run.run_id # TODO does .run_id exists in PipelineRun? (.id) It does in a ScriptRun.
         tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
@@ -1435,10 +1473,16 @@ class AutoMLFactory(metaclass=Singleton):
         #properties = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         #"trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
         
-        model = remote_run.register_model(model_name=model_name, tags=tags, description="") #, properties=properties) # register_model() got an unexpected keyword argument 'properties'
+        # TypeError: register_model() got an unexpected keyword argument 'datasets'
+        #model = remote_run.register_model(model_name=model_name, tags=tags, description="",datasets =[('training data',train_dataset)]) #, properties=properties) # register_model() got an unexpected keyword argument 'properties'
+        model = remote_run.register_model(model_name=model_name, tags=tags, description="")
         print("model.version", model.version)
 
         self.write_run_config(experiment.name, model.name,remote_run.run_id, target_env, model.version)
+
+        # Also TAG Experiemnt with model and version
+        tags = {'model_name':model_name, 'best_model_version': model.version}
+        experiment.set_tags(tags)
 
         print("Model name {} is registered.".format(model.name))
         return model
