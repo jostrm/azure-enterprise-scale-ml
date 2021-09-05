@@ -304,7 +304,7 @@ class ESMLProject():
             data = {
                 "active_dev_test_prod": self.dev_test_prod
             }
-            with open("../settings/active_dev_test_prod.json", "w") as f:
+            with open("../../../settings/active_dev_test_prod.json", "w") as f:
                 json.dump(data, f)
         except Exception as e:
             raise ValueError("ESMLProject.save_active_env - could not write active_dev_test_prod.json") from e
