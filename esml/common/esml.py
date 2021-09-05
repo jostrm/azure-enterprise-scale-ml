@@ -595,7 +595,7 @@ class ESMLProject():
         ex1 = Experiment(self.ws, self.experiment_name)
         tag_model_name = None
         tag_model_version = None
-        if (ex1.tags is not None):
+        if (ex1.tags is not None and "best_model_version" in ex1.tags and "model_name" in ex1.tags):
             tag_model_name = ex1.tags["model_name"]
             tag_model_version = ex1.tags["best_model_version"]
         
