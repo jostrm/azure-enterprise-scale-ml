@@ -36,17 +36,22 @@ parser.add_argument('--esml_optional_unique_scoring_folder', dest='my_custom_par
 args_again = parser.parse_args()
 print("My custom ArgumentParser parameter {}".format(args_again.my_custom_parameter))
 
-# Alt 1) Loop datasets (MERGE silvers to GOLD)
-for ds_name in run.input_datasets: # Dictionary
-    print(ds_name) # M11_ds01_diabetes_inference_SILVER
+DEMO = True
+if (DEMO): # Alt 1 DEMO) Loop datasets (MERGE silvers to GOLD)
+    for ds_name in run.input_datasets: # Dictionary
+        print(ds_name) # M11_ds01_diabetes_inference_SILVER
 
-    if (ds is not None): # 2nd time, merge with 1st dataset
-        df = run.input_datasets[ds_name].to_pandas_dataframe()
-        combined_df = combined_df.append(df, ignore_index=True)
-    else:
-        ds = run.input_datasets[ds_name] # Fetch dataset
-        combined_df = ds.to_pandas_dataframe()
+        if (ds is not None): # 2nd time, merge with 1st dataset
+            df = run.input_datasets[ds_name].to_pandas_dataframe()
+            combined_df = combined_df.append(df, ignore_index=True)
+        else:
+            ds = run.input_datasets[ds_name] # Fetch dataset
+            combined_df = ds.to_pandas_dataframe()
 
+# Alt 2 -Just choose 1st dataset
+aml_ds = next(iter(run.input_datasets.items()))[1] # Get 1st DATASET
+
+combined_df = aml_ds.to_pandas_dataframe()
 custom_code = In2GoldProcessor(combined_df, ["something", "else", "to", "pass"])
 combined_df = custom_code.silver_merged_processing() # DEMO does noting here...
 

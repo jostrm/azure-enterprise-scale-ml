@@ -4,7 +4,7 @@ import pandas as pd
 # You can create whatever code you like in this M11 folder, to reference in the "template scripts"
 class In2GoldProcessor():
     _df = None
-    _df_silver = None
+    _df_processed = None
     _your_other_thing = None
     
     def __init__(self, dataframe_in, other_thing=None):

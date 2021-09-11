@@ -5,9 +5,9 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
 - ESML has a default scaling from 25-250 ESMLprojects for its `EMSL AI Factory`. That said, but you can start with just 1. The roof is on IP-plan. (e.g. allocated IP-ranges for min 25 projects, you can adjust this default)
 
  Q:Looking for ESML *`AutoLake™ - (supports: Data Mesh/Featurestore/DeltaLake) @ Azure`* and `ESML AI Factory` with turnkey `MLOps` with `AutoML`?
- - Yes, this is the repo and solution accelerator including this.
- - Yes, ESML are using `Azure Datalake GEN 2` 100%. Also for Azure ML Pipelines/Datastore (using the GA Storage SDK to upload files, since Azure ML SDK has only experimental status). No blob storage needed. 
- - Yes, `ESML supports DeltaLake` for MASTER data. How does that work since Azure ML does not support .delta yet? A: When ESML autogenerates Azure ML pipelines, a .parquet representation is used in the PROJECTS structure.
+ - This is the repo and solution accelerator for that.
+ - ESML are using `Azure Datalake GEN 2` 100%. Also for Azure ML Pipelines/Datastore. No blob storage needed. 
+ - `ESML supports DeltaLake` for MASTER data. (When ESML autogenerates Azure ML pipelines, a .parquet representation is used in the PROJECTS structure)
 
 ![](./esml/images/esml-turnkey.png)
 ## ESML Dashboard - Dev,Test,Prod environments
@@ -239,15 +239,6 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
     - **Spark clusters**:  You can also `use Azure Databricks` as a pipeline-step, e.g. to crunch big data from/to the ESML `Auto-lake` via `Bronze,Silver,Gold` concept.
         - You can ALSO work from Azure Databricks as IDE, via ESML SDK to get 100% of `AutoLake` features, or Spark directly to the `Bronze,Silver,Gold` mounted folders, only X% of `Autolake` features works.
  
-**Q7: As a `Project manager ` or `Head of AI` will I like ESML?** (ESML Cockpit & Governance)
-- A: Yes, since this has `policy-based` support for `allowed` compute/training cost per DEV, TEST, PROD environment. `They` can choose the defaults, on a `cost-based decicion` and get a fair but rough estimate via `ESML cost tracking`
-    - ESML tracks estimated `COST ` after 1 run in DEV, TEST or PROD - what the future runs will costs for a training pipeline,  or batch/online scoring 
-    - ESML has `configuration defaults`, that can be `overriden per project/model` use case.
-        - Example: In DEV you might want to have cheap training, with poor scoring in "rnd-mode", but then flip to `p.rnd=False` to get great scoring.
-- `Predicted cost:` For `training` or `scoring`, `AutoLake` has its `TRAIN` and `SCORING` datasets which is used for the estimation.
-    - How does it work? Since the DEV has its own config, and the training data registered in Azure ML Studio as Datasets, you will see the predicted cost there (on run/pipeline), after 1st run is completed.
-    -   After 1 training-run/scoring - we know how long the DEV-cluster was used, for a specific data, and a specific ML-configuration, and what the NEXT run will cost
-
 **Q8:I need DirectQuery from Power BI, Azure datalake does not support this. I guess I need a SQL Database, datalake just is not enough?**
 - A: True. BUT - since you have versioning built in (both for data and changing schema) in `AutoLake`, you may utilize this: first save the scored data/analytics to the datalake, then to database as `cache`
     - The pro's of this is that you can use the build in versioning to create your Database tables from the dataset-version: A "version-table" in your DB, and use INFERENCE version in ESML and "GOLD_SCORED" schema.
@@ -282,17 +273,16 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 
 **Q: What are the limitations in ESML v0.2 ?**
 - A: An accelerator has a purposed `edge` and `ease of use` - also purposely less flexible and more `standardized`.
-    - All data is saves automatically as `.parquet` in the datalake (Bronz, Silver, Gold). The `IN` data folder should be either .csv or .parquet
+    - All data is saves automatically as `.parquet` (no .orc support) in the datalake (Bronze, Silver, Gold). The MASTER `IN` data folder can be whatever format, that `Azure Data factory` have to transform to .parquet (or .csv) if TABULAR analysis.
     - Only TABULAR data is supported. No images as of now.
     - Saving / Reading data defaults to `Pandas dataframes` (as of now), and `Azure ML Dataset is always available` - use this to `convert to Spark dataframe` to run `Azure Databricks steps` etc.
     - Tips: Things ESML does not cover, you can always fall back to the Azure ML SDK & open source.
         - Use the ESML accelerator to `solve 80% of your use cases faster`. Example: The `Autolake feature` can be used for **whatever data-refinement/analytics projects**
     - Model serving: ESML right now accelerates only `batch scoring`and `online scoring`. If you have a `streaming` scenario, build as usual (EventHubs with Kafka) but you can use `ESML AutoLake`etc.
     - The DEMO examples: MLOps pipeline uses AML compute clusters and AKS clusters in v0.2. `Spark/Databricks DEMO` examples are coming in future ESML releases.
-
    
 **Q:Does ESML support <ins>`BIG DATA` use cases? </ins>?** - Can I still get use ESML, which is Python focused, no PySpark?
-- A: ESML are an accelerator to `DEFINE` Azure ML Pipelines, which can have a `Synapse Spark step` or `DataBricksStep`, where you can wrhite `PySpark`
+- A: Yes, ESML are an accelerator to `DEFINE` Azure ML Pipelines, which can have a `Synapse Spark step` or `DataBricksStep`, where you can wrhite `PySpark`
 - A: **But, first**. `What is BIG DATA?` I asked my collegeus on the Databricks team:
 
     - A: -Well, If you have data below 8-10TB, No, but this is a grey zone here.
