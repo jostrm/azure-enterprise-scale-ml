@@ -477,9 +477,14 @@ class ESMLPipelineFactory():
             in_template =  d.InPathTemplate
             in_name = d.AzureName_IN
             in_path = self.create_template_path(in_template)
-            input_path = in_path + "*.csv"
-            # TODO: Add dummy data,since bug that validate=False does not work, still gives DatasetValidationError 
-            ds_IN = Dataset.Tabular.from_delimited_files(path = [(self._datalake, input_path)], validate=False)
+            ds_IN = None
+            try: # TODO: Add dummy data,since bug that validate=False does not work, still gives DatasetValidationError 
+                input_path = in_path + "*.csv"
+                ds_IN = Dataset.Tabular.from_delimited_files(path = [(self._datalake, input_path)], validate=False)
+            except:
+                input_path = in_path + "*.parquet"
+                ds_IN = Dataset.Tabular.from_parquet_files(path = [(self._datalake, input_path)], validate=False)
+
             out_name = d.AzureName_Silver
             out_path = d.SilverPath
             script_name_template = d.in2silver_filename
@@ -499,8 +504,13 @@ class ESMLPipelineFactory():
             in_template =  d.InPathTemplate
             in_name = d.AzureName_IN
             in_path = self.create_template_path(in_template)
-            input_path = in_path + "*.csv"
-            ds_IN = Dataset.Tabular.from_parquet_files(path = [(self._datalake, input_path)], validate=False)
+            ds_IN = None
+            try: # TODO: Add dummy data,since bug that validate=False does not work, still gives DatasetValidationError 
+                input_path = in_path + "*.csv"
+                ds_IN = Dataset.Tabular.from_delimited_files(path = [(self._datalake, input_path)], validate=False)
+            except:
+                input_path = in_path + "*.parquet"
+                ds_IN = Dataset.Tabular.from_parquet_files(path = [(self._datalake, input_path)], validate=False)
 
             out_name = d.AzureName_Bronze
             out_path = d.AzureName_Bronze

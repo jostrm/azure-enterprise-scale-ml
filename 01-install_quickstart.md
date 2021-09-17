@@ -7,18 +7,21 @@
   - Windows computer:  [environment_setup/user_dev_env_install/automl_setup.cmd](./environment_setup/user_dev_env_install/automl_setup.cmd)
   - Mac computer:  [environment_setup/user_dev_env_install/automl_setup_mac.sh](./environment_setup/user_dev_env_install/automl_setup.cmd)
 
-# 2 (Alt A)) NEW Azure Devops project - Import the Azure Devops project (template project)
-- It has the `ESML as submodule`, and MLops template ready to run, but you need to run the following command to see the files (not just an empty folder)
-- Open GIT command prompt, go to your local root folder for the code, run below: 
+# 2 (Alt A) NEW Azure Devops project - "link" ESML (GIT subclassing)
 
-> git submodule update --init --recursive
-
-# 2 (Alt B) EXISTING Azure Devops project - "link" ESML (GIT subclassing)
 -  Add ESML as a GIT Submodule "linked" to your GIT repo
+- Creat a "project001" folder on local machine, open GIT command prompt there, then run:
+> git config --system core.longpaths true
 > git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
 
 - Use the PIPELINE mlops-templates, to quickly get your project working as the ESML template project
 Located here:  [./esml/azure_provisioning/azure_devops_pipelines/](./esml/azure_provisioning/azure_devops_pipelines/)
+# 2 (Alt B) EXISTING Azure Devops project - Import the Azure Devops project (template project)
+- Project already hashas the `ESML as submodule`, and MLops template ready to run, but you need to run the following command to see the files (not just an empty folder)
+- Open GIT command prompt, go to your local root folder for the code, run below: 
+
+> git config --system core.longpaths true
+> git submodule update --init --recursive
 
 # 3) Create the Azure Resources needed
 The button below will deploy Azure Machine Learning and its related resources, BUT you may want to tailor to YOUR `naming convention` 
@@ -51,8 +54,9 @@ HOWTO:
 # 4) Configure ESML settings, to target YOUR Azure resources
 1) You should copy all subfolders in `copy_my_subfolders_to_my_grandparent` to your root, next to the subclass `azure-enterprise-scale-ml`.
     - `Example:`: See here, for how these folders are use together with EMSL:  https://github.com/jostrm/azure-enterprise-scale-ml-usage
+    - `adf`: Here is the Azur Data factory templates for `Scoring&Writeback`
     - `mlops`: This is a template, a working `MLOps pipeline, using the ESML SDK, that can deploy a model `across environments where DEV, TEST, PROD` can be in different workspaces/different Azure subscriptions.
-    - `settings`: This is a template settings folder, for `dev,test,prod`.
+    - `settings`: This is a template settings folder, for `dev,test,prod` to override
     - `demo_notebooks`: Notebooks redy to run - perfect for quick R&D mode.
 - 2) Create your new branch for `Project` and `Model` 
     -  **Branch-name:** We recommend to include `organization/bu, project, and model`.
