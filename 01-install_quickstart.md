@@ -12,6 +12,7 @@
 -  Add ESML as a GIT Submodule "linked" to your GIT repo
 - Creat a "project001" folder on local machine, open GIT command prompt there, then run:
 > git config --system core.longpaths true
+
 > git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
 
 - Use the PIPELINE mlops-templates, to quickly get your project working as the ESML template project
@@ -21,6 +22,7 @@ Located here:  [./esml/azure_provisioning/azure_devops_pipelines/](./esml/azure_
 - Open GIT command prompt, go to your local root folder for the code, run below: 
 
 > git config --system core.longpaths true
+
 > git submodule update --init --recursive
 
 # 3) Create the Azure Resources needed

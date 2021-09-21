@@ -5,7 +5,8 @@
     "model_number": 10,
     "model_folder_name": "10_titanic_model_clas",
     "model_short_alias": "M10",
-    "dataset_folder_names": ["ds01_titanic"],
+    "__dataset_folder_names": ["ds01_titanic"],
+    "dataset_folder_names": ["ds01_titanic","ds02_haircolor","ds03_housing","ds04_lightsaber"],
 
     "_model_number": 11,
     "_model_folder_name": "11_diabetes_model_reg",
