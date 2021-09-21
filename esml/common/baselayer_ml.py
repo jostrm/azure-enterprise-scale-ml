@@ -68,9 +68,18 @@ def get_7_classification_metrics(test_set, label,fitted_model):
     X_test = test_set # X_test
     y_test = X_test.pop(label).to_frame() # y_test (true labels)
     y_predict = fitted_model.predict(X_test) # y_predict (predicted labels)
-    y_predict_proba = fitted_model.predict_proba(X_test) # y_predict (predicted probabilities)
+    y_predict_proba = None
+    
+    if (has_predict_proba(fitted_model)):
+        y_predict_proba = fitted_model.predict_proba(X_test) # y_predict (predicted probabilities)
+        if(has_iloc(y_predict_proba)):
+            #df_out['predict_proba_0']  = y_predict_proba.iloc[:,0]
+            predict_proba = y_predict_proba.iloc[:,1]
+        else:
+            #df_out['predict_proba_0']  = y_predict_proba[:,0]
+            predict_proba  = y_predict_proba[:,1]
 
-    predict_proba = y_predict_proba[:, 1] # Positive values only
+    #predict_proba = y_predict_proba[:, 1] # Positive values only
     auc = roc_auc_score(y_test, predict_proba)
     fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
     
@@ -92,3 +101,20 @@ def get_7_classification_metrics(test_set, label,fitted_model):
     
     return auc,accuracy,f1, precision,recall,matrix,matthews, plt
 
+def has_predict_proba(model):
+    if model is not None and hasattr(model, 'predict_proba') and model.predict_proba is not None:
+        return True
+    else:
+        return False
+
+from scipy.sparse import issparse
+def has_iloc(df_series_or_ndarray):
+    if issparse(df_series_or_ndarray):
+        return True
+    if (isinstance(df_series_or_ndarray, pd.DataFrame)):
+        return True
+    if (isinstance(df_series_or_ndarray, pd.Series)):
+        return True
+    if (isinstance(df_series_or_ndarray, np.ndarray)):
+        return False
+    return False

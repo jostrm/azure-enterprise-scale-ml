@@ -111,8 +111,12 @@ def run(gold_to_score_df):
         df_out = gold_to_score_df.join(df_res[['prediction']],how = 'left')
 
         if (has_predict_proba):
-            df_out['predict_proba_0']  = probability_y[:,0]
-            df_out['predict_proba_1']  = probability_y[:,1]
+            if(has_iloc(probability_y)):
+                df_out['predict_proba_0']  = probability_y.iloc[:,0]
+                df_out['predict_proba_1']  = probability_y.iloc[:,1]
+            else:
+                df_out['predict_proba_0']  = probability_y[:,0]
+                df_out['predict_proba_1']  = probability_y[:,1]
 
         # ###############  Custom code below
         # Example: Post process scored data - able to join back to SQL Database, at WriteBack activity in Azure Data factory (also for DEMO change back scaled values)
@@ -158,16 +162,16 @@ def run(gold_to_score_df):
         raise
 
 from scipy.sparse import issparse
-def convert_to_list(df_series_or_ndarray):
+def has_iloc(df_series_or_ndarray):
     if issparse(df_series_or_ndarray):
-        return df_series_or_ndarray.toarray().tolist()
+        return True
     if (isinstance(df_series_or_ndarray, pd.DataFrame)):
-        return df_series_or_ndarray.values.tolist()
+        return True
     if (isinstance(df_series_or_ndarray, pd.Series)):
-        return df_series_or_ndarray.values.tolist()
+        return True
     if (isinstance(df_series_or_ndarray, np.ndarray)):
-        return df_series_or_ndarray.tolist()
-    return df_series_or_ndarray
+        return False
+    return False
 
 if __name__ == "__main__":
     init()

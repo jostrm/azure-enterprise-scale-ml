@@ -2,6 +2,7 @@ import argparse
 import os
 import datetime
 import numpy as np
+import pandas as pd
 from azureml.core import Run
 from azureml.core import Dataset
 from azureml.data.dataset_factory import FileDatasetFactory

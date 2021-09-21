@@ -58,3 +58,20 @@ class In2GoldProcessor():
         #self._df_processed = self._df_processed.reset_index(drop=True)
         return self._df_processed
 
+# Once and only once: Use a class (static or not) from both your notebooks to DEBUG, and from the pipeline python files
+class M01In2GoldProcessor(object):
+    @staticmethod
+    def M01_ds01_process_in2silver(df):
+        df_processed = df #df.drop(columns=['XYZ'])
+        return df_processed
+
+    @staticmethod
+    def M01_ds02_process_in2silver(df):
+        df_processed = df
+        return df_processed
+
+    @staticmethod
+    def M01_merge_silvers(df1,df2):
+        merged = df1 # #pd.merge(df1, df2, left_on='Xyz', right_on='Zxy')
+        merged = merged # merged.drop(columns=['XyzKlyfs','XyzKlax'])
+        return merged

@@ -18,6 +18,8 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
 - Can optionally integrate with ITSM system as a "ticket" in ServiceNow/Remedy/JIRA Service Desk. The below info is needed for the ESML provisioning:
 ![](./esml/images/esml-project-ticket.png)
 ## ESML Architecture - "Modern data analytics platform"
+Based on this reference architecture: https://docs.microsoft.com/en-us/azure/architecture/solution-ideas/articles/azure-databricks-modern-analytics-architecture
+
 ![](./esml/images/esml-arch-small.png)
 
 # INTRO - Is this for you?
