@@ -1592,7 +1592,7 @@ class ESMLProject():
             self._recreate_datastore = True
         self._suppress_logging = True
  
-        self.automap_and_register_aml_datasets(ws)
+        return self.automap_and_register_aml_datasets(ws)
 
     def unregister_all_datasets(self,ws):
         self.set_lake_as_datastore(ws)

@@ -50,12 +50,14 @@ class In2GoldProcessor():
         target_column_name = "Y"
         if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
             self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
+
         return self._df_processed
 
     def silver_merged_processing(self, other_thing=None):
         #combined_df = combined_df.sample(frac=0.5, replace=True, random_state=1) # For DEMO purpose, just user 50% to score
         self._df_processed = self._df.dropna()
         #self._df_processed = self._df_processed.reset_index(drop=True)
+        self._df_processed.columns =  self._df_processed.columns.str.replace("[/]", "_") # Rename columns, remove /
         return self._df_processed
 
 # Once and only once: Use a class (static or not) from both your notebooks to DEBUG, and from the pipeline python files
@@ -63,15 +65,18 @@ class M01In2GoldProcessor(object):
     @staticmethod
     def M01_ds01_process_in2silver(df):
         df_processed = df #df.drop(columns=['XYZ'])
+        df_processed.columns = df_processed.columns.str.replace("[/]", "_")
         return df_processed
 
     @staticmethod
     def M01_ds02_process_in2silver(df):
         df_processed = df
+        df_processed.columns = df_processed.columns.str.replace("[/]", "_")
         return df_processed
 
     @staticmethod
     def M01_merge_silvers(df1,df2):
         merged = df1 # #pd.merge(df1, df2, left_on='Xyz', right_on='Zxy')
         merged = merged # merged.drop(columns=['XyzKlyfs','XyzKlax'])
+        merged =merged # merged[merged['label_col'].notna()] # drop na rows
         return merged

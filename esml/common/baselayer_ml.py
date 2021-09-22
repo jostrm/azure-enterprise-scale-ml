@@ -64,7 +64,7 @@ def get_4_regression_metrics(test_set, label,fitted_model):
     return rmse, r2, mean_abs_percent_error,mae, spearman_correlation,plt
 
 
-def get_7_classification_metrics(test_set, label,fitted_model):
+def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
     X_test = test_set # X_test
     y_test = X_test.pop(label).to_frame() # y_test (true labels)
     y_predict = fitted_model.predict(X_test) # y_predict (predicted labels)
@@ -80,7 +80,11 @@ def get_7_classification_metrics(test_set, label,fitted_model):
             predict_proba  = y_predict_proba[:,1]
 
     #predict_proba = y_predict_proba[:, 1] # Positive values only
-    auc = roc_auc_score(y_test, predict_proba)
+    auc = None
+    if(multiclass is not None):
+        auc = roc_auc_score(y_true=y_test, y_score=predict_proba,multi_class=multiclass)
+    else:
+        auc = roc_auc_score(y_test, predict_proba)
     fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
     
     accuracy, precision, recall, f1, matrix, matthews = \

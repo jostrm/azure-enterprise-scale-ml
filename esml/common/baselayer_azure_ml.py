@@ -712,13 +712,24 @@ class ESMLTestScoringFactory(metaclass=Singleton):
     def __init__(self,project):
         self.project = project
 
-    def get_test_scoring_4_regression(self, label,run=None, model=None):
+    def get_test_scoring_4_regression(self, label,run=None, fitted_model=None):
         p = self.project
         if(run is not None):
             source_best_run = run
-            fitted_model = model
+            model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
+            model = Model(p.ws, model_name)
+            fitted_model = fitted_model
         else:
-            source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
+            model = p.get_best_model_via_experiment_name() # This is not stale
+            model_name = model.tags["model_name"]
+            run_id = model.tags["run_id"]
+            experiment = Experiment(p.ws, p.experiment_name)
+            source_best_run = AutoMLRun(experiment=experiment, run_id=run_id)
+            #source_best_run = Run(experiment=experiment, run_id=run_id)
+            best_run, fitted_model = source_best_run.get_output()
+            
+            #### old working ###
+            #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
 
         test_set_pd =  p.GoldTest.to_pandas_dataframe()
         rmse, r2, mean_abs_percent_error,mae, spearman_correlation,plt = get_4_regression_metrics(test_set_pd, label,fitted_model)
@@ -729,8 +740,8 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         p.GoldTest.tags["Spearman_Correlation"] = "{:.6f}".format(spearman_correlation)
         ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
 
-        model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
-        model = Model(p.ws, model_name)
+        #model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
+        #model = Model(p.ws, model_name)
         model.tags["test_set_RMSE"] = "{:.6f}".format(rmse)
         model.tags["test_set_R2"] = "{:.6f}".format(r2)
         model.tags["test_set_MAPE"] = "{:.6f}".format(mean_abs_percent_error)
@@ -743,17 +754,25 @@ class ESMLTestScoringFactory(metaclass=Singleton):
 
         return rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt
     
-    def get_test_scoring_7_classification(self, label, run=None, model=None):
+    def get_test_scoring_7_classification(self, label,multiclass=None, run=None, fitted_model=None):
         p = self.project
 
         if(run is not None):
             source_best_run = run
-            fitted_model = model
+            model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
+            model = Model(p.ws, model_name)
+            fitted_model = fitted_model
         else:
-            source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
+            model = p.get_best_model_via_experiment_name() # This is not stale
+            model_name = model.tags["model_name"]
+            run_id = model.tags["run_id"]
+            experiment = Experiment(p.ws, p.experiment_name)
+            source_best_run = AutoMLRun(experiment=experiment, run_id=run_id)
+            best_run, fitted_model = source_best_run.get_output()
+            #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)  # Old, stale ...since local metadata
 
         test_set_pd =  p.GoldTest.to_pandas_dataframe()
-        auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, label,fitted_model)
+        auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, label,fitted_model,multiclass)
 
         # 1) Log on the TEST_SET used
         p.GoldTest.tags["ROC_AUC"] = "{:.6f}".format(auc)
@@ -765,8 +784,8 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         p.GoldTest.tags["Confusion_Matrix"] = str(matrix)
 
         #2) Also, log on MODEL
-        model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
-        model = Model(p.ws, model_name)
+        #model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
+        #model = Model(p.ws, model_name)
         model.tags["test_set_ROC_AUC"] =  "{:.6f}".format(auc)
         model.tags["test_set_Accuracy"] =  "{:.6f}".format(accuracy)
         model.tags["test_set_F1_Score"] =  "{:.6f}".format(f1)
