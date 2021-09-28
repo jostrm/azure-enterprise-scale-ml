@@ -557,18 +557,19 @@ class ESMLPipelineFactory():
         USE_CURATED_ENV = use_curated_automl_env
         if USE_CURATED_ENV:
             # "AzureML-Tutorial" https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
-            curated_environment = Environment.get(
-                workspace=self.p.ws, name="AzureML-AutoML")
+            #curated_environment = Environment.get(workspace=self.p.ws, name="AzureML-AutoML")
+            curated_automl = "AzureML-AutoML"
+            curated_sklearn ="AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference"
+            curated_environment = Environment.get(workspace=self.p.ws, name=curated_sklearn)
+
             aml_run_config.environment = curated_environment
         else:
             aml_run_config.environment.python.user_managed_dependencies = False
 
             if (conda_dependencies_object is None):  # Add some packages relied on by data prep step
                 aml_run_config.environment.python.conda_dependencies = CondaDependencies.create(
-                    conda_packages=['pandas==0.25.1',
-                                    'scikit-learn==0.22.1', 'numpy==1.18.5', ''],
-                    pip_packages=['azureml-defaults',
-                                  'azureml-dataprep[fuse,pandas]'],  # azureml-sdk
+                    conda_packages=['pandas==0.25.1','scikit-learn==0.22.1', 'numpy==1.18.5', ''],
+                    pip_packages=['azureml-defaults','azureml-dataprep[fuse,pandas]'],  # azureml-sdk
                     pin_sdk_version=False)
 
                 # Alt 2 ) Create an Environment for the experiment

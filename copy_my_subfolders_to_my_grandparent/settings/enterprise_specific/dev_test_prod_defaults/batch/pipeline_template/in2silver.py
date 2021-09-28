@@ -4,7 +4,7 @@ import pandas as pd
 import argparse
 import os
 import datetime
-from your_code.your_custom_code import In2GoldProcessor
+from your_code.your_custom_code import In2GoldProcessor,M01In2GoldProcessor
 
 # IN/OUT folder paths
 parser = argparse.ArgumentParser()
