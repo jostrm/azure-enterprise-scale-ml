@@ -1,8 +1,8 @@
 {
-    "debug_always_promote_model": true,
+    "debug_always_promote_model": false,
     "enable_voting_ensemble":false,
     "enable_stack_ensemble":false,
-    "model_explainability":false,
+    "model_explainability":true,
     "experiment_timeout_hours":0.25,
     "iteration_timeout_minutes":2,
     "n_cross_validations": 2,
@@ -11,6 +11,9 @@
     "featurization":"auto",
     "path":"./logs/",
     "debug_log": "azure_automl_debug_dev.log",
-    "allowed_models": ["LightGBM"],
-    "blocked_models": []
+    "allowed_models": ["LightGBM","AveragedPerceptronClassifier","RandomForest","Xgboost","StochasticGradientDescent","NaiveBayes","LinearSVMClassifier","GradientBoosting","DecisionTree","LinearSVC","KNearestNeighbors","ExtremeRandomTrees"],
+    "blocked_models": ["ElasticNet","KNearestNeighbors","LassoLars","OnlineGradientDescentRegressor","FastLinearRegressor","StochasticGradientDescent"],
+    "docs_allowed_models_classification": ["AveragedPerceptronClassifier","RandomForest","Xgboost","StochasticGradientDescent","NaiveBayes","LinearSVMClassifier","GradientBoosting","DecisionTree","LinearSVC","KNearestNeighbors","ExtremeRandomTrees"],
+    "docs_allowed_models_regression": ["ElasticNet","KNearestNeighbors","LassoLars","OnlineGradientDescentRegressor","FastLinearRegressor","StochasticGradientDescent"],
+    "docs_allowed_models_time_series_forecasting":["AutoArima","Prophet","ForecastTCN"]
 }
