@@ -559,8 +559,8 @@ class ESMLPipelineFactory():
             # "AzureML-Tutorial" https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
             #curated_environment = Environment.get(workspace=self.p.ws, name="AzureML-AutoML")
             curated_automl = "AzureML-AutoML"
-            curated_sklearn ="AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference"
-            curated_environment = Environment.get(workspace=self.p.ws, name=curated_sklearn)
+            #curated_sklearn ="AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference"
+            curated_environment = Environment.get(workspace=self.p.ws, name=curated_automl)
 
             aml_run_config.environment = curated_environment
         else:
