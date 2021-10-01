@@ -183,7 +183,8 @@ class ESMLPipelineFactory():
             gold_test_if_exists = self._script_template_enterprise + "/" + self._scoring_filename
 
             if(not only_info):
-                if(not overwrite_if_exists and os.path.exists(gold_test_if_exists)):
+                file_exist = os.path.exists(gold_test_if_exists)
+                if(not overwrite_if_exists and file_exist):
                     print ("Did NOT overwrite script-files with template-files such as '{}', since overwrite_if_exists=False".format(self._scoring_filename))
                     return # Guard
             else: # only info

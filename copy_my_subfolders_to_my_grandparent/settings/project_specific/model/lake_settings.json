@@ -5,11 +5,15 @@
     "model_number": 10,
     "model_folder_name": "10_titanic_model_clas",
     "model_short_alias": "M10",
-    "__dataset_folder_names": ["ds01_titanic"],
     "dataset_folder_names": ["ds01_titanic","ds02_haircolor","ds03_housing","ds04_lightsaber"],
 
     "_model_number": 11,
     "_model_folder_name": "11_diabetes_model_reg",
     "_model_short_alias": "M11",
-    "_dataset_folder_names": ["ds01_diabetes", "ds02_other"]
+    "_dataset_folder_names": ["ds01_diabetes", "ds02_other"],
+
+    "__model_number": 12,
+    "__model_folder_name": "12_car_price_regression",
+    "__model_short_alias": "M12",
+    "__dataset_folder_names": ["ds01_vw","ds02_audi","ds03_bmw"]
 }

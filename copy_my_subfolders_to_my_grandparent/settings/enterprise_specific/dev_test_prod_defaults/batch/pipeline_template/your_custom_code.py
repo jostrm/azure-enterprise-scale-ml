@@ -50,6 +50,10 @@ class In2GoldProcessor():
         target_column_name = "Y"
         if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
             self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
+        
+        target_column_name = "price"
+        if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
+            self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
 
         return self._df_processed
 

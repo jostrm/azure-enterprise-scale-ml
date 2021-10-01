@@ -31,16 +31,13 @@ print("IN Dataset. INPUT full path: {}".format(input_path_csv))
 run = Run.get_context()
 ws = run.experiment.workspace
 datastore = ws.get_default_datastore()
+aml_dataset_in = None
 
 try:
-    M11_ds02_diabetes_inference_IN_csv = Dataset.Tabular.from_delimited_files(path = [(datastore, input_path_csv)]) 
+    aml_dataset_in = Dataset.Tabular.from_delimited_files(path = [(datastore, input_path_csv)]) 
 except Exception as e:
     print("Could not load .CSV files from IN dataset. Now trying .PARQUET instead:  {}".format(input_path_parquet))
-    M11_ds02_diabetes_inference_IN_csv = Dataset.Tabular.from_parquet_files(path = [(datastore, input_path_parquet)])
-
-# 2) UPDATE INPUT Dataset
-#name_ds = M11_ds02_diabetes_inference_IN_csv.name
-#run.input_datasets[name_ds] = M11_ds02_diabetes_inference_IN_csv.as_named_input(name_ds) # Get Dataset
+    aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(datastore, input_path_parquet)])
 
 ################################### 3) EDIT BELOW - feature engieering ########################
 
@@ -50,7 +47,7 @@ args_again, remaining_names_again = parser.parse_known_args()
 print("My custom ArgumentParser parameter {}".format(args_again.my_custom_parameter))
 
 
-df = M11_ds02_diabetes_inference_IN_csv.to_pandas_dataframe()
+df = aml_dataset_in.to_pandas_dataframe()
 IS_DEMO = True
 if (IS_DEMO): # Simulate feature engineering...source system might not know column name for Y, and certainly not values
     custom_code = In2GoldProcessor(df) # Drops columns, renamce columns, etc

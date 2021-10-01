@@ -6,7 +6,7 @@ import pandas as pd
 from azureml.core import Run
 from azureml.core import Dataset
 from azureml.data.dataset_factory import FileDatasetFactory
-from your_code.your_custom_code import In2GoldProcessor
+from your_code.your_custom_code import In2GoldProcessor,M01In2GoldProcessor
 
 parser = argparse.ArgumentParser("gold")
 parser.add_argument('--target_column_name', dest='target_column_name',type=str, help="Target Label - column to add", required=True)
@@ -37,11 +37,13 @@ parser.add_argument('--esml_optional_unique_scoring_folder', dest='my_custom_par
 args_again = parser.parse_args()
 print("My custom ArgumentParser parameter {}".format(args_again.my_custom_parameter))
 
-DEMO = True
-if (DEMO): # Alt 1 DEMO) Loop datasets (MERGE silvers to GOLD)
+
+LOOP_ALL_SILVERS = False
+if (LOOP_ALL_SILVERS): # Alt 1 DEMO) Loop datasets (MERGE silvers to GOLD)
     for ds_name in run.input_datasets: # Dictionary
         print(ds_name) # M11_ds01_diabetes_inference_SILVER
 
+        ############ Option 1: Do your MERGE logic here ############
         if (ds is not None): # 2nd time, merge with 1st dataset
             df = run.input_datasets[ds_name].to_pandas_dataframe()
             combined_df = combined_df.append(df, ignore_index=True)
@@ -49,12 +51,13 @@ if (DEMO): # Alt 1 DEMO) Loop datasets (MERGE silvers to GOLD)
             ds = run.input_datasets[ds_name] # Fetch dataset
             combined_df = ds.to_pandas_dataframe()
 
-# Alt 2 -Just choose 1st dataset
+############ Option 2: Do your MERGE logic as below, instead of a loop... ############
 aml_ds = next(iter(run.input_datasets.items()))[1] # Get 1st DATASET
+df = aml_ds.to_pandas_dataframe()
 
-combined_df = aml_ds.to_pandas_dataframe()
-custom_code = In2GoldProcessor(combined_df, ["something", "else", "to", "pass"])
-combined_df = custom_code.silver_merged_processing() # DEMO does noting here...
+aml_ds2 = next(iter(run.input_datasets.items()))[1] # Get 1st DATASET
+df2 = aml_ds2.to_pandas_dataframe()
+combined_df = M01In2GoldProcessor.M01_merge_silvers(df,df2)
 
 '''
 # Alt2 a) Direct access to Dataset ( DEMO purpose only)
