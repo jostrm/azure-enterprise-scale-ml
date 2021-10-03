@@ -379,14 +379,14 @@ class ESMLProject():
             self._model_short_alias = self.lake_config['model_short_alias']
 
             # add at least 1 NEW model info, programmatically
-            model_details['model_number'] = int(self._modelNumber)
-            model_details['model_folder_name'] = self.model_folder_name
-            model_details['model_short_alias'] =  self._model_short_alias
-            model_details['dataset_folder_names'] =  self.dataset_folder_names
-            model_details['label'] = "Y"
-            self.models_array.append(model_details)
+            model_1 = {"model_number":11, "model_folder_name":"11_diabetes_model_reg","model_short_alias":"M11","dataset_folder_names":["ds01_diabetes","ds02_other"], "label":"Y"}
+            model_2 = {"model_number":10, "model_folder_name":"10_titanic_model_clas","model_short_alias":"M10","dataset_folder_names": ["ds01_titanic","ds02_haircolor","ds03_housing","ds04_lightsaber"], "label":"Survived"}
+            model_3 = {"model_number":12, "model_folder_name":"12_car_price_regression","model_short_alias":"M12","dataset_folder_names":["ds01_vw","ds02_audi","ds03_bmw"], "label":"price"}
+            self.models_array.append(model_1)
+            self.models_array.append(model_2)
+            self.models_array.append(model_3)
 
-            self.active_model_config = model_details
+            self.set_active_model_config(10)
 
     def parseDateFolderConfig(self, date_in_folder, scoring):
         date_string = date_in_folder["{}_in_folder_date".format(self.dev_test_prod)] # String in DateTime format
