@@ -378,7 +378,15 @@ class ESMLProject():
             self.dataset_folder_names = self.lake_config['dataset_folder_names'] 
             self._model_short_alias = self.lake_config['model_short_alias']
 
-            self.active_model_config = {"label": "Y"}
+            # add at least 1 NEW model info, programmatically
+            model_details['model_number'] = int(self._modelNumber)
+            model_details['model_folder_name'] = self.model_folder_name
+            model_details['model_short_alias'] =  self._model_short_alias
+            model_details['dataset_folder_names'] =  self.dataset_folder_names
+            model_details['label'] = "Y"
+            self.models_array.append(model_details)
+
+            self.active_model_config = model_details
 
     def parseDateFolderConfig(self, date_in_folder, scoring):
         date_string = date_in_folder["{}_in_folder_date".format(self.dev_test_prod)] # String in DateTime format
