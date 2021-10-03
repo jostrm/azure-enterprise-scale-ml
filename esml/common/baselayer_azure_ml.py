@@ -720,16 +720,7 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             model = Model(p.ws, model_name)
             fitted_model = fitted_model
         else:
-            model = p.get_best_model_via_experiment_name() # This is not stale
-            model_name = model.tags["model_name"]
-            run_id = model.tags["run_id"]
-            experiment = Experiment(p.ws, p.experiment_name)
-            source_best_run = AutoMLRun(experiment=experiment, run_id=run_id)
-            #source_best_run = Run(experiment=experiment, run_id=run_id)
-            best_run, fitted_model = source_best_run.get_output()
-            
-            #### old working ###
-            #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)
+            experiment, model,source_best_run, best_run,fitted_model = p.get_best_model_and_run_via_experiment_name() # Looks at Azure
 
         test_set_pd =  p.GoldTest.to_pandas_dataframe()
         rmse, r2, mean_abs_percent_error,mae, spearman_correlation,plt = get_4_regression_metrics(test_set_pd, label,fitted_model)
@@ -763,13 +754,8 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             model = Model(p.ws, model_name)
             fitted_model = fitted_model
         else:
-            model = p.get_best_model_via_experiment_name() # This is not stale
-            model_name = model.tags["model_name"]
-            run_id = model.tags["run_id"]
-            experiment = Experiment(p.ws, p.experiment_name)
-            source_best_run = AutoMLRun(experiment=experiment, run_id=run_id)
-            best_run, fitted_model = source_best_run.get_output()
-            #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)  # Old, stale ...since local metadata
+            experiment, model,source_best_run, best_run,fitted_model = p.get_best_model_and_run_via_experiment_name() # Looks at Azure
+            #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)  # Old, stale ...since local agent metadata of "last run"
 
         test_set_pd =  p.GoldTest.to_pandas_dataframe()
         auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, label,fitted_model,multiclass)
@@ -1278,16 +1264,31 @@ class AutoMLFactory(metaclass=Singleton):
                  print("TARGET is in the same Azure ML Studio workspace as SOURCE, comparing with latest registered model...")
             
             #target_model, target_best_run_id = AutoMLFactory(p).get_latest_model(target_workspace)
-            target_model, target_best_run_id = AutoMLFactory(p).get_latest_model_from_experiment_name(target_workspace,experiment_name)
-                            
+            #target_model, target_best_run_id = AutoMLFactory(p).get_latest_model_from_experiment_name(target_workspace,experiment_name)
+            target_exp, model,target_run, target_best_run,target_model = None,None,None,None,None
+            try:
+                target_exp, target_model,target_run, target_best_run,fitted_model = p.get_best_model_and_run_via_experiment_name_and_ws(target_workspace)
+                target_best_run_id = target_model.tags["run_id"] # model.tags.get("run_id") Example: AutoML_08bb87d4-9587-4b99-b781-fe16bd13f140
+                target_model_name = target_model.tags["model_name"]
+                target_best_model_version = target_model.version
+
+                print("Target found (registered):")
+                print(" Target - best_run_id", target_best_run_id)
+                print(" Target - best_run_id (best run)", target_best_run.id)
+                print(" Target - model_name (from model.tag)",target_model_name)
+                #print("target - model_name (from target_best_run.properties[''model_name'])",target_best_run.properties['model_name'] )
+                print(" Target - model_version",target_best_model_version)
+
+            except Exception as e1:
+                print(e1.message)
+                promote_new_model = True
+                print("get_best_model_and_run_via_experiment_name_and_ws() could not EXISTING MODEL with same experiment name = No TARGET run. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
+                                
             if(target_model is not None):
                 print("target_best_run_id", target_best_run_id)
 
                 if (target_best_run_id is not None):
-                    target_exp = Experiment(workspace=target_workspace, name=experiment_name)
-                    target_run = AutoMLRun(experiment=target_exp, run_id=target_best_run_id) #'AutoML_b11eaa25-d692-420b-b89c-28bbe7caf262')
-                    target_best_run, prod_fitted_model = target_run.get_output()
-                    target_model_name = target_best_run.properties['model_name']
+                    #target_model_name = target_best_run.properties['model_name'] # model.name
                     target_task_type = self.get_task_type(target_run)
                 else: 
                     promote_new_model = True
@@ -1296,11 +1297,12 @@ class AutoMLFactory(metaclass=Singleton):
                 promote_new_model = True
                 print("No TARGET MODEL. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
         except Exception as e:
-            raise UserErrorException("Unkown error. Cannot load TARGET AutoMLRun for model best run id {}, in environment {}. Try register model manually".format(target_best_run_id, target_environment)) from e
+            raise e
+            #raise UserErrorException("Unkown error. Cannot load TARGET AutoMLRun for model best run id {}, in environment {}. Try register model manually".format(target_best_run_id, target_environment)) from e
         
         # IF we have a target to compare with
         if (promote_new_model == False):
-            promote_new_model = self.promote_model(source_best_run, target_best_run,source_task_type, target_task_type)
+            promote_new_model = self.promote_model(source_best_run, target_best_run,target_best_run_id,source_task_type, target_task_type)
         # END, IF we have a target to compare with
         
         # Save NEW model (Not registered)
@@ -1313,16 +1315,16 @@ class AutoMLFactory(metaclass=Singleton):
         return promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id
 
     # https://docs.microsoft.com/en-us/python/api/azureml-automl-core/azureml.automl.core.shared.constants.tasks?view=azure-ml-py
-    def promote_model(self, source_best_run, target_best_run, source_task_type, target_task_type):
+    def promote_model(self, source_best_run, target_best_run, target_best_run_id, source_task_type, target_task_type):
         if (self.debug_always_promote_model==True): # Guard
             print("OBS! 'debug_always_promote_model=TRUE' - will not perform scoring-comparison, nor look into scoring-WEIGHTs in `settings/project_specific/model/model_settings.json")
             return True
         #task_type = self.model_settings.get('task_type','regression')
 
         print("New trained model & cached RUN, has TASK_TYPE: {} and Best_Run_id: {}".format(source_task_type,source_best_run.id))
-        print("Target model & RUN, in Azure ML Studio workspace to compare with, has TASK_TYPE: {} and Best_Run_id: ".format(target_task_type,target_best_run.id))
+        print("Target model & RUN, in Azure ML Studio workspace to compare with, has TASK_TYPE: {} and Best_Run_id:{} ".format(target_task_type,target_best_run.id))
 
-        if(target_best_run.id !=None): # 1st run, 1st model...just promote
+        if(target_best_run_id == None): # 1st run, 1st model...just promote
             print("This is the first model. No target to compare with, hence we will PROMOTE")
             return True
 
@@ -1500,7 +1502,7 @@ class AutoMLFactory(metaclass=Singleton):
         self.write_run_config(experiment.name, model.name,remote_run.run_id, target_env, model.version)
 
         # Also TAG Experiemnt with model and version
-        tags = {'model_name':model_name, 'best_model_version': model.version}
+        tags = {'model_name':model_name, 'best_model_version': str(model.version)}
         experiment.set_tags(tags)
 
         print("Model name {} is registered.".format(model.name))

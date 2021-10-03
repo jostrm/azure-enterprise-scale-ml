@@ -279,7 +279,7 @@ class ESMLPipelineFactory():
                 self._snapshot_folder, "model.pkl")
         )
         '''
-        model = self.p.get_best_model_via_experiment_name() # This is not stale
+        model = self.p.get_best_model_via_experiment_name(self.p.ws) # This is not stale
         m = model.download(target_dir=self.get_snapshot_dir_relative(), exist_ok=True)
         return m
 
