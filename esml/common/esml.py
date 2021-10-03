@@ -366,7 +366,7 @@ class ESMLProject():
             self.set_active_model_config(active_model_id) # ACTIVATE from config...which can be over-ridden by notebooks/pipelines/mlops
 
         except Exception as e: # old setup, no array
-            print("ESML deprecated error. Using old lake_settings as fallback. Error: {}".format(e.message))
+            print("ESML deprecated error. Using old lake_settings as fallback. Error: {}".format(e))
             print("Using lake_settings.json with ESML version 1.3")
             self.lake_config = lake_config
             self.projectNumber = self.lake_config['project_number']
