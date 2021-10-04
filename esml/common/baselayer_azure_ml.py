@@ -1093,25 +1093,24 @@ class AutoMLFactory(metaclass=Singleton):
     def get_active_model_inference_config(self,target_workspace,target_env, override_enterprise_settings_with_model_specific):
         self.LoadConfiguration(target_env, override_enterprise_settings_with_model_specific)
 
-        target_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific)
-        target_best_run, fitted_model = target_run.get_output()
+        #target_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific)
+        #target_best_run, fitted_model = target_run.get_output()
+
+        target_experiment, target_model,target_run, target_best_run,fitted_model = self.project.get_best_model_and_run_via_experiment_name_and_ws(target_workspace)
        
         model_class = None
         old_loc = os.getcwd()
         try:
-            user_settings = ""
-            if(self.project.demo_mode == False):
-                user_settings = "../../"
-
             os.chdir(os.path.dirname(__file__))
-            script_file_local = "{}../settings/project_specific/model/dev_test_prod/train/automl/scoring_file_{}.py".format(user_settings,self.dev_test_prod)
+            script_file_local = "../../../settings/project_specific/model/dev_test_prod/train/automl/scoring_file_{}.py".format(self.dev_test_prod)
             target_best_run.download_file('outputs/scoring_file_v_1_0_0.py', script_file_local)
 
             script_file_abs = os.path.abspath(script_file_local)
             inference_config = InferenceConfig(environment=target_best_run.get_environment(), entry_script=script_file_abs)
 
-            model_name = target_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
-            model_class = Model(target_workspace, model_name)
+            #model_name = target_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
+            #model_class = Model(target_workspace, model_name)
+            model_class = target_model
         except Exception as e:
             raise e
         finally:

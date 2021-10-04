@@ -37,7 +37,6 @@ parser.add_argument('--esml_optional_unique_scoring_folder', dest='my_custom_par
 args_again = parser.parse_args()
 print("My custom ArgumentParser parameter {}".format(args_again.my_custom_parameter))
 
-
 LOOP_ALL_SILVERS = False
 if (LOOP_ALL_SILVERS): # Alt 1 DEMO) Loop datasets (MERGE silvers to GOLD)
     for ds_name in run.input_datasets: # Dictionary
@@ -55,7 +54,7 @@ if (LOOP_ALL_SILVERS): # Alt 1 DEMO) Loop datasets (MERGE silvers to GOLD)
 aml_ds = next(iter(run.input_datasets.items()))[1] # Get 1st DATASET
 df = aml_ds.to_pandas_dataframe()
 
-aml_ds2 = next(iter(run.input_datasets.items()))[1] # Get 1st DATASET
+aml_ds2 = next(iter(run.input_datasets.items()))[1] # Get 2nd DATASET
 df2 = aml_ds2.to_pandas_dataframe()
 combined_df = M01In2GoldProcessor.M01_merge_silvers(df,df2)
 

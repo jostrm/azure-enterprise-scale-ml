@@ -46,12 +46,13 @@ parser.add_argument('--esml_optional_unique_scoring_folder', dest='my_custom_par
 args_again, remaining_names_again = parser.parse_known_args()
 print("My custom ArgumentParser parameter {}".format(args_again.my_custom_parameter))
 
-
 df = aml_dataset_in.to_pandas_dataframe()
 IS_DEMO = True
 if (IS_DEMO): # Simulate feature engineering...source system might not know column name for Y, and certainly not values
-    custom_code = In2GoldProcessor(df) # Drops columns, renamce columns, etc
+    custom_code = In2GoldProcessor(df) # Drops columns, rename columns, filter data, interpolate, etc
     df = custom_code.in_to_silver_ds01_M10_M11_DEMO()
+else:
+    M01In2GoldProcessor.M01_ds01_process_in2silver(df) # Here you can add YOUR code
 
 ################################### EDIT ABOVE - feature engieering ########################
 

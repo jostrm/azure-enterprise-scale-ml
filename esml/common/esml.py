@@ -46,6 +46,7 @@ import argparse
 from azureml.train.automl.exceptions import NotFoundException
 from azureml.core import Experiment
 from azureml.train.automl.run import AutoMLRun
+from pathlib import Path
 
 class ESMLProject():
     ws = None
@@ -1213,12 +1214,12 @@ class ESMLProject():
             if(specific_file_guid is not None):
                 file_name_to_score = "to_score_{}.parquet".format(specific_file_guid)
 
-            ESMLProject.clean_temp(self.project_folder_name)
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty
 
             # 1) To score: Generate LAKE-path, what to READ, what to SCORE?
             day_folder = self.GoldPathScoring + date_folder + '/'
             unique_folder = self.GoldPathScoring + date_folder + '/'+unique_folder + "/"
-            srs_folder = './common/temp_data/{}/inference/{}/Gold/'.format(self.project_folder_name,v_str)
+            srs_folder = '../../../../common/temp_data/{}/inference/{}/Gold/'.format(self.project_folder_name,v_str)
             local_path = '{}{}'.format(srs_folder,file_name_to_score)
             ESMLProject.create_folder_if_not_exists(srs_folder)
 
@@ -1235,13 +1236,15 @@ class ESMLProject():
                 return scored_result
             
             unique_folder = self.ScoredPath + date_folder + '/'+ unique_folder + "/"
-            srs_folder = './common/temp_data/{}/inference/{}/Scored/'.format(self.project_folder_name,v_str)
+            srs_folder = '../../../../common/temp_data/{}/inference/{}/Scored/'.format(self.project_folder_name,v_str)
             file_name = "scored.parquet" # Score all
             if(specific_file_guid is not None): # Score specific / Filter
                 file_name = "scored_{}.parquet".format(specific_file_guid) # HERE ....who is this scoring about?
 
             local_path = '{}{}'.format(srs_folder,file_name)
             ESMLProject.create_folder_if_not_exists(srs_folder)
+            old_loc = os.getcwd()
+            os.chdir(os.path.dirname(__file__))
             scored_result.to_parquet(local_path, engine='pyarrow', compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
             self.LakeAccess.upload(file_name, srs_folder, unique_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2
 
@@ -1249,6 +1252,9 @@ class ESMLProject():
         except Exception as e:
             raise e
         finally:
+            #ESMLProject.delete_all_in_folder('../../../../common/temp_data/') # What if..2 models running on same VM or server?
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty, for project only...for multiple models to be running at the same time
+            os.chdir(old_loc)
             self.inferenceModelVersion = inference_before # Set back to same state
 
         return scored_result,model_version
@@ -1271,16 +1277,17 @@ class ESMLProject():
         else:
             caller_guid = user_id
         try:
-
             ESMLProject.clean_temp(self.project_folder_name) # clean temp
             # 2) Save pandas_X_test to goldpath
 
             to_score_folder, scored_folder, date_folder = self.get_gold_scored_unique_path()
             to_score_folder_latest, scored_folder_latest, date_folder_latest = self.get_gold_scored_unique_path(batch_datetime_from_config = None, same_guid_folder=False,unique_uuid4 = None)
 
-            srs_folder = './common/temp_data/{}/inference/{}/Gold/'.format(self.project_folder_name,v_str)
+            srs_folder = '../../../../common/temp_data/{}/inference/{}/Gold/'.format(self.project_folder_name,v_str)
             file_name = "to_score_{}.parquet".format(caller_guid) # HERE ....who is this scoring about?
             local_path = '{}{}'.format(srs_folder,file_name)
+            old_loc = os.getcwd()
+            os.chdir(os.path.dirname(__file__))
             ESMLProject.create_folder_if_not_exists(srs_folder)
             pandas_X_test.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
@@ -1293,10 +1300,12 @@ class ESMLProject():
             # 3) Save scored_results, to unique folder, for the day 
             # Note: Here we can save also, which CALLER/User-Guid it is about. We cab have a User_id_GUID as a "feature/column"
 
-            srs_folder = './common/temp_data/{}/inference/{}/Scored/'.format(self.project_folder_name,v_str)
+            srs_folder = '../../../../common/temp_data/{}/inference/{}/Scored/'.format(self.project_folder_name,v_str)
             file_name = "scored_{}.parquet".format(caller_guid) # HERE ....who is this scoring about?
 
             local_path = '{}{}'.format(srs_folder,file_name)
+            old_loc = os.getcwd()
+            os.chdir(os.path.dirname(__file__))
             ESMLProject.create_folder_if_not_exists(srs_folder)
             scored_result.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
             self.LakeAccess.upload(file_name, srs_folder, scored_folder, overwrite=True,use_dataset_factory = False) # BLOB or GEN 2
@@ -1309,7 +1318,7 @@ class ESMLProject():
                 try:
                     ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, scored_folder + "*.parquet")],validate=False)
                 except:
-                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, scored_folder + file_name+"/*.parquet")],validate=False)
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, scored_folder + file_name+"_dbx/*.parquet")],validate=False)
                 description = "Scored gold data with model version {}".format(v_str)
                 self.registerGoldScored(ds,description,date_folder, v_str,caller_guid,self.rnd)
             except Exception as e2:
@@ -1318,6 +1327,8 @@ class ESMLProject():
         except Exception as e:
             raise e
         finally:
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty
+            os.chdir(old_loc)
             self.inferenceModelVersion = inference_before # Set back to same state
 
         return scored_result
@@ -1329,86 +1340,101 @@ class ESMLProject():
             return self.save_gold_pandas_as_azure_dataset(dataframe,new_version)
 
     def save_gold_pandas_as_azure_dataset(self,dataframe, new_version=True):
-        srs_folder = './common/temp_data/{}/Gold/'.format(self.project_folder_name)
+        srs_folder = '../../../../common/temp_data/{}/Gold/'.format(self.project_folder_name)
         target_path = self.GoldPath
         file_name = "gold.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
-        #ESMLProject.clean_temp(self.project_folder_name)
+
         ESMLProject.create_folder_if_not_exists(srs_folder)
+        old_loc = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(__file__))
+            dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
-        dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+            ds = None
+            if(self.rnd): # No versioning & overwrite
+                self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath +file_name+ "_dbx/*.parquet")],validate=False)
+            else: # Version folder (don't overwrite) AND LatestVersion at "root", where we overwrite   #NB - This can be optimizes later, if we dont want to double write GOLD
+                self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=True) # Save 1 - Latest GOLD, overwrite
 
-        ds = None
-        if(self.rnd): # No versioning & overwrite
-            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath +file_name+ "/*.parquet")],validate=False)
-        else: # Version folder (don't overwrite) AND LatestVersion at "root", where we overwrite   #NB - This can be optimizes later, if we dont want to double write GOLD
-            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=True) # Save 1 - Latest GOLD, overwrite
-
-            version_folder = self.GoldPath + uuid.uuid4().hex + "/"
-            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # Save 2 - versioning
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath +file_name+ "/*.parquet")],validate=False)
-
+                version_folder = self.GoldPath + uuid.uuid4().hex + "/"
+                self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # Save 2 - versioning
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath +file_name+ "_dbx/*.parquet")],validate=False)
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty
+            os.chdir(old_loc)
         # Set and return "LATEST" version
         return self.registerGold(ds, self.model_folder_name+": GOLD.parquet merged from all datasets. Source to be splitted (Train,Validate,Test)",new_version)
 
  #TRAIN, VALIDATE, TEST   
     def save_gold_train_pandas_as_azure_dataset(self,dataframe,split_percentage,label, new_version=True):
-        srs_folder = './common/temp_data/{}/Gold/Train/'.format(self.project_folder_name)
+        srs_folder = '../../../../common/temp_data/{}/Gold/Train/'.format(self.project_folder_name)
         target_path = self.GoldPath + 'Train/'
         file_name = "gold_train.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
+
         ESMLProject.create_folder_if_not_exists(srs_folder)
+        old_loc = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(__file__))
+            dataframe.to_parquet(local_path, engine='pyarrow', compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-
-        ds = None
-        if(self.rnd): # No versioning & overwrite
-            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + file_name +"/*.parquet")],validate=False)
-        else: # Version folder + don't overwrite
-            version_folder = target_path + uuid.uuid4().hex + "/"
-            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # BLOB, or GEN 2
-            ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
-
+            ds = None
+            if(self.rnd): # No versioning & overwrite
+                self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + file_name +"_dbx/*.parquet")],validate=False)
+            else: # Version folder + don't overwrite
+                version_folder = target_path + uuid.uuid4().hex + "/"
+                self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # BLOB, or GEN 2
+                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty
+            os.chdir(old_loc)
         # Set and return "LATEST" version
         return self.registerGoldTrain(ds, self.model_folder_name+"GOLD_TRAIN.parquet from splitted Train, Validate, Test",split_percentage,label,new_version)
 
     def save_gold_inference_pandas_as_azure_dataset(self,dataframe, new_version=True, label=None):
         target_path = self.GoldPathToScoreBatch
-        srs_folder = './common/temp_data/{}/Gold/Inference/'.format(self.project_folder_name)
+        srs_folder = '../../../../common/temp_data/{}/Gold/Inference/'.format(self.project_folder_name)
         file_name = "gold_to_score.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
-        #ESMLProject.clean_temp(self.project_folder_name)
+        
         ESMLProject.create_folder_if_not_exists(srs_folder)
+        
+        old_loc = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(__file__))
+            dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy',  index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
-        dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy',  index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+            ds = None
+            if(self.rnd): # No versioning & overwrite
+                self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path +file_name +"_dbx/*.parquet")],validate=False)
+            else: # Version folder + don't overwrite
+                self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=True) # Save 1: Latest - Also save "latest", NB: Optimize potential 
 
-        ds = None
-        if(self.rnd): # No versioning & overwrite
-            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path +file_name +"/*.parquet")],validate=False)
-        else: # Version folder + don't overwrite
-            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=True) # Save 1: Latest - Also save "latest", NB: Optimize potential 
-
-            version_folder = target_path + uuid.uuid4().hex + "/"
-            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # Save2: unique per day (support multiple scorings per day)
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder +file_name +"/*.parquet")],validate=False)
+                version_folder = target_path + uuid.uuid4().hex + "/"
+                self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # Save2: unique per day (support multiple scorings per day)
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder +file_name +"_dbx/*.parquet")],validate=False)
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty, if it existed for some reason
+            os.chdir(old_loc)
 
         # Set and return "LATEST" version
         version_string = str(self.inferenceModelVersion)
@@ -1416,56 +1442,66 @@ class ESMLProject():
         return self.registerGoldToScore(ds, self.model_folder_name+": GOLD_to_score.parquet",date_folder,version_string,new_version), version_folder
 
     def save_gold_validate_pandas_as_azure_dataset(self,dataframe,split_percentage,label, new_version=True):
-        srs_folder = './common/temp_data/{}/Gold/Validate/'.format(self.project_folder_name)
+        srs_folder = '../../../../common/temp_data/{}/Gold/Validate/'.format(self.project_folder_name)
         target_path = self.GoldPath + 'Validate/'
         file_name = "gold_validate.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
         
         ESMLProject.create_folder_if_not_exists(srs_folder)
+        old_loc = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(__file__))
+            dataframe.to_parquet(local_path, engine='pyarrow', compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
-        dataframe.to_parquet(local_path, engine='pyarrow', compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-
-        ds = None
-        if(self.rnd): # No versioning & overwrite
-            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path +file_name+ "/*.parquet")],validate=False)
-        else: # Version folder + don't overwrite
-            version_folder = target_path + uuid.uuid4().hex + "/"
-            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # BLOB, or GEN 2
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder +file_name+ "/*.parquet")],validate=False)
+            ds = None
+            if(self.rnd): # No versioning & overwrite
+                self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path +file_name+ "_dbx/*.parquet")],validate=False)
+            else: # Version folder + don't overwrite
+                version_folder = target_path + uuid.uuid4().hex + "/"
+                self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # BLOB, or GEN 2
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder +file_name+ "_dbx/*.parquet")],validate=False)
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty, if it existed for some reason
+            os.chdir(old_loc)
 
         # Set and return "LATEST" version
         return self.registerGoldValidate(ds, self.model_folder_name+": GOLD_VALIDATE.parquet from splitted Train, Validate, Test",split_percentage,label, new_version)
 
     def save_gold_test_pandas_as_azure_dataset(self,dataframe, split_percentage,label, new_version=True):
-        srs_folder = './common/temp_data/{}/Gold/Test/'.format(self.project_folder_name)
+        srs_folder = '../../../../common/temp_data/{}/Gold/Test/'.format(self.project_folder_name)
         target_path = self.GoldPath + 'Test/'
         file_name = "gold_test.parquet"
         local_path = '{}{}'.format(srs_folder,file_name)
         ESMLProject.create_folder_if_not_exists(srs_folder)
+        try:
+            old_loc = os.getcwd()
+            os.chdir(os.path.dirname(__file__))
+            dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy',  index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
-        dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy',  index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-
-        ds = None
-        if(self.rnd): # No versioning & overwrite
-            self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path+ "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path+file_name+ "/*.parquet")],validate=False)
-        else: # Version folder + don't overwrite
-            version_folder = target_path + uuid.uuid4().hex + "/"
-            self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # BLOB, or GEN 2
-            try:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
-            except:
-                ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder +file_name+ "/*.parquet")],validate=False)
+            ds = None
+            if(self.rnd): # No versioning & overwrite
+                self.LakeAccess.upload(file_name, srs_folder, target_path, overwrite=self.rnd) # BLOB or GEN 2
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path+ "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, target_path+file_name+ "_dbx/*.parquet")],validate=False)
+            else: # Version folder + don't overwrite
+                version_folder = target_path + uuid.uuid4().hex + "/"
+                self.LakeAccess.upload(file_name,srs_folder, version_folder, overwrite=self.rnd) # BLOB, or GEN 2
+                try:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder + "*.parquet")],validate=False)
+                except:
+                    ds = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, version_folder +file_name+ "_dbx/*.parquet")],validate=False)
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty
+            os.chdir(old_loc)
 
         # Set and return "LATEST" version
         return self.registerGoldTest(ds, self.model_folder_name+": GOLD_TEST.parquet from splitted Train, Validate, Test",split_percentage,label,new_version)
@@ -1798,133 +1834,139 @@ class ESMLProject():
     def automap_and_register_aml_datasets(self, ws, dataset_name = "", dataset_description_in=""):
         self.ws = ws
 
-        temp_folder = './common/temp_data/{}/'.format(self.project_folder_name)
+        temp_folder = '../../../../common/temp_data/{}/'.format(self.project_folder_name)
         #print("Cleaning local temp for project at: {}".format(temp_folder))
-        ESMLProject.clean_temp(self.project_folder_name)
         ESMLProject.create_folder_if_not_exists(temp_folder)
-
-        if(self._suppress_logging == False):
-            print("Register ES-ML Datastore...")
-        lakestore = self.set_lake_as_datastore(ws)
-        self.readActiveDatesFromLake()
-        self.checkLakeCompatability()
-
-        print("")
-        print("Inference mode (False = Training mode):", self.inference_mode)
-        print("Load data as Datasets....")
-
-        exists_dictionary = defaultdict(list)
-        # VERISONS samename  "ds01_diabetes". Specify `create_new_version=True` to register the dataset as a new version. 
-        # Use `update`, `add_tags`, or `remove_tags` to change only the description or tags.
-        error_path = ""
+        ESMLProject.clean_temp(self.project_folder_name)
+        old_loc = os.getcwd()
         try:
-            for ds in self.dataset_list:
-                print(ds.Name)
-                # specify datastore paths dstore_paths = [(lakestore, 'weather/*/*/*/*/data.parquet')]
-                #dstore_paths = [(lakestore,  ds.BronzePath(0) + "*.parquet")]
-                #partition_format = 'weather/{state}/{in_date:yyyy/MM/dd}/data.parquet'  # specify partition format
-                #dset = Dataset.Tabular.from_parquet_files(path=dstore_paths, partition_format=partition_format) # create the Tabular dataset with 'state' and 'date' as virtual columns 
-                dataset_description = ""
-                dataset_description = dataset_description_in + " "+ ds.DatasetFolderName
-                #name = dataset_name
+            os.chdir(os.path.dirname(__file__))
 
-                # IN folder / Azure dataset
-                error_path = ""
-                dstore_paths = [(lakestore,  ds.InPath + "*.csv")]
-                desc_in =  "IN: " + dataset_description
-                try:
-                    error_path = ds.InPath
-                    in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
+            if(self._suppress_logging == False):
+                print("Register ES-ML Datastore...")
+            lakestore = self.set_lake_as_datastore(ws)
+            self.readActiveDatesFromLake()
+            self.checkLakeCompatability()
+
+            print("")
+            print("Inference mode (False = Training mode):", self.inference_mode)
+            print("Load data as Datasets....")
+
+            exists_dictionary = defaultdict(list)
+            # VERISONS samename  "ds01_diabetes". Specify `create_new_version=True` to register the dataset as a new version. 
+            # Use `update`, `add_tags`, or `remove_tags` to change only the description or tags.
+            error_path = ""
+            try:
+                for ds in self.dataset_list:
+                    print(ds.Name)
+                    # specify datastore paths dstore_paths = [(lakestore, 'weather/*/*/*/*/data.parquet')]
+                    #dstore_paths = [(lakestore,  ds.BronzePath(0) + "*.parquet")]
+                    #partition_format = 'weather/{state}/{in_date:yyyy/MM/dd}/data.parquet'  # specify partition format
+                    #dset = Dataset.Tabular.from_parquet_files(path=dstore_paths, partition_format=partition_format) # create the Tabular dataset with 'state' and 'date' as virtual columns 
+                    dataset_description = ""
+                    dataset_description = dataset_description_in + " "+ ds.DatasetFolderName
+                    #name = dataset_name
+
+                    # IN folder / Azure dataset
+                    error_path = ""
+                    dstore_paths = [(lakestore,  ds.InPath + "*.csv")]
+                    desc_in =  "IN: " + dataset_description
                     try:
-                        exists_dictionary.setdefault(ds.Name, []).append("IN_Folder_has_files")
-                        ds.registerIn(in_ds,desc_in,False)
-                    except UserErrorException as e:
-                        print("Wrong path | OR wrong format (if .csv conversion to .parquet will be made) | OR error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{} ".format(ds.Name,desc_in,e))
-                except Exception as e2: # Try .parquet instead - Else just throw exception
-                    print("IN (.csv or .parquet) coult not be initiated  for dataset {} with description {}. Trying as .parquet instead.".format(ds.Name,desc_in))
-                    
-                    desc_in =  "IN_PQ: " + dataset_description
-                    in_ds = None
+                        error_path = ds.InPath
+                        in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
+                        try:
+                            exists_dictionary.setdefault(ds.Name, []).append("IN_Folder_has_files")
+                            ds.registerIn(in_ds,desc_in,False)
+                        except UserErrorException as e:
+                            print("Wrong path | OR wrong format (if .csv conversion to .parquet will be made) | OR error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{} ".format(ds.Name,desc_in,e))
+                    except Exception as e2: # Try .parquet instead - Else just throw exception
+                        print("IN (.csv or .parquet) coult not be initiated  for dataset {} with description {}. Trying as .parquet instead.".format(ds.Name,desc_in))
+                        
+                        desc_in =  "IN_PQ: " + dataset_description
+                        in_ds = None
+                        try:
+                            dstore_paths = [(lakestore,  ds.InPath + "*.parquet")]
+                            in_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
+                            ds.registerIn(in_ds,desc_in,False)
+                        except Exception as e3:
+                            dstore_paths = [(lakestore,  ds.InPath + "in.parquet/*.parquet")]
+                            in_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with
+                            ds.registerIn(in_ds,desc_in,False)
+                            if("Cannot load any data from the specified path" not in e3.message):
+                                raise e3
+                            
+                        #if("Cannot load any data from the specified path" not in e2.message):
+                        #    raise e2
+                        
+                    # BRONZE folder / Azure dataset
+                    desc_bronze =  "BRONZE: " + dataset_description
+                    error_path = ds.BronzePath
+                    path_parquet_part = ds.BronzePath + "bronze_dbx.parquet/"
                     try:
-                        dstore_paths = [(lakestore,  ds.InPath + "*.parquet")]
-                        in_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
-                        ds.registerIn(in_ds,desc_in,False)
-                    except Exception as e3:
-                        dstore_paths = [(lakestore,  ds.InPath + "in.parquet/*.parquet")]
-                        in_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with
-                        ds.registerIn(in_ds,desc_in,False)
-                        if("Cannot load any data from the specified path" not in e3.message):
-                            raise e3
-                         
-                    #if("Cannot load any data from the specified path" not in e2.message):
-                    #    raise e2
-                    
-                # BRONZE folder / Azure dataset
-                desc_bronze =  "BRONZE: " + dataset_description
-                error_path = ds.BronzePath
-                path_parquet_part = ds.BronzePath + "bronze_dbx.parquet/"
-                try:
-                    dstore_paths = [(lakestore,  ds.BronzePath + "*.parquet")]
-                    bronze_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=True) # create the Tabular dataset with 'state' and 'date' as virtual columns 
-                    exists_dictionary.setdefault(ds.Name, []).append("BRONZE_Folder_has_files")
-                except Exception as e2:
-                    dstore_paths = [(lakestore,  path_parquet_part + "*.parquet")]
-                    try:
-                        bronze_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False)
+                        dstore_paths = [(lakestore,  ds.BronzePath + "*.parquet")]
+                        bronze_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=True) # create the Tabular dataset with 'state' and 'date' as virtual columns 
                         exists_dictionary.setdefault(ds.Name, []).append("BRONZE_Folder_has_files")
-                    except Exception as e3:
-                        if("Cannot load any data from the specified path" not in e3.message):
-                            raise e3
-                
-                # SILVER folder / Azure dataset
-                silver_parquet_part = ds.SilverPath + "silver.parquet/"
-                error_path = ds.SilverPath
-                desc_silver =  "SILVER: " + dataset_description
-                try:
-                    dstore_paths = [(lakestore,  ds.SilverPath + "*.parquet")]
-                    ds_silver = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=True) # create the Tabular dataset with 'state' and 'date' as virtual columns 
+                    except Exception as e2:
+                        dstore_paths = [(lakestore,  path_parquet_part + "*.parquet")]
+                        try:
+                            bronze_ds = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False)
+                            exists_dictionary.setdefault(ds.Name, []).append("BRONZE_Folder_has_files")
+                        except Exception as e3:
+                            if("Cannot load any data from the specified path" not in e3.message):
+                                raise e3
+                    
+                    # SILVER folder / Azure dataset
+                    silver_parquet_part = ds.SilverPath + "silver.parquet/"
+                    error_path = ds.SilverPath
+                    desc_silver =  "SILVER: " + dataset_description
                     try:
-                        exists_dictionary.setdefault(ds.Name, []).append("SILVER_Folder_has_files")
-                        ds.registerSilver(ds_silver,desc_silver,False)
-                    except UserErrorException as e:
-                        print("Wrong path / or error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{}".format(ds.name,desc_silver,e))
-                except Exception as e2:
-                    try:
-                        dstore_paths = [(lakestore, silver_parquet_part + "*.parquet")]
-                        ds_silver = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with 'state' and 'date' as virtual columns 
+                        dstore_paths = [(lakestore,  ds.SilverPath + "*.parquet")]
+                        ds_silver = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=True) # create the Tabular dataset with 'state' and 'date' as virtual columns 
                         try:
                             exists_dictionary.setdefault(ds.Name, []).append("SILVER_Folder_has_files")
                             ds.registerSilver(ds_silver,desc_silver,False)
                         except UserErrorException as e:
                             print("Wrong path / or error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{}".format(ds.name,desc_silver,e))
-                    except UserErrorException as e3:
-                        if("Cannot load any data from the specified path" not in e3.message):
-                            raise e3
+                    except Exception as e2:
+                        try:
+                            dstore_paths = [(lakestore, silver_parquet_part + "*.parquet")]
+                            ds_silver = Dataset.Tabular.from_parquet_files(path=dstore_paths,validate=False) # create the Tabular dataset with 'state' and 'date' as virtual columns 
+                            try:
+                                exists_dictionary.setdefault(ds.Name, []).append("SILVER_Folder_has_files")
+                                ds.registerSilver(ds_silver,desc_silver,False)
+                            except UserErrorException as e:
+                                print("Wrong path / or error at registering dataset '{}' in Azure, with description: {}. Inner exception:\n{}".format(ds.name,desc_silver,e))
+                        except UserErrorException as e3:
+                            if("Cannot load any data from the specified path" not in e3.message):
+                                raise e3
 
-        except Exception as e2:
-            
-            if("Cannot load any data from the specified path" not in e2.message):
-                if(self.inference_mode):
-                    str_1 = "to IN-folder is successful. Check in lake if: correct model_version={} and correct date_folder".format(self.inferenceModelVersion)
-                    str_2 = "\n Tip_2: Maybe data is deleted in lake? But dataset is still registered? Check here in the datalake with Storage Explorer: {}".format(error_path)
+            except Exception as e2:
+                
+                if("Cannot load any data from the specified path" not in e2.message):
+                    if(self.inference_mode):
+                        str_1 = "to IN-folder is successful. Check in lake if: correct model_version={} and correct date_folder".format(self.inferenceModelVersion)
+                        str_2 = "\n Tip_2: Maybe data is deleted in lake? But dataset is still registered? Check here in the datalake with Storage Explorer: {}".format(error_path)
 
-                    raise UserErrorException("Error! Please check that Dataset name you provied in ESMLProject contructor also matches datalake-folder-names setup by your ESML core team" \
-                    ". \n Tip_1: Since INFERENCE MODE=TRUE, check that your Ingestion-pipeline (Azure Data factory) " + str_1 + str_2) from e2
-                else:
-                    raise UserErrorException("Error! Please check that Dataset name you provied in ESMLProject contructor also matches datalake-folder-names setup by your ESML core team") from e2
+                        raise UserErrorException("Error! Please check that Dataset name you provied in ESMLProject contructor also matches datalake-folder-names setup by your ESML core team" \
+                        ". \n Tip_1: Since INFERENCE MODE=TRUE, check that your Ingestion-pipeline (Azure Data factory) " + str_1 + str_2) from e2
+                    else:
+                        raise UserErrorException("Error! Please check that Dataset name you provied in ESMLProject contructor also matches datalake-folder-names setup by your ESML core team") from e2
 
-        print("")
-        print("####### Automap & Autoregister - SUCCESS!")
-        print("1) Auto mapped {} ESML Dataset with registered Azure ML Datasets (potentially all 3: IN,BRONZE, SILVER) in Datastore {} ".format(str(len(exists_dictionary.items())), lakestore.name))
-        #print(" - Existing files already? Status: {} ".format(exists_dictionary.items()))
-        print("")
-        for k in exists_dictionary:
-            print("Dataset '{}' status:".format(k))
-            for listItem in exists_dictionary[k]:
-                print(" - "+ listItem)
-        print("")
-        print("2) Registered each Dataset with suffixes (_IN, _BRONZE, _SILVER) \n Tip: Use ESMLProject.Datasets list or .DatasetByName(myDatasetName) to read/write")
-        print("#######")
+            print("")
+            print("####### Automap & Autoregister - SUCCESS!")
+            print("1) Auto mapped {} ESML Dataset with registered Azure ML Datasets (potentially all 3: IN,BRONZE, SILVER) in Datastore {} ".format(str(len(exists_dictionary.items())), lakestore.name))
+            #print(" - Existing files already? Status: {} ".format(exists_dictionary.items()))
+            print("")
+            for k in exists_dictionary:
+                print("Dataset '{}' status:".format(k))
+                for listItem in exists_dictionary[k]:
+                    print(" - "+ listItem)
+            print("")
+            print("2) Registered each Dataset with suffixes (_IN, _BRONZE, _SILVER) \n Tip: Use ESMLProject.Datasets list or .DatasetByName(myDatasetName) to read/write")
+            print("#######")
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name) # Ensure empty
+            os.chdir(old_loc)
         return lakestore
 
     # https://docs.microsoft.com/en-us/python/api/azureml-core/azureml.data.dataset_factory.tabulardatasetfactory?view=azure-ml-py#register-pandas-dataframe-dataframe--target--name--description-none--tags-none--show-progress-true-
@@ -1935,67 +1977,179 @@ class ESMLProject():
         return self.save_silver_pandas_as_azure_dataset(esml_dataset, dataframe)
 
     def save_silver_pandas_as_azure_dataset(self,esml_dataset, dataframe):
-        srs_folder = './common/temp_data/{}/{}/Silver/{}/'.format(self.project_folder_name,esml_dataset.Name,self.dev_test_prod)
+        srs_folder = '../../../../common/temp_data/{}/{}/Silver/{}/'.format(self.project_folder_name,esml_dataset.Name,self.dev_test_prod)
         target_path = esml_dataset.SilverPath
         file_name = "silver.parquet" #file_name = uuid.uuid4().hex
         local_path = '{}{}'.format(srs_folder,file_name)
-        #ESMLProject.clean_temp(self.project_folder_name)
+        
         ESMLProject.create_folder_if_not_exists(srs_folder)
-
-        dataframe.to_parquet(local_path, engine='pyarrow', compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-
-        esml_dataset.upload_and_register_pandas_silver(file_name,srs_folder, target_path)
+        old_loc = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(__file__))
+            dataframe.to_parquet(local_path, engine='pyarrow', compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+            esml_dataset.upload_and_register_pandas_silver(file_name,srs_folder, target_path)
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name)
+            os.chdir(old_loc)
         return esml_dataset.Silver
 
     def save_bronze(self,esml_dataset, dataframe):
         return self.save_bronze_pandas_as_azure_dataset(esml_dataset, dataframe)
         
     def save_bronze_pandas_as_azure_dataset(self,esml_dataset, dataframe):
-        srs_folder = './common/temp_data/{}/{}/Bronze/{}/'.format(self.project_folder_name,esml_dataset.Name, self.dev_test_prod)
+        srs_folder = '../../../../common/temp_data/{}/{}/Bronze/{}/'.format(self.project_folder_name,esml_dataset.Name, self.dev_test_prod)
         target_path = esml_dataset.BronzePath
         file_name = "bronze.parquet" # uuid.uuid4().hex
         local_path = '{}{}'.format(srs_folder,file_name)
-        ESMLProject.create_folder_if_not_exists(srs_folder)
-        
-        #dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-        dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-        # (PathConflict) The specified path, or an element of the path, exists and its resource type is invalid for this operation.
-        esml_dataset.upload_and_register_pandas_bronze(file_name,srs_folder, target_path) 
-        ESMLProject.clean_temp(self.project_folder_name)
+
+        try:
+            ESMLProject.create_folder_if_not_exists(srs_folder)
+            #dataframe.to_parquet(local_path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+            old_loc = os.getcwd()
+            os.chdir(os.path.dirname(__file__))
+            dataframe.to_parquet(local_path, engine='pyarrow',compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+            # (PathConflict) The specified path, or an element of the path, exists and its resource type is invalid for this operation.
+            esml_dataset.upload_and_register_pandas_bronze(file_name,srs_folder, target_path)
+        finally:
+            ESMLProject.clean_temp(self.project_folder_name)
+            os.chdir(old_loc)
         return esml_dataset.Bronze
-
-
-    @staticmethod 
-    def _z_pandas_to_parquet_date_safe(esml_dataset,local_path):
-        print("trying to save parquet from Pandas (csv) manually since Azure ML Dataset failed casting timestamp via Parquet")
-
-        pd_df = esml_dataset.to_pandas_dataframe()
-        csv_name = local_path + ".csv"
-        pd_df.to_csv(csv_name,index=False)
-
-        df = pd.read_csv(csv_name)
-        df.to_parquet(local_path, engine='pyarrow',compression='snappy', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
     @staticmethod
     def create_folder_if_not_exists(new_folder):
-        if not os.path.exists(new_folder):
-            os.makedirs(new_folder)
-            print("..")                
-            #os.chmod(srs_folder,0o755)
-
-    def clean_temp(project_folder_name):
         old_loc = os.getcwd()
-        srs_folder = './temp_data/'+project_folder_name
+        try:
+            os.chdir(os.path.dirname(__file__))
+            if not os.path.exists(new_folder):
+                os.makedirs(new_folder)
+                #os.chmod(srs_folder,0o755)
+        finally:  # Create folder if not exists
+            os.chdir(old_loc)
+            
+    
+    @staticmethod
+    def clean_automl_logs():
+        old_loc = os.getcwd()
 
         try: # Clean ALL, first
             os.chdir(os.path.dirname(__file__))
+            srs_folder1 = Path('../automl.log')
+            srs_folder2 = Path('../azure_automl_debug_dev.log')
+            srs_folder3 = Path('../azure_automl_debug_test.log')
+            srs_folder4 = Path('../azure_automl_debug_prod.log')
+            srs_folder5 = Path('../azureml_automl.log')
+
+            srs_folder6 = Path('automl.log')
+            srs_folder7 = Path('azure_automl_debug_dev.log')
+            srs_folder8 = Path('azure_automl_debug_test.log')
+            srs_folder9 = Path('azure_automl_debug_prod.log')
+            srs_folder10 = Path('azureml_automl.log')
+
+            srs_folder11 = Path('../../../notebook_demos/automl.log')
+            srs_folder12 = Path('../../../notebook_demos/azure_automl_debug_dev.log')
+            srs_folder13 = Path('../../../notebook_demos/azure_automl_debug_test.log')
+            srs_folder14 = Path('../../../notebook_demos/azure_automl_debug_prod.log')
+            srs_folder15 = Path('../../../notebook_demos/azureml_automl.log')
+
+            if srs_folder2.is_file():
+                os.remove(srs_folder2)
+            if srs_folder3.is_file():
+                os.remove(srs_folder3)
+            if srs_folder4.is_file():
+                os.remove(srs_folder4)
+            if srs_folder5.is_file():
+                os.remove(srs_folder5)
+            if srs_folder7.is_file():
+                os.remove(srs_folder7)
+            if srs_folder8.is_file():
+                os.remove(srs_folder8)
+            if srs_folder9.is_file():
+                os.remove(srs_folder9)
+            if srs_folder10.is_file():
+                os.remove(srs_folder10)
+            if srs_folder12.is_file():
+                os.remove(srs_folder12)
+            if srs_folder13.is_file():
+                os.remove(srs_folder13)
+            if srs_folder14.is_file():
+                os.remove(srs_folder14)
+            if srs_folder15.is_file():
+                os.remove(srs_folder15)
+
+            # Files can be locked, and throws error...
+            if srs_folder11.is_file():
+                os.remove(srs_folder11)
+            if srs_folder1.is_file():
+                os.remove(srs_folder1)
+            if srs_folder6.is_file():
+                os.remove(srs_folder6)
+        except Exception as e:
+            #print(e)
+            pass
+        finally:
+            os.chdir(old_loc)
+
+    @staticmethod
+    def clean_azureml_folder():
+        old_loc = os.getcwd()
+
+        try: # Clean ALL, first
+            os.chdir(os.path.dirname(__file__))
+            srs_folder = Path('.azureml')
+            srs_folder2 = Path('../.azureml')
+            srs_folder3 = Path('../../.azureml')
+            srs_folder4 = Path('../../../.azureml')
+            srs_folder5 = Path('../../../.azureml')
+            srs_folder6 = Path('../../../notebook_demos/.azureml')
+            srs_folder7 = Path('../../../../.azureml')
             try:
-                print("...")
-                shutil.rmtree(srs_folder) # Delete all
-                os.makedirs(srs_folder) # Create "root" folder
-            except OSError as e:
-                print("....")
-                #print("Error: %s : %s" % (srs_folder, e.strerror))
+                if srs_folder.exists() and srs_folder.is_dir():
+                    shutil.rmtree(srs_folder) # Delete all
+            except: pass
+            
+            try:
+                if srs_folder2.exists() and srs_folder2.is_dir():
+                    shutil.rmtree(srs_folder2) # Delete all
+            except: pass
+
+            try:
+                if srs_folder3.exists() and srs_folder3.is_dir():
+                    shutil.rmtree(srs_folder3) # Delete all
+            except:pass
+            try:
+                if srs_folder4.exists() and srs_folder4.is_dir():
+                    shutil.rmtree(srs_folder4) # Delete all
+            except:pass
+            try:
+                if srs_folder5.exists() and srs_folder5.is_dir():
+                    shutil.rmtree(srs_folder5) # Delete all
+            except:pass
+            try:
+                if srs_folder6.exists() and srs_folder6.is_dir():
+                    shutil.rmtree(srs_folder6) # Delete all
+            except:pass
+            try:
+                if srs_folder7.exists() and srs_folder7.is_dir():
+                    shutil.rmtree(srs_folder7) # Delete all
+            except:pass
+        finally:
+            os.chdir(old_loc)
+
+    @staticmethod
+    def clean_temp(project_folder_name):
+        old_loc = os.getcwd()
+
+        try: # Clean ALL, first
+            os.chdir(os.path.dirname(__file__))
+            srs_folder = '../../../../common/temp_data/'+project_folder_name
+            source_dir = Path(srs_folder)
+            if source_dir.exists() and source_dir.is_dir():
+                try:
+                    shutil.rmtree(source_dir) # Delete all
+                    os.makedirs(srs_folder) # Create "root" folder
+                except OSError as e:
+                    print("....")
+                    #print("Error: %s : %s" % (srs_folder, e.strerror))
         except Exception as e:
             raise e
         finally:  # Create folder if not exists
