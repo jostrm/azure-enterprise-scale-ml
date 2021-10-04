@@ -116,3 +116,5 @@ esml_0_DEBUG.ipynb
 *_DEBUG.ipynb
 out/
 temp_data/
+*.csv
+*.parquet
