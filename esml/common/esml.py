@@ -1112,13 +1112,10 @@ class ESMLProject():
         # TODO: To include files in subfolders, append '/**' after the folder name like so: '{Folder}/**'.
         try:
             if(self.inference_mode):
-                if (self._gold_to_score is None): # Lazy load 1st version 
-                    self._gold_to_score = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath)])  # If not registered, fetch from LAKE
-                    # self._gold_to_score = Dataset.get_by_name(self.ws, name=self.dataset_gold_inference_name_azure)
+                self._gold_to_score = Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPath)])  # If not registered, fetch from LAKE
                 return self._gold_to_score # Latest version
             else:
-                if (self._gold_dataset is None): # Lazy load 1st version 
-                    self._gold_dataset = Dataset.get_by_name(self.ws, name=self.dataset_gold_name_azure)
+                self._gold_dataset = Dataset.get_by_name(self.ws, name=self.dataset_gold_name_azure)
                 return self._gold_dataset # Latest version
         except UserErrorException as e1:
             if("Cannot load any data from the specified path" in e1.message):
@@ -1129,6 +1126,20 @@ class ESMLProject():
             return self._inference_gold_path.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion, self.dev_test_prod)
         else:
             return self._train_gold_path.format(self.project_folder_name,self.model_folder_name, self.dev_test_prod)
+
+    @property
+    def GoldPathDatabricks(self):
+        if(self.inference_mode):
+            return self._inference_gold_path.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion, self.dev_test_prod) + "gold_dbx.parquet/*.parquet"
+        else:
+            return self._train_gold_path.format(self.project_folder_name,self.model_folder_name, self.dev_test_prod)+ "gold_dbx.parquet/*.parquet"
+    @property
+    def GoldDatabricks(self):
+        if(self.inference_mode):
+            return Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPathDatabricks)])
+        else:
+            return Dataset.Tabular.from_parquet_files(path = [(self.Lakestore, self.GoldPathDatabricks)])
+
     @property
     def ScoredPath(self): # TODO: Default to LATEST version folder
         return self._inference_scored_path.format(self.project_folder_name,self.model_folder_name,self.inferenceModelVersion, self.dev_test_prod)
@@ -1461,9 +1472,15 @@ class ESMLProject():
 
 #TRAIN, VALIDATE, TEST
 
-    def split_gold_3(self,train_percentage=0.6, label=None,new_version=True, seed=42):
+    def split_gold_dbx(self,train_percentage=0.6, label=None,new_version=True, seed=42):
+        return self.split_gold(self.GoldDatabricks,train_percentage, label,new_version,seed)
 
-        df = self.Gold.to_pandas_dataframe()
+    def split_gold_3(self,train_percentage=0.6, label=None,new_version=True, seed=42):
+        return self.split_gold(self.Gold,train_percentage, label,new_version,seed)
+
+    def split_gold(self,azure_ml_gold_dataset, train_percentage=0.6, label=None,new_version=True, seed=42):
+
+        df = azure_ml_gold_dataset.to_pandas_dataframe()
         whats_left_for_both = round(1-train_percentage,1)  # 0.4 ...0.3 if 70%
         left_per_set = round((whats_left_for_both / 2),2) # 0.2  ...0.15
         validate_and_test = round((1-left_per_set),2) # 0.8 ....0.75
@@ -2141,6 +2158,10 @@ class ESMLDataset():
         return self._nameAzurePrefix
     
     @property
+    def BronzeDatabricks(self):
+        return Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.BronzePath + "bronze_dbx.parquet/*.parquet")],validate=False)
+
+    @property
     def Bronze(self):
         try:
             if(self._project.inference_mode):
@@ -2172,6 +2193,11 @@ class ESMLDataset():
             self._bronze_inference = bronze_azure_dataset
         else:
             self._bronze_train = bronze_azure_dataset
+    
+    @property
+    def SilverDatabricks(self):
+        return Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "silver_dbx.parquet/*.parquet")],validate=False)
+
     @property
     def Silver(self):
         if(self._project.inference_mode):
@@ -2179,14 +2205,14 @@ class ESMLDataset():
                 try:
                     self._silver_inference = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "*.parquet")],validate=False)
                 except:
-                    self._silver_inference = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "silver.parquet/*.parquet")],validate=False)
+                    self._silver_inference = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "silver_dbx.parquet/*.parquet")],validate=False)
             return self._silver_inference
         else:
             if (self._silver_train is None): # Lazy load
                 try:
                     self._silver_train = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "*.parquet")],validate=False)
                 except:
-                    self._silver_train = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "silver.parquet/*.parquet")],validate=False)
+                    self._silver_train = Dataset.Tabular.from_parquet_files(path = [(self._project.Lakestore, self.SilverPath + "silver_dbx.parquet/*.parquet")],validate=False)
             return self._silver_train
    
     @Silver.setter

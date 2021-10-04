@@ -6,6 +6,7 @@ import shutil
 from azureml.core import Experiment
 from azureml.core import Model
 from azureml.data.constants import NONE
+from azureml.telemetry import UserErrorException
 from azureml.train.automl.run import AutoMLRun
 # if  PipelineParameter - you can't use this technique of referring to an existing Environment. Instead, you must set the environment field of the RunConfiguration to an Environment = DONE.
 from azureml.pipeline.core import PipelineParameter
@@ -31,9 +32,9 @@ from azureml.data.dataset_error_handling import DatasetValidationError
 class esml_pipeline_types():
     IN_2_GOLD_SCORING = "IN_2_GOLD_SCORING"
     IN_2_GOLD = "IN_2_GOLD"
-    BRONZE_2_GOLD = "BRONZE_2_GOLD"
-    BRONZE_2_GOLD_SCORING = "BRONZE_2_GOLD_SCORING"
     GOLD_SCORING = "GOLD_SCORING"
+    #BRONZE_2_GOLD = "BRONZE_2_GOLD"
+    #BRONZE_2_GOLD_SCORING = "BRONZE_2_GOLD_SCORING"
 
 class esml_step_types():
     IN_2_BRONZE = "IN_2_BRONZE"
@@ -144,8 +145,10 @@ class ESMLPipelineFactory():
 
         if(pipeline is None):
             if (pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
+                raise UserErrorException("Pipeline is None.You need to provide a pipeline, or update ESML to support fire and forget =  creating a pipeline on the fly of certain type")
                 pipeline = self.create_batch_bronze2gold_scoring_if_not_exists()
             elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
+                raise UserErrorException("Pipeline is None.You need to provide a pipeline, or update ESML to support fire and forget =  creating a pipeline on the fly of certain type")
                 pipeline = self.create_batch_gold_scoring_if_not_exists()
 
         experiment_name = self.name_batch_pipeline
@@ -257,7 +260,11 @@ class ESMLPipelineFactory():
 
         pipe = None
         if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
-            pipe = self._create_pipeline(same_compute_for_all,cpu_gpu_databricks)
+            pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
+        elif(pipeline_type == esml_pipeline_types.IN_2_GOLD):
+            pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
+        elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
+            pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
         else: # TODO: Switch/Case on  esml_pipeline_types, to support multiple types
             raise ValueError('ESML does not support this pipeline type, as of this moment. Check for updates..')
             
@@ -301,38 +308,53 @@ class ESMLPipelineFactory():
 #endregion
 
 #region(collapsed) PRIVATE - BATCH PIPELINE -----------------------------------------------------------
-    def _create_pipeline(self, same_compute_for_all = True, aml_compute=None):
+    def _create_pipeline(self, pipeline_type = esml_pipeline_types.IN_2_GOLD_SCORING, same_compute_for_all = True, aml_compute=None):
         p = self.p
         step_array = []
 
         compute = None
         runconfig = None
-        for d in p.Datasets:
-            if(same_compute_for_all and compute is not None):
-                pass # we alreday wave compute and runconfig
-            else:
-                if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
-                    if(d.cpu_gpu_databricks == "cpu"):
-                        compute, runconfig = self.init_cpu_environment()
-                    elif(d.cpu_gpu_databricks == "databricks"):
-                        compute, runconfig = self.init_databricks_environment()
-                    elif(d.cpu_gpu_databricks == "gpu"):
-                        compute, runconfig = self.init_gpu_environment()
-                else:  # User user configured RunConfig and compute. Custom
-                    runconfig = d.runconfig  # Each dataset can have different compute or environment
-                    compute = d.runconfig.target
-            
-            # 1) Silver datasets (multiple)
-            step_array.append(self.create_esml_step(d, compute,runconfig,esml_step_types.IN_2_SILVER)) 
 
-        # 2) Gold to score (merge all silver datasets)
-        gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array)
-        step_array.append(gold_to_score)
+        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
+            pipeline_type == esml_pipeline_types.IN_2_GOLD):
+            for d in p.Datasets:
+                if(same_compute_for_all and compute is not None):
+                    pass # we alreday wave compute and runconfig
+                else:
+                    if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
+                        if(d.cpu_gpu_databricks == "cpu"):
+                            compute, runconfig = self.init_cpu_environment()
+                        elif(d.cpu_gpu_databricks == "databricks"):
+                            compute, runconfig = self.init_databricks_environment()
+                        elif(d.cpu_gpu_databricks == "gpu"):
+                            compute, runconfig = self.init_gpu_environment()
+                    else:  # User user configured RunConfig and compute. Custom
+                        runconfig = d.runconfig  # Each dataset can have different compute or environment
+                        compute = d.runconfig.target
+                
+                # 1) Silver datasets (multiple)
+                step_array.append(self.create_esml_step(d, compute,runconfig,esml_step_types.IN_2_SILVER)) 
+
+        gold_to_score= None
+        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
+            pipeline_type == esml_pipeline_types.IN_2_GOLD):
+            # 2) Gold to score (merge all silver datasets)
+            gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array)
+            step_array.append(gold_to_score)
         
-        # 3) Score Gold (Do the actual scoring, and saves result to LAKE)
-        step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
-        pipeline = Pipeline(workspace = p.ws, steps=step_array)
+        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.GOLD_SCORING):
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
+                step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
+            elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
+                raise NotImplementedError("Not suppported in your ESML version. Please ask admin for private preview")
+                path_gold_to_score_template_latest = p.path_gold_to_score_template()
+                path_gold_to_score_template_pars = p.path_gold_to_score_template(True,True)
+                gold_to_score_folder = path_gold_to_score_template_latest.format(model_version = 0) # 0 means "latest" par_esml_model_version.default_value
+                gold_to_score_name = p.dataset_gold_to_score_name_azure
 
+                step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
+        
+        pipeline = Pipeline(workspace = p.ws, steps=step_array)
         return pipeline
 
     def get_silver_as_inputs(self,silver_steps):
@@ -352,7 +374,11 @@ class ESMLPipelineFactory():
         latest_scored_folder = p.path_gold_scored_template().format(model_version=0) # 0= latest scored
         latest_gold_scored_path = latest_scored_folder + "{run-id}"
         scored_folder_template = p.path_gold_scored_template(True,True)
-        gold_to_score = gold_to_score_step._outputs[0] # gives us the "OutputFileDatasetConfig"
+
+        if(type(gold_to_score_step) is OutputFileDatasetConfig):  # esml_pipeline_type.SCORE_GOLD 
+            gold_to_score = gold_to_score_step # gives us the "OutputFileDatasetConfig"
+        else: # esml_pipeline_type.IN_2_GOLD_SCORING
+            gold_to_score = gold_to_score_step._outputs[0] # gives us the "OutputFileDatasetConfig"
 
         # OUT:
         scored_gold = (
