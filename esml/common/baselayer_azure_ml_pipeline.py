@@ -290,6 +290,9 @@ class ESMLPipelineFactory():
         )
         '''
         model = self.p.get_best_model_via_experiment_name(self.p.ws) # This is not stale
+        if(model is None):
+            print("Could not fetch BEST MODEL from Azure ML.This might be the first time training model. Now trying with local cache model.")
+            model =  self.p.BestModel
         m = model.download(target_dir=self.get_snapshot_dir_relative(), exist_ok=True)
         return m
 
