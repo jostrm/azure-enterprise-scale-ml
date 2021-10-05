@@ -516,9 +516,18 @@ class ESMLProject():
             print (" - INFERENCE in date: {} and ModelVersion to score with: {}{}".format(self._in_scoring_folder_date,self.inferenceModelVersion, " (0=latest)"))
            
         except Exception as e:
-            print("ESML in-folder settings override = FALSE. [active_in_folder.json,active_scoring_in_folder.json] not found. \n - Using [active_in_folder.json,active_scoring_in_folder.json] from ArgParse or GIT. No override from datalake settings")
-            if("The specified path does not exist" not in e.message):
-                print(e.message)
+            print("ESML in-folder settings override = FALSE. [active_in_folder.json,active_scoring_in_folder.json] not found in LAKE. \n - Using [active_in_folder.json,active_scoring_in_folder.json] from ArgParse or GIT. No override from datalake settings")
+            if("train/active'. Please make sure the path you've specified is correct, files exist and can be accessed" not in e.message):
+                lake_path = ""
+                start = "'"
+                end = "'"
+                try:
+                    s = e.message
+                    path_active = s[s.find(start)+len(start):s.rfind(end)]
+                    print("Path for active folder (where no files exists):")
+                    print(path_active)
+                except:
+                    pass
         finally:
             os.chdir(old_loc) # Switch back to callers "working dir"
 
@@ -748,6 +757,8 @@ class ESMLProject():
 
     def connect_to_lake(self):
         self.lakestore = self.set_lake_as_datastore(self.ws) # only needed if NOT p.init() is done
+        self.readActiveDatesFromLake()
+        self.checkLakeCompatability()
         return self.lakestore
     def initComputeFactory(self,ws,reload_config=False):
 
