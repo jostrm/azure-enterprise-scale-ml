@@ -526,8 +526,8 @@ class ESMLProject():
                     path_active = s[s.find(start)+len(start):s.rfind(end)]
                     print("Path for active folder (where no files exists):")
                     print(path_active)
-                except:
-                    pass
+                except Exception as e4:
+                    print(e4)
         finally:
             os.chdir(old_loc) # Switch back to callers "working dir"
 
