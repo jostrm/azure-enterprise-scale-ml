@@ -660,13 +660,13 @@ class ESMLProject():
         if(model is None): # guard
             #print("No best model found in this Azure ML Studio, for this ESMLProject and ESMLModel. 1st time")
             return None,None,None,None,None
-            
-        model_name = model.tags["model_name"]
-        run_id = model.tags["run_id"]
-        experiment = Experiment(self.ws, self.experiment_name)
-        main_run = AutoMLRun(experiment=experiment, run_id=run_id) 
-        #main_run = Run(experiment=experiment, run_id=run_id) # Why not this? 
-        best_automl_run, fitted_model = main_run.get_output() # TODO-AutoML specific really? to get "best_automl_run, fitted_model"...should be 1 run returned either way?
+        else:
+            model_name = model.tags["model_name"]
+            run_id = model.tags["run_id"]
+            experiment = Experiment(self.ws, self.experiment_name)
+            main_run = AutoMLRun(experiment=experiment, run_id=run_id) 
+            #main_run = Run(experiment=experiment, run_id=run_id) # Why not this? 
+            best_automl_run, fitted_model = main_run.get_output() # TODO-AutoML specific really? to get "best_automl_run, fitted_model"...should be 1 run returned either way?
         return experiment, model,main_run, best_automl_run,fitted_model
 
     def get_best_model_and_run_via_experiment_name(self,filter_on_version = None):
