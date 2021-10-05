@@ -71,9 +71,12 @@ class ESMLPipelineFactory():
 #endregion
 
 # region(collapsed) INIT
-    def __init__(self, project, target_column_name, esml_pipeline_type = esml_pipeline_types.IN_2_GOLD_SCORING):
+    def __init__(self, project, target_column_name = None, esml_pipeline_type = esml_pipeline_types.IN_2_GOLD_SCORING):
         self.p = project
-        self._target_column_name = target_column_name
+        if(target_column_name is None):
+            self._target_column_name = project.active_model["label"]
+        else:
+            self._target_column_name = target_column_name
         self._esml_pipeline_type = esml_pipeline_type
         self._snapshot_folder = self._snapshot_folder + self.p.ModelAlias+ "/" # self.p.model_folder_name
         self._create_parameters()
