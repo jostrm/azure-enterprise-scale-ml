@@ -657,6 +657,10 @@ class ESMLProject():
 
     def get_best_model_and_run_via_experiment_name_and_ws(self, ws, filter_on_version = None):
         model = self.get_best_model_via_experiment_name(ws,filter_on_version) # 2021-09
+        if(model is None): # guard
+            #print("No best model found in this Azure ML Studio, for this ESMLProject and ESMLModel. 1st time")
+            return None,None,None,None,None
+            
         model_name = model.tags["model_name"]
         run_id = model.tags["run_id"]
         experiment = Experiment(self.ws, self.experiment_name)

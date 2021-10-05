@@ -1267,17 +1267,17 @@ class AutoMLFactory(metaclass=Singleton):
             target_exp, model,target_run, target_best_run,target_model = None,None,None,None,None
             try:
                 target_exp, target_model,target_run, target_best_run,fitted_model = p.get_best_model_and_run_via_experiment_name_and_ws(target_workspace)
-                target_best_run_id = target_model.tags["run_id"] # model.tags.get("run_id") Example: AutoML_08bb87d4-9587-4b99-b781-fe16bd13f140
-                target_model_name = target_model.tags["model_name"]
-                target_best_model_version = target_model.version
+                if(target_model is not None):
+                    target_best_run_id = target_model.tags["run_id"] # model.tags.get("run_id") Example: AutoML_08bb87d4-9587-4b99-b781-fe16bd13f140
+                    target_model_name = target_model.tags["model_name"]
+                    target_best_model_version = target_model.version
 
-                print("Target found (registered):")
-                print(" Target - best_run_id", target_best_run_id)
-                print(" Target - best_run_id (best run)", target_best_run.id)
-                print(" Target - model_name (from model.tag)",target_model_name)
-                #print("target - model_name (from target_best_run.properties[''model_name'])",target_best_run.properties['model_name'] )
-                print(" Target - model_version",target_best_model_version)
-
+                    print("Target found (registered):")
+                    print(" Target - best_run_id", target_best_run_id)
+                    print(" Target - best_run_id (best run)", target_best_run.id)
+                    print(" Target - model_name (from model.tag)",target_model_name)
+                    #print("target - model_name (from target_best_run.properties[''model_name'])",target_best_run.properties['model_name'] )
+                    print(" Target - model_version",target_best_model_version)
             except Exception as e1:
                 print(e1.message)
                 promote_new_model = True
