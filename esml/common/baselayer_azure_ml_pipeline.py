@@ -278,18 +278,7 @@ class ESMLPipelineFactory():
     from azureml.core.model import Model
     def _create_scriptfolder_and_download_files(self):
         os.makedirs(self._snapshot_folder, exist_ok=True)
-
-        # NOTE: Below commented is STALE if you switch lake_settings without a training run to refresh "run_id"
-        '''
-        inference_config_to_override_and_inject, model, best_run = self.p.get_active_model_inference_config() 
-        inference_env = best_run.get_environment()
-        best_run.download_file(
-            # Download model.pkl for SNAPSHOT
-            "outputs/model.pkl", os.path.join(
-                self._snapshot_folder, "model.pkl")
-        )
-        '''
-        model = self.p.get_best_model_via_experiment_name(self.p.ws) # This is not stale
+        model = self.p.get_best_model_via_experiment_name(self.p.ws)
         if(model is None):
             print("Could not fetch BEST MODEL from Azure ML Studo - remotely.This might be the first time training model. \n - Now trying with local cache model.")
             model =  self.p.BestModel

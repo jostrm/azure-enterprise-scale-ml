@@ -1323,7 +1323,7 @@ class AutoMLFactory(metaclass=Singleton):
         print("New trained model & cached RUN, has TASK_TYPE: {} and Best_Run_id: {}".format(source_task_type,source_best_run.id))
         print("Target model & RUN, in Azure ML Studio workspace to compare with, has TASK_TYPE: {} and Best_Run_id:{} ".format(target_task_type,target_best_run.id))
 
-        if(target_best_run_id == None): # 1st run, 1st model...just promote
+        if(target_best_run_id is None): # 1st run, 1st model...just promote
             print("This is the first model. No target to compare with, hence we will PROMOTE")
             return True
 

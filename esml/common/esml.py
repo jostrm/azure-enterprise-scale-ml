@@ -23,6 +23,7 @@ IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THE SOFTWARE CODE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
+from ctypes import ArgumentError
 import json
 import sys
 import os
@@ -672,10 +673,17 @@ class ESMLProject():
     def get_best_model_and_run_via_experiment_name(self,filter_on_version = None):
         return self.get_best_model_and_run_via_experiment_name_and_ws(self.ws,filter_on_version)
 
-    def get_best_model_via_experiment_name(self,ws,filter_on_version = None):
+    def get_best_model_via_experiment_name(self,workspace=None,filter_on_version = None):
         latest_model = None
+        active_workspace = None
+        if(workspace is None):
+            active_workspace = self.ws
+        else:
+            active_workspace = workspace
+        if(active_workspace is None):
+            raise ArgumentError("Azure ML workspace is null. You need to connect to a workspace and set ESMProject.ws property, or pass an external workspace as first parameter")
 
-        ex1 = Experiment(ws, self.experiment_name) # Can be other workspace (dev,test,prod), but same experiment name
+        ex1 = Experiment(active_workspace, self.experiment_name) # Can be other workspace (dev,test,prod), but same experiment name
         tag_model_name = None
         tag_model_version = None
         if (ex1.tags is not None and "best_model_version" in ex1.tags and "model_name" in ex1.tags):
@@ -683,14 +691,14 @@ class ESMLProject():
             tag_model_version = ex1.tags["best_model_version"]
         
             if (filter_on_version is not None):
-                latest_model = Model(self.ws, name=tag_model_name, version=filter_on_version)
+                latest_model = Model(active_workspace, name=tag_model_name, version=filter_on_version)
                 print ("found model via REMOTE FILTER + VersionFilter as input.Tags: mode_name, model_version")
             else:
-                latest_model = Model(self.ws, name=tag_model_name, version=tag_model_version)
+                latest_model = Model(active_workspace, name=tag_model_name, version=tag_model_version)
                 print ("found model via REMOTE FILTER: Experiment TAGS: model_name")
         else:
             print ("Searching model - LOOPING the experiment to match name (1st time thing, since no tags)")
-            for m in Model.list(self.ws):
+            for m in Model.list(active_workspace):
                 if(m.experiment_name == self.experiment_name):
                     
                     if(filter_on_version is not None):
@@ -704,7 +712,7 @@ class ESMLProject():
                     break
                     
             if (latest_model is not None): # Update Experiment tag
-                ex = Experiment(self.ws, self.experiment_name)
+                ex = Experiment(active_workspace, self.experiment_name)
                 tags = {'model_name':latest_model.name, 'best_model_version':m.version}
                 ex.set_tags(tags)
 
