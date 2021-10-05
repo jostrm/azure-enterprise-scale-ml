@@ -684,21 +684,25 @@ class ESMLProject():
         
             if (filter_on_version is not None):
                 latest_model = Model(self.ws, name=tag_model_name, version=filter_on_version)
-                print ("found model via REMOTE FILTER + VersionFilter as input")
+                print ("found model via REMOTE FILTER + VersionFilter as input.Tags: mode_name, model_version")
             else:
                 latest_model = Model(self.ws, name=tag_model_name, version=tag_model_version)
-                print ("found model via REMOTE FILTER: Experiment TAGS: model name and version")
+                print ("found model via REMOTE FILTER: Experiment TAGS: model_name")
         else:
+            print ("Searching model - LOOPING the experiment to match name (1st time thing, since no tags)")
             for m in Model.list(self.ws):
                 if(m.experiment_name == self.experiment_name):
+                    
                     if(filter_on_version is not None):
                         if(filter_on_version == m.version):
                             latest_model = m
+                            print ("found model matching experiment_name, also matching on model_version")
                             break
                     else:
                         latest_model = m
+                        print ("found model matching experiment_name, selecting latest registered.")
                     break
-            print ("found model via looping all in experiment on CLIENT")
+                    
             if (latest_model is not None): # Update Experiment tag
                 ex = Experiment(self.ws, self.experiment_name)
                 tags = {'model_name':latest_model.name, 'best_model_version':m.version}
