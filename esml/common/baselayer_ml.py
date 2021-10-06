@@ -83,24 +83,25 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
     auc = None
     matrix = None
     precision = None
+    f1 = None
     if(multiclass is not None):
         print("Multiclass classification")
         auc = roc_auc_score(y_true=y_test, y_score=y_predict_proba,multi_class=multiclass)
         matrix = multilabel_confusion_matrix(y_test, y_predict) # binarized under a one-vs-rest way
         precision = precision_score(y_test, y_predict, average=None)
         recall = recall_score(y_test, y_predict, average=None)
+        f1 = f1_score(y_test,y_predict,average=None)
     else:
         print("Binary classification")
         auc = roc_auc_score(y_test, predict_proba)
         matrix = confusion_matrix(y_test, y_predict)
         precision= average_precision_score(y_test, y_predict)
         recall = recall_score(y_test, y_predict)
+        f1 = f1_score(y_test,y_predict)
 
     print("Generic classification metrics")
-    accuracy, f1, matthews = \
-    accuracy_score(y_test, y_predict),\
-    f1_score(y_test,y_predict), \
-    matthews_corrcoef(y_test, y_predict)  # Matthews Correlation Coefficient is The Best Classification Metric You’ve Never Heard Of...
+    accuracy = accuracy_score(y_test, y_predict)
+    matthews = matthews_corrcoef(y_test, y_predict)  # Matthews Correlation Coefficient is The Best Classification Metric You’ve Never Heard Of...
 
     plt = None
     if(multiclass is None):
