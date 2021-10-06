@@ -83,12 +83,15 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
     auc = None
     matrix = None
     if(multiclass is not None):
+        print("Multiclass classification")
         auc = roc_auc_score(y_true=y_test, y_score=y_predict_proba,multi_class=multiclass)
         matrix = multilabel_confusion_matrix(y_test, y_predict) # binarized under a one-vs-rest way
     else:
+        print("Binary classification")
         auc = roc_auc_score(y_test, predict_proba)
         matrix = confusion_matrix(y_test, y_predict)
 
+    print("Generic classification metrics")
     accuracy, precision, recall, f1, matthews = \
     accuracy_score(y_test, y_predict),\
     average_precision_score(y_test, y_predict),\
