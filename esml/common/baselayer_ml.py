@@ -95,7 +95,7 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
         precision= average_precision_score(y_test, y_predict)
 
     print("Generic classification metrics")
-    accuracy, precision, recall, f1, matthews = \
+    accuracy, recall, f1, matthews = \
     accuracy_score(y_test, y_predict),\
     recall_score(y_test, y_predict),\
     f1_score(y_test,y_predict), \
