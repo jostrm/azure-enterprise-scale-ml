@@ -85,8 +85,7 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
         auc = roc_auc_score(y_true=y_test, y_score=y_predict_proba,multi_class=multiclass)
     else:
         auc = roc_auc_score(y_test, predict_proba)
-    fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
-    
+
     accuracy, precision, recall, f1, matrix, matthews = \
     accuracy_score(y_test, y_predict),\
     average_precision_score(y_test, y_predict),\
@@ -95,12 +94,15 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
     confusion_matrix(y_test, y_predict), \
     matthews_corrcoef(y_test, y_predict)  # Matthews Correlation Coefficient is The Best Classification Metric You’ve Never Heard Of...
 
-    plt.plot(fpr, tpr, color='blue', label='AUC='+str(auc))
-    plt.plot([0, 1], [0, 1], color='darkblue', linestyle='--')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic (ROC) Curve')
-    plt.legend()
+    plt = None
+    if(multiclass is None):
+        fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
+        plt.plot(fpr, tpr, color='blue', label='AUC='+str(auc))
+        plt.plot([0, 1], [0, 1], color='darkblue', linestyle='--')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC) Curve')
+        plt.legend()
     #plt.show()
     
     return auc,accuracy,f1, precision,recall,matrix,matthews, plt
