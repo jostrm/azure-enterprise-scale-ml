@@ -763,9 +763,22 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         # 1) Log on the TEST_SET used
         p.GoldTest.tags["ROC_AUC"] = "{:.6f}".format(auc)
         p.GoldTest.tags["Accuracy"] = "{:.6f}".format(accuracy)
-        p.GoldTest.tags["F1_Score"] = "{:.6f}".format(f1)
-        p.GoldTest.tags["Precision"] = "{:.6f}".format(precision)
-        p.GoldTest.tags["Recall"] = "{:.6f}".format(recall)
+
+        f1_str = None
+        prec_str = None
+        rec_str = None
+        if(multiclass is not None):
+            f1_str = list(map('{:.6f}'.format,f1))
+            prec_str = list(map('{:.6f}'.format,precision))
+            rec_str = list(map('{:.6f}'.format,recall))
+        else:
+            f1_str = "{:.6f}".format(f1)
+            prec_str = "{:.6f}".format(precision)
+            rec_str = "{:.6f}".format(recall)
+
+        p.GoldTest.tags["F1_Score"] = f1_str
+        p.GoldTest.tags["Precision"] = prec_str
+        p.GoldTest.tags["Recall"] = rec_str
         p.GoldTest.tags["Matthews_Correlation"] = "{:.6f}".format(matthews)
         p.GoldTest.tags["Confusion_Matrix"] = str(matrix)
 
@@ -774,9 +787,9 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         #model = Model(p.ws, model_name)
         model.tags["test_set_ROC_AUC"] =  "{:.6f}".format(auc)
         model.tags["test_set_Accuracy"] =  "{:.6f}".format(accuracy)
-        model.tags["test_set_F1_Score"] =  "{:.6f}".format(f1)
-        model.tags["test_set_Precision"] =  "{:.6f}".format(precision)
-        model.tags["test_set_Recall"] =  "{:.6f}".format(recall)
+        model.tags["test_set_F1_Score"] =  f1_str
+        model.tags["test_set_Precision"] =  prec_str
+        model.tags["test_set_Recall"] =  rec_str
         model.tags["test_set_Matthews_Correlation"] =  "{:.6f}".format(matthews)
         model.tags["test_set_CM"] =  str(matrix)
 
@@ -785,7 +798,9 @@ class ESMLTestScoringFactory(metaclass=Singleton):
 
         # 3) Also, log on RUN
         #source_best_run.tag("ESML TEST_SET Scoring", "Yes, including plot: ROC")
-        source_best_run.log_image("ESML_GOLD_TestSet_ROC", plot=plt)
+        if(plt is not None):
+            source_best_run.log_image("ESML_GOLD_TestSet_ROC", plot=plt)
+            
         return auc,accuracy, f1, precision,recall,matrix,matthews, plt
 
 from azureml.core import Experiment
