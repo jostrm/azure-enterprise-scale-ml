@@ -82,7 +82,7 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
     #predict_proba = y_predict_proba[:, 1] # Positive values only
     auc = None
     if(multiclass is not None):
-        auc = roc_auc_score(y_true=y_test, y_score=predict_proba,multi_class=multiclass)
+        auc = roc_auc_score(y_true=y_test, y_score=y_predict_proba,multi_class=multiclass)
     else:
         auc = roc_auc_score(y_test, predict_proba)
     fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
