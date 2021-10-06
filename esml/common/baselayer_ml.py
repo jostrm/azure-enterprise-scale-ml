@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from math import sqrt
-from sklearn.metrics import mean_squared_error, r2_score,recall_score,average_precision_score,f1_score,roc_auc_score,accuracy_score,roc_curve,confusion_matrix,mean_absolute_error, matthews_corrcoef
+from sklearn.metrics import mean_squared_error, r2_score,recall_score,average_precision_score,f1_score,roc_auc_score,accuracy_score,roc_curve,confusion_matrix,mean_absolute_error, matthews_corrcoef, multilabel_confusion_matrix
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 
@@ -81,17 +81,19 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
 
     #predict_proba = y_predict_proba[:, 1] # Positive values only
     auc = None
+    matrix = None
     if(multiclass is not None):
         auc = roc_auc_score(y_true=y_test, y_score=y_predict_proba,multi_class=multiclass)
+        matrix = multilabel_confusion_matrix(y_test, y_predict) # binarized under a one-vs-rest way
     else:
         auc = roc_auc_score(y_test, predict_proba)
+        matrix = confusion_matrix(y_test, y_predict)
 
-    accuracy, precision, recall, f1, matrix, matthews = \
+    accuracy, precision, recall, f1, matthews = \
     accuracy_score(y_test, y_predict),\
     average_precision_score(y_test, y_predict),\
     recall_score(y_test, y_predict),\
     f1_score(y_test,y_predict), \
-    confusion_matrix(y_test, y_predict), \
     matthews_corrcoef(y_test, y_predict)  # Matthews Correlation Coefficient is The Best Classification Metric You’ve Never Heard Of...
 
     plt = None
