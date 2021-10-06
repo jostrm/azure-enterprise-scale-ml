@@ -776,6 +776,12 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             prec_str = "{:.6f}".format(precision)
             rec_str = "{:.6f}".format(recall)
 
+        if(f1_str is None):
+            f1_str = ""
+        if(prec_str is None):
+            prec_str = ""
+        if(rec_str is None):
+            rec_str = ""
         p.GoldTest.tags["F1_Score"] = f1_str
         p.GoldTest.tags["Precision"] = prec_str
         p.GoldTest.tags["Recall"] = rec_str
@@ -793,14 +799,16 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         model.tags["test_set_Matthews_Correlation"] =  "{:.6f}".format(matthews)
         model.tags["test_set_CM"] =  str(matrix)
 
-        model.add_tags(tags = model.tags)
-        ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
+        try:
+            model.add_tags(tags = model.tags)
+            ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
+        except:pass
 
         # 3) Also, log on RUN
         #source_best_run.tag("ESML TEST_SET Scoring", "Yes, including plot: ROC")
         if(plt is not None):
             source_best_run.log_image("ESML_GOLD_TestSet_ROC", plot=plt)
-            
+
         return auc,accuracy, f1, precision,recall,matrix,matthews, plt
 
 from azureml.core import Experiment
