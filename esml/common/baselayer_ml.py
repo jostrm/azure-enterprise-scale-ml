@@ -86,7 +86,15 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
     f1 = None
     if(multiclass is not None):
         #print("Multiclass classification")
-        auc = roc_auc_score(y_true=y_test, y_score=y_predict_proba,multi_class=multiclass)
+        try:
+            auc = roc_auc_score(y_true=y_test, y_score=y_predict_proba,multi_class=multiclass)
+            pass
+        except Exception as e:
+            if("IndexError: too many indices for array" in e.message):
+                pred = y_predict_proba[:,1]
+                auc = roc_auc_score(y_true=y_test, y_score=pred,multi_class=multiclass)
+            else:
+                raise e
         matrix = multilabel_confusion_matrix(y_test, y_predict) # binarized under a one-vs-rest way
         precision = precision_score(y_test, y_predict, average=None)
         recall = recall_score(y_test, y_predict, average=None)

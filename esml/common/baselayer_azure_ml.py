@@ -761,7 +761,9 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, label,fitted_model,multiclass)
 
         # 1) Log on the TEST_SET used
-        p.GoldTest.tags["ROC_AUC"] = "{:.6f}".format(auc)
+        if(auc is not None):
+            p.GoldTest.tags["ROC_AUC"] = "{:.6f}".format(auc)
+
         p.GoldTest.tags["Accuracy"] = "{:.6f}".format(accuracy)
 
         f1_str = None
@@ -791,7 +793,8 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         #2) Also, log on MODEL
         #model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
         #model = Model(p.ws, model_name)
-        model.tags["test_set_ROC_AUC"] =  "{:.6f}".format(auc)
+        if(auc is not None):
+            model.tags["test_set_ROC_AUC"] =  "{:.6f}".format(auc)
         model.tags["test_set_Accuracy"] =  "{:.6f}".format(accuracy)
         model.tags["test_set_F1_Score"] =  f1_str
         model.tags["test_set_Precision"] =  prec_str
@@ -799,10 +802,9 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         model.tags["test_set_Matthews_Correlation"] =  "{:.6f}".format(matthews)
         model.tags["test_set_CM"] =  str(matrix)
 
-        try:
-            model.add_tags(tags = model.tags)
-            ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
-        except:pass
+        model.add_tags(tags = model.tags)
+        ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
+        
 
         # 3) Also, log on RUN
         #source_best_run.tag("ESML TEST_SET Scoring", "Yes, including plot: ROC")

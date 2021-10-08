@@ -1541,7 +1541,10 @@ class ESMLProject():
     def split_gold_3(self,train_percentage=0.6, label=None,new_version=True, seed=42):
         return self.split_gold(self.Gold,train_percentage, label,new_version,seed)
 
-    def split_gold(self,azure_ml_gold_dataset, train_percentage=0.6, label=None,new_version=True, seed=42):
+    def split_gold(self,azure_ml_gold_dataset, train_percentage=0.6, label_in=None,new_version=True, seed=42):
+        label = None
+        if (label_in is None):
+            label = self.active_model["label"]
 
         df = azure_ml_gold_dataset.to_pandas_dataframe()
         whats_left_for_both = round(1-train_percentage,1)  # 0.4 ...0.3 if 70%
@@ -2408,7 +2411,7 @@ class ESMLDataset():
         if(self._project.inference_mode): # Inference path
              if (self._in_inference is None): #Lazy load
                 try:
-                    self._in_inference = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False)
+                    self._in_inference = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=',')
                 except Exception as e:
                     print("ESML Note: Could not read InData (Scoring) as .CSV - Now trying as .PARQUET instead.")
                     try:
@@ -2421,7 +2424,7 @@ class ESMLDataset():
         else:
             if (self._in_train is None): # Lazy load
                 try:
-                    self._in_train = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False)
+                    self._in_train = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=',')
                 except Exception as e:
                     print("ESML Note: Could not read InData as .CSV - Now trying as .PARQUET instead.")
                     try:
