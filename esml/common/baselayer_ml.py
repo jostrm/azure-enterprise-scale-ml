@@ -101,7 +101,7 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None,po
         f1 = f1_score(y_test,y_predict,average=None)
     else:
         #print("Binary classification")
-        auc = roc_auc_score(y_test, predict_proba,positive_label=positive_label)
+        auc = roc_auc_score(y_test, predict_proba,pos_label=positive_label)
         matrix = confusion_matrix(y_test, y_predict)
         precision= average_precision_score(y_test, y_predict,pos_label=positive_label)
         recall = recall_score(y_test, y_predict,pos_label=positive_label)
