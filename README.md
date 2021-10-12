@@ -238,8 +238,10 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 - A: You can use Python machine learning algorithms such as (scikit learn, Keras, Pytorch, Tensorflow), or use Azure Machine learning and AutoML which includes +29 algorithms such as Prophet for forecasting.
     - **ML problems:** ESML and AutoML can be used for fast building of `regresssion`,`classification`, `forecasting` machine learning solutions. 
     - **Model serving:** ESML accelerates models to be served as: `batch scoring`,`online scoring`. 
-    - **Spark clusters**:  You can also `use Azure Databricks` as a pipeline-step, e.g. to crunch big data from/to the ESML `Auto-lake` via `Bronze,Silver,Gold` concept.
+    - **Spark clusters**:  You can also `use Azure Databricks` or `Synapse Spark` as a pipeline-step, e.g. to crunch big data from/to the ESML `Auto-lake` via `Bronze,Silver,Gold` concept.
         - You can ALSO work from Azure Databricks as IDE, via ESML SDK to get 100% of `AutoLake` features, or Spark directly to the `Bronze,Silver,Gold` mounted folders, only X% of `Autolake` features works.
+        - Tip: For datasets to process above 10GB: If you like PANDAS - use `Pandas dataframes` with Ray, Dask via `Modin` or if you like Spark, use PySpark dataframes with `Spark clusters`
+           [Data processing - optimization ](https://docs.microsoft.com/en-us/azure/machine-learning/concept-optimize-data-processing)
  
 **Q8:I need DirectQuery from Power BI, Azure datalake does not support this. I guess I need a SQL Database, datalake just is not enough?**
 - A: True. BUT - since you have versioning built in (both for data and changing schema) in `AutoLake`, you may utilize this: first save the scored data/analytics to the datalake, then to database as `cache`
@@ -287,12 +289,11 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 - A: Yes, ESML are an accelerator to `DEFINE` Azure ML Pipelines, which can have a `Synapse Spark step` or `DataBricksStep`, where you can wrhite `PySpark`
 - A: **But, first**. `What is BIG DATA?` I asked my collegeus on the Databricks team:
 
-    - A: -Well, If you have data below 8-10TB, No, but this is a grey zone here.
-    - A: ..If <1TB - definetely not BIG data.
-    - A: ...Above 10TB - Yes. Here you need a spark cluster. Azure ML CPU clusters is not a good tool here.
-    - AND: Looking at my own recent experience (past 2 years) - helping customers in 13 ML projects. 
-
-        - None of the 13 ML-projects (models) was close to being BIG DATA (e.g. well below 1TB)
+    - A: Well, If you have data below 8-10TB, Not really but this is a grey zone here:
+    - A: If above 10GB-1TB, its not really BIG DATA, but Pandas datafram with `modin` or `PySpark` will bring you more fun.
+    - A: Above 10TB - Yes. Here you need a spark cluster. Azure ML CPU clusters & Pandas dataframes are not a good tool here.
+    - AND: Looking at my own recent experience (past 2-3 years) helping customers in +15 ML projects:
+        - None of those ML-projects (models) was close to being BIG DATA (e.g. well below 10GB). (Often when training or scoring data with ML, we work with subsets of data)
         - A few was 100-500MB
         - Most was 50-100MB
         - Some was <15 MB

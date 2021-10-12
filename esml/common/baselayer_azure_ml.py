@@ -745,7 +745,7 @@ class ESMLTestScoringFactory(metaclass=Singleton):
 
         return rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt
     
-    def get_test_scoring_7_classification(self, label,multiclass=None, run=None, fitted_model=None):
+    def get_test_scoring_7_classification(self, label,multiclass=None,positive_label=None, run=None, fitted_model=None):
         p = self.project
 
         if(run is not None):
@@ -758,7 +758,7 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)  # Old, stale ...since local agent metadata of "last run"
 
         test_set_pd =  p.GoldTest.to_pandas_dataframe()
-        auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, label,fitted_model,multiclass)
+        auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, label,fitted_model,multiclass,positive_label)
 
         # 1) Log on the TEST_SET used
         if(auc is not None):

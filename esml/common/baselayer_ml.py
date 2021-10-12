@@ -64,7 +64,7 @@ def get_4_regression_metrics(test_set, label,fitted_model):
     return rmse, r2, mean_abs_percent_error,mae, spearman_correlation,plt
 
 
-def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
+def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None,positive_label=None):
     X_test = test_set # X_test
     y_test = X_test.pop(label).to_frame() # y_test (true labels)
     y_predict = fitted_model.predict(X_test) # y_predict (predicted labels)
@@ -101,11 +101,11 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None):
         f1 = f1_score(y_test,y_predict,average=None)
     else:
         #print("Binary classification")
-        auc = roc_auc_score(y_test, predict_proba)
+        auc = roc_auc_score(y_test, predict_proba,positive_label=positive_label)
         matrix = confusion_matrix(y_test, y_predict)
-        precision= average_precision_score(y_test, y_predict)
-        recall = recall_score(y_test, y_predict)
-        f1 = f1_score(y_test,y_predict)
+        precision= average_precision_score(y_test, y_predict,pos_label=positive_label)
+        recall = recall_score(y_test, y_predict,pos_label=positive_label)
+        f1 = f1_score(y_test,y_predict,pos_label=positive_label)
 
     #print("Generic classification metrics")
     accuracy = accuracy_score(y_test, y_predict)
