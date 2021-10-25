@@ -38,23 +38,26 @@ class In2GoldProcessor():
     def data_processed(self):
         return self._df_processed
 
-    def in_to_silver_ds01_M10_M11_DEMO(self):
-        #### DEMO code ### replace this with YOUR custom code (for DEMO it supports 2 models, usually only 1....) 
-        target_column_name = "Survived" 
-        if target_column_name in self._df.columns: # 1) M10_Titanic specific code
-            #  DROP some columns
-            self._df_processed = self._df.drop(target_column_name, axis=1) # DEMO scenario: Simulate feature engineering...source system might not know column name for Y, and certainly not values
-            #self._df.drop("Name", axis=1, inplace=True) # Drop Name since its only "noise" for ML. AutoML will remove it automatically though...
-            #self._df.rename(columns={'Siblings/Spouses Aboard': 'siblings_spouces_aboard', 'Parents/Children Aboard': 'parent_or_child_aboard'}, inplace=True)
-            self._df_processed.columns =  self._df_processed.columns.str.replace("[/]", "_")
- 
-        target_column_name = "Y"
-        if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
-            self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
+    def in_to_silver_ds01_M10_M11_DEMO(self, inference_mode=True):
+        #### DEMO code ### replace this with YOUR custom code (for DEMO it supports 3 models. real world - you only have 1 model to care for here) 
+        
+        # Drop LABEL column for DEMO purpose if INFERNCE, to simulate real inference scenario...we dont know the prediction yet.
+        if(inference_mode):
+            target_column_name = "Survived"
+            if target_column_name in self._df.columns: # 1) M10_Titanic specific code
+                #  DROP some columns
+                self._df_processed = self._df.drop(target_column_name, axis=1) # DEMO scenario: Simulate feature engineering...source system might not know column name for Y, and certainly not values
+                #self._df.drop("Name", axis=1, inplace=True) # Drop Name since its only "noise" for ML. AutoML will remove it automatically though...
+                #self._df.rename(columns={'Siblings/Spouses Aboard': 'siblings_spouces_aboard', 'Parents/Children Aboard': 'parent_or_child_aboard'}, inplace=True)
+                self._df_processed.columns =  self._df_processed.columns.str.replace("[/]", "_")
+    
+            target_column_name = "Y"
+            if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
+                self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
 
-        target_column_name = "price"
-        if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
-            self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
+            target_column_name = "price"
+            if target_column_name in self._df.columns: # 3)car specicif
+                self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
             
         return self._df_processed
 
@@ -84,4 +87,31 @@ class M01In2GoldProcessor(object):
         merged = df1 # #pd.merge(df1, df2, left_on='Xyz', right_on='Zxy')
         merged = merged # merged.drop(columns=['XyzKlyfs','XyzKlax'])
         merged =merged # merged[merged['label_col'].notna()] # drop na rows
+        return merged
+
+class M12_In2GoldProcessor(object):
+    @staticmethod
+    def ds01_process_in2silver(df):
+        df_processed = df #df.drop(columns=['XYZ'])
+        df_processed = df_processed[df_processed.mileage < 10000]
+        return df_processed
+
+    @staticmethod
+    def ds02_process_in2silver(df):
+        df_processed = df
+        df_processed = df_processed[df_processed.mileage < 10000]
+        return df_processed
+    @staticmethod
+    def ds03_process_in2silver(df):
+        df_processed = df
+        df_processed = df_processed[df_processed.mileage < 10000]
+        return df_processed
+
+    @staticmethod
+    def merge_silvers(df1,df2,df3):
+        merged = df1 # #pd.merge(df1, df2, left_on='Xyz', right_on='Zxy')
+        merged = merged # merged.drop(columns=['XyzKlyfs','XyzKlax'])
+        merged =merged # merged[merged['label_col'].notna()] # drop na rows
+        
+        merged = pd.concat([df1,df2,df3]) # VW + AUDI + BMW
         return merged

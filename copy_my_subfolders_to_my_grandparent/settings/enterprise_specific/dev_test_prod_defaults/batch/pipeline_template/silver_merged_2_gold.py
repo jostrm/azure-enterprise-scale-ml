@@ -15,9 +15,14 @@ parser.add_argument('--target_column_name', dest='target_column_name',type=str, 
 parser.add_argument('--par_esml_scoring_date', dest='par_esml_scoring_date',help='Date_folder in lake  to score',required=True)
 parser.add_argument('--par_esml_model_version', dest='par_esml_model_version',help='Model version to score with 1,2,3',required=True)
 parser.add_argument('--esml_output_lake_template', dest='esml_output_lake_template',help='Template path with plae holders to write GOLD_TO_SCORE',required=True)
+parser.add_argument('--par_esml_inference_mode', dest='par_esml_inference_mode', type=int, required=True)
+
+#optional
 parser.add_argument('--par_esml_env', type=str, help='ESML environment: dev,test,prod', required=False)
 parser.add_argument('--azure_dataset_names', nargs='+',type=str, help='List of SILVER Azure dataset names', required=False)
 args, remaining_names = parser.parse_known_args()
+
+esml_inference_mode = bool(args.par_esml_inference_mode)
 
 run = Run.get_context()
 ws = run.experiment.workspace
@@ -56,7 +61,11 @@ df = aml_ds.to_pandas_dataframe()
 
 aml_ds2 = next(iter(run.input_datasets.items()))[1] # Get 2nd DATASET
 df2 = aml_ds2.to_pandas_dataframe()
-combined_df = M01In2GoldProcessor.M01_merge_silvers(df,df2)
+
+if (esml_inference_mode == True): # Inference: prep data for scoring purpose, that is IF anything NEEDS to be different...
+    combined_df = M01In2GoldProcessor.M01_merge_silvers(df,df2)
+else: # Training: Prep data to train, we here have a label from IN_DATA (do something specif IF you want...)
+    combined_df = M01In2GoldProcessor.M01_merge_silvers(df,df2)
 
 '''
 # Alt2 a) Direct access to Dataset ( DEMO purpose only)
@@ -77,19 +86,38 @@ output_to_score_gold = run.output_datasets[output_to_score_gold_name]
 if not (output_to_score_gold is None):
     os.makedirs(output_to_score_gold, exist_ok=True)
     print("%s created" % output_to_score_gold)
-    path = output_to_score_gold + "/gold_to_score.parquet"
-    
-    # 1) Save/Overwrite "latest" data: 'projects/project002/11_diabetes_model_reg/inference/0/gold/dev/', for SCORE_GOLD step to read
-    write_df = combined_df.to_parquet(path,engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-    
-    # Copy also to a "date_folder", for history in the lake
-    date_infolder = datetime.datetime.strptime(args.par_esml_scoring_date, '%Y-%m-%d %H:%M:%S.%f')
-    esml_scoring_date_out = date_infolder.strftime('%Y/%m/%d') #  Save scoring same date as IN-data 'in/2020/01/01' for 'gold_scored/2020/01/01'
 
-    # 2) Save historic data, with runtime parameters 'projects/project002/11_diabetes_model_reg/inference/{model_version}/gold/dev/{date_folder}/{id_folder}/'
-    print("Step run.run_id {}".format(run.id))
-    print("Piepline run.parent.id {}".format(run.id))
-    run_id = run.parent.id #run.id
-    
-    new_path = args.esml_output_lake_template.format(model_version = args.par_esml_model_version, date_folder = esml_scoring_date_out,id_folder= run_id)
-    FileDatasetFactory.upload_directory(src_dir=output_to_score_gold, target=(datastore, new_path), pattern=None, overwrite=True, show_progress=False)
+    if (esml_inference_mode == True):
+        path = output_to_score_gold + "/gold_to_score.parquet"
+        
+        # 1) Save/Overwrite "latest" data: 'projects/project002/11_diabetes_model_reg/inference/0/gold/dev/', for SCORE_GOLD step to read
+        write_df = combined_df.to_parquet(path,engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+        
+        # Copy also to a "date_folder", for history in the lake
+        date_infolder = datetime.datetime.strptime(args.par_esml_scoring_date, '%Y-%m-%d %H:%M:%S.%f')
+        esml_scoring_date_out = date_infolder.strftime('%Y/%m/%d') #  Save scoring same date as IN-data 'in/2020/01/01' for 'gold_scored/2020/01/01'
+
+        # 2) Save historic data, with runtime parameters 'projects/project002/11_diabetes_model_reg/inference/{model_version}/gold/dev/{date_folder}/{id_folder}/'
+        print("Step run.run_id {}".format(run.id))
+        print("Piepline run.parent.id {}".format(run.id))
+        run_id = run.parent.id #run.id
+        
+        new_path = args.esml_output_lake_template.format(model_version = args.par_esml_model_version, date_folder = esml_scoring_date_out,id_folder= run_id)
+        FileDatasetFactory.upload_directory(src_dir=output_to_score_gold, target=(datastore, new_path), pattern=None, overwrite=True, show_progress=False)
+    else: # TRAIN.......................................
+        path = output_to_score_gold + "/gold.parquet"
+        
+        # 1) Save/Overwrite "latest" data: 'projects/project002/11_diabetes_model_reg/train/gold/dev/', GOLD TRAIN step to read
+        write_df = combined_df.to_parquet(path,engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
+        
+        # Copy also to a "GUID", for history/versioning in the lake
+        date_infolder = datetime.datetime.strptime(args.par_esml_scoring_date, '%Y-%m-%d %H:%M:%S.%f')
+        esml_scoring_date_out = date_infolder.strftime('%Y/%m/%d') #  Save scoring same date as IN-data 'in/2020/01/01' for 'gold_scored/2020/01/01'
+
+        # 2) Save historic data, with runtime parameters 'projects/project002/11_diabetes_model_reg/train/gold/dev/{guid}/'
+        print("Step run.run_id {}".format(run.id))
+        print("Piepline run.parent.id {}".format(run.id))
+        run_id = run.parent.id #run.id
+        
+        new_path = args.esml_output_lake_template.format(id_folder= run_id)
+        FileDatasetFactory.upload_directory(src_dir=output_to_score_gold, target=(datastore, new_path), pattern=None, overwrite=True, show_progress=False)

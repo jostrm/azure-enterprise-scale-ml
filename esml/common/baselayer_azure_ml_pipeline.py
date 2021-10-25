@@ -33,6 +33,8 @@ class esml_pipeline_types():
     IN_2_GOLD_SCORING = "IN_2_GOLD_SCORING"
     IN_2_GOLD = "IN_2_GOLD"
     GOLD_SCORING = "GOLD_SCORING"
+    IN_2_GOLD_TRAIN_AUTOML= "IN_2_GOLD_TRAIN_AUTOML"
+    IN_2_GOLD_TRAIN_MANUAL= "IN_2_GOLD_TRAIN_MANUAL"
     #BRONZE_2_GOLD = "BRONZE_2_GOLD"
     #BRONZE_2_GOLD_SCORING = "BRONZE_2_GOLD_SCORING"
 
@@ -42,6 +44,8 @@ class esml_step_types():
     IN_2_SILVER = "IN_2_SILVER"
     SILVER_MERGED_2_GOLD = "SILVER_MERGED_2_GOLD"
     SCORING_GOLD = "SCORING_GOLD"
+    TRAIN_AUTOML = "TRAIN_AUTOML"
+    TRAIN_MANUAL = "TRAIN_MANUAL"
 
 #endregion
 
@@ -88,7 +92,21 @@ class ESMLPipelineFactory():
         return self._batch_pipeline_parameters
     @property
     def name_batch_pipeline(self):
-        return self.p.experiment_name + "_batch_scoring_pipe"
+
+        if(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_SCORING):
+            return self.p.experiment_name + "_pipe_IN_2_GOLD_SCORING"
+        elif(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD):
+            if(self.p.inference_mode == True):
+                return self.p.experiment_name + "_pipe_IN_2_GOLD"
+            else:
+                return self.p.experiment_name + "_pipe_IN_2_GOLD_TRAIN" # 4_TRAIN_or_PBI
+        elif(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML or self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+            return self.p.experiment_name + "_pipe_IN_2_GOLD_TRAIN"
+        elif(self._esml_pipeline_type ==  esml_pipeline_types.GOLD_SCORING):
+            return self.p.experiment_name + "_pipe_GOLD_SCORING"
+        else:
+            return self.p.experiment_name + "_pipeline_OTHER"
+
     @property
     def name_batch_pipeline_endpoint(self):
         return self.name_batch_pipeline + "_EP"
@@ -161,7 +179,8 @@ class ESMLPipelineFactory():
             parameters[0].name: parameters[0].default_value, # esml_inference_model_version
             parameters[1].name: parameters[1].default_value,# esml_scoring_folder_date
             parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
-            parameters[3].name: parameters[3].default_value # par_esml_dev_test_prod
+            parameters[3].name: parameters[3].default_value, # par_esml_dev_test_prod
+            parameters[4].name: parameters[4].default_value # par_esml_inference_mode 
         }
         pipeline_run = experiment.submit(pipeline, regenerate_outputs=regenerate_outputs,pipeline_parameters=par_dic
         # ,tags={
@@ -248,16 +267,18 @@ class ESMLPipelineFactory():
 
     def create_batch_pipeline(self, pipeline_type=esml_pipeline_types.IN_2_GOLD_SCORING, same_compute_for_all=True, cpu_gpu_databricks="cpu", allow_reuse=True):
         p = self.p
+        self._esml_pipeline_type = pipeline_type
+
         self._allow_reuse = allow_reuse
         # 2) Load DEV or TEST or PROD Azure ML Studio workspace
         p.ws = p.get_workspace_from_config()
-        p.inference_mode = True
+        #p.inference_mode = True
         self._datalake = p.connect_to_lake()  # Get Lake
 
         old_loc = os.getcwd()
         try:
             os.chdir(os.path.dirname(__file__))
-            self._create_scriptfolder_and_download_files()
+            model = self._create_scriptfolder_and_download_files(pipeline_type)
         finally:
             os.chdir(old_loc)
 
@@ -276,29 +297,42 @@ class ESMLPipelineFactory():
 
 #region(collapsed) PRIVATE - init
     from azureml.core.model import Model
-    def _create_scriptfolder_and_download_files(self):
+    def _create_scriptfolder_and_download_files(self,pipeline_type):
         os.makedirs(self._snapshot_folder, exist_ok=True)
-        model = self.p.get_best_model_via_experiment_name(self.p.ws)
-        if(model is None):
-            print("Could not fetch BEST MODEL from Azure ML Studo - remotely.This might be the first time training model. \n - Now trying with local cache model.")
-            model =  self.p.BestModel
-        m = model.download(target_dir=self.get_snapshot_dir_relative(), exist_ok=True)
+        m = None
+
+        if(pipeline_type != esml_pipeline_types.IN_2_GOLD): # Don't fetch model If we only want to REFINE data
+            model = self.p.get_best_model_via_experiment_name(self.p.ws)
+            if(model is None):
+                print("Could not fetch BEST MODEL from Azure ML Studo - remotely.This might be the first time training model. \n - Now trying with local cache model.")
+                model =  self.p.BestModel
+            m = model.download(target_dir=self.get_snapshot_dir_relative(), exist_ok=True)
         return m
 
     def _create_parameters(self):
         self._batch_pipeline_parameters.clear()
         par_esml_model_version = PipelineParameter(name="esml_inference_model_version", default_value=self.p.inferenceModelVersion)
-        par_esml_scoring_date = PipelineParameter(name="esml_scoring_folder_date", default_value=str(self.p.date_scoring_folder))
+
+        if(self.p.inference_mode):
+            par_esml_scoring_date = PipelineParameter(name="esml_scoring_folder_date", default_value=str(self.p.date_scoring_folder))
+        else:
+            par_esml_scoring_date = PipelineParameter(name="esml_scoring_folder_date", default_value=str(self.p.date_scoring_folder))
+
         par_esml_guid_folder = PipelineParameter(name="esml_optional_unique_scoring_folder", default_value="*")
         
         # PIPELINE  "locked and loaded" in a TEST workspace, but needed for LAKE folder
         par_esml_environment = PipelineParameter(name="esml_environment_dev_test_prod", default_value=self.p.dev_test_prod)
         
+        # IN_2_GOLD is used for both TRAIN and INFERENCE
+        inference_mode_as_int = int(self.p.inference_mode) # True == 1
+        par_esml_inference_mode = PipelineParameter(name="esml_inference_mode", default_value=inference_mode_as_int)
+        
         # self._batch_pipeline_parameters.append(par_esml_model_version,par_esml_scoring_date,par_esml_environment,par_esml_guid_folder)
         self._batch_pipeline_parameters += [par_esml_model_version,
                                             par_esml_scoring_date,
                                             par_esml_guid_folder,
-                                            par_esml_environment]
+                                            par_esml_environment,
+                                            par_esml_inference_mode]
 
 #endregion
 
@@ -406,7 +440,8 @@ class ESMLPipelineFactory():
             "--par_esml_model_version",self.batch_pipeline_parameters[0],
             "--par_esml_scoring_date",self.batch_pipeline_parameters[1],
             "--esml_output_lake_template",scored_folder_template,
-            "--par_esml_env", self.batch_pipeline_parameters[3] # optional
+            "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
+            "--par_esml_inference_mode", self.batch_pipeline_parameters[4] # does not need to be a parameter that changes runtime...but at DEFINITION time.
             ],
             inputs=[gold_to_score.as_input(gold_to_score.name)], 
             outputs=[scored_gold,last_gold_run,active_folder], 
@@ -424,10 +459,20 @@ class ESMLPipelineFactory():
         silver_input_array,silver_names = self.get_silver_as_inputs(silver_steps)
 
         # OUT: gold_to_score_folder = gold_to_score_path+'{run-id}'
-        path_gold_to_score_template_latest = p.path_gold_to_score_template()
-        path_gold_to_score_template_pars = p.path_gold_to_score_template(True,True)
-        gold_to_score_folder = path_gold_to_score_template_latest.format(model_version = 0) # 0 means "latest" par_esml_model_version.default_value
-        gold_to_score_name = p.dataset_gold_to_score_name_azure
+        gold_to_score_folder = ""
+        gold_to_score_name = ""
+        path_gold_to_score_template_pars = ""
+
+        if(p.inference_mode == True):
+            path_gold_to_score_template_latest = p.path_gold_to_score_template()
+            gold_to_score_folder = path_gold_to_score_template_latest.format(model_version = 0) # 0 means "latest" par_esml_model_version.default_value
+
+            path_gold_to_score_template_pars = p.path_gold_to_score_template(True,True)
+            gold_to_score_name = p.dataset_gold_to_score_name_azure # dataset_gold_name_azure
+        else:
+            path_gold_to_score_template_pars = p.path_gold_to_score_template(False,True,False)
+            gold_to_score_name = p.dataset_gold_name_azure
+            gold_to_score_folder = p.path_gold_to_score_template(False,False,False)
 
         gold_to_score = (
             OutputFileDatasetConfig(name=gold_to_score_name,destination=(self._datalake,gold_to_score_folder))
@@ -448,6 +493,7 @@ class ESMLPipelineFactory():
             "--par_esml_scoring_date",self.batch_pipeline_parameters[1],
             "--esml_output_lake_template",path_gold_to_score_template_pars,
             "--par_esml_env", self.batch_pipeline_parameters[3], # optional - good for logging purpose
+            "--par_esml_inference_mode", self.batch_pipeline_parameters[4], #
             "--esml_optional_unique_scoring_folder", self.batch_pipeline_parameters[2] # optional parameter
             ],
             inputs=silver_input_array,
@@ -484,7 +530,8 @@ class ESMLPipelineFactory():
                     "--par_esml_model_version", self.batch_pipeline_parameters[0], 
                     "--par_esml_scoring_date", self.batch_pipeline_parameters[1],
                     "--esml_optional_unique_scoring_folder", self.batch_pipeline_parameters[2],  # optional
-                    "--par_esml_env", self.batch_pipeline_parameters[3] # does not need to be a parameter that changes runtime
+                    "--par_esml_env", self.batch_pipeline_parameters[3], # does not need to be a parameter that changes runtime
+                    "--par_esml_inference_mode", self.batch_pipeline_parameters[4] # does not need to be a parameter that changes runtime...but at DEFINITION time.
                     ],
             inputs=[ds_IN.as_named_input(in_name)],
             outputs=[ds_OUT],  # optional, adds to
@@ -545,10 +592,13 @@ class ESMLPipelineFactory():
         scoring_date_dummy = date_infolder.strftime('%Y/%m/%d') #  String 2020/01/01
         
         # IN "a template" - path will be reset dynamically during runtime.
-        path = in_template_path.format(
-            inference_model_version=self.batch_pipeline_parameters[0].default_value,
-            dev_test_prod=self.batch_pipeline_parameters[3].default_value,
-            scoring_folder_date=scoring_date_dummy)
+        if(self.p.inference_mode == True):
+            path = in_template_path.format(
+                inference_model_version=self.batch_pipeline_parameters[0].default_value,
+                dev_test_prod=self.batch_pipeline_parameters[3].default_value,
+                folder_date=scoring_date_dummy)
+        else:
+            path = in_template_path.format(dev_test_prod=self.batch_pipeline_parameters[3].default_value,folder_date=scoring_date_dummy)
         return path
 
     def get_snapshot_dir_relative(self):

@@ -12,6 +12,7 @@ parser.add_argument('--esml_input_lake_template', dest='esml_input_lake_template
 parser.add_argument('--par_esml_model_version', dest='par_esml_model_version',type=str, required=True)
 parser.add_argument('--par_esml_scoring_date', dest='par_esml_scoring_date',type=str, required=True)
 parser.add_argument('--par_esml_env', dest='par_esml_env',type=str, required=True)
+parser.add_argument('--par_esml_inference_mode', dest='par_esml_inference_mode', type=int, required=True)
 
 args, remaining_names = parser.parse_known_args()
 
@@ -20,9 +21,16 @@ date_infolder = datetime.datetime.strptime(args.par_esml_scoring_date, '%Y-%m-%d
 esml_scoring_date_in = date_infolder.strftime('%Y/%m/%d') #  String to folder structure 2020/01/01
 esml_model_version = args.par_esml_model_version
 esml_env = args.par_esml_env
+esml_inference_mode = bool(args.par_esml_inference_mode)
+
+print("Inference_mode: {}".format(esml_inference_mode))
 print("Scoring date IN folder: {}".format(esml_scoring_date_in))
 
-input_path = args.esml_input_lake_template.format(inference_model_version = esml_model_version, dev_test_prod = esml_env, scoring_folder_date=esml_scoring_date_in)
+if(esml_inference_mode == True):
+    input_path = args.esml_input_lake_template.format(inference_model_version = esml_model_version, dev_test_prod = esml_env, folder_date=esml_scoring_date_in)
+else:
+    input_path = args.esml_input_lake_template.format(dev_test_prod = esml_env, folder_date=esml_scoring_date_in)
+    
 input_path_csv = input_path + '*.csv'
 input_path_parquet = input_path + '*.parquet'
 print("IN Dataset. INPUT full path: {}".format(input_path_csv))

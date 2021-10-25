@@ -1016,9 +1016,13 @@ class ESMLProject():
         dataset_gold_scored_name_azure
     '''
 
-    def path_gold_to_score_template(self, date_folder=False,id_folder=False):
+    def path_gold_to_score_template(self, date_folder=False,id_folder=False,inference_mode = True):
         to_score_template = ""
-        baseline = self._inference_gold_path.format(self.project_folder_name,self.model_folder_name,"{model_version}", self.dev_test_prod)
+
+        if(inference_mode == True):
+            baseline = self._inference_gold_path.format(self.project_folder_name,self.model_folder_name,"{model_version}", self.dev_test_prod)
+        else:
+            baseline = self.GoldPath
 
         if(date_folder):
             to_score_template = baseline+ "{date_folder}" + "/"
@@ -1030,9 +1034,12 @@ class ESMLProject():
         
         return to_score_template
     
-    def path_gold_scored_template(self, date_folder=False,id_folder=False):
+    def path_gold_scored_template(self, date_folder=False,id_folder=False, inference_mode = True):
         to_score_template = "" 
-        baseline = self._inference_scored_path.format(self.project_folder_name,self.model_folder_name,"{model_version}", self.dev_test_prod)
+        if(inference_mode == True):
+            baseline = self._inference_scored_path.format(self.project_folder_name,self.model_folder_name,"{model_version}", self.dev_test_prod)
+        else:
+            baseline = self.GoldPath
 
         if(date_folder):
             to_score_template = baseline+ "{date_folder}" + "/"
@@ -2544,10 +2551,10 @@ class ESMLDataset():
     @property
     def InPathTemplate(self):
         if(self._project.inference_mode):
-            self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, "{inference_model_version}",self.ds_name  ,"in","{dev_test_prod}","{scoring_folder_date}")
+            self._in_path_inference = self._inference_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name, "{inference_model_version}",self.ds_name  ,"in","{dev_test_prod}","{folder_date}")
             return self._in_path_inference
         else:
-            self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in","{dev_test_prod}","{in_folder_date}")
+            self._in_path_train = self._train_path_template.format(self._project._proj_start_path,self.project_folder_name,self.model_folder_name,self.ds_name ,"in","{dev_test_prod}","{folder_date}")
             return self._in_path_train
 
     @property

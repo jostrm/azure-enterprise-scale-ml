@@ -29,8 +29,10 @@ def init():
     #parser.add_argument('--input_gold_name', dest="input_gold_name", type=str, required=True)
     parser.add_argument('--target_column_name', dest="target_column_name", type=str, required=True)
     parser.add_argument('--par_esml_scoring_date', dest="par_esml_scoring_date", required=True)
-    parser.add_argument('--par_esml_model_version', dest="par_esml_model_version", required=False)
-    parser.add_argument('--esml_output_lake_template', dest="esml_output_lake_template", required=False)
+    parser.add_argument('--par_esml_model_version', dest="par_esml_model_version", required=True)
+    parser.add_argument('--esml_output_lake_template', dest="esml_output_lake_template", required=True)
+    parser.add_argument('--par_esml_inference_mode', dest='par_esml_inference_mode', type=int, required=True)
+
     #Optional
     parser.add_argument('--par_esml_env', type=str, help='ESML environment: dev,test,prod', required=False)
     parser.add_argument('--esml_optional_unique_scoring_folder', dest="esml_optional_unique_scoring_folder", required=False)
@@ -39,6 +41,8 @@ def init():
 
     try:
         model_version_in = args.par_esml_model_version
+        esml_inference_mode = bool(args.par_esml_inference_mode)
+
         logger.info("Loading model version {} from path: model.pkl".format(model_version_in))
         model = joblib.load("model.pkl")
         logger.info("Model loading success - model.pkl")
