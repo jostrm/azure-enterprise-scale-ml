@@ -1,9 +1,13 @@
+from re import S
+from azureml.dataprep.api.engineapi.typedefinitions import TelemetryStrategy
 import pandas as pd
 import numpy as np
 from math import sqrt
+from scipy.stats.stats import Ttest_indResult
 from sklearn.metrics import mean_squared_error, r2_score,precision_score,recall_score,average_precision_score,f1_score,roc_auc_score,accuracy_score,roc_curve,confusion_matrix,mean_absolute_error, matthews_corrcoef, multilabel_confusion_matrix
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
+from sklearn.model_selection import StratifiedShuffleSplit
 
 def APE(actual, pred):
     """
@@ -63,6 +67,25 @@ def get_4_regression_metrics(test_set, label,fitted_model):
 
     return rmse, r2, mean_abs_percent_error,mae, spearman_correlation,plt
 
+# validateset_and_testset_percentage_together - If train=0.8 then this is 0.2
+# left_per_set - 0.5 meaning will be 10% each if 20% validateset_and_testset_percentage_together
+def split_stratified(gold_data, validateset_and_testset_percentage_together=0.2,left_per_set=0.5, y_label=None, seed=42):
+
+    s1 = StratifiedShuffleSplit(n_splits=1, test_size=validateset_and_testset_percentage_together, random_state=seed)
+
+    y_labels_array = gold_data[y_label]
+    for train_index, test_valid_index in s1.split(gold_data, y_labels_array): # gold_dataset_pandas, gold_dataset_pandas.status_
+        train = gold_data.iloc[train_index]
+        testset_and_validate_set = gold_data.iloc[test_valid_index]
+
+    s2 = StratifiedShuffleSplit(n_splits=1, test_size=left_per_set, random_state=seed) # Split Remaining from TRAIN in 2 sets, for us to get 3 sets: TRAIN, VALIDATE, TEST
+
+    y_labels_array = testset_and_validate_set[y_label]
+    for test_index, validate_index in s2.split(testset_and_validate_set, y_labels_array):
+        test_set = testset_and_validate_set.iloc[test_index]
+        validate_set = testset_and_validate_set.iloc[validate_index]
+        
+    return train,validate_set,test_set
 
 def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None,positive_label=None):
     X_test = test_set # X_test
