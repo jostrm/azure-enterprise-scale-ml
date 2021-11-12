@@ -468,8 +468,6 @@ class ESMLProject():
                 json_date_scoring_folder = json.load(f2)
 
             # 5) Update "in memory" to be consistent
-            print("json_date_in_folder",json_date_in_folder)
-            print("json_date_scoring_folder", json_date_scoring_folder)
             self.parseDateFolderConfig(json_date_in_folder,json_date_scoring_folder)
             self.inferenceModelVersion = int(param_inference_model_version)
             self.dev_test_prod = param_esml_env # overrides config

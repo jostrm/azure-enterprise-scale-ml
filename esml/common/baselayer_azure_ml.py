@@ -745,8 +745,12 @@ class ESMLTestScoringFactory(metaclass=Singleton):
 
         return rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt
     
-    def get_test_scoring_7_classification(self, label,multiclass=None,positive_label=None, run=None, fitted_model=None):
+    def get_test_scoring_7_classification(self, label_in=None,multiclass=None,positive_label=None, run=None, fitted_model=None):
         p = self.project
+
+        label = p.active_model["label"]
+        if(label_in is not None):
+            label = label_in
 
         if(run is not None):
             source_best_run = run
@@ -758,11 +762,19 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)  # Old, stale ...since local agent metadata of "last run"
 
         test_set_pd =  p.GoldTest.to_pandas_dataframe()
+        labels = test_set_pd[label].unique()
+        lbl_count = len(labels)
+        if lbl_count>2: # Multi class classification
+            if(multiclass is None):
+                multiclass = 'ovr' # Set default if user forgotten...that it is multi-class classification
+
         auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, label,fitted_model,multiclass,positive_label)
 
         # 1) Log on the TEST_SET used
         if(auc is not None):
             p.GoldTest.tags["ROC_AUC"] = "{:.6f}".format(auc)
+        else:
+            p.GoldTest.tags["ROC_AUC"] = "-"
 
         p.GoldTest.tags["Accuracy"] = "{:.6f}".format(accuracy)
 
@@ -770,13 +782,14 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         prec_str = None
         rec_str = None
         if(multiclass is not None):
-            f1_str = list(map('{:.6f}'.format,f1))
-            prec_str = list(map('{:.6f}'.format,precision))
-            rec_str = list(map('{:.6f}'.format,recall))
+            f1_str =  str(list(map('{:.6f}'.format,f1))).replace("'","")
+            prec_str = str(list(map('{:.6f}'.format,precision))).replace("'","")
+            rec_str = str(list(map('{:.6f}'.format,recall))).replace("'","")
         else:
             f1_str = "{:.6f}".format(f1)
             prec_str = "{:.6f}".format(precision)
             rec_str = "{:.6f}".format(recall)
+            labels = p.GoldTest.to_pandas_dataframe()[p.active_model["label"]].unique()
 
         if(f1_str is None):
             f1_str = ""
@@ -795,23 +808,26 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         #model = Model(p.ws, model_name)
         if(auc is not None):
             model.tags["test_set_ROC_AUC"] =  "{:.6f}".format(auc)
+        else:
+            model.tags["test_set_ROC_AUC"] =  "multiclass classification - see multilabel_confusion_matrix instead"
+
         model.tags["test_set_Accuracy"] =  "{:.6f}".format(accuracy)
         model.tags["test_set_F1_Score"] =  f1_str
         model.tags["test_set_Precision"] =  prec_str
         model.tags["test_set_Recall"] =  rec_str
         model.tags["test_set_Matthews_Correlation"] =  "{:.6f}".format(matthews)
         model.tags["test_set_CM"] =  str(matrix)
-
         model.add_tags(tags = model.tags)
         ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
-        
 
         # 3) Also, log on RUN
         #source_best_run.tag("ESML TEST_SET Scoring", "Yes, including plot: ROC")
         if(plt is not None):
             source_best_run.log_image("ESML_GOLD_TestSet_ROC", plot=plt)
+        #if(plt2 is not None):
+        #    source_best_run.log_image("ESML_GOLD_TestSet_CM", plot=plt2)
 
-        return auc,accuracy, f1, precision,recall,matrix,matthews, plt
+        return auc,accuracy, f1, precision,recall,matrix,matthews,plt
 
 from azureml.core import Experiment
 from azureml.core import Model
