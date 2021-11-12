@@ -823,7 +823,8 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         # 3) Also, log on RUN
         #source_best_run.tag("ESML TEST_SET Scoring", "Yes, including plot: ROC")
         if(plt is not None):
-            source_best_run.log_image("ESML_GOLD_TestSet_ROC", plot=plt)
+            print("Saving plot to Azure ML - best run {}".format(source_best_run.id))
+            source_best_run.log_image(name="ESML_GOLD_TestSet_ROC", plot=plt)
         #if(plt2 is not None):
         #    source_best_run.log_image("ESML_GOLD_TestSet_CM", plot=plt2)
 
