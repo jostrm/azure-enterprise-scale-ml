@@ -122,6 +122,7 @@ class ESMLProject():
     multi_output = None
     inference_use_top_version = True
     _cpu_gpu_databricks = "cpu" # gpu, databricks
+    _project_dirty=False
     
     # , param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None
     def __init__(self, dev_test_prod=None, param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None):
@@ -266,6 +267,7 @@ class ESMLProject():
         for d in DatasetFolderNamesIn:
             ds = ESMLDataset(self,inferenceModelVersion,project_folder_name,model_folder_name,d)
             self.dataset_list.append(ds)
+        self._project_dirty = True
     
     def ReloadConfiguration(self):
         try:
@@ -1097,7 +1099,7 @@ class ESMLProject():
     @property
     def GoldScored(self): 
         try:
-            if (self._gold_scored is None): # Lazy load 1st version 
+            if (self._gold_scored is None  or self._project_dirty): # Lazy load 1st version 
                 self._gold_scored = Dataset.get_by_name(self.ws, name=self.dataset_gold_scored_name_azure)
             return self._gold_scored # Latest version
         except UserErrorException as e1:
@@ -1107,7 +1109,7 @@ class ESMLProject():
     @property
     def GoldTrain(self): 
         try:
-            if (self._gold_train is None): # Lazy load 1st version 
+            if (self._gold_train is None  or self._project_dirty): # Lazy load 1st version 
                 self._gold_train = Dataset.get_by_name(self.ws, name=self.dataset_gold_train_name_azure)
             return self._gold_train # Latest version
         except UserErrorException as e1:
@@ -1116,7 +1118,7 @@ class ESMLProject():
     @property
     def GoldValidate(self): 
         try:
-            if (self._gold_validate is None): # Lazy load 1st version 
+            if (self._gold_validate is None  or self._project_dirty): # Lazy load 1st version 
                 self._gold_validate = Dataset.get_by_name(self.ws, name=self.dataset_gold_validate_name_azure)
             return self._gold_validate # Latest version
         except UserErrorException as e1:
@@ -1125,7 +1127,7 @@ class ESMLProject():
     @property
     def GoldTest(self): 
         try:
-            if (self._gold_test is None): # Lazy load 1st version 
+            if (self._gold_test is None or self._project_dirty): # Lazy load 1st version 
                 self._gold_test = Dataset.get_by_name(self.ws, name=self.dataset_gold_test_name_azure)
             return self._gold_test# Latest version
         except UserErrorException as e1:
@@ -1134,7 +1136,7 @@ class ESMLProject():
     @property
     def GoldToScore(self): 
         try:
-            if (self._gold_to_score is None): # Lazy load 1st version 
+            if (self._gold_to_score is None  or self._project_dirty): # Lazy load 1st version 
                 self._gold_to_score = Dataset.get_by_name(self.ws, name=self.dataset_gold_to_score_name_azure)
             return self._gold_to_score # Latest version
         except UserErrorException as e1:
