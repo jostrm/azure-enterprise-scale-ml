@@ -185,6 +185,7 @@ class ESMLProject():
             self.project_folder_name = "project"+self._projectNoXXX
 
     def describe(self):
+        print("Environment: {}".format(self.dev_test_prod))
         if(self.inferenceModelVersion>0):
             print("Inference version: {}".format(self.inferenceModelVersion))
         else:
@@ -667,6 +668,14 @@ class ESMLProject():
         self.initAutoMLFactory()
         return self.automl_factory.get_best_model(self,pipeline_run)
 
+    def get_next_environment(self):
+        if(self.dev_test_prod == "dev"):
+            return "test"
+        elif (self.dev_test_prod == "test"):
+            return "prod"
+        elif(self.dev_test_prod == "prod"):
+            return "prod"
+
     def get_best_model_and_run_via_experiment_name_and_ws(self, ws, filter_on_version = None):
         model = self.get_best_model_via_experiment_name(ws,filter_on_version) # 2021-09
         if(model is None): # guard
@@ -876,6 +885,7 @@ class ESMLProject():
                                                 service_principal_id=kv.get_secret(self.security_config["kv-secret-esml-projectXXX-sp-id"]), # clientId
                                                 service_principal_password=kv.get_secret(self.security_config["kv-secret-esml-projectXXX-sp-secret"])) # clientSecret
         return sp
+        
 
     def get_other_workspace(self, dev_test_prod):
         kv = self.ws.get_default_keyvault() # Get "current" workspace, either CLI Authenticated if MLOps, or in DEMO/DEBUG Interactive
@@ -1127,7 +1137,8 @@ class ESMLProject():
     @property
     def GoldTest(self): 
         try:
-            if (self._gold_test is None or self._project_dirty): # Lazy load 1st version 
+            if (self._gold_test is None or self._project_dirty): # Lazy load 1st version
+                print("...")
                 self._gold_test = Dataset.get_by_name(self.ws, name=self.dataset_gold_test_name_azure)
             return self._gold_test# Latest version
         except UserErrorException as e1:
@@ -1547,7 +1558,7 @@ class ESMLProject():
     def split_gold_dbx(self,train_percentage=0.6, label=None,stratified=False,seed=42, new_version=True):
         return self.split_gold(self.GoldDatabricks,train_percentage, label,new_version,stratified,seed)
 
-    def split_gold_3(self,train_percentage=0.6, label=None,stratified=False,seed=42, new_version=True):
+    def split_gold_3(self,train_percentage=0.6, stratified=False,label=None,seed=42, new_version=True):
         return self.split_gold(self.Gold,train_percentage, label,new_version,stratified,seed)
 
     def split_gold(self,azure_ml_gold_dataset, train_percentage=0.6, label_in=None,new_version=True, stratified=False,seed=42):

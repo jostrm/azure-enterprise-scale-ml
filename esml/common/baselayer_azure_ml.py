@@ -725,11 +725,13 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         test_set_pd =  p.GoldTest.to_pandas_dataframe()
         rmse, r2, mean_abs_percent_error,mae, spearman_correlation,plt = get_4_regression_metrics(test_set_pd, label,fitted_model)
 
-        p.GoldTest.tags["RMSE"] = "{:.6f}".format(rmse)
-        p.GoldTest.tags["R2"] = "{:.6f}".format(r2)
-        p.GoldTest.tags["MAPE"] = "{:.6f}".format(mean_abs_percent_error)
-        p.GoldTest.tags["Spearman_Correlation"] = "{:.6f}".format(spearman_correlation)
-        ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
+        ds = p.GoldTest
+        tags = ds.tags
+        tags["RMSE"] = "{:.6f}".format(rmse)
+        tags["R2"] = "{:.6f}".format(r2)
+        tags["MAPE"] = "{:.6f}".format(mean_abs_percent_error)
+        tags["Spearman_Correlation"] = "{:.6f}".format(spearman_correlation)
+        ds = ds.add_tags(tags = tags)
 
         #model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
         #model = Model(p.ws, model_name)
@@ -761,7 +763,8 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             experiment, model,source_best_run, best_run,fitted_model = p.get_best_model_and_run_via_experiment_name() # Looks at Azure
             #source_best_run, fitted_model, experiment = p.get_best_model(p.ws)  # Old, stale ...since local agent metadata of "last run"
 
-        test_set_pd =  p.GoldTest.to_pandas_dataframe()
+        ds = p.GoldTest
+        test_set_pd =  ds.to_pandas_dataframe()
         labels = test_set_pd[label].unique()
         lbl_count = len(labels)
         if lbl_count>2: # Multi class classification
@@ -772,11 +775,11 @@ class ESMLTestScoringFactory(metaclass=Singleton):
 
         # 1) Log on the TEST_SET used
         if(auc is not None):
-            p.GoldTest.tags["ROC_AUC"] = "{:.6f}".format(auc)
+            ds.tags["ROC_AUC"] = "{:.6f}".format(auc)
         else:
-            p.GoldTest.tags["ROC_AUC"] = "-"
+            ds.tags["ROC_AUC"] = "-"
 
-        p.GoldTest.tags["Accuracy"] = "{:.6f}".format(accuracy)
+        ds.tags["Accuracy"] = "{:.6f}".format(accuracy)
 
         f1_str = None
         prec_str = None
@@ -789,7 +792,7 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             f1_str = "{:.6f}".format(f1)
             prec_str = "{:.6f}".format(precision)
             rec_str = "{:.6f}".format(recall)
-            labels = p.GoldTest.to_pandas_dataframe()[p.active_model["label"]].unique()
+            labels = ds.to_pandas_dataframe()[p.active_model["label"]].unique()
 
         if(f1_str is None):
             f1_str = ""
@@ -797,11 +800,14 @@ class ESMLTestScoringFactory(metaclass=Singleton):
             prec_str = ""
         if(rec_str is None):
             rec_str = ""
-        p.GoldTest.tags["F1_Score"] = f1_str
-        p.GoldTest.tags["Precision"] = prec_str
-        p.GoldTest.tags["Recall"] = rec_str
-        p.GoldTest.tags["Matthews_Correlation"] = "{:.6f}".format(matthews)
-        p.GoldTest.tags["Confusion_Matrix"] = str(matrix)
+        
+        tags = ds.tags
+        tags["F1_Score"] = f1_str
+        tags["Precision"] = prec_str
+        tags["Recall"] = rec_str
+        tags["Matthews_Correlation"] = "{:.6f}".format(matthews)
+        tags["Confusion_Matrix"] = str(matrix)
+        ds = ds.add_tags(tags = tags)
 
         #2) Also, log on MODEL
         #model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
@@ -818,7 +824,6 @@ class ESMLTestScoringFactory(metaclass=Singleton):
         model.tags["test_set_Matthews_Correlation"] =  "{:.6f}".format(matthews)
         model.tags["test_set_CM"] =  str(matrix)
         model.add_tags(tags = model.tags)
-        ds = p.GoldTest.add_tags(tags = p.GoldTest.tags)
 
         # 3) Also, log on RUN
         #source_best_run.tag("ESML TEST_SET Scoring", "Yes, including plot: ROC")

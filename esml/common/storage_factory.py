@@ -106,9 +106,11 @@ class LakeAccess():
         if(self.suppress_logging==False):
             print("Register ES-ML lake as Datastore, as {}".format(datastore_name))
 
-        # 1) API to WRITE
+        # COMMON SP - to mount DataStore. to overcome "upload files" to GEN 2
         secret_bundle1 = external_kv.get_secret(self.storage_config['esml-common-sp-id'], "")
         secret_bundle2 = external_kv.get_secret(self.storage_config['esml-common-sp-secret'], "")
+        
+        # ESML-fix: GA API to WRITE to GEN2 via Azure Storage SDK
         self.service_client = AzureBase.initialize_storage_account_ad(sa_name, secret_bundle1.value, secret_bundle2.value, tenantId)
         
         try:
@@ -117,11 +119,12 @@ class LakeAccess():
             if(ds != None):
                 if(setAsDefault):
                     ds.set_as_default()
-                return ds
+                return ds # Return Datastore....based on Authentication (Interactive or SP) in p.ws
         except Exception as ex:
             print("Datastore to common lake does not exists in AMLS workspace {}, creating it...{}".format(self.ws.name, datastore_name))
             print(ex)
         
+        # Error & CONTINUE...No Datastore Lets create one. We need IAM: BLOB STORAGE CONTRIBUTOR, which COMMON-SP should have (Interactive Admin might alos have this, but not project-SP)
         #2 API to READ 
 
         datastore = Datastore.register_azure_data_lake_gen2(workspace=self.ws,
@@ -129,8 +132,8 @@ class LakeAccess():
                                                             filesystem=file_system_name,
                                                             account_name=sa_name,
                                                             tenant_id=tenantId,
-                                                            client_id=secret_bundle1.value,
-                                                            client_secret=secret_bundle2.value,
+                                                            client_id=secret_bundle1.value, # COMMON-SP
+                                                            client_secret=secret_bundle2.value, # COMMON-SP
                                                             grant_workspace_access=True,
                                                             subscription_id=sub_id, 
                                                             resource_group=rg_name)
