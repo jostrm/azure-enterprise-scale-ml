@@ -8,6 +8,7 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
  - This is the repo and solution accelerator for that.
  - ESML are using `Azure Datalake GEN 2` 100%. Also for Azure ML Pipelines/Datastore. No blob storage needed. 
  - `ESML supports DeltaLake` for MASTER data. (When ESML autogenerates Azure ML pipelines, a .parquet representation is used in the PROJECTS structure)
+ - `Enterprise Datalake, with ADLS GEN2, and logical DataMesh`(not physical. No scattered Blob/GEN2 storage accounts with myriad/different security(sometimes vNet, sometimes private links, sometimes open,RBAC) 
 
 ![](./esml/images/esml-turnkey.png)
 ## ESML Dashboard - Dev,Test,Prod environments
@@ -25,6 +26,7 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
 # INTRO - Is this for you?
 **Q1:I want to use Azure AutoML, with MLOps ready to be `turned ON`** , with datalake design automatically generated for me, including `BRONZE, SILVER, GOLD` concept
 - A: Yes. ESML is AutoML first, and have married this with MLOps, and an `AutoLake™` for Azure ML Studio.
+- There is `22 DEMO notebooks` End-2-End MLOps, with Azure ML Pipelines, `using Azure datalake GEN 2 all the way` - from Azure datafactory, in Azure ML Pipelines/Datasets.
 
 **Q2:I want to do ML, but <ins>only R&D phase</ins>** - I don't need MLOps or DEV,TEST, PROD environments. Can I still get benefits of ESML - get a quick DEV env & AutoLake?
 - A: Yes. ESML is meant for quick R&D ( and if successful PoC -> quickly turn ON, to full enterprise scale MLOps solution
@@ -45,6 +47,7 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
     * [X] ESML `extends` Azure Machine Learning via accelerators, organizational agnostic - since the `project/teams` concept in ESML.
     * [X] It extends at specific purposes: `data refinement/datalake/machine learning` to build faster. 
     * [X] Also adds `enterprise grade solution design & scalability` (dev,test, prod environments) - across subscriptions. 
+    * [X] `An Enterprise Datalake, with ADLS GEN2, and logical DataMesh`(not physical. No scattered Blob storage accounts with myriad/different security(sometimes vNet, sometimes private links, sometimes open)
 
 Note: You can use this for any `enterprise grade` solution in need of single or multi-subscription solutions, with an `enterprise datalake` need, `DEV only` need, or `DEV->TEST->PROD` need.
 - ESML was born out of these needs. Based on both Microsoft `best practices` and customer `proven practices`
@@ -59,18 +62,21 @@ Contains both "must-have" infrastructure and bootstrapping, and other "efficiecy
     - part 3) `The enterprise datalake design` (ADLS Gen2 storage account, with a folder structure)
     
 - That said, to get the `accelerator power` - use the `EMSL SDK`. See benefits listed below ( and look at this full README feature list for all benefits)
-    - `5.5 out of the 7 steps/pipelines of a ML application`: There is `always at least 6 steps you need to create`, step 7 is optional.
-    - ESML gives you 5 (or 5 and a half) of these automatically. Not the asterix (*) ones, but the `bold ones` (3,4,5a,5b,6,7)
-        - *1) Ingest from source
-            - Azure Data Factory: This is too specific for EMSL. A COPY Activity from your source (DW/Database) to the IN-folder in ADLS Gen2, Datalake)
-        - *2) FeatureEngineering "Bronze2Gold"
-            - Azure ML Pipeline: Too specific for ESML. You need yo create your own Azure ML Pipleine)
+    - `6 out of the 7 steps/pipelines of a ML application for REALTIME or BATCH scoring`: There is `always at least 6 steps you need to create`, step 7 is optional.
+    - ESML gives you 6 of these productional steps/pipelines automatically. Not the asterix (*) ones, but the `bold ones` (2,3,4,5a,5b,6,7)
+        - *1) Ingest Data from source to MASTER lake, and MASTER to project
+            - Azure Data Factory: A COPY Activity from your source (DW/Database) to the IN-folder in ADLS Gen2, Datalake), you of course need to do the mapping
+            - That said, `ESML Azure Datafactory templates` exists with paramenters to work with `ESML Datalake`: `IN_2_MASTER ingestion` and `MASTER_2_PROJECT` and to support `DataMesh`
+        - `2) FeatureEngineering "IN_2_GOLD"` pipeline (Azure Data factory, Azure ML Pipeline)
+            - `ESMLPipelineFactory` will genereate the actaul Azure ML Pipelines. But the content in the generated bootstrapped Python script files is of course too specific for ESML. 
+                - *You need yo create your own `Data wrangling` code
         - `3) TrainModel` (AutoML pipeline - you can also create your own manual Training Azure ML Pipeline)
             - Inclusing TEST_SET scoring...which is not included in Azure ML Studio funcionality.
         - `4) CompareScoringDrift & DataDrift` - Should be promote & Deploy the newly trained model? Needed to refit model to real world changes.
         - `5a) ONLINE scoring: Deploy AKS Scoring endpoint - Online/Batch (Only up to 5min REST call for BATCH)`
+            - ESML managed AKS clusters only requires 2-lines of code, and the AKS Cluster is secured with GA `private links` (no public internet used)
         - `5b) BATCH scoring: Create & Publish  Scoring endpoint`
-            - Azure ML Pipeline: See ESMLPipelineFactory. 
+            - Azure ML Pipeline: See `ESMLPipelineFactory` and also the `Azure Datafactory ESML templates` with parameters to work towards the ESML generated Azure ML pipelines.
         - `6) Scoring  & *Writeback`  (Azure Data Factory) - See `ESMLPipelineFactory`
             - To get data to score from SOURCE and *WriteBack* is of course specific for EMSL to automate, but 4 Azure datafactory TEMPLATE pipelines is given,with parameters, working end-to-end from SOURCE SQL Database:
                 - Since ESML has already has created the Azure ML Pipline, it knows how to score and what parameters to set. 
