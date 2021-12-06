@@ -2,14 +2,17 @@
 Enterprise Scale ML (ESML) - AI Factory on Azure
 - A solution accelerator, for `Enterprise Scale Machine Learning` & `MLOps`, based on best & proven practices for organizational scale, across projects. 
 - Read more about Enterprise Scale ML best practices here: https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#mlops-at-organizational-scale-ai-factories
-- ESML has a default scaling from 25-250 ESMLprojects for its `EMSL AI Factory`. That said, but you can start with just 1. The roof is on IP-plan. (e.g. allocated IP-ranges for min 25 projects, you can adjust this default)
+- ESML has a default scaling from 1-250 ESMLprojects for its `EMSL AI Factory`. 
+    - That said, the scaling roof is on IP-plan, and ESML has its own IP-calculator (allocated IP-ranges for 250 is just the default)
+- `Enterprise "cockpit"` over ALL your projects & models. 
+    - See what `state` a project are in (Dev,Test,Prod states) with `cost dashboard` per project/environment
 
  Q:Looking for ESML *`AutoLake™ - (supports: Data Mesh/Featurestore/DeltaLake) @ Azure`* and `ESML AI Factory` with turnkey `MLOps` with `AutoML`?
  - This is the repo and solution accelerator for that.
  - ESML are using `Azure Datalake GEN 2` 100%. Also for Azure ML Pipelines/Datastore. No blob storage needed. 
  - `ESML supports DeltaLake` for MASTER data. (When ESML autogenerates Azure ML pipelines, a .parquet representation is used in the PROJECTS structure)
  - `Enterprise Datalake, with ADLS GEN2, and logical DataMesh`(not physical DataMesh. No scattered Blob/GEN2 storage accounts with myriad/different security - sometimes vNet, sometimes private links, sometimes open. Not different RBAC models on same data, Not multiple copies on MASTER DATA that needs to be event-synced,etc.)
-
+ 
 ![](./esml/images/esml-turnkey.png)
 ## ESML Dashboard - Dev,Test,Prod environments
 - Easy to provision a new ESMLProject for Dev,Test,Prod with easy cost followup, since its own PROJECT resource groups for each `Project team` in the ESML `AI Factory`:
