@@ -49,8 +49,7 @@ from azureml.train.automl.exceptions import NotFoundException
 from azureml.core import Experiment
 from azureml.train.automl.run import AutoMLRun
 from pathlib import Path
-
-
+import logging
 class ESMLProject():
     ws = None
     datastore = None
@@ -127,6 +126,7 @@ class ESMLProject():
     # , param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None
     def __init__(self, dev_test_prod=None, param_inference_model_version=None, param_scoring_folder_date=None,param_train_in_folder_date=None):
         self.demo_mode = False # dont change this
+        logging.basicConfig(level=logging.ERROR)
         
         if(dev_test_prod is not None and ((param_train_in_folder_date is not None) or (param_scoring_folder_date is not None))): # Scenario 01: SCORING or RETRAINING pipeline
             if (dev_test_prod in ["dev","test","prod"]):
@@ -676,6 +676,37 @@ class ESMLProject():
         elif(self.dev_test_prod == "prod"):
             return "prod"
 
+    def get_best_model_via_modeltags_only(self,ws,tag_experiment_name,filter_on_version=None):
+        #experiment_name : 10_titanic_model_clas
+        #model_name : AutoML97755f9d418
+        #run_id : AutoML_97755f9d-4509-4594-8485-9e4f9cf3a459
+        #trained_in_environment : test
+        #trained_in_workspace : msft-weu-TEST-eap-proj02_ai-amls
+        latest_model = None
+        model_highest_version = None
+        all_versions_in_same_experiment = []
+        for model in Model.list(ws):
+
+            if "experiment_name" not in model.tags: # KeyError...if not ESML registered MODEL
+                continue
+            experiment_name = model.tags["experiment_name"] # KeyError...if not ESML registered MODEL
+            #trained_in_environment = model.tags["trained_in_environment"]
+            #model_name = model.tags["model_name"]
+            #print("model.experiment_name", model.experiment_name) # None...for "external registrations"
+            if(experiment_name== tag_experiment_name): # Get all models from same experiment (also great if same model_name...but..then we need to register as custom model_name, which is the same as expermient_name )
+                if(filter_on_version is not None):
+                    if(filter_on_version == model.version):
+                        latest_model = model
+                        #print ("found model matching experiment_name, also matching on model_version")
+                        all_versions_in_same_experiment.append(latest_model)
+                        break
+                else:
+                    latest_model = model
+                    all_versions_in_same_experiment.append(latest_model)  # All models in this experiment
+        if (len(all_versions_in_same_experiment) > 0): # IF we found any...
+            model_highest_version = all_versions_in_same_experiment[0] # Try to get LATEST/highest version
+        return model_highest_version
+    
     def get_best_model_and_run_via_experiment_name_and_ws(self, ws, filter_on_version = None):
         model = self.get_best_model_via_experiment_name(ws,filter_on_version) # 2021-09
         if(model is None): # guard
@@ -712,10 +743,10 @@ class ESMLProject():
         
             if (filter_on_version is not None):
                 latest_model = Model(active_workspace, name=tag_model_name, version=filter_on_version)
-                print ("found model via REMOTE FILTER + VersionFilter as input.Tags: mode_name, model_version")
+                #print ("found model via REMOTE FILTER + VersionFilter as input.Tags: mode_name, model_version")
             else:
                 latest_model = Model(active_workspace, name=tag_model_name, version=tag_model_version)
-                print ("found model via REMOTE FILTER: Experiment TAGS: model_name")
+                #print ("found model via REMOTE FILTER: Experiment TAGS: model_name")
         else:
             print ("Searching model - LOOPING the experiment to match name (1st time thing, since no tags)")
             for m in Model.list(active_workspace):
@@ -724,11 +755,11 @@ class ESMLProject():
                     if(filter_on_version is not None):
                         if(filter_on_version == m.version):
                             latest_model = m
-                            print ("found model matching experiment_name, also matching on model_version")
+                            #print ("found model matching experiment_name, also matching on model_version")
                             break
                     else:
                         latest_model = m
-                        print ("found model matching experiment_name, selecting latest registered.")
+                        #print ("found model matching experiment_name, selecting latest registered.")
                     break
                     
             if (latest_model is not None): # Update Experiment tag

@@ -302,7 +302,11 @@ class ESMLPipelineFactory():
         m = None
 
         if(pipeline_type != esml_pipeline_types.IN_2_GOLD): # Don't fetch model If we only want to REFINE data
-            model = self.p.get_best_model_via_experiment_name(self.p.ws)
+            #model = self.p.get_best_model_via_experiment_name(self.p.ws) 
+            model = self.p.get_best_model_via_modeltags_only(self.p.ws,self.p.experiment_name, filter_on_version=1) # Version=1 is the TEMPLATE "LakeStructure"...hence Model=1 and not 2...since placegolder data is always model_version=1
+            #self._batch_pipeline_parameters[0].default_value = model.version # If we are in DEV and have registered Model in TEST - seting default_value to LATEST model version (2,3,4), requires placeholder Data in Lake for VERSION
+            #print("Model version (get_best_model_via_modeltags_only): {}".format(model.version))
+
             if(model is None):
                 print("Could not fetch BEST MODEL from Azure ML Studo - remotely.This might be the first time training model. \n - Now trying with local cache model.")
                 model =  self.p.BestModel

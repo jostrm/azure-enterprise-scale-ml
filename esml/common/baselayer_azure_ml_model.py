@@ -7,14 +7,13 @@ from azureml.pipeline.core import PipelineRun
 from azureml.telemetry import UserErrorException
 import sklearn
 import tempfile
+from azureml.core.resource_configuration import ResourceConfiguration
 
 class ESMLModelCompare():
 
     dev_test_prod = "dev"
     project = None
-    model_settings = None
     active_model_config = None
-    
     debug_always_promote_model = False
     model_settings = None
     
@@ -191,12 +190,12 @@ class ESMLModelCompare():
                     target_model_name = target_model.tags["model_name"]
                     target_best_model_version = target_model.version
 
-                    print("Target found (registered):")
-                    print(" Target - best_run_id", target_best_run_id)
-                    print(" Target - best_run_id (best run)", target_best_run.id)
-                    print(" Target - model_name (from model.tag)",target_model_name)
+                    #print("Target found (registered):")
+                    #print(" Target - best_run_id", target_best_run_id)
+                    #print(" Target - best_run_id (best run)", target_best_run.id)
+                    #print(" Target - model_name (from model.tag)",target_model_name)
                     #print("target - model_name (from target_best_run.properties[''model_name'])",target_best_run.properties['model_name'] )
-                    print(" Target - model_version",target_best_model_version)
+                    #print(" Target - model_version",target_best_model_version)
             except Exception as e1:
                 print(e1.message)
                 promote_new_model = True
@@ -257,9 +256,7 @@ class ESMLModelCompare():
 
         try: 
             print("")
-            print("Q: Do we have SCORING DRIFT / CONCEPT DRIFT?") 
-            print("Q: Is a model trained on NEW data better? Is the one in production degraded? (not fit for the data it scores - real world changed, other CONCEPT)")
-            print("A: - Lets check. Instead of DataDrift, lets look at actual SCORING on new data (or same data, other code). See if we should PROMOTE newly trained model...")
+            print("Q: Do we have SCORING DRIFT / CONCEPT DRIFT? - Is a model trained on NEW data better? = the one in production degraded?") # not fit for the data it scores - real world changed, other CONCEPT)"
             print("")
 
             if(task_type == "classification"):
@@ -269,9 +266,10 @@ class ESMLModelCompare():
                 print("Target model, to compare with; ")
                 target_metrics = self.classification_print_metrics(target_best_run)
                 print("")
-                                
+
                 selected_metric_array = self.model_settings['classification_compare_metrics']
-                lower_is_better = ["TODO_Add_LogLoss"]
+
+                lower_is_better = ["Log_loss_weight"]
                 promote_new_model = self.compare_metrics(cl_map, source_metrics, target_metrics,selected_metric_array,lower_is_better)
 
             elif (task_type == "regression" or task_type == "forecasting"):
@@ -299,6 +297,8 @@ class ESMLModelCompare():
             
     def compare_metrics(self, metric_map, source_metrics, target_metrics, selected_metric_array,lower_is_better):
         promote_new_model = False
+        for test in selected_metric_array:
+            print("metric array {}".format(test))
 
         if(selected_metric_array is not None and len(selected_metric_array) > 0):
             print("Selected metrics, and weights, to be used when comparing for promotion/scoring drift")
@@ -306,9 +306,9 @@ class ESMLModelCompare():
             
             for m in selected_metric_array:
                 latest_metric = m
-
-                newly_trained = float(source_metrics[metric_map[m]])
-                current_prod = float(target_metrics[metric_map[m]])
+                m_map = metric_map[m]
+                current_prod = float(target_metrics[m_map])
+                newly_trained = float(source_metrics[m_map])
 
                 #if(newly_trained == -1.0 or current_prod == -1.0): # Old model was probably another task_type (cannot compare REGRESSION with CLASSIFICATION -> Just promote..)
                 #    print("!Current best model (or newly trained) is of different Machine learning task_types (cannot compare REGRESSION with CLASSIFICATION) promote_new_model is returned as True)")
@@ -326,20 +326,20 @@ class ESMLModelCompare():
                         promote_new_model = True
                     else:
                         promote_new_model = False
-                        print (" - WORSE: NEW trained model {:.12f} is WORSE than CURRENT model: {:.12f} for metric {}".format(newly_trained_weighted,current_prod,metric_map[m]))
+                        print (" - WORSE: NEW trained model {:.12f} is WORSE than CURRENT model: {:.12f} for metric {}".format(newly_trained_weighted,current_prod,m_map))
                         break # break loop if ANY metric is worse
                 else:
                     if (newly_trained_weighted > current_prod):
                         promote_new_model = True
                     else:
                         promote_new_model = False
-                        print (" - WORSE: NEW trained model {:.16f} is WORSE than CURRENT model: {:.16f} for metric {}".format(newly_trained_weighted,current_prod,metric_map[m]))
+                        print (" - WORSE: NEW trained model {:.16f} is WORSE than CURRENT model: {:.16f} for metric {}".format(newly_trained_weighted,current_prod,m_map))
                         break # break loop if ANY metric is worse
                 print("")
 
             if(promote_new_model == False):
                 print("")
-                print("Promote model = False!")
+                print("Promote model = False")
                 print(" - Not promote, due to metric {}. You can adjust the WEIGHT {} in ESML settings".format(metric_map[latest_metric], latest_metric))
             else:
                 print("")
@@ -369,8 +369,9 @@ class ESMLModelCompare():
     # https://docs.microsoft.com/en-us/python/api/azureml-core/azureml.core.model.model?view=azure-ml-py
     #def register_model_in_other_ws(self,target_ws, newtrained_modelname,newtrained_run_id,description_in=None,pkl_name_in=None):
     def register_model_in_correct_ws(self,target_dev_test_prod=None,new_model=None, description_in=None,pkl_name_in=None):
-        pkl_name = "model.pkl"
+        pkl_name = "outputs" # "model.pkl"
         current_env = self.project.dev_test_prod
+        current_ws_name = self.project.ws.name
         if (pkl_name_in is not None):
             pkl_name = pkl_name_in
 
@@ -394,6 +395,11 @@ class ESMLModelCompare():
         run_id = model_ph.tags["run_id"]
 
         tags = model_ph.tags
+        tags["trained_in_environment"] = current_env
+        tags["trained_in_workspace"] = current_ws_name
+        print("run_id {}".format(run_id))
+        tags["run_id"] = run_id
+
         #tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": self.project.dev_test_prod, 
         #"trained_in_workspace": self.project.ws.name, "experiment_name": self.project.model_folder_name}
 
@@ -401,18 +407,23 @@ class ESMLModelCompare():
         target_ws = self.connect_to_target_workspace(target_dev_test_prod)
         print("workspace:", target_ws.name)
         print("temp-files: ", full_local_path)
+        #model_name = self.project.experiment_name
+        #print("ExperimentName as Modelname {}".format(model_name))
 
         # REGISTER aml MODEL in new workspace
         model = Model.register(model_path=full_local_path, # Local file to upload and register as a model.
                         model_name=model_name,
                         model_framework=Model.Framework.SCIKITLEARN,  # Framework used to create the model.
                         model_framework_version=sklearn.__version__,  # Version of scikit-learn used to create the model.
-                        sample_input_dataset=self.project.GoldTest,
-                        sample_output_dataset=self.project.GoldTest,
+                        #sample_input_dataset=self.project.GoldTest,  #sample_input_data=sample_input_dataset_id
+                        #sample_output_dataset=self.project.GoldTest,
+                        resource_configuration=ResourceConfiguration(cpu=1, memory_in_gb=0.5),
                         tags=tags,
                         description=description_in,
                         workspace=target_ws)
 
+        #input_dataset = Dataset.Tabular.from_delimited_files(path=[(datastore, 'sklearn_regression/features.csv')])
+        #output_dataset = Dataset.Tabular.from_delimited_files(path=[(datastore, 'sklearn_regression/labels.csv')])
         
         # FINALLY....
         self.project.dev_test_prod = current_env # flip back to ORIGINAL environment
@@ -547,6 +558,7 @@ class ESMLModelCompare():
         recall = metrics.get('recall_score_weighted', -1.0)
         f1_score = metrics.get('f1_score_weighted', -1.0)
         log_loss = metrics.get('log_loss', -1.0)
+        mathews = metrics.get('matthews_correlation', -1.0)
 
         all_metrics = {}
         all_metrics["AUC_weighted"] = auc
@@ -556,6 +568,7 @@ class ESMLModelCompare():
         all_metrics["recall_score_weighted"] = recall
         all_metrics["f1_score_weighted"] = f1_score
         all_metrics["log_loss"] = log_loss
+        all_metrics["matthews_correlation"] = mathews
 
         print("AUC (AUC_weighted): " + str(auc))
         print("Accuracy: " + str(accuracy))
@@ -563,6 +576,7 @@ class ESMLModelCompare():
         print("Recall (recall): " + str(recall))
         print("F1 Score (1.0 is good): " + str(f1_score))
         print("Logg loss (0.0 is good): " + str(log_loss))
+        print("matthews_correlation (1.0 is good): " + str(mathews))
 
         return all_metrics
 
