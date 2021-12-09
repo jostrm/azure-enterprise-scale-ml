@@ -318,10 +318,52 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
         - See `ESMLPipelinefactory`
     - ESML puts a `project` , `enterprise`, `Autolake` concept on top of Azure compute power - the exact workload/analysis can be `ML, MILP, Multivariate`, or just a `Hello world counter`.
 - A: With that said. ESML has a <ins>*ML first*</ins> approach, the most <ins>accelerators</ins> are ML-specific.
-# ESML - Feature list (Currently: v 0.2)
-- Curren verision is v 0.2 is - built for Azure ML SDK 1.26.0 (AutoML)
-## ROADMAP (can change of course, and has no timeline)
-- Please email me feature requests at: `joakim.joakim@microsoft.com`
+# ESML - Feature list (Currently: v 0.4)
+- Curren verision is v 0.2 is - built for `Azure ML SDK 1.26.0 (AutoML)`
+## For Feature requests: 
+- Feel free to email me feature requests at: `joakim.joakim@microsoft.com`
+# Most POPULAR ESML Accelerator features right now (2021-12)
+## 1) `AutoMapping Azure ML datasets:` Never need to remember how to register Azure ML datasets again
+
+## 2)`AutoLake: BRONZE, SILVER, GOLD & ML concepts:` Out of the box datalake design: BRONZE, SILVER, GOLD & ML concepts
+- lake_settings
+
+## 3)`AutoSplit` & StratififedShuffledSplit – 1-liner: registers the splitted data as Azure ML Datasets w tags
+
+## 4) `AutoMLFactory, ComputeFactory: 1-liners to get PERFORMANCE & Compute`
+- project_settings: Dev,Test, Prod
+
+## 5)`Test_Set_Scoring – 1-liner: Automatically calculated, and tagged` in Azure ML Studio on Dataset, Run and Model
+- model_settings.json
+
+## 6)`Scoring compare & promote WITHIN same environment`: 1-liner: Compare MODEL scoring (test_set) across Azure ML workspaces (Dev,Test, Prod)
+- Compare across WITHIN same subscriptions/ML Studio (Promote new model in DEV, compare other in DEV)
+- *See 9) for Compare ACROSS 3  subscriptions (DEV → TESt → PROD)
+
+## 7)`2-lines: Deploy model Online (AKS) or Batch deployment (Azure ML Pipeline)`
+- including predict_proba for classification/AutoML
+
+## 8)`Networking & Security taken care of` out-of-the-box vNets, private links, secret scopes
+….ALL services glued together. 
+….Default “Clusters” (CPU, Spark) to train and to deploy to (AKS)…already “network secured”
+….Autosaves “secrets” in your project-keyvault
+
+## 9a)`Scoring compare & promote ACROSS (DEV → TESt → PROD) AML studios `: 1-liner: Compare MODEL scoring (test_set) across Azure ML workspaces (Dev,Test, Prod)
+- Compare across 3  subscriptions (dev,test,prod)
+
+## 9b)`Working Across Azure ML Studio workspaces (dev,test,prod) - TRANSFER model & productionalize in PROD from TEST` 
+- Move model across from DEV to TEST after comparing. Model Trained in DEV, registered in TEST, if `promote`
+- 2-lines to create Azure ML Pipelin in "externally registered model" `ESMLPipelineFactory`: 3 lines of code
+
+## 10) `DataOps & DataMesh`: ShareBack data feature, WriteBack data feature, decentralised data refinement on ESMLProjects (IN_2_GOLD)
+- End-2-end ESML templates, including Azure Datafactory ESML templates (IN_2_GOLD, IN_2_GOLD_SCORING, MASTER_2_PROJECT, ...) that as Azure ML activirty, to call ESML Azure ML pipelines with correct parameters
+- Daily scoring, Weekly retraining, ScoringDrift, Writeback scored data to Y.
+- Example: `Subscribe to a SILVER pipeline` from another project.
+- Azure Datalake GEN 2 support 100% in ESML. 
+- Supports delta
+
+# FULL FEATURES LIST (and version history)
+
 ## v 0.1
 
 * [X] Automapping & scanning of datalake to Azure Datasets
@@ -358,7 +400,8 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 * [x] AutoMLFactory: `run training`(AutoMLRun) - `best_run, fitted_model, exp` = `AutoMLFactory(p).train(ws,automl_config, experiment_name, dev_test_prod)`
     - dev,test, or prod
 
-(AFter above - PUBLISHES to Public GIT)
+(After above - 1st PUBLISH to Public GIT from private Azure Devops)
+
 
 * [x] `MLOps+AutoML pipeline with ESML`
 * [x] `1-click Azure Devops MLOps template`(subclassing ESML)
@@ -373,29 +416,38 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
     * [x] Train: `AutoMLStep`(1) 
     * [x] Deploy: `Deploy_2_AKS`(1) 
     * [x] Test: `Test_AKS`(1)
-* [ ] Secret feature (maybe in May)
+* [x] `ESMLProject provisioning`: Azure blueprint update
+* [ ] `ESMLProject provisioning`: Azure blueprint + networking with private link for external AKS cluster, attached to Azure ML Studio
+# 2019-01
 
 ### v 0.3
-* [ ] PipelineFactory: 6 step example: 
-    * [ ] Prep: `Bronze_2_Gold_pipeline(3)` 
+* [x] TEST_SET Scoring - `ESMLTestScoringFactory:` 1-liner to calculate scoring on `TEST_SET` and `tag` the scoring to Azure ML Studio: Model, GOLD_TEST Azure ML Dataset 
+    - `Motivation:` Data scientist request, both to support fully turnkey automated MLOps (no human intervention to create that code-snippet) and to avoid human error, and boilerplate work.
+    - * [x] Update to use `GOLD_TEST_SET scoring` as `default` when comparing. If forgetting to run using Azure ML `AutoML` the fallback is to use the `Validation scoring`
+* [x] Enterprise scale MLOps - `ESMLModelCompare: `  Can compare ML Model Scoring both WITHIN a `ESML AI Factory environment` but also `acrorr multiple` Azure ML Studio workspaces (Dev,Test,Prod)
+- * [x] `Best model according to YOU` - using model_settings.json with metrics and weights
+    - `Motivation:`: To have the MLOps process work across subscription boundries, for 3 Azure ML STudio workspaces. Fully automated enterprise scale approach
 
+# 2019-12
 ### v 0.4
-* [ ] PipelineFactory: Train: `Bronze_2_Gold_pipeline` (non AutoML) 3 step example
-* [ ] PipelineFactory: Train: `Batch Scoring` example
-
+* [x] `ESMLPipelineFactory`: ESML pipelinetypes that auomatically generates Azure ML Pipelines
+    * [x] `3 Premade steps, using Dev,Test,Prod config for CONPUTE clusters`: IN_2_SILVER, SILVER_MERGED_2_GOLD, SCORE_GOLD
+        - IN_2_SILVER to be used for 1 to many datasets
+    * [x] `In_2_Gold_SCORING` for Machine learning BATCH SCORING
+    * [x] `In_2_GOLD`  for traditional data refinement  / Power BI purpose
+    * [x] `In_2_GOLD_TRAIN` for AutoML training, that automatically fetches both `BEST trained model according to you`, but also 100% automated `SCORE_GOLD steps`
+    * [x] `In_2_GOLD_TRAIN_MANUAL` for manual ML training
+# 2021-04
 ### v 0.5
-* [ ] PipelineFactory: 3 step example: 
-    * [ ] Databricks: `Bronze_2_Gold_pipeline(3)` with `Databricks notebook`
-
+* [x] `ESMLProject provisioning`: `BICEP` instead of Blueprint: All private links. Including private link for external AKS cluster, attached to Azure ML Studio
+* [x] `Azure Datafactory ESML templates:`In_2_Gold_SCORING, In_2_GOLD, In_2_GOLD_TRAIN, MASTER_2_Project, ShareBack, WriteBack
+* [x] `ESML Datalake:` Support .DELTA format. Now supported in MASTER ESML lake structure, whereof still .parquet in PROJECTS/OUT, since Azure ML Pipeline (did not support .delta)
+* [ ] `ESMLProject provisioning`: `YAML` instead of Azure Devops pipeline templates.
+* [ ] `ESMLPipelineFactory:` Automated Spark cluster support (now Azure ML compute is default, you need to edit manually)
 ### v 0.6
-* [ ] Test examples for AutoMLFactory for also: classification, forecasting.
-* [ ] PipelineFactory: Inference: `Bronze_2_Gold_pipeline` (non AutoML) 3 step example
-* [ ] PipelineFactory: Inference: `Train_step` (non AutoML) 1 step
-
-### v 0.7
-* [ ] Azure blueprint update
-* [ ] Azure blueprint + networking/PL update
-* [ ] Bicep instead of Blueprint + YAML instead of Azure Devops pipeline templates.
+* [ ] AutoMLFactory: Update DEMO examples for AutoML forecasting
+* [ ] `ESML SDK:` Pyton wheel/Docker or PIP. Motivation: Easier to install on Azure Devops Build Agent and `Azure Compute Instance`
+* [ ] `ESML SDK:` update Azure ML SDK version. 1.26.0 as of now.
 
 # More IMAGES
 

@@ -676,6 +676,14 @@ class ESMLProject():
         elif(self.dev_test_prod == "prod"):
             return "prod"
 
+    def set_promote_current(env=None):
+        pass
+    def set_promote_2_next(env=False):
+        pass
+    def set_promote_current():
+        pass
+    def set_promote_2_next():
+        pass
     def get_best_model_via_modeltags_only(self,ws,tag_experiment_name,filter_on_version=None):
         #experiment_name : 10_titanic_model_clas
         #model_name : AutoML97755f9d418
