@@ -323,6 +323,9 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 ### For Feature requests: 
 - Feel free to email me feature requests at: `joakim.joakim@microsoft.com`
 ## Most POPULAR ESML Accelerator features right now (2021-12)
+- DEMO : 1,2,3,4,5,6,7,8 → [esml_classification_1_train_env_dev.ipynb](copy_my_subfolders_to_my_grandparent/notebook_demos/esml_classification_1_train_env_dev.ipynb)
+- DEMO 9a,9b → [esml_classification_1b_train_env_dev_2_test.ipynb](copy_my_subfolders_to_my_grandparent/notebook_demos/esml_classification_1b_train_env_dev_2_test.ipynb)
+
 ### 1) `AutoMapping Azure ML datasets:` Never need to remember how to register Azure ML datasets again
 
 ### 2)`AutoLake: BRONZE, SILVER, GOLD & ML concepts:` Out of the box datalake design: BRONZE, SILVER, GOLD & ML concepts
