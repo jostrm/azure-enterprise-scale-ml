@@ -448,10 +448,10 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
     - [x] 01 `ESML Overview`: The Powerpoint video session.
     - [x] 02 `ESML R&D phase:`Codinf VS Code `&` Azure Databricks with Azure ML/ESML `(DEMO)`
     - [x] 03 `ESML Datalake & ESMLAccelerators:` AutoMap. Scoring-drift, Test_set Scoring, `(DEMO)`
-* [] `Educational ESML VIDEOS (6/6)` 3 more Educational videos: 
-    - [] 04 `ESML Production & DataOps:` ESML PipelineFactory: AML Pipelines, AKS ,Datafactory templates in ESML`(DEMO)`
-    - [] 05 `ESML MLOps:` End-2-End turnkey MLOps `(PPT+DEMO)`
-    - [] 06 `ESML AI Factory:` BICEP 1-click ESMLProject (PPT+DEMO)
+* [ ] `Educational ESML VIDEOS (6/6)` 3 more Educational videos: 
+    - [ ] 04 `ESML Production & DataOps:` ESML PipelineFactory: AML Pipelines, AKS ,Datafactory templates in ESML`(DEMO)`
+    - [ ] 05 `ESML MLOps:` End-2-End turnkey MLOps `(PPT+DEMO)`
+    - [ ] 06 `ESML AI Factory:` BICEP 1-click ESMLProject (PPT+DEMO)
     
 # ROADMAP ideas
 ### v 0.6
