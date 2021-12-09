@@ -319,43 +319,43 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
     - ESML puts a `project` , `enterprise`, `Autolake` concept on top of Azure compute power - the exact workload/analysis can be `ML, MILP, Multivariate`, or just a `Hello world counter`.
 - A: With that said. ESML has a <ins>*ML first*</ins> approach, the most <ins>accelerators</ins> are ML-specific.
 # ESML - Feature list (Currently: v 0.4)
-- Curren verision is v 0.2 is - built for `Azure ML SDK 1.26.0 (AutoML)`
-## For Feature requests: 
+- Curren version is built for `Azure ML SDK 1.26.0 (AutoML)`
+### For Feature requests: 
 - Feel free to email me feature requests at: `joakim.joakim@microsoft.com`
-# Most POPULAR ESML Accelerator features right now (2021-12)
-## 1) `AutoMapping Azure ML datasets:` Never need to remember how to register Azure ML datasets again
+## Most POPULAR ESML Accelerator features right now (2021-12)
+### 1) `AutoMapping Azure ML datasets:` Never need to remember how to register Azure ML datasets again
 
-## 2)`AutoLake: BRONZE, SILVER, GOLD & ML concepts:` Out of the box datalake design: BRONZE, SILVER, GOLD & ML concepts
+### 2)`AutoLake: BRONZE, SILVER, GOLD & ML concepts:` Out of the box datalake design: BRONZE, SILVER, GOLD & ML concepts
 - lake_settings
 
-## 3)`AutoSplit` & StratififedShuffledSplit – 1-liner: registers the splitted data as Azure ML Datasets w tags
+### 3)`AutoSplit` & StratififedShuffledSplit – 1-liner: registers the splitted data as Azure ML Datasets w tags
 
-## 4) `AutoMLFactory, ComputeFactory: 1-liners to get PERFORMANCE & Compute`
+### 4) `AutoMLFactory, ComputeFactory: 1-liners to get PERFORMANCE & Compute`
 - project_settings: Dev,Test, Prod
 
-## 5)`Test_Set_Scoring – 1-liner: Automatically calculated, and tagged` in Azure ML Studio on Dataset, Run and Model
+### 5)`Test_Set_Scoring – 1-liner: Automatically calculated, and tagged` in Azure ML Studio on Dataset, Run and Model
 - model_settings.json
 
-## 6)`Scoring compare & promote WITHIN same environment`: 1-liner: Compare MODEL scoring (test_set) across Azure ML workspaces (Dev,Test, Prod)
+### 6)`Scoring compare & promote WITHIN same environment`: 1-liner: Compare MODEL scoring (test_set) across Azure ML workspaces (Dev,Test, Prod)
 - Compare across WITHIN same subscriptions/ML Studio (Promote new model in DEV, compare other in DEV)
 - *See 9) for Compare ACROSS 3  subscriptions (DEV → TESt → PROD)
 
-## 7)`2-lines: Deploy model Online (AKS) or Batch deployment (Azure ML Pipeline)`
+### 7)`2-lines: Deploy model Online (AKS) or Batch deployment (Azure ML Pipeline)`
 - including predict_proba for classification/AutoML
 
-## 8)`Networking & Security taken care of` out-of-the-box vNets, private links, secret scopes
+### 8)`Networking & Security taken care of` out-of-the-box vNets, private links, secret scopes
 ….ALL services glued together. 
 ….Default “Clusters” (CPU, Spark) to train and to deploy to (AKS)…already “network secured”
 ….Autosaves “secrets” in your project-keyvault
 
-## 9a)`Scoring compare & promote ACROSS (DEV → TESt → PROD) AML studios `: 1-liner: Compare MODEL scoring (test_set) across Azure ML workspaces (Dev,Test, Prod)
+### 9a)`Scoring compare & promote ACROSS (DEV → TESt → PROD) AML studios `: 1-liner: Compare MODEL scoring (test_set) across Azure ML workspaces (Dev,Test, Prod)
 - Compare across 3  subscriptions (dev,test,prod)
 
-## 9b)`Working Across Azure ML Studio workspaces (dev,test,prod) - TRANSFER model & productionalize in PROD from TEST` 
+### 9b)`Working Across Azure ML Studio workspaces (dev,test,prod) - TRANSFER model & productionalize in PROD from TEST` 
 - Move model across from DEV to TEST after comparing. Model Trained in DEV, registered in TEST, if `promote`
 - 2-lines to create Azure ML Pipelin in "externally registered model" `ESMLPipelineFactory`: 3 lines of code
 
-## 10) `DataOps & DataMesh`: ShareBack data feature, WriteBack data feature, decentralised data refinement on ESMLProjects (IN_2_GOLD)
+### 10) `DataOps & DataMesh`: ShareBack data feature, WriteBack data feature, decentralised data refinement on ESMLProjects (IN_2_GOLD)
 - End-2-end ESML templates, including Azure Datafactory ESML templates (IN_2_GOLD, IN_2_GOLD_SCORING, MASTER_2_PROJECT, ...) that as Azure ML activirty, to call ESML Azure ML pipelines with correct parameters
 - Daily scoring, Weekly retraining, ScoringDrift, Writeback scored data to Y.
 - Example: `Subscribe to a SILVER pipeline` from another project.
@@ -431,7 +431,7 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 # 2019-12
 ### v 0.4
 * [x] `ESMLPipelineFactory`: ESML pipelinetypes that auomatically generates Azure ML Pipelines
-    * [x] `3 Premade steps, using Dev,Test,Prod config for CONPUTE clusters`: IN_2_SILVER, SILVER_MERGED_2_GOLD, SCORE_GOLD
+    * [x] `3 Premade steps, using Dev,Test,Prod config for COMPUTE clusters`: IN_2_SILVER, SILVER_MERGED_2_GOLD, SCORE_GOLD
         - IN_2_SILVER to be used for 1 to many datasets
     * [x] `In_2_Gold_SCORING` for Machine learning BATCH SCORING
     * [x] `In_2_GOLD`  for traditional data refinement  / Power BI purpose
