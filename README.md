@@ -484,7 +484,7 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 ### Project/Model settings
 ![](./l/esml/images/01_setup_model_1.png)
 #### Lake settings
-![](./esml/images/01_setup_model_2.png)
+![](./esml/images/lake_setttings.png)
 
 ## "The BEST Model - according to YOU": Model_settings
 - What: YOU define what "the best model" is. When ESML are comparing and promoting models, its based on YOUR `Model settings` with your `weights` that will decide `last registered model = best`
