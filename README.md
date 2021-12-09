@@ -485,6 +485,7 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 ![](./l/esml/images/01_setup_model_1.png)
 #### Lake settings
 ![](./esml/images/lake_setttings.png)
+![](./esml/images/lake_setttings.png)
 - You switch model, or sub-project if you will with 1 line of code.
 - To switch model `p.active_model = 10` to `p.active_model = 11` - and you are working towards other DATA, and other Azure ML Studio artifacts.
 ![](./esml/images/lake_setttings_usage.png)
