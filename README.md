@@ -418,7 +418,7 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
     * [x] Test: `Test_AKS`(1)
 * [x] `ESMLProject provisioning`: Azure blueprint update
 * [ ] `ESMLProject provisioning`: Azure blueprint + networking with private link for external AKS cluster, attached to Azure ML Studio
-# 2019-01
+# 2019-01 - 2019-12
 
 ### v 0.3
 * [x] TEST_SET Scoring - `ESMLTestScoringFactory:` 1-liner to calculate scoring on `TEST_SET` and `tag` the scoring to Azure ML Studio: Model, GOLD_TEST Azure ML Dataset 
@@ -428,7 +428,7 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
 - * [x] `Best model according to YOU` - using model_settings.json with metrics and weights
     - `Motivation:`: To have the MLOps process work across subscription boundries, for 3 Azure ML STudio workspaces. Fully automated enterprise scale approach
 
-# 2019-12
+# 2019-12 - 2021-04
 ### v 0.4
 * [x] `ESMLPipelineFactory`: ESML pipelinetypes that auomatically generates Azure ML Pipelines
     * [x] `3 Premade steps, using Dev,Test,Prod config for COMPUTE clusters`: IN_2_SILVER, SILVER_MERGED_2_GOLD, SCORE_GOLD
@@ -437,13 +437,23 @@ We'd recommend running `esml_howto_0_mini.ipynb` first, for a QUICK step demo. T
     * [x] `In_2_GOLD`  for traditional data refinement  / Power BI purpose
     * [x] `In_2_GOLD_TRAIN` for AutoML training, that automatically fetches both `BEST trained model according to you`, but also 100% automated `SCORE_GOLD steps`
     * [x] `In_2_GOLD_TRAIN_MANUAL` for manual ML training
-# 2021-04
+# 2021-04 - ACTIVE
 ### v 0.5
 * [x] `ESMLProject provisioning`: `BICEP` instead of Blueprint: All private links. Including private link for external AKS cluster, attached to Azure ML Studio
 * [x] `Azure Datafactory ESML templates:`In_2_Gold_SCORING, In_2_GOLD, In_2_GOLD_TRAIN, MASTER_2_Project, ShareBack, WriteBack
 * [x] `ESML Datalake:` Support .DELTA format. Now supported in MASTER ESML lake structure, whereof still .parquet in PROJECTS/OUT, since Azure ML Pipeline (did not support .delta)
 * [ ] `ESMLProject provisioning`: `YAML` instead of Azure Devops pipeline templates.
 * [ ] `ESMLPipelineFactory:` Automated Spark cluster support (now Azure ML compute is default, you need to edit manually)
+* [x] `Educational ESML VIDEOS (3/6):` 3 Educational videos: 
+    - [x] 01 `ESML Overview`: The Powerpoint video session.
+    - [x] 02 `ESML R&D phase:`Codinf VS Code `&` Azure Databricks with Azure ML/ESML `(DEMO)`
+    - [x] 03 `ESML Datalake & ESMLAccelerators:` AutoMap. Scoring-drift, Test_set Scoring, `(DEMO)`
+* [] `Educational ESML VIDEOS (6/6)` 3 more Educational videos: 
+    - [] 04 `ESML Production & DataOps:` ESML PipelineFactory: AML Pipelines, AKS ,Datafactory templates in ESML`(DEMO)`
+    - [] 05 `ESML MLOps:` End-2-End turnkey MLOps `(PPT+DEMO)`
+    - [] 06 `ESML AI Factory:` BICEP 1-click ESMLProject (PPT+DEMO)
+    
+# ROADMAP ideas
 ### v 0.6
 * [ ] AutoMLFactory: Update DEMO examples for AutoML forecasting
 * [ ] `ESML SDK:` Pyton wheel/Docker or PIP. Motivation: Easier to install on Azure Devops Build Agent and `Azure Compute Instance`
