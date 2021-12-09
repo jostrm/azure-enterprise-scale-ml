@@ -76,7 +76,7 @@ class ESMLModelCompare():
             #raise UserErrorException("You must set a TARGET environement. It can be same as SOURCE. 'dev' to 'dev' is OK, or 'dev' -> 'test', 'text'->'prod'")
 
         if (target_environment== "prod" and p.dev_test_prod=="test"): # target=PROD -> compare against previous models in PROD...highest level
-            print ("Compare model version in TEST with latest registered in PROD subscription/workspace")
+            print ("Connect from TEST to PROD ( if you want to compare TEST-model with latest registered in PROD subscription/workspace")
             print("")
             try:
                 #p.dev_test_prod = "prod" # get settings for target
@@ -87,7 +87,7 @@ class ESMLModelCompare():
                 pass
                 #p.dev_test_prod = current_env # flip back to TEST
         elif (target_environment == "test" and p.dev_test_prod == "dev"): # target=test -> compare againt previous stage "dev"
-            print ("Compare model version in DEV with latest registered in TEST subscription/workspace")
+            print ("Connect from DEV to TEST subscription/workspace  ( if you want to compare TEST-model with latest registered in PROD")
             print("")
             try:
                 target_workspace = p.get_other_workspace(target_environment)
@@ -95,7 +95,7 @@ class ESMLModelCompare():
                 pass
                 #p.dev_test_prod = current_env # flip back to DEV
         elif (target_environment == p.dev_test_prod ): # -> compare againt previous model in same "dev" workspace
-            print ("targe=source environement. Compare model version in DEV/TEST/PROD with latest registered in same DEV/TEST/PROD workspace (same workspace & subscriptiom comparison)")
+            print ("target=source environement. Compare model version in DEV/TEST/PROD with latest registered in same DEV/TEST/PROD workspace (same workspace & subscriptiom comparison)")
             print("")
             target_workspace = p.ws
         
@@ -160,6 +160,7 @@ class ESMLModelCompare():
         target_best_run_id = None
         target_metrics = None
         target_task_type = None
+        source_model = None
 
         #if(source_model is None):
         if(not new_run_id):
@@ -168,11 +169,25 @@ class ESMLModelCompare():
             return promote_new_model,source_model_name,None,target_model_name, target_best_run_id
         else:
             #try: # GET source from saved new RUN_ID
+            if (target_environment != current_env): # If REGISTER model in other WORKSPACE, no Run or Experiment exists
+                source_model = p.get_best_model_via_modeltags_only(source_workspace,experiment_name,filter_on_version=None)
+                source_exp = Experiment(workspace=source_workspace, name=experiment_name) # Fetch the OLD run from SOURCE () TODO: What if TEST->PROD and both are just "registered" from DEV?)
+                source_best_run_id = source_model.tags["run_id"]
+                source_run = AutoMLRun(experiment=source_exp, run_id=source_best_run_id)
+                
+                source_best_run, source_fitted_model = source_run.get_output()
+                source_task_type = self.get_task_type(source_run)
+                source_model_name = source_best_run.properties['model_name']
+                source_model = Model(source_workspace, name=source_model_name) # LAtest best version
+            else:
                 source_exp = Experiment(workspace=source_workspace, name=experiment_name)
-                source_run = AutoMLRun(experiment=source_exp, run_id=new_run_id)
+                source_run = AutoMLRun(experiment=source_exp, run_id=new_run_id)  # From local cache..Assume just retrained model.
+
                 source_best_run, source_fitted_model = source_run.get_output()
                 source_model_name = source_best_run.properties['model_name']
                 source_task_type = self.get_task_type(source_run)
+                source_model = Model(source_workspace, name=source_model_name) # LAtest best version
+
             #except Exception as e1:
             #     raise UserErrorException("Cannot find SOURCE AutoMLRun for model best run id {}, in environment {}. Try register model manually".format(new_run_id, p.dev_test_prod)) from e1
 
@@ -184,7 +199,25 @@ class ESMLModelCompare():
             #target_model, target_best_run_id = AutoMLFactory(p).get_latest_model_from_experiment_name(target_workspace,experiment_name)
             target_exp, model,target_run, target_best_run,target_model = None,None,None,None,None
             try:
-                target_exp, target_model,target_run, target_best_run,fitted_model = p.get_best_model_and_run_via_experiment_name_and_ws(target_workspace)
+                
+                if (target_environment != current_env): # If REGISTER model in other WORKSPACE, no Run or Experiment exists
+                    target_model = p.get_best_model_via_modeltags_only(target_workspace,experiment_name,filter_on_version=None)
+                    source_exp = Experiment(workspace=source_workspace, name=experiment_name) # Fetch the OLD run from SOURCE () TODO: What if TEST->PROD and both are just "registered" from DEV?)
+                    target_best_run_id = target_model.tags["run_id"]
+                    target_run = AutoMLRun(experiment=source_exp, run_id=target_best_run_id)
+                    target_best_run, fitted_model = source_run.get_output()
+                else:
+                    target_exp, target_model,target_run, target_best_run,fitted_model = p.get_best_model_and_run_via_experiment_name_and_ws(target_workspace)  # 2021-12-09  WORKS dev_2_test and DEV..but not if "mixed as TEST"
+
+                    #######
+                    #target_model = p.get_best_model_via_modeltags_only(target_workspace,experiment_name,filter_on_version=None) # 2021-12-09 test below...
+                    #print("target_model is ...{}".format( target_model.name))
+                    #target_exp = Experiment(workspace=source_workspace, name=experiment_name) # Fetch the OLD run from SOURCE () TODO: What if TEST->PROD and both are just "registered" from DEV?)
+                    #target_best_run_id = target_model.tags["run_id"]
+                    #target_run = AutoMLRun(experiment=target_exp, run_id=target_best_run_id)
+                    #target_best_run, fitted_model = source_run.get_output()
+                    #######
+
                 if(target_model is not None):
                     target_best_run_id = target_model.tags["run_id"] # model.tags.get("run_id") Example: AutoML_08bb87d4-9587-4b99-b781-fe16bd13f140
                     target_model_name = target_model.tags["model_name"]
@@ -202,14 +235,20 @@ class ESMLModelCompare():
                 print("get_best_model_and_run_via_experiment_name_and_ws() could not EXISTING MODEL with same experiment name = No TARGET run. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
                                 
             if(target_model is not None):
-                print("target_best_run_id", target_best_run_id)
+                if(target_environment != current_env):
+                    target_task_type = source_task_type # Asssume same type, if REGISTER model in other WORKSPACE
+                else:
+                    print("target_best_run_id", target_best_run_id)
 
-                if (target_best_run_id is not None):
-                    #target_model_name = target_best_run.properties['model_name'] # model.name
-                    target_task_type = self.get_task_type(target_run)
-                else: 
-                    promote_new_model = True
-                    print("No TARGET run_id. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
+                    if (target_best_run_id is not None): 
+                        #target_model_name = target_best_run.properties['model_name'] # model.name
+                        try:
+                            target_task_type = self.get_task_type(target_run)
+                        except:
+                            target_task_type = source_task_type # Asssume same type, if REGISTER model in other WORKSPACE
+                    else: 
+                        promote_new_model = True
+                        print("No TARGET run_id. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
             else:
                 promote_new_model = True
                 print("No TARGET MODEL. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
@@ -219,7 +258,7 @@ class ESMLModelCompare():
         
         # IF we have a target to compare with
         if (promote_new_model == False):
-            promote_new_model = self.promote_model(source_best_run, target_best_run,target_best_run_id,source_task_type, target_task_type)
+            promote_new_model = self.promote_model(source_best_run, target_best_run,target_best_run_id,source_task_type, target_task_type,source_model,target_model)
         # END, IF we have a target to compare with
         
         # Save NEW model (Not registered)
@@ -229,10 +268,10 @@ class ESMLModelCompare():
         #else:
         #    self.write_run_config(new_experiment_name, source_model_name, -1, new_dev_test_prod) 
 
-        return promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace
+        return promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model
 
     # https://docs.microsoft.com/en-us/python/api/azureml-automl-core/azureml.automl.core.shared.constants.tasks?view=azure-ml-py
-    def promote_model(self, source_best_run, target_best_run, target_best_run_id, source_task_type, target_task_type):
+    def promote_model(self, source_best_run, target_best_run, target_best_run_id, source_task_type, target_task_type, source_model, target_model):
         if (self.debug_always_promote_model==True): # Guard
             print("OBS! 'debug_always_promote_model=TRUE' - will not perform scoring-comparison, nor look into scoring-WEIGHTs in `settings/project_specific/model/model_settings.json")
             return True
@@ -261,10 +300,10 @@ class ESMLModelCompare():
 
             if(task_type == "classification"):
                 print("New trained model: ")
-                source_metrics = self.classification_print_metrics(source_best_run)
+                source_metrics = self.classification_print_metrics(source_best_run,source_model)
                 print("")
                 print("Target model, to compare with; ")
-                target_metrics = self.classification_print_metrics(target_best_run)
+                target_metrics = self.classification_print_metrics(target_best_run,target_model)
                 print("")
 
                 selected_metric_array = self.model_settings['classification_compare_metrics']
@@ -274,10 +313,10 @@ class ESMLModelCompare():
 
             elif (task_type == "regression" or task_type == "forecasting"):
                 print("New trained model: ")
-                source_metrics = self.regression_print_metrics(source_best_run)
+                source_metrics = self.regression_print_metrics(source_best_run,source_model)
                 print("")
                 print("Target model, to compare with; ")
-                target_metrics = self.regression_print_metrics(target_best_run)
+                target_metrics = self.regression_print_metrics(target_best_run,target_model)
                 print("")
 
                 selected_metric_array = self.model_settings['regression_compare_metrics']
@@ -297,8 +336,6 @@ class ESMLModelCompare():
             
     def compare_metrics(self, metric_map, source_metrics, target_metrics, selected_metric_array,lower_is_better):
         promote_new_model = False
-        for test in selected_metric_array:
-            print("metric array {}".format(test))
 
         if(selected_metric_array is not None and len(selected_metric_array) > 0):
             print("Selected metrics, and weights, to be used when comparing for promotion/scoring drift")
@@ -400,13 +437,27 @@ class ESMLModelCompare():
         print("run_id {}".format(run_id))
         tags["run_id"] = run_id
 
+        if("test_set_ROC_AUC" in model_ph.tags):
+            tags["test_set_Accuracy"] = model_ph.tags["test_set_Accuracy"]
+            tags["test_set_ROC_AUC"] = model_ph.tags["test_set_ROC_AUC"]
+            tags["test_set_Precision"] = model_ph.tags["test_set_Precision"]
+            tags["test_set_Recall"] = model_ph.tags["test_set_Recall"]
+            tags["test_set_F1_Score"] = model_ph.tags["test_set_F1_Score"]
+            tags["test_set_Matthews_Correlation"] = model_ph.tags["test_set_Matthews_Correlation"]
+            tags["test_set_CM"] = model_ph.tags["test_set_CM"]
+        if("test_set_RMSE" in model_ph.tags):
+            tags["test_set_RMSE"] = model_ph.tags["test_set_RMSE"]
+            tags["test_set_R2"] = model_ph.tags["test_set_R2"]
+            tags["test_set_MAPE"] = model_ph.tags["test_set_MAPE"]
+            tags["test_set_Spearman_Correlation"] = model_ph.tags["test_set_Spearman_Correlation"]
+
         #tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": self.project.dev_test_prod, 
         #"trained_in_workspace": self.project.ws.name, "experiment_name": self.project.model_folder_name}
 
         # CONNECT to target Workspace
         target_ws = self.connect_to_target_workspace(target_dev_test_prod)
-        print("workspace:", target_ws.name)
-        print("temp-files: ", full_local_path)
+        print("Register in workspace:", target_ws.name)
+        #print("temp-files: ", full_local_path)
         #model_name = self.project.experiment_name
         #print("ExperimentName as Modelname {}".format(model_name))
 
@@ -421,10 +472,8 @@ class ESMLModelCompare():
                         tags=tags,
                         description=description_in,
                         workspace=target_ws)
-
         #input_dataset = Dataset.Tabular.from_delimited_files(path=[(datastore, 'sklearn_regression/features.csv')])
         #output_dataset = Dataset.Tabular.from_delimited_files(path=[(datastore, 'sklearn_regression/labels.csv')])
-        
         # FINALLY....
         self.project.dev_test_prod = current_env # flip back to ORIGINAL environment
 
@@ -434,7 +483,7 @@ class ESMLModelCompare():
     #    self.LoadConfiguration(target_env,self.project.override_enterprise_settings_with_model_specific)
     #    return self._register_model(target_env,target_workspace.name, target_workspace,self.model_name_automl, target_env, self.project.GoldTrain)
 
-    def register_active_model(self,target_env):
+    def register_active_model(self,target_env, source_model_4_tags=None):
 
         p = self.project
         if(p.dev_test_prod != target_env):
@@ -449,7 +498,7 @@ class ESMLModelCompare():
         else:
             target_workspace = p.get_other_workspace(target_env)
 
-        return self._register_model(source_env,source_ws_name, target_workspace,self.model_name_automl, target_env, p.override_enterprise_settings_with_model_specific,p.GoldTrain)
+        return self._register_model(source_env,source_ws_name, target_workspace,self.model_name_automl, target_env, p.override_enterprise_settings_with_model_specific,p.GoldTrain,source_model_4_tags)
 
     def _get_active_model_run_and_experiment(self, target_workspace, target_env, override_enterprise_settings_with_model_specific, pipeline_run=False):
         self.LoadConfiguration(target_env, override_enterprise_settings_with_model_specific)
@@ -467,11 +516,25 @@ class ESMLModelCompare():
         remote_run = AutoMLRun(experiment=experiment, run_id=run_id)
         return remote_run, experiment
 
-    def _register_model(self,source_env,source_ws_name, target_workspace,model_name, target_env, override_enterprise_settings_with_model_specific, train_dataset=None):
+    def _register_model(self,source_env,source_ws_name, target_workspace,model_name, target_env, override_enterprise_settings_with_model_specific, train_dataset=None,model_ph=None):
         remote_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific)
         run_id = remote_run.run_id # TODO does .run_id exists in PipelineRun? (.id) It does in a ScriptRun.
         tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         "trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
+
+        if("test_set_ROC_AUC" in model_ph.tags):
+            tags["test_set_Accuracy"] = model_ph.tags["test_set_Accuracy"]
+            tags["test_set_ROC_AUC"] = model_ph.tags["test_set_ROC_AUC"]
+            tags["test_set_Precision"] = model_ph.tags["test_set_Precision"]
+            tags["test_set_Recall"] = model_ph.tags["test_set_Recall"]
+            tags["test_set_F1_Score"] = model_ph.tags["test_set_F1_Score"]
+            tags["test_set_Matthews_Correlation"] = model_ph.tags["test_set_Matthews_Correlation"]
+            tags["test_set_CM"] = model_ph.tags["test_set_CM"]
+        if("test_set_RMSE" in model_ph.tags):
+            tags["test_set_RMSE"] = model_ph.tags["test_set_RMSE"]
+            tags["test_set_R2"] = model_ph.tags["test_set_R2"]
+            tags["test_set_MAPE"] = model_ph.tags["test_set_MAPE"]
+            tags["test_set_Spearman_Correlation"] = model_ph.tags["test_set_Spearman_Correlation"]
 
         #properties = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         #"trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
@@ -524,8 +587,9 @@ class ESMLModelCompare():
         finally: 
             os.chdir(old_loc) # Change back working location...
 
-    def regression_print_metrics(self,best_run):
-        metrics = best_run.get_metrics()
+    def regression_print_metrics(self,best_run, model):
+        #metrics = best_run.get_metrics()
+        metrics = self.get_metrics_regression(best_run,model)
 
         rmse = metrics.get('normalized_root_mean_squared_error',-999.0)
         r2 = metrics.get('r2_score', -999.0)
@@ -548,16 +612,16 @@ class ESMLModelCompare():
         
         return all_metrics
 
-    def classification_print_metrics(self,best_run):
-        metrics = best_run.get_metrics()
+    def classification_print_metrics(self,best_run,model):
+        metrics = self.get_metrics_classification(best_run,model)
 
         auc = metrics.get('AUC_weighted', -1.0)
-        accuracy = metrics.get('AUC_weighted', -1.0)
+        accuracy = metrics.get('accuracy', -1.0)
         precision = metrics.get('precision_score_weighted', -1.0)
-        precision_avg = metrics.get('average_precision_score_weighted', -1.0)
+        precision_avg = metrics.get('average_precision_score_weighted', -1.0) # No Testset scoring
         recall = metrics.get('recall_score_weighted', -1.0)
         f1_score = metrics.get('f1_score_weighted', -1.0)
-        log_loss = metrics.get('log_loss', -1.0)
+        log_loss = metrics.get('log_loss', -1.0) # No Testset scoring
         mathews = metrics.get('matthews_correlation', -1.0)
 
         all_metrics = {}
@@ -579,6 +643,44 @@ class ESMLModelCompare():
         print("matthews_correlation (1.0 is good): " + str(mathews))
 
         return all_metrics
+
+    def get_metrics_classification(self,best_run, model):
+        metrics = {}
+        if("test_set_Accuracy" in model.tags): # First Try: TEST SET Scoring from TAGS
+            print("INFO: Using ESML TEST_SET SCORING, since tagged on MODEL - using this to compare SCORING")
+            
+            metrics["accuracy"] = model.tags["test_set_Accuracy"]
+            metrics["AUC_weighted"] = model.tags["test_set_ROC_AUC"]
+            metrics["precision_score_weighted"] = model.tags["test_set_Precision"]
+            metrics["recall_score_weighted"] = model.tags["test_set_Recall"]
+            metrics["f1_score_weighted"] = model.tags["test_set_F1_Score"]
+            metrics["matthews_correlation"] = model.tags["test_set_Matthews_Correlation"]
+            # Missing: log_loss, average_precision_score_weighted (same loss for both..)
+            metrics["log_loss"] = -1
+            metrics["average_precision_score_weighted"] = -1
+
+        elif (best_run is not None):
+            print("Warning: Falling back o use AutoML validation scoring when comparing. Run 'ESMLTestScoringFactory(p).get_test_scoring_7_classification()' use TEST_SET SCORING when comparing")
+            metrics = best_run.get_metrics() # Backup, use Validation scoring, e.g. no TestSet scoring is calculated&tagged on model
+        return metrics
+
+    def get_metrics_regression(self,best_run, model):
+        metrics = {}
+        if("test_set_Accuracy" in model.tags): # First Try: TEST SET Scoring from TAGS 
+            print("INFO: Using ESML TEST_SET SCORING, since tagged on MODEL - using this to compare SCORING")
+            
+            metrics["normalized_root_mean_squared_error"] = model.tags["test_set_RMSE"]
+            metrics["r2_score"] = model.tags["test_set_R2"]
+            metrics["mean_absolute_percentage_error"] = model.tags["test_set_MAPE"]
+            metrics["spearman_correlation"] = model.tags["test_set_Spearman_Correlation"]
+            
+            #Missing: normalized_mean_absolute_error
+            metrics["normalized_mean_absolute_error"] = -1
+
+        elif (best_run is not None):
+            print("Warning: Falling back o use AutoML validation scoring when comparing. Run 'ESMLTestScoringFactory(p).get_test_scoring_4_regression()' to use TEST_SET SCORING when comparing")
+            metrics = best_run.get_metrics() # Backup, use Validation scoring, e.g. no TestSet scoring is calculated&tagged on model
+        return metrics
 
 # Task_type - https://docs.microsoft.com/en-us/python/api/azureml-automl-core/azureml.automl.core.shared.constants.tasks?view=azure-ml-py
 # AutoML Supported value(s): 'accuracy, precision_score_weighted, norm_macro_recall, AUC_weighted, average_precision_score_weighted'. 
