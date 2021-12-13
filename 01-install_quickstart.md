@@ -21,9 +21,10 @@ Located here:  [./esml/azure_provisioning/azure_devops_pipelines/](./esml/azure_
 - Project already hashas the `ESML as submodule`, and MLops template ready to run, but you need to run the following command to see the files (not just an empty folder)
 - Open GIT command prompt, go to your `local root folder for the code` (you should see the folder `azure-enterprise-scale-ml` and `notebook_demos` with a `dir` in the GIT CMD)run below: 
 
-> git config --system core.longpaths true
-
 > git submodule update --init --recursive
+
+If you get ann errormessage about `too long paths` then you need to open the GIT CMD prompt as `Administrator` and run the below (then try again)
+> git config --system core.longpaths true
 
 # 3) Create the Azure Resources needed
 The button below will deploy Azure Machine Learning and its related resources, BUT you may want to tailor to YOUR `naming convention` 
