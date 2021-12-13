@@ -19,7 +19,7 @@
 Located here:  [./esml/azure_provisioning/azure_devops_pipelines/](./esml/azure_provisioning/azure_devops_pipelines/)
 # 2 (Alt B) EXISTING Azure Devops project - Import the Azure Devops project (template project)
 - Project already hashas the `ESML as submodule`, and MLops template ready to run, but you need to run the following command to see the files (not just an empty folder)
-- Open GIT command prompt, go to your local root folder for the code, run below: 
+- Open GIT command prompt, go to your `local root folder for the code` (you should see the folder `azure-enterprise-scale-ml` and `notebook_demos` with a `dir` in the GIT CMD)run below: 
 
 > git config --system core.longpaths true
 
