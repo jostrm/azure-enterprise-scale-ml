@@ -99,7 +99,7 @@ Contains both "must-have" infrastructure and bootstrapping, and other "efficiecy
 
 It `glues (networking, identity,security)` Azure services together, to get a more `product feel/ SaaS feel`. Glues together multiple PaaS (data factory, Azure ML Studio, Datalake GEN 2) across `subscriptions`. 
 
-# EDUCATION & prerequsites
+# EDUCATION & Prerequisites (good to have in the `backpack`)
 - Learning by doing is probably the best thing, but below some `Azure certificates` are listed good to have in the `backpack`
  - DP 100 https://docs.microsoft.com/en-us/learn/certifications/exams/dp-100
 - There are also 6 ESML videos (in editing room), about ~1h each, as can be seen below.
