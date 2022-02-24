@@ -1,5 +1,6 @@
 from azureml.core import Run
 from azureml.core import Dataset
+from azureml.telemetry import UserErrorException
 import pandas as pd 
 import argparse
 import os
@@ -55,13 +56,16 @@ args_again, remaining_names_again = parser.parse_known_args()
 print("My custom ArgumentParser parameter {}".format(args_again.my_custom_parameter))
 
 df = aml_dataset_in.to_pandas_dataframe()
+if(df is None):
+    raise UserErrorException("df = aml_dataset_in.to_pandas_dataframe() - df is NONE!")
 IS_DEMO = True
 if (IS_DEMO): # Simulate feature engineering...source system might not know column name for Y, and certainly not values
     custom_code = In2GoldProcessor(df) # Drops columns, rename columns, filter data, interpolate, etc
     df = custom_code.in_to_silver_ds01_M10_M11_DEMO()
 else:
-    M01In2GoldProcessor.M01_ds01_process_in2silver(df) # Here you can add YOUR code
+    df = M01In2GoldProcessor.M01_ds01_process_in2silver(df) # Here you can add YOUR code
 
+print("df.shape post processing {}".format(df.shape))
 ################################### EDIT ABOVE - feature engieering ########################
 
 # Save as Dataset

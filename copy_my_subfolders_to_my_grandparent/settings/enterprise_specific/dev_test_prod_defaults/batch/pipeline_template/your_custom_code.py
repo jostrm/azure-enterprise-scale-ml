@@ -50,14 +50,18 @@ class In2GoldProcessor():
                 #self._df.drop("Name", axis=1, inplace=True) # Drop Name since its only "noise" for ML. AutoML will remove it automatically though...
                 #self._df.rename(columns={'Siblings/Spouses Aboard': 'siblings_spouces_aboard', 'Parents/Children Aboard': 'parent_or_child_aboard'}, inplace=True)
                 self._df_processed.columns =  self._df_processed.columns.str.replace("[/]", "_")
-    
+            else:
+               self._df_processed = self._df
             target_column_name = "Y"
             if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
                 self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
-
+            else:
+               self._df_processed = self._df
             target_column_name = "price"
             if target_column_name in self._df.columns: # 3)car specicif
                 self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
+            else:
+               self._df_processed = self._df
             
         return self._df_processed
 

@@ -14,10 +14,11 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
  - `Enterprise Datalake, with ADLS GEN2, and logical DataMesh`(not physical DataMesh. No scattered Blob/GEN2 storage accounts with myriad/different security - sometimes vNet, sometimes private links, sometimes open. Not different RBAC models on same data, Not multiple copies on MASTER DATA that needs to be event-synced,etc.)
  
 ![](./esml/images/esml-turnkey.png)
-## ESML Dashboard - Dev,Test,Prod environments
+## ESML AI Factory - Dev,Test,Prod environments
 - Easy to provision a new ESMLProject for Dev,Test,Prod with easy cost followup, since its own PROJECT resource groups for each `Project team` in the ESML `AI Factory`:
+- Horisontally 3 COMMON environment (Dev,Test, Prod) and vertically ESMLProject 1-250
 
-![](./esml/images/esml-dash-small.png)
+![](./esml/images/esml-s01e01-0.png.png)
 
 - Can optionally integrate with ITSM system as a "ticket" in ServiceNow/Remedy/JIRA Service Desk. The below info is needed for the ESML provisioning:
 ![](./esml/images/esml-project-ticket.png)
@@ -26,7 +27,12 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
 
 ![](./esml/images/esml-arch-small.png)
 
-# INTRO - Is this for you?
+# INTRO - Is this for you? 
+-ESML "marries" DataOps + MLOps, with `templates` for both Azure Data factory that calls `ESML autogenereated Azure ML Pipelines`
+-ESML also autoprovisions the AI Factory, with 100% BICEP, where you can `1-click` a new ESMLProject in Azure Devops, serviecs glued together with `private endpoints` (network & identity)
+-ESML can `talk across Dev,Test, Prod Azure ML workspaces`, comare scoring from model in DEV workspace with TEST, and register the model in an external workspace. See image
+![](./esml/images/esml-s01e01-3.png)
+
 **Q1:I want to use Azure AutoML, with MLOps ready to be `turned ON`** , with datalake design automatically generated for me, including `BRONZE, SILVER, GOLD` concept
 - A: Yes. ESML is AutoML first, and have married this with MLOps, and an `AutoLake™` for Azure ML Studio.
 - There is `22 DEMO notebooks` End-2-End MLOps, with Azure ML Pipelines, `using Azure datalake GEN 2 all the way` - from Azure datafactory, in Azure ML Pipelines/Datasets.
@@ -60,8 +66,8 @@ Contains both "must-have" infrastructure and bootstrapping, and other "efficiecy
 
 **Q6 ESML AI Factory: Can I just use the Azure ML SDK directly? Instead of the ESML SDK?** 
 - Yes, You can bypass ESML SDK 100%  (the 4th ingredience) and only take advantage of the 3 other ingredients: part: 1,2,3
-    - part 1) `Azure services glued together securely` (ARM / Provisioing / Networking / Infra)
-    - part 2) `Azure Devops template, for MLOps` (BUILD and RELEASE pipelines / Networking / Security & Glue) 
+    - part 1) `Azure services glued together securely` (BICEP Provisioing / Networking & Infra with RBAC and identity)
+    - part 2) `Azure Devops template, for MLOps & 1-click provisioning of ESMLProject/BICEP` (BUILD and RELEASE pipelines / Networking / Security & Glue)
     - part 3) `The enterprise datalake design` (ADLS Gen2 storage account, with a folder structure)
     
 - That said, to get the `accelerator power` - use the `EMSL SDK`. See benefits listed below ( and look at this full README feature list for all benefits)
@@ -93,6 +99,12 @@ Contains both "must-have" infrastructure and bootstrapping, and other "efficiecy
 
 It `glues (networking, identity,security)` Azure services together, to get a more `product feel/ SaaS feel`. Glues together multiple PaaS (data factory, Azure ML Studio, Datalake GEN 2) across `subscriptions`. 
 
+# EDUCATION & prerequsites
+- Learning by doing is probably the best thing, but below some `Azure certificates` are listed good to have in the `backpack`
+ - DP 100 https://docs.microsoft.com/en-us/learn/certifications/exams/dp-100
+- There are also 6 ESML videos (in editing room), about ~1h each, as can be seen below.
+![](./esml/images/esml-s01e01-2.png)
+
 ## ESML Accelerator benefits 
 ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio: 
 - EMSL enables `enterprise CONCEPTS` (Project/Model/Dev_Test_Prod)` - able to scale across Azure subscriptions in DEV, TEST, PROD for a model.
@@ -123,6 +135,11 @@ ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio:
 ![](./esml/images/esml-autolake.png)
 
 ### CONCEPTUALLY
+-ESML is based on BEST PRACTICE's combined with PROVEN practices. 
+-To have an ESML AI Factory, all your projects are provisioned automatically "glued" togehter, where `1 project team` can jump into an ESMLProject.
+ - Example: ESMLProject001 a project team from HR can use to build models, and ESMLProject002 can be used by an analytical. (`Recommended team size is 1-5 people`)
+![](./esml/images/esml-s01e01-1.png)
+
 - `Data mesh support:` Not only support for monolitic centralized data ingestion pipelines/team, but `also SELF-SERVICE domain-driven/per project`
     - Each project has their own pipelines (and Azure Datafactory instance), but can get help from the centralized Data ingestion team.
         - To have ONLY a centralized team who owns and curates the data from all domains. It does not organizationally scale as we have learned.

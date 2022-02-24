@@ -273,7 +273,7 @@ class ESMLPipelineFactory():
         # 2) Load DEV or TEST or PROD Azure ML Studio workspace
         p.ws = p.get_workspace_from_config()
         #p.inference_mode = True
-        self._datalake = p.connect_to_lake()  # Get Lake
+        self._datalake = p.connect_to_lake(False)  # Get Lake, but don't use "date_folder from lake", use contstructor
 
         old_loc = os.getcwd()
         try:

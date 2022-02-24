@@ -537,13 +537,28 @@ class ESMLProject():
     def parseEnvConfig(self, env_config):
         self.overrideEnvConfig(env_config['active_dev_test_prod'],env_config) # Sets ACTIVE subscription also
 
+    def getResourceGroupName(self, dev_test_prod_in):
+        dev_test_prod = "dev" # default to dev
+        if(dev_test_prod_in is not None):
+            dev_test_prod = dev_test_prod_in
+
+        rg_name = self.env_config['common_rg_name'].format(dev_test_prod.upper())
+        rg_suffix_template = 'common_rg_name_{}_optional_suffix'
+        rg_suffix_key = rg_suffix_template.format(dev_test_prod)
+
+        if (self.env_config[rg_suffix_key]): # Backward compatibility: Ensure key exists in SETTINGS
+            rg_suffix = self.env_config[rg_suffix_key] # Default is empty string
+            rg_name = rg_name + rg_suffix
+
+        return rg_name
+
     def vNetForActiveEnvironment(self):
         rg_name,vnet_name, subnet_name = None,None,None
         self.set_active_common_subnet_name()
 
         if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod. 
             vnet_name = self.env_config['common_vnet_name'].format("dev")
-            rg_name = self.env_config['common_rg_name'].format("dev")
+            rg_name = self.getResourceGroupName("dev")
             subnet_name = self.active_common_subnet_name
         elif (self.lake_storage_accounts > 1): # (dev + test_prod) or (dev,test,prod)
             vnet_name = self.common_vnet_name
@@ -557,7 +572,7 @@ class ESMLProject():
 
         if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod
             sa_name = self.dev_sa
-            rg_name = self.env_config['common_rg_name'].format("DEV")
+            rg_name = self.getResourceGroupName("dev")
             sub_id = self.dev_subscription
         elif (self.lake_storage_accounts > 1): # (dev + test_prod) or (dev,test,prod)
             sa_name = self.active_sa
@@ -597,7 +612,7 @@ class ESMLProject():
 
         self.lake_design_version = self.env_config['lake_design_version']
 
-        self.common_rg_name = self.env_config['common_rg_name'].format(self.dev_test_prod.upper())
+        self.common_rg_name = self.getResourceGroupName(self.dev_test_prod) # self.env_config['common_rg_name'].format(self.dev_test_prod.upper())
         self.common_vnet_name = self.env_config['common_vnet_name'].format(self.dev_test_prod)
         self.common_subnet_name = self.env_config['dev_common_subnet_name']
 
@@ -805,9 +820,10 @@ class ESMLProject():
             self.initComputeFactory(self.ws)
         return self._compute_factory 
 
-    def connect_to_lake(self):
+    def connect_to_lake(self, date_folder_from_lake = True):
         self.lakestore = self.set_lake_as_datastore(self.ws) # only needed if NOT p.init() is done
-        self.readActiveDatesFromLake()
+        if(date_folder_from_lake):
+            self.readActiveDatesFromLake()
         self.checkLakeCompatability()
         return self.lakestore
     def initComputeFactory(self,ws,reload_config=False):
