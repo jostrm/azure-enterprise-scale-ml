@@ -13,6 +13,10 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
  - `ESML supports DeltaLake` for MASTER data. (When ESML autogenerates Azure ML pipelines, a .parquet representation is used in the PROJECTS structure)
  - `Enterprise Datalake, with ADLS GEN2, and logical DataMesh`(not physical DataMesh. No scattered Blob/GEN2 storage accounts with myriad/different security - sometimes vNet, sometimes private links, sometimes open. Not different RBAC models on same data, Not multiple copies on MASTER DATA that needs to be event-synced,etc.)
  
+ # ESML AI Factory "Oneslider"
+  ![](./esml/images/esml-s01e01-0.png)
+
+## ESML technically: The 4 ingrediences:
 ![](./esml/images/esml-turnkey.png)
 ## ESML AI Factory - Dev,Test,Prod environments
 - Easy to provision a new ESMLProject for Dev,Test,Prod with easy cost followup, since its own PROJECT resource groups for each `Project team` in the ESML `AI Factory`:
