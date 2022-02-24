@@ -13,16 +13,18 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
  - `ESML supports DeltaLake` for MASTER data. (When ESML autogenerates Azure ML pipelines, a .parquet representation is used in the PROJECTS structure)
  - `Enterprise Datalake, with ADLS GEN2, and logical DataMesh`(not physical DataMesh. No scattered Blob/GEN2 storage accounts with myriad/different security - sometimes vNet, sometimes private links, sometimes open. Not different RBAC models on same data, Not multiple copies on MASTER DATA that needs to be event-synced,etc.)
  
- # ESML AI Factory "Oneslider"
+ # ESML AI Factory "Oneslider": Dev,Test,Prod environments
+- Easy to provision a new ESMLProject for Dev,Test,Prod with easy cost followup, since its own PROJECT resource groups for each `Project team` in the ESML `AI Factory`:
+- Horisontally 3 COMMON environment (Dev,Test, Prod) and vertically ESMLProject 1-250
   ![](./esml/images/esml-s01e01-0.png)
 
 ## ESML technically: The 4 ingrediences:
+-`BICEP provisioning`: Makes all ESML Projects in the AI factory to have the same `security`, all 
+-`Azure Devops templates`: For MLOps (CI/CD) and to kick off the BICEP for a project manager to "order a ESMLProject".
+-`ESML DATALAKE`: Battle tested lakedesign to support DataMesh, IoT, Machine learning, BRONZE, SILVER, GOLD concepts.
+-`ESML SDK`: That is preconfigured: knows the datalake design (don't need to remember folderpaths) and can talk horisontally `across Dev, Test, Production` workspaces.
+ - Contains templates for Azure Datafactory, Azure Devops templates, BICEP templates, and has accelerator code such as the `ESML Azure ML Pipeline factory`, 2 lines of code to generate pipelines
 ![](./esml/images/esml-turnkey.png)
-## ESML AI Factory - Dev,Test,Prod environments
-- Easy to provision a new ESMLProject for Dev,Test,Prod with easy cost followup, since its own PROJECT resource groups for each `Project team` in the ESML `AI Factory`:
-- Horisontally 3 COMMON environment (Dev,Test, Prod) and vertically ESMLProject 1-250
-
-![](./esml/images/esml-s01e01-0.png.png)
 
 - Can optionally integrate with ITSM system as a "ticket" in ServiceNow/Remedy/JIRA Service Desk. The below info is needed for the ESML provisioning:
 ![](./esml/images/esml-project-ticket.png)
