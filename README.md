@@ -19,7 +19,7 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
   ![](./esml/images/esml-s01e01-0.png)
 
 ## ESML technically: The 4 ingrediences:
-- `BICEP provisioning`: Makes all ESML Projects in the AI factory to have the same `security`
+- `BICEP provisioning`: ESML Projects in the AI factory:same `setup`,`common toolbox` & `security` (private link)
 - `Azure Devops templates`: MLOps (CI/CD). Kick off BICEP release pipeline (PM "order a ESMLProject" in 15min)
 - `ESML DATALAKE`: Battle tested design supports DataMesh,IoT,ML concepts, BRONZE, SILVER, GOLD
 - `ESML SDK & REPO`: SDK knows setup/preconfigured: knows datalake design (don't need to remember folderpaths) and can talk horisontally `across Dev, Test, Production` workspaces.
