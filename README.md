@@ -136,8 +136,9 @@ ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio:
 
 ### CONCEPTUALLY
 -ESML is based on BEST PRACTICE's combined with PROVEN practices. 
--To have an ESML AI Factory, all your projects are provisioned automatically "glued" togehter, where `1 project team` can jump into an ESMLProject.
- - Example: ESMLProject001 a project team from HR can use to build models, and ESMLProject002 can be used by an analytical. (`Recommended team size is 1-5 people`)
+-In the `ESML AI Factory` all your ESML projects are provisioned automatically "glued" togehter, where `1 project team` can jump into an ESMLProject and start working.
+ - `ESML PROJECT`: ESMLProject001 a project team from HR can use to build models, and ESMLProject002 can be used by an analytical. (`Recommended team size is 1-5 people`)
+ - `ESML CORE TEAM`: An ESML Coreteam has at the roles of `goverance` of the ESML AI factory, both technically (helps provision new projects, update AKS-versions) and educationally to `onboard people`
 ![](./esml/images/esml-s01e01-1.png)
 
 - `Data mesh support:` Not only support for monolitic centralized data ingestion pipelines/team, but `also SELF-SERVICE domain-driven/per project`
