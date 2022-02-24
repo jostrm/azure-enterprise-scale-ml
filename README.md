@@ -19,14 +19,13 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
   ![](./esml/images/esml-s01e01-0.png)
 
 ## ESML technically: The 4 ingrediences:
--`BICEP provisioning`: Makes all ESML Projects in the AI factory to have the same `security`
+- `BICEP provisioning`: Makes all ESML Projects in the AI factory to have the same `security`
+- `Azure Devops templates`: MLOps (CI/CD). Kick off the BICEP via release pipeline (PM to "order a ESMLProject" in 15min)
+- `ESML DATALAKE`: Battle tested lakedesign to support DataMesh, IoT, Machine learning, BRONZE, SILVER, GOLD concepts.
 
--`Azure Devops templates`: For MLOps (CI/CD) and to kick off the BICEP for a project manager to "order a ESMLProject".
-
--`ESML DATALAKE`: Battle tested lakedesign to support DataMesh, IoT, Machine learning, BRONZE, SILVER, GOLD concepts.
-
--`ESML SDK`: That is preconfigured: knows the datalake design (don't need to remember folderpaths) and can talk horisontally `across Dev, Test, Production` workspaces.
- - Contains templates for Azure Datafactory, Azure Devops templates, BICEP templates, and has accelerator code such as the `ESML Azure ML Pipeline factory`, 2 lines of code to generate pipelines
+- `ESML SDK & REPO`: That is preconfigured: knows the datalake design (don't need to remember folderpaths) and can talk horisontally `across Dev, Test, Production` workspaces.
+    - Has accelerator code such as the `ESML Azure ML Pipeline factory`, 2 lines of code to generate pipelines
+    - Templates for Azure Datafactory, Azure Devops templates, BICEP templates
 ![](./esml/images/esml-turnkey.png)
 
 - Can optionally integrate with ITSM system as a "ticket" in ServiceNow/Remedy/JIRA Service Desk. The below info is needed for the ESML provisioning:
