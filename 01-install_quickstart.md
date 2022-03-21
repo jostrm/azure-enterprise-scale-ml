@@ -1,7 +1,8 @@
-## Tip: Use an Azure Data science Virtual Machine, to install the ESML SDK on.
-- You have an easy way of "governance" for onboarding consultants easy - all is preinstalled
+## Tip: Use the Azure Data science Virtual Machine, to install the ESML SDK on, "jump host & client - all at once" 
+- You have an easy way of "governance" for onboarding consultants easy - all is preinstalled (comes with ESML bicep)
   - You can have AAD login (Virtual Machine Administrator Login or Virtual Machine User Login)
   - VM inside of vNet already (no point-2-site gateway setup needed, no personal laptops to join to AAD)
+  - Bastion host avaialble in the `ESML bicep provisioining`, including native RDP.
 # 1) Install ESML Python SDK that includes Azure ML with AutoML
 - Install MiniConda (>v 4.7), and open the MiniConda command prompt on your computer
   - Windows computer:  [environment_setup/user_dev_env_install/automl_setup.cmd](./environment_setup/user_dev_env_install/automl_setup.cmd)
@@ -26,10 +27,10 @@ Located here:  [./esml/azure_provisioning/azure_devops_pipelines/](./esml/azure_
 If you get ann errormessage about `too long paths` then you need to open the GIT CMD prompt as `Administrator` and run the below (then try again)
 > git config --system core.longpaths true
 
-# 3) Create the Azure Resources needed
+# 3) Create the Azure Resources needed (ESML Bicep)
 The button below will deploy Azure Machine Learning and its related resources, BUT you may want to tailor to YOUR `naming convention` 
 - **Q: How to edit the DEFAULT naming convention, to adher `to our enterprise policy naming convention`?**
-- A: You can tailor your own Azure blueprint /Bicep version. Use the ESML tool, and config-file `../settings/enterprise_specific/naming_convention.json`.
+- A: You can tailor your own Bicep version. Use the ESML tool, and config-file `../settings/enterprise_specific/naming_convention.json`.
     - The `ESML naming convention template` is good to get a baseline start - then edit the .json file for YOUR convention.
   
 HOWTO: 

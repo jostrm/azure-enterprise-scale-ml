@@ -37,12 +37,15 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
 
 ![](./esml/images/esml-arch-small.png)
 
-# INTRO - Is this for you? 
--ESML "marries" DataOps + MLOps, with `templates` for both Azure Data factory that calls `ESML autogenereated Azure ML Pipelines`
--ESML also autoprovisions the AI Factory, with 100% BICEP, where you can `1-click` a new ESMLProject in Azure Devops, serviecs glued together with `private endpoints` (network & identity)
--ESML can `talk across Dev,Test, Prod Azure ML workspaces`, comare scoring from model in DEV workspace with TEST, and register the model in an external workspace. See image
+# INTRO - Is this for you? MLOps? 
+- ESML "marries" DataOps + MLOps, with `templates` for both Azure Data factory that calls `ESML autogenereated Azure ML Pipelines`
+- ESML Auto-provisions the AI Factory, with 100% BICEP, where you can `1-click` a new ESMLProject in Azure Devops, serviecs glued together with `private endpoints` (network & identity)
+- ESML has MLOps: both `INNER` and `OUTER LOOP` (can `talk across Dev,Test, Prod Azure ML workspaces`)
+    - ESML can compare scoring from model in `DEV workspace` with `TEST workspace`, and register the model in an external workspace (this with also network security: vNets & private endpoints, NSG's, FW)
+    - See image: 
 ![](./esml/images/esml-s01e01-3.png)
 
+# INTRO - Is this for you: refine data? AutoML or manual ML? R&D phase? 
 **Q1:I want to use Azure AutoML, with MLOps ready to be `turned ON`** , with datalake design automatically generated for me, including `BRONZE, SILVER, GOLD` concept
 - A: Yes. ESML is AutoML first, and have married this with MLOps, and an `AutoLake™` for Azure ML Studio.
 - There is `22 DEMO notebooks` End-2-End MLOps, with Azure ML Pipelines, `using Azure datalake GEN 2 all the way` - from Azure datafactory, in Azure ML Pipelines/Datasets.
