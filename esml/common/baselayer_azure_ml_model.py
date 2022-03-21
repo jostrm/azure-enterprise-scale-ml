@@ -8,8 +8,9 @@ from azureml.telemetry import UserErrorException
 import sklearn
 import tempfile
 from azureml.core.resource_configuration import ResourceConfiguration
+from ..interfaces.iESMLModelCompare import IESMLModelCompare
 
-class ESMLModelCompare():
+class ESMLModelCompare(IESMLModelCompare):
 
     dev_test_prod = "dev"
     project = None
