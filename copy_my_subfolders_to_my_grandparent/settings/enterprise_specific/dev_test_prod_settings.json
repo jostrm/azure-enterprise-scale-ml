@@ -25,5 +25,8 @@
     "lake_storage_accounts": 1,
     "dev_sa": "acmeweudevesml001",
     "test_sa": "acmeweudevesml001",
-    "prod_sa": "acmeweudevesml001"
+    "prod_sa": "acmeweudevesml001",
+    "common_rg_name_dev_optional_suffix": "",
+    "common_rg_name_test_optional_suffix": "",
+    "common_rg_name_prod_optional_suffix": ""
 }
