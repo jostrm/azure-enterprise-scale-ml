@@ -1269,15 +1269,15 @@ class ESMLProject():
     def get_workspace_from_config(self,cli_auth=None, vNetACR=True):
         try:
             if(cli_auth is None):
-                self.ws = Workspace.from_config(path="../../../", _file_name= self.get_workspace_configname())
+                self.ws = Workspace.from_config(path="../../", _file_name= self.get_workspace_configname())
             else:
-                self.ws = Workspace.from_config(path="../../../", auth=cli_auth, _file_name= self.get_workspace_configname())
+                self.ws = Workspace.from_config(path="../../", auth=cli_auth, _file_name= self.get_workspace_configname())
         except:
             try:
                 if(cli_auth is None):
-                    self.ws = Workspace.from_config(path="../../", _file_name= self.get_workspace_configname())
+                    self.ws = Workspace.from_config(path="../../../", _file_name= self.get_workspace_configname())
                 else:
-                    self.ws = Workspace.from_config(path="../../", auth=cli_auth, _file_name= self.get_workspace_configname())
+                    self.ws = Workspace.from_config(path="../../../", auth=cli_auth, _file_name= self.get_workspace_configname())
             except Exception as e:
                 raise UserErrorException("Config could not be found neither 3 or 2 folders, via: Workspace.from_config(path=../../, auth=cli_auth, _file_name= self.get_workspace_configname())") from e
         return self.ws

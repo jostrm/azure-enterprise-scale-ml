@@ -1,9 +1,9 @@
 {
     "storage_type_blob": false,
-    "temp_blob_container_name": "project02",
-    "temp_blob_secret_key": "kv-secret-proj02-ai-saKey",
-    
-    "blob_datastore_name": "project002",
+    "deprecated_temp_blob_container_name": "project02",
+    "deprecated_temp_blob_secret_key": "kv-secret-proj02-ai-saKey",
+    "deprecated_blob_datastore_name": "project002",
+
     "lake_datastore_name": "project002lake",
     "lake_fs": "lake3",
 

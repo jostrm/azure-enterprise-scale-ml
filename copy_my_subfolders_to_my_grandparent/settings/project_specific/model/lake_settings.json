@@ -1,22 +1,22 @@
 {
-    "project_number": 2,
-    "project_folder_name": "project002",
-    "active_model": 11,
+    "project_number": 1,
+    "project_folder_name": "project001",
+    "active_model": 10,
     "models":
         [
-            {
-                "model_number": 11,
-                "model_folder_name": "11_diabetes_model_reg",
-                "model_short_alias": "M11",
-                "dataset_folder_names": ["ds01_diabetes","ds02_other"],
-                "label":"Y"
-            },
             {
                 "model_number": 10,
                 "model_folder_name": "10_titanic_model_clas",
                 "model_short_alias": "M10",
                 "dataset_folder_names": ["ds01_titanic","ds02_haircolor","ds03_housing","ds04_lightsaber"],
                 "label":"Survived"
+            },
+            {
+                "model_number": 11,
+                "model_folder_name": "11_diabetes_model_reg",
+                "model_short_alias": "M11",
+                "dataset_folder_names": ["ds01_diabetes","ds02_other"],
+                "label":"Y"
             },
             {
                 "model_number": 12,
