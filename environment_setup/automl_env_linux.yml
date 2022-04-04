@@ -23,7 +23,7 @@ dependencies:
   # ESML required to MLops unattended
   - azure-keyvault>=4.1.0
   - repackage==0.7.3
-  - azure-cli-core==2.29.2 # 2022-04-03 (2.34.1-1~bionic) testade DOWNGRADE i AzureDevops till 2.0.25 iom att 2.19.1 inte fanns # 2021-01-01 (2.19.1 = worked)
+  - azure-cli-core==2.19.1 # 2022-04-03 (2.34.1-1~bionic) testade DOWNGRADE i AzureDevops till 2.0.25 iom att 2.19.1 inte fanns # 2021-01-01 (2.19.1 = worked)
   # TODO testa: A) 2.0.25  ...B) 2.34.1 och DOWNGRADEa INTE
   # TODO: 2.29.2
   - azure-storage-file-datalake
