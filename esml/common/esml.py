@@ -546,7 +546,7 @@ class ESMLProject():
         rg_suffix_template = 'common_rg_name_{}_optional_suffix'
         rg_suffix_key = rg_suffix_template.format(dev_test_prod)
 
-        if (self.env_config[rg_suffix_key]): # Backward compatibility: Ensure key exists in SETTINGS
+        if (rg_suffix_key in self.env_config): # Backward compatibility: Ensure key exists in SETTINGS
             rg_suffix = self.env_config[rg_suffix_key] # Default is empty string
             rg_name = rg_name + rg_suffix
 
