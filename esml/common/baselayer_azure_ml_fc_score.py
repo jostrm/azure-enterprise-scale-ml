@@ -17,7 +17,7 @@ test_dataset_id = args.test_dataset
 run = Run.get_context()
 ws = run.experiment.workspace
 
-# get the input dataset by id
+# get the input dataset by id - sdfsd
 test_dataset = Dataset.get_by_id(ws, id=test_dataset_id)
 
 X_test_df = test_dataset.drop_columns(columns=[target_column_name]).to_pandas_dataframe().reset_index(drop=True)
