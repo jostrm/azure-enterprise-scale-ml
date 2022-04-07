@@ -1628,7 +1628,7 @@ class ESMLProject():
         left_per_set = round((whats_left_for_both / 2),2) # 0.2  ...0.15
         validate_and_test = round((1-left_per_set),2) # 0.8 ....0.75
 
-        if(stratified):
+        if(stratified == True):
             print("Stratified split on column {} using StratifiedShuffleSplit twice, to get GOLD_TRAIN/OTHER and then 0.5 split on OTHER to get GOLD_VALIDATE & GOLD_TEST".format(label))
             train, validate, test = split_stratified(df,whats_left_for_both,left_per_set,label)
         else:
