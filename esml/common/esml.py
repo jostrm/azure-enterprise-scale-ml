@@ -1613,7 +1613,7 @@ class ESMLProject():
     def split_gold_dbx(self,train_percentage=0.6, label=None,stratified=False,seed=42, new_version=True):
         return self.split_gold(self.GoldDatabricks,train_percentage, label,new_version,stratified,seed)
 
-    def split_gold_3(self,train_percentage=0.6, stratified=False,label=None,seed=42, new_version=True):
+    def split_gold_3(self,train_percentage=0.6, label=None,stratified=False,seed=42, new_version=True):
         return self.split_gold(self.Gold,train_percentage, label,new_version,stratified,seed)
 
     def split_gold(self,azure_ml_gold_dataset, train_percentage=0.6, label_in=None,new_version=True, stratified=False,seed=42):
