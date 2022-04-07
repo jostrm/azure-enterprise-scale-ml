@@ -21,13 +21,16 @@ dependencies:
 
 - pip:
   # ESML required to write files to GEN 2 - Bronze,Silver,Gold
-  - azure-keyvault==4.1.0 # jostrm 2022-04--07 set this to FIXED, not >=  sdf
-  - azure-core==1.23.1 # ModuleNotFoundError: No module named 'azure.core.rest'
+  # - azure-keyvault==4.1.0 # jostrm 2022-04-07 set this to FIXED, not >= ...no effect.
+  - azure-keyvault-keys==4.1.0
+  - azure-keyvault-secrets==4.1.0
+  - azure-keyvault-certificates==4.1.0
+  # - azure-core==1.23.1 # ModuleNotFoundError: No module named 'azure.core.rest' # conflictinv verions: azure-core<=1.13.0
   - repackage==0.7.3
   - azure-cli-core==2.19.1 # 2022-04-03 (2.34.1-1~bionic) testade DOWNGRADE i AzureDevops till 2.0.25 iom att 2.19.1 inte fanns # 2021-01-01 (2.19.1 = worked)
   # TODO testa: A) 2.0.25  ...B) 2.34.1 och DOWNGRADEa INTE. 
   # TODO: 2.29.2
-  - azure-storage-file-datalake
+  - azure-storage-file-datalake==12.3.1 # # jostrm 2022-04-07: froze this to 12.3.1 (last working, even if it works anyhow
   #optional
   - seaborn==0.11.1
   #END ESML
