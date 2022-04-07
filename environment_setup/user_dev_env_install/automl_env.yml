@@ -20,16 +20,18 @@ dependencies:
 - cudatoolkit=10.1.243
 
 - pip:
-  #MLOps required for unattended mode (not really needed for WIndows, but for Linux build agent - a must have)
+ #MLOps required for unattended mode (not really needed for WIndows, but for Linux build agent - a must have)
   - azure-cli-core==2.19.1
-  - azure-keyvault>=4.1.0
+  # - azure-keyvault>=4.1.0 # 2022-04-08 (worked 2019-2022, but no longer due to Azure CLI update)
+  - azure-keyvault-keys~=4.3.1 # 2022-04-08 (replacing azure-keyvault>=4.1.0)
+  - azure-keyvault-secrets~=4.2.0 # 2022-04-08 (replacing azure-keyvault>=4.1.0)
+  - azure-keyvault-certificates~=4.2.1 # 2022-04-08 (replacing azure-keyvault>=4.1.0)
   - repackage==0.7.3
   # ESML requred to write files to GEN 2 - Bronze,Silver,Gold
-  - azure-storage-file-datalake
-  # optional - just for me - Form recognizer API, Plotting, etc
+  - azure-storage-file-datalake==12.3.1 # 2022-04-07: froze this to 12.3.1 (even if it works wothout, no surprises needed)
+  # Optional
   - azure-ai-formrecognizer
   - seaborn==0.11.1
-  # just for me - END
   # Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.26.0
   - pytorch-transformers==1.0.0
