@@ -46,6 +46,7 @@ class esml_step_types():
     SCORING_GOLD = "SCORING_GOLD"
     TRAIN_AUTOML = "TRAIN_AUTOML"
     TRAIN_MANUAL = "TRAIN_MANUAL"
+    TRAIN_SPLIT_AND_REGISTER = "TRAIN_SPLIT_AND_REGISTER"
 
 #endregion
 
@@ -68,6 +69,9 @@ class ESMLPipelineFactory():
     _in2silver_filename = "in2silver.py"
     _silver2gold_filename = "silver_merged_2_gold.py"
     _scoring_filename = "scoring_gold.py"
+    _train_split_and_register_file = "train_split_and_register.py"
+    _train_manual_filename = "train_manual.py"
+    _train_automl_filename = "train_automl.py"
 
     _in2bronze_filename = "in2bronze.py" # Not used in In2Silver2Gold data model
     _bronze2silver_filename = "bronze2silver.py" # Not used In2Silver2Gold data model
@@ -174,14 +178,28 @@ class ESMLPipelineFactory():
 
         experiment_name = self.name_batch_pipeline
         experiment = Experiment(self.p.ws,experiment_name)
+        par_dic = None
+        if (pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.IN_2_GOLD):
+            print ("execute_pipeline (scoring): Inference_mode: {}".format(parameters[4].default_value))
 
-        par_dic = {
-            parameters[0].name: parameters[0].default_value, # esml_inference_model_version
-            parameters[1].name: parameters[1].default_value,# esml_scoring_folder_date
-            parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
-            parameters[3].name: parameters[3].default_value, # par_esml_dev_test_prod
-            parameters[4].name: parameters[4].default_value # par_esml_inference_mode 
-        }
+            par_dic = {
+                parameters[0].name: parameters[0].default_value, # esml_inference_model_version
+                parameters[1].name: parameters[1].default_value,# esml_scoring_folder_date | par_esml_training_date
+                parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
+                parameters[3].name: parameters[3].default_value, # par_esml_dev_test_prod
+                parameters[4].name: parameters[4].default_value # par_esml_inference_mode
+            }
+        elif (pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
+            print ("execute_pipeline (training): Inference_mode: {}".format(parameters[4].default_value))
+            par_dic = {
+                parameters[0].name: parameters[0].default_value, # esml_inference_model_version
+                parameters[1].name: parameters[1].default_value,# esml_scoring_folder_date | par_esml_training_date
+                parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
+                parameters[3].name: parameters[3].default_value, # par_esml_dev_test_prod
+                parameters[4].name: parameters[4].default_value, # par_esml_inference_mode
+                parameters[5].name: parameters[5].default_value # par_esml_split_percentage
+            }
+
         pipeline_run = experiment.submit(pipeline, regenerate_outputs=regenerate_outputs,pipeline_parameters=par_dic
         # ,tags={
         #        "training_run_id": best_run.id,
@@ -245,6 +263,30 @@ class ESMLPipelineFactory():
                 print("Edit at {}".format(scoring_gold))
             self._script_names_dic[esml_step_types.SCORING_GOLD] = scoring_gold
 
+             # TRAIN_SPLIT_AND_REGISTER
+            source = self._script_template_enterprise + "/" + self._train_split_and_register_file
+            train_split = self._snapshot_folder + self._train_split_and_register_file
+            if(not only_info):
+                shutil.copy(source, train_split)
+                print("Edit at {}".format(train_split))
+            self._script_names_dic[esml_step_types.TRAIN_SPLIT_AND_REGISTER] = train_split
+
+            # TRAIN_MANUAL
+            source = self._script_template_enterprise + "/" + self._train_manual_filename
+            train_manual = self._snapshot_folder + self._train_manual_filename
+            if(not only_info):
+                shutil.copy(source, train_manual)
+                print("Edit at {}".format(train_manual))
+            self._script_names_dic[esml_step_types.TRAIN_MANUAL] = train_manual
+
+            # TRAIN_AUTOML
+            #source = self._script_template_enterprise + "/" + self._train_automl_filename
+            #train_automl = self._snapshot_folder + self._train_automl_filename
+            #if(not only_info):
+            #    shutil.copy(source, train_automl)
+            #    print("Edit at {}".format(train_automl))
+            #self._script_names_dic[esml_step_types.TRAIN_AUTOML] = train_automl
+
              # your_custom_code.PY
             init_py_name = "your_custom_code.py"
             source = self._script_template_enterprise + "/" + init_py_name
@@ -268,6 +310,11 @@ class ESMLPipelineFactory():
     def create_batch_pipeline(self, pipeline_type=esml_pipeline_types.IN_2_GOLD_SCORING, same_compute_for_all=True, cpu_gpu_databricks="cpu", allow_reuse=True):
         p = self.p
         self._esml_pipeline_type = pipeline_type
+        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
+            p.inference_mode = False
+        else:
+            p.inference_mode = True
+
 
         self._allow_reuse = allow_reuse
         # 2) Load DEV or TEST or PROD Azure ML Studio workspace
@@ -281,22 +328,60 @@ class ESMLPipelineFactory():
             model = self._create_scriptfolder_and_download_files(pipeline_type)
         finally:
             os.chdir(old_loc)
-
-        pipe = None
-        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
-            pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
-        elif(pipeline_type == esml_pipeline_types.IN_2_GOLD):
-            pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
-        elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
-            pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
-        else: # TODO: Switch/Case on  esml_pipeline_types, to support multiple types
-            raise ValueError('ESML does not support this pipeline type, as of this moment. Check for updates..')
+        
+        try: 
+            esml_current_mode = p.inference_mode
+            pipe = None
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
+                p.inference_mode = True
+                pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
+            elif(pipeline_type == esml_pipeline_types.IN_2_GOLD):
+                p.inference_mode = True
+                pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
+            elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+                p.inference_mode = False
+                pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
+            else: # TODO: Switch/Case on  esml_pipeline_types, to support multiple types
+                raise ValueError('ESML does not support this pipeline type, as of this moment. Check for updates..')
+        finally:
+            p.inference_mode = esml_current_mode
             
         return pipe
 # endregion
 
 #region(collapsed) PRIVATE - init
     from azureml.core.model import Model
+
+    def getBestModel(self):
+        p = self.p
+        aml_model = None
+        aml_model_name = None
+        esml_model_name = p.model_folder_name
+        source_fitted_model = None
+
+        # model = p.get_best_model_via_modeltags_only(self.p.ws,self.p.experiment_name, filter_on_version=1) # Version=1 is the TEMPLATE "LakeStructure"...hence Model=1 and not 2...since placegolder data is always model_version=1
+        if(aml_model is None):
+            print("Tryingt to get CURRENT leader model from Azure ML Studio workspace - remotely.This might be the first time training model. then None is returned \n")
+
+            try:
+                # 0 - Get "Pipelin run" info, for the most recent "trained model"
+                ds1 = Dataset.get_by_name(workspace = self.p.ws, name =  p.dataset_gold_train_runinfo_name_azure)
+                run_id = ds1.to_pandas_dataframe().iloc[0]["pipeline_run_id"] #  ['pipeline_run_id', 'training_data_used', 'training_data_source_date', 'date_at_pipeline_run','model_version_current','model_version_newly_trained']
+                experiment = Experiment(workspace=p.ws, name=p.experiment_name)
+                remote_run = PipelineRun(experiment=experiment, run_id=run_id)
+                #remote_run = AutoMLRun(experiment=experiment, run_id=run_id)
+
+                # 1
+                best_run, source_fitted_model = remote_run.get_output()
+
+                # 2
+                aml_model_name = best_run.properties['model_name']
+                aml_model = Model(self.ws, aml_model_name)
+            except:
+                pass
+
+        return aml_model,aml_model_name, source_fitted_model, esml_model_name
+
     def _create_scriptfolder_and_download_files(self,pipeline_type):
         os.makedirs(self._snapshot_folder, exist_ok=True)
         m = None
@@ -316,11 +401,12 @@ class ESMLPipelineFactory():
     def _create_parameters(self):
         self._batch_pipeline_parameters.clear()
         par_esml_model_version = PipelineParameter(name="esml_inference_model_version", default_value=self.p.inferenceModelVersion)
+        par_esml_split_percentage = PipelineParameter(name="esml_split_percentage", default_value=0.6)
 
         if(self.p.inference_mode):
             par_esml_scoring_date = PipelineParameter(name="esml_scoring_folder_date", default_value=str(self.p.date_scoring_folder))
         else:
-            par_esml_scoring_date = PipelineParameter(name="esml_scoring_folder_date", default_value=str(self.p.date_scoring_folder))
+            par_esml_scoring_date = PipelineParameter(name="esml_training_folder_date", default_value=str(self.p.date_scoring_folder))
 
         par_esml_guid_folder = PipelineParameter(name="esml_optional_unique_scoring_folder", default_value="*")
         
@@ -336,7 +422,8 @@ class ESMLPipelineFactory():
                                             par_esml_scoring_date,
                                             par_esml_guid_folder,
                                             par_esml_environment,
-                                            par_esml_inference_mode]
+                                            par_esml_inference_mode,
+                                            par_esml_split_percentage]
 
 #endregion
 
@@ -347,47 +434,69 @@ class ESMLPipelineFactory():
 
         compute = None
         runconfig = None
+        old_mode = p.inference_mode
+        try:
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML): # TRAINING
+                self.p.inference_mode = False
+                par_esml_inference_mode = PipelineParameter(name="esml_inference_mode", default_value=0)
+                self.batch_pipeline_parameters[4] = par_esml_inference_mode
+            else:
+                self.p.inference_mode = True
+                par_esml_inference_mode = PipelineParameter(name="esml_inference_mode", default_value=1)
+                self.batch_pipeline_parameters[4] = par_esml_inference_mode
 
-        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
-            pipeline_type == esml_pipeline_types.IN_2_GOLD):
-            for d in p.Datasets:
-                if(same_compute_for_all and compute is not None):
-                    pass # we alreday wave compute and runconfig
-                else:
-                    if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
-                        if(d.cpu_gpu_databricks == "cpu"):
-                            compute, runconfig = self.init_cpu_environment()
-                        elif(d.cpu_gpu_databricks == "databricks"):
-                            compute, runconfig = self.init_databricks_environment()
-                        elif(d.cpu_gpu_databricks == "gpu"):
-                            compute, runconfig = self.init_gpu_environment()
-                    else:  # User user configured RunConfig and compute. Custom
-                        runconfig = d.runconfig  # Each dataset can have different compute or environment
-                        compute = d.runconfig.target
-                
-                # 1) Silver datasets (multiple)
-                step_array.append(self.create_esml_step(d, compute,runconfig,esml_step_types.IN_2_SILVER)) 
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
+                pipeline_type == esml_pipeline_types.IN_2_GOLD or 
+                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+                for d in p.Datasets:
+                    if(same_compute_for_all and compute is not None):
+                        pass # we alreday wave compute and runconfig
+                    else:
+                        if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
+                            if(d.cpu_gpu_databricks == "cpu"):
+                                compute, runconfig = self.init_cpu_environment()
+                            elif(d.cpu_gpu_databricks == "databricks"):
+                                compute, runconfig = self.init_databricks_environment()
+                            elif(d.cpu_gpu_databricks == "gpu"):
+                                compute, runconfig = self.init_gpu_environment()
+                        else:  # User user configured RunConfig and compute. Custom
+                            runconfig = d.runconfig  # Each dataset can have different compute or environment
+                            compute = d.runconfig.target
+                    
+                    # 1) Silver datasets (multiple)
+                    step_array.append(self.create_esml_step(d, compute,runconfig,esml_step_types.IN_2_SILVER)) 
 
-        gold_to_score= None
-        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
-            pipeline_type == esml_pipeline_types.IN_2_GOLD):
-            # 2) Gold to score (merge all silver datasets)
-            gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array)
-            step_array.append(gold_to_score)
-        
-        if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.GOLD_SCORING):
-            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
-                step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
-            elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
-                raise NotImplementedError("Not suppported in your ESML version. Please ask admin for private preview")
-                path_gold_to_score_template_latest = p.path_gold_to_score_template()
-                path_gold_to_score_template_pars = p.path_gold_to_score_template(True,True)
-                gold_to_score_folder = path_gold_to_score_template_latest.format(model_version = 0) # 0 means "latest" par_esml_model_version.default_value
-                gold_to_score_name = p.dataset_gold_to_score_name_azure
+            gold_to_score= None
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
+                pipeline_type == esml_pipeline_types.IN_2_GOLD or 
+                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+                # 2) Gold to score (merge all silver datasets)
+                gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array)
+                step_array.append(gold_to_score)
+            
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.GOLD_SCORING): # SCORING
+                if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
+                    step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
+                elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
+                    raise NotImplementedError("Not suppported in your ESML version. Please ask admin for private preview, or run IN_2_GOLD_SCORING instead of only GOLD_SCORING")
+                    path_gold_to_score_template_latest = p.path_gold_to_score_template()
+                    path_gold_to_score_template_pars = p.path_gold_to_score_template(True,True)
+                    gold_to_score_folder = path_gold_to_score_template_latest.format(model_version = 0) # 0 means "latest" par_esml_model_version.default_value
+                    gold_to_score_name = p.dataset_gold_to_score_name_azure
+                    step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
+            
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML): # TRAINING
+                split_gold = self.create_split_gold_step(compute,runconfig,gold_to_score)
+                step_array.append(split_gold)
 
-                step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
-        
-        pipeline = Pipeline(workspace = p.ws, steps=step_array)
+                if (pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+                    step_array.append(self.create_train_gold_step_manual(compute,runconfig,split_gold))
+                elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
+                    raise NotImplementedError("Not suppported in your ESML version, try 'IN_2_GOLD_TRAIN_MANUAL' instead . Please ask admin for private preview for IN_2_GOLD_TRAIN_AUTOML, or use ESML IN_2_GOLD_TRAIN_AUTOML Agentless.")
+                    
+            pipeline = Pipeline(workspace = p.ws, steps=step_array)
+        finally: 
+             self.p.inference_mode = old_mode
         return pipeline
 
     def get_silver_as_inputs(self,silver_steps):
@@ -400,6 +509,129 @@ class ESMLPipelineFactory():
             silver_names.append(name)
             silver_input_array.append(out_as_input)
         return silver_input_array,silver_names
+
+    def create_split_gold_step(self,compute, runconfig, gold_to_split_step):
+        p = self.p
+        
+        # IN: Gold to score
+        if(type(gold_to_split_step) is OutputFileDatasetConfig):  # esml_pipeline_type.SCORE_GOLD 
+            gold_to_split = gold_to_split_step # gives us the "OutputFileDatasetConfig"
+        else: # esml_pipeline_type.IN_2_GOLD_SCORING
+            gold_to_split = gold_to_split_step._outputs[0] # gives us the "OutputFileDatasetConfig"
+
+        # OUT: Splitted datasets
+
+        train_path = p.GoldPath + 'Train' # projects/project002/10_titanic_model_clas/train/gold/dev/Train
+        validate_path = p.GoldPath + 'Validate' # projects/project002/10_titanic_model_clas/train/gold/{env}/Validate/{guid}/*.parquet
+        test_path = p.GoldPath + 'Test'
+
+        #train_version_folder = train_path + uuid.uuid4().hex + "/"
+
+        train_ds = (
+            OutputFileDatasetConfig(name=p.dataset_gold_train_name_azure,destination=(self._datalake,train_path))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name=p.dataset_gold_train_name_azure)
+        )
+        validate_ds = (
+            OutputFileDatasetConfig(name=p.dataset_gold_validate_name_azure,destination=(self._datalake,validate_path))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name=p.dataset_gold_validate_name_azure)
+        )
+        test_ds = (
+            OutputFileDatasetConfig(name=p.dataset_gold_test_name_azure,destination=(self._datalake,test_path))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name=p.dataset_gold_test_name_azure)
+        )
+
+        #name_auto = esml_step_types.TRAIN_SPLIT_AND_REGISTER.replace("_"," ")
+        name_w_split_per = "SPLIT AND REGISTER ("+str(self.batch_pipeline_parameters[5].default_value)+" % TRAIN)"
+
+        step_split_gold = PythonScriptStep(
+            runconfig=runconfig,
+            script_name=self._train_split_and_register_file,
+            name="SPLIT AND REGISTER",
+            arguments=[
+            "--target_column_name",self._target_column_name,
+            "--par_esml_split_percentage",self.batch_pipeline_parameters[5], # 0.6 as default for TRAIN
+            "--par_esml_training_date",self.batch_pipeline_parameters[1], # datefolder with TRAIN data
+            "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
+            "--par_esml_inference_mode", self.batch_pipeline_parameters[4] # does not need to be a parameter that changes runtime...but at DEFINITION time.
+            ],
+            inputs=[gold_to_split.as_input(gold_to_split.name)], 
+            outputs=[train_ds,validate_ds,test_ds], 
+            source_directory=self.get_snapshot_dir_relative(),
+            compute_target=compute,
+            allow_reuse=self._allow_reuse
+        )
+
+        return step_split_gold
+
+    def create_train_gold_step_manual(self,compute, runconfig, gold_to_split_step):
+        p = self.p
+
+        # Get model name info, and current model info
+        aml_model,aml_model_name, current_fitted_model, esml_model_name = self.getBestModel()
+
+        # A)
+        #latest_scored_folder = p.path_gold_scored_template(False,True,False) # (False,True,False) projects/project002/11_diabetes_model_reg/train/gold/dev/{id_folder}/
+        #latest_gold_scored_path = latest_scored_folder + "{run-id}"
+        
+        # B) 
+        #train_folder_template = p.path_gold_scored_template(False,False,False) # (False,False,False) projects/project002/11_diabetes_model_reg/train/gold/dev/
+        #train_folder_template_with_id = train_folder_template  + "{run-id}" #  projects/project002/11_diabetes_model_reg/train/gold/dev/{run-id}
+
+        # C) 
+        train_folder_template_with_id = p.path_gold_scored_template(False,True,False) # projects/project002/11_diabetes_model_reg/train/gold/dev/{id_folder}/
+
+        train_out = None
+        validate_out = None
+        test_out = None
+
+        if(type(gold_to_split_step) is OutputFileDatasetConfig):  # esml_pipeline_type.SCORE_GOLD 
+            train_out = gold_to_split_step # gives us the "OutputFileDatasetConfig"
+        else: # esml_pipeline_type.IN_2_GOLD_SCORING
+            train_out = gold_to_split_step._outputs[0] # gives us the "OutputFileDatasetConfig"
+            validate_out = gold_to_split_step._outputs[1]
+            test_out = gold_to_split_step._outputs[2]
+
+        # OUT: Training meta data (scoring, promote=True, etc)
+        last_gold_training_run = (
+            OutputFileDatasetConfig(name=p.dataset_gold_train_runinfo_name_azure,destination=(self._datalake,p.path_gold_trained_runinfo))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name=p.dataset_gold_train_runinfo_name_azure)
+        )
+
+        #name_incl_env = "TRAINING in ESML " + self.batch_pipeline_parameters[3] +" performance"
+        name_auto = esml_step_types.TRAIN_MANUAL.replace("_"," ")
+        name_incl_env = name_auto + " ["+self.batch_pipeline_parameters[3].default_value +"]"
+
+        step_train_gold = PythonScriptStep(
+            runconfig=runconfig,
+            script_name=self._train_manual_filename,
+            name=name_incl_env,
+            arguments=[
+            "--target_column_name",self._target_column_name,
+            "--par_esml_model_version",self.batch_pipeline_parameters[0], # model to compare with (inner loop), version=0 if first time
+            "--par_esml_training_date",self.batch_pipeline_parameters[1], # model to compare with (inner loop), datefolder to scoring
+            "--esml_train_lake_template",train_folder_template_with_id,
+            "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
+            "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
+            "--par_esml_model_alias", p.ModelAlias,
+            "--par_esml_model_name", p.model_folder_name,
+            "--par_aml_model_name", aml_model_name
+            ],
+            inputs=[train_out.as_input(train_out.name),validate_out.as_input(validate_out.name),test_out.as_input(test_out.name)], 
+            outputs=[last_gold_training_run], 
+            source_directory=self.get_snapshot_dir_relative(),
+            compute_target=compute,
+            allow_reuse=self._allow_reuse
+        )
+
+        return step_train_gold
 
     def create_score_gold_step(self,compute, runconfig, gold_to_score_step):
         p = self.p
@@ -456,8 +688,10 @@ class ESMLPipelineFactory():
 
         return step_score_gold
 
+    
     def create_gold_to_score_step(self,compute, runconfig, silver_steps):
         p = self.p
+        next_step_is_databricks_step = False # TODO: Figure this via "runconfig.target = amlcompute or databricks"
 
         # INPUT - All silver outputs as input
         silver_input_array,silver_names = self.get_silver_as_inputs(silver_steps)
@@ -468,15 +702,21 @@ class ESMLPipelineFactory():
         path_gold_to_score_template_pars = ""
 
         if(p.inference_mode == True):
+            print("create_gold_to_score_step: inference_mode=True")
             path_gold_to_score_template_latest = p.path_gold_to_score_template()
             gold_to_score_folder = path_gold_to_score_template_latest.format(model_version = 0) # 0 means "latest" par_esml_model_version.default_value
 
             path_gold_to_score_template_pars = p.path_gold_to_score_template(True,True)
             gold_to_score_name = p.dataset_gold_to_score_name_azure # dataset_gold_name_azure
         else:
+            print("create_gold_to_score_step: inference_mode=False")
             path_gold_to_score_template_pars = p.path_gold_to_score_template(False,True,False)
             gold_to_score_name = p.dataset_gold_name_azure
             gold_to_score_folder = p.path_gold_to_score_template(False,False,False)
+            if(next_step_is_databricks_step):
+                gold_to_score_folder = gold_to_score_folder + "gold_dbx.parquet"
+            else: 
+                gold_to_score_folder = gold_to_score_folder + "latest_gold_train"
 
         gold_to_score = (
             OutputFileDatasetConfig(name=gold_to_score_name,destination=(self._datalake,gold_to_score_folder))
@@ -690,6 +930,7 @@ class ESMLPipelineFactory():
         #print("Date_scoring_folder (data to score) : {}".format(str(self.p.date_scoring_folder)))
         print("Date_scoring_folder (data to score) : {}".format(self._batch_pipeline_parameters[1].default_value))
         print("ESML environment:", self.p.dev_test_prod)
+        print("Inference mode (self.batch_pipeline_parameters[4]): {}".format(self._batch_pipeline_parameters[4].default_value))
         print("")
 
         print(" ---- ESML Datalake locations: ESML Datasets (IN-data) ---- ")

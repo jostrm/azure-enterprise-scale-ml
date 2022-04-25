@@ -8,9 +8,9 @@ from azureml.telemetry import UserErrorException
 import sklearn
 import tempfile
 from azureml.core.resource_configuration import ResourceConfiguration
-from ..interfaces.iESMLModelCompare import IESMLModelCompare
+#from ..interfaces.iESMLModelCompare import IESMLModelCompare
 
-class ESMLModelCompare(IESMLModelCompare):
+class ESMLModelCompare():
 
     dev_test_prod = "dev"
     project = None
@@ -231,7 +231,7 @@ class ESMLModelCompare(IESMLModelCompare):
                     #print("target - model_name (from target_best_run.properties[''model_name'])",target_best_run.properties['model_name'] )
                     #print(" Target - model_version",target_best_model_version)
             except Exception as e1:
-                print(e1.message)
+                print(e1)
                 promote_new_model = True
                 print("get_best_model_and_run_via_experiment_name_and_ws() could not EXISTING MODEL with same experiment name = No TARGET run. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
                                 

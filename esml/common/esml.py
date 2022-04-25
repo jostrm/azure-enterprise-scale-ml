@@ -1045,10 +1045,12 @@ class ESMLProject():
     @property
     def dataset_gold_scored_name_azure(self):
         return self.ModelAlias+"_GOLD_SCORED"
-
     @property
     def dataset_gold_scored_runinfo_name_azure(self):
         return self.ModelAlias+"_GOLD_SCORED_RUNINFO"
+    @property
+    def dataset_gold_train_runinfo_name_azure(self):
+        return self.ModelAlias+"_GOLD_TRAINED_RUNINFO"
     @property
     def dataset_active_name_azure(self):
         return self.ModelAlias+"_ACTIVE_FOLDER"
@@ -1126,6 +1128,10 @@ class ESMLProject():
     def path_inference_gold_scored_runinfo(self):
         inference_gold_scored_info = self._project_inference_path.format(self.project_folder_name,self.model_folder_name) + "active/gold_scored_runinfo"
         return inference_gold_scored_info
+    @property
+    def path_gold_trained_runinfo(self): # TODO 2022-04-10
+        trained_gold_scored_info = self._project_train_path.format(self.project_folder_name,self.model_folder_name) + "active/gold_trained_runinfo"
+        return trained_gold_scored_info
 
     def get_gold_scored_unique_path(self, batch_datetime_from_config = None, same_guid_folder=True,unique_uuid4 = None):
         to_score_unique_folder = ""
