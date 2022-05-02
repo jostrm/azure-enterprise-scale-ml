@@ -4,7 +4,7 @@ set automl_env_file=%2
 set options=%3
 set PIP_NO_WARN_SCRIPT_LOCATION=0
 
-IF "%conda_env_name%"=="" SET conda_env_name="azure_automl_esml"
+IF "%conda_env_name%"=="" SET conda_env_name="azure_automl_esml_v13"
 IF "%automl_env_file%"=="" SET automl_env_file="automl_env.yml"
 SET check_conda_version_script="check_conda_version.py"
 

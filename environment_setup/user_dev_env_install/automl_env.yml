@@ -20,19 +20,22 @@ dependencies:
 - cudatoolkit=10.1.243
 
 - pip:
- #MLOps required for unattended mode (not really needed for WIndows, but for Linux build agent - a must have)
+  #ESML required for MLOps OUTER LOOP & unattended mode (not really needed for Windows, but for Linux build agent - a must have)
   - azure-cli-core==2.19.1
-  # - azure-keyvault>=4.1.0 # 2022-04-08 (worked 2019-2022, but no longer due to Azure CLI update)
-  - azure-keyvault-keys~=4.3.1 # 2022-04-08 (replacing azure-keyvault>=4.1.0)
-  - azure-keyvault-secrets~=4.2.0 # 2022-04-08 (replacing azure-keyvault>=4.1.0)
-  - azure-keyvault-certificates~=4.2.1 # 2022-04-08 (replacing azure-keyvault>=4.1.0)
+  #ESML required for OUTER LOOP MLOps
+  - azure-keyvault==4.1.0 
+  - azure-keyvault-keys==4.4.0
+  - azure-keyvault-secrets==4.3.0
+  - azure-keyvault-certificates~=4.3.0
+  # ESML required to reference custom/your source code on Windows and Linux
   - repackage==0.7.3
-  # ESML requred to write files to GEN 2 - Bronze,Silver,Gold
-  - azure-storage-file-datalake==12.3.1 # 2022-04-07: froze this to 12.3.1 (even if it works wothout, no surprises needed)
-  # Optional
-  - azure-ai-formrecognizer
+  # ESML Required for reporting (todo remove this dependency)
   - seaborn==0.11.1
-  # Required packages for AzureML execution, history, and data preparation.
+  # ESML required to write files to GEN 2 - Bronze,Silver,Gold
+  - azure-storage-file-datalake==12.6.0
+  # Azure ML and AutoML Required
+  - azure-storage-blob==12.10.0
+  # AzureML: Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.26.0
   - pytorch-transformers==1.0.0
   - spacy==2.1.8

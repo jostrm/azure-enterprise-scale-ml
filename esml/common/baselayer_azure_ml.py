@@ -1066,7 +1066,9 @@ class AutoMLFactory(metaclass=Singleton):
         remote_run = experiment.submit(automl_config, show_output = True)
 
         remote_run.wait_for_completion()
-        best_run, fitted_model = remote_run.get_output()
+        best_run, fitted_model = remote_run.get_output() # remote_run.get_output() = Return the run with the corresponding best pipeline that has already been tested (local inferencing works also)
+        #best_run = remote_run.get_best_child()
+
         print(best_run)
         print(fitted_model)
 
@@ -1091,7 +1093,7 @@ class AutoMLFactory(metaclass=Singleton):
 
                 best_run.log_image("ESML_GOLD_TestSet_ActualPredicted", plot=plt)
 
-        #Save RUN to .json
+        #Save RUN to properties, and save to .json
         source_model_name = best_run.properties['model_name']
         print("AutoML Model name: {}".format(source_model_name))
         self.write_run_config(remote_run.experiment.name, source_model_name,remote_run.id, dev_test_prod)

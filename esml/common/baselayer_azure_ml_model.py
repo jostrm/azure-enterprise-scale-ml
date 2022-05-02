@@ -17,6 +17,7 @@ class ESMLModelCompare():
     active_model_config = None
     debug_always_promote_model = False
     model_settings = None
+    model_name_automl = "AutoML_Generated_Name"
     
     metrics_output_name = 'metrics_output' # PipelineRun
     best_model_output_name = 'best_model_output'
@@ -138,13 +139,15 @@ class ESMLModelCompare():
             finally:
                 p.dev_test_prod = current_env # flip back to DEV
         elif (target_environment == p.dev_test_prod ): # -> compare againt previous model in same "dev" workspace
-            print ("targe=source environement. Compare model version in DEV/TEST/PROD with latest registered in same DEV/TEST/PROD workspace (same workspace & subscriptiom comparison)")
+            print ("target=source environement. Compare model version in DEV/TEST/PROD with latest registered in same DEV/TEST/PROD workspace (same workspace & subscriptiom comparison)")
             print("")
             target_workspace = source_workspace
 
         
         # NEW model (Not registered) - fetch from json
         new_run_id = self.active_model_config["run_id"] # Should NOT be empty, either -1 or AutoML GUID 
+        print("new_run_id",new_run_id)
+
         new_experiment_name = self.active_model_config["experiment_name"]
         new_model_name = self.active_model_config["model_name_automl"]
         new_dev_test_prod = self.active_model_config["dev_test_prod"]
@@ -167,7 +170,7 @@ class ESMLModelCompare():
         if(not new_run_id):
             print("No run_id for source model. Need to train a model in environment: {}, nothing to evaluate for now. If target exists, its better than nothing.".format(target_environment))
             promote_new_model = False
-            return promote_new_model,source_model_name,None,target_model_name, target_best_run_id
+            return promote_new_model,source_model_name,None,target_model_name, target_best_run_id,target_workspace,None
         else:
             #try: # GET source from saved new RUN_ID
             if (target_environment != current_env): # If REGISTER model in other WORKSPACE, no Run or Experiment exists
@@ -180,12 +183,19 @@ class ESMLModelCompare():
                 source_task_type = self.get_task_type(source_run)
                 source_model_name = source_best_run.properties['model_name']
                 source_model = Model(source_workspace, name=source_model_name) # LAtest best version
-            else:
+            else: # Same source=target, may be 1st time of model
                 source_exp = Experiment(workspace=source_workspace, name=experiment_name)
                 source_run = AutoMLRun(experiment=source_exp, run_id=new_run_id)  # From local cache..Assume just retrained model.
 
                 source_best_run, source_fitted_model = source_run.get_output()
                 source_model_name = source_best_run.properties['model_name']
+                print(source_best_run)
+                
+                print ("active_model_config from automl_active_model_env.json: source_model_name:",source_model_name)
+                print ("active_model_config automl_active_model_env.json: new_run_id:",new_run_id)
+                print ("active_model_config automl_active_model_env.json: source_workspace:",source_workspace)
+                print ("active_model_config automl_active_model_env.json: experiment_name:",experiment_name)
+
                 source_task_type = self.get_task_type(source_run)
                 source_model = Model(source_workspace, name=source_model_name) # LAtest best version
 
@@ -410,6 +420,7 @@ class ESMLModelCompare():
         pkl_name = "outputs" # "model.pkl"
         current_env = self.project.dev_test_prod
         current_ws_name = self.project.ws.name
+
         if (pkl_name_in is not None):
             pkl_name = pkl_name_in
 
