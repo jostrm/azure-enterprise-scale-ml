@@ -189,12 +189,11 @@ class ESMLModelCompare():
 
                 source_best_run, source_fitted_model = source_run.get_output()
                 source_model_name = source_best_run.properties['model_name']
-                print(source_best_run)
 
-                print ("active_model_config from automl_active_model_env.json: source_model_name:",source_model_name)
-                print ("active_model_config automl_active_model_env.json: new_run_id:",new_run_id)
-                print ("active_model_config automl_active_model_env.json: source_workspace:",source_workspace)
-                print ("active_model_config automl_active_model_env.json: experiment_name:",experiment_name)
+                print ("active_model_config from 'automl_active_model_env.json': source_model_name:",source_model_name)
+                #print ("active_model_config automl_active_model_env.json: new_run_id:",new_run_id)
+                #print ("active_model_config automl_active_model_env.json: source_workspace:",source_workspace)
+                #print ("active_model_config automl_active_model_env.json: experiment_name:",experiment_name)
 
                 source_task_type = self.get_task_type(source_run)
                 try:
@@ -540,19 +539,20 @@ class ESMLModelCompare():
         tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         "trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
 
-        if("test_set_ROC_AUC" in model_ph.tags):
-            tags["test_set_Accuracy"] = model_ph.tags["test_set_Accuracy"]
-            tags["test_set_ROC_AUC"] = model_ph.tags["test_set_ROC_AUC"]
-            tags["test_set_Precision"] = model_ph.tags["test_set_Precision"]
-            tags["test_set_Recall"] = model_ph.tags["test_set_Recall"]
-            tags["test_set_F1_Score"] = model_ph.tags["test_set_F1_Score"]
-            tags["test_set_Matthews_Correlation"] = model_ph.tags["test_set_Matthews_Correlation"]
-            tags["test_set_CM"] = model_ph.tags["test_set_CM"]
-        if("test_set_RMSE" in model_ph.tags):
-            tags["test_set_RMSE"] = model_ph.tags["test_set_RMSE"]
-            tags["test_set_R2"] = model_ph.tags["test_set_R2"]
-            tags["test_set_MAPE"] = model_ph.tags["test_set_MAPE"]
-            tags["test_set_Spearman_Correlation"] = model_ph.tags["test_set_Spearman_Correlation"]
+        if(model_ph is not None):
+            if("test_set_ROC_AUC" in model_ph.tags):
+                tags["test_set_Accuracy"] = model_ph.tags["test_set_Accuracy"]
+                tags["test_set_ROC_AUC"] = model_ph.tags["test_set_ROC_AUC"]
+                tags["test_set_Precision"] = model_ph.tags["test_set_Precision"]
+                tags["test_set_Recall"] = model_ph.tags["test_set_Recall"]
+                tags["test_set_F1_Score"] = model_ph.tags["test_set_F1_Score"]
+                tags["test_set_Matthews_Correlation"] = model_ph.tags["test_set_Matthews_Correlation"]
+                tags["test_set_CM"] = model_ph.tags["test_set_CM"]
+            if("test_set_RMSE" in model_ph.tags):
+                tags["test_set_RMSE"] = model_ph.tags["test_set_RMSE"]
+                tags["test_set_R2"] = model_ph.tags["test_set_R2"]
+                tags["test_set_MAPE"] = model_ph.tags["test_set_MAPE"]
+                tags["test_set_Spearman_Correlation"] = model_ph.tags["test_set_Spearman_Correlation"]
 
         #properties = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         #"trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
