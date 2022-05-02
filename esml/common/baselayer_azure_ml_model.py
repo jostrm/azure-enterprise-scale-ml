@@ -190,14 +190,18 @@ class ESMLModelCompare():
                 source_best_run, source_fitted_model = source_run.get_output()
                 source_model_name = source_best_run.properties['model_name']
                 print(source_best_run)
-                
+
                 print ("active_model_config from automl_active_model_env.json: source_model_name:",source_model_name)
                 print ("active_model_config automl_active_model_env.json: new_run_id:",new_run_id)
                 print ("active_model_config automl_active_model_env.json: source_workspace:",source_workspace)
                 print ("active_model_config automl_active_model_env.json: experiment_name:",experiment_name)
 
                 source_task_type = self.get_task_type(source_run)
-                source_model = Model(source_workspace, name=source_model_name) # LAtest best version
+                try:
+                    source_model = Model(source_workspace, name=source_model_name) # LAtest best version
+                except: 
+                    promote_new_model = True
+                    print("Could not find EXISTING MODEL with same experiment name = No TARGET run. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
 
             #except Exception as e1:
             #     raise UserErrorException("Cannot find SOURCE AutoMLRun for model best run id {}, in environment {}. Try register model manually".format(new_run_id, p.dev_test_prod)) from e1
@@ -243,7 +247,7 @@ class ESMLModelCompare():
             except Exception as e1:
                 print(e1)
                 promote_new_model = True
-                print("get_best_model_and_run_via_experiment_name_and_ws() could not EXISTING MODEL with same experiment name = No TARGET run. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
+                print("Could not find EXISTING MODEL with same experiment name = No TARGET run. This is the first model to be trained in environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(target_environment))
                                 
             if(target_model is not None):
                 if(target_environment != current_env):
@@ -530,7 +534,9 @@ class ESMLModelCompare():
 
     def _register_model(self,source_env,source_ws_name, target_workspace,model_name, target_env, override_enterprise_settings_with_model_specific, train_dataset=None,model_ph=None):
         remote_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific)
-        run_id = remote_run.run_id # TODO does .run_id exists in PipelineRun? (.id) It does in a ScriptRun.
+        #  # 2022-05-02: best_run.run_id -> AttributeError: 'Run' object has no attribute 'run_id'
+
+        run_id = remote_run.id # TODO does .run_id exists in PipelineRun? (.id) It does in a ScriptRun.
         tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         "trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
 

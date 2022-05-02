@@ -15,7 +15,7 @@ conda init bash # TODO Add this
 
 if [ "$CONDA_ENV_NAME" == "" ]
 then
-  CONDA_ENV_NAME="azure_automl_esml_v13"
+  CONDA_ENV_NAME="azure_automl"
 fi
 
 if [ "$AUTOML_ENV_FILE" == "" ]

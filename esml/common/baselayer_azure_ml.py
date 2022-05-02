@@ -1067,7 +1067,7 @@ class AutoMLFactory(metaclass=Singleton):
 
         remote_run.wait_for_completion()
         best_run, fitted_model = remote_run.get_output() # remote_run.get_output() = Return the run with the corresponding best pipeline that has already been tested (local inferencing works also)
-        #best_run = remote_run.get_best_child()
+        best_run_automl = remote_run.get_best_child()
 
         print(best_run)
         print(fitted_model)
@@ -1095,10 +1095,11 @@ class AutoMLFactory(metaclass=Singleton):
 
         #Save RUN to properties, and save to .json
         source_model_name = best_run.properties['model_name']
+        self.model_name_automl = source_model_name # 2022-05-02
         print("AutoML Model name: {}".format(source_model_name))
         self.write_run_config(remote_run.experiment.name, source_model_name,remote_run.id, dev_test_prod)
 
-        return best_run, fitted_model,experiment
+        return best_run, fitted_model,experiment,best_run_automl
 
     def get_latest_model_from_experiment_name(self,env_workspace, exp_name):
         try:
