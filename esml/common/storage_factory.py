@@ -92,7 +92,11 @@ class LakeAccess():
             suffix = self.storage_config[suffix_key]
             url = self.storage_config['external_keyvault_url'].format(self.project.dev_test_prod,suffix)
         else:
-            url = self.storage_config['external_keyvault_url'].format(self.project.dev_test_prod)
+            try:
+                url = self.storage_config['external_keyvault_url'].format(self.project.dev_test_prod) # if only {}
+            except:
+                url = self.storage_config['external_keyvault_url'].format(self.project.dev_test_prod,"") # if {} {} add empty str
+
 
         sa_name, rg_name, sub_id = self.project.getLakeForActiveEnvironment()
 
