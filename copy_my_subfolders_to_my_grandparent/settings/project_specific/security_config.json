@@ -12,7 +12,7 @@
     "external_keyvault_url_suffix_dev":"", 
     "external_keyvault_url_suffix_test":"", 
     "external_keyvault_url_suffix_prod":"",
-    "external_keyvault_url": "https://todo{dev}-abc-{suffix}.vault.azure.net/",
+    "external_keyvault_url": "https://todo{dev_test_prod_placeholder}-abc-{suffix_placeholder}.vault.azure.net/",
 
     "kv-secret-esml-projectXXX-sp-id":"kv-secret-esml-project002-sp-id",
     "tenant": "kv-msft-weu-dev-cmnai-tenant",
