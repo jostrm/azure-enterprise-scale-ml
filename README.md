@@ -32,6 +32,7 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
 
 - Can optionally integrate with ITSM system as a "ticket" in ServiceNow/Remedy/JIRA Service Desk. The below info is needed for the ESML provisioning:
 ![](./esml/images/esml-project-ticket.png)
+![](./esml/images/Bicep-1-click.png)
 ## ESML Architecture - "Modern data analytics platform"
 Based on this reference architecture: https://docs.microsoft.com/en-us/azure/architecture/solution-ideas/articles/azure-databricks-modern-analytics-architecture
 
@@ -136,6 +137,10 @@ ESML has `MLOps embedded`, and adds `NEW` concepts to enrich Azure ML Studio:
 - This scoring pipeline is automatically ESML-generated, via only `2 lines of code`!! (This is possible due to the 4 ingrediences in ESML)
 - If you have your data in IN in "GOLD" state, it will work `as-is`, but probably : ) you want to add your `data wrangling` per `IN_TO_SILVER` step, in the 1-M auto-generated `ds_name_by_config.py` scripts
 ![](./esml/images/aml-pipeline_batch_ppt-3.png)
+- Azure ML is great, improves pipeline creation with 90%. But can we accelerate that even more? 
+    - Yes. 0.1% of the already 90% acceleration:
+    
+![](./esml/images/templates-aml.png)
 
 
 # WHAT is ESML Autolake™ ( Azure Datalake Storage GEN2 accelerator)
