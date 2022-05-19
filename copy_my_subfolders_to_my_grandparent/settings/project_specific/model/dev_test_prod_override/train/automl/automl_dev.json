@@ -16,5 +16,5 @@
     "blocked_models": [],
     "docs_allowed_models_classification": ["AveragedPerceptronClassifier","RandomForest","Xgboost","StochasticGradientDescent","NaiveBayes","LinearSVMClassifier","GradientBoosting","DecisionTree","LinearSVC","KNearestNeighbors","ExtremeRandomTrees"],
     "docs_allowed_models_regression": ["ElasticNet","KNearestNeighbors","LassoLars","OnlineGradientDescentRegressor","FastLinearRegressor","StochasticGradientDescent"],
-    "docs_allowed_models_time_series_forecasting":["AutoArima","Prophet","ForecastTCN"]
+    "docs_see_here_for_latest_values":["https://docs.microsoft.com/en-us/python/api/azureml-train-automl-client/azureml.train.automl.constants.supportedmodels.classification?view=azure-ml-py"]
 }
