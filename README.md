@@ -144,6 +144,8 @@ I love when I get asked to push the boundries, and asks where dropping in from m
 
 ## `Settings`
 - Besides there green circles, you have a config per environment (dev,test,prod) for COMPUTE power & and HYPERPARAMETER tuning needed (e.g. in DEV you might wanna have cheaper training runs)
+    - Defaults `enteprise settings` (dev,test,prod), is usually set & decided once, by an `enterprise architect`, and all `ESML Projects` inherits these, but can `override` them also, if use case needs that.
+        - To override default `enteprise settings`, a projects sets the `project specific` settings.
 
 ![](./esml/images/esml-settings.png)
 ### Project/Model settings
@@ -159,4 +161,6 @@ I love when I get asked to push the boundries, and asks where dropping in from m
 ## DEPLOY to AKS - realtime scoring
 - You can deploy a model to AKS with 2 lines of code. All ESML projects has their own `private attached AKS cluster to Azure ML (BICEP)`
 - ESML will also save the credentials & url directly `to the ESML Projects keuvault.`
+- ESML environments: If you are in DEV environment, the default `enteprise settings` is a Dev_Test (1 node AKS-cluster), if TEST or PROD environment an `autoscale cluster` decided by `ESML core team`
+    - Defaults `enteprise settings` settings, is usually set & decided once, by an `enterprise architect` in the ESML core team, and all `ESML Projects` inherits these, but can `override` them also, if use case needs that.
 ![](./esml/images/deploy-to-aks.png)
