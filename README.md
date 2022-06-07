@@ -133,6 +133,8 @@ I love when I get asked to push the boundries, and asks where dropping in from m
 ![](./esml/images/esml-mlops-2.png)
 
 ## `TEST_SET Scoring` to Azure ML Studio, as TAGS
+- You can use ESML to `automatically calculate TEST-SET scoring`, 1 line of code (works for classification or regression), and this will be TAGGED on the Azure ML Dataset `GOLD_TEST` and also on the `Model`
+- ![](./esml/images/esml-testset-scoring.png)
 - ![](./esml/images/01_setup_model_9.png)
  
 ## `Scoring Drift / Concept Drift` to promote newly trained model (also as step in ESML MLOps pipeline)
@@ -154,7 +156,6 @@ I love when I get asked to push the boundries, and asks where dropping in from m
 - All else, you can set to 0.0 to have no `WEIGHTS` when comparing scoring for model A and B, to see if we want ot promote model A
 - ![](./esml/images/01_setup_model_3.png)
 
-## DEPLOY to AKS - realtime & batch scoring
+## DEPLOY to AKS - realtime scoring
 - You can deploy a model to AKS with 2 lines of code. All ESML projects has their own `private attached AKS cluster to Azure ML (BICEP)`
-- Then use this endpoint to inference, for a single row or batches of rows (that will be saved in the lake). See other inmages.
 ![](./esml/images/deploy-to-aks.png)
