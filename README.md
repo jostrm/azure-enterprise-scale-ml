@@ -158,4 +158,5 @@ I love when I get asked to push the boundries, and asks where dropping in from m
 
 ## DEPLOY to AKS - realtime scoring
 - You can deploy a model to AKS with 2 lines of code. All ESML projects has their own `private attached AKS cluster to Azure ML (BICEP)`
+- ESML will also save the credentials & url directly `to the ESML Projects keuvault.`
 ![](./esml/images/deploy-to-aks.png)
