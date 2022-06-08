@@ -1,23 +1,18 @@
 {
     "storage_type_blob": false,
-    "deprecated_temp_blob_container_name": "project02",
-    "deprecated_temp_blob_secret_key": "kv-secret-proj02-ai-saKey",
-    "deprecated_blob_datastore_name": "project002",
 
-    "lake_datastore_name": "project002lake",
+    "lake_datastore_name": "project001",
     "lake_fs": "lake3",
 
     "esml-common-sp-id":"esml-common-sp-id",
     "esml-common-sp-secret": "esml-common-sp-secret",
-    "external_keyvault_url_suffix_dev":"", 
+    "external_keyvault_url_suffix_dev":"suffix_placeholder", 
     "external_keyvault_url_suffix_test":"", 
     "external_keyvault_url_suffix_prod":"",
     "external_keyvault_url": "https://todo{dev_test_prod_placeholder}-abc-{suffix_placeholder}.vault.azure.net/",
 
-    "kv-secret-esml-projectXXX-sp-id":"kv-secret-esml-project002-sp-id",
-    "tenant": "kv-msft-weu-dev-cmnai-tenant",
-    "kv-secret-esml-projectXXX-sp-secret":"kv-secret-esml-project002-sp-secret",
-
-    "kv-secret-esml-projectXXX-sp-name":"kv-secret-esml-project002-sp-name",
-    "kv-secret-esml-projectXXX-sp-secret-id":"kv-secret-esml-project002-sp-secret-id"
+    "kv-secret-esml-projectXXX-sp-id":"esml-project-sp-id",
+    "kv-secret-esml-projectXXX-sp-secret":"esml-project-sp-secret",
+    "tenant": "esml-tenant-id",
+    "use_project_sp_2_mount": true
 }

@@ -111,19 +111,33 @@ class LakeAccess():
             print("GetLakeAsDatastore: sub_id", sub_id)
             print("GetLakeAsDatastore.setAsDefault: setAsDefault: {}".format(setAsDefault))
 
+        use_common_sp = True
+        if("use_project_sp_2_mount" in self.storage_config):
+            use_project_sp_2_mount = self.storage_config["use_project_sp_2_mount"]
+            if(use_project_sp_2_mount == True):
+                use_common_sp = False
+                print("use_project_sp_2_mount: True")
 
-        external_kv, tenantId = AzureBase.get_external_keyvault(self.ws, sp_id_key, sp_secret_key, tenant, url)
+        tenantId = None
+        sp_id_1 = None
+        sp_secret_1 = None
         file_system_name = self.storage_config['lake_fs']
+        if (use_common_sp):
+            external_kv, tenantId = AzureBase.get_external_keyvault(self.ws, sp_id_key, sp_secret_key, tenant, url)
 
-        if(self.suppress_logging==False):
-            print("Register ES-ML lake as Datastore, as {}".format(datastore_name))
+            # COMMON SP - to mount DataStore. to overcome "upload files" to GEN 2
+            secret_bundle1 = external_kv.get_secret(self.storage_config['esml-common-sp-id'], "")
+            secret_bundle2 = external_kv.get_secret(self.storage_config['esml-common-sp-secret'], "")
+            sp_id_1 = secret_bundle1.value
+            sp_secret_1 = secret_bundle2.value
+        else: # Project specific
+            keyvault = self.ws.get_default_keyvault()
+            sp_id_1 = keyvault.get_secret(name=self.storage_config['kv-secret-esml-projectXXX-sp-id'])
+            sp_secret_1 = keyvault.get_secret(name=self.storage_config['kv-secret-esml-projectXXX-sp-secret'])
+            tenantId = keyvault.get_secret(name=self.storage_config['tenant'])
 
-        # COMMON SP - to mount DataStore. to overcome "upload files" to GEN 2
-        secret_bundle1 = external_kv.get_secret(self.storage_config['esml-common-sp-id'], "")
-        secret_bundle2 = external_kv.get_secret(self.storage_config['esml-common-sp-secret'], "")
-        
         # ESML-fix: GA API to WRITE to GEN2 via Azure Storage SDK
-        self.service_client = AzureBase.initialize_storage_account_ad(sa_name, secret_bundle1.value, secret_bundle2.value, tenantId)
+        self.service_client = AzureBase.initialize_storage_account_ad(sa_name, sp_id_1, sp_secret_1, tenantId)
         
         try:
             ds = Datastore(self.ws, datastore_name)  # Return if already exists
@@ -139,13 +153,15 @@ class LakeAccess():
         # Error & CONTINUE...No Datastore Lets create one. We need IAM: BLOB STORAGE CONTRIBUTOR, which COMMON-SP should have (Interactive Admin might alos have this, but not project-SP)
         #2 API to READ 
 
+        if(self.suppress_logging==False):
+            print("Register ESML lake as Datastore, as {}".format(datastore_name))
         datastore = Datastore.register_azure_data_lake_gen2(workspace=self.ws,
                                                             datastore_name=datastore_name,
                                                             filesystem=file_system_name,
                                                             account_name=sa_name,
                                                             tenant_id=tenantId,
-                                                            client_id=secret_bundle1.value, # COMMON-SP
-                                                            client_secret=secret_bundle2.value, # COMMON-SP
+                                                            client_id=sp_id_1, # COMMON-SP (or PRJ SP)
+                                                            client_secret=sp_secret_1, # COMMON-SP (or PRJ SP)
                                                             grant_workspace_access=True,
                                                             subscription_id=sub_id, 
                                                             resource_group=rg_name)
