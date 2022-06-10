@@ -431,7 +431,8 @@ class ESMLProject():
                 print("ESML WARNING - Possible incompatible datalake desgin:"\
                     "lake_name={} in ESML SDK, but lake_name={} in storage account, at 'container/active/esml_lake_version.json'".format(self.lake_name,df_name))
         except Exception as e:
-            raise UserErrorException("Could not Check ESML DataLake Compatability") from e
+            print("Could not Check ESML DataLake Compatability - but we can continue anyway. Pleas double check version manually. Or fix the ACL to container/active")
+            #raise UserErrorException("Could not Check ESML DataLake Compatability") from e
 
     #import jsonlines
     def update_json_files(self, param_esml_env,param_inference_model_version,param_scoring_folder_date,param_train_in_folder_date):
