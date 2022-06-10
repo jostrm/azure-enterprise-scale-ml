@@ -413,8 +413,12 @@ class ESMLProject():
             try:
                 df = ds_train_json.to_pandas_dataframe()
             except Exception as e1:
-                print("Error: checkLakeCompatability, lake_paths: " + lake_paths)
-                print("Error: checkLakeCompatability, to_pandas_dataframe() failed, from JSON: " + ds_train_json)
+                print (e1)
+                try:
+                    print("Error: checkLakeCompatability, lake_paths: " + lake_paths)
+                    print("Error: checkLakeCompatability, to_pandas_dataframe() failed, from JSON: " + ds_train_json)
+                except: 
+                    pass
                 raise e1
 
             df_version = df.iloc[0]["lake_design_version"]
