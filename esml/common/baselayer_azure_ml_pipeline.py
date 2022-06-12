@@ -54,7 +54,7 @@ class esml_step_types():
 class ESMLPipelineFactory():
     p = None
     _use_curated_automl_environment = True
-    _environment_name = "AzureML-AutoML"
+    _environment_name = "AzureML-AutoML-DNN" # # Training[ "AzureML-AutoML","AzureML-AutoML-DNN", "AzureML-lightgbm-3.2-ubuntu18.04-py37-cpu"]  Inference["AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference",]
     _use_own_compute_per_step = False
     _pipeline_steps_array = []
     _datalake = None
