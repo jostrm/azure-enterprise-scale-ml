@@ -53,6 +53,9 @@ class esml_step_types():
 # ESMLPipelineFactory brings same logging for ALL models in enterprise. Uniform way of pipelines
 class ESMLPipelineFactory():
     p = None
+    _use_curated_automl_environment = True
+    _use_own_compute_per_step = False
+    _pipeline_steps_array = []
     _datalake = None
     _allow_reuse = True
     _batch_pipeline_parameters = []
@@ -91,9 +94,40 @@ class ESMLPipelineFactory():
 # endregion
 
 #region PUBLIC Properties
+
+    # ENVIRONMENT vs CONDA
+    @property
+    def use_curated_automl_environment(self):
+        return self._use_curated_automl_environment
+    
+    @use_curated_automl_environment.setter
+    def use_curated_automl_environment(self, use_curated_automl_environment):
+        self._use_curated_automl_environment = use_curated_automl_environment
+
+    # STEPS
+    @property
+    def pipeline_steps_array(self):
+        return self._pipeline_steps_array
+    
+    @pipeline_steps_array.setter
+    def pipeline_steps_array(self, pipeline_steps_array):
+        self._pipeline_steps_array = pipeline_steps_array
+
+    # COMPUTE
+    @property
+    def use_own_compute_per_step(self):
+        return self._use_own_compute_per_step
+    
+    #@use_own_compute_per_step.setter
+    #def use_own_compute_per_step(self, use_own_compute_per_step):
+    #    self._use_own_compute_per_step = use_own_compute_per_step
+
+    # PIPELINE PARAMETERS
     @property
     def batch_pipeline_parameters(self):
         return self._batch_pipeline_parameters
+
+    # PIPELINE - Name, endpoint, description etc
     @property
     def name_batch_pipeline(self):
 
@@ -448,21 +482,42 @@ class ESMLPipelineFactory():
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+
+                compute_suffix = 1
+
                 for d in p.Datasets:
                     if(same_compute_for_all and compute is not None):
-                        pass # we alreday wave compute and runconfig
-                    else:
+                        print("Reusing existing compute...")
+                        pass # we alreday have compute and runconfig
+                    elif(same_compute_for_all and compute is None):
+                        print("ESML will auto-create a compute...")
                         if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
                             if(d.cpu_gpu_databricks == "cpu"):
-                                compute, runconfig = self.init_cpu_environment()
+                                compute, runconfig = self.init_cpu_environment(self._use_curated_automl_environment)
                             elif(d.cpu_gpu_databricks == "databricks"):
-                                compute, runconfig = self.init_databricks_environment()
+                                compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment)
                             elif(d.cpu_gpu_databricks == "gpu"):
-                                compute, runconfig = self.init_gpu_environment()
+                                compute, runconfig = self.init_gpu_environment(self._use_curated_automl_environment)
                         else:  # User user configured RunConfig and compute. Custom
                             runconfig = d.runconfig  # Each dataset can have different compute or environment
                             compute = d.runconfig.target
-                    
+                    elif(same_compute_for_all == False):
+                        print("ESML will create separate compute, per SILVER-step to run in parallell...")
+                        compute_suffix_str = str(compute_suffix)
+
+                        if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
+                            if(d.cpu_gpu_databricks == "cpu"):
+                                compute, runconfig = self.init_cpu_environment(self._use_curated_automl_environment,compute_suffix_str)
+                            elif(d.cpu_gpu_databricks == "databricks"):
+                                compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment,compute_suffix_str)
+                            elif(d.cpu_gpu_databricks == "gpu"):
+                                compute, runconfig = self.init_gpu_environment(self._use_curated_automl_environment,compute_suffix_str)
+                        else:  # User user configured RunConfig and compute. Custom
+                            runconfig = d.runconfig  # Each dataset can have different compute or environment
+                            compute = d.runconfig.target
+
+                        compute_suffix = compute_suffix+1
+
                     # 1) Silver datasets (multiple)
                     step_array.append(self.create_esml_step(d, compute,runconfig,esml_step_types.IN_2_SILVER)) 
 
@@ -494,6 +549,7 @@ class ESMLPipelineFactory():
                 elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
                     raise NotImplementedError("Not suppported in your ESML version, try 'IN_2_GOLD_TRAIN_MANUAL' instead . Please ask admin for private preview for IN_2_GOLD_TRAIN_AUTOML, or use ESML IN_2_GOLD_TRAIN_AUTOML Agentless.")
                     
+            self._pipeline_steps_array = step_array
             pipeline = Pipeline(workspace = p.ws, steps=step_array)
         finally: 
              self.p.inference_mode = old_mode
@@ -863,9 +919,12 @@ class ESMLPipelineFactory():
     def init_gpu_environment(self):
         pass
 
-    def init_cpu_environment(self, use_curated_automl_env=True, conda_dependencies_object=None):
-        # Get compute, for active environment.
-        aml_compute = self.p.get_training_aml_compute(self.p.ws)
+    def init_cpu_environment(self, use_curated_automl_env=True, conda_dependencies_object=None, suffix_char=None):
+
+        if(suffix_char is None):
+            aml_compute = self.p.get_training_aml_compute(self.p.ws) # Create or Get compute, for active environment.
+        else:
+            aml_compute = self.p.get_training_aml_compute(self.p.ws, False,suffix_char) # Create or Get compute, for active environment.
         aml_run_config = RunConfiguration()
         # `compute_target` as defined in "Azure Machine Learning compute" section above
         aml_run_config.target = aml_compute
@@ -883,10 +942,15 @@ class ESMLPipelineFactory():
             aml_run_config.environment.python.user_managed_dependencies = False
 
             if (conda_dependencies_object is None):  # Add some packages relied on by data prep step
+                #aml_run_config.environment.python.conda_dependencies = CondaDependencies.create(
+                    #conda_packages=['pandas==0.25.1','scikit-learn==0.22.1', 'numpy==1.18.5', ''],
+                    #pip_packages=['azureml-defaults','azureml-dataprep[fuse,pandas]'],  # azureml-sdk
+                    #pin_sdk_version=False)
+                
+                # Specify CondaDependencies obj, add necessary packages
                 aml_run_config.environment.python.conda_dependencies = CondaDependencies.create(
-                    conda_packages=['pandas==0.25.1','scikit-learn==0.22.1', 'numpy==1.18.5', ''],
-                    pip_packages=['azureml-defaults','azureml-dataprep[fuse,pandas]'],  # azureml-sdk
-                    pin_sdk_version=False)
+                    conda_packages=['pandas','scikit-learn'],
+                    pip_packages=['azureml-sdk[automl]', 'pyarrow'])
 
                 # Alt 2 ) Create an Environment for the experiment
                 #batch_process_env = Environment.from_conda_specification("esml_batch_prep_environment_v02", script_folder + "/esml_batch_environment.yml")
