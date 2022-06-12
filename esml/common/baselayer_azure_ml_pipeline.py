@@ -54,6 +54,7 @@ class esml_step_types():
 class ESMLPipelineFactory():
     p = None
     _use_curated_automl_environment = True
+    _environment_name = "AzureML-AutoML"
     _use_own_compute_per_step = False
     _pipeline_steps_array = []
     _datalake = None
@@ -96,6 +97,14 @@ class ESMLPipelineFactory():
 #region PUBLIC Properties
 
     # ENVIRONMENT vs CONDA
+    @property
+    def environment_name(self):
+        return self._environment_name
+    
+    @environment_name.setter
+    def environment_name(self, environment_name):
+        self._environment_name = environment_name
+
     @property
     def use_curated_automl_environment(self):
         return self._use_curated_automl_environment
@@ -933,7 +942,7 @@ class ESMLPipelineFactory():
         if USE_CURATED_ENV:
             # "AzureML-Tutorial" https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
             #curated_environment = Environment.get(workspace=self.p.ws, name="AzureML-AutoML")
-            curated_automl = "AzureML-AutoML"
+            curated_automl = self.environment_name # "AzureML-AutoML"
             #curated_sklearn ="AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference"
             curated_environment = Environment.get(workspace=self.p.ws, name=curated_automl)
 
