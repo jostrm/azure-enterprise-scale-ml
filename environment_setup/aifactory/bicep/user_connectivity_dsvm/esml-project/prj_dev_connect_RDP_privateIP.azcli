@@ -1,0 +1,37 @@
+#Q: How to run AZ CLI in VS Code
+#A: Mark all code below, and run in VS Code with (CTRL+ä) if Swedish keyboard
+
+### 
+### What: This will connect to a DSVM within the ESML AI factory network PROD environment.
+### -> The technology used is Remote Desktop (RDP) over PRIVATE IP to DSVM via BASTION tunnel.
+###
+
+# https://docs.microsoft.com/en-us/cli/azure/install-azure-cli-windows?tabs=azure-cli
+az version # 2.43.1  (version 2.32 or later)
+
+## 1) This is cached - you need to do these 3 lines of code once and a while
+# See ESML /settings/enterprise_specific/dev_test_prod_settings.json
+$subscription_id = "todo_subscription_id" # change depending on (DEV,TEST,PROD) in ESML enterprise_specific settings
+az login
+az account list
+az account set --subscription $subscription_id
+## 1) END
+
+# 2) START Mark all code below, and run in VS Code with (CTRL+ä) if Swedish keyboard
+
+# CONFIGURE ONCE (ask your ESML core team)
+$esml_ai_factory_instance = "001" # admin only changes this (Common RG name)
+$resource_id_suffix="001" # admin only changes (this Bastion host suffix)
+$rg_prefix = "abc-def-"
+$subscription_id = "todo_subscription_id"
+$locationSuffix ="weu"
+
+# CONFIGURE PER PROJECT (ask your ESML core team)
+$project_number = "001"
+$dev_test_prod = "dev"
+$dsvm_number = "001" # Your team may have multiple DSVM in the resource group,suffixs: 001,002,003
+
+##  Then when logged in, this line will trigger Remote Desktop client on your Windows computer, with your AD-user, and you have your AD-user profile on the DSVM, connected with private IP (via Bastion)
+az network bastion rdp --name "bastion-${locationSuffix}-${dev_test_prod}-${resource_id_suffix}" --resource-group "${rg_prefix}esml-common-${locationSuffix}-${dev_test_prod}-${esml_ai_factory_instance}" --target-resource-id "/subscriptions/${subscription_id}/resourceGroups/${rg_prefix}esml-project${project_number}-{$locationSuffix}-${dev_test_prod}-${esml_ai_factory_instance}-rg/providers/Microsoft.Compute/virtualMachines/dsvm-prj${project_number}-${locationSuffix}-${dev_test_prod}-${dsvm_number}"
+
+## 2) END

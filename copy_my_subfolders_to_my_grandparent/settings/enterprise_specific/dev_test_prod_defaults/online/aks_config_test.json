@@ -1,6 +1,6 @@
 {
   "aks_dev_test": false,
-  "aks_name": "esml-test-prj{}",
+  "aks_name": "esml{}-weu-test",
   "aks_name_override": "",
   "aks_service_name": "esml-test-prj{}-aks-api",
   "image_name": "esml-dev-prj{}-image",

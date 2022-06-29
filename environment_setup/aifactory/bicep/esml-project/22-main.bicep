@@ -1,0 +1,863 @@
+targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
+
+@description('Allow Azure ML Studio UI or not. Dataplane is always private, private endpoint - Azure backbone ')
+param AMLStudioUIPrivate bool = true
+@description('Databricks with PRIVATE endpoint or with SERVICE endpoint. Either way controlplane is on Azure backbone network ')
+param databricksPrivate bool = false
+@secure()
+//@minLength(8)
+//@maxLength(128)
+@description('The password that is saved to keyvault and used by local admin user on VM')
+param adminPassword string
+@description('The username of the local admin that is created on VM')
+param adminUsername string
+@description('Specifies the name of the public databricks subnet that should be used by new databricks instance')
+param dbxPubSubnetName string
+@description('Specifies the name of the private databricks subnet that should be used by new databricks instance')
+param dbxPrivSubnetName string
+@description('Specifies the id of the AKS subnet that should be used by new AKS instance')
+param aksSubnetId string
+@description('Specifies the tags2 that should be applied to newly created resources')
+param tags object
+@description('Deployment location.')
+param location string
+@description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')
+param locationSuffix string
+
+@description('Specifies the project number, such as a string "005". This is used to generate the projectName to embed in resources such as "prj005"')
+param projectNumber string
+var projectName = 'prj${projectNumber}'
+
+@allowed([
+  'dev'
+  'test'
+  'prod'
+])
+@description('Specifies the name of the environment [dev,test,prod]. This name is reflected in resource group and sub-resources')
+param env string
+
+@allowed([
+  'Standard_LRS'
+  'Standard_GRS'
+  'Standard_ZRS'
+  'Premium_LRS'
+  'Premium_ZRS'
+  'Standard_GRS'
+  'Standard_GZRS'
+  'Standard_LRS'
+  'Standard_RAGRS'
+  'Standard_RAGZRS'
+  'Standard_ZRS'
+])
+@description('Specifies the SKU of the storage account')
+param skuNameStorage string = 'Standard_ZRS'
+
+// RBAC START
+@description('Specifies project owner email and will be used for tagging and RBAC')
+param projectOwnerEmail string
+@description('Specifies project owner objectId and will be used for tagging and RBAC')
+param projectOwnerId string
+@description('ESML CoreTeam assigned to help project. Specifies technical contact email and will be used for tagging and RBAC')
+param technicalContactEmail string
+@description('ESML CoreTeam assigned to help project.Specifies technical contact objectId and will be used for tagging and RBAC')
+param technicalContactId string
+@description('Specifies the tenant id')
+param tenantId string
+@description('Project specific service principle for RBAC - Object ID') // OID: Get it by using Get-AzADUser or Get-AzADServicePrincipal cmdlet
+param projectServicePrincipleOID string // Specifies the object ID of a user, service principal or security group in the Azure AD. The object ID must be unique for the list of access policies. 
+@description('Project specific service principle to be added in kv - Application ID')
+param projectServicePrincipleAppID string
+@description('AzureDatabricks enterprise application')
+param databricksOID string
+
+// ESML START
+@description('Specifies the virtual network name')
+param vnetNameBase string
+@description('AI Factory suffix. If you have multiple instances')
+param aifactorySuffixRG string
+param commonResourceSuffix string
+param prjResourceSuffix string
+@description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
+param hybridBenefit bool
+@description('Datalake GEN 2 storage account prefix. Max 8 chars.Example: If prefix is "marvel", then "marvelesml001[random5]dev",marvelesml001[random5]test,marvelesml001[random5]prod')
+param commonLakeNamePrefixMax8chars string
+var subscriptionIdDevTestProd = subscription().subscriptionId
+
+// ENABLE/DISABLE: Optional exclusions in deployment
+@description('Azure ML workspace can only be called once from BICEP, otherwise COMPUTE name will give error 2nd time. ')
+param enableAML bool = true
+
+@description('if Eventhubs, Streaming use cases to be enabled and provisioned by default, or added.')
+param enableEventhubs bool = true
+@description('Specifies wether or not the virtual machine should have a public IP address or not')
+param enableVmPubIp bool = false
+
+// ENABLE/DISABLE end
+
+var vnetNameFull = '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+
+@description('Meta. Needed to calculate subnet: subnetCalc and genDynamicNetworkParamFile')
+param vnetResourceGroupBase string
+@description('ESML COMMON Resource Group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
+param commonRGNamePrefix string
+
+// ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
+var commonResourceGroup = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // change this to correct rg
+var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
+var subscriptions_subscriptionId = subscription().id
+var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+var defaultSubnet = 'snet-esml-cmn-001' //'snet-esmlcmn-001'
+// ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
+
+// ADO comma separated VARIABLE to ARRAY
+@description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')
+param technicalAdminsObjectID string = 'null'
+@description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')
+param technicalAdminsEmail string = 'null'
+@description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
+param IPwhiteList string = ''
+
+var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
+var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
+var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
+var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
+
+var tags2 = tags
+/*
+var tags2 = {
+  CostCenter: tags.CostCenter
+  UnitCode: tags.UnitCode
+  Project: tags.Project
+  Owner: tags.Owner
+  TechnicalContact: tags.TechnicalContact
+  Description: tags.Description
+  DatabricksUIPrivate:databricksPrivate
+  AMLStudioUIPrivate: AMLStudioUIPrivate
+}
+*/
+
+var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
+var sweden_central_adf_missing =  (location == 'swedencentral')?true:false
+var sweden_central_dbx_missing = (location == 'swedencentral')?true:false
+var sweden_central_appInsight_classic_missing = (location == 'swedencentral')?true:false
+
+@description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
+param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
+
+var privateLinksDnsZones = {
+  'blob': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
+  }
+  'file': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
+  }
+  'dfs': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
+  }
+  'registry': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // ${environment().suffixes.acrLoginServer}'
+  }
+  'vault': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
+  }
+  'amlworkspace': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.api.azureml.ms'
+  }
+  'notebooks': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.notebooks.azure.net' 
+  }
+  'dataFactory': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net'
+  }
+  'portal': {
+    'id': '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
+  }
+}
+
+module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
+  scope: subscription(subscriptionIdDevTestProd)
+  name: 'prjResourceGroup${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    rgName: targetResourceGroup
+    location: location
+    tags: tags2
+  }
+}
+
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: commonResourceGroup
+  scope:subscription(subscriptionIdDevTestProd)
+}
+
+
+var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+var twoNumbers = substring(prjResourceSuffix,2,2) // -001 -> 01
+var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
+
+module ownerPermissions '../modules/contributorRbac.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'Owner4TechContact${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    userId: technicalContactId
+    userEmail: technicalContactEmail
+    additionalUserEmails: technicalAdminsEmail_array_safe
+    additionalUserIds:technicalAdminsObjectID_array_safe
+  }
+  dependsOn:[
+    projectResourceGroup
+  ]
+}
+module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'VMAdminLogin4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    userId: technicalContactId
+    userEmail: technicalContactEmail
+    additionalUserEmails: technicalAdminsEmail_array_safe
+    additionalUserIds:technicalAdminsObjectID_array_safe
+  }
+  dependsOn:[
+    projectResourceGroup
+  ]
+}
+
+var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+resource logAnalyticsWorkspaceOpInsight 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+  name: commonResourceGroup
+  scope:subscription(subscriptionIdDevTestProd)
+}
+
+/* MOVED to ESML-COMMON
+var laName = 'la-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+module logAnalyticsWorkspaceOpInsight '../modules/logAnalyticsWorkspace.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'LogAnalyticsWS4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: laName
+    tags: tags2
+    location: location
+  }
+
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+module wsQueries '../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyticsQueries == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'logAnalyticsQs${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    logAnalyticsName:laName
+  }
+  dependsOn: [
+    logAnalyticsWorkspaceOpInsight
+  ]
+}
+ MOVED to ESML-COMMON, end
+*/
+
+
+module applicationInsight '../modules/applicationInsights.bicep'= if(sweden_central_appInsight_classic_missing== false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}' // max 255 chars
+    tags: tags2
+    location: location
+  }
+
+  dependsOn: [
+    projectResourceGroup
+    
+  ]
+}
+
+module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(sweden_central_appInsight_classic_missing== true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+    logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id //logAnalyticsWorkspaceOpInsight.outputs.logAnalyticsWkspId # TODO-Check
+    tags: tags2
+    location: location
+  }
+
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+var adfName = 'adf-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+module adf '../modules/dataFactory.bicep' = if(sweden_central_adf_missing== false)  {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'DataFactory4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: adfName
+    location: location
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    portalPrivateEndpointName: 'pend-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-adfportal-to-vnt-mlcmn'
+    runtimePrivateEndpointName: 'pend-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-adfruntime-to-vnt-mlcmn'
+    tags: tags2
+  }
+
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateVM4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    adminUsername: adminUsername
+    adminPassword: adminPassword
+    hybridBenefit: hybridBenefit
+    vmSize: 'Standard_DS3_v2'
+    location: location
+    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+    subnetName: defaultSubnet
+    vnetId: vnetId
+    tags: tags2
+    keyvaultName: kv1.outputs.keyvaultName
+  }
+
+  dependsOn: [
+    kv1
+    projectResourceGroup
+    
+  ]
+}
+
+module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'publicVM${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    adminUsername: adminUsername
+    adminPassword: adminPassword
+    hybridBenefit: hybridBenefit
+    vmSize: 'Standard_DS3_v2'
+    location: location
+    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+    subnetName: defaultSubnet
+    vnetId: vnetId
+    tags: tags2
+    keyvaultName: kv1.outputs.keyvaultName
+  }
+
+  dependsOn: [
+    kv1
+    projectResourceGroup
+  ]
+}
+
+var prjResourceSuffixNoDash = replace(prjResourceSuffix,'-','')
+module acr '../modules/containerRegistry.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AMLContainerReg4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: 'acr${projectName}${locationSuffix}${uniqueInAIFenv}${env}${prjResourceSuffixNoDash}'
+    skuName: 'Premium'
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-${projectName}${locationSuffix}-containerreg-to-vnt-mlcmn'
+    tags: tags2
+    location:location
+  }
+
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module sacc '../modules/storageAccount.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+    skuName: 'Standard_LRS'
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    blobPrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
+    filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn' 
+    tags: tags2
+  }
+
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module kv1 '../modules/keyVault.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyvaultName: keyvaultName
+    location: location
+    tags: tags2
+    enablePurgeProtection:true
+    tenantIdentity: tenantId
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
+    keyvaultNetworkPolicySubnets: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/snt-${projectName}-dbxpub'
+    ]
+    accessPolicies: [] 
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module addSecret '../modules/kvSecretsPrj.bicep' = {
+  name: '${keyvaultName}addSecrect2ProjectKV${projectNumber}${locationSuffix}${env}'
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    spAppIDValue:projectServicePrincipleAppID //externalKv.getSecret(inputCommonSPIDKey)
+    spOIDValue:projectServicePrincipleOID
+    keyvaultName: keyvaultName
+  }
+  dependsOn: [
+    kv1
+  ]
+}
+
+var secretGetListSet = {
+  secrets: [ 
+    'get'
+    'list'
+    'set'
+  ]
+}
+module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: '${keyvaultName}APTechContact${projectNumber}${locationSuffix}${env}'
+  params: {
+    keyVaultPermissions: secretGetListSet
+    keyVaultResourceName: keyvaultName
+    policyName: 'add'
+    principalId: technicalContactId
+    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    kv1
+    addSecret
+  ]
+}
+
+module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
+  params: {
+    dnsConfig: sacc.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsZoneLinkKeyVault${projectNumber}${locationSuffix}${env}'
+  params: {
+    dnsConfig: kv1.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsZoneLinkACR${projectNumber}${locationSuffix}${env}'
+  params: {
+    dnsConfig: acr.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+var amlName ='aml-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+module aml '../modules/machineLearning.bicep'= if(enableAML) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AzureMachineLearning4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: amlName
+    uniqueDepl: deploymentProjSpecificUniqueSuffix
+    uniqueSalt5char: uniqueInAIFenv
+    projectName:projectName
+    projectNumber:projectNumber
+    location: location
+    locationSuffix:locationSuffix
+    aifactorySuffix: aifactorySuffixRG
+    skuName: 'basic'
+    skuTier: 'basic'
+    env:env
+    storageAccount: sacc.outputs.storageAccountId
+    containerRegistry: acr.outputs.containerRegistryId
+    keyVault: kv1.outputs.keyvaultId
+    applicationInsights: (sweden_central_appInsight_classic_missing == true)? applicationInsightSWC.outputs.ainsId: applicationInsight.outputs.ainsId 
+    aksSubnetId: aksSubnetId
+    tags: tags2
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-${projectName}-aml-to-vnt-mlcmn'
+    amlPrivateDnsZoneID: privateLinksDnsZones['amlworkspace'].id
+    notebookPrivateDnsZoneID:privateLinksDnsZones['notebooks'].id
+    allowPublicAccessWhenBehindVnet:(AMLStudioUIPrivate == true)? false:true
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+  }
+
+  dependsOn: [
+    projectResourceGroup
+    privateDnsContainerRegistry
+    privateDnsKeyVault
+    privateDnsStorage
+  ]
+}
+
+var evenhubNameSpaceAndWsName = 'ev-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+module eventHubLogging '../modules/eventhub.bicep' = if(enableEventhubs) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'EventHub4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    namespaceName: evenhubNameSpaceAndWsName
+    location:location
+    privateEndpointName:'pend-${projectName}-ev-to-vnt-mlcmn'
+    tags: tags2
+    vnetId: vnetId
+    subnetName: defaultSubnet
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+      
+}
+
+var databricksName = 'dbx-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+var databricksNameP = 'dbxp-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+var databricksManagedRG = '${targetResourceGroup}${prjResourceSuffix}-dbxmgmt'
+var databricksManagedRGId = '${subscription().id}/resourceGroups/${databricksManagedRG}'
+
+resource amlResource 'Microsoft.MachineLearningServices/workspaces@2021-04-01' existing = {
+  name: amlName
+  scope:resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
+module dbx '../modules/dataBricks.bicep'  = if(databricksPrivate == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'Dbx4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: databricksName
+    amlWorkspaceId:aml.outputs.amlId
+    location: location
+    skuName: 'standard'
+    managedResourceGroupId:databricksManagedRGId
+    databricksPrivateSubnet: dbxPrivSubnetName
+    databricksPublicSubnet: dbxPubSubnetName
+    vnetId: vnetId
+    tags: tags2
+  }
+  dependsOn: [
+    projectResourceGroup
+    aml
+  ]
+}
+
+module dbxPrivate '../modules/databricksPrivate.bicep' = if(databricksPrivate == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'DbxPriv4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    amlWorkspaceId: aml.outputs.amlId
+    databricksPrivateSubnet: dbxPrivSubnetName
+    databricksPublicSubnet: dbxPubSubnetName
+    location: location
+    managedResourceGroupId: databricksManagedRGId
+    name: databricksNameP
+    skuName: 'standard'
+    tags: tags2
+    vnetId: vnetId
+  }
+  dependsOn: [
+    projectResourceGroup
+    aml
+  ]
+}
+
+var mangedIdentityName = 'esml${projectName}${env}DbxMI'
+
+module dbxMIPriv '../modules/databricksManagedIdentityRBAC.bicep' = if(databricksPrivate == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'dbxMIOwnerPriv${projectNumber}${locationSuffix}${env}'
+  params: {
+    location: location
+    managedIdentityName: mangedIdentityName
+    databricksName: databricksNameP
+  }
+  dependsOn:[
+    dbxPrivate
+  ]
+}
+module dbxMI '../modules/databricksManagedIdentityRBAC.bicep' = if(databricksPrivate == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'dbxMIOwner${projectNumber}${locationSuffix}${env}'
+  params: {
+    location: location
+    managedIdentityName: mangedIdentityName
+    databricksName: databricksName
+  }
+  dependsOn:[
+    dbx
+  ]
+}
+
+
+var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
+resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
+  name: datalakeName
+  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+ 
+}
+var existingRules = esmlCommonLake.properties.networkAcls.virtualNetworkRules
+var keepSku = esmlCommonLake.sku.name
+var keepLocation = esmlCommonLake.location
+var keepTags = esmlCommonLake.tags
+var dbxPublicSubnetResourceID = '${vnetId}/subnets/${dbxPubSubnetName}'
+
+var virtualNetworkRules2Add = [
+  {
+    id: dbxPublicSubnetResourceID
+    action: 'Allow'
+    state: 'succeeded'
+  }
+]
+var mergeVirtualNetworkRulesMerged = union(existingRules, virtualNetworkRules2Add)
+
+param lakeContainerName string
+module dataLake '../modules/dataLake.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'saUpdateVnetLake${projectNumber}${locationSuffix}${env}'
+  params: {
+    storageAccountName: datalakeName
+    containerName: lakeContainerName
+    skuName: skuNameStorage
+    location: keepLocation
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-vnt-esmlcmn'
+    filePrivateEndpointName: 'pend-${datalakeName}-file-to-vnt-esmlcmn'
+    dfsPrivateEndpointName: 'pend-${datalakeName}-dfs-to-vnt-esmlcmn'
+    tags: keepTags
+    virtualNetworkRules: mergeVirtualNetworkRulesMerged
+  }
+  dependsOn: [
+    commonResourceGroupRef
+    aml // optional, but convenient: aml success, optherwise virtualNetworkRules needs to be removed manually if aml fails..and rerun
+  ]
+}
+
+module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false) && (sweden_central_adf_missing==false)){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsZoneLinkADF${projectNumber}${locationSuffix}${env}'
+  params: {
+    dnsConfig: adf.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+    adf
+  ]
+}
+
+// RBAC
+var secretGet = {
+  secrets: [ 
+    'get'
+  ]
+}
+var secretGetList = {
+  secrets: [ 
+    'get'
+    'list'
+  ]
+}
+
+// AzureDatabricks - if set, and if this EnterpriseApplication already exists (can be that a project needs to be provisoned first..)
+module spProjectSPAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'spProjectSPAccessGet${projectNumber}${locationSuffix}${env}' //'${keyvaultName}/add'
+  params: {
+    keyVaultPermissions: secretGet
+    keyVaultResourceName: keyvaultName
+    policyName: 'add'
+    principalId: projectServicePrincipleOID
+    additionalPrincipalIds:[]
+  }
+  dependsOn: [
+    kv1
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+  ]
+}
+
+module adfAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if((databricksOID != null) && (sweden_central_adf_missing==false)) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'adfAccessPolicyGet${projectNumber}${locationSuffix}${env}'
+  params: {
+    keyVaultPermissions: secretGet
+    keyVaultResourceName: keyvaultName
+    policyName: 'add'
+    principalId: adf.outputs.principalId
+    additionalPrincipalIds:[]
+  }
+  dependsOn: [
+    kv1
+    aml
+    spProjectSPAccessPolicyGet
+  ]
+}
+
+
+module spDatabricksAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'spDBXAccessPolicyGetList${projectNumber}${locationSuffix}${env}'
+  params: {
+    keyVaultPermissions: secretGetList
+    keyVaultResourceName: keyvaultName
+    policyName: 'add'
+    principalId: databricksOID
+    additionalPrincipalIds:[]
+  }
+  dependsOn: [
+    kv1
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    adfAccessPolicyGet
+  ]
+}
+
+var cmnName = 'cmn'
+var kvNameFromCOMMON = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+
+resource kvFromCommon 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  name: kvNameFromCOMMON
+}
+
+module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'spCmnKVPolicyGetList${projectNumber}${locationSuffix}${env}'
+  params: {
+    keyVaultPermissions: secretGet
+    keyVaultResourceName: kvFromCommon.name
+    policyName: 'add'
+    principalId: projectServicePrincipleOID
+    additionalPrincipalIds:[]
+  }
+  dependsOn: [
+    kvFromCommon
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+  ]
+}
+
+module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = if(sweden_central_adf_missing== false){
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacLake4Project${projectNumber}${locationSuffix}${env}'
+  params: {
+    amlPrincipalId: aml.outputs.principalId
+    userPrincipalId: technicalContactId
+    adfPrincipalId: adf.outputs.principalId
+    datalakeName: datalakeName
+  }
+  dependsOn: [
+    dataLake
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    adf
+    logAnalyticsWorkspaceOpInsight
+  ]
+}
+
+module rbackDatabricks '../modules/databricksRBAC.bicep' = if(databricksPrivate == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDBX4Project${projectNumber}${locationSuffix}${env}'
+  params: {
+    databricksName: databricksName
+    userPrincipalId: technicalContactId
+    additionalUserIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    dbx
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+  ]
+}
+module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPrivate == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDBXP4Project${projectNumber}${locationSuffix}${env}'
+  params: {
+    databricksName: databricksNameP
+    userPrincipalId: technicalContactId
+    additionalUserIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    dbxPrivate
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+  ]
+}
+
+
+//-- Needed if connnecting from Databricks to Azure ML workspace
+// Note: SP OID: it must be the OBJECT ID of a service principal, not the OBJECT ID of an Application, different thing, and I have to agree it is very confusing.
+module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing== false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDBX2AazureMLwithProjectSP${projectNumber}${locationSuffix}${env}'
+  params: {
+    amlName:amlName
+    projectSP:projectServicePrincipleOID
+    adfSP:adf.outputs.principalId
+    projectADuser:technicalContactId
+    additionalUserIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    adf
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+  ]
+}
+module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing==true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDBX2AMLProjectSPSWC${projectNumber}${locationSuffix}${env}'
+  params: {
+    amlName:amlName
+    projectSP:projectServicePrincipleOID
+    adfSP:'null' // this duplicate will be ignored
+    projectADuser:technicalContactId
+    additionalUserIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+  ]
+}
+
+module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_adf_missing== false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacADFFromAMLorProjSP${projectNumber}${locationSuffix}${env}'
+  params: {
+    datafactoryName:adfName
+    userPrincipalId:technicalContactId
+    additionalUserIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    adf
+    rbackSPfromDBX2AML
+  ]
+}

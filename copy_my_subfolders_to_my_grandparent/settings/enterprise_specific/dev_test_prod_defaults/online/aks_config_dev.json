@@ -1,7 +1,7 @@
 {
   "aks_dev_test": true,
   "num_replicas":1,
-  "aks_name": "esml-dev-prj{}",
+  "aks_name": "esml{}-weu-dev",
   "aks_name_override": "",
   "aks_service_name": "esml-dev-p{}-m{}-aksapi",
   "image_name": "esml-dev-p{}-m{}-img",

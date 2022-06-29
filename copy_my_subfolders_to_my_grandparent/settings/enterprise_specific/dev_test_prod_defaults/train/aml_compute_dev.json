@@ -1,5 +1,5 @@
 {
-    "aml_cluster_name": "prj{}-m{}-dev",
+    "aml_cluster_name": "p{}-m{}weu-dev",
     "aml_training_vm_size": "STANDARD_D3_V2",
     "vm_priority":"lowpriority",
     "aml_training_nodes":4,

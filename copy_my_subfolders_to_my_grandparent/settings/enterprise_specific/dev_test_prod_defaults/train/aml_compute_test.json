@@ -1,5 +1,5 @@
 {
-    "aml_cluster_name": "prj{}-m{}-test",
+    "aml_cluster_name": "p{}-m{}weu-test",
     "aml_training_vm_size": "STANDARD_D3_V2",
     "vm_priority":"dedicated",
     "aml_training_nodes":8,

@@ -46,12 +46,15 @@ class In2GoldProcessor():
             target_column_name = "Survived"
             if target_column_name in self._df.columns: # 1) M10_Titanic specific code
                 #  DROP some columns
-                self._df_processed = self._df.drop(target_column_name, axis=1) # DEMO scenario: Simulate feature engineering...source system might not know column name for Y, and certainly not values
+                self._df_processed = self._df
+                self._df_processed = self._df_processed.drop(target_column_name, axis=1) # DEMO scenario: Simulate feature engineering...source system might not know column name for Y, and certainly not values
                 #self._df.drop("Name", axis=1, inplace=True) # Drop Name since its only "noise" for ML. AutoML will remove it automatically though...
                 #self._df.rename(columns={'Siblings/Spouses Aboard': 'siblings_spouces_aboard', 'Parents/Children Aboard': 'parent_or_child_aboard'}, inplace=True)
                 self._df_processed.columns =  self._df_processed.columns.str.replace("[/]", "_")
+                return self._df_processed
             else:
                self._df_processed = self._df
+
             target_column_name = "Y"
             if target_column_name in self._df.columns: # 2) M11_Diabetes specific code
                 self._df_processed = self._df.drop(target_column_name, axis=1) # ,inplace=True
