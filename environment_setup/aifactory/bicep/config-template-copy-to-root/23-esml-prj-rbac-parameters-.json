@@ -1,0 +1,28 @@
+{
+    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "projectOwnerId": {
+            "value": "todo_stan_lel_ADuser_objectID"
+        },
+        "projectOwnerEmail": {
+            "value": "stan.lee@spiderman"
+        },
+        "technicalContactId": {
+            "value": "todo_batman_ADuser_objectID"
+        },
+        "technicalContactEmail": {
+            "value": "batman@gothamcity.dc"
+        },
+        "databricksOID": {
+            "value": "todo_databricks_oid_Search4_AzureDatabricks"
+        },
+        "projectServicePrincipleOID": {
+            "value": "done_abc_oid_from_ADO_var"
+        },
+        "projectServicePrincipleAppID": {
+            "value": "done_abc_appid_from_ADO_var"
+        }
+        
+    }
+}
