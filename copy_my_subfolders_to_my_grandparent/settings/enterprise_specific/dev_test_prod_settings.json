@@ -5,27 +5,31 @@
     "test_subscription": "same_as_1_or_2_or_3",
     "prod_subscription": "same_as_1_or_2_or_3",
     
-    "common_rg_name": "MSFT-WEU-EAP_CMN_AI-{}-RG",
-    "common_vnet_name": "msft-weu-{}-cmnai-vnet",
-    "dev_common_subnet_name": "",
-    "test_common_subnet_name": "",
-    "prod_common_subnet_name": "",
+    "common_rg_name": "acme-weu-esml-common-weu-{}-001",
+    "common_vnet_name": "acme-vnt-esmlcmn-weu-{}-001",
+
+    "dev_common_subnet_name": "acme-snet-esml-cmn-001",
+    "test_common_subnet_name": "acme-snet-esml-cmn-001",
+    "prod_common_subnet_name": "acme-snet-esml-cmn-001",
+    
     "use_aml_cluster_to_build_images": true,
 
     "project_number_XX_or_XXX": 3,
     "project_location": "westeurope",
-    "project_resource_group": "MSFT-WEU-EAP_PROJECT{}_AI-{}-RG",
+    "project_resource_group": "acme-weu-esml-project{}-weu-{}-001-rg",
     "convention_project_resource_group_env_first":false,
-    "project_workspace_name": "msft-weu-{}-eap-proj{}_ai-amls",
+    "project_workspace_name": "aml-prj{}-weu-{}-001",
 
-    "convention_project_workspace_name_env_first":true,
+    "convention_project_workspace_name_env_first":false,
     
-    "lake_storage_accounts": 1,
-    "dev_sa": "acmeweudevesml001",
-    "test_sa": "acmeweudevesml001",
-    "prod_sa": "acmeweudevesml001",
+    "optional_demo_param": "Set to 1 if you run ESML in DEMO mode with only 1 subscription - same subscriptionid for all 3 environment and same storage account. Otherwise 3",
+    "lake_storage_accounts": 3,
+    "dev_sa": "acmeweudevesml001dev",
+    "test_sa": "acmeweudevesml001test",
+    "prod_sa": "acmeweudevesml001prod",
     "lake_design_version": "3",
 
+    "optional_overrides": "Below is parameters for you to override or scale (example: vNets name must be unique within RG, but not within subscription/region)",
     "common_rg_name_dev_optional_suffix": "",
     "common_rg_name_test_optional_suffix": "",
     "common_rg_name_prod_optional_suffix": ""
