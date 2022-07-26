@@ -32,8 +32,9 @@ dependencies:
   - seaborn==0.11.1
   # ESML required to write files to GEN 2 - Bronze,Silver,Gold
   - azure-storage-file-datalake==12.6.0
-  # Azure ML and AutoML Required
-  - azure-storage-blob==12.10.0
+  # Azure ML and AutoML Required (added in AzureML execution setup since 1.43 Not needed separately anymore)
+  #- azure-storage-blob==12.10.0
+
  # Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.43.0
   - pytorch-transformers==1.0.0
