@@ -797,6 +797,9 @@ class ESMLProject():
 
         return latest_model
 
+    def get_default_training_aml_compute_name(self):
+        return self.compute_factory.aml_cluster_name
+
     def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix_char=None):
         self.initComputeFactory(ws)
         
