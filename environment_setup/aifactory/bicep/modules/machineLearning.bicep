@@ -118,7 +118,7 @@ param ciVmSku_testProd string = ci_devTest_defaults[0]
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 
-resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2021-04-01' = {
+resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-05-01' = {
   name: name
   location: location
   identity: {
@@ -141,11 +141,13 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     // configuration for workspaces with private link endpoint
     imageBuildCompute: 'cluster001'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet // todo later..test set to TRUE?
+    publicNetworkAccess: 'Disabled'
 
     // If sensitive data
     hbiWorkspace:false
   }
 }
+
 module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
   name: 'machineLearningNetworking${uniqueDepl}'
   scope: resourceGroup()

@@ -38,6 +38,13 @@ param hybridBenefit bool = true
 @description('default keyvault secret expiration date in inteter, EPOC, seconds after 1970')
 param expiration_date_default_2025_01_10_epoch int = 1736467877
 
+@description('default StandardSSD_LRS as demo mode, recommended for production purpose is to upgrade to Premium_LRS ')
+param osDiskType string = 'StandardSSD_LRS' //'Premium_LRS'
+@description('default StandardSSD_LRS as demo mode, recommended is to upgrade to Premium_LRS for productional purpose ')
+param extraDiskType string = 'StandardSSD_LRS' // 'Standard_LRS' = HDD , StandardSSD_LRS = SSD , 'Premium_LRS'
+@description('default is 128GB, change to bigger, 1024, GB if much local data')
+param extraDiskSizeGB int = 128 // 1024
+
 resource nInter 'Microsoft.Network/networkInterfaces@2020-06-01' = {
   name: nicName
   location: location
@@ -93,12 +100,15 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2020-12-01' = {
         createOption: 'FromImage'
         diskSizeGB:256
         managedDisk: {
-          storageAccountType: 'Premium_LRS'
+          storageAccountType: osDiskType
         }
       }
       dataDisks: [
         {
-          diskSizeGB: 1024
+          diskSizeGB: extraDiskSizeGB
+          managedDisk: {
+            storageAccountType: extraDiskType
+          }
           lun: 0
           createOption: 'Empty'
         }
