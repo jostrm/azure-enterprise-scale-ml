@@ -223,7 +223,8 @@ class ESMLPipelineFactory():
         experiment = Experiment(self.p.ws,experiment_name)
         par_dic = None
         if (pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.IN_2_GOLD):
-            print ("execute_pipeline (scoring): Inference_mode: {}".format(parameters[4].default_value))
+            print ("Execute_pipeline (scoring): Inference_mode: {}".format(parameters[4].default_value))
+            print ("-Scoring data, default value {}".format(parameters[1].default_value))
 
             par_dic = {
                 parameters[0].name: parameters[0].default_value, # esml_inference_model_version
@@ -233,7 +234,9 @@ class ESMLPipelineFactory():
                 parameters[4].name: parameters[4].default_value # par_esml_inference_mode
             }
         elif (pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
-            print ("execute_pipeline (training): Inference_mode: {}".format(parameters[4].default_value))
+            print ("Execute_pipeline (training): Inference_mode: {}".format(parameters[4].default_value))
+            print ("-Training data, default value: {}".format(parameters[1].default_value))
+
             par_dic = {
                 parameters[0].name: parameters[0].default_value, # esml_inference_model_version
                 parameters[1].name: parameters[1].default_value,# esml_scoring_folder_date | par_esml_training_date
@@ -252,6 +255,7 @@ class ESMLPipelineFactory():
         #    }
         )
         print("Pipeline submitted for execution!")
+        print(" ### ")
         return pipeline_run
 
     # Copies 1-M script files from Datasets, to be edited later by user
