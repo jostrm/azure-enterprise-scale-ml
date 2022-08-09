@@ -2,14 +2,14 @@ $Password = New-Object -TypeName PSObject
 $Password | Add-Member -MemberType ScriptProperty -Name "Password" -Value { ("!@#$%^&*0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".tochararray() | sort {Get-Random})[0..8] -join '' }
 
 ## EDIT per DSVM you want to deploy
-$dsvmNumber = '-004' # update this to an available suffix
+$dsvmNumber = '-002' # update this to an available suffix
 $dsvm_pass_4= $Password.Password # 'uT$ENaWvLNSa' # your PWD
 $adminPassword = $dsvm_pass_4 | ConvertTo-SecureString -AsPlainText -Force
 
 $deplName = '23-add-dsvm'
 $commonRGNamePrefix = 'abc-def-'
 $commonResourceSuffix = '-001'
-$aifactorySuffixRG = '-004'
+$aifactorySuffixRG = '-001'
 
 $tags = @{
     "Application Name" = "Enterprise Scale ML (ESML)"
@@ -24,12 +24,12 @@ $tags = @{
    }
 
 $location = 'westeurope'
-
-$rg = 'abc-def-esml-project002-weu-dev-004-rg'
+$projectNumber = '001'
 $env = 'dev'
 $locationSuffix = 'weu'
-$projectNumber = '002'
-$prjResourceSuffix = '-003'
+$prjResourceSuffix = '-001'
+
+$rg = '${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${prjResourceSuffix}-rg'
 $vnetNameBase = 'vnt-esmlcmn'
 
 Write-Host "Kicking off the BICEP..."

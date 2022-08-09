@@ -70,7 +70,8 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = {
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: tags
-    keyvaultName: keyvaultName // kv1.outputs.keyvaultName
+    keyvaultName: keyvaultName
+    kvSecretNameSuffix: dsvmSuffix // esml-dsvm-password-001,esml-dsvm-password-002, esml-dsvm-password-003
   }
 
   dependsOn: [
