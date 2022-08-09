@@ -23,6 +23,18 @@ dependencies:
 - cudatoolkit=10.1.243
 
 - pip:
+  #ESML required for MLOps OUTER LOOP & unattended mode (not really needed for Windows, but for Linux build agent - a must have)
+  - azure-cli-core==2.19.1
+  #ESML Required for OUTER LOOP MLOps
+  - azure-keyvault==4.1.0 
+  - azure-keyvault-keys==4.4.0
+  - azure-keyvault-secrets==4.3.0
+  - azure-keyvault-certificates~=4.3.0
+  # ESML Required for reporting (todo remove this dependancy)
+  - seaborn==0.11.1
+  # ESML required to write files to GEN 2 - Bronze,Silver,Gold
+  - azure-storage-file-datalake==12.6.0
+  
   # Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.43.0
   - pytorch-transformers==1.0.0
