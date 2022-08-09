@@ -26,6 +26,7 @@ from  azureml.pipeline.core import PipelineRun
 from azureml.pipeline.core import PublishedPipeline
 from azureml.pipeline.core import PipelineEndpoint
 from azureml.data.dataset_error_handling import DatasetValidationError
+from azureml.core import Run
 
 #endregion
 #region(collapsed) Enumerators
@@ -405,6 +406,7 @@ class ESMLPipelineFactory():
         aml_model_name = None
         esml_model_name = p.model_folder_name
         source_fitted_model = None
+        best_run = None
 
         # model = p.get_best_model_via_modeltags_only(self.p.ws,self.p.experiment_name, filter_on_version=1) # Version=1 is the TEMPLATE "LakeStructure"...hence Model=1 and not 2...since placegolder data is always model_version=1
         if(aml_model is None):
@@ -415,11 +417,24 @@ class ESMLPipelineFactory():
                 ds1 = Dataset.get_by_name(workspace = self.p.ws, name =  p.dataset_gold_train_runinfo_name_azure)
                 run_id = ds1.to_pandas_dataframe().iloc[0]["pipeline_run_id"] #  ['pipeline_run_id', 'training_data_used', 'training_data_source_date', 'date_at_pipeline_run','model_version_current','model_version_newly_trained']
                 experiment = Experiment(workspace=p.ws, name=p.experiment_name)
-                remote_run = PipelineRun(experiment=experiment, run_id=run_id)
+                
                 #remote_run = AutoMLRun(experiment=experiment, run_id=run_id)
 
                 # 1
-                best_run, source_fitted_model = remote_run.get_output()
+                try:
+                    remote_run = PipelineRun(experiment=experiment, run_id=run_id)
+                    best_run, source_fitted_model = remote_run.get_output()
+                except Exception as e:
+                    print("1)Soft Error: PipelineRun .get_output() gave error {}".format(e))
+                    print("2)Soft Error: Now trying as AutoMLRun instead of PipelineRun, to get Run() and fitted_model")
+                    try:
+                        remote_run = AutoMLRun(experiment=experiment, run_id=run_id)
+                        best_run, source_fitted_model = remote_run.get_output()
+                    except:
+                        print("Soft Error: It was not an AutoMLRun() Lets init it as a regular Run()")
+                        remote_run = Run(experiment=experiment, run_id=run_id)
+                        best_run = remote_run # , source_fitted_model = remote_run.get_output()
+
 
                 # 2
                 aml_model_name = best_run.properties['model_name']

@@ -51,7 +51,7 @@ from azureml.telemetry import UserErrorException
 from azureml.core.webservice import AksWebservice
 from azureml.core.compute import AksCompute
 from azureml.core.model import InferenceConfig, Model
-from azureml.core.webservice import AksEndpoint
+from azureml.core.webservice import AksEndpoint 
 #from azureml.exceptions import WebserviceNotFound
 
 # Aks call
