@@ -46,11 +46,16 @@ Alternatively: The button below will deploy Azure Machine Learning and its relat
 <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fsolution-accelerator-many-models%2Fmaster%2Fazuredeploy.json" target="_blank">
     <img src="http://azuredeploy.net/deploybutton.png" alt="Work in progress!"/>
 </a> 
- 
+
+# Almost done. Your codebase should look like below now: 
+`Example:`: See here, for how these folders are use together with EMSL:  https://github.com/jostrm/azure-enterprise-scale-ml-usage 
 
 # 4) Configure ESML settings, to target YOUR Azure resources
 1) You should copy all (except `notebook_templates`, here you should take a subfolder) subfolders in `copy_my_subfolders_to_my_grandparent` to your root, next to the subclass `azure-enterprise-scale-ml`.
     - `Example:`: See here, for how these folders are use together with EMSL:  https://github.com/jostrm/azure-enterprise-scale-ml-usage
+    - 
+    - `azure-enterprise-scale-ml`(s)
+      - `copy_my_subfolders_to_my_grandparent`
     - `adf`: Here is the Azur Data factory templates for `Scoring&Writeback`
     - `mlops`: This is a template, a working `MLOps pipeline, using the ESML SDK, that can deploy a model `across environments where DEV, TEST, PROD` can be in different workspaces/different Azure subscriptions.
     - `settings`: This is a template settings folder, for `dev,test,prod` to override
