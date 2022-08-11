@@ -5,6 +5,7 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
     - Best practice: `Modern data architecture`: https://docs.microsoft.com/en-us/azure/architecture/solution-ideas/articles/azure-databricks-modern-analytics-architecture
     - Best practice: `Datalake design`: https://docs.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-best-practices
         - `Datamesh`: https://martinfowler.com/articles/data-mesh-principles.html
+            - Credit to: Zhamak Dehghani
 - ESML has a default scaling from 1-250 ESMLprojects for its `ESML AI Factory`. 
     - That said, the scaling roof is on IP-plan, and ESML has its own IP-calculator (allocated IP-ranges for 250 is just the default)
 - `Enterprise "cockpit"` over ALL your projects & models. 

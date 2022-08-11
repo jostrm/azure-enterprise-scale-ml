@@ -27,46 +27,39 @@ Located here:  [./esml/azure_provisioning/azure_devops_pipelines/](./esml/azure_
 If you get ann errormessage about `too long paths` then you need to open the GIT CMD prompt as `Administrator` and run the below (then try again)
 > git config --system core.longpaths true
 
-# 3) Create the Azure Resources needed (ESML Bicep)
-The button below will deploy Azure Machine Learning and its related resources, BUT you may want to tailor to YOUR `naming convention` 
-- **Q: How to edit the DEFAULT naming convention, to adher `to our enterprise policy naming convention`?**
-- A: You can tailor your own Bicep version. Use the ESML tool, and config-file `../settings/enterprise_specific/naming_convention.json`.
-    - The `ESML naming convention template` is good to get a baseline start - then edit the .json file for YOUR convention.
-  
-HOWTO: 
- - 1) Go here to EDIT the suggested naming convention to fit YOUR company specific convention, a config file:
-    - [../settings/enterprise_specific/naming_convention.json](../settings/enterprise_specific/naming_convention.json)
- - 2) View the result of your edits, and all resources, per environment (DEV, TEST, PROD), you need to create:
-    - [./esml/azure_provisioning/01-azure-resources.ipyndb](./esml/azure_provisioning/01-azure-resources.ipynb)
-    - Example: instead of `msft` maybe `acme` - then send the "prescription" to your IT/infra department, to provision via preconfigured Azure blueprint.
- - 3) Run the BICEP script (or create the resources manually for now - the button is IN progress right now, don't use.) 
+3) After the CONDA is installed, and the ESML CODE is on your computer
+- Then after the code is on your computer, or at the ESML generated DSVM, you need to "flip" to main branch, and when running notebooks, you need to select the correct CONDA-evironment. 
+See images below: 
 
+### 3a) Select correct BRANCH on the subclassed ESML library (only need to do this once)
+![](./esml/images/quickstart_branch_guid_1.png)
+![](./esml/images/quickstart_branch_guid_2.png)
+![](./esml/images/quickstart_branch_guid_3.png)
+### 3b) Select correct CONDA environment, when running notebooks (only need to do this once, per notebook)
+![](./esml/images/quickstart_notebooks_1.png)
+![](./esml/images/quickstart_notebooks_2_select_conda.png)
+# 3) Create the Azure Resources needed (ESML Bicep)
+The usual way is to configure Azure Devops, as a release pipeline to provision ESML Projects via the ESML BICEP.
+- Note: This should be done by a `ESML core team member`, supporting the projects. Not by projects themselves.
+
+Alternatively: The button below will deploy Azure Machine Learning and its related resources, BUT you may want to tailor to YOUR `naming convention` 
 <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmicrosoft%2Fsolution-accelerator-many-models%2Fmaster%2Fazuredeploy.json" target="_blank">
     <img src="http://azuredeploy.net/deploybutton.png" alt="Work in progress!"/>
 </a> 
-
-  - Note: This should be done by a `ESML core team member`, supporting the projects. Not by projects themselves.
-  - Note **Azure roles (IAM)**: 
-    - Most part you only need to be have CONTRIBUTOR role on 2 resource groups, these 2 resource groups, you can ask you Security admin to create for you, and get OWNER or CONTRIBUTOR access on.
-    - But, to create the service principle, you need to have the Azure role  to be able to create service principles (ask your IT department/subscription administrator) 
-      - 1) Subscription level: You or your IT-admin needs to have the role to `register applications` (create service principles) for reasons A and B:   
-          - Reason A): In Azure to create the SERVICE PRINCIPLES to be used in the 2 resource groups.
-          - Reason B): Azure Devops needs a SERVICE PRINCIPLE to run the pipline Auzure CLI, as CONTRIBUTOR on Subscription level.
-      - 2) Resource group level: You or your IT-admin needs to have `Owner role` or `User Access Administrator` role, to assigne the service principles in the 2 resource groups resources.
-    - [Read more - howto create service principles](https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal#permissions-required-for-registering-an-app)
+ 
 
 # 4) Configure ESML settings, to target YOUR Azure resources
-1) You should copy all subfolders in `copy_my_subfolders_to_my_grandparent` to your root, next to the subclass `azure-enterprise-scale-ml`.
+1) You should copy all (except `notebook_templates`, here you should take a subfolder) subfolders in `copy_my_subfolders_to_my_grandparent` to your root, next to the subclass `azure-enterprise-scale-ml`.
     - `Example:`: See here, for how these folders are use together with EMSL:  https://github.com/jostrm/azure-enterprise-scale-ml-usage
     - `adf`: Here is the Azur Data factory templates for `Scoring&Writeback`
     - `mlops`: This is a template, a working `MLOps pipeline, using the ESML SDK, that can deploy a model `across environments where DEV, TEST, PROD` can be in different workspaces/different Azure subscriptions.
     - `settings`: This is a template settings folder, for `dev,test,prod` to override
-    - `demo_notebooks`: Notebooks redy to run - perfect for quick R&D mode.
+    - `notebook_templates_esml_v14_2022-06-2023_aml_v143`: Notebooks redy to run - perfect for quick R&D mode.
 - 2) Create your new branch for `Project` and `Model` 
     -  **Branch-name:** We recommend to include `organization/bu, project, and model`.
     - Ask your ESML-coreteam what project-number you have `001,...,123` and choose your model prefix `M01`,...`M34` 
     - > Important: `projectXXX` and `MXX` should be unique, and is a defined `ESML naming convention`
-    - Example name: `microsoft_hr_project001_M01` or `hr_project001_M01`
+    - Example name: `project001_M01` or `HR_Dept_project001_M01`
 - 3) EDIT the setting files, you copied to your rott: 
 - Even if you did not edit the nanming convention, you still need to check the settings in at least the top 3 files below:
   - 1) [../settings/enterprise_specific/dev_test_prod_settings](../settings/enterprise_specific/dev_test_prod_settings.json) - Role: ESML coreteam/IT admin (`configure once`)
@@ -85,9 +78,7 @@ And - Clean these 3 files: [../settings/project_specific/model/dev_test_prod/aut
  >   "registered_model_version": ""
  > }
 
-# DONE! It should look something like this
-- ESML Usage example: https://github.com/jostrm/azure-enterprise-scale-ml-usage
-
+# DONE! 
 # TROUBLE SHOOT - Tips
 ## If manual security setup: SP - Keyvault IAM and Azure ML Studio
 - A)AML Studio You need to have your project SP (esml-project005-sp-id) be CONTRIBUTOR on the DEV, TEST, PROD workspaces, or else you will seee this: 
