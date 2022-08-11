@@ -35,8 +35,10 @@ See images below:
 ![](./esml/images/quickstart_branch_guid_1.png)
 ![](./esml/images/quickstart_branch_guid_2.png)
 ![](./esml/images/quickstart_branch_guid_3.png)
-### 3b) Select correct CONDA environment, when running notebooks (only need to do this once, per notebook)
+
+### 3b) Open a notebook (note what level the folder is on)
 ![](./esml/images/quickstart_notebooks_1.png)
+### 3c) Select correct CONDA environment, when running notebooks (only need to do this once, per notebook)
 ![](./esml/images/quickstart_notebooks_2_select_conda.png)
 # 3) Create the Azure Resources needed (ESML Bicep)
 The usual way is to configure Azure Devops, as a release pipeline to provision ESML Projects via the ESML BICEP.
