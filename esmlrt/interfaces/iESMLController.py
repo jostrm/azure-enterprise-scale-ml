@@ -25,16 +25,16 @@ class IESMLController:
 
     # Dev, Test, Prod
     
-    _subscription_id_dev = 'ca0a8c40-b06a-4e4e-8434-63c03a1dee34'
-    _subscription_id_test = 'ca0a8c40-b06a-4e4e-8434-63c03a1dee34'
-    _subscription_id_prod = 'ca0a8c40-b06a-4e4e-8434-63c03a1dee34'
+    _subscription_id_dev = 'todo'
+    _subscription_id_test = 'todo'
+    _subscription_id_prod = 'todo'
 
-    _resource_group_dev = 'MSFT-WEU-EAP_PROJECT02_AI-DEV-RG'
-    _resource_group_test = 'MSFT-WEU-EAP_PROJECT02_AI-test-RG'
+    _resource_group_dev = 'todo'
+    _resource_group_test = 'todo'
     _resource_group_prod = 'todo'
 
-    _workspace_name_dev = 'msft-weu-dev-eap-proj02_ai-amls'
-    _workspace_name_test = 'msft-weu-test-eap-proj02_ai-amls'
+    _workspace_name_dev = 'todo'
+    _workspace_name_test = 'todo'
     _workspace_name_prod = 'todo'
     
     ## Auth
