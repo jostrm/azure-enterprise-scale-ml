@@ -361,12 +361,14 @@ class ESMLProject():
             self.active_model_config = None
 
             for item in lake_config["models"]:
-                model_details = {"model_number":None, "model_folder_name":None,"model_short_alias":None,"dataset_folder_names":None, "label":None}
+                model_details = {"model_number":None, "model_folder_name":None,"model_short_alias":None,"dataset_folder_names":None, "label":None, "ml_type":"classification"}
                 model_details['model_number'] = int(item['model_number'])
                 model_details['model_folder_name'] = item['model_folder_name']
                 model_details['model_short_alias'] = item['model_short_alias']
                 model_details['dataset_folder_names'] = item['dataset_folder_names']
                 model_details['label'] = item['label']
+                
+                model_details['ml_type'] = item['ml_type']
 
                 self.models_array.append(model_details)
 
@@ -655,6 +657,54 @@ class ESMLProject():
             self.workspace_name = self.env_config['project_workspace_name'].format(self._projectNoString,self.dev_test_prod.upper())
 
         self.location = self.env_config['project_location'].format(self.dev_test_prod)
+
+    def get_all_envs(self):
+        convention_order_env_first_rg = self.env_config['convention_project_resource_group_env_first']
+        convention_order_env_first_ws = self.env_config['convention_project_workspace_name_env_first']
+
+        dev_resource_group = ""
+        test_resource_group = ""
+        prod_resource_group = ""
+        dev_workspace_name = ""
+        test_workspace_name = ""
+        prod_workspace_name = ""
+
+        if(convention_order_env_first_rg == True):
+            dev_resource_group = self.env_config['project_resource_group'].format("DEV",self._projectNoString)
+            test_resource_group = self.env_config['project_resource_group'].format("TEST",self._projectNoString)
+            prod_resource_group = self.env_config['project_resource_group'].format("PROD",self._projectNoString)
+        else:
+            dev_resource_group = self.env_config['project_resource_group'].format(self._projectNoString, "DEV")
+            test_resource_group = self.env_config['project_resource_group'].format(self._projectNoString, "TEST")
+            prod_resource_group = self.env_config['project_resource_group'].format(self._projectNoString, "PROD")
+
+        if(convention_order_env_first_ws == True):
+            dev_workspace_name = self.env_config['project_workspace_name'].format("DEV", self._projectNoString)
+            test_workspace_name = self.env_config['project_workspace_name'].format("TEST", self._projectNoString)
+            prod_workspace_name = self.env_config['project_workspace_name'].format("PROD", self._projectNoString)
+        else:
+            dev_workspace_name = self.env_config['project_workspace_name'].format(self._projectNoString,"DEV")
+            test_workspace_name = self.env_config['project_workspace_name'].format(self._projectNoString,"TEST")
+            prod_workspace_name = self.env_config['project_workspace_name'].format(self._projectNoString,"PROD")
+
+        esml_envs = {
+            "dev": {
+                "subscription_id": self.env_config['dev_subscription'],
+                "resourcegroup_id":  dev_resource_group,
+                "workspace_name": dev_workspace_name,
+            },
+            "test": {
+                "subscription_id": self.env_config['test_subscription'],
+                "resourcegroup_id": test_resource_group,
+                "workspace_name": test_workspace_name,
+            },
+            "prod": {
+                "subscription_id": self.env_config['prod_subscription'],
+                "resourcegroup_id": prod_resource_group,
+                "workspace_name": prod_workspace_name,
+            }
+        }
+        return esml_envs
 
     def is_json(self, data): 
         if isinstance(data, dict):

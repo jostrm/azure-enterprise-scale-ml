@@ -10,8 +10,8 @@ from ..interfaces.iESMLController import IESMLController
 
 class ESMLController(IESMLController):
     
-    def __init__(self,modelCompare,testScoringFactory,esml_project_folder_name, esml_model_name, esml_model_alias, secret_name_tenant = None,secret_name_project_sp_id= None,secret_name_project_sp_secret = None):
-        super().__init__(modelCompare,testScoringFactory,esml_project_folder_name,esml_model_name, esml_model_alias, secret_name_tenant,secret_name_project_sp_id,secret_name_project_sp_secret)
+    def __init__(self,modelCompare,testScoringFactory,esml_project_folder_name, esml_model_name, esml_model_alias,all_envs, secret_name_tenant = None,secret_name_project_sp_id= None,secret_name_project_sp_secret = None):
+        super().__init__(modelCompare,testScoringFactory,esml_project_folder_name,esml_model_name, esml_model_alias,all_envs, secret_name_tenant,secret_name_project_sp_id,secret_name_project_sp_secret)
 
     def get_best_model(self, ws):
         return IESMLController.get_best_model_run_fitted_model_Dev(ws,self.experiment_name)

@@ -19,9 +19,9 @@ class IESMLController:
     __metaclass__ = ABCMeta
 
     # Sub, RG, WS
-    subscription_id = 'ca0a8c40-b06a-4e4e-8434-63c03a1dee34'
-    resource_group = 'abc-def-esml-project002-weu-dev-004-rg'
-    workspace_name = 'aml-prj002-weu-dev-003'
+    subscription_id = 'todo'
+    resource_group = 'todo'
+    workspace_name = 'todo'
 
     # Dev, Test, Prod
     
@@ -62,7 +62,7 @@ class IESMLController:
     @classmethod
     def version(self): return "1.4"
 
-    def __init__(self,modelCompare,testScoringFactory, esml_project_folder_name, esml_model_name, esml_model_alias, secret_name_tenant = None,secret_name_project_sp_id= None,secret_name_project_sp_secret = None):
+    def __init__(self,modelCompare,testScoringFactory, esml_project_folder_name, esml_model_name, esml_model_alias,all_envs, secret_name_tenant = None,secret_name_project_sp_id= None,secret_name_project_sp_secret = None):
 
         if not isinstance(modelCompare, IESMLModelCompare): raise Exception('Bad interface. Should be IESMLModelCompare')
         if not IESMLModelCompare.version() == self._supported_revision: raise Exception('Bad revision, should be ' +self. _supported_revision)
@@ -84,6 +84,23 @@ class IESMLController:
             self._secret_name_tenant = secret_name_tenant
             self._secret_name_project_sp_id =secret_name_project_sp_id
             self._secret_name_project_sp_secret = secret_name_project_sp_secret
+
+        try:
+            _subscription_id_dev = all_envs["dev"]["subscription_id"]
+            subscription_id = _subscription_id_dev # start at DEV 
+
+            _subscription_id_test = all_envs["test"]["subscription_id"]
+            _subscription_id_prod = all_envs["prod"]["subscription_id"]
+
+            _resource_group_dev = all_envs["dev"]["resourcegroup_id"]
+            _resource_group_test = all_envs["test"]["resourcegroup_id"]
+            _resource_group_prod = all_envs["prod"]["resourcegroup_id"]
+
+            _workspace_name_dev = all_envs["dev"]["workspace_name"]
+            _workspace_name_test = all_envs["test"]["workspace_name"]
+            _workspace_name_prod = all_envs["prod"]["workspace_name"]
+        except:
+            print("INFO: Could not load all ESML environments in ESMLController. maybe DEMO mode / not all are configured or created? ")
 
     ###
     # properties

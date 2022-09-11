@@ -140,8 +140,14 @@ def train(train_ds,validate_ds,test_ds):
         secret_name_tenant = "kv-msft-weu-dev-cmnai-tenant"
         secret_name_sp_id = "kv-secret-esml-project002-sp-id"
         secret_name_sp_secret = "kv-secret-esml-project002-sp-secret"
+
+        # You can get this info by p.get_all_envs() (where p is ESMLProject)
+        all_envs = {
+            'dev': {'subscription_id': 'x','resourcegroup_id': 'y', 'workspace_name': 'z'},
+            'test': {'subscription_id': 'x','resourcegroup_id': 'y','workspace_name': 'z'},
+            'prod': {'subscription_id': 'x','resourcegroup_id': 'y','workspace_name': 'z'}}
         # CUSTOMIZE END ###############
-        controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
+        controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias,all_envs, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
 
         train_test_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, train_ds,validate_ds,test_ds,ml_type)
 
