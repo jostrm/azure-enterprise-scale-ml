@@ -23,7 +23,12 @@ from esmlrt.runtime.ESMLModelCompare2 import ESMLModelCompare
 from esmlrt.runtime.ESMLTestScoringFactory2 import ESMLTestScoringFactory
 from your_code.your_train_code import Trainer
 from azureml.core import Dataset
-import tempfile
+
+from azureml.core.run import _OfflineRun
+from azureml.core import Workspace
+from azureml.core.model import Model
+#from azureml.pipeline.steps import AutoMLStep # ModuleNotFoundError: No module named 'azureml.pipeline.steps'
+from azureml.train.automl.run import AutoMLRun
 
 try: # not needed, but since AutoML scoring script copied, we'll keep this logging.
     log_server.enable_telemetry(INSTRUMENTATION_KEY)
@@ -33,7 +38,7 @@ except:
     pass
 
 def init():
-    global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws
+    global prev_model,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws,model_path,model_name
 
     parser = argparse.ArgumentParser("Split the GOLD and Train the model")
     parser.add_argument('--target_column_name', dest="target_column_name", type=str, required=True)
@@ -46,6 +51,10 @@ def init():
     parser.add_argument('--par_esml_model_name', dest='par_esml_model_name', type=str, required=True)
     parser.add_argument('--par_aml_model_name', dest='par_aml_model_name', type=str, required=False)
     parser.add_argument('--par_esml_env', type=str, help='ESML environment: dev,test,prod', required=True)
+    
+    parser.add_argument('--model_name', dest='model_name', type=str, required=True)
+    parser.add_argument('--model_path', dest='model_path', type=str, required=True)
+    #parser.add_argument('--metrics_data', dest='metrics_data', type=str, required=True)
     
     
     args = parser.parse_args()
@@ -60,6 +69,10 @@ def init():
         esml_modelname = args.par_esml_model_name
         aml_model_name = args.par_aml_model_name
         target_column_name = args.target_column_name
+        model_path = args.model_path
+        model_name = args.model_name
+        #metrics_data = args.metrics_data
+        #print(metrics_data)
 
         if_user_implmeneted_model_compare = False
         if(if_user_implmeneted_model_compare):
@@ -74,32 +87,20 @@ def init():
 
         run = Run.get_context()
         ws = run.experiment.workspace
+        ws = Workspace.from_config() if type(run) == _OfflineRun else run.experiment.workspace
         datastore = ws.get_default_datastore()
 
         # INPUT:
         it1 = iter(run.input_datasets.items())
-        train_ds = next(it1)[1] 
-        #train_ds = next(iter(run.input_datasets.items()))[1] # Get 1st DATASET: GOLD "TRAIN"
-        #print("train_ds is = {}".format(train_ds))
-        #train_df = train_ds.to_pandas_dataframe()
-
-        validate_ds = next(it1)[1] # Get 2nd DATASET: GOLD_VALIDATE
-        #validate_df = validate_ds.to_pandas_dataframe()
+        #train_ds = next(it1)[1] 
+        #validate_ds = next(it1)[1] # Get 2nd DATASET: GOLD_VALIDATE
 
         test_ds = next(it1)[1] # Get 3rd DATASET: GOLD_TEST
         #test_df = validate_ds.to_pandas_dataframe()
 
-        logger.info("Azure ML Dataset Train, Validate, Test loaded successfully. {}, {}, {}".format(train_ds,validate_ds,test_ds))
-        print("Azure ML Dataset Train, Validate, Test loaded successfully. {}, {}, {}".format(train_ds,validate_ds,test_ds))
-        print("Azure ML Dataset Tran is of TYPE: {}".format(type(train_ds)))
+        logger.info("Azure ML Dataset Test loaded successfully. {}".format(test_ds))
+        print("Azure ML Dataset Test loaded successfully. {}".format(test_ds))
 
-        try:
-            train_ds2 = Dataset.get_by_name(workspace=ws, name=train_ds,  version='latest')
-            print("train_ds2.Azure ML Dataset  is of TYPE: {}".format(type(train_ds2)))
-            print("train_ds2.tags = {}".format(train_ds2.tags))
-        except: 
-            pass
-        
         # OUTPUT: PATHS
         # 1) Save META data: "WHAT data was used, when did the training occur in time, etc "  (train_gold path, run_id, pipeline_id )
         it = iter(run.output_datasets)
@@ -123,7 +124,7 @@ def init():
         logging_utilities.log_traceback(e, logger)
         raise
 
-def train(train_ds,validate_ds,test_ds):
+def compare(test_ds):
     try:
         logger.info("train() started...")
         print("train() started...")
@@ -131,7 +132,7 @@ def train(train_ds,validate_ds,test_ds):
         comparer = None # IESMLModelCompare
         #trainer = None # IESMLTrainer
 
-        # CUSTOMIZE ############### Optional: You can CUSTOMIZE how test_set scoring is calculated, and model comparison is done, by implementing your own CLASS that supports interfaces/abstract classes: IESMLTestScoringFactory,IESMLModelCompare
+        # CUSTOMIZE ############### Optinonal: You can CUSTOMIZE, by implementing your own CLASS that supports interfaces/abstract classes: IESMLTestScoringFactory,IESMLModelCompare
         project_number = 'project002'
         ml_type = "regression"
         test_scoring = ESMLTestScoringFactory(ml_type) # You need to implement IESMLTestScoringFactory
@@ -143,81 +144,119 @@ def train(train_ds,validate_ds,test_ds):
         # CUSTOMIZE END ###############
         controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
 
-        train_test_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, train_ds,validate_ds,test_ds,ml_type)
+        calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, test_ds,ml_type)
 
 
     except Exception as e:
         logging_utilities.log_traceback(e, logger)
         raise
 
-def train_test_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_current_env, train_ds,validate_ds,test_ds, ml_type):
+# TODO: fitted_model_1,best_automl_run,model,main_run
+# FROM experiment, model,main_run, best_automl_run,fitted_model_1 = IESMLController.get_best_model_run_fitted_model_Dev(ws,controller.experiment_name)
+def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_current_env, test_ds, ml_type):
     test_scoring = controller.ESMLTestScoringFactory # IESMLTestScoringFactory
     comparer = controller.ESMLComparer # IESMLModelCompare
     trainer = None # IESMLTrainer
 
     controller.dev_test_prod = esml_current_env
-    model_name = None
-    main_run = run.parent # Parent is the pipeline run, current 'run' is just the current step in pipeline.
 
-    ##1 ) Get "current" 'last_gold_training_run' [pipeline_run_id, training_data_used]
-    current_model,run_id_tag, model_name_tag = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,controller.experiment_name)
-    model_name = model_name_tag
+    ##1 ) Get "current" BEST mpodel 
+    current_model,run_id_tag, model_name = "","",""
 
-    # CUSTOMIZE ############### If using MANUAL ML you need to implement a Trainer class, that support ITrainer abstract methods/interfaces
+    current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,controller.experiment_name)
+    if(current_model is None):
+        print("No existing model with experiment name {}. The Model name will now be same as experiment name".format(controller.experiment_name))
+        current_model = None
+        run_id_tag = ""
+        model_name = controller.experiment_name
+    else:
+        print("Current BEST model is: {} from Model registry with experiment_name-TAG {}, run_id-TAG {}  model_name-TAG {}".format(current_model.name,controller.experiment_name,run_id_tag,model_name))
 
-    # ITrainer: Defaults to using AutoML. Optionally you can implement this. Else you need to implement ITrainer in 'YourTrainer' class
-    trainer = Trainer(model_name,esml_modelname,esml_model_alias, esml_current_env, ml_type,train_ds,validate_ds,test_ds)
-    train_run, aml_model,fitted_model_new = trainer.train(train_ds,validate_ds)
-
-    # CUSTOMIZE ###############
+    print ("esml_modelname inparameter {} and controller.experiment_name: {} and get_betModel, model_name {} ".format(esml_modelname,controller.experiment_name,model_name))
 
     ##2 ) Register NEW TRAINED model, with TAG status_code=esml_new_trained
     tags = {"status_code": IESMLController.esml_status_new, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
-        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "PythonScriptStep-ManualML"}
+        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "AutoMLStep"}
 
-    ##3) Register NEW model in CURRENT env
-    model = controller._register_aml_model(full_local_path=None,model_name=model_name,tags=tags,target_ws=ws,description_in="")
+    ##2b) Register NEW model in CURRENT env
+    model = controller._register_aml_model(model_path,model_name,tags,ws,"")
+    fitted_model_1 = None
+    
+    #2c) Get fitted_model_1, best_automl_run,model
 
-    ##4) Calculate TEST_SET SCORING  on NEW model(label,ws, GoldTest, model, fitted_model, source_best_run/run)
-    rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_new,main_run,aml_model)
+    try:
+        fitted_model_1 = joblib.load("model.pkl")
+        print("load Model with joblib.load, name model.pkl SUCCESS") # SUCCESS!
+    except Exception as e:
+        print("Cannot load Model with name model.pkl")
 
+####################### Get AutoMLRun from AutoMLStep and best_trained_model etc #####################
+    step_name = "AutoML TRAIN in [{}]".format(esml_current_env)
+    print("step_name: {}".format(step_name))
+    pipeline_run = run.parent # Parent is the pipeline run, current is the current step.
+    
+    step_list = list(pipeline_run.get_steps())
+    step_len = len(step_list) # 6
+    automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
+
+    automl_run_step_by_index = step_list[automl_step_id]
+    print("automl_run_step_by_index: {} and type {}".format(automl_run_step_by_index.id,type(automl_run_step_by_index)))
+    automl_step_run_id = automl_run_step_by_index.id
+    
+    experiment_run = ws.experiments[controller.experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
+    automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
+    best_run, fitted_model_1 = automl_step_run.get_output()
+    #automl_step_run.register_model()
+
+####################################
+    print("Registered version {0} of model {1}".format(model.version, model.name))
+    print("model_path: {}".format(model_path))
+    print("model_name: {}".format(model_name))
+    print("Model returned after Model.register of type {}".format(type(model)))
+    #print("Model")
+    #print(model)
+
+    # TODO:2) Get LATEST model, without ANY TAGS  status_code = "esml_new_trained", then we get PREVIOUS winning model
+
+
+    #3) Calculate Testset scoring on NEW model
+    rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
+    print("Scoring for NEW model is: {},{},{},{}, {}".format(rmse,r2,mean_abs_percent_error,mae,spearman_correlation))
+
+    ## 4) COMPARE if NEW model is better, than all else:
     next_environment = controller.get_next_environment()
-
-    #  current_ws,current_environment, target_environment,target_workspace, experiment_name)
     target_ws = controller.get_target_workspace(current_environment = esml_current_env, current_ws = ws, target_environment = esml_current_env)
 
-    ## 5) COMPARE if better
-
     promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model = comparer.compare_scoring_current_vs_new_model(
-        new_run_id = main_run.id,
+        new_run_id =automl_step_run_id, # pipeline_run_id, #main_run.id,
         current_ws = ws,
         current_environment = esml_current_env,
         target_environment = esml_current_env,
         target_workspace = target_ws,
-        experiment_name = trainer.experiment_name)
+        experiment_name = controller.experiment_name)
 
-    print("compared once, 1 time, inner loop - Dev")
+# OUTER LOOP - Not tested 2022-09-06
 
-    ## 6) REGISTER model, if better
+    ## 3) OUTER LOOP - REGISTER model, if better in TARGET environment TEST, if it is best in DEV.
 
-    if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env)
-        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model_to_copy_tags_from=aml_model)
-        print("registered in {}".format(esml_current_env))
+    if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
+        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted) 
+        print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
         next_environment = controller.get_next_environment() # Test, or PROD
         promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model = comparer.compare_scoring_current_vs_new_model(
-            new_run_id = main_run.id,
+            new_run_id = automl_step_run_id,
             current_ws = ws,
             current_environment = esml_current_env,
             target_environment = next_environment,
             target_workspace = target_ws,
-            experiment_name = trainer.experiment_name)
+            experiment_name = controller.experiment_name)
 
         print("Compared 2nd time - Outer loop")
         if (promote_new_model == True):
-            model_registered_in_target = controller.register_model(source_ws=ws, target_env=next_environment, source_model_to_copy_tags_from=model) # next_environment should be 'test'
-            print("Registered model {} with version {} in {}".format(model_registered_in_target.name,model_registered_in_target.version,next_environment))
+            model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model)
+            print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
 
 def save_results():
     try:
@@ -244,5 +283,5 @@ def save_results():
 
 if __name__ == "__main__":
     init()
-    train(train_ds,validate_ds,test_ds)
+    compare(test_ds)
     save_results()

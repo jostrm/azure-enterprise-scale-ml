@@ -56,6 +56,10 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
     - See image: 
 ![](./esml/images/esml-s01e01-3.png)
 
+# Contributing to ESML?
+This repository is a push-only mirror. Pull requests are ignored. See LICEENCE file (open source, MIT license)
+- Ping Joakim Åström for contributions / ideas. Speaking of: Credit to Kim Berg and Ben Kooijman for contributing! (kudos to the ESML IP calculator and Bicep for ESML Project)
+
 # INTRO - Is this for you: refine data? AutoML or manual ML? R&D phase? 
 **Q1:I want to use Azure AutoML, with MLOps ready to be `turned ON`** , with datalake design automatically generated for me, including `BRONZE, SILVER, GOLD` concept
 - A: Yes. ESML is AutoML first, and have married this with MLOps, and an `AutoLake™` for Azure ML Studio.

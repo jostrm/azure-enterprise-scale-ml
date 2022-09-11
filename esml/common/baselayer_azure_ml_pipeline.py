@@ -27,6 +27,12 @@ from azureml.pipeline.core import PublishedPipeline
 from azureml.pipeline.core import PipelineEndpoint
 from azureml.data.dataset_error_handling import DatasetValidationError
 from azureml.core import Run
+from azureml.train.automl import AutoMLConfig
+
+from azureml.pipeline.steps import AutoMLStep
+from azureml.pipeline.steps import AutoMLStepRun
+from azureml.pipeline.core import TrainingOutput, PipelineData
+from azureml.core import Datastore
 
 #endregion
 #region(collapsed) Enumerators
@@ -55,6 +61,7 @@ class esml_step_types():
 class ESMLPipelineFactory():
     p = None
     _use_curated_automl_environment = True
+    # https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
     _environment_name = "AzureML-AutoML-DNN" # # Training[ "AzureML-AutoML","AzureML-AutoML-DNN", "AzureML-lightgbm-3.2-ubuntu18.04-py37-cpu"]  Inference["AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference",]
     _use_own_compute_per_step = False
     _pipeline_steps_array = []
@@ -65,6 +72,9 @@ class ESMLPipelineFactory():
     _esml_pipeline_type = None
     _script_names_dic = {}
     _script_template_enterprise = "../../../settings/enterprise_specific/dev_test_prod_defaults/batch/pipeline_template"
+    _script_template_enterprise_runtime = "../../esmlrt"
+    _script_template_project_settings = "../../../settings/project_specific/model"
+
     #region(collapsed) TODO
     #script_template_user = "../../../settings/project_specific/model/dev_test_prod_override/batch/pipeline_template"
     #endregion
@@ -76,7 +86,7 @@ class ESMLPipelineFactory():
     _scoring_filename = "scoring_gold.py"
     _train_split_and_register_file = "train_split_and_register.py"
     _train_manual_filename = "train_manual.py"
-    _train_automl_filename = "train_automl.py"
+    _train_automl_filename = "train_post_automl_step.py"
 
     _in2bronze_filename = "in2bronze.py" # Not used in In2Silver2Gold data model
     _bronze2silver_filename = "bronze2silver.py" # Not used In2Silver2Gold data model
@@ -328,16 +338,16 @@ class ESMLPipelineFactory():
             self._script_names_dic[esml_step_types.TRAIN_MANUAL] = train_manual
 
             # TRAIN_AUTOML
-            #source = self._script_template_enterprise + "/" + self._train_automl_filename
-            #train_automl = self._snapshot_folder + self._train_automl_filename
-            #if(not only_info):
-            #    shutil.copy(source, train_automl)
-            #    print("Edit at {}".format(train_automl))
-            #self._script_names_dic[esml_step_types.TRAIN_AUTOML] = train_automl
+            source = self._script_template_enterprise + "/" + self._train_automl_filename
+            train_automl = self._snapshot_folder + self._train_automl_filename
+            if(not only_info):
+                shutil.copy(source, train_automl)
+                print("Edit at {}".format(train_automl))
+            self._script_names_dic[esml_step_types.TRAIN_AUTOML] = train_automl
 
              # your_custom_code.PY
             init_py_name = "your_custom_code.py"
-            source = self._script_template_enterprise + "/" + init_py_name
+            source = self._script_template_enterprise + "/your_code/" + init_py_name
             initpy = self._snapshot_folder + "your_code/"+ init_py_name
             if(not only_info):
                 os.makedirs(os.path.dirname(self._snapshot_folder + "your_code/"), exist_ok=True)
@@ -345,12 +355,37 @@ class ESMLPipelineFactory():
                 print("Edit at {}".format(initpy))
             self._script_names_dic["Custom code"] = initpy
 
+            # your_train_code.PY
+            source_file = "your_train_code.py"
+            source = self._script_template_enterprise + "/your_code/" + source_file
+            target_file = self._snapshot_folder + "your_code/" + source_file
+            if(not only_info):
+                shutil.copy(source, target_file)
+
             # __INIT__.PY
             init_py_name = "__init__.py"
             source = self._script_template_enterprise + "/" + init_py_name
             initpy = self._snapshot_folder + init_py_name
             if(not only_info):
                 shutil.copy(source, initpy)
+
+            # RUNTIME
+            source = self._script_template_enterprise_runtime
+            target = self._snapshot_folder + "esmlrt"
+            if(not only_info):
+                shutil.copytree(source, target,dirs_exist_ok=True)
+            
+            # SETTINGS
+            
+            project_settings = 'model_settings.json'
+            source = self._script_template_project_settings + "/" + project_settings
+            target_folder = self._snapshot_folder + "esmlrt/settings/project_specific/model/"
+            
+            target_file = target_folder + project_settings
+            if(not only_info):
+                os.makedirs(os.path.dirname(target_folder), exist_ok=True)
+                shutil.copy(source, target_file)
+                
         finally:
             os.chdir(old_loc)
         return self._script_names_dic
@@ -389,6 +424,9 @@ class ESMLPipelineFactory():
             elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
                 p.inference_mode = False
                 pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
+            elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
+                p.inference_mode = False
+                pipe = self._create_pipeline(pipeline_type,same_compute_for_all,cpu_gpu_databricks)
             else: # TODO: Switch/Case on  esml_pipeline_types, to support multiple types
                 raise ValueError('ESML does not support this pipeline type, as of this moment. Check for updates..')
         finally:
@@ -425,13 +463,13 @@ class ESMLPipelineFactory():
                     remote_run = PipelineRun(experiment=experiment, run_id=run_id)
                     best_run, source_fitted_model = remote_run.get_output()
                 except Exception as e:
-                    print("1)Soft Error: PipelineRun .get_output() gave error {}".format(e))
-                    print("2)Soft Error: Now trying as AutoMLRun instead of PipelineRun, to get Run() and fitted_model")
+                    #print("1)Soft Error: PipelineRun .get_output() gave error {}".format(e))
+                    #print("2)Soft Error: Now trying as AutoMLRun instead of PipelineRun, to get Run() and fitted_model")
                     try:
                         remote_run = AutoMLRun(experiment=experiment, run_id=run_id)
                         best_run, source_fitted_model = remote_run.get_output()
                     except:
-                        print("Soft Error: It was not an AutoMLRun() Lets init it as a regular Run()")
+                        print("It was not an AutoMLRun() Lets init it as a regular Run()")
                         remote_run = Run(experiment=experiment, run_id=run_id)
                         best_run = remote_run # , source_fitted_model = remote_run.get_output()
 
@@ -509,7 +547,8 @@ class ESMLPipelineFactory():
 
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD or 
-                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or
+                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
 
                 compute_suffix = 1
 
@@ -552,7 +591,8 @@ class ESMLPipelineFactory():
             gold_to_score= None
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD or 
-                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
+                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or 
+                pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
                 # 2) Gold to score (merge all silver datasets)
                 gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array)
                 step_array.append(gold_to_score)
@@ -575,7 +615,10 @@ class ESMLPipelineFactory():
                 if (pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
                     step_array.append(self.create_train_gold_step_manual(compute,runconfig,split_gold))
                 elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
-                    raise NotImplementedError("Not suppported in your ESML version, try 'IN_2_GOLD_TRAIN_MANUAL' instead . Please ask admin for private preview for IN_2_GOLD_TRAIN_AUTOML, or use ESML IN_2_GOLD_TRAIN_AUTOML Agentless.")
+                    train_automl_step,model_data,metrics_data = self.create_train_automl_step(compute,runconfig,split_gold)
+                    step_array.append(train_automl_step)
+                    step_array.append(self.create_post_AutoMLStep(compute,runconfig,split_gold,train_automl_step,model_data,metrics_data))
+                    #raise NotImplementedError("Not suppported in your ESML version, try 'IN_2_GOLD_TRAIN_MANUAL' instead . Please ask admin for private preview for IN_2_GOLD_TRAIN_AUTOML, or use ESML IN_2_GOLD_TRAIN_AUTOML Agentless.")
                     
             self._pipeline_steps_array = step_array
             pipeline = Pipeline(workspace = p.ws, steps=step_array)
@@ -605,28 +648,40 @@ class ESMLPipelineFactory():
 
         # OUT: Splitted datasets
 
-        train_path = p.GoldPath + 'Train' # projects/project002/10_titanic_model_clas/train/gold/dev/Train
-        validate_path = p.GoldPath + 'Validate' # projects/project002/10_titanic_model_clas/train/gold/{env}/Validate/{guid}/*.parquet
-        test_path = p.GoldPath + 'Test'
+        #train_path = p.GoldPath + 'Train/1_latest/' # projects/project002/10_titanic_model_clas/train/gold/dev/Train/1_latest/
+        #validate_path = p.GoldPath + 'Validate/1_latest/' # projects/project002/10_titanic_model_clas/train/gold/{env}/Validate/{guid}/*.parquet
+        #test_path = p.GoldPath + 'Test/1_latest/'
+
+
+        train_path,validate_path,test_path = p.path_gold_train_splitted_template() # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{id_folder}}/
+        train_path_out = train_path.format(id_folder="{run-id}")
+        validate_path_out = validate_path.format(id_folder="{run-id}")
+        test_path_out = test_path.format(id_folder="{run-id}")
+        
+        print("ESML-train_path_out = ".format(train_path_out))
+
+        #train_path = train_path + '*.parquet' # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/8e9792b1f7e84d40b3dd29dbc5a91a37/*.parquet
+        #validate_path = validate_path + '*.parquet'
+        #test_path = test_path + '*.parquet'
 
         #train_version_folder = train_path + uuid.uuid4().hex + "/"
 
         train_ds = (
-            OutputFileDatasetConfig(name=p.dataset_gold_train_name_azure,destination=(self._datalake,train_path))
+            OutputFileDatasetConfig(name=p.dataset_gold_train_name_azure,destination=(self._datalake,train_path_out))
             .as_upload(overwrite=True) # as_mount() also works
-            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .read_parquet_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
             .register_on_complete(name=p.dataset_gold_train_name_azure)
         )
         validate_ds = (
-            OutputFileDatasetConfig(name=p.dataset_gold_validate_name_azure,destination=(self._datalake,validate_path))
+            OutputFileDatasetConfig(name=p.dataset_gold_validate_name_azure,destination=(self._datalake,validate_path_out))
             .as_upload(overwrite=True) # as_mount() also works
-            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .read_parquet_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
             .register_on_complete(name=p.dataset_gold_validate_name_azure)
         )
         test_ds = (
-            OutputFileDatasetConfig(name=p.dataset_gold_test_name_azure,destination=(self._datalake,test_path))
+            OutputFileDatasetConfig(name=p.dataset_gold_test_name_azure,destination=(self._datalake,test_path_out))
             .as_upload(overwrite=True) # as_mount() also works
-            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .read_parquet_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
             .register_on_complete(name=p.dataset_gold_test_name_azure)
         )
 
@@ -636,13 +691,16 @@ class ESMLPipelineFactory():
         step_split_gold = PythonScriptStep(
             runconfig=runconfig,
             script_name=self._train_split_and_register_file,
-            name="SPLIT AND REGISTER",
+            name="SPLIT AND REGISTER datasets",
             arguments=[
             "--target_column_name",self._target_column_name,
             "--par_esml_split_percentage",self.batch_pipeline_parameters[5], # 0.6 as default for TRAIN
             "--par_esml_training_date",self.batch_pipeline_parameters[1], # datefolder with TRAIN data
             "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
-            "--par_esml_inference_mode", self.batch_pipeline_parameters[4] # does not need to be a parameter that changes runtime...but at DEFINITION time.
+            "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
+            "--esml_output_lake_template_train",train_path,
+            "--esml_output_lake_template_validate",validate_path,
+            "--esml_output_lake_template_test",test_path
             ],
             inputs=[gold_to_split.as_input(gold_to_split.name)], 
             outputs=[train_ds,validate_ds,test_ds], 
@@ -659,16 +717,9 @@ class ESMLPipelineFactory():
         # Get model name info, and current model info
         aml_model,aml_model_name, current_fitted_model, esml_model_name = self.getBestModel()
 
-        # A)
-        #latest_scored_folder = p.path_gold_scored_template(False,True,False) # (False,True,False) projects/project002/11_diabetes_model_reg/train/gold/dev/{id_folder}/
-        #latest_gold_scored_path = latest_scored_folder + "{run-id}"
-        
-        # B) 
-        #train_folder_template = p.path_gold_scored_template(False,False,False) # (False,False,False) projects/project002/11_diabetes_model_reg/train/gold/dev/
-        #train_folder_template_with_id = train_folder_template  + "{run-id}" #  projects/project002/11_diabetes_model_reg/train/gold/dev/{run-id}
-
-        # C) 
-        train_folder_template_with_id = p.path_gold_scored_template(False,True,False) # projects/project002/11_diabetes_model_reg/train/gold/dev/{id_folder}/
+        # projects/project002/11_diabetes_model_reg/train/gold/dev/{todays_date_folder}/{run-id}/
+        train_folder_template_with_date_and_run_id = p.path_gold_scored_template(date_folder=False,id_folder=True, inference_mode = False)
+        print("train_folder_template_with_date_id: {}".format(train_folder_template_with_date_and_run_id))
 
         train_out = None
         validate_out = None
@@ -692,6 +743,7 @@ class ESMLPipelineFactory():
         #name_incl_env = "TRAINING in ESML " + self.batch_pipeline_parameters[3] +" performance"
         name_auto = esml_step_types.TRAIN_MANUAL.replace("_"," ")
         name_incl_env = name_auto + " ["+self.batch_pipeline_parameters[3].default_value +"]"
+        name_incl_env = "TRAIN in "+ " ["+self.batch_pipeline_parameters[3].default_value +"]" +", COMPARE & REGISTER model in " + "["+self.batch_pipeline_parameters[3].default_value +"] & PROMOTE to [test]"
 
         step_train_gold = PythonScriptStep(
             runconfig=runconfig,
@@ -700,8 +752,8 @@ class ESMLPipelineFactory():
             arguments=[
             "--target_column_name",self._target_column_name,
             "--par_esml_model_version",self.batch_pipeline_parameters[0], # model to compare with (inner loop), version=0 if first time
-            "--par_esml_training_date",self.batch_pipeline_parameters[1], # model to compare with (inner loop), datefolder to scoring
-            "--esml_train_lake_template",train_folder_template_with_id,
+            "--par_esml_training_date",self.batch_pipeline_parameters[1], # training data
+            "--esml_train_lake_template",train_folder_template_with_date_and_run_id,
             "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
             "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
             "--par_esml_model_alias", p.ModelAlias,
@@ -716,6 +768,114 @@ class ESMLPipelineFactory():
         )
 
         return step_train_gold
+
+    def create_post_AutoMLStep(self,compute, runconfig, gold_to_split_step, train_automl_step,model_data,metrics_data):
+        p = self.p
+
+        # Get model name info, and current model info
+        aml_model,aml_model_name, current_fitted_model, esml_model_name = self.getBestModel()
+
+        # projects/project002/11_diabetes_model_reg/train/gold/dev/{todays_date_folder}/{run-id}/
+        train_folder_template_with_date_and_run_id = p.path_gold_scored_template(date_folder=False,id_folder=True, inference_mode = False)
+        print("train_folder_template_with_date_id: {}".format(train_folder_template_with_date_and_run_id))
+
+        train_out = None
+        validate_out = None
+        test_out = None
+
+        if(type(gold_to_split_step) is OutputFileDatasetConfig):  # esml_pipeline_type.SCORE_GOLD 
+            train_out = gold_to_split_step # gives us the "OutputFileDatasetConfig"
+        else: # esml_pipeline_type.IN_2_GOLD_SCORING
+            train_out = gold_to_split_step._outputs[0] # gives us the "OutputFileDatasetConfig"
+            validate_out = gold_to_split_step._outputs[1]
+            test_out = gold_to_split_step._outputs[2]
+
+        # OUT: Training meta data (scoring, promote=True, etc)
+        last_gold_training_run = (
+            OutputFileDatasetConfig(name=p.dataset_gold_train_runinfo_name_azure,destination=(self._datalake,p.path_gold_trained_runinfo))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name=p.dataset_gold_train_runinfo_name_azure)
+        )
+
+        name_incl_env = "["+self.batch_pipeline_parameters[3].default_value +"]" +"Calculate SCORING on TEST_SET, COMPARE & REGISTER model in " + "["+self.batch_pipeline_parameters[3].default_value +"] & PROMOTE to [test]"
+
+        step_train_gold = PythonScriptStep(
+            runconfig=runconfig,
+            script_name=self._train_automl_filename,
+            name=name_incl_env,
+            arguments=[
+            "--target_column_name",self._target_column_name,
+            "--par_esml_model_version",self.batch_pipeline_parameters[0], # model to compare with (inner loop), version=0 if first time
+            "--par_esml_training_date",self.batch_pipeline_parameters[1], # training data
+            "--esml_train_lake_template",train_folder_template_with_date_and_run_id,
+            "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
+            "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
+            "--par_esml_model_alias", p.ModelAlias,
+            "--par_esml_model_name", p.model_folder_name,
+            "--par_aml_model_name", aml_model_name,
+            "--model_name", p.model_folder_name,
+            "--model_path", model_data
+            ],
+            inputs=[test_out.as_input(test_out.name),model_data], 
+            outputs=[last_gold_training_run], 
+            source_directory=self.get_snapshot_dir_relative(),
+            compute_target=compute,
+            allow_reuse=self._allow_reuse
+        )
+
+        return step_train_gold
+
+    #
+    # You must set enable_default_model_output and enable_default_metrics_output to True only if you are using AutoMLStepRun.
+    #
+    def create_train_automl_step(self,compute, runconfig, gold_to_split_step):
+        p = self.p
+
+        label = p.active_model["label"]
+        automl_performance_config = p.get_automl_performance_config() # 1)Get config, for active environment (dev,test or prod)
+        #aml_compute = p.get_training_aml_compute(p.ws) # 2)Get compute, for active environment
+
+        train_out = gold_to_split_step._outputs[0] # gives us the "OutputFileDatasetConfig"
+        validate_out = gold_to_split_step._outputs[1]
+        test_out = gold_to_split_step._outputs[2]
+
+        automl_config = AutoMLConfig(task = 'regression',  #TODO: move as a parameter in get_automl_performance_config()
+                            primary_metric = 'normalized_mean_absolute_error', #TODO: move as a parameter in get_automl_performance_config()
+                            compute_target = compute,
+                            #run_configuration = runconfig,
+                            training_data = train_out, # p.GoldTrain, 
+                            experiment_exit_score = '0.308', # DEMO purpose #TODO: pass as a parameter "DEMO"
+                            label_column_name = label,
+                            **automl_performance_config
+                        )
+
+        # Save model information
+        # https://docs.microsoft.com/en-us/azure/machine-learning/v1/how-to-use-automlstep-in-pipelines
+        datastore = Datastore(p.ws, 'workspaceblobstore')
+        metrics_data = PipelineData(name='metrics_data',
+                            datastore=datastore,
+                            pipeline_output_name='metrics_output',
+                            training_output=TrainingOutput(type='Metrics'))
+
+        model_data = PipelineData(name='best_model_data',
+                          datastore=datastore,
+                          pipeline_output_name='model_output',
+                          training_output=TrainingOutput(type='Model'))
+
+        name_auto = esml_step_types.TRAIN_MANUAL.replace("_"," ")
+        name_incl_env = name_auto + " ["+self.batch_pipeline_parameters[3].default_value +"]"
+        name_incl_env = "AutoML TRAIN in "+ " ["+self.batch_pipeline_parameters[3].default_value +"]"
+        
+        train_step = AutoMLStep(name=name_incl_env,
+            automl_config=automl_config,
+            passthru_automl_config=False,
+            outputs=[metrics_data,model_data], # NB! PipelineData use DataReference underlying which is no longer the recommended approach for data access and delivery, please use OutputFileDatasetConfig instead
+            enable_default_model_output=False, # You must set enable_default_model_output and enable_default_metrics_output to True only if you are using AutoMLStepRun.
+            enable_default_metrics_output=False,
+            allow_reuse=self._allow_reuse)
+
+        return train_step,model_data,metrics_data
 
     def create_score_gold_step(self,compute, runconfig, gold_to_score_step):
         p = self.p
@@ -793,14 +953,15 @@ class ESMLPipelineFactory():
             path_gold_to_score_template_pars = p.path_gold_to_score_template(True,True)
             gold_to_score_name = p.dataset_gold_to_score_name_azure # dataset_gold_name_azure
         else:
-            print("create_gold_to_score_step: inference_mode=False")
-            path_gold_to_score_template_pars = p.path_gold_to_score_template(False,True,False)
+            print("create_gold_train_step: inference_mode=False")
+            path_gold_to_score_template_pars = p.path_gold_to_score_template(False,True,False) # projects/project002/11_diabetes_model_reg/train/gold/dev/{id_folder}/
             gold_to_score_name = p.dataset_gold_name_azure
             gold_to_score_folder = p.path_gold_to_score_template(False,False,False)
             if(next_step_is_databricks_step):
                 gold_to_score_folder = gold_to_score_folder + "gold_dbx.parquet"
             else: 
-                gold_to_score_folder = gold_to_score_folder + "latest_gold_train"
+                gold_to_score_folder = gold_to_score_folder + "1_latest/"
+
 
         gold_to_score = (
             OutputFileDatasetConfig(name=gold_to_score_name,destination=(self._datalake,gold_to_score_folder))

@@ -903,6 +903,18 @@ class ESMLProject():
         if(self.automl_factory is None):
             self.automl_factory = AutoMLFactory(self)
 
+    def get_active_inference_config(self,best_run,target_env, ws_in = None):
+        if (ws_in is None):
+            ws = self.ws # use its own default WS
+        else:
+            ws = ws_in
+
+        self.initAutoMLFactory()
+        if(self._compute_factory is None):
+            self.initComputeFactory(ws)
+
+        return self.automl_factory.get_active_inference_config(best_run,target_env)
+
     def get_active_model_inference_config(self, ws_in = None):
         ws = None
         if (ws_in is None):
@@ -1088,23 +1100,50 @@ class ESMLProject():
     def Lakestore(self):
         return self.datastore
 
+    #
+    # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{8e9792b1f7e84d40b3dd29dbc5a91a37}/
+    # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{2020/01/01}/{8e9792b1f7e84d40b3dd29dbc5a91a37}/
+    # 
+    #
+    def path_gold_train_splitted_template(self, date_folder=False,id_folder=True):
+        baseline = self.GoldPath # _proj_start_path+"/{project}/{model}/train/gold/{dev}/"
+
+        train_template = baseline+ "Train/"
+        validate_template = baseline+ "Validate/"
+        test_template = baseline+ "Test/"
+
+        if(date_folder):
+            train_template = train_template + "{date_folder}" + "/"
+            validate_template = validate_template+ "{date_folder}" + "/"
+            test_template = test_template+ "{date_folder}" + "/"
+        else:
+            train_template = train_template
+            validate_template = validate_template 
+            test_template = test_template
+
+        if (id_folder):
+            train_template = train_template + "{id_folder}" + "/"
+            validate_template = validate_template + "{id_folder}" + "/"
+            test_template = test_template + "{id_folder}" + "/"
+        
+        return train_template,validate_template,test_template
+
     '''
         self._gold_scored = ds
         dataset_gold_scored_name_azure
     '''
-
     def path_gold_to_score_template(self, date_folder=False,id_folder=False,inference_mode = True):
         to_score_template = ""
 
         if(inference_mode == True):
             baseline = self._inference_gold_path.format(self.project_folder_name,self.model_folder_name,"{model_version}", self.dev_test_prod)
         else:
-            baseline = self.GoldPath
+            baseline = self.GoldPath #  = _proj_start_path+"/{project002}/{model001}/train/gold/{dev}/"
 
         if(date_folder):
             to_score_template = baseline+ "{date_folder}" + "/"
         else:
-            to_score_template = baseline
+            to_score_template = baseline 
 
         if (id_folder):
             to_score_template = to_score_template + "{id_folder}" + "/"

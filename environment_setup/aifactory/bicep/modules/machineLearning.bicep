@@ -58,7 +58,7 @@ param amlPrivateDnsZoneID string
 @description('Resource name ID on DnsZone')
 param notebookPrivateDnsZoneID string
 @description('AKS Kubernetes version and AgentPool orchestrator version')
-param kubernetesVersionAndOrchestrator string = '1.23.3'
+param kubernetesVersionAndOrchestrator string = '1.24.3' // 2022-09-11: 1.23.3 not supported anymore in West Europe (az aks get-versions --location westeurope --output table). Supported >='1.23.5'
 
 @description('AKS Kubernetes version and AgentPool orchestrator version')
 param allowPublicAccessWhenBehindVnet bool = false

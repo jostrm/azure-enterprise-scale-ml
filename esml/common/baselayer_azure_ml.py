@@ -1140,7 +1140,7 @@ class AutoMLFactory(metaclass=Singleton):
             print("This is the first model to be trained, thus nothing to evaluate for now")
             return None, None
     
-    def get_active_model_inference_config(self,target_workspace,target_env, override_enterprise_settings_with_model_specific):
+    def get_active_model_inference_config(self,target_workspace,target_env, override_enterprise_settings_with_model_specific=True):
         self.LoadConfiguration(target_env, override_enterprise_settings_with_model_specific)
 
         #target_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific)
@@ -1167,6 +1167,24 @@ class AutoMLFactory(metaclass=Singleton):
              os.chdir(old_loc)
 
         return inference_config, model_class, target_best_run
+
+    def get_active_inference_config(self,target_best_run,target_env, override_enterprise_settings_with_model_specific=True):
+        self.LoadConfiguration(target_env, override_enterprise_settings_with_model_specific)
+        old_loc = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(__file__))
+            script_file_local = "../../../settings/project_specific/model/dev_test_prod/train/automl/scoring_file_{}.py".format(self.dev_test_prod)
+            target_best_run.download_file('outputs/scoring_file_v_1_0_0.py', script_file_local)
+
+            script_file_abs = os.path.abspath(script_file_local)
+            inference_config = InferenceConfig(environment=target_best_run.get_environment(), entry_script=script_file_abs)
+
+        except Exception as e:
+            raise e
+        finally:
+             os.chdir(old_loc)
+
+        return inference_config
     
     # https://github.com/Azure/MachineLearningNotebooks/blob/master/how-to-use-azureml/machine-learning-pipelines/intro-to-pipelines/aml-pipelines-with-automated-machine-learning-step.ipynb
     def get_pipeline_output_and_model(self,target_workspace,target_env, override_enterprise_settings_with_model_specific):

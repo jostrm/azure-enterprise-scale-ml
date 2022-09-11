@@ -8,10 +8,11 @@ from azureml.telemetry import UserErrorException
 import sklearn
 import tempfile
 from azureml.core.resource_configuration import ResourceConfiguration
-from datetime import datetime
+from interfaces.iESMLModelCompare import IESMLModelCompare
+from interfaces.iESMLController import IESMLController
 #from ..interfaces.iESMLModelCompare import IESMLModelCompare
 
-class ESMLModelCompare():
+class ESMLModelCompare(IESMLModelCompare):
 
     dev_test_prod = "dev"
     project = None
@@ -25,9 +26,12 @@ class ESMLModelCompare():
     
 
     def __init__(self,project):
+        if not isinstance(project, IESMLController): raise Exception('Bad interface. Should be IESMLController')
+        if not IESMLController.version() == '1.4': raise Exception('Bad revision')
+
         self.project = project
 
-    def LoadConfiguration(self, dev_test_prod, override_enterprise_settings_with_model_specific):
+    def LoadConfiguration(self, dev_test_prod, override_enterprise_settings_with_model_specific = True):
         old_loc = os.getcwd()
         
         try:
@@ -37,7 +41,9 @@ class ESMLModelCompare():
 
             os.chdir(os.path.dirname(__file__))
 
-            user_settings = "../../"
+            #user_settings = "../../"
+            user_settings = ""
+
             start_path = "enterprise_specific/dev_test_prod_defaults"
             if (override_enterprise_settings_with_model_specific):
                 start_path = "project_specific/model/dev_test_prod_override"
@@ -314,10 +320,10 @@ class ESMLModelCompare():
             print("")
 
             if(task_type == "classification"):
-                print("New trained model: model id {}".format(source_model.id))
+                print("New trained model: ")
                 source_metrics = self.classification_print_metrics(source_best_run,source_model)
                 print("")
-                print("Target model, to compare with, model id {}".format(target_model.id))
+                print("Target model, to compare with; ")
                 target_metrics = self.classification_print_metrics(target_best_run,target_model)
                 print("")
 
@@ -327,10 +333,10 @@ class ESMLModelCompare():
                 promote_new_model = self.compare_metrics(cl_map, source_metrics, target_metrics,selected_metric_array,lower_is_better)
 
             elif (task_type == "regression" or task_type == "forecasting"):
-                print("New trained model: model id {}".format(source_model.id))
+                print("New trained model: ")
                 source_metrics = self.regression_print_metrics(source_best_run,source_model)
                 print("")
-                print("Target model, to compare with, model id {}".format(target_model.id))
+                print("Target model, to compare with; ")
                 target_metrics = self.regression_print_metrics(target_best_run,target_model)
                 print("")
 
@@ -467,10 +473,6 @@ class ESMLModelCompare():
             tags["test_set_MAPE"] = model_ph.tags["test_set_MAPE"]
             tags["test_set_Spearman_Correlation"] = model_ph.tags["test_set_Spearman_Correlation"]
 
-        date_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-        tags["esml_time_updated"] = "{}".format(date_time)
-        tags["status_code"] = "esml_not_newly_trained"
-
         #tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": self.project.dev_test_prod, 
         #"trained_in_workspace": self.project.ws.name, "experiment_name": self.project.model_folder_name}
 
@@ -542,7 +544,7 @@ class ESMLModelCompare():
 
         run_id = remote_run.id # TODO does .run_id exists in PipelineRun? (.id) It does in a ScriptRun.
         tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
-        "trained_in_workspace": source_ws_name, "experiment_name": experiment.name, "status_code": "esml_newly_trained"}
+        "trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
 
         if(model_ph is not None):
             if("test_set_ROC_AUC" in model_ph.tags):
@@ -558,8 +560,6 @@ class ESMLModelCompare():
                 tags["test_set_R2"] = model_ph.tags["test_set_R2"]
                 tags["test_set_MAPE"] = model_ph.tags["test_set_MAPE"]
                 tags["test_set_Spearman_Correlation"] = model_ph.tags["test_set_Spearman_Correlation"]
-            if("esml_time_updated " in model_ph.tags):
-                tags["esml_time_updated"] = model_ph.tags["esml_time_updated"]
 
         #properties = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         #"trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
@@ -691,7 +691,7 @@ class ESMLModelCompare():
 
     def get_metrics_regression(self,best_run, model):
         metrics = {}
-        if("test_set_R2" in model.tags): # First Try: TEST SET Scoring from TAGS 
+        if("test_set_Accuracy" in model.tags): # First Try: TEST SET Scoring from TAGS 
             print("INFO: Using ESML TEST_SET SCORING, since tagged on MODEL - using this to compare SCORING")
             
             metrics["normalized_root_mean_squared_error"] = model.tags["test_set_RMSE"]
