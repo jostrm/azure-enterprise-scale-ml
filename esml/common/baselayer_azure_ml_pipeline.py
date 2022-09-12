@@ -190,8 +190,8 @@ class ESMLPipelineFactory():
         #published_pipelines = PublishedPipeline.list(self.p.ws)
         published_endpoints = PipelineEndpoint.list(self.p.ws)
         for ep in published_endpoints:
-            print ("pub_pipe.name", ep.name)
-            print ("pub_pipe.id", ep.id)
+            #print ("pub_pipe.name", ep.name)
+            #print ("pub_pipe.id", ep.id)
             if(ep.name == name_endpoint):
                 found_endpoint = ep
                 exists = True
