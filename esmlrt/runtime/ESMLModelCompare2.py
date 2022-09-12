@@ -135,7 +135,7 @@ class ESMLModelCompare(IESMLModelCompare):
                         source_model = Model(source_workspace, name=experiment_name) # Try with model_name=exp_name if PipelineRun() 
                     except Exception as e3:
                         promote_new_model = True
-                        print("ESML INFO: Could not find EXISTING MODE in workspace{} and source_model_name {} with same experiment name = No TARGET run. This might be the first model to be trained in target_environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(source_workspace.name,source_model_name,target_environment))
+                        print("ESML INFO: Could not find EXISTING MODEL in workspace {} and source_model_name {} with same experiment name = No TARGET run. This might be the first model to be trained in target_environment: {}, nothing to compare against -> Go ahead and register & deploy new model".format(source_workspace.name,experiment_name,target_environment))
                         print(e3)
 
         try: # Compare latest SOURCE_MODEL with TARGET_MODEL
