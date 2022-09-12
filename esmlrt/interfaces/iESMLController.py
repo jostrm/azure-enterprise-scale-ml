@@ -86,19 +86,19 @@ class IESMLController:
             self._secret_name_project_sp_secret = secret_name_project_sp_secret
 
         try:
-            _subscription_id_dev = all_envs["dev"]["subscription_id"]
-            subscription_id = _subscription_id_dev # start at DEV 
+            self._subscription_id_dev = all_envs["dev"]["subscription_id"]
+            self.subscription_id = self._subscription_id_dev # start at DEV 
 
-            _subscription_id_test = all_envs["test"]["subscription_id"]
-            _subscription_id_prod = all_envs["prod"]["subscription_id"]
+            self._subscription_id_test = all_envs["test"]["subscription_id"]
+            self._subscription_id_prod = all_envs["prod"]["subscription_id"]
 
-            _resource_group_dev = all_envs["dev"]["resourcegroup_id"]
-            _resource_group_test = all_envs["test"]["resourcegroup_id"]
-            _resource_group_prod = all_envs["prod"]["resourcegroup_id"]
+            self._resource_group_dev = all_envs["dev"]["resourcegroup_id"]
+            self._resource_group_test = all_envs["test"]["resourcegroup_id"]
+            self._resource_group_prod = all_envs["prod"]["resourcegroup_id"]
 
-            _workspace_name_dev = all_envs["dev"]["workspace_name"]
-            _workspace_name_test = all_envs["test"]["workspace_name"]
-            _workspace_name_prod = all_envs["prod"]["workspace_name"]
+            self._workspace_name_dev = all_envs["dev"]["workspace_name"]
+            self._workspace_name_test = all_envs["test"]["workspace_name"]
+            self._workspace_name_prod = all_envs["prod"]["workspace_name"]
         except:
             print("INFO: Could not load all ESML environments in ESMLController. maybe DEMO mode / not all are configured or created? ")
 
