@@ -23,12 +23,9 @@ param enableLogAnalyticsQueries bool = true
   'Standard_ZRS'
   'Premium_LRS'
   'Premium_ZRS'
-  'Standard_GRS'
   'Standard_GZRS'
-  'Standard_LRS'
   'Standard_RAGRS'
   'Standard_RAGZRS'
-  'Standard_ZRS'
 ])
 @description('Specifies the SKU of the storage account')
 param skuNameStorage string = 'Standard_ZRS'

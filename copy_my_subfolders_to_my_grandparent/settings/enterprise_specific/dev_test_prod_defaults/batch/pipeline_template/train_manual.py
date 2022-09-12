@@ -139,7 +139,7 @@ def train(train_ds,validate_ds,test_ds):
 
         secret_name_tenant = "esml-tenant-id" # TODO: Look in your security_config.json
         secret_name_sp_id = "esml-project-sp-id" # TODO: Look in your security_config.json
-        secret_name_sp_secret = "esml-project-sp-id-secret" # TODO: Look in your security_config.json
+        secret_name_sp_secret = "esml-project-sp-secret" # TODO: Look in your security_config.json
 
         # # TODO: You can get this info by p.get_all_envs() (where p is ESMLProject) and then just copy and paste the dictionary here:
         all_envs = {
