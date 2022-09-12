@@ -18,8 +18,6 @@ class ESMLController(IESMLController):
 
     def get_target_workspace(self, current_environment, current_ws, target_environment):
 
-        #raise UserErrorException("You must set a TARGET environement. It can be same as SOURCE. 'dev' to 'dev' is OK, or 'dev' -> 'test', 'text'->'prod'")
-
         if (target_environment== "prod" and current_environment=="test"): # target=PROD -> compare against previous models in PROD...highest level
             print ("Connect from TEST to PROD ( if you want to compare TEST-model with latest registered in PROD subscription/workspace")
             print("")
