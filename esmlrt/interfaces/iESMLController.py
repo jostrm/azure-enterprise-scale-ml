@@ -102,6 +102,8 @@ class IESMLController:
         except:
             print("INFO: Could not load all ESML environments in ESMLController. maybe DEMO mode / not all are configured or created? ")
 
+        self.dev_test_prod = "dev" # Set default value
+
     ###
     # properties
     ###
@@ -111,22 +113,22 @@ class IESMLController:
         return self._dev_test_prod
 
     @dev_test_prod.setter
-    def dev_test_prod(self, dev_test_prod):
+    def dev_test_prod(self, dev_test_prod_in):
 
-        if(dev_test_prod == "dev"):
+        if(dev_test_prod_in == "dev"):
             self.subscription_id = self._subscription_id_dev
             self.resource_group = self._resource_group_dev
             self.workspace_name = self._workspace_name_dev
-        elif(dev_test_prod == "test"):
+        elif(dev_test_prod_in == "test"):
             self.subscription_id = self._subscription_id_test
             self.resource_group = self._resource_group_test
             self.workspace_name = self._workspace_name_test
-        elif(dev_test_prod == "prod"):
+        elif(dev_test_prod_in == "prod"):
             self.subscription_id = self._subscription_id_prod
             self.resource_group = self._resource_group_prod
             self.workspace_name = self._workspace_name_prod
 
-        self._dev_test_prod = dev_test_prod
+        self._dev_test_prod = dev_test_prod_in
 
 
     @property
