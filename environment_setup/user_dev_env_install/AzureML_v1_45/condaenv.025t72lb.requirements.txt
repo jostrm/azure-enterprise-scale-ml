@@ -1,0 +1,15 @@
+azure-cli-core==2.19.1
+azure-keyvault==4.1.0
+azure-keyvault-keys==4.4.0
+azure-keyvault-secrets==4.3.0
+azure-keyvault-certificates~=4.3.0
+seaborn==0.11.1
+azure-storage-file-datalake==12.6.0
+azureml-widgets~=1.44.0
+pytorch-transformers==1.0.0
+spacy==2.2.4
+pystan==2.19.1.1
+https://aka.ms/automl-resources/packages/en_core_web_sm-2.1.0.tar.gz
+-r https://automlsdkdataresources.blob.core.windows.net/validated-requirements/1.44.0/validated_win32_requirements.txt [--no-deps]
+arch==4.14
+wasabi==0.9.1
