@@ -133,16 +133,16 @@ def compare(test_ds):
         #trainer = None # IESMLTrainer
 
         # CUSTOMIZE ############### Optinonal: You can CUSTOMIZE, by implementing your own CLASS that supports interfaces/abstract classes: IESMLTestScoringFactory,IESMLModelCompare
-        project_number = 'project002'
+        project_number = 'project001'  # TODO: Look in your lake_settings.json
         ml_type = "regression"
-        test_scoring = ESMLTestScoringFactory(ml_type) # You need to implement IESMLTestScoringFactory
-        comparer = ESMLModelCompare(setting_path = "") # You need to implement IESMLModelCompare
+        test_scoring = ESMLTestScoringFactory(ml_type) # Optional: IF , you want to have a customized way of calculating Test_set scoring need to implement your own IESMLTestScoringFactory
+        comparer = ESMLModelCompare(setting_path = "") # Optional: IF, you want to have a customized way, You need to implement IESMLModelCompare
 
-        secret_name_tenant = "kv-msft-weu-dev-cmnai-tenant"
-        secret_name_sp_id = "kv-secret-esml-project002-sp-id"
-        secret_name_sp_secret = "kv-secret-esml-project002-sp-secret"
+        secret_name_tenant = "esml-tenant-id" # TODO: Look in your security_config.json
+        secret_name_sp_id = "esml-project-sp-id" # TODO:Look in your security_config.json
+        secret_name_sp_secret = "esml-project-sp-id-secret" # TODO:Look in your security_config.json
 
-        # You can get this info by p.get_all_envs() (where p is ESMLProject)
+        # TODO:You can get this info by p.get_all_envs() (where p is ESMLProject)
         all_envs = {
             'dev': {'subscription_id': 'x','resourcegroup_id': 'y', 'workspace_name': 'z'},
             'test': {'subscription_id': 'x','resourcegroup_id': 'y','workspace_name': 'z'},
@@ -158,8 +158,6 @@ def compare(test_ds):
         logging_utilities.log_traceback(e, logger)
         raise
 
-# TODO: fitted_model_1,best_automl_run,model,main_run
-# FROM experiment, model,main_run, best_automl_run,fitted_model_1 = IESMLController.get_best_model_run_fitted_model_Dev(ws,controller.experiment_name)
 def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_current_env, test_ds, ml_type):
     test_scoring = controller.ESMLTestScoringFactory # IESMLTestScoringFactory
     comparer = controller.ESMLComparer # IESMLModelCompare
@@ -252,18 +250,28 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
         next_environment = controller.get_next_environment() # Test, or PROD
-        promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model = comparer.compare_scoring_current_vs_new_model(
-            new_run_id = automl_step_run_id,
-            current_ws = ws,
-            current_environment = esml_current_env,
-            target_environment = next_environment,
-            target_workspace = target_ws,
-            experiment_name = controller.experiment_name)
+        print("OUTER LOOP: Now trying to compare with models in environment: {}".format(next_environment))
+        try:
+            promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model = comparer.compare_scoring_current_vs_new_model(
+                new_run_id = automl_step_run_id,
+                current_ws = ws,
+                current_environment = esml_current_env,
+                target_environment = next_environment,
+                target_workspace = target_ws,
+                experiment_name = controller.experiment_name)
 
-        print("Compared 2nd time - Outer loop")
-        if (promote_new_model == True):
-            model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model)
-            print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
+            print("Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
+
+            if (promote_new_model == True):
+                print("Now registering model in test environment...")
+                model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model)
+                print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
+
+        except Exception as e1:
+            print("Error/Warning: OUTER loop. Maybe you don't have a TEST and PROD environment setup? Are you running in DEMO-mode with only DEV environment")
+            print(e1)
+
+    print("Done: INNER and OUTER loop")
 
 def save_results():
     try:
