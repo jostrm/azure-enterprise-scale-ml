@@ -9,21 +9,24 @@
                 "model_folder_name": "10_titanic_model_clas",
                 "model_short_alias": "M10",
                 "dataset_folder_names": ["ds01_titanic","ds02_haircolor","ds03_housing","ds04_lightsaber"],
-                "label":"Survived"
+                "label":"Survived",
+                "ml_type":"classification"
             },
             {
                 "model_number": 11,
                 "model_folder_name": "11_diabetes_model_reg",
                 "model_short_alias": "M11",
                 "dataset_folder_names": ["ds01_diabetes","ds02_other"],
-                "label":"Y"
+                "label":"Y",
+                "ml_type":"regression"
             },
             {
                 "model_number": 12,
                 "model_folder_name": "12_car_price_regression",
                 "model_short_alias": "M12",
                 "dataset_folder_names": ["ds01_vw","ds02_audi","ds03_bmw"],
-                "label":"price"
+                "label":"price",
+                "ml_type":"regression"
             }
         ]
 }

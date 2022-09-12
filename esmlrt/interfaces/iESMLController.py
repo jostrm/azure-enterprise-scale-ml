@@ -19,23 +19,23 @@ class IESMLController:
     __metaclass__ = ABCMeta
 
     # Sub, RG, WS
-    subscription_id = 'todo'
-    resource_group = 'todo'
-    workspace_name = 'todo'
+    subscription_id = None
+    resource_group = None
+    workspace_name = None
 
     # Dev, Test, Prod
     
-    _subscription_id_dev = 'todo'
-    _subscription_id_test = 'todo'
-    _subscription_id_prod = 'todo'
+    _subscription_id_dev = None
+    _subscription_id_test = None
+    _subscription_id_prod = None
 
-    _resource_group_dev = 'todo'
-    _resource_group_test = 'todo'
-    _resource_group_prod = 'todo'
+    _resource_group_dev = None
+    _resource_group_test = None
+    _resource_group_prod = None
 
-    _workspace_name_dev = 'todo'
-    _workspace_name_test = 'todo'
-    _workspace_name_prod = 'todo'
+    _workspace_name_dev = None
+    _workspace_name_test = None
+    _workspace_name_prod = None
     
     ## Auth
     _supported_revision = '1.4'
