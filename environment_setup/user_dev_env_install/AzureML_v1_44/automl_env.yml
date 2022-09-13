@@ -35,7 +35,7 @@ dependencies:
   - azure-storage-file-datalake==12.6.0
   # ESML Required for Azure ML pipelines to work, since Azure ML runs 1.7.0 and we need 1.10.0 to avoid 
   # Error: Failed to load entrypoint automl = azureml.train.automl.run:AutoMLRun._from_run_dto with exception azure-identity 1.10.0, Requirement...azure-identity==1.7.0
-  - azure-identity==1.10.0
+  # - azure-identity==1.10.0 # double requirements...
   # Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.44.0
   - pytorch-transformers==1.0.0
