@@ -19,6 +19,8 @@ dependencies:
 - PySocks==1.7.1
 - jsonschema==4.6.0
 - conda-forge::pyqt==5.12.3
+- Pygments==2.12.0 ## Added this for 1.43 since added in 1.44
+- tqdm==4.64.0 ## Added this for 1.43 since added in 1.44
 
 - pip:
   #ESML required for MLOps OUTER LOOP & unattended mode (not really needed for Windows, but for Linux build agent - a must have)
