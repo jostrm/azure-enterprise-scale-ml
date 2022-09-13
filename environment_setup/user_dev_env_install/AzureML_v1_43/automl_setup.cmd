@@ -30,7 +30,9 @@ if not errorlevel 1 (
   call conda env update --name %conda_env_name% --file %automl_env_file%
   if errorlevel 1 goto ErrorExit
 ) else (
+  echo Kalle Anka
   call conda env create -f %automl_env_file% -n %conda_env_name%
+  echo Lasse Berghagen
 )
 
 call conda activate %conda_env_name% 2>nul:
