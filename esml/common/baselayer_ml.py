@@ -1,9 +1,9 @@
 from re import S
-from azureml.dataprep.api.engineapi.typedefinitions import TelemetryStrategy
+#from azureml.dataprep.api.engineapi.typedefinitions import TelemetryStrategy
 import pandas as pd
 import numpy as np
 from math import sqrt
-from scipy.stats.stats import Ttest_indResult
+#from scipy.stats.stats import Ttest_indResult
 from sklearn.metrics import mean_squared_error, r2_score,precision_score,recall_score,average_precision_score,f1_score,roc_auc_score,accuracy_score,roc_curve,confusion_matrix,mean_absolute_error, matthews_corrcoef, multilabel_confusion_matrix
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
