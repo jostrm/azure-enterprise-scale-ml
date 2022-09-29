@@ -41,4 +41,4 @@ class IESMLTestScoringFactory:
             dummy = None
             return rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy # returns 8
         elif self._ml_type == 'classification':
-            return self.get_test_scoring_classification(ws,target_column_name,test_ds,fitted_model,run=None,aml_model=None,multiclass=None,positive_label=None) # returns 8
+            return self.get_test_scoring_classification(ws,target_column_name,test_ds,fitted_model,train_run,aml_model,multiclass,positive_label) # returns 8

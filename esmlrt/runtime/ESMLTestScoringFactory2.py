@@ -80,10 +80,12 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
     def get_test_scoring_classification(self,ws,target_column_name,GoldTest,fitted_model,run=None,aml_model=None,multiclass=None,positive_label=None):
         
         if(run is not None):
+            print("ESML info: get_test_scoring_classification: RUN exists, lets get a model from that run")
             source_best_run = run
             model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
-            model = Model(ws, model_name)    
+            model = Model(ws, model_name)
         elif(aml_model is not None):
+            print("ESML info: get_test_scoring_classification: RUN does not exists, aml_model is passed as a parameter")
             model = aml_model
         else:
             raise ArgumentError("run is None! Cannot get model name. Also aml_model parameter is None")
