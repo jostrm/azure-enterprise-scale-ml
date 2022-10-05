@@ -2369,6 +2369,16 @@ class ESMLProject():
         finally:  # Create folder if not exists
             os.chdir(old_loc)
     @staticmethod
+    def get_date_utc_and_esml_model_number():
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--esml_date_utc', type=str, help='ESML training date or scoring date - to determine date_folder')
+        parser.add_argument('--esml_model_number', type=str, help='ESML Model number such as 1,11,12 to determine which model to load and work with M01, M11, M12')
+        args = parser.parse_args()
+        esml_date_utc = args.esml_date_utc
+        esml_model_number = args.esml_model_number
+        return esml_date_utc,esml_model_number
+
+    @staticmethod
     def get_project_from_env_command_line():
         parser = argparse.ArgumentParser()
         parser.add_argument('--esml_environment', type=str, help='ESML target environment: dev,test,prod')
