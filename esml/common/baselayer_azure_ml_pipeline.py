@@ -64,7 +64,7 @@ class ESMLPipelineFactory():
     _use_curated_automl_environment = True
     _override_compute_target = None
     _conda_dependencies_object = None
-    
+
     # https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
     _esml_automl_lts_env_name = "ESML-AzureML-144-AutoML_126"
     _environment_name = _esml_automl_lts_env_name # "AzureML-AutoML-DNN" # # Training[ "AzureML-AutoML","AzureML-AutoML-DNN", "AzureML-lightgbm-3.2-ubuntu18.04-py37-cpu"]  Inference["AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference",]
@@ -1183,7 +1183,7 @@ class ESMLPipelineFactory():
         else:
             aml_run_config.environment.python.user_managed_dependencies = False
 
-            if (conda_dependencies_object is None):  # Add some packages relied on by data prep step
+            if (self.conda_dependencies_object is None):  # Add some packages relied on by data prep step
                 #aml_run_config.environment.python.conda_dependencies = CondaDependencies.create(
                     #conda_packages=['pandas==0.25.1','scikit-learn==0.22.1', 'numpy==1.18.5', ''],
                     #pip_packages=['azureml-defaults','azureml-dataprep[fuse,pandas]'],  # azureml-sdk
@@ -1198,7 +1198,7 @@ class ESMLPipelineFactory():
                 #batch_process_env = Environment.from_conda_specification("esml_batch_prep_environment_v02", script_folder + "/esml_batch_environment.yml")
                 # batch_process_env.docker.base_image = DEFAULT_CPU_IMAGE # mcr.microsoft.com/mlops/python:latest
             else:
-                aml_run_config.environment.python.conda_dependencies = conda_dependencies_object
+                aml_run_config.environment.python.conda_dependencies = self.conda_dependencies_object
 
             docker_config = DockerConfiguration(use_docker=True)
             aml_run_config.docker = docker_config
