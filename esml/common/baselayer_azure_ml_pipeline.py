@@ -1,6 +1,7 @@
 #region(collapsed) IMPORTS
 from genericpath import exists
 import os
+import time
 import datetime
 import shutil
 from azureml.core import Experiment
@@ -61,8 +62,13 @@ class esml_step_types():
 class ESMLPipelineFactory():
     p = None
     _use_curated_automl_environment = True
+    _override_compute_target = None
+    _conda_dependencies_object = None
+    
     # https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
-    _environment_name = "AzureML-AutoML-DNN" # # Training[ "AzureML-AutoML","AzureML-AutoML-DNN", "AzureML-lightgbm-3.2-ubuntu18.04-py37-cpu"]  Inference["AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference",]
+    _esml_automl_lts_env_name = "ESML-AzureML-144-AutoML_126"
+    _environment_name = _esml_automl_lts_env_name # "AzureML-AutoML-DNN" # # Training[ "AzureML-AutoML","AzureML-AutoML-DNN", "AzureML-lightgbm-3.2-ubuntu18.04-py37-cpu"]  Inference["AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference",]
+    
     _use_own_compute_per_step = False
     _pipeline_steps_array = []
     _datalake = None
@@ -115,6 +121,22 @@ class ESMLPipelineFactory():
     @environment_name.setter
     def environment_name(self, environment_name):
         self._environment_name = environment_name
+
+    @property
+    def conda_dependencies_object(self):
+        return self._conda_dependencies_object
+    
+    @conda_dependencies_object.setter
+    def conda_dependencies_object(self, conda_dependencies_object):
+        self._conda_dependencies_object = conda_dependencies_object
+
+    # ComputeTarget
+    @property
+    def override_compute_target(self):
+        return self._override_compute_target
+    @override_compute_target.setter
+    def override_compute_target(self, compute_target_to_override_with):
+        self._override_compute_target = compute_target_to_override_with
 
     @property
     def use_curated_automl_environment(self):
@@ -1102,18 +1124,45 @@ class ESMLPipelineFactory():
 #endregion
 
 #region PRIVATE environments
+
+    def create_automl_lts_environment_if_not_exists(self):
+        automl_esml_env = None
+        try:
+            if (self.p.ws == None):
+                self.p.ws = self.p.get_workspace_from_config()
+
+            automl_esml_env = Environment.get(workspace=self.p.ws,name=self._esml_automl_lts_env_name)
+        except Exception as e:
+            s = str(e)
+            if ("No environment exists for name" in s):
+                env_esml_v2 = Environment(name=self._esml_automl_lts_env_name)
+                env_esml_v2.docker.base_image = "mcr.microsoft.com/azureml/curated/azureml-automl:126"
+                env_esml_v2.python.user_managed_dependencies = True
+                b_details = env_esml_v2.build(self.p.ws)
+                
+                while (b_details.status != 'Succeeded'):
+                    time.sleep(10)
+                    print("Still building image for {}...".format(self._esml_automl_lts_env_name))
+
+        print("Environment {} exists".format(self._esml_automl_lts_env_name))
+        return automl_esml_env
+
     def init_databricks_environment(self):
         pass
 
     def init_gpu_environment(self):
         pass
+    
 
-    def init_cpu_environment(self, use_curated_automl_env=True, conda_dependencies_object=None, suffix_char=None):
+    def init_cpu_environment(self, use_curated_automl_env=True, suffix_char=None):
 
-        if(suffix_char is None):
-            aml_compute = self.p.get_training_aml_compute(self.p.ws) # Create or Get compute, for active environment.
+        if(self._override_compute_target is not None):
+            aml_compute = self._override_compute_target
         else:
-            aml_compute = self.p.get_training_aml_compute(self.p.ws, False,suffix_char) # Create or Get compute, for active environment.
+            if(suffix_char is None):
+                aml_compute = self.p.get_training_aml_compute(self.p.ws) # Create or Get compute, for active environment.
+            else:
+                aml_compute = self.p.get_training_aml_compute(self.p.ws, False,suffix_char) # Create or Get compute, for active environment.
         aml_run_config = RunConfiguration()
         # `compute_target` as defined in "Azure Machine Learning compute" section above
         aml_run_config.target = aml_compute
@@ -1122,9 +1171,13 @@ class ESMLPipelineFactory():
         if USE_CURATED_ENV:
             # "AzureML-Tutorial" https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
             #curated_environment = Environment.get(workspace=self.p.ws, name="AzureML-AutoML")
-            curated_automl = self.environment_name # "AzureML-AutoML"
+            
             #curated_sklearn ="AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference"
-            curated_environment = Environment.get(workspace=self.p.ws, name=curated_automl)
+
+            if(self.environment_name == self._esml_automl_lts_env_name):
+                curated_environment = self.create_automl_lts_environment_if_not_exists()
+            else:
+                curated_environment = Environment.get(workspace=self.p.ws, name=self.environment_name) # "AzureML-AutoML" or your OWN environment
 
             aml_run_config.environment = curated_environment
         else:
