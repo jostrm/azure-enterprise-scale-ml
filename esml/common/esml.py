@@ -2386,11 +2386,28 @@ class ESMLProject():
         parser.add_argument('--esml_scoring_in_datetime', type=str, help='IN folder, datetype:datetime - the data to SCORE, same datetime as prestep Bronze2Gold pipeline')
         parser.add_argument('--esml_train_in_datetime', type=str, help='IN folder. datetype:datetime - the data to RETRAIN model on, same datetime as prestep Bronze2Gold pipeline')
         
+        # SP Authentication
+        parser.add_argument('--esml_environment', type=str, help='')
+        parser.add_argument('--tenant_id', type=str, help='')
+        parser.add_argument('--sp_id', type=str, help='')
+        parser.add_argument('--sp_secret', type=str, help='')
+
+        # ESML date and model
+        parser.add_argument('--esml_date_utc', type=str, help='ESML training date or scoring date - to determine date_folder')
+        parser.add_argument('--esml_model_number', type=str, help='ESML Model number such as 1,11,12 to determine which model to load and work with M01, M11, M12')
+        args = parser.parse_args()
+        esml_date_utc = args.esml_date_utc
+        esml_model_number = args.esml_model_number
+
         args = parser.parse_args()
         esml_environment = args.esml_environment
         inference_model_version = args.esml_inference_model_version
         scoring_folder_date = args.esml_scoring_in_datetime
         train_in_folder_date = args.esml_train_in_datetime
+
+        tenant_id = args.tenant_id
+        sp_id = args.sp_id
+        sp_secret = args.sp_secret
 
         p = None
         if((esml_environment is not None) and (inference_model_version is None)):
@@ -2413,7 +2430,13 @@ class ESMLProject():
         else: # Default 
             p = ESMLProject()
             print("args.esml_environment is None. Reading environment from config-files")
-        return p
+
+        if ((tenant_id is not None) and (sp_id is not None)):
+            auth_1 = ServicePrincipalAuthentication(tenant_id=tenant_id,service_principal_id=sp_id, service_principal_password=sp_secret)
+            ws, config_name = p.authenticate_workspace_and_write_config(auth_1)
+            p.ws = ws
+
+        return p,esml_date_utc,esml_model_number
 
 class ESMLDataset():
     #Defaults - project specicfic examples
