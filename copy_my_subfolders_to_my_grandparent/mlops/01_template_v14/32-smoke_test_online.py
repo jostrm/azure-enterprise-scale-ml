@@ -26,21 +26,22 @@ POSSIBILITY OF SUCH DAMAGE.
 import sys
 sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
-from azureml.core.authentication import AzureCliAuthentication
+#from azureml.core.authentication import AzureCliAuthentication
+from azureml.core.authentication import ServicePrincipalAuthentication
+import argparse
 from esml import ESMLProject
-
+from baselayer_azure_ml_pipeline import esml_pipeline_types
+from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 print("SDK Version:", azureml.core.VERSION)
 
-p = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
+p,scoring_date,model_number = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
 p.describe()
 
-cli_auth = AzureCliAuthentication()
-ws = p.get_workspace_from_config(cli_auth) # Reads the current environment (dev,test, prod)config.json | Use CLI auth if MLOps
-p.inference_mode = True # We want "INFERENCE" mode
+p.inference_mode = True # We want "INFERENCE" mode, when calling AKS cluster
 p.connect_to_lake() # Connect to lake...to be able to also SAVE SCORING
 
 print("Environment:")
-print(p.dev_test_prod,ws.name)
+print(p.dev_test_prod,p.ws.name)
 
 # TEST webservice!
 X_test, y_test, tags = p.get_gold_validate_Xy() # Get the X_test data |  ESML knows the SPLIT and LABEL already (due to training)

@@ -26,7 +26,9 @@ POSSIBILITY OF SUCH DAMAGE.
 import sys
 sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
-from azureml.core.authentication import AzureCliAuthentication
+#from azureml.core.authentication import AzureCliAuthentication
+from azureml.core.authentication import ServicePrincipalAuthentication
+import argparse
 from esml import ESMLProject
 print("SDK Version:", azureml.core.VERSION)
 
@@ -41,14 +43,30 @@ print (f'##vso[task.setvariable variable=esml_environment]{p.dev_test_prod}')
 # END example. Where you can use this to set ESMProject.dev_test_prod = args.esml_env
 
 '''
-p = ESMLProject.get_project_from_env_command_line() # Alt A)
+p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
 if(p is None): # Alt B) Just for DEMO purpose..its never None
     p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment
 
 print("DEMO MLOPS FOLDER settings - remove this after you copies this folder)") # remove this after you copies this folder
-print("ESML environment (dev, test or prod): {}".format(p.dev_test_prod))
-p.describe()
+#print("ESML environment (dev, test or prod): {}".format(p.dev_test_prod))
+#p.describe()
 
-cli_auth = AzureCliAuthentication()
-ws, config_name = p.authenticate_workspace_and_write_config(cli_auth) # Authenticat to the current environment (dev,test, prod) and WRITES config.json | Use CLI auth if MLOps
+#cli_auth = AzureCliAuthentication()
+
+#parser = argparse.ArgumentParser()
+#parser.add_argument('--esml_environment', type=str, help='')
+#parser.add_argument('--tenant_id', type=str, help='')
+#parser.add_argument('--sp_id', type=str, help='')
+#parser.add_argument('--sp_secret', type=str, help='')
+#args = parser.parse_args()
+#tenant_id = args.tenant_id
+#sp_id = args.sp_id
+#sp_secret = args.sp_secret
+
+#cli_auth = ServicePrincipalAuthentication(tenant_id=tenant_id,service_principal_id=sp_id, service_principal_password=sp_secret)
+#p = ESMLProject()
+#ws, config_name = p.authenticate_workspace_and_write_config(cli_auth) # Authenticat to the current environment (dev,test, prod) and WRITES config.json | Use CLI auth if MLOps
+ws = p.ws
 print(ws.name, ws.resource_group, ws.location, ws.subscription_id, sep="\n")
+print("Project number: {}".format(p.project_folder_name))
+print("Model number: {} , esml_date_utc: {}".format(esml_model_number, esml_date_utc))

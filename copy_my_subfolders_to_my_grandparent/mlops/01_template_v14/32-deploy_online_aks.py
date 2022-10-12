@@ -26,22 +26,18 @@ POSSIBILITY OF SUCH DAMAGE.
 import sys
 sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
-from azureml.core.authentication import AzureCliAuthentication
+import argparse
 from esml import ESMLProject
+from baselayer_azure_ml_pipeline import esml_pipeline_types
+from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 print("SDK Version:", azureml.core.VERSION)
 
-p = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
+p,scoring_date,model_number = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
 p.describe()
-
-cli_auth = AzureCliAuthentication()
-ws, config_name = p.authenticate_workspace_and_write_config(cli_auth) # Authenticat to the current environment (dev,test, prod) and WRITES config.json | Use CLI auth if MLOps
-p.inference_mode = False # We want "TRAIN" mode
-#p.init(ws) # Not needed. No Lake needed (Automapping from datalake to Azure ML datasets, prints status)
-
-print("DEMO MLOPS FOLDER settings - remove this after you copies this folder)") # remove this after you copies this folder
+p.inference_mode = False # We want "TRAIN" mode when deploying to AKS
 print("Environment:")
-print(p.dev_test_prod,ws.name)
+print(p.dev_test_prod,p.ws.name)
 
 # DEPLOY!
-inference_config, model, best_run = p.get_active_model_inference_config(ws)
+inference_config, model, best_run = p.get_active_model_inference_config(p.ws)
 service,api_uri, kv_aks_api_secret= p.deploy_automl_model_to_aks(model,inference_config)

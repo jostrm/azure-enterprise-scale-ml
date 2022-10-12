@@ -26,33 +26,32 @@ POSSIBILITY OF SUCH DAMAGE.
 import sys
 sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
-from azureml.core.authentication import AzureCliAuthentication
+#from azureml.core.authentication import AzureCliAuthentication
+from azureml.core.authentication import ServicePrincipalAuthentication
+import argparse
 from esml import ESMLProject
-from baselayer_azure_ml_pipeline import ESMLPipelineFactory, esml_pipeline_types
-
+from baselayer_azure_ml_pipeline import esml_pipeline_types
+from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 print("SDK Version:", azureml.core.VERSION)
 
 # IN PARAMETERS
-scoring_date = '1000-01-01 10:35:01.243860' # In parameter: You can override what training data to use.
-model_number = 11
-training_date,model_number = ESMLProject.get_date_utc_and_esml_model_number()
+esml_date_utc = '1000-01-01 10:35:01.243860' # In parameter: You can override what training data to use.
+esml_model_number = 11
 
-p = ESMLProject.get_project_from_env_command_line()
-p.describe()
+p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
+if(p is None): # Alt B) Just for DEMO purpose..its never None
+    p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment
 
-cli_auth = AzureCliAuthentication() 
-ws = p.get_workspace_from_config(cli_auth) # Reads the current environment (dev,test, prod)config.json | Use CLI auth if MLOps
-p.inference_mode = True # We want "TRAIN" mode
-#p.init(ws) # Automapping from datalake to Azure ML datasets, prints status
-p.active_model = model_number # Y=11, price=12
+ws = p.ws
+print(ws.name, ws.resource_group, ws.location, ws.subscription_id, sep="\n")
+print("Project number: {}".format(p.project_folder_name))
+print("Model number: {} , esml_date_utc: {}".format(esml_model_number, esml_date_utc))
+
+p.inference_mode = False
+p.active_model = esml_model_number
+
 p_factory = ESMLPipelineFactory(p)
-
-print("FEATURE ENGINEERING - Bronze 2 Gold - working with Azure ML Datasets with Bronze, Silver, Gold concept")
-print("TRAIN with AutoML")
-print("COMPARE: Calculate testset-scoring, and compare INNER and OUTER LOOP MLOps, with ESML")
-
-## Read IN parameter, what data to train on
-p_factory.batch_pipeline_parameters[1].default_value = scoring_date # overrides ESMLProject.date_scoring_folder.
+p_factory.batch_pipeline_parameters[1].default_value = esml_date_utc # overrides ESMLProject.date_scoring_folder.
 p_factory.describe()
 
 ## BUILD
@@ -74,4 +73,3 @@ print("Experiment name:  {}".format(p_factory.experiment_name))
 print("In AZURE DATA FACTORY - This is the ID you need, if using PRIVATE LINK, private Azure ML workspace.")
 print("-You need SCORING PIPELINE id, not pipeline ENDPOINT ID ( since cannot be chosen in Azure data factory if private Azure ML)")
 published_pipeline.id
-
