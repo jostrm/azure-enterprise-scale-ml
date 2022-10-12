@@ -32,7 +32,8 @@ from azureml.train.automl import AutoMLConfig
 
 from azureml.pipeline.steps import AutoMLStep
 from azureml.pipeline.steps import AutoMLStepRun
-from azureml.pipeline.core import TrainingOutput, PipelineData
+from azureml.pipeline.core import TrainingOutput
+from azureml.pipeline.core import PipelineData
 from azureml.core import Datastore
 
 #endregion
@@ -420,11 +421,11 @@ class ESMLPipelineFactory():
         else:
             p.inference_mode = True
 
-
         self._allow_reuse = allow_reuse
         # 2) Load DEV or TEST or PROD Azure ML Studio workspace
-        p.ws = p.get_workspace_from_config()
-        #p.inference_mode = True
+        if(p.ws is None):
+            p.ws = p.get_workspace_from_config()
+        
         self._datalake = p.connect_to_lake(False)  # Get Lake, but don't use "date_folder from lake", use contstructor
 
         old_loc = os.getcwd()
