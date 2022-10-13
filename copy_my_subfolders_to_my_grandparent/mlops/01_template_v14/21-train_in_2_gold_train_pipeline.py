@@ -36,7 +36,7 @@ from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 print("SDK Version:", azureml.core.VERSION)
 
 # IN PARAMETERS
-esml_date_utc = '1000-01-01 10:35:01.243860' # In parameter: You can override what training data to use.
+esml_date_utc = '1000-01-01 10:35:01.243860' # In parameter: You can override what training data to use. 
 esml_model_number = 11
 
 p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
@@ -56,11 +56,13 @@ p_factory.batch_pipeline_parameters[1].default_value = esml_date_utc # overrides
 p_factory.describe()
 
 ## BUILD
+print ("Building pipeline (estimated: 10 min)")
 batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML) # Training: AutoMLStep or ManualMLStep
 
 ## RUN training
+print ("Running pipeline (estimated time: 10-XXX min)")
 pipeline_run = p_factory.execute_pipeline(batch_pipeline)
-pipeline_run.wait_for_completion(show_output=True)
+pipeline_run.wait_for_completion(show_output=False)
 
 # PUBLISH
 published_pipeline, endpoint = p_factory.publish_pipeline(batch_pipeline,"_1")

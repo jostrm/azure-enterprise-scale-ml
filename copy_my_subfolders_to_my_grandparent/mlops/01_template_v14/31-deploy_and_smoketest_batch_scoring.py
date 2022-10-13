@@ -59,7 +59,7 @@ batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_S
 
 ## RUN training
 pipeline_run = p_factory.execute_pipeline(batch_pipeline)
-pipeline_run.wait_for_completion(show_output=True)
+pipeline_run.wait_for_completion(show_output=False)
 
 # PUBLISH
 published_pipeline, endpoint = p_factory.publish_pipeline(batch_pipeline,"_1")
