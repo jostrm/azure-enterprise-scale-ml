@@ -2393,7 +2393,7 @@ class ESMLProject():
 
         # ESML MLOps - date and model
         parser.add_argument('--esml_date_utc', type=str, help='ESML training date or scoring date - to determine date_folder')
-        parser.add_argument('--esml_model_number', type=str, help='ESML Model number such as 1,11,12 to determine which model to load and work with M01, M11, M12')
+        parser.add_argument('--esml_model_number', type=int, help='ESML Model number such as 1,11,12 to determine which model to load and work with M01, M11, M12')
 
         args = parser.parse_args()
         esml_environment = args.esml_environment
@@ -2408,7 +2408,7 @@ class ESMLProject():
 
         # ESML MLOps - date and model
         esml_date_utc = args.esml_date_utc
-        esml_model_number = args.esml_model_number
+        esml_model_number = int(args.esml_model_number)
 
         p = None
         if((esml_environment is not None) and (inference_model_version is None)):
