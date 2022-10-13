@@ -48,7 +48,7 @@ print("Project number: {}".format(p.project_folder_name))
 print("Model number: {} , esml_date_utc: {}".format(esml_model_number, esml_date_utc))
 
 p.inference_mode = False
-p.active_model = esml_model_number
+p.active_model = int(esml_model_number)
 
 p_factory = ESMLPipelineFactory(p)
 p_factory.batch_pipeline_parameters[1].default_value = esml_date_utc # overrides ESMLProject.date_scoring_folder.
@@ -59,7 +59,7 @@ batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_S
 
 ## RUN training
 pipeline_run = p_factory.execute_pipeline(batch_pipeline)
-pipeline_run.wait_for_completion(show_output=False)
+pipeline_run.wait_for_completion(show_output=True)
 
 # PUBLISH
 published_pipeline, endpoint = p_factory.publish_pipeline(batch_pipeline,"_1")
@@ -72,4 +72,4 @@ print("Experiment name:  {}".format(p_factory.experiment_name))
 
 print("In AZURE DATA FACTORY - This is the ID you need, if using PRIVATE LINK, private Azure ML workspace.")
 print("-You need SCORING PIPELINE id, not pipeline ENDPOINT ID ( since cannot be chosen in Azure data factory if private Azure ML)")
-published_pipeline.id
+print(published_pipeline.id)
