@@ -902,15 +902,21 @@ class ESMLProject():
     '''
     ESML - This will also cache the scored results to DATALAKE,   IF `inference_model_version=1` in `settings/project_specific/lake_settings.json`
     '''
-    def call_webservice(self,ws, pandas_X_test,user_id=None, firstRowOnly=False,inference_model_version=None, reload_config=True):
+    def call_webservice(self,ws, pandas_X_test,user_id=None, firstRowOnly=False,save_2_lake_also=True, inference_model_version=None, reload_config=True):
         self.initComputeFactory(ws,reload_config)
 
+        result = None
         df_result,model_version = self._compute_factory.call_webservice(pandas_X_test,firstRowOnly) # TODO: Use inference_model_version to pick webservice/model version, other than the "single one & latest"
         
         if(inference_model_version is not None): # user override, not reading from keyvault
-            model_version = inference_model_version 
-        scored_result = self.save_scored_result(model_version,pandas_X_test,df_result, user_id)
-        return scored_result
+            model_version = inference_model_version
+        
+        if (save_2_lake_also): 
+            result = self.save_scored_result(model_version,pandas_X_test,df_result, user_id)
+        else:
+            result = df_result
+
+        return result
     
     #TODO batch score
     def batch_score(self,ws, date_folder, unique_folder,specific_file_guid=None,use_spark_compute=False,firstRowOnly=False,inference_model_version=None, reload_config=True ):
@@ -1923,11 +1929,12 @@ class ESMLProject():
                                         name =  self.GoldValidate.name, #  'M03_GOLD_Validate'
                                         version = ds_version)
         if(label is None): # Try reading from TAGS
-            try:
-                label = gt.tags["label"]
-            except:
-                raise UserErrorException("You need to provide LABEL as argument, since Azure Dataset {} TAGS,  did not contain the label info.".format(self.GoldValidate.name))
-
+            label = self.active_model["label"]
+            if (label is None):
+                try:
+                    label = gt.tags["label"]
+                except:
+                    raise UserErrorException("You need to provide LABEL as argument, since Azure Dataset {} TAGS,  did not contain the label info.".format(self.GoldValidate.name))
         df_test = gt.to_pandas_dataframe()
         print("{} : {}".format(self.GoldValidate.name, df_test.shape))
         X_test = df_test.drop([label], axis=1)
