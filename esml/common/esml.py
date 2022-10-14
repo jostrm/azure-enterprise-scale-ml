@@ -1719,35 +1719,50 @@ class ESMLProject():
 
 #TRAIN, VALIDATE, TEST
 
-    def split_gold_dbx(self,train_percentage=0.6, label=None,stratified=False,seed=42, new_version=True):
-        return self.split_gold(self.GoldDatabricks,train_percentage, label,new_version,stratified,seed)
+    def split_gold_dbx(self,train_percentage=0.6, label=None,stratified=False,override_with_custom_iESMLSplitter=None,seed=42, new_version=True):
+        return self.split_gold(self.GoldDatabricks,train_percentage, label,new_version,stratified,seed,override_with_custom_iESMLSplitter)
 
-    def split_gold_3(self,train_percentage=0.6, label=None,stratified=False,seed=42, new_version=True):
-        return self.split_gold(self.Gold,train_percentage, label,new_version,stratified,seed)
+    def split_gold_3(self,train_percentage=0.6, label=None,stratified=False,override_with_custom_iESMLSplitter=None, seed=42, new_version=True):
+        return self.split_gold(self.Gold,train_percentage, label,new_version,stratified,seed,override_with_custom_iESMLSplitter)
 
-    def split_gold(self,azure_ml_gold_dataset, train_percentage=0.6, label_in=None,new_version=True, stratified=False,seed=42):
+    def split_gold(self,azure_ml_gold_dataset, train_percentage=0.6, label_in=None,new_version=True, stratified=False,seed=42,override_with_custom_iESMLSplitter=None):
+        # Common ESML acceleration
         label = None
         if (label_in is None):
             label = self.active_model["label"]
         else:
             label = label_in
 
+        train = None
+        validate = None
+        validate_percentage = None
+        test = None
+        test_percentage = None
         df = azure_ml_gold_dataset.to_pandas_dataframe()
-        whats_left_for_both = round(1-train_percentage,1)  # 0.4 ...0.3 if 70%
-        left_per_set = round((whats_left_for_both / 2),2) # 0.2  ...0.15
-        validate_and_test = round((1-left_per_set),2) # 0.8 ....0.75
 
-        if(stratified == True):
-            print("Stratified split on column {} using StratifiedShuffleSplit twice, to get GOLD_TRAIN/OTHER and then 0.5 split on OTHER to get GOLD_VALIDATE & GOLD_TEST".format(label))
-            train, validate, test = split_stratified(df,whats_left_for_both,left_per_set,label)
-        else:
-            train, validate, test = \
-                np.split(df.sample(frac=1, random_state=seed), 
-                        [int(train_percentage*len(df)), int(validate_and_test*len(df))])
+        # Your Custom implementation
+        if(override_with_custom_iESMLSplitter is not None):
+            train,train_percentage,validate,validate_percentage,test,test_percentage = override_with_custom_iESMLSplitter.split(df,label,train_percentage,seed,stratified)
+        else: # Default implementation
+            whats_left_for_both = round(1-train_percentage,1)  # 0.4 ...0.3 if 70%
+            left_per_set = round((whats_left_for_both / 2),2) # 0.2  ...0.15
+            validate_and_test = round((1-left_per_set),2) # 0.8 ....0.75
 
+            if(stratified == True):
+                print("Stratified split on column {} using StratifiedShuffleSplit twice, to get GOLD_TRAIN/OTHER and then 0.5 split on OTHER to get GOLD_VALIDATE & GOLD_TEST".format(label))
+                train, validate, test = split_stratified(df,whats_left_for_both,left_per_set,label)
+            else:
+                train, validate, test = \
+                    np.split(df.sample(frac=1, random_state=seed), 
+                            [int(train_percentage*len(df)), int(validate_and_test*len(df))])
+
+            validate_percentage = left_per_set
+            test_percentage = left_per_set
+
+        # Common ESML acceleration
         self.save_gold_train_pandas_as_azure_dataset(train,train_percentage,label, new_version)
-        self.save_gold_validate_pandas_as_azure_dataset(validate,left_per_set,label,new_version)
-        self.save_gold_test_pandas_as_azure_dataset(test,left_per_set,label,new_version)
+        self.save_gold_validate_pandas_as_azure_dataset(validate,validate_percentage,label,new_version)
+        self.save_gold_test_pandas_as_azure_dataset(test,test_percentage,label,new_version)
     
         return train,validate,test
     
