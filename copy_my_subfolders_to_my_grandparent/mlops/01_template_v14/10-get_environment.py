@@ -47,25 +47,6 @@ p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_lin
 if(p is None): # Alt B) Just for DEMO purpose..its never None
     p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment
 
-print("DEMO MLOPS FOLDER settings - remove this after you copies this folder)") # remove this after you copies this folder
-#print("ESML environment (dev, test or prod): {}".format(p.dev_test_prod))
-#p.describe()
-
-#cli_auth = AzureCliAuthentication()
-
-#parser = argparse.ArgumentParser()
-#parser.add_argument('--esml_environment', type=str, help='')
-#parser.add_argument('--tenant_id', type=str, help='')
-#parser.add_argument('--sp_id', type=str, help='')
-#parser.add_argument('--sp_secret', type=str, help='')
-#args = parser.parse_args()
-#tenant_id = args.tenant_id
-#sp_id = args.sp_id
-#sp_secret = args.sp_secret
-
-#cli_auth = ServicePrincipalAuthentication(tenant_id=tenant_id,service_principal_id=sp_id, service_principal_password=sp_secret)
-#p = ESMLProject()
-#ws, config_name = p.authenticate_workspace_and_write_config(cli_auth) # Authenticat to the current environment (dev,test, prod) and WRITES config.json | Use CLI auth if MLOps
 ws = p.ws
 print(ws.name, ws.resource_group, ws.location, ws.subscription_id, sep="\n")
 print("Project number: {}".format(p.project_folder_name))
