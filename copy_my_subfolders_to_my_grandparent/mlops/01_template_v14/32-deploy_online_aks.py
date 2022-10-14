@@ -28,16 +28,18 @@ sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
 import argparse
 from esml import ESMLProject
-from baselayer_azure_ml_pipeline import esml_pipeline_types
-from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 print("SDK Version:", azureml.core.VERSION)
 
 p,scoring_date,model_number = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
 p.describe()
 p.inference_mode = False # We want "TRAIN" mode when deploying to AKS
+
 print("Environment:")
 print(p.dev_test_prod,p.ws.name)
+print("Project number: {}".format(p.project_folder_name))
+print("Model number: {} , esml_date_utc: {}".format(model_number, scoring_date))
 
-# DEPLOY!
+print("DEPLOY model on to a PRIVATE AKS cluster / endpoint...")
 inference_config, model, best_run = p.get_active_model_inference_config(p.ws)
 service,api_uri, kv_aks_api_secret= p.deploy_automl_model_to_aks(model,inference_config)
+print("Finished!")

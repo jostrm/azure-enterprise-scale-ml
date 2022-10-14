@@ -32,17 +32,6 @@ import argparse
 from esml import ESMLProject
 print("SDK Version:", azureml.core.VERSION)
 
-'''
-Howto: Write variables in Azure Devops
-To set pipeline variables in scripts:
-
-print ('##vso[task.setvariable variable=esml_environment]dev_from_python')
-print('##vso[task.setvariable variable=secret.Sauce;issecret=true]crushed tomatoes with garlic')
-print (f'##vso[task.setvariable variable=esml_environment]{p.dev_test_prod}')
-
-# END example. Where you can use this to set ESMProject.dev_test_prod = args.esml_env
-
-'''
 p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
 if(p is None): # Alt B) Just for DEMO purpose..its never None
     p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment

@@ -26,29 +26,27 @@ POSSIBILITY OF SUCH DAMAGE.
 import sys
 sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
-#from azureml.core.authentication import AzureCliAuthentication
-from azureml.core.authentication import ServicePrincipalAuthentication
-import argparse
 from esml import ESMLProject
-from baselayer_azure_ml_pipeline import esml_pipeline_types
-from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 print("SDK Version:", azureml.core.VERSION)
 
 p,scoring_date,model_number = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
 p.describe()
 
 p.inference_mode = True # We want "INFERENCE" mode, when calling AKS cluster
-p.connect_to_lake() # Connect to lake...to be able to also SAVE SCORING
+p.connect_to_lake() # Connect to lake...to be able to read test data and also SAVE SCORING
 
 print("Environment:")
 print(p.dev_test_prod,p.ws.name)
+print("Project number: {}".format(p.project_folder_name))
+print("Model number: {} , esml_date_utc: {}".format(model_number, scoring_date))
 
-# TEST webservice!
+print("Get testdata to do a smoke test with")
 X_test, y_test, tags = p.get_gold_validate_Xy() # Get the X_test data |  ESML knows the SPLIT and LABEL already (due to training)
 print(tags)
 
 #inference_config, model, best_run = p.get_active_model_inference_config(ws) # Get Model to call other pecific MODEL version, than latest |
 
+print("Call webservice - http request to AKS endpoint over PRIVATE ip/endpoint")
 caller_user_id = '81965d9c-40ca-4e47-9723-5a608a32a0e4' # Optional: Connect scoring to a caller/user | globally for all rows
 df = p.call_webservice(p.ws, X_test,caller_user_id, False) # Call and save results to version-folder | Auto-fetch key, model_version from keyvault | #  (p.ws, X_test,caller_user_id, False, model.version)
 print(df.head())

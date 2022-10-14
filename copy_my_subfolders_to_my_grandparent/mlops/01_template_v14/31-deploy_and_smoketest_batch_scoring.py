@@ -26,9 +26,6 @@ POSSIBILITY OF SUCH DAMAGE.
 import sys
 sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
-#from azureml.core.authentication import AzureCliAuthentication
-from azureml.core.authentication import ServicePrincipalAuthentication
-import argparse
 from esml import ESMLProject
 from baselayer_azure_ml_pipeline import esml_pipeline_types
 from baselayer_azure_ml_pipeline import ESMLPipelineFactory
