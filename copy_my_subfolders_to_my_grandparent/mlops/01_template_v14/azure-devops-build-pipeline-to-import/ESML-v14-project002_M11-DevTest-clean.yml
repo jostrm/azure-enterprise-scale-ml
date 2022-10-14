@@ -1,0 +1,153 @@
+# Variable 'esml_environment' was defined in the Variables tab
+# Variable 'esml_project_sp_id' was defined in the Variables tab
+# Variable 'esml_project_sp_secret' was defined in the Variables tab
+# Variable 'esml_tenant_id' was defined in the Variables tab
+# Variable 'ipAddr' was defined in the Variables tab
+# Variable 'kvName' was defined in the Variables tab
+# Variable 'kvRG' was defined in the Variables tab
+jobs:
+- job: Job_1
+  displayName: Project000
+  timeoutInMinutes: 360
+  pool:
+    name: esml-pool
+  steps:
+  - checkout: self
+    submodules: true
+  - task: UsePythonVersion@0
+    displayName: Use Python 3.9
+    enabled: False
+    inputs:
+      versionSpec: 3.9
+  - task: PowerShell@2
+    displayName: 01-Azure Devops as whitelist for Keyvault - Get Client IP from Trusted REST API Service
+    inputs:
+      targetType: inline
+      script: >-
+        $resp = Invoke-RestMethod -Uri 'https://api.ipify.org/'
+                Write-Host $resp
+                Write-Host "##vso[task.setvariable variable=ipAddr]$resp"
+                $ipAddr = $resp
+                Write-Host ipAddr is: $ipAddr
+  - task: AzureCLI@2
+    displayName: 01-Azure Devops as whitelist for Keyvault - Firewall rules
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >
+        az keyvault network-rule add --resource-group $(kvRG) --name $(kvName) --ip-address $(ipAddr)
+
+        echo "1_Currentd dir:" $PWD
+
+        ls -l
+  - task: Bash@3
+    displayName: '02-Test  BUILD AGENT: Activate Conda'
+    inputs:
+      targetType: inline
+      script: >-
+        echo "##vso[task.prependpath]$CONDA/bin"
+
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+
+        conda --version
+
+        conda env list
+
+        conda activate azure_automl_esml_v144
+  - task: AzureCLI@2
+    displayName: '10-Test  BUILD AGENT & Networking: ws and resources'
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl_esml_v144
+
+        echo "echo env: " $(esml_environment)
+
+        ls
+
+
+        python -m 10-get_environment --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number 11 --esml_date_utc "1000-01-01 10:35:01.243860"
+      cwd: mlops/01_template_v14/
+  - task: AzureCLI@2
+    displayName: 21-train_in_2_gold_train_AutoML_pipeline
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl_esml_v144
+
+
+        python -m 21-train_in_2_gold_train_pipeline --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number 11 --esml_date_utc "1000-01-01 10:35:01.243860"
+      cwd: mlops/01_template_v14/
+  - task: AzureCLI@2
+    displayName: 31-deploy_and_smoketest_batch_scoring_pipeline
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl_esml_v144
+
+
+        python -m 31-deploy_and_smoketest_batch_scoring --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number 11 --esml_date_utc "1000-01-01 10:35:01.243860"
+      cwd: mlops/01_template_v14/
+  - task: AzureCLI@2
+    displayName: 32-deploy_online_aks_endpoint
+    enabled: False
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl_esml_v144
+
+
+        python -m 32-deploy_online_aks --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number 11 --esml_date_utc "1000-01-01 10:35:01.243860"
+      cwd: mlops/01_template_v14/
+  - task: AzureCLI@2
+    displayName: 32-smoke_test_online_aks_endpoint
+    enabled: False
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: >-
+        eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
+
+        conda activate azure_automl_esml_v144
+
+
+        python -m 32-smoke_test_online --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number 11 --esml_date_utc "1000-01-01 10:35:01.243860"
+      cwd: mlops/01_template_v14/
+  - task: AzureCLI@2
+    displayName: '01- Finally/Try: Remove Firewall rule'
+    condition: succeededOrFailed()
+    continueOnError: True
+    inputs:
+      connectedServiceNameARM: d9e34da4-661f-4802-bb20-404fcc7f2471
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: az keyvault network-rule remove --resource-group $(kvRG) --name $(kvName) --ip-address $(ipAddr)
+  - task: CopyFiles@2
+    displayName: Copy Files (Source-2-Staging)
+    inputs:
+      SourceFolder: $(Build.SourcesDirectory)
+      TargetFolder: $(Build.ArtifactStagingDirectory)
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: mlops-build'
+    inputs:
+      ArtifactName: mlops-build
+...

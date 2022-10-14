@@ -54,7 +54,7 @@ p_factory.describe()
 ## BUILD
 batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_SCORING)
 
-## RUN training
+## RUN scoring pipeline - to smoke test it, see that it works.
 pipeline_run = p_factory.execute_pipeline(batch_pipeline)
 pipeline_run.wait_for_completion(show_output=False)
 
