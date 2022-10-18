@@ -176,11 +176,17 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
         model_name = controller.experiment_name
     else:
         print("Current BEST model is: {} from Model registry with experiment_name-TAG {}, run_id-TAG {}  model_name-TAG {}".format(current_model.name,controller.experiment_name,run_id_tag,model_name))
+        if ("esml_time_updated" in current_model.tags):
+            print("esml_time_updated: {}".format(current_model.tags.get("esml_time_updated")))
+        print("status_code : {}".format(current_model.tags.get("status_code")))
+        print("model_name  : {}".format(current_model.tags.get("model_name")))
+        print("trained_in_workspace   : {}".format(current_model.tags.get("trained_in_workspace")))
 
     print ("esml_modelname inparameter {} and controller.experiment_name: {} and get_betModel, model_name {} ".format(esml_modelname,controller.experiment_name,model_name))
 
-    ##2 ) Register NEW TRAINED model, with TAG status_code=esml_new_trained
-    tags = {"status_code": IESMLController.esml_status_new, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
+    ##2) Register NEW TRAINED model, with TAG status_code=esml_new_trained
+    time_stamp = str(datetime.datetime.now())
+    tags = {"esml_time_updated": time_stamp,"status_code": IESMLController.esml_status_new, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
         "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "AutoMLStep"}
 
     ##2b) Register NEW model in CURRENT env
@@ -240,17 +246,14 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
         target_workspace = target_ws,
         experiment_name = controller.experiment_name)
 
-# OUTER LOOP - Not tested 2022-09-06
-
-    ## 3) OUTER LOOP - REGISTER model, if better in TARGET environment TEST, if it is best in DEV.
-
+    print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
         model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
         print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
         next_environment = controller.get_next_environment() # Test, or PROD
-        print("OUTER LOOP: Now trying to compare with models in environment: {}".format(next_environment))
+        print("OUTER LOOP(dev-test): Now trying to compare with models in environment: {}".format(next_environment))
         try:
             promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model = comparer.compare_scoring_current_vs_new_model(
                 new_run_id = automl_step_run_id,
@@ -260,19 +263,20 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
                 target_workspace = target_ws,
                 experiment_name = controller.experiment_name)
 
-            print("Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
+            print("OUTER LOOP (dev-test): Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
 
             if (promote_new_model == True):
                 print("Now registering model in test environment...")
                 #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model)
-                model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test)
+                #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test)
+                model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None)
                 print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
 
         except Exception as e1:
             print("Error/Warning: OUTER loop. Maybe you don't have a TEST and PROD environment setup? Are you running in DEMO-mode with only DEV environment")
             print(e1)
 
-    print("Done: INNER and OUTER loop")
+    print("Done: INNER and OUTER loop to Test is done automatically. See human approval gate in Azure Devops staging to get TEST to PROD")
 
 def save_results():
     try:
