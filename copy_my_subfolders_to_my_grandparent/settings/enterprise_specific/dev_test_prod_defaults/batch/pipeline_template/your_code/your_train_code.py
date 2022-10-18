@@ -3,6 +3,9 @@ import pandas as pd
 import sys
 sys.path.append("..")
 from esmlrt.interfaces.iESMLTrainer import IESMLTrainer
+from esmlrt.interfaces.iESMLSplitter import IESMLSplitter # Just for reference to see where the abstract class exists
+from esmlrt.runtime.ESMLSplitter import ESMLSplitter1 # Point at your own code/class here instead..that needst to implement the IESMLSplitter class
+
 from azureml.train.automl import AutoMLConfig
 
 class Trainer(IESMLTrainer):
@@ -13,14 +16,9 @@ class Trainer(IESMLTrainer):
 
     @staticmethod
     def split_gold(azure_ml_gold_dataset, train_percentage=0.6, label=None,stratified=False,seed=42):
+        my_IESMLSplitter = ESMLSplitter1() # Provides a consistent way of spli logic - from pipeline or from notebook - using same Splitter.
         df = azure_ml_gold_dataset.to_pandas_dataframe()
-        whats_left_for_both = round(1-train_percentage,1)  # 0.4 ...0.3 if 70%
-        left_per_set = round((whats_left_for_both / 2),2) # 0.2  ...0.15
-        validate_and_test = round((1-left_per_set),2) # 0.8 ....0.75
-
-        train, validate, test = \
-            np.split(df.sample(frac=1, random_state=seed), 
-                    [int(train_percentage*len(df)), int(validate_and_test*len(df))])
+        train,train_percentage,validate,validate_percentage,test,test_percentage = my_IESMLSplitter.split(df,label,train_percentage,seed,stratified)
         return train,validate,test
 
     # https://github.com/CESARDELATORRE/Easy-AutoML-MLOps/blob/master/notebooks/4-automlstep-pipeline-run/automlstep-pipeline-run-safe-driver-classifier.ipynb

@@ -267,7 +267,6 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
             if (promote_new_model == True):
                 print("Now registering model in test environment...")
-                #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model)
                 #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test)
                 model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None)
                 print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
