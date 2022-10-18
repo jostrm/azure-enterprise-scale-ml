@@ -35,7 +35,14 @@ class Trainer(IESMLTrainer):
         return train_run, aml_model,fitted_model
 
     
-    def automl_training(self,train_aml_ds, ws,amlcompute_cluster_name, ):
+    ##
+    # If you want to use AutoML, and not AutoMLStep via ESML and IN_2_GOLD_TRAIN_AUTOML_PIPELINE
+    # Then you can override 100% and implement your own AutoML. Example for Image classification, or NLP
+    ##
+    def automl_training(self,train_aml_ds, ws,amlcompute_cluster_name):
+
+        train_run, aml_model,fitted_model = None,None,None # Needs to return this
+        ####################### Pseudo code below ############ 
 
         automl_performance_config = {'enable_voting_ensemble': True,
         'enable_stack_ensemble': False,
@@ -50,7 +57,10 @@ class Trainer(IESMLTrainer):
         'path': '.',
         'debug_log': 'azure_automl_debug_dev.log'}
 
-        compute_target = ComputeTarget(workspace=ws, name=amlcompute_cluster_name)
+        compute_target = None
+        runconfig = None
+        label = None
+        #compute_target = ComputeTarget(workspace=ws, name=amlcompute_cluster_name)
         automl_config = AutoMLConfig(task = 'regression',  #TODO: move as a parameter in get_automl_performance_config()
                             primary_metric = 'normalized_mean_absolute_error', #TODO: move as a parameter in get_automl_performance_config()
                             compute_target = self,
@@ -60,9 +70,9 @@ class Trainer(IESMLTrainer):
                             label_column_name = label,
                             **automl_performance_config
                         )
-        experiment = Experiment(ws, experiment_name)
-        remote_run = experiment.submit(automl_config, show_output = True)
+        #experiment = Experiment(ws, experiment_name)
+        #remote_run = experiment.submit(automl_config, show_output = True)
 
-        remote_run.wait_for_completion()
-        best_run, fitted_model = remote_run.get_output()
-        return  train_run, aml_model,fitted_model
+        #remote_run.wait_for_completion()
+        #best_run, fitted_model = remote_run.get_output()
+        return  train_run, aml_model,fitted_model # Needs to return this
