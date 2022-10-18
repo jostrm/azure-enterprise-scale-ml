@@ -46,9 +46,9 @@ class ESMLController(IESMLController):
 
     ### Internal method of ESML, use PUBLIC method register_model() instead. But here you can affect the logic how to register a model in correct dev_test_prod workspace
     # Readmore: https://docs.microsoft.com/en-us/python/api/azureml-core/azureml.core.model.model?view=azure-ml-py
-    # Implements: iESMLController _register_model_in_correct_workspace(self,current_ws, target_environment,new_model=None, description_in=None,pkl_name_in=None):
+    # Implements: iESMLController _register_model_in_correct_workspace(self,current_ws, target_environment,new_model=None,  esml_status=IESMLController.esml_status_new, description_in=None,pkl_name_in=None):
     ###
-    def _register_model_in_correct_workspace(self,current_environment, current_ws, target_environment,new_model=None, description_in=None,pkl_name_in=None, esml_status=IESMLController.esml_status_not_new):
+    def _register_model_in_correct_workspace(self,current_environment, current_ws, target_environment,new_model=None, esml_status=IESMLController.esml_status_new, description_in=None,pkl_name_in=None):
         pkl_name = "outputs" # "model.pkl"
         current_ws_name = current_ws.name
 
@@ -85,6 +85,10 @@ class ESMLController(IESMLController):
 
         tags["run_id"] = run_id
         tags["status_code"] = esml_status # Overwrite status_
+        try:
+            tags["mflow_stage"] = IESMLController._get_flow_equivalent(tags["status_code"])
+        except: 
+            print ("Warning: Could not map MFLow stages from ESML status. Source: IESMLController._get_flow_equivalent(esml_status_code)")
 
         if("test_set_ROC_AUC" in model_source.tags):
             tags["test_set_Accuracy"] = model_source.tags["test_set_Accuracy"]

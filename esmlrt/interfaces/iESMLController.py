@@ -54,10 +54,19 @@ class IESMLController:
     _esml_model_name = None
     _esml_model_alias = None
 
-    # STATUS
-    esml_status_new = "esml_newly_trained"
-    esml_status_not_new = "esml_not_newly_trained"
-    esml_status_promoted = "esml_promoted"
+    
+    # ESML status / stages
+    esml_status_new = "esml_newly_trained" # Something to compare with the LEADING model. Registered to be able to TAGS Test_scoring = mlflow.None
+    esml_status_demoted_or_archive = "demoted_or_archive" # Filter out during comparision ~ To demote a model. E.g. model already lost to LEADING model, already compared mlflow.? maybe mlflow.Archived is equivalent?
+    esml_status_promoted_2_dev = "esml_promoted_2_dev" # INNER LOOP: A model that WON at some point in time in DEV-stage. The latest registered promoted model is the LEADING model.
+    esml_status_promoted_2_test = "esml_promoted_2_test" # OUTER LOOP: A model that WON at some point in time in TEST-stage.
+    esml_status_promoted_2_prod = "esml_promoted_2_prod" # OUTER LOOP: A model that WON at some point in time in PROD-stage.
+    
+    # MLFlow states: ESML supports MFFlow (and suggestion to AML v2 central registry) uses MLFlow stating: Staging|Archived|Production|None) as below, mapped to ESML
+    mflow_stage_none = "None" # esml_status_new = newly trained model in Dev environment, e.g. R&D phase.
+    mflow_stage_staging = "Staging" # esml_status_promoted_in_dev esml_status_promoted_2_test  = (Promoted in "Dev" or to "Test" environmet. MLFlow model registry does not have this granularity)
+    mflow_stage_production = "Production" # esml_status_promoted_2_prod
+    mflow_stage_none = "Archive" # esml_status_not_new = To demote a model.
 
     @classmethod
     def version(self): return "1.4"
@@ -360,11 +369,22 @@ class IESMLController:
             start = time.time()
             print("TIME: Model list LAMBDA FILTER, on experiment_name {}".format(tag_experiment_name))
             all_models = Model.list(workspace=ws)
+
             if(filter_on_version is not None):
                 print("Filter on version:ON")
-                filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name and r.version == filter_on_version and r.tags.get("status_code") != IESMLController.esml_status_new), all_models))
+                filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name and r.version == filter_on_version 
+                and r.tags.get("status_code") != IESMLController.esml_status_new
+                and (r.tags.get("status_code") == IESMLController.esml_status_promoted_2_dev 
+                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_test
+                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_prod)
+                ), all_models))
             else:
-                filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name and r.tags.get("status_code") != IESMLController.esml_status_new), all_models))
+                filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name 
+                and r.tags.get("status_code") != IESMLController.esml_status_new
+                and (r.tags.get("status_code") == IESMLController.esml_status_promoted_2_dev 
+                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_test
+                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_prod)
+                ), all_models))
             
             print("TIME: FILTER ModelList:")
             end = time.time()
@@ -383,6 +403,11 @@ class IESMLController:
             ## A: Manual run can have higher VERSION, but created EARLIER, hence .created_time always brings "latest registered model", when .version does not.
             
             if (len(filtered_list) > 0): # IF we found any...
+                model_highest_version = filtered_list[0]
+            else: # No models promoted - Just take latest, that is note DEMOTED
+                filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name 
+                and r.tags.get("status_code") != IESMLController.esml_status_demoted_or_archive
+                ), all_models))
                 model_highest_version = filtered_list[0]
 
         except Exception as e:
@@ -408,10 +433,20 @@ class IESMLController:
                             all_versions_in_same_experiment.append(latest_model)
                             break
                     else:
-                        latest_model = model
+                        if("status_code" in model.tags):
+                            if(model.tags["status_code"] == IESMLController.esml_status_promoted_2_dev or 
+                            model.tags["status_code"] == IESMLController.esml_status_promoted_2_test or model.tags["status_code"] == IESMLController.esml_status_promoted_2_prod):
+                                latest_model = model
+                            elif(model.tags["status_code"] == IESMLController.esml_status_new):
+                                latest_tagged_with_status_new = model # 1st model, hence winning/leading model
+                        else: # fallback
+                            latest_model = model
+
                         all_versions_in_same_experiment.append(latest_model)  # All models in this experiment
             if (len(all_versions_in_same_experiment) > 0): # IF we found any...
                 model_highest_version = all_versions_in_same_experiment[0] # Try to get LATEST/highest version
+            else:
+                model_highest_version = latest_tagged_with_status_new # If NEW only. No promoted models yet.
             end = time.time()
             seconds = end - start
             minutes = seconds / 60
@@ -420,8 +455,9 @@ class IESMLController:
         try:
             run_id = model_highest_version.tags["run_id"]
             model_name = model_highest_version.tags["model_name"]
-        except: 
+        except Exception as e:
             print("Could not find tags, run_id or model_name on model_highest_version")
+            print(e)
 
         return model_highest_version, run_id, model_name
 
@@ -434,6 +470,7 @@ class IESMLController:
     @staticmethod
     def _get_best_model_via_experiment_tags_or_loop(ws,experiment_name,filter_on_version = None):
         latest_model = None
+        latest_tagged_with_status_new = None
         active_workspace = ws
 
         if(active_workspace is None):
@@ -466,14 +503,31 @@ class IESMLController:
                             #print ("found model matching experiment_name, also matching on model_version")
                             break
                     else:
-                        latest_model = m
+                        if("status_code" in m.tags):
+                            if(m.tags["status_code"] == IESMLController.esml_status_promoted_2_dev or 
+                            m.tags["status_code"] == IESMLController.esml_status_promoted_2_test or m.tags["status_code"] == IESMLController.esml_status_promoted_2_prod):
+                                latest_model = m
+                            elif(m.tags["status_code"] == IESMLController.esml_status_new):
+                                latest_tagged_with_status_new = m # 1st model, hence winning/leading model
+                        else: # fallback
+                            latest_model = m
                         #print ("found model matching experiment_name, selecting latest registered.")
                     break
                     
             if (latest_model is not None): # Update Experiment tag
                 ex = Experiment(active_workspace, experiment_name)
-                tags = {'model_name':latest_model.name, 'best_model_version':m.version}
+                if("status_code" in latest_model.tags):
+                    tags = {'model_name':latest_model.name, 'best_model_version':latest_model.version,"status_code":latest_model.tags["status_code"]}
+                else:
+                    tags = {'model_name':latest_model.name, 'best_model_version':latest_model.version}
                 ex.set_tags(tags)
+            elif(latest_tagged_with_status_new is not None):
+                ex = Experiment(active_workspace, experiment_name)
+                tags = {'model_name':latest_tagged_with_status_new.name, 'best_model_version':latest_tagged_with_status_new.version,
+                 "status_code":latest_tagged_with_status_new.tags["status_code"]  }
+                ex.set_tags(tags)
+                latest_model = latest_tagged_with_status_new
+                print("Note: There was no models earlier promoted, the latest NEW model, is the leading one. latest_model = latest_tagged_with_status_new")
 
         try:
             model_tag_run_id = latest_model.tags["run_id"]
@@ -486,7 +540,7 @@ class IESMLController:
 
 ###
 # REGISTER model, abstract implemented method
-# Note: For last parameter 'esml_status', please use IESMLController.esml_status_... properties, such as IESMLController.esml_status_not_new
+# Note: For last parameter 'esml_status', please use IESMLController.esml_status_... properties, such as IESMLController.esml_status_new
 # returns: model_registered_in_target
 ###
 
@@ -504,12 +558,18 @@ class IESMLController:
             raise Exception("Source environment cannot be PROD, cannot register from PROD to PROD, or from PROD to X. Source must be DEV or TEST")
             target_workspace = source_ws # Last stop. Prod->Prod
 
-        if(esml_status is None):
-            esml_status = IESMLController.esml_status_not_new
+        if(esml_status is None): # default behavoiur is to PROMOTE if register to TEST and PROD, pass esml_status as parameter to override this behaviour
+            if (target_env == "test"):
+                esml_status = IESMLController.esml_status_promoted_2_test
+            elif (target_env == "prod"):
+                esml_status = IESMLController.esml_status_promoted_2_prod
+            elif (target_env == "dev"):
+                pass # The user decides, can be esml_status_not_new or esml_status_promoted_2_dev
+            else:
+                esml_status = IESMLController.esml_status_new # default value
         
         target_workspace = self.get_other_workspace(source_ws,target_env) # dev, test, prod
         dev_workspace = self.get_other_workspace(source_ws, "dev")
-
         
         model_name = None
         model = None
@@ -536,21 +596,37 @@ class IESMLController:
                 print("registering model with name: {}, from run.".format(model_name))
                 model_registered_in_target = self._register_model_on_run(source_model,model_name,source_env,source_ws_name,run,experiment,esml_status,extra_model_tags)
             else: # fall back...
-                model_registered_in_target, model_source = self._register_model_in_correct_workspace("dev", dev_workspace, "dev",new_model=model)
+                model_registered_in_target, model_source = self._register_model_in_correct_workspace("dev", dev_workspace, "dev",new_model=model,esml_status=esml_status)
 
             #model_registered_in_target = self._register_model_on_run(source_model_to_copy_tags_from,model_name,source_env,source_ws_name,main_run,experiment)
         else: # 2b) If target is TEST or PROD, we dont have a RUN to connect to - only a MODEL registry
             if(target_env == "test"):  # run or experiment in SOURCE exists
-                model_registered_in_target, model_source = self._register_model_in_correct_workspace(source_env, source_ws, target_env,new_model=model)
+                model_registered_in_target, model_source = self._register_model_in_correct_workspace(source_env, source_ws, target_env,new_model=model,esml_status=esml_status)
             elif(target_env == "prod" and source_env=="test"): # No run or experiment in SOURCE
                 source_model,run_id_tag, model_name_tag = IESMLController.get_best_model_via_modeltags_only_DevTestProd(target_workspace,self.experiment_name)
-                model_registered_in_target, model_source = self._register_model_in_correct_workspace(source_env, source_ws, target_env,new_model=model)
+                model_registered_in_target, model_source = self._register_model_in_correct_workspace(source_env, source_ws, target_env,new_model=model,esml_status=esml_status)
             elif(target_env == "prod" and source_env=="dev"): # Run or experiment in SOURCE exists (skip TEST is never recommended, but possible)
-                model_registered_in_target, model_source = self._register_model_in_correct_workspace(source_env, source_ws, target_env,new_model=model)
+                model_registered_in_target, model_source = self._register_model_in_correct_workspace(source_env, source_ws, target_env,new_model=model,esml_status=esml_status)
 
         return model_registered_in_target
                 
 
+    ###
+    # Maps ESML status to MLFlow stages. Is tagged on Model
+    ##
+    @staticmethod
+    def _get_flow_equivalent(esml_status):
+        ml_flow_stage = "None"
+
+        if(esml_status == IESMLController.esml_status_new):
+            ml_flow_stage = "None"
+        elif(esml_status == IESMLController.esml_status_demoted_or_archive): # Demoted or already compared and failed.
+            ml_flow_stage = "Archive"
+        elif(esml_status == IESMLController.esml_status_promoted_2_dev or esml_status == IESMLController.esml_status_promoted_2_test): # Staging
+            ml_flow_stage = "Staging"
+        elif(esml_status == IESMLController.esml_status_promoted_2_prod): # Staging
+            ml_flow_stage = "Production"
+        return ml_flow_stage
 
     def _register_model_on_run(self,source_model_to_copy_tags_from,model_name, source_env,source_ws_name, remote_run, experiment, esml_status=None, extra_model_tags=None):
         #remote_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific) # 2022-08-08 do not READ anything to disk/file
@@ -581,6 +657,11 @@ class IESMLController:
             tags["status_code"] = esml_status
         else:
             tags["status_code"]=IESMLController.esml_status_new
+
+        try:
+            tags["mflow_stage"] = IESMLController._get_flow_equivalent(tags["status_code"])
+        except: 
+            print ("Warning: Could not map MFLow stages from ESML status. Hence to tag for this. Source: IESMLController._get_flow_equivalent(esml_status_code)")
 
         if(extra_model_tags is not None):
             tags = {**tags, **extra_model_tags}
