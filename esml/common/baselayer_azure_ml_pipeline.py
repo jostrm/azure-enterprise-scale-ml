@@ -85,7 +85,7 @@ class ESMLPipelineFactory():
     #region(collapsed) TODO
     #script_template_user = "../../../settings/project_specific/model/dev_test_prod_override/batch/pipeline_template"
     #endregion
-    _snapshot_folder = "../../../2_A_aml_pipeline/4_inference/batch/"
+    _snapshot_folder = "../../../01_pipelines/batch/"
 
 #region USER CUSTOMIZATION - EDIT the code in THESE files. Init files with "create_dataset_scripts_from_template()"
     _in2silver_filename = "in2silver.py"
