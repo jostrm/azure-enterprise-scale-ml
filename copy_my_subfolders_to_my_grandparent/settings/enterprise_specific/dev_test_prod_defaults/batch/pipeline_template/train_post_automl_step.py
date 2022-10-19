@@ -213,6 +213,7 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     automl_run_step_by_index = step_list[automl_step_id]
     print("automl_run_step_by_index: {} and type {}".format(automl_run_step_by_index.id,type(automl_run_step_by_index)))
     automl_step_run_id = automl_run_step_by_index.id
+    print("automl_step_run_id:{} which is 'new_run_id' in comparer.compare_scoring_current_vs_new_model".format(automl_step_run_id))
     
     experiment_run = ws.experiments[controller.experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
     automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)

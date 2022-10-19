@@ -80,33 +80,48 @@ class ESMLModelCompare(IESMLModelCompare):
             promote_new_model = False
             return promote_new_model,source_model_name,None,target_model_name, target_best_run_id,target_workspace,None
         else:
+            source_model_name = None
+            source_best_run_id = None
+
             #try: # GET source from saved new RUN_ID
             if (target_environment != current_env): # If REGISTER model in other WORKSPACE, no Run or Experiment exists
                 source_model,run_id_tag, model_name_tag = IESMLController.get_best_model_via_modeltags_only_DevTestProd(source_workspace,experiment_name) # 2022-08-08: != IESMLController.esml_status_new
                 
                 try:
-                    source_model_name2 = source_model.name # 2022-08-08, test if this is possible...model may not have a Run associated with it. Hence use TAGS instead
+                    source_model_name = source_model.name # 2022-08-08, test if this is possible...model may not have a Run associated with it. Hence use TAGS instead
                     source_best_run_id2 = source_model.run.id # 2022-08-08
-                    print ("Model name 2, source: {}".format(source_model_name2))
+                    print ("Model source_model.name {}".format(source_model_name))
+                    print ("Run ID 1: source_model.run.id: {}".format(source_best_run_id2)) # eef9793a-b684-4f24-888e-f795280b6e1f_0
+                    print ("Run ID 2: get_best_model_and_run_id_tag: {} = ACTIVE".format(run_id_tag)) # eef9793a-b684-4f24-888e-f795280b6e1f
+                    print ("-Run ID 3: source_model.tags[run_id] {}".format(source_model.tags["run_id"])) # eef9793a-b684-4f24-888e-f795280b6e1f
+                    print("Run ID 4:IN parameter: new_run_id {}".format(new_run_id))
                 except Exception as e5:
                     print("INFO: Could not get source_model.name or source_model.run.id, when target_environment != current_env {}".format(e5))
 
                 source_exp = Experiment(workspace=source_workspace, name=experiment_name) # Fetch the OLD run from SOURCE () TODO: What if TEST->PROD and both are just "registered" from DEV?)
-                source_best_run_id = source_model.tags["run_id"]
+                source_best_run_id = source_model.tags["run_id"] # 2022-10-19 changed run_id to fix correct behaviour
+                source_best_run_id = run_id_tag # 2010-19 test 1. WORKS! run_id_tag
+                #source_best_run_id = new_run_id # 2010-19 test 2
                 try:
+                    print("source_best_run_id for initating AutoMLRun {}".format(source_best_run_id))
                     source_run = AutoMLRun(experiment=source_exp, run_id=source_best_run_id)
                     
                     source_best_run, source_fitted_model = source_run.get_output()
                     source_task_type = self.get_task_type(source_run)
                     
-                    source_model_name = source_best_run.properties['model_name'] # 2022-08-08 source_model  is already fetched...
-                    source_model = Model(source_workspace, name=source_model_name) # 2022-08-08 source_model  is already fetched...
+                    source_model_name_from_properties = source_best_run.properties['model_name'] #2022-10-19 wrong modelname 
+                    if(source_model_name_from_properties != source_model_name):  # 2022-08-08 Added this check
+                        print("WARNING! source_best_run.properties['model_name'] {} != source_model.name {}".format(source_model_name_from_properties,source_model.name))
+                        print("- INFO: Chosing source_model.name from IESMLController.get_best_model")
+                        
+                    print("Model name for initating Model() is source_model_name2: {}".format(source_model_name)) # 2022-10-19 WORKS!source_model_name
+                    source_model = Model(source_workspace, name=source_model_name) # 2022-08-08 source_model  is already fetched...2022-10-19 crashed here. changed run_id to fix correct behaviour
                 except Exception as e2:
-                    print("INFO: 100: source!=target: Could not initiate source_run, as AutoMLRun, now trying as other Run(), PipelineRun() with source: source_model.tags[run_id] = {}".format(source_best_run_id))
-                    source_task_type = self.get_task_type(source_model.run)
+                    print("INFO: 100: source!=target: Could not initiate source_run or Model with source_best_run_id = {} and Model name {}".format(source_best_run_id,source_model_name))
+                    print(e2)
+                    # source_task_type = self.get_task_type(source_model.run) # Can throw an errror
                     source_model_name = source_model.name
                     print("101: 'model.run.id = '{}".format(source_model.run.id))
-                    print(e2)
 
             else: # Same source=target, may be 1st time of model
                 source_exp = Experiment(workspace=source_workspace, name=experiment_name)
