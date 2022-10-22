@@ -880,6 +880,7 @@ class ESMLPipelineFactory():
             "--par_esml_model_name", p.model_folder_name,
             "--par_aml_model_name", aml_model_name,
             "--model_name", p.model_folder_name,
+            "--model_path", model_data
             "--project_number", p.project_folder_name,
             "--ml_type", p.active_model["ml_type"],
             "--secret_name_tenant", p.LakeAccess.storage_config["tenant"],
