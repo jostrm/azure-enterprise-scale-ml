@@ -1,7 +1,7 @@
 {
-    "project_number": 1,
-    "project_folder_name": "project001",
-    "active_model": 10,
+    "project_number": 2,
+    "project_folder_name": "project002",
+    "active_model": 11,
     "models":
         [
             {
@@ -10,7 +10,10 @@
                 "model_short_alias": "M10",
                 "dataset_folder_names": ["ds01_titanic","ds02_haircolor","ds03_housing","ds04_lightsaber"],
                 "label":"Survived",
-                "ml_type":"classification"
+                "ml_type":"classification",
+                "ml_metric":"AUC_weighted",
+                "ml_metric_docs": ["AUC_weighted","accuracy","precision_score_weighted","average_precision_score_weighted","norm_macro_recall"],
+                "ml_time_out_score": 0.8
             },
             {
                 "model_number": 11,
@@ -18,15 +21,10 @@
                 "model_short_alias": "M11",
                 "dataset_folder_names": ["ds01_diabetes","ds02_other"],
                 "label":"Y",
-                "ml_type":"regression"
-            },
-            {
-                "model_number": 12,
-                "model_folder_name": "12_car_price_regression",
-                "model_short_alias": "M12",
-                "dataset_folder_names": ["ds01_vw","ds02_audi","ds03_bmw"],
-                "label":"price",
-                "ml_type":"regression"
+                "ml_type":"regression",
+                "ml_metric":"normalized_mean_absolute_error",
+                "ml_metric_docs": ["normalized_root_mean_squared_error","normalized_mean_absolute_error","r2_score","spearman_correlation"],
+                "ml_time_out_score": 0.3
             }
         ]
 }
