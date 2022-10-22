@@ -59,7 +59,7 @@ df = aml_dataset_in.to_pandas_dataframe()
 if(df is None):
     raise UserErrorException("df = aml_dataset_in.to_pandas_dataframe() - df is NONE!")
 IS_DEMO = True
-if (IS_DEMO): # Simulate feature engineering...source system might not know column name for Y, and certainly not values
+if (IS_DEMO and esml_inference_mode == True): # Simulate feature engineering...source system might not know column name for LABEL and certainly not values
     custom_code = In2GoldProcessor(df) # Drops columns, rename columns, filter data, interpolate, etc
     df = custom_code.in_to_silver_ds01_M10_M11_DEMO()
 else:

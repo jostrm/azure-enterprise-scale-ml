@@ -54,6 +54,26 @@ def init():
     
     parser.add_argument('--model_name', dest='model_name', type=str, required=True)
     parser.add_argument('--model_path', dest='model_path', type=str, required=True)
+
+    parser.add_argument('--project_number', dest='project_number', type=str, required=True)
+    parser.add_argument('--ml_type', dest='ml_type', type=str, required=True)
+    parser.add_argument('--secret_name_tenant', dest='secret_name_tenant', type=str, required=True)
+    parser.add_argument('--secret_name_sp_id', dest='secret_name_sp_id', type=str, required=True)
+    parser.add_argument('--secret_name_sp_secret', dest='secret_name_sp_secret', type=str, required=True)
+
+    # envs
+    parser.add_argument('--dev_resourcegroup_id', dest='dev_resourcegroup_id', type=str, required=True)
+    parser.add_argument('--dev_workspace_name', dest='dev_workspace_name', type=str, required=True)
+    parser.add_argument('--dev_subscription_id', dest='dev_subscription_id', type=str, required=True)
+
+    parser.add_argument('--test_resourcegroup_id', dest='test_resourcegroup_id', type=str, required=True)
+    parser.add_argument('--test_workspace_name', dest='test_workspace_name', type=str, required=True)
+    parser.add_argument('--test_subscription_id', dest='test_subscription_id', type=str, required=True)
+
+    parser.add_argument('--prod_resourcegroup_id', dest='prod_resourcegroup_id', type=str, required=True)
+    parser.add_argument('--prod_workspace_name', dest='prod_workspace_name', type=str, required=True)
+    parser.add_argument('--prod_subscription_id', dest='prod_subscription_id', type=str, required=True)
+
     #parser.add_argument('--metrics_data', dest='metrics_data', type=str, required=True)
     
     
@@ -71,6 +91,28 @@ def init():
         target_column_name = args.target_column_name
         model_path = args.model_path
         model_name = args.model_name
+
+        #project info & security
+        project_number = args.project_number
+        ml_type = args.ml_type
+
+        secret_name_tenant = args.secret_name_tenant
+        secret_name_sp_id = args.secret_name_sp_id
+        secret_name_sp_secret = args.secret_name_sp_secret
+
+        #envs
+        dev_subscription_id = args.dev_subscription_id
+        test_subscription_id = args.test_subscription_id
+        prod_subscription_id = args.prod_subscription_id
+
+        dev_resourcegroup_id = args.dev_resourcegroup_id
+        test_resourcegroup_id = args.test_resourcegroup_id
+        prod_resourcegroup_id = args.prod_resourcegroup_id
+
+        dev_workspace_name = args.dev_workspace_name
+        test_workspace_name = args.test_workspace_name
+        prod_workspace_name = args.prod_workspace_name
+
         #metrics_data = args.metrics_data
         #print(metrics_data)
 
@@ -96,10 +138,8 @@ def init():
         #validate_ds = next(it1)[1] # Get 2nd DATASET: GOLD_VALIDATE
 
         test_ds = next(it1)[1] # Get 3rd DATASET: GOLD_TEST
-        #test_df = validate_ds.to_pandas_dataframe()
-
-        logger.info("Azure ML Dataset Test loaded successfully. {}".format(test_ds))
-        print("Azure ML Dataset Test loaded successfully. {}".format(test_ds))
+        logger.info("Azure ML Dataset Test loaded successfully. {}".format(test_ds.name))
+        print("Azure ML Dataset Test loaded successfully. {}".format(test_ds.name))
 
         # OUTPUT: PATHS
         # 1) Save META data: "WHAT data was used, when did the training occur in time, etc "  (train_gold path, run_id, pipeline_id )
@@ -112,13 +152,12 @@ def init():
         date_infolder = datetime.datetime.strptime(date_in, '%Y-%m-%d %H:%M:%S.%f') # UTC string to DateTime object
         esml_training_day_date_out = date_infolder.strftime('%Y/%m/%d')
         run_id = run.parent.id #run.id
-        #historic_path = args.esml_train_lake_template.format(date_folder = esml_training_day_date_out,id_folder= run_id)
+        
         # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{"8e9792b1f7e84d40b3dd29dbc5a91a37"}/
         historic_path = args.esml_train_lake_template.format(id_folder=run_id)
-        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{8e9792b1f7e84d40b3dd29dbc5a91a37}/
-        
 
         logger.info("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")
+        print("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")
 
     except Exception as e:
         logging_utilities.log_traceback(e, logger)
@@ -132,37 +171,27 @@ def compare(test_ds):
         comparer = None # IESMLModelCompare
         #trainer = None # IESMLTrainer
 
-        # CUSTOMIZE ############### Optinonal: You can CUSTOMIZE, by implementing your own CLASS that supports interfaces/abstract classes: IESMLTestScoringFactory,IESMLModelCompare
-        project_number = 'project001'  # TODO: Look in your lake_settings.json
-        ml_type = "regression"
+        # Optional CUSTOMIZATION ############### Optional: You can CUSTOMIZE, by implementing your own CLASS that supports interfaces/abstract classes: IESMLTestScoringFactory,IESMLModelCompare
         test_scoring = ESMLTestScoringFactory(ml_type) # Optional: IF , you want to have a customized way of calculating Test_set scoring need to implement your own IESMLTestScoringFactory
         comparer = ESMLModelCompare(setting_path = "") # Optional: IF, you want to have a customized way, You need to implement IESMLModelCompare
 
-        secret_name_tenant = "esml-tenant-id" # TODO: Look in your security_config.json
-        secret_name_sp_id = "esml-project-sp-id" # TODO:Look in your security_config.json
-        secret_name_sp_secret = "esml-project-sp-secret" # TODO:Look in your security_config.json
+        # Note: You can get this info in ESML by p.get_all_envs() (where p is ESMLProject)
+        all_envs ={'dev': {'subscription_id': dev_subscription_id,'resourcegroup_id': dev_resourcegroup_id,'workspace_name': dev_workspace_name},
+        'test': {'subscription_id': test_subscription_id,'resourcegroup_id': test_resourcegroup_id,'workspace_name': test_workspace_name},
+        'prod': {'subscription_id': prod_dev_subscription_id,'resourcegroup_id': prod_resourcegroup_id,'workspace_name': prod_workspace_name}}
 
-        # TODO:You can get this info by p.get_all_envs() (where p is ESMLProject)
-        all_envs = {
-            'dev': {'subscription_id': 'x','resourcegroup_id': 'y', 'workspace_name': 'z'},
-            'test': {'subscription_id': 'x','resourcegroup_id': 'y','workspace_name': 'z'},
-            'prod': {'subscription_id': 'x','resourcegroup_id': 'y','workspace_name': 'z'}}
+        # OptionalCUSTOMIZE END ###############
 
-        # CUSTOMIZE END ###############
         controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias,all_envs, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
-
         calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, test_ds,ml_type)
-
-
     except Exception as e:
         logging_utilities.log_traceback(e, logger)
+        print(e)
         raise
 
 def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_current_env, test_ds, ml_type):
     test_scoring = controller.ESMLTestScoringFactory # IESMLTestScoringFactory
     comparer = controller.ESMLComparer # IESMLModelCompare
-    trainer = None # IESMLTrainer
-
     controller.dev_test_prod = esml_current_env
 
     ##1 ) Get "current" BEST mpodel 
@@ -186,7 +215,8 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
     ##2) Register NEW TRAINED model, with TAG status_code=esml_new_trained
     time_stamp = str(datetime.datetime.now())
-    tags = {"esml_time_updated": time_stamp,"status_code": IESMLController.esml_status_new, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
+    ml_flow_stage = IESMLController._get_flow_equivalent(IESMLController.esml_status_new)
+    tags = {"esml_time_updated": time_stamp,"status_code": IESMLController.esml_status_new,"mflow_stage":ml_flow_stage, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
         "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "AutoMLStep"}
 
     ##2b) Register NEW model in CURRENT env
@@ -195,11 +225,13 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     
     #2c) Get fitted_model_1, best_automl_run,model
 
+    '''
     try:
         fitted_model_1 = joblib.load("model.pkl")
         print("load Model with joblib.load, name model.pkl SUCCESS") # SUCCESS!
     except Exception as e:
         print("Cannot load Model with name model.pkl")
+    '''
 
 ####################### Get AutoMLRun from AutoMLStep and best_trained_model etc #####################
     step_name = "AutoML TRAIN in [{}]".format(esml_current_env)
@@ -228,18 +260,21 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     #print("Model")
     #print(model)
 
-    # TODO:2) Get LATEST model, without ANY TAGS  status_code = "esml_new_trained", then we get PREVIOUS winning model
-
-
     #3) Calculate Testset scoring on NEW model
-    rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
+    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
     print("Scoring for NEW model is: {},{},{},{}, {}".format(rmse,r2,mean_abs_percent_error,mae,spearman_correlation))
+    a_scoring = ""
+    if (controller.ESMLTestScoringFactory.ml_type == "regression"):
+        a_scoring = model.tags.get("test_set_R2")
+    elif (controller.ESMLTestScoringFactory.ml_type == "classification"):
+        a_scoring = model.tags.get("test_set_Accuracy")
+    print("Verifying that at least 1 scoring exists in TAGS on model: {}".format(a_scoring))
 
     ## 4) COMPARE if NEW model is better, than all else:
     next_environment = controller.get_next_environment()
     target_ws = controller.get_target_workspace(current_environment = esml_current_env, current_ws = ws, target_environment = esml_current_env)
 
-    promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model = comparer.compare_scoring_current_vs_new_model(
+    promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
         new_run_id =automl_step_run_id, # pipeline_run_id, #main_run.id,
         current_ws = ws,
         current_environment = esml_current_env,
@@ -256,7 +291,7 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
         next_environment = controller.get_next_environment() # Test, or PROD
         print("OUTER LOOP(dev-test): Now trying to compare with models in environment: {}".format(next_environment))
         try:
-            promote_new_model,source_model_name,new_run_id,target_model_name, target_best_run_id,target_workspace,source_model = comparer.compare_scoring_current_vs_new_model(
+            promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
                 new_run_id = automl_step_run_id,
                 current_ws = ws,
                 current_environment = esml_current_env,
@@ -267,9 +302,9 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
             print("OUTER LOOP (dev-test): Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
 
             if (promote_new_model == True):
-                print("Now registering model in test environment...")
+                print("Now registering model in TARGET environment {}".format(next_environment))
                 #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test)
-                model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None)
+                model_registered_in_target = controller.register_model(source_ws=ws, target_env=next_environment, source_model=model,run=None)
                 print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
 
         except Exception as e1:

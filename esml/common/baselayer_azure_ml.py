@@ -95,7 +95,6 @@ class ComputeFactory():
    
     ws = None
     config = None
-    aks_config = None
     dev_test_prod = "dev"
 
     # TRAIN - AML defaults
@@ -106,8 +105,17 @@ class ComputeFactory():
     min_nodes = 0
     idle_seconds_before_scaledown = 120
 
+    # batch
+    batch_aml_cluster_name = None
+    batch_vm_size = "STANDARD_D3_V2"
+    batch_vm_prio = "dedicated"
+    batch_vm_maxnodes = 3
+    batch_min_nodes = 0
+    batch_idle_seconds_before_scaledown = 120
+
     # INFERENCE - Online
     aks_config = None
+    batch_config = None
     aks_name = None
     aks_service_name = None
     image_name = None
@@ -155,19 +163,26 @@ class ComputeFactory():
                     self.config = json.load(f)
                 with open("{}../settings/{}/online/aks_config_dev.json".format(user_settings,start_path)) as f:
                     self.aks_config = json.load(f)
+                with open("{}../settings/{}/batch/aml_compute_dev.json".format(user_settings,start_path)) as f:
+                    self.batch_config = json.load(f)
             if(self.dev_test_prod == "test"): 
                 with open("{}../settings/{}/train/aml_compute_test.json".format(user_settings,start_path)) as f:
                     self.config = json.load(f)
                 with open("{}../settings/{}/online/aks_config_test.json".format(user_settings,start_path)) as f:
                     self.aks_config = json.load(f)
+                with open("{}../settings/{}/batch/aml_compute_dev.json".format(user_settings,start_path)) as f:
+                    self.batch_config = json.load(f)
             if(self.dev_test_prod == "prod"): 
                 with open("{}../settings/{}/train/aml_compute_prod.json".format(user_settings,start_path)) as f:
                     self.config = json.load(f)
                 with open("{}../settings/{}/online/aks_config_prod.json".format(user_settings,start_path)) as f:
                    self.aks_config = json.load(f)
+                with open("{}../settings/{}/batch/aml_compute_dev.json".format(user_settings,start_path)) as f:
+                    self.batch_config = json.load(f)
 
             self.parseTrainConfig(self.config, projNr,modelNr)
             self.parseAKSConfig(self.aks_config,projNr,modelNr)
+            self.parseBatchConfig(self.batch_config, projNr,modelNr)
         except Exception as e:
             raise Exception("ComputeFactory.LoadConfiguration - could not open .json config files: aml_compute_x.json") from e
         finally: 
@@ -196,6 +211,19 @@ class ComputeFactory():
         if((len(config['aks_name_override']) > 0)):  # ('aks_name_override' in config)
             self.aks_name = config['aks_name_override']
   
+    def parseBatchConfig(self, config,projNr, modelNr):
+        self.batch_aml_cluster_name = config['aml_cluster_name'].format(projNr,modelNr) # max 16 chars [prj002-m03-dev,prj002-m03-test,prj002-m03-prod]
+        self.batch_vm_size = config['aml_training_vm_size']
+        self.batch_vm_prio = config['vm_priority']
+        self.batch_vm_maxnodes = int(config['aml_training_nodes'])
+        self.batch_min_nodes = int(config['min_nodes'])
+
+        if(self.batch_min_nodes > 0):
+            print("WARNING - This batch cluster will not autoscale down, since you override 'min_nodes' to"\
+                "be greater than 0. Contact your IT / Core team to validate that it is OK with cost of {} min_nodes".format(self.batch_min_nodes))
+
+        self.batch_idle_seconds_before_scaledown = int(config['idle_seconds_before_scaledown'])
+
     def parseTrainConfig(self, config,projNr, modelNr):
         self.aml_cluster_name = config['aml_cluster_name'].format(projNr,modelNr) # max 16 chars [prj002-m03-dev,prj002-m03-test,prj002-m03-prod]
         self.vm_size = config['aml_training_vm_size']
@@ -204,7 +232,7 @@ class ComputeFactory():
         self.min_nodes = int(config['min_nodes'])
 
         if(self.min_nodes > 0):
-            print("WARNING - This cluster will not autoscale down, since you override 'min_nodes' to"\
+            print("WARNING - This training cluster will not autoscale down, since you override 'min_nodes' to"\
                 "be greater than 0. Contact your IT / Core team to validate that it is OK with cost of {} min_nodes".format(self.min_nodes))
 
         self.idle_seconds_before_scaledown = int(config['idle_seconds_before_scaledown'])
@@ -560,6 +588,44 @@ class ComputeFactory():
         cpu_cluster.wait_for_completion(show_output=True, min_node_count=None, timeout_in_minutes=30)
         return cpu_cluster, name
 
+    def get_batch_aml_compute(self,dev_test_prod,override_enterprise_settings_with_model_specific=False, projNr="000", modelNr="00", create_cluster_with_suffix=None):
+        self.LoadConfiguration(self.project,dev_test_prod,override_enterprise_settings_with_model_specific, projNr, modelNr)
+
+        try:
+            name = None
+            if (create_cluster_with_suffix is not None):
+                name = self.batch_aml_cluster_name + "-"+create_cluster_with_suffix
+                cpu_cluster = AmlCompute(workspace=self.ws, name=name)
+            else:
+                name = self.batch_aml_cluster_name
+                cpu_cluster = AmlCompute(workspace=self.ws, name=self.batch_aml_cluster_name)
+            print('Found existing cluster {} for project and environment, using it.'.format(name))
+        except ComputeTargetException:
+            print('Creating new cluster - ' + name)
+
+            rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
+
+            if((len(subnet_name) > 0)):
+                compute_config = AmlCompute.provisioning_configuration(vm_size=self.batch_vm_size,
+                                                                        vm_priority=self.batch_vm_prio,  # 'dedicated', 'lowpriority'
+                                                                        min_nodes=self.batch_min_nodes,
+                                                                        max_nodes=self.batch_vm_maxnodes,
+                                                                        vnet_resourcegroup_name=rg_name,
+                                                                        vnet_name=vnet_name,
+                                                                        subnet_name=subnet_name)
+            else:
+                compute_config = AmlCompute.provisioning_configuration(vm_size=self.batch_vm_size,
+                                                                    vm_priority=self.batch_vm_prio,  # 'dedicated', 'lowpriority'
+                                                                    min_nodes=self.batch_min_nodes,
+                                                                    max_nodes=self.batch_vm_maxnodes)
+
+            cpu_cluster = ComputeTarget.create(self.ws, name, compute_config)
+
+        # Can poll for a minimum number of nodes and for a specific timeout.
+        # If min_node_count=None is provided, it will use the scale settings for the cluster instead
+        cpu_cluster.wait_for_completion(show_output=True, min_node_count=None, timeout_in_minutes=30)
+        return cpu_cluster, name
+
 # DELETE
 
     def delete_aks_endpoint(self,ws):
@@ -589,6 +655,11 @@ class ComputeFactory():
             cpu_cluster.delete() 
         except ComputeTargetException:
             print('Not found cluster - {}'.format(self.aml_cluster_name))
+    
+    def delete_batch_aml_compute(self,ws):
+        self.delete_aml_compute_by_custom_name(ws,self.batch_aml_cluster_name)
+
+       
 #PUBLIC END
 
 #OLD
@@ -868,7 +939,7 @@ class AutoMLFactory(metaclass=Singleton):
     def __init__(self,project):
         self.project = project
 
-    def LoadConfiguration(self, dev_test_prod, override_enterprise_settings_with_model_specific):
+    def LoadConfiguration(self, dev_test_prod, override_enterprise_settings_with_model_specific=True):
         old_loc = os.getcwd()
         
         try:
@@ -883,6 +954,7 @@ class AutoMLFactory(metaclass=Singleton):
             if (override_enterprise_settings_with_model_specific):
                 start_path = "project_specific/model/dev_test_prod_override"
             automl_active_path = "project_specific/model/dev_test_prod"
+            #automl_active_path = "project_specific/model/dev_test_prod_override"
 
             if(self.dev_test_prod == "dev"): 
                 with open("{}../settings/{}/train/automl/automl_dev.json".format(user_settings,start_path)) as f:

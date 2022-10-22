@@ -35,6 +35,10 @@ from azureml.pipeline.steps import AutoMLStepRun
 from azureml.pipeline.core import TrainingOutput
 from azureml.pipeline.core import PipelineData
 from azureml.core import Datastore
+from azureml.core.model import Model
+import sys
+sys.path.insert(0, "../azure-enterprise-scale-ml/")
+from esmlrt.interfaces.iESMLController import IESMLController
 
 #endregion
 #region(collapsed) Enumerators
@@ -459,9 +463,28 @@ class ESMLPipelineFactory():
 # endregion
 
 #region(collapsed) PRIVATE - init
-    from azureml.core.model import Model
-
+    
     def getBestModel(self):
+        p = self.p
+        current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(p.ws,p.model_folder_name)
+
+        if(current_model is None):
+            print("No existing model with experiment name {}. The Model name will now be same as experiment name".format(p.model_folder_name))
+            current_model = None
+            run_id_tag = ""
+            model_name = p.model_folder_name
+        else:
+            print("Current BEST model is: {} from Model registry with experiment_name-TAG {}, run_id-TAG {}  model_name-TAG {}".format(current_model.name,p.model_folder_name,run_id_tag,model_name))
+            if ("esml_time_updated" in current_model.tags):
+                print("esml_time_updated: {}".format(current_model.tags.get("esml_time_updated")))
+            print("status_code : {}".format(current_model.tags.get("status_code")))
+            print("model_name  : {}".format(current_model.tags.get("model_name")))
+            print("trained_in_workspace   : {}".format(current_model.tags.get("trained_in_workspace")))
+            print("current worksdpace p.ws  : {}".format(p.ws.name))
+
+        return current_model,model_name, None, p.model_folder_name
+
+    def getBestModel_old(self):
         p = self.p
         aml_model = None
         aml_model_name = None
@@ -471,7 +494,7 @@ class ESMLPipelineFactory():
 
         # model = p.get_best_model_via_modeltags_only(self.p.ws,self.p.experiment_name, filter_on_version=1) # Version=1 is the TEMPLATE "LakeStructure"...hence Model=1 and not 2...since placegolder data is always model_version=1
         if(aml_model is None):
-            print("Tryingt to get CURRENT leader model from Azure ML Studio workspace - remotely.This might be the first time training model. then None is returned \n")
+            print("Trying to get CURRENT leader model from Azure ML Studio workspace - remotely.This might be the first time training model. then None is returned \n")
 
             try:
                 # 0 - Get "Pipelin run" info, for the most recent "trained model"
@@ -574,6 +597,9 @@ class ESMLPipelineFactory():
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
 
                 compute_suffix = 1
+                train = True
+                if(pipeline_type != esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type != esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
+                    train=False
 
                 for d in p.Datasets:
                     if(same_compute_for_all and compute is not None):
@@ -583,7 +609,7 @@ class ESMLPipelineFactory():
                         print("ESML will auto-create a compute...")
                         if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
                             if(d.cpu_gpu_databricks == "cpu"):
-                                compute, runconfig = self.init_cpu_environment(self._use_curated_automl_environment)
+                                compute, runconfig = self.init_cpu_environment(train,self._use_curated_automl_environment)
                             elif(d.cpu_gpu_databricks == "databricks"):
                                 compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment)
                             elif(d.cpu_gpu_databricks == "gpu"):
@@ -597,7 +623,7 @@ class ESMLPipelineFactory():
 
                         if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
                             if(d.cpu_gpu_databricks == "cpu"):
-                                compute, runconfig = self.init_cpu_environment(self._use_curated_automl_environment,compute_suffix_str)
+                                compute, runconfig = self.init_cpu_environment(train,self._use_curated_automl_environment,compute_suffix_str)
                             elif(d.cpu_gpu_databricks == "databricks"):
                                 compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment,compute_suffix_str)
                             elif(d.cpu_gpu_databricks == "gpu"):
@@ -768,6 +794,7 @@ class ESMLPipelineFactory():
         name_incl_env = name_auto + " ["+self.batch_pipeline_parameters[3].default_value +"]"
         name_incl_env = "TRAIN in "+ " ["+self.batch_pipeline_parameters[3].default_value +"]" +", COMPARE & REGISTER model in " + "["+self.batch_pipeline_parameters[3].default_value +"] & PROMOTE to [test]"
 
+        all_envs = p.get_all_envs()
         step_train_gold = PythonScriptStep(
             runconfig=runconfig,
             script_name=self._train_manual_filename,
@@ -777,11 +804,25 @@ class ESMLPipelineFactory():
             "--par_esml_model_version",self.batch_pipeline_parameters[0], # model to compare with (inner loop), version=0 if first time
             "--par_esml_training_date",self.batch_pipeline_parameters[1], # training data
             "--esml_train_lake_template",train_folder_template_with_date_and_run_id,
-            "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
+            "--par_esml_env", self.batch_pipeline_parameters[3], # current environment. not essential since only default value
             "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
             "--par_esml_model_alias", p.ModelAlias,
             "--par_esml_model_name", p.model_folder_name,
-            "--par_aml_model_name", aml_model_name
+            "--par_aml_model_name", aml_model_name,
+            "--project_number", p.project_folder_name,
+            "--ml_type", p.active_model["ml_type"],
+            "--secret_name_tenant", esml_project.LakeAccess.storage_config["tenant"],
+            "--secret_name_sp_id",  esml_project.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-id"],
+            "--secret_name_sp_secret", esml_project.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-secret"],
+            "--dev_resourcegroup_id", all_envs["dev"]["resourcegroup_id"],
+            "--dev_workspace_name", all_envs["dev"]["workspace_name"],
+            "--dev_subscription_id", all_envs["dev"]["subscription_id"],
+            "--test_resourcegroup_id", all_envs["test"]["resourcegroup_id"],
+            "--test_workspace_name", all_envs["test"]["workspace_name"],
+            "--test_subscription_id",  all_envs["test"]["subscription_id"],
+            "--prod_resourcegroup_id", all_envs["prod"]["resourcegroup_id"],
+            "--prod_workspace_name", all_envs["prod"]["workspace_name"],
+            "--prod_subscription_id", all_envs["prod"]["subscription_id"]
             ],
             inputs=[train_out.as_input(train_out.name),validate_out.as_input(validate_out.name),test_out.as_input(test_out.name)], 
             outputs=[last_gold_training_run], 
@@ -823,6 +864,7 @@ class ESMLPipelineFactory():
 
         name_incl_env = "["+self.batch_pipeline_parameters[3].default_value +"]" +"Calculate SCORING on TEST_SET, COMPARE & REGISTER model in " + "["+self.batch_pipeline_parameters[3].default_value +"] & PROMOTE to [test]"
 
+        all_envs = p.get_all_envs()
         step_train_gold = PythonScriptStep(
             runconfig=runconfig,
             script_name=self._train_automl_filename,
@@ -832,13 +874,26 @@ class ESMLPipelineFactory():
             "--par_esml_model_version",self.batch_pipeline_parameters[0], # model to compare with (inner loop), version=0 if first time
             "--par_esml_training_date",self.batch_pipeline_parameters[1], # training data
             "--esml_train_lake_template",train_folder_template_with_date_and_run_id,
-            "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
+            "--par_esml_env", self.batch_pipeline_parameters[3],
             "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
             "--par_esml_model_alias", p.ModelAlias,
             "--par_esml_model_name", p.model_folder_name,
             "--par_aml_model_name", aml_model_name,
             "--model_name", p.model_folder_name,
-            "--model_path", model_data
+            "--project_number", p.project_folder_name,
+            "--ml_type", p.active_model["ml_type"],
+            "--secret_name_tenant", p.LakeAccess.storage_config["tenant"],
+            "--secret_name_sp_id",  p.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-id"],
+            "--secret_name_sp_secret", p.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-secret"],
+            "--dev_resourcegroup_id", all_envs["dev"]["resourcegroup_id"],
+            "--dev_workspace_name", all_envs["dev"]["workspace_name"],
+            "--dev_subscription_id", all_envs["dev"]["subscription_id"],
+            "--test_resourcegroup_id", all_envs["test"]["resourcegroup_id"],
+            "--test_workspace_name", all_envs["test"]["workspace_name"],
+            "--test_subscription_id",  all_envs["test"]["subscription_id"],
+            "--prod_resourcegroup_id", all_envs["prod"]["resourcegroup_id"],
+            "--prod_workspace_name", all_envs["prod"]["workspace_name"],
+            "--prod_subscription_id", all_envs["prod"]["subscription_id"]
             ],
             inputs=[test_out.as_input(test_out.name),model_data], 
             outputs=[last_gold_training_run], 
@@ -863,12 +918,12 @@ class ESMLPipelineFactory():
         validate_out = gold_to_split_step._outputs[1]
         test_out = gold_to_split_step._outputs[2]
 
-        automl_config = AutoMLConfig(task = 'regression',  #TODO: move as a parameter in get_automl_performance_config()
-                            primary_metric = 'normalized_mean_absolute_error', #TODO: move as a parameter in get_automl_performance_config()
+        automl_config = AutoMLConfig(task = p.active_model["ml_type"],
+                            primary_metric = p.active_model["ml_metric"],
                             compute_target = compute,
                             #run_configuration = runconfig,
                             training_data = train_out, # p.GoldTrain, 
-                            experiment_exit_score = '0.308', # DEMO purpose #TODO: pass as a parameter "DEMO"
+                            experiment_exit_score = p.active_model["ml_time_out_score"],
                             label_column_name = label,
                             **automl_performance_config
                         )
@@ -902,8 +957,31 @@ class ESMLPipelineFactory():
 
     def create_score_gold_step(self,compute, runconfig, gold_to_score_step):
         p = self.p
+        
+        model_version_chosen = self.batch_pipeline_parameters[0]
+        model_version_user = self.batch_pipeline_parameters[0]
+        if (model_version_user == 0): # Get Latest model, with TAG that says it is promoted "esml_promoted_2_dev, or "
+            print("ESML INFO: LEADING MODEL: model_version in-parameter from user is 0 - hence overridden with BEST LATEST = PROMOTED leading model is used (model.version=13 as an example)")
+            print("Tip: This is good for R&D and smoke testing of pipeline. You only need DATA in one place, under .../inference/0/ but will get LATEST & BEST model to score with...")
+            print(" - 1) GOLD to SCORE will be saved temporary by pipeline here: .../inference/0/gold/dev/*.parquet (e.g. overwritten each run)")
+            print(" - 2) SCORED GOLD data will be saved in .../inference/0/scored/dev/run_id/*.parquet (e.g. not overwritten each run, saved for each run)")
+            print(" - 3) LATEST SCORED GOLD data will be saved in .../inference/0/scored/dev/run_id/*.parquet (e.g. not overwritten since run_folder. version_folder, for easy retrieval from external systems)")
+            print("Tip 2: If you set model_version=1 e.g. batch_pipeline_parameters[0] = 1 it will fetch model version 1, and READ IN DATA from .../inference/1/... folder structure")
+            aml_model,aml_model_name, current_fitted_model, esml_model_name = self.getBestModel()
+            model_version_chosen = aml_model.version
+        else:
+            print("ESML INFO: SPECIFIC (maybe leading) MODEL: model_version in-parameter from user is {}, hence no guarantee that BEST LATEST PROMOTED model.version is used. User decided version is used".format(model_version_user))
+            print("ESML INFO: model_version is {} e.g. batch_pipeline_parameters[0] = {} meaning, it will fetch model.version={}, and READ IN DATA from .../inference/{}/ folder structure".format(
+            model_version_user,
+            model_version_user,
+            model_version_user,
+            model_version_user))
+            print(" - 1) GOLD to SCORE will be saved temporary by pipeline here: .../inference/0/gold/dev/*.parquet (e.g. overwritten each run)")
+            print(" - 2) SCORED GOLD data will be saved in .../inference/{}/scored/dev/run_id/*.parquet (e.g. not overwritten since run_folder, saved for each run)".format(model_version_user))
+            print(" - 3) LATEST SCORED GOLD data will be saved in .../inference/0/scored/dev/run_id/*.parquet (e.g. not overwritten since run_folder. version_folder, for easy retrieval from external systems)")
+
         # IN: Gold to score
-        latest_scored_folder = p.path_gold_scored_template().format(model_version=0) # 0= latest scored
+        latest_scored_folder = p.path_gold_scored_template().format(model_version=0) # 0=Always use latest scored folder, since run_id is known.
         latest_gold_scored_path = latest_scored_folder + "{run-id}"
         scored_folder_template = p.path_gold_scored_template(True,True)
 
@@ -940,11 +1018,12 @@ class ESMLPipelineFactory():
             name="SCORING GOLD",
             arguments=[
             "--target_column_name",self._target_column_name,
-            "--par_esml_model_version",self.batch_pipeline_parameters[0],
+            "--par_esml_model_version",model_version_chosen,
             "--par_esml_scoring_date",self.batch_pipeline_parameters[1],
             "--esml_output_lake_template",scored_folder_template,
             "--par_esml_env", self.batch_pipeline_parameters[3], # not needed, since static
-            "--par_esml_inference_mode", self.batch_pipeline_parameters[4] # does not need to be a parameter that changes runtime...but at DEFINITION time.
+            "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
+            "--model_folder_name", p.model_folder_name
             ],
             inputs=[gold_to_score.as_input(gold_to_score.name)], 
             outputs=[scored_gold,last_gold_run,active_folder], 
@@ -1155,15 +1234,22 @@ class ESMLPipelineFactory():
         pass
     
 
-    def init_cpu_environment(self, use_curated_automl_env=True, suffix_char=None):
+    def init_cpu_environment(self, train=True, use_curated_automl_env=True, suffix_char=None):
 
         if(self._override_compute_target is not None):
             aml_compute = self._override_compute_target
         else:
-            if(suffix_char is None):
-                aml_compute = self.p.get_training_aml_compute(self.p.ws) # Create or Get compute, for active environment.
+            if(train):
+                if(suffix_char is None):
+                    aml_compute = self.p.get_training_aml_compute(self.p.ws) # Create or Get compute, for active environment.
+                else:
+                    aml_compute = self.p.get_training_aml_compute(self.p.ws, False,suffix_char) # Create or Get compute, for active environment.
             else:
-                aml_compute = self.p.get_training_aml_compute(self.p.ws, False,suffix_char) # Create or Get compute, for active environment.
+                if(suffix_char is None):
+                    aml_compute = self.p.get_batch_aml_compute(self.p.ws) # Create or Get compute, for active environment.
+                else:
+                    aml_compute = self.p.get_batch_aml_compute(self.p.ws, False,suffix_char) # Create or Get compute, for active environment.
+
         aml_run_config = RunConfiguration()
         # `compute_target` as defined in "Azure Machine Learning compute" section above
         aml_run_config.target = aml_compute
@@ -1171,9 +1257,6 @@ class ESMLPipelineFactory():
         USE_CURATED_ENV = use_curated_automl_env
         if USE_CURATED_ENV:
             # "AzureML-Tutorial" https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
-            #curated_environment = Environment.get(workspace=self.p.ws, name="AzureML-AutoML")
-            
-            #curated_sklearn ="AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference"
 
             if(self.environment_name == self._esml_automl_lts_env_name):
                 curated_environment = self.create_automl_lts_environment_if_not_exists()
@@ -1185,11 +1268,7 @@ class ESMLPipelineFactory():
             aml_run_config.environment.python.user_managed_dependencies = False
 
             if (self.conda_dependencies_object is None):  # Add some packages relied on by data prep step
-                #aml_run_config.environment.python.conda_dependencies = CondaDependencies.create(
-                    #conda_packages=['pandas==0.25.1','scikit-learn==0.22.1', 'numpy==1.18.5', ''],
-                    #pip_packages=['azureml-defaults','azureml-dataprep[fuse,pandas]'],  # azureml-sdk
-                    #pin_sdk_version=False)
-                
+
                 # Specify CondaDependencies obj, add necessary packages
                 aml_run_config.environment.python.conda_dependencies = CondaDependencies.create(
                     conda_packages=['pandas','scikit-learn'],

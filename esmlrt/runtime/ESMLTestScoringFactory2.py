@@ -51,6 +51,7 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
         tags["MAPE"] = "{:.6f}".format(mean_abs_percent_error)
         tags["Spearman_Correlation"] = "{:.6f}".format(spearman_correlation)
         tags["esml_time_updated"] = "{}".format(date_time)
+        tags["ml_type"] = self._ml_type
         ds = ds.add_tags(tags = tags)
 
         model.tags["test_set_RMSE"] = "{:.6f}".format(rmse)
@@ -59,7 +60,7 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
         model.tags["test_set_Spearman_Correlation"] = "{:.6f}".format(spearman_correlation)
 
         model.tags["esml_time_updated"] = "{}".format(date_time)
-
+        model.tags["ml_type"] = self._ml_type
         model.add_tags(tags = model.tags)
         
         if(source_best_run is not None):
@@ -71,7 +72,7 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
             #figure = plt.gcf()
             #mlflow.log_figure(figure, "ESML_GOLD_TestSet_AcutalPredicted.png")
 
-        return rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt
+        return model,rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt
     
     ###
     # Pass either a Run, or a Model(). If Run, this superseeds Model
@@ -138,6 +139,7 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
         tags["Matthews_Correlation"] = "{:.6f}".format(matthews)
         tags["Confusion_Matrix"] = str(matrix)
         tags["esml_time_updated"] = "{}".format(date_time)
+        tags["ml_type"] = self._ml_type
         ds = ds.add_tags(tags = tags)
 
         #2) Also, log on MODEL
@@ -153,6 +155,7 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
         model.tags["test_set_Matthews_Correlation"] =  "{:.6f}".format(matthews)
         model.tags["test_set_CM"] =  str(matrix)
         model.tags["esml_time_updated"] = "{}".format(date_time)
+        model.tags["ml_type"] = self._ml_type
         model.add_tags(tags = model.tags)
 
         # 3) Also, log on RUN
@@ -161,4 +164,4 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
             print("Saving plot to Azure ML - best run {}".format(source_best_run.id))
             source_best_run.log_image(name="ESML_GOLD_TestSet_ROC", plot=plt)
 
-        return auc,accuracy, f1, precision,recall,matrix,matthews,plt
+        return model,auc,accuracy, f1, precision,recall,matrix,matthews,plt

@@ -200,7 +200,7 @@ class IESMLController:
     ###
 
     def get_other_workspace(self, source_ws, target_dev_test_prod):
-        kv = source_ws.get_default_keyvault() # Get "current" workspace, either CLI Authenticated if MLOps, or in DEMO/DEBUG Interactive
+        kv = source_ws.get_default_keyvault() # Get "current" workspace, either CLI Authenticated if MLOps
         other_ws = None
         current_env = self.dev_test_prod
 
@@ -285,13 +285,13 @@ class IESMLController:
 
      ###
     # Gets LATEST version of model, via EXPERIMENT TAGS and MODEL TAGS, as fallback LOOPING all Models in workspace. Also fetches the best RUN and FITTED MODEL
-    # Pros: Quick it TAGS exists (since ModelName and RunId is known no looping nessesary), and safe as 1st time when to TAGS exists.
+    # Pros: Quick if TAGS exists (since ModelName and RunId is known no looping nessesary), and safe as 1st time when to TAGS exists.
     # Cons: Only works in DEV (not TEST, PROD) Do not work, fetching parentless Model. Needs an experiment and run
     # Tip when to use: When comparing within same Azure ML workspace. QUICK and SAFE within workspace
     ###
     @staticmethod
-    def get_best_model_run_fitted_model_Dev(ws,experiment_name, filter_on_version = None):
-        model,run_id,model_name = IESMLController._get_best_model_via_experiment_tags_or_loop(ws,experiment_name,filter_on_version) # 2021-09 update
+    def get_best_model_run_fitted_model_Dev(ws,experiment_name, get_latest_challenger=False, filter_on_version = None):
+        model,run_id,model_name = IESMLController._get_best_model_via_experiment_tags_or_loop(ws,experiment_name,get_latest_challenger,filter_on_version) # 2021-09 update
 
         if(model is None): # guard
             #print("No best model found in this Azure ML Studio, for this ESMLProject and ESMLModel. 1st time")
@@ -343,7 +343,104 @@ class IESMLController:
         #return aml_model,aml_model_name, source_fitted_model, experiment_name # self._esml_model_name
         return experiment, aml_model, main_run, best_automl_run,fitted_model # self._esml_model_name
 
-     ### 
+    @staticmethod
+    def init_run(ws,experiment_name, run_id, run_type="automl_run"):
+        exp = Experiment(workspace=ws, name=experiment_name)
+        run = None
+        best_run = None # AutoML only
+        fitted_model = None
+        debug_print = True
+
+        try: # if (run_type == "automl_run" or run_type == "notebook_automl"):
+            if(debug_print):
+                print("ESML INFO: try: automl_run or notebook_automl")
+                print("Experiment name: {}".format(experiment_name))
+                print("ws name: {}".format(ws.name))
+                print("run_id: {}".format(run_id))
+            run = AutoMLRun(experiment=exp, run_id=run_id)
+            best_run, fitted_model = run.get_output()
+        except: # elif(run_type == "pipeline_automl_step"):
+            if(debug_print):
+                print("ESML INFO: except PipelineRun")
+            pipeline_run = PipelineRun(experiment=exp, run_id=run_id)
+            #pipeline_run = run.parent # Parent is the pipeline run, current is the current step.
+            step_list = list(pipeline_run.get_steps())
+            step_len = len(step_list) # 6
+            automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
+
+            automl_run_step_by_index = step_list[automl_step_id]
+            if(debug_print):
+                print("automl_run_step_by_index: {} and type {}".format(automl_run_step_by_index.id,type(automl_run_step_by_index)))
+            automl_step_run_id = automl_run_step_by_index.id
+            if(debug_print):
+                print("automl_step_run_id:{} which is 'new_run_id' in comparer.compare_scoring_current_vs_new_model".format(automl_step_run_id))
+            
+            experiment_run = ws.experiments[experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
+            automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
+            best_run, fitted_model = automl_step_run.get_output()
+            '''
+            elif(run_type == "notebook_manual_run"):
+                pass
+            elif(run_type == "pipeline_manual_run"):
+                pass
+            '''
+        
+        return run,best_run,fitted_model
+
+    def check_if_test_scoring_exists_as_tags(self, model):
+        a_scoring = ""
+        exists = False
+        if (self.ESMLTestScoringFactory.ml_type == "regression"):
+            a_scoring = model.tags.get("test_set_R2")
+        elif (self.ESMLTestScoringFactory.ml_type == "classification"):
+            a_scoring = model.tags.get("test_set_Accuracy")
+        
+        if(len(a_scoring) > 0):
+            exists = True
+        return exists
+    
+    @staticmethod
+    def get_safe_automl_parent_run_id(astring):
+        str_len = len(astring)
+        end_str = astring[-2]+astring[-1]
+        res = astring
+        if (end_str == "_0"):
+            print("ESML Info: get_safe_automl_parent_run_id() did remove child _0 to get PARENT RUN, needed for rehydration of RUN")
+            end = int((str_len-2))
+            res = astring[0:end]
+        return res
+    ### 
+    # Gets LATEST created model of PROMOTED status or NEW status, if get_latest_challenger=False
+    # Pros: Try/Catch: Quick if DEV and INNER LOOP, and FLEXIBLE, since fallback to support search with parentless models/OUTER LOOP (across aml workspaces)
+    ###
+    @staticmethod
+    def get_best_or_challenger_model_with_run_in_dev(experiment_name, source_workspace,get_latest_challenger=False):
+        model = None
+        run_id = None
+        run = None
+        model_name = None
+        
+        '''
+        print("ESML INFO:IESMLController:105: get_best_or_challenger_model_with_run_in_dev(get_latest_challenger={})".format(get_latest_challenger))
+        try: # Get Model and RUN at the same time
+            print("ESML INFO: TRY: get_best_model_run_fitted_model_Dev")
+            source_experiment, model,main_run, best_automl_run,source_fitted_model = IESMLController.get_best_model_run_fitted_model_Dev(source_workspace,experiment_name,get_latest_challenger)
+            run_id = main_run.id 
+            run = main_run
+            model_name = model.name
+            print("ESML INFO:106 run_id = main_run.id")
+        except Exception as e:
+        '''
+        #print("ESML INFO: CATCH: get_best_model_via_modeltags_only_DevTestProd")
+        #print ("ESML Warning:106:ModelCompare:101:SOURCE:Dev: Tried an optimized FETCH to get model and hydrate run at the same time - did not work. Not fetching model separately")
+        source_model,run_id_tag, model_name_tag = IESMLController.get_best_model_via_modeltags_only_DevTestProd(source_workspace,experiment_name,get_latest_challenger)
+        model=source_model
+        model_name = model_name_tag
+        run_id = run_id_tag
+        model_name = model_name_tag
+
+        return model,run_id,run,model_name
+    ### 
     # Gets LATEST version of model, via ESML tags
     # Pros: quick, needed for parentless models (across aml workspaces)
     # Cons: Only MODEL is returned (not fitted model, not run, not experiment)
@@ -351,7 +448,7 @@ class IESMLController:
     # RETURNS: Model(), run_id
     ###
     @staticmethod
-    def get_best_model_via_modeltags_only_DevTestProd(ws,tag_experiment_name,filter_on_version=None, sort_by_created_instead_of_version=True):
+    def get_best_model_via_modeltags_only_DevTestProd(ws,tag_experiment_name,get_latest_challenger=False,filter_on_version=None, sort_by_created_instead_of_version=True):
         #experiment_name : 10_titanic_model_clas
         #model_name : AutoML97755f9d411
         #run_id : AutoML_97755f9d-4509-4594-8485-9e4f9cf3a419
@@ -362,35 +459,48 @@ class IESMLController:
         all_versions_in_same_experiment = []
         run_id = None
         model_name = None
+        filtered_list= None
         
         try:
             tag_esml_status = ""
 
             start = time.time()
-            print("TIME: Model list LAMBDA FILTER, on experiment_name {}".format(tag_experiment_name))
+            print("Searching with Model list LAMBDA FILTER, on experiment_name in Model.tags called: {} . Meaning ESML checks for both Notebook run (AutoMLRun, Run) and PipelineRuns (AutoMLStep, PipelineRun)".format(tag_experiment_name))
+            print("E.g. Even if Pipeline experiment is called '11_diabetes_model_reg_IN_2_GOLD_TRAIN' it will be included, since original model_folder_name in ESML is '11_diabetes_model_reg' as a notebook Run experiment name. Both is included in search")
             all_models = Model.list(workspace=ws)
 
             if(filter_on_version is not None):
                 print("Filter on version:ON")
-                filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name and r.version == filter_on_version 
-                and r.tags.get("status_code") != IESMLController.esml_status_new
-                and (r.tags.get("status_code") == IESMLController.esml_status_promoted_2_dev 
-                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_test
-                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_prod)
-                ), all_models))
+                if(get_latest_challenger ==False):
+                    filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name and r.version == filter_on_version 
+                    and r.tags.get("status_code") != IESMLController.esml_status_new
+                    and (r.tags.get("status_code") == IESMLController.esml_status_promoted_2_dev 
+                    or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_test
+                    or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_prod)
+                    ), all_models))
+                else:
+                    filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name and r.version == filter_on_version 
+                    and r.tags.get("status_code") == IESMLController.esml_status_new
+                    ), all_models))
+
             else:
-                filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name 
-                and r.tags.get("status_code") != IESMLController.esml_status_new
-                and (r.tags.get("status_code") == IESMLController.esml_status_promoted_2_dev 
-                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_test
-                or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_prod)
-                ), all_models))
+                if(get_latest_challenger ==False):
+                    filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name 
+                    and r.tags.get("status_code") != IESMLController.esml_status_new
+                    and (r.tags.get("status_code") == IESMLController.esml_status_promoted_2_dev 
+                    or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_test
+                    or r.tags.get("status_code") == IESMLController.esml_status_promoted_2_prod)
+                    ), all_models))
+                else:
+                    filtered_list = list(filter(lambda r: (r.tags.get("experiment_name") == tag_experiment_name 
+                    and r.tags.get("status_code") == IESMLController.esml_status_new
+                    ), all_models))
+
             
-            print("TIME: FILTER ModelList:")
             end = time.time()
             seconds = end - start
             minutes = seconds / 60
-            print("Minutes: {}".format(minutes))
+            print("Filter search, minutes: {}".format(minutes))
 
             # SORT
             if (sort_by_created_instead_of_version == True): 
@@ -453,8 +563,8 @@ class IESMLController:
             print("Minutes: {}".format(minutes))
         
         try:
-            run_id = model_highest_version.tags["run_id"]
-            model_name = model_highest_version.tags["model_name"]
+            run_id = model_highest_version.tags.get("run_id")
+            model_name = model_highest_version.tags.get("model_name")
         except Exception as e:
             print("Could not find tags, run_id or model_name on model_highest_version")
             print(e)
@@ -468,21 +578,22 @@ class IESMLController:
     # Tip when to use: Use this if you only need MODEL and want a SAFE method. ( otherwise if also RUN and FITTED_MODEL use get_best_model_and_run_via_tags_or_loop)
     ###
     @staticmethod
-    def _get_best_model_via_experiment_tags_or_loop(ws,experiment_name,filter_on_version = None):
+    def _get_best_model_via_experiment_tags_or_loop(ws,experiment_name,get_latest_challenger=False, filter_on_version = None):
         latest_model = None
         latest_tagged_with_status_new = None
         active_workspace = ws
 
         if(active_workspace is None):
             raise Exception("get_best_model_via_experiment_name:Azure ML workspace is null.")
-
-        ex1 = Experiment(active_workspace, experiment_name) # Can be other workspace (dev,test,prod), but same experiment name
+        '''
+        ex1 = Experiment(active_workspace, experiment_name)
         tag_model_name = None
         tag_model_version = None
         model_tag_run_id = None
         model_tag_name = None
 
         if (ex1.tags is not None and "best_model_version" in ex1.tags and "model_name" in ex1.tags):
+            print("DEBUG: Gets the best model via experiment")
             tag_model_name = ex1.tags["model_name"]
             tag_model_version = ex1.tags["best_model_version"]
         
@@ -493,45 +604,50 @@ class IESMLController:
                 latest_model = Model(active_workspace, name=tag_model_name, version=tag_model_version)
                 #print ("found model via REMOTE FILTER: Experiment TAGS: model_name")
         else:
-            print ("Searching model - LOOPING the experiment to match name (1st time thing, since no tags)")
-            for m in Model.list(active_workspace):
-                if(m.experiment_name == experiment_name):
-                    
-                    if(filter_on_version is not None):
-                        if(filter_on_version == m.version):
-                            latest_model = m
-                            #print ("found model matching experiment_name, also matching on model_version")
-                            break
-                    else:
-                        if("status_code" in m.tags):
+        '''
+        print ("Searching model - LOOPING the experiment to match name (1st time thing, since no tags)")
+        for m in Model.list(active_workspace):
+            if(m.experiment_name == experiment_name):
+                
+                if(filter_on_version is not None):
+                    if(filter_on_version == m.version):
+                        latest_model = m
+                        #print ("found model matching experiment_name, also matching on model_version")
+                        break
+                else:
+                    if("status_code" in m.tags):
+                        if(get_latest_challenger == False):
                             if(m.tags["status_code"] == IESMLController.esml_status_promoted_2_dev or 
                             m.tags["status_code"] == IESMLController.esml_status_promoted_2_test or m.tags["status_code"] == IESMLController.esml_status_promoted_2_prod):
                                 latest_model = m
-                            elif(m.tags["status_code"] == IESMLController.esml_status_new):
-                                latest_tagged_with_status_new = m # 1st model, hence winning/leading model
-                        else: # fallback
-                            latest_model = m
-                        #print ("found model matching experiment_name, selecting latest registered.")
-                    break
-                    
-            if (latest_model is not None): # Update Experiment tag
-                ex = Experiment(active_workspace, experiment_name)
-                if("status_code" in latest_model.tags):
-                    tags = {'model_name':latest_model.name, 'best_model_version':latest_model.version,"status_code":latest_model.tags["status_code"]}
-                else:
-                    tags = {'model_name':latest_model.name, 'best_model_version':latest_model.version}
-                ex.set_tags(tags)
-            elif(latest_tagged_with_status_new is not None):
-                ex = Experiment(active_workspace, experiment_name)
-                tags = {'model_name':latest_tagged_with_status_new.name, 'best_model_version':latest_tagged_with_status_new.version,
-                 "status_code":latest_tagged_with_status_new.tags["status_code"]  }
-                ex.set_tags(tags)
-                latest_model = latest_tagged_with_status_new
-                print("Note: There was no models earlier promoted, the latest NEW model, is the leading one. latest_model = latest_tagged_with_status_new")
+                        elif(m.tags["status_code"] == IESMLController.esml_status_new):
+                            latest_model = m # new model
+                    else: # fallback
+                        latest_model = m
+                    #print ("found model matching experiment_name, selecting latest registered.")
+                break
+                
+        if (latest_model is not None): # Update Experiment tag
+            ex = Experiment(active_workspace, experiment_name)
+            if("status_code" in latest_model.tags):
+                tags = {'model_name':latest_model.name, 'best_model_version':latest_model.version,"status_code":latest_model.tags["status_code"]}
+            else:
+                tags = {'model_name':latest_model.name, 'best_model_version':latest_model.version}
+            ex.set_tags(tags)
+        '''
+        elif(latest_tagged_with_status_new is not None):
+            ex = Experiment(active_workspace, experiment_name)
+            tags = {'model_name':latest_tagged_with_status_new.name, 'best_model_version':latest_tagged_with_status_new.version,
+                "status_code":latest_tagged_with_status_new.tags["status_code"]  }
+            ex.set_tags(tags)
+            latest_model = latest_tagged_with_status_new
+            print("Note: There was no models earlier promoted, the latest NEW model, is the leading one. latest_model = latest_tagged_with_status_new")
+        '''
 
         try:
-            model_tag_run_id = latest_model.tags["run_id"]
-            model_tag_name = latest_model.tags["model_name"]
+            if (latest_model is not None):
+                model_tag_run_id = latest_model.tags["run_id"]
+                model_tag_name = latest_model.tags["model_name"]
         except: 
             print("Could not find tags, run_id or model_name on latest_model")
 
@@ -587,13 +703,13 @@ class IESMLController:
         if(target_env == "dev"): 
             if(run is not None): # Probably Run from notebook, not pipelinerun
                 experiment = dev_workspace.experiments[self.experiment_name]
-                try:
-                    model_name = run.properties['model_name']
-                except Exception as e:
-                    print("Could not get model_name from run.properties")
-                    print(e)
+                #try:
+                #    model_name = run.properties['model_name']
+                #except Exception as e:
+                #    print("Could not get model_name from run.properties")
+                #    print(e)
 
-                print("registering model with name: {}, from run.".format(model_name))
+                #print("registering model with name: {}, from run.".format(model_name))
                 model_registered_in_target = self._register_model_on_run(source_model,model_name,source_env,source_ws_name,run,experiment,esml_status,extra_model_tags)
             else: # fall back...
                 model_registered_in_target, model_source = self._register_model_in_correct_workspace("dev", dev_workspace, "dev",new_model=model,esml_status=esml_status)

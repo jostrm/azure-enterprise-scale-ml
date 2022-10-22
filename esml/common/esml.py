@@ -50,6 +50,7 @@ from azureml.core import Experiment
 from azureml.train.automl.run import AutoMLRun
 from pathlib import Path
 import logging
+
 class ESMLProject():
     ws = None
     datastore = None
@@ -361,7 +362,7 @@ class ESMLProject():
             self.active_model_config = None
 
             for item in lake_config["models"]:
-                model_details = {"model_number":None, "model_folder_name":None,"model_short_alias":None,"dataset_folder_names":None, "label":None, "ml_type":"classification"}
+                model_details = {"model_number":None, "model_folder_name":None,"model_short_alias":None,"dataset_folder_names":None, "label":None, "ml_type":"classification","ml_metric":"r2_score","ml_time_out_score":1.0}
                 model_details['model_number'] = int(item['model_number'])
                 model_details['model_folder_name'] = item['model_folder_name']
                 model_details['model_short_alias'] = item['model_short_alias']
@@ -369,6 +370,8 @@ class ESMLProject():
                 model_details['label'] = item['label']
                 
                 model_details['ml_type'] = item['ml_type']
+                model_details['ml_metric'] = item['ml_metric']
+                model_details['ml_time_out_score'] = float(item['ml_time_out_score'])
 
                 self.models_array.append(model_details)
 
@@ -850,20 +853,30 @@ class ESMLProject():
     def get_default_training_aml_compute_name(self):
         return self.compute_factory.aml_cluster_name
 
-    def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix_char=None):
+    def get_training_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix_char=None,train=True):
         self.initComputeFactory(ws)
-        
+        compute = None
+        name = None
         if(use_non_model_specific_cluster==True):
             print("Using a non model specific cluster (enterprice policy cluster), yet environment specific")
-            compute,name = self._compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            if(train):
+                compute,name = self._compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            else:
+                compute,name = self._compute_factory.get_batch_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            self.use_compute_cluster_to_build_images(ws, name)
+            return compute
+        else:
+            print("Using a model specific cluster, per configuration in project specific settings, (the integer of 'model_number' is the base for the name)")
+            if(train):
+                compute,name = self._compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+            else:
+                compute,name = self._compute_factory.get_batch_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
+
             self.use_compute_cluster_to_build_images(ws, name)
             return compute
 
-        else:
-            print("Using a model specific cluster, per configuration in project specific settings, (the integer of 'model_number' is the base for the name)")
-            compute,name = self._compute_factory.get_training_aml_compute(self.dev_test_prod, self.override_enterprise_settings_with_model_specific,self._projectNoString,self._modelNrString,create_cluster_with_suffix_char)
-            self.use_compute_cluster_to_build_images(ws, name)
-            return compute
+    def get_batch_aml_compute(self,ws, use_non_model_specific_cluster=False, create_cluster_with_suffix_char=None):
+        return self.get_training_aml_compute(ws, use_non_model_specific_cluster, create_cluster_with_suffix_char,False)
 
     '''
     def get_latest_model(self, ws):

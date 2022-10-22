@@ -11,7 +11,16 @@ from azureml.telemetry import INSTRUMENTATION_KEY
 import argparse
 from azureml.core import Run
 from azureml.data.dataset_factory import FileDatasetFactory
+from azureml.core.model import Model
 import datetime
+from esmlrt.interfaces.iESMLController import IESMLController
+from esmlrt.interfaces.iESMLModelCompare import IESMLModelCompare
+from esmlrt.interfaces.iESMLTestScoringFactory import IESMLTestScoringFactory
+from esmlrt.interfaces.iESMLTrainer import IESMLTrainer
+
+from esmlrt.runtime.ESMLController import ESMLController
+from esmlrt.runtime.ESMLModelCompare2 import ESMLModelCompare
+from esmlrt.runtime.ESMLTestScoringFactory2 import ESMLTestScoringFactory
 
 from your_code.your_custom_code import In2GoldProcessor
 
@@ -26,12 +35,12 @@ def init():
     global model, probabilities, gold_to_score_df, output_scored_gold,datastore,historic_path,last_gold_run,run_id,active_folder,date_in,model_version_in
 
     parser = argparse.ArgumentParser("Scoring the model")
-    #parser.add_argument('--input_gold_name', dest="input_gold_name", type=str, required=True)
     parser.add_argument('--target_column_name', dest="target_column_name", type=str, required=True)
     parser.add_argument('--par_esml_scoring_date', dest="par_esml_scoring_date", required=True)
     parser.add_argument('--par_esml_model_version', dest="par_esml_model_version", required=True)
     parser.add_argument('--esml_output_lake_template', dest="esml_output_lake_template", required=True)
     parser.add_argument('--par_esml_inference_mode', dest='par_esml_inference_mode', type=int, required=True)
+    parser.add_argument('--model_folder_name', dest="model_folder_name", required=True)
 
     #Optional
     parser.add_argument('--par_esml_env', type=str, help='ESML environment: dev,test,prod', required=False)
@@ -40,15 +49,43 @@ def init():
     args = parser.parse_args()
 
     try:
-        model_version_in = args.par_esml_model_version
-        esml_inference_mode = bool(args.par_esml_inference_mode)
-
-        logger.info("Loading model version {} from path: model.pkl".format(model_version_in))
-        model = joblib.load("model.pkl")
-        logger.info("Model loading success - model.pkl")
-
         run = Run.get_context()
         ws = run.experiment.workspace
+
+        model_version_in = args.par_esml_model_version
+        model_version_in_int = int(model_version_in)
+        esml_inference_mode = bool(args.par_esml_inference_mode)
+
+        current_model = None
+        model_name = None
+        fitted_model = None
+        experiment_name = args.model_folder_name 
+
+        print("Fetching BEST MODEL that is promoted. To get its name")
+        current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,experiment_name)
+        if(current_model is None):
+            print("No existing model with experiment name {}. The Model name will now be same as experiment name".format(experiment_name))
+        if(model_version_in_int == 0):
+            print("Initiating BEST MODEL - PROMOTED leading model (since model_version=0). Hydrating to get its run and fitted model.")
+            
+            run_id = current_model.tags.get("run_id")
+            safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
+            run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id) # TODO: Test in notebook = pickle?
+            model = fitted_model
+            print("Model loading success")
+        else:
+            print("Initiating MODEL with same name as BEST MODEl, but with a specific VERSION = {} from user in-parameter".format(model_version_in_int))
+            aml_model = Model(ws, name=model_name, version=model_version_in_int) # TODO: Test in notebook = get fitted model? pickle?
+            run_id_user = aml_model.tags.get("run_id")
+            safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
+            run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)  # TODO: Test in notebook = pickle?
+            model = fitted_model
+            print("Model loading success")
+
+        #print("Loading model version {} from path: model.pkl".format(model_version_in))            
+        #model = joblib.load("model.pkl")
+        #print("Model loading success - model.pkl")
+
         datastore = ws.get_default_datastore()
 
         gold_to_score = next(iter(run.input_datasets.items()))[1] # Get DATASET

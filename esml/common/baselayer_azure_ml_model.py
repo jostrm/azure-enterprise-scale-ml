@@ -507,7 +507,7 @@ class ESMLModelCompare():
 
         p = self.project
         if(p.dev_test_prod != target_env):
-            raise UserErrorException("User the PRIVATE PREVIEW function 'register_model_in_correct_ws' to register on OTHER workspace. \n - This method 'register_active_model' can only register a model in same azure ml workspace (test->test), then you need to retrain in new workspace if going from dev->test")
+            raise UserErrorException("Use the PRIVATE PREVIEW function 'register_model_in_correct_ws' to register on OTHER workspace. \n - This method 'register_active_model' can only register a model in same azure ml workspace (test->test), then you need to retrain in new workspace if going from dev->test")
 
         self.LoadConfiguration(target_env,p.override_enterprise_settings_with_model_specific)
         

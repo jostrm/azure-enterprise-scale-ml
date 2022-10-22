@@ -9,9 +9,9 @@
     "Matthews_promote_weight": 0.0,
 
     "regression_compare_metrics": ["RMSE_promote_weight","R2_promote_weight","Spearman_promote_weight"],
-    "RMSE_promote_weight": -0.3,
-    "MAPE_promote_weight": -10.0,
-    "MAE_promote_weight": -0.3,
+    "RMSE_promote_weight": 0.3,
+    "MAPE_promote_weight": 10.0,
+    "MAE_promote_weight": 0.3,
     "R2_promote_weight": -0.5,
     "Spearman_promote_weight": -0.3,
 
