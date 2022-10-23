@@ -39,6 +39,8 @@ except:
 
 def init():
     global prev_model,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws,model_path,model_name
+    global project_number,ml_type,secret_name_tenant,secret_name_sp_id,secret_name_sp_secret
+    global dev_resourcegroup_id,dev_workspace_name,dev_subscription_id,test_resourcegroup_id,test_workspace_name,test_subscription_id,prod_resourcegroup_id,prod_workspace_name,prod_subscription_id
 
     parser = argparse.ArgumentParser("Split the GOLD and Train the model")
     parser.add_argument('--target_column_name', dest="target_column_name", type=str, required=True)
@@ -178,7 +180,7 @@ def compare(test_ds):
         # Note: You can get this info in ESML by p.get_all_envs() (where p is ESMLProject)
         all_envs ={'dev': {'subscription_id': dev_subscription_id,'resourcegroup_id': dev_resourcegroup_id,'workspace_name': dev_workspace_name},
         'test': {'subscription_id': test_subscription_id,'resourcegroup_id': test_resourcegroup_id,'workspace_name': test_workspace_name},
-        'prod': {'subscription_id': prod_dev_subscription_id,'resourcegroup_id': prod_resourcegroup_id,'workspace_name': prod_workspace_name}}
+        'prod': {'subscription_id': prod_subscription_id,'resourcegroup_id': prod_resourcegroup_id,'workspace_name': prod_workspace_name}}
 
         # OptionalCUSTOMIZE END ###############
 
@@ -261,7 +263,7 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     #print(model)
 
     #3) Calculate Testset scoring on NEW model
-    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
+    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, class_matthews,class_plt = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
     print("Scoring for NEW model is: {},{},{},{}, {}".format(rmse,r2,mean_abs_percent_error,mae,spearman_correlation))
     a_scoring = ""
     if (controller.ESMLTestScoringFactory.ml_type == "regression"):

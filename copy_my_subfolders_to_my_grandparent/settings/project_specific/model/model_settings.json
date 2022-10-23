@@ -1,12 +1,12 @@
 {
     "classification_compare_metrics": ["AUC_promote_weight","Accuracy_promote_weight","F1_promote_weight", "Matthews_promote_weight2"],
-    "AUC_promote_weight": 0.1,
+    "AUC_promote_weight": -0.15,
     "Accuracy_promote_weight": -0.1,
-    "Precision_promote_weight": 0.0,
-    "Recall_promote_weight": 0.0,
+    "Precision_promote_weight": -0.1,
+    "Recall_promote_weight": -0.1,
     "F1_promote_weight": -0.1,
     "Log_loss_weight": 0.0,
-    "Matthews_promote_weight": 0.0,
+    "Matthews_promote_weight": -0.1,
 
     "regression_compare_metrics": ["RMSE_promote_weight","R2_promote_weight","Spearman_promote_weight"],
     "RMSE_promote_weight": 0.3,

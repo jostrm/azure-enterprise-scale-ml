@@ -40,14 +40,14 @@ class IESMLTestScoringFactory:
     def get_test_scoring_regression(self,ws,label,GoldTest,fitted_model,run=None, aml_model=None): raise NotImplementedError
 
     ### 
-    # returns:8 metric values + model with tags, equals 9 values to unpack
-    ## Regression: model,rmse, r2, mean_abs_percent_error,mae,spearman_corr,plt, None
-    ## Classification: model,auc,accuracy,f1, precision,recall,matrix,matthews,plt
+    # returns:7 or 9 metric values + model with tags, equals 9 values to unpack
+    ## Regression (7+2 summy=9): model,rmse, r2, mean_abs_percent_error,mae,spearman_corr,plt, dummy, dummy
+    ## Classification (9): model,auc,accuracy,f1, precision,recall,matrix,matthews,plt
     ###
     def get_test_scoring_8(self,ws,target_column_name,test_ds,fitted_model,train_run=None,aml_model=None, multiclass=None,positive_label=None):
         if self._ml_type == 'regression':
             model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt = self.get_test_scoring_regression(ws,target_column_name,test_ds,fitted_model,train_run,aml_model)
             dummy = None
-            return model,rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy # returns 8
+            return model,rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy, dummy # returns 9 (unpacking same as classification)
         elif self._ml_type == 'classification':
-            return self.get_test_scoring_classification(ws,target_column_name,test_ds,fitted_model,train_run,aml_model,multiclass,positive_label) # returns 8
+            return self.get_test_scoring_classification(ws,target_column_name,test_ds,fitted_model,train_run,aml_model,multiclass,positive_label) # returns 9

@@ -16,5 +16,6 @@
     "blocked_models": [],
     "docs_allowed_models_classification": ["AveragedPerceptronClassifier","RandomForest","Xgboost","StochasticGradientDescent","NaiveBayes","LinearSVMClassifier","GradientBoosting","DecisionTree","LinearSVC","KNearestNeighbors","ExtremeRandomTrees"],
     "docs_allowed_models_regression": ["ElasticNet","KNearestNeighbors","LassoLars","OnlineGradientDescentRegressor","FastLinearRegressor","StochasticGradientDescent"],
-    "docs_allowed_models_time_series_forecasting":["AutoArima","Prophet","ForecastTCN"]
+    "docs_allowed_models_time_series_forecasting":["AutoArima","Prophet","ForecastTCN"],
+    "docs_models_classification_from_pipeline_automlstep_2022_10_23":["RandomForest", "ExtremeRandomTrees", "LinearSVM", "SGD", "TensorFlowDNN", "TensorFlowLinearClassifier", "BernoulliNaiveBayes", "LightGBM", "XGBoostClassifier", "TabnetClassifier", "MultinomialNaiveBayes", "DecisionTree", "AveragedPerceptronClassifier", "GradientBoosting", "KNN", "SVM", "LogisticRegression"]
 }

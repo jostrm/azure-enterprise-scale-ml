@@ -71,7 +71,8 @@ class ESMLPipelineFactory():
     _conda_dependencies_object = None
 
     # https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
-    _esml_automl_lts_env_name = "ESML-AzureML-144-AutoML_126"
+    _esml_automl_lts_env_name = "ESML-AzureML-144-AutoML_126" # 2022-10-23: AutoMLStep PARAMETERS says BaseDockerIMage is: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:20220708.v1 
+    # # 2022-10-23: AutoMLStep PARAMETERS says CondaDependencies are: {"name": "project_environment", "dependencies": ["python=3.8.13", {"pip": ["azureml-defaults"]}], "channels": ["anaconda", "conda-forge"]}
     _environment_name = _esml_automl_lts_env_name # "AzureML-AutoML-DNN" # # Training[ "AzureML-AutoML","AzureML-AutoML-DNN", "AzureML-lightgbm-3.2-ubuntu18.04-py37-cpu"]  Inference["AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference",]
     
     _use_own_compute_per_step = False

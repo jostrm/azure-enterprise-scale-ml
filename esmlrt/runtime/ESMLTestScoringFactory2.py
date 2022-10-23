@@ -21,7 +21,11 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
 
         source_best_run = None
         model = None
-        if(run is not None):
+        if(run is not None and aml_model is not None):
+            print("ESML info: get_test_scoring_classification: RUN exists, Model exists with name {}".format(aml_model.name))
+            model = aml_model
+            source_best_run = run
+        elif(run is not None):
             source_best_run = run
             if(aml_model is None):
                 model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
@@ -80,7 +84,13 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
     ###
     def get_test_scoring_classification(self,ws,target_column_name,GoldTest,fitted_model,run=None,aml_model=None,multiclass=None,positive_label=None):
         
-        if(run is not None):
+        source_best_run = None
+        model = None
+        if((run is not None) and (aml_model is not None)):
+            print("ESML info: get_test_scoring_classification: RUN exists, Model exists with name {}".format(aml_model.name))
+            model = aml_model
+            source_best_run = run
+        elif(run is not None):
             print("ESML info: get_test_scoring_classification: RUN exists, lets get a model from that run")
             source_best_run = run
             model_name = source_best_run.properties['model_name'] # we need Model() object instead of "fitted_model" -> which is a pipeline, "regression pipeline",
@@ -103,13 +113,17 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
 
         auc,accuracy,f1, precision,recall,matrix,matthews, plt = get_7_classification_metrics(test_set_pd, target_column_name,fitted_model,multiclass,positive_label)
 
+        tags = ds.tags
+        if(tags is None):
+            tags = {} # Create new dictionary
+
         # 1) Log on the TEST_SET used
         if(auc is not None):
-            ds.tags["ROC_AUC"] = "{:.6f}".format(auc)
+            tags["ROC_AUC"] = "{:.6f}".format(auc)
         else:
-            ds.tags["ROC_AUC"] = "-"
+            tags["ROC_AUC"] = "-"
 
-        ds.tags["Accuracy"] = "{:.6f}".format(accuracy)
+        tags["Accuracy"] = "{:.6f}".format(accuracy)
 
         f1_str = None
         prec_str = None
@@ -132,7 +146,7 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
             rec_str = ""
         
         date_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-        tags = ds.tags
+        
         tags["F1_Score"] = f1_str
         tags["Precision"] = prec_str
         tags["Recall"] = rec_str
