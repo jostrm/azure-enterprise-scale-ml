@@ -34,6 +34,8 @@ except:
 
 def init():
     global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws
+    global project_number,ml_type,secret_name_tenant,secret_name_sp_id,secret_name_sp_secret
+    global dev_resourcegroup_id,dev_workspace_name,dev_subscription_id,test_resourcegroup_id,test_workspace_name,test_subscription_id,prod_resourcegroup_id,prod_workspace_name,prod_subscription_id
 
     parser = argparse.ArgumentParser("Split the GOLD and Train the model")
     parser.add_argument('--target_column_name', dest="target_column_name", type=str, required=True)
@@ -215,7 +217,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
     # ITrainer: Defaults to using AutoML. Optionally you can implement this. Else you need to implement ITrainer in 'YourTrainer' class
     trainer = Trainer(model_name,esml_modelname,esml_model_alias, esml_current_env, ml_type,train_ds,validate_ds,test_ds)
-    train_run, aml_model,fitted_model_new = trainer.train(train_ds,validate_ds)
+    train_run, model,fitted_model_new = trainer.train(train_ds,validate_ds)
 
     # CUSTOMIZE ###############
 
@@ -229,7 +231,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     model = controller._register_aml_model(full_local_path=None,model_name=model_name,tags=tags,target_ws=ws,description_in="")
 
     #4) Calculate Testset scoring on NEW model
-    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
+    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_new,train_run,model)
     print("Scoring for NEW model is: {},{},{},{}, {}".format(rmse,r2,mean_abs_percent_error,mae,spearman_correlation))
     a_scoring = ""
     if (controller.ESMLTestScoringFactory.ml_type == "regression"):
@@ -248,7 +250,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     target_ws = controller.get_target_workspace(current_environment = esml_current_env, current_ws = ws, target_environment = esml_current_env)
 
     promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
-        new_run_id =automl_step_run_id, # pipeline_run_id, #main_run.id,
+        new_run_id =train_run.id, # pipeline_run_id, #main_run.id,
         current_ws = ws,
         current_environment = esml_current_env,
         target_environment = esml_current_env,
@@ -259,7 +261,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
     print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
-        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
+        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=train_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
         print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
@@ -267,7 +269,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
         print("OUTER LOOP(dev-test): Now trying to compare with models in environment: {}".format(next_environment))
         try:
             promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
-                new_run_id = automl_step_run_id,
+                new_run_id = train_run.id,
                 current_ws = ws,
                 current_environment = esml_current_env,
                 target_environment = next_environment,
