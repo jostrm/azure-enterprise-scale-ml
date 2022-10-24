@@ -155,7 +155,7 @@ def init():
         esml_training_day_date_out = date_infolder.strftime('%Y/%m/%d')
         run_id = run.parent.id #run.id
         
-        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{"8e9792b1f7e84d40b3dd29dbc5a91a37"}/
+        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{id}/
         historic_path = args.esml_train_lake_template.format(id_folder=run_id)
 
         logger.info("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")

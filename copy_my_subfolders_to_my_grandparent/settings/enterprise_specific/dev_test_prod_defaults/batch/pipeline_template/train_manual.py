@@ -147,9 +147,9 @@ def init():
         esml_training_day_date_out = date_infolder.strftime('%Y/%m/%d')
         run_id = run.parent.id #run.id
         #historic_path = args.esml_train_lake_template.format(date_folder = esml_training_day_date_out,id_folder= run_id)
-        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{"8e9792b1f7e84d40b3dd29dbc5a91a37"}/
+        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{id}/
         historic_path = args.esml_train_lake_template.format(id_folder=run_id)
-        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{8e9792b1f7e84d40b3dd29dbc5a91a37}/
+        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{id}/
         
 
         logger.info("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")
@@ -173,7 +173,7 @@ def train(train_ds,validate_ds,test_ds):
         # Note: You can get this info in ESML by p.get_all_envs() (where p is ESMLProject)
         all_envs ={'dev': {'subscription_id': dev_subscription_id,'resourcegroup_id': dev_resourcegroup_id,'workspace_name': dev_workspace_name},
         'test': {'subscription_id': test_subscription_id,'resourcegroup_id': test_resourcegroup_id,'workspace_name': test_workspace_name},
-        'prod': {'subscription_id': prod_dev_subscription_id,'resourcegroup_id': prod_resourcegroup_id,'workspace_name': prod_workspace_name}}
+        'prod': {'subscription_id': prod_subscription_id,'resourcegroup_id': prod_resourcegroup_id,'workspace_name': prod_workspace_name}}
 
         # Optional CUSTOMIZE END ###############
         controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias,all_envs, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
@@ -259,7 +259,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
    ## 6) REGISTER model, if better than all else, in same environment = DEV
 
-    print("INNER LOOP (dev->dev) - PROMOTE?")
+    print("INNER LOOP  dev to dev - PROMOTE")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
         model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=train_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
         print("Promoted model! in environment {}".format(esml_current_env))
@@ -276,7 +276,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
                 target_workspace = target_ws,
                 experiment_name = controller.experiment_name)
 
-            print("OUTER LOOP (dev-test): Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
+            print("OUTER LOOP  dev to test: Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
 
             if (promote_new_model == True):
                 print("Now registering model in TARGET environment {}".format(next_environment))

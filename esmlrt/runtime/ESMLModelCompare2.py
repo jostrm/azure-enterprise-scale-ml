@@ -158,7 +158,7 @@ class ESMLModelCompare(IESMLModelCompare):
 
                 # 1b)Guard: that TEST_SET SCORING is calculated
                 if(p.check_if_test_scoring_exists_as_tags(source_model) == False):
-                    raise UserErrorException("ESML Error:301: You need to calculate testset scoring before comparing. No TAG with scoring.Use the ESMLTestScoringFactory property on your ESMLController. If new model, register it first via controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_new). Example: 1_R&D_phase_M11.ipynb ")
+                    raise UserErrorException("ESML Error You need to calculate testset scoring before comparing. ")
         
         else: # OUTER LOOP: TEST->PROD (no RUN associated since source is TEST)
             # 1a) Source LEADING model
@@ -172,7 +172,7 @@ class ESMLModelCompare(IESMLModelCompare):
                 print("ESML INFO:ModelCompare:203:Source leading model, name {}".format(source_model_name))
 
                 if(p.check_if_test_scoring_exists_as_tags(source_model) == False):
-                    raise UserErrorException("ESML Error:302: You need to calculate testset scoring before comparing. No TAG with scoring.Use the ESMLTestScoringFactory property on your ESMLController. If new model, register it first via controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_new). Example: 1_R&D_phase_M11.ipynb ")
+                    raise UserErrorException("ESML Error You need to calculate testset scoring before comparing. No TAG with scoring.")
                     # Note: TEST or PROD model, SHOULD definetely have SCORING calculated...since already compared & promoted.
 
         ########### GUARD - if no SOURCE model to promote, return FALSE
