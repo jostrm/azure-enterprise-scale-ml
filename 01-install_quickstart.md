@@ -52,22 +52,25 @@ Alternatively: The button below will deploy Azure Machine Learning and its relat
 # Almost done. Your codebase should look like below now: 
 `Example:`: See here, for how these folders are use together with EMSL:  https://github.com/jostrm/azure-enterprise-scale-ml-usage 
 
-# 4) Configure ESML settings, to target YOUR Azure resources
-1) You should copy all (except `notebook_templates`, here you should take a subfolder) subfolders in `copy_my_subfolders_to_my_grandparent` to your root, next to the subclass `azure-enterprise-scale-ml`.
-    - `Example:`: See here, for how these folders are use together with EMSL:  https://github.com/jostrm/azure-enterprise-scale-ml-usage
-    - 
-    - `azure-enterprise-scale-ml`(s)
-      - `copy_my_subfolders_to_my_grandparent`
-    - `adf`: Here is the Azur Data factory templates for `Scoring&Writeback`
-    - `mlops`: This is a template, a working `MLOps pipeline, using the ESML SDK, that can deploy a model `across environments where DEV, TEST, PROD` can be in different workspaces/different Azure subscriptions.
-    - `settings`: This is a template settings folder, for `dev,test,prod` to override
-    - `notebook_templates_esml_v14_2022-06-2023_aml_v143`: Notebooks redy to run - perfect for quick R&D mode.
-- 2) Create your new branch for `Project` and `Model` 
-    -  **Branch-name:** We recommend to include `organization/bu, project, and model`.
-    - Ask your ESML-coreteam what project-number you have `001,...,123` and choose your model prefix `M01`,...`M34` 
-    - > Important: `projectXXX` and `MXX` should be unique, and is a defined `ESML naming convention`
-    - Example name: `project001_M01` or `HR_Dept_project001_M01`
-- 3) EDIT the setting files, you copied to your rott: 
+# 4) Copy TEMPLATES to your GIT branch, your root, and configure ESML settings to target YOUR Azure resources, and templates
+### 4a) First time only:Run the Notebook 
+- [01_init_templates_ALL.ipynb](../azure-enterprise-scale-ml/copy_my_subfolders_to_my_grandparent/01_init_templates_ALL.ipynb) 
+- NB If you want, you can copy & paste the TEMPLATES manyally, You should copy all (except `notebook_templates`, here you should take a subfolder) subfolders in `copy_my_subfolders_to_my_grandparent` to your root, next to the subclass`azure-enterprise-scale-ml`
+### 4b) 2nd time, or when you want to UPDATE templates: Azure ML pipeline template, Notebook templates etc, run this notebook
+ - [02_update_templates_QUICK.ipynb](../azure-enterprise-scale-ml/copy_my_subfolders_to_my_grandparent/02_update_templates_QUICK.ipynb)
+
+### How will it look like?
+![](./esml/images/folder_structure_post_copy.png)
+  
+### 5a) Create your new branch for `Project` and `Model`  and EDIT the SETTINGS
+
+  - Branch-name: We recommend to include organization/bu, project, and model.
+  - Ask your ESML-coreteam what project-number you have 001,...,123 and choose your model prefix M01...M34 
+  - Important: projectXXX and MXX should be unique, and is a defined ESML naming convention
+  - Example name: `project001_M01` or HR_Dept_project001_M01
+
+
+##### EDIT the setting files, you copied to your root:
 - Even if you did not edit the nanming convention, you still need to check the settings in at least the top 3 files below:
   - 1) [../settings/enterprise_specific/dev_test_prod_settings](../settings/enterprise_specific/dev_test_prod_settings.json) - Role: ESML coreteam/IT admin (`configure once`)
   - 2) [../settings/project_specific/security_config.json](../settings/project_specific/security_config.json)  - Role: ESML coreteam/IT admin (`configure once, per project`)
@@ -85,8 +88,44 @@ And - Clean these 3 files: [../settings/project_specific/model/dev_test_prod/aut
  >   "registered_model_version": ""
  > }
 
-# DONE! 
+## 5b) DONE - Let run some NOTEBOOKS!
+
+### `notebook_templates_quickstart` (recommended to start here)
+  - Notebook templates. Runnable. Full workflow. 
+  - TIP: Copy the `notebook_templates_quickstart` FOLDER for your OWN model, and rename it like `notebooks_M20` if your model is M20
+
+[1_R&D_phase_M10_M11.ipynb](../notebook_templates_quickstart/1_R&D_phase_M10_M11.ipynb)
+
+[2_PRODUCTION_phase_TRAIN_Pipeline_M10_M11.ipynb](../notebook_templates_quickstart/2_PRODUCTION_phase_TRAIN_Pipeline_M10_M11.ipynb)
+
+[3a_PRODUCTION_phase_BATCH_INFERENCE_Pipeline_M11.ipynb](../notebook_templates_quickstart/3a_PRODUCTION_phase_BATCH_INFERENCE_Pipeline_M11.ipynb)
+
+[3b_PRODUCTION_phase_ONLINE_INFERENCE_Endpoint_M11.ipynb](../notebook_templates_quickstart/3b_PRODUCTION_phase_ONLINE_INFERENCE_Endpoint_M11.ipynb)
+
+
+### `notebook_templates_v14` (advanced notebooks)
+  - All notebook teamplates. Not guaranteed / maintained to work 100%, but shows concepts of ESML.
+
+[notebook_templates_esml_v14/0_update_templates_QUICK.ipynb](../notebook_templates_esml_v14/0_update_templates_QUICK.ipynb)
+ - This UPDATES some TEMPLATES, and the QUICKSTART folder,with new fresh notebooks from ESML.
+ - Safe to run it will backup your lake_settings.json and model_settings.json (but only run once, and then manuallytake your lake_settings.bak.json model clause, and past to new lake_settings.json)
+
+[notebook_templates_esml_v14/00_v143_esml_1_clean.ipynb](../notebook_templates_esml_v14/00_v143_esml_1_clean.ipynb)
+- This will clean any cashed LOGIN information, and CLEAN temp files. Run this if needed. If having login problem to Azure ML Studio workspace.
+
+[notebook_templates_esml_v14/00_v143_esml_controller_misc.ipynb](../notebook_templates_esml_v14/00_v143_esml_controller_misc.ipynb)
+- This explaines INNER and OUTER loop with the ESMLController class. 
+
+[notebook_templates_esml_v14/00_v143_esml_ml_features.ipynb](../notebook_templates_esml_v14/00_v143_esml_ml_features.ipynb)
+- This explaines various ESML Features. The "Bible" notebook of ESML if you wish. If it isn't there, ping me and we'll add it.
+
 # TROUBLE SHOOT - Tips
+
+### Q1) I get a StreamAccessException error when running the Pipeline, it the first steps "IN_2_SILVER 
+ - There is a folder path in the Error message "projects/project...1000/01/01/...
+### A1) This is the most common error. It means it cannot find the data in the datalek folder structure
+- Verify the path you see in the errormessage, that data exists in the datalake
+- Usual cause: you probably have the wrong DATE utc, for it to point at wrong date folders such as `2010/01/01`
 ## If manual security setup: SP - Keyvault IAM and Azure ML Studio
 - A)AML Studio You need to have your project SP (esml-project005-sp-id) be CONTRIBUTOR on the DEV, TEST, PROD workspaces, or else you will seee this: 
   - > ERROR:azureml._project._commands:get_workspace error using subscription_id...

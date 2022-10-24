@@ -14,6 +14,7 @@ from azureml.core import Workspace
 from azureml.exceptions import ProjectSystemException
 import joblib
 import time
+import datetime
 
 class IESMLController:
     __metaclass__ = ABCMeta
@@ -749,8 +750,10 @@ class IESMLController:
         #remote_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific) # 2022-08-08 do not READ anything to disk/file
         #  # 2022-05-02: best_run.run_id -> AttributeError: 'Run' object has no attribute 'run_id'
 
-        run_id = remote_run.id # TODO does .run_id exists in PipelineRun? (.id) It does in a ScriptRun.
-        tags = {"run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
+        run_id = remote_run.id
+
+        time_stamp = str(datetime.datetime.now())
+        tags = {"esml_time_updated": time_stamp, "run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
         "trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
 
         if(source_model_to_copy_tags_from is not None):
@@ -761,7 +764,7 @@ class IESMLController:
                 tags["test_set_Recall"] = source_model_to_copy_tags_from.tags["test_set_Recall"]
                 tags["test_set_F1_Score"] = source_model_to_copy_tags_from.tags["test_set_F1_Score"]
                 tags["test_set_Matthews_Correlation"] = source_model_to_copy_tags_from.tags["test_set_Matthews_Correlation"]
-                tags["test_set_CM"] = source_model_to_copy_tags_from.tags["source_model_to_copy_tags_from"]
+                tags["test_set_CM"] = source_model_to_copy_tags_from.tags["test_set_CM"]
             if("test_set_RMSE" in source_model_to_copy_tags_from.tags):
                 tags["test_set_RMSE"] = source_model_to_copy_tags_from.tags["test_set_RMSE"]
                 tags["test_set_R2"] = source_model_to_copy_tags_from.tags["test_set_R2"]
