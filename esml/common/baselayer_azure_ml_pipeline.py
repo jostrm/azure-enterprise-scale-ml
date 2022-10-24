@@ -37,8 +37,8 @@ from azureml.pipeline.core import PipelineData
 from azureml.core import Datastore
 from azureml.core.model import Model
 import sys
-sys.path.insert(0, "../azure-enterprise-scale-ml/")
-from esmlrt.interfaces.iESMLController import IESMLController
+#sys.path.insert(0, "../azure-enterprise-scale-ml/")
+from ...esmlrt.interfaces.iESMLController import IESMLController
 
 #endregion
 #region(collapsed) Enumerators
