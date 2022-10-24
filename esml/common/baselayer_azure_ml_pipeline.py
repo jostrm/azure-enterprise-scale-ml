@@ -38,7 +38,7 @@ from azureml.core import Datastore
 from azureml.core.model import Model
 import sys
 #sys.path.insert(0, "../azure-enterprise-scale-ml/")
-sys.path.insert(0, "../../../azure-enterprise-scale-ml/")
+sys.path.insert(0, "../../azure-enterprise-scale-ml/")
 #from ...esmlrt.interfaces.iESMLController import IESMLController
 from esmlrt.interfaces.iESMLController import IESMLController
 
