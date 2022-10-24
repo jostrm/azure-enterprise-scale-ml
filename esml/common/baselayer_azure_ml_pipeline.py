@@ -37,10 +37,15 @@ from azureml.pipeline.core import PipelineData
 from azureml.core import Datastore
 from azureml.core.model import Model
 import sys
-#sys.path.insert(0, "../azure-enterprise-scale-ml/")
-sys.path.insert(0, "../../azure-enterprise-scale-ml/")
-#from ...esmlrt.interfaces.iESMLController import IESMLController
-from esmlrt.interfaces.iESMLController import IESMLController
+
+try:
+    sys.path.insert(0, "../azure-enterprise-scale-ml/")
+    from esmlrt.interfaces.iESMLController import IESMLController # works from Notebook, Windows
+except ModuleNotFoundError:
+    sys.path.insert(0, "../../azure-enterprise-scale-ml/")
+    from esmlrt.interfaces.iESMLController import IESMLController # Works from mlops, Linux
+
+#from ...esmlrt.interfaces.iESMLController import IESMLController # does not work.
 
 #endregion
 #region(collapsed) Enumerators
