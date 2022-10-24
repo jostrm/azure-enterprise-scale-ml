@@ -350,7 +350,8 @@ class IESMLController:
         best_run = None # AutoML only
         fitted_model = None
         debug_print = True
-
+        run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
+        
         try: # if (run_type == "automl_run" or run_type == "notebook_automl"):
             if(debug_print):
                 print("ESML INFO: try: automl_run or notebook_automl")

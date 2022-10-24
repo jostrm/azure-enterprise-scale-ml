@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay
 
 #import seaborn as sn
 
@@ -88,6 +89,13 @@ def split_stratified(gold_data, validateset_and_testset_percentage_together=0.2,
         
     return train,validate_set,test_set
 
+'''
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+labels = p.GoldTest.to_pandas_dataframe()[p.active_model["label"]].unique()
+disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=labels)
+p1 = disp.plot()
+
+'''
 def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None,positive_label=None):
     X_test = test_set # X_test
     labels = test_set[label].unique()
@@ -126,6 +134,8 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None,po
         chart_1.set_title("Confusion Matrix - TEST_SET")
         df_cm = pd.DataFrame(matrix, index = [i for i in labels],columns = [i for i in labels])
         
+        disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=labels)
+        cm_plot = disp.plot(ax = chart_1)
         #s1= sn.heatmap(df_cm, annot=True) # ESML-v14 dependency to seaborn removed
 
         try:
@@ -143,8 +153,8 @@ def get_7_classification_metrics(test_set, label,fitted_model,multiclass=None,po
     if(multiclass is None):
         fpr, tpr, thresholds = roc_curve(y_test, predict_proba)
 
-        fig_2 = plt.figure(1,figsize = (20,4.8))
-        chart_2 = fig_2.add_subplot(122)
+        fig_1 # fig_2 = plt.figure(1,figsize = (20,4.8))
+        chart_2 = fig_1.add_subplot(122) # fig_2.add_subplot(122)
 
         chart_2.plot(fpr, tpr, color='blue', label='AUC='+str(auc))
         chart_2.plot([0, 1], [0, 1], color='darkblue', linestyle='--')
