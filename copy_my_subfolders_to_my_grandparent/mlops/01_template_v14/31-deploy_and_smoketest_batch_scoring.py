@@ -48,6 +48,7 @@ p.inference_mode = False
 p.active_model = int(esml_model_number)
 
 p_factory = ESMLPipelineFactory(p)
+p_factory.batch_pipeline_parameters[1].default_value = 0 # 0 = Latest Best model_version
 p_factory.batch_pipeline_parameters[1].default_value = esml_date_utc # overrides ESMLProject.date_scoring_folder.
 p_factory.describe()
 

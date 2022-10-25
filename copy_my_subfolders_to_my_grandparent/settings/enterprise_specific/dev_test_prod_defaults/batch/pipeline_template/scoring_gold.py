@@ -70,21 +70,25 @@ def init():
             
             run_id = current_model.tags.get("run_id")
             safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
-            run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id) # TODO: Test in notebook = pickle?
+            run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)
             model = fitted_model
             print("Model loading success")
         else:
             print("Initiating MODEL with same name as BEST MODEl, but with a specific VERSION = {} from user in-parameter".format(model_version_in_int))
-            aml_model = Model(ws, name=model_name, version=model_version_in_int) # TODO: Test in notebook = get fitted model? pickle?
-            run_id_user = aml_model.tags.get("run_id")
-            safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
-            run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)  # TODO: Test in notebook = pickle?
-            model = fitted_model
-            print("Model loading success")
-
-        #print("Loading model version {} from path: model.pkl".format(model_version_in))            
-        #model = joblib.load("model.pkl")
-        #print("Model loading success - model.pkl")
+            aml_model =  None
+            try:
+                aml_model = Model(ws, name=model_name, version=model_version_in_int)
+                #run_id_user = aml_model.tags.get("run_id")
+                run_id = aml_model.tags.get("run_id")
+                print("Model loading success with specific VERSION = {}".format(model_version_in_int))
+            except Exception as e:
+                print("Model not found with name {} and specific VERSION = {}. If you pass model_version=0 instead, ESML will search for Latest-promoted model, with fallback of Latest model not promoted (if no promoted exists) ")
+                run_id = current_model.tags.get("run_id")
+            finally:
+                safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
+                run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)
+                model = fitted_model
+                print("Model loading success: Latest-promoted model")
 
         datastore = ws.get_default_datastore()
 
