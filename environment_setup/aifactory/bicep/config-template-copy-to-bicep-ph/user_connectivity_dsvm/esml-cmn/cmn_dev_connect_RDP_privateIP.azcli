@@ -11,6 +11,7 @@ az version # 2.43.1  (version 2.32 or later)
 ## 1) This is cached - you need to do these 3 lines of code once and a while
 # See ESML /settings/enterprise_specific/dev_test_prod_settings.json
 $subscription_id = "todo_subscription_id" # change depending on (DEV,TEST,PROD) in ESML enterprise_specific settings
+az account clear
 az login
 az account list
 az account set --subscription $subscription_id
@@ -31,6 +32,9 @@ $dsvm_number = "001" # Your team may have multiple DSVM in the resource group,su
 
 ## Info: Then when logged in, this line will trigger Remote Desktop client on your Windows computer, with your AD-user, and you have your AD-user profile on the DSVM, connected with private IP (via Bastion)
 az network bastion rdp --name "bastion-${locationSuffix}-${dev_test_prod}-${resource_id_suffix}" --resource-group "${rg_prefix}esml-common-${locationSuffix}-${dev_test_prod}-${esml_ai_factory_instance}" --target-resource-id "/subscriptions/${subscription_id}/resourceGroups/${rg_prefix}esml-common-${locationSuffix}-${dev_test_prod}-${esml_ai_factory_instance}/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-${locationSuffix}-${dev_test_prod}-${dsvm_number}"
+
+######### If problem with the above,  try the below, that also --disable-gateway
+#az network bastion rdp --disable-gateway --name "bastion-${locationSuffix}-${dev_test_prod}-${resource_id_suffix}" --resource-group "${rg_prefix}esml-common-${locationSuffix}-${dev_test_prod}-${esml_ai_factory_instance}" --target-resource-id "/subscriptions/${subscription_id}/resourceGroups/${rg_prefix}esml-common-${locationSuffix}-${dev_test_prod}-${esml_ai_factory_instance}/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-${locationSuffix}-${dev_test_prod}-${dsvm_number}"
 
 # 2) End
 
