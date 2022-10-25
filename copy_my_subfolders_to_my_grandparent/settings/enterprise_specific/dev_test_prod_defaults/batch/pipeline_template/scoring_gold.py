@@ -82,14 +82,20 @@ def init():
                 run_id = aml_model.tags.get("run_id")
                 print("Model loading success with specific VERSION = {}".format(model_version_in_int))
             except Exception as e:
-                print("Model not found with name {} and specific VERSION = {}. If you pass model_version=0 instead, ESML will search for Latest-promoted model, with fallback of Latest model not promoted (if no promoted exists) ")
-                run_id = current_model.tags.get("run_id")
+                print("Model not found with name {} and specific VERSION = {}. If you pass model_version=0 instead then ESML will search for Latest-promoted model, with fallback of Latest model not promoted (if no promoted exists) ")
+                if (current_model is not None):
+                    run_id = current_model.tags.get("run_id")
+                    print("ESML will now try model_version=0, to see if we have any model promote, e.g. best latest registered model...")
             finally:
-                safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
-                run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)
-                model = fitted_model
-                print("Model loading success: Latest-promoted model")
+                if(run_id is not None):
+                    safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
+                    run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)
+                    model = fitted_model
+                    print("Model loading success: Latest-promoted model")
 
+        if(current_model is None and run_id is None):
+            print("scoring_gold.py.init() no success - ESML Could not find any model to score with in workspace {}.")
+            return False
         datastore = ws.get_default_datastore()
 
         gold_to_score = next(iter(run.input_datasets.items()))[1] # Get DATASET
@@ -128,7 +134,8 @@ def init():
         ################### EDIT optional things to do before scoring END #########################
 
         logger.info("scoring_gold.py.init() success")
-
+        print("scoring_gold.py.init() success")
+        return True # Went OK
     except Exception as e:
         logging_utilities.log_traceback(e, logger)
         raise
@@ -201,7 +208,6 @@ def run(gold_to_score_df):
             os.makedirs(active_folder, exist_ok=True)
             path_active_folder = active_folder + "/"+last_gold_run_filename
             written_df3 = df2.to_csv(path_active_folder, encoding='utf-8',index=False) # DUMMY 2nd Write needed?
-
     except Exception as e:
         logging_utilities.log_traceback(e, logger)
         raise
@@ -219,5 +225,6 @@ def has_iloc(df_series_or_ndarray):
     return False
 
 if __name__ == "__main__":
-    init()
-    run(gold_to_score_df)
+    went_ok = init()
+    if(went_ok):
+        run(gold_to_score_df)
