@@ -2,8 +2,8 @@
     "dev_scoring_folder_date": "1000-01-01 15:35:01.243860",
     "test_scoring_folder_date": "1000-01-01 15:35:01.243860",
     "prod_scoring_folder_date": "1000-01-01 15:35:01.243860",
-    "dev_inference_model_version": "1",
-    "test_inference_model_version": "1",
-    "prod_inference_model_version": "1"
+    "dev_inference_model_version": "0",
+    "test_inference_model_version": "0",
+    "prod_inference_model_version": "0"
 
 }
