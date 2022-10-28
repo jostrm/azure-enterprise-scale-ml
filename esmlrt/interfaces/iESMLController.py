@@ -462,6 +462,7 @@ class IESMLController:
         run_id = None
         model_name = None
         filtered_list= None
+        latest_tagged_with_status_new = None
         
         try:
             tag_esml_status = ""
