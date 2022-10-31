@@ -8,7 +8,7 @@ targetScope = 'subscription'  // Just to avoid sending a static RG. Instead: ESM
 param env string
 @description('Specifies the short location notation. This name is reflected in resource group and sub-resources')
 param locationSuffix string
-param resourceSuffix string
+param commonResourceSuffix string
 @description('Deployment location')
 param location string
 @description('tags')
@@ -48,7 +48,7 @@ var common_subnet_cidr_v = replace(common_subnet_cidr,'XX',cidr_range)
 var common_pbi_subnet_cidr_v = replace(common_pbi_subnet_cidr,'XX',cidr_range)
 var common_bastion_subnet_cidr_v = replace(common_bastion_subnet_cidr,'XX',cidr_range)
 var common_subnet_scoring_cidr_v = replace(common_subnet_scoring_cidr,'XX',cidr_range)
-var vnetNameFull ='${vnetNameBase}-${locationSuffix}-${env}${resourceSuffix}'  // vnt-esmlcmn-weu-dev-001
+var vnetNameFull ='${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
 var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // esml-common-weu-dev-002 // esml-common-weu-dev-002 // DEPENDENCIES - should exist
 
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {

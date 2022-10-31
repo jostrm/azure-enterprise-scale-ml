@@ -8,26 +8,11 @@
         "commonRGNamePrefix":{
 			"value": "bcd-efg-"
 		},
-        "commonResourceSuffix": {
-            "value": "-001"
-        },
-        "resourceSuffix": {
-            "value": "-001"
-        },
-        "commonLakeNamePrefixMax8chars":{
-			"value": "bcdefg"
-		},
         "locationSuffix": {
             "value": "weu"
         },
         "location": {
             "value": "westeurope"
-        },
-        "hybridBenefit":{
-            "value": true
-        },
-        "vnetNameBase": {
-            "value": "vnt-esmlcmn"
         },
         "tags": {
             "value": {
