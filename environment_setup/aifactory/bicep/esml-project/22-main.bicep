@@ -73,7 +73,7 @@ param vnetNameBase string
 @description('AI Factory suffix. If you have multiple instances')
 param aifactorySuffixRG string
 param commonResourceSuffix string
-param prjResourceSuffix string
+param resourceSuffix string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
 @description('Datalake GEN 2 storage account prefix. Max 8 chars.Example: If prefix is "marvel", then "marvelesml001[random5]dev",marvelesml001[random5]test,marvelesml001[random5]prod')
@@ -188,7 +188,7 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2021-04-01' 
 
 
 var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
-var twoNumbers = substring(prjResourceSuffix,2,2) // -001 -> 01
+var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 
 module ownerPermissions '../modules/contributorRbac.bicep' = {
@@ -225,7 +225,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.Resources/resourceGroups@2021
 }
 
 /* MOVED to ESML-COMMON
-var laName = 'la-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+var laName = 'la-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 module logAnalyticsWorkspaceOpInsight '../modules/logAnalyticsWorkspace.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'LogAnalyticsWS4${deploymentProjSpecificUniqueSuffix}'
@@ -257,7 +257,7 @@ module applicationInsight '../modules/applicationInsights.bicep'= if(sweden_cent
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}' // max 255 chars
+    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // max 255 chars
     tags: tags2
     location: location
   }
@@ -272,7 +272,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(sw
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id //logAnalyticsWorkspaceOpInsight.outputs.logAnalyticsWkspId # TODO-Check
     tags: tags2
     location: location
@@ -283,7 +283,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(sw
   ]
 }
 
-var adfName = 'adf-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+var adfName = 'adf-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 module adf '../modules/dataFactory.bicep' = if(sweden_central_adf_missing== false)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'DataFactory4${deploymentProjSpecificUniqueSuffix}'
@@ -311,7 +311,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == 
     hybridBenefit: hybridBenefit
     vmSize: 'Standard_DS3_v2'
     location: location
-    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: tags2
@@ -334,7 +334,7 @@ module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == tr
     hybridBenefit: hybridBenefit
     vmSize: 'Standard_DS3_v2'
     location: location
-    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: tags2
@@ -347,7 +347,7 @@ module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == tr
   ]
 }
 
-var prjResourceSuffixNoDash = replace(prjResourceSuffix,'-','')
+var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
 module acr '../modules/containerRegistry.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLContainerReg4${deploymentProjSpecificUniqueSuffix}'
@@ -483,7 +483,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
   ]
 }
 
-var amlName ='aml-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureMachineLearning4${deploymentProjSpecificUniqueSuffix}'
@@ -522,7 +522,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
   ]
 }
 
-var evenhubNameSpaceAndWsName = 'ev-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffix}'
+var evenhubNameSpaceAndWsName = 'ev-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 module eventHubLogging '../modules/eventhub.bicep' = if(enableEventhubs) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'EventHub4${deploymentProjSpecificUniqueSuffix}'
@@ -540,9 +540,9 @@ module eventHubLogging '../modules/eventhub.bicep' = if(enableEventhubs) {
       
 }
 
-var databricksName = 'dbx-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
-var databricksNameP = 'dbxp-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
-var databricksManagedRG = '${targetResourceGroup}${prjResourceSuffix}-dbxmgmt'
+var databricksName = 'dbx-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var databricksNameP = 'dbxp-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var databricksManagedRG = '${targetResourceGroup}${resourceSuffix}-dbxmgmt'
 var databricksManagedRGId = '${subscription().id}/resourceGroups/${databricksManagedRG}'
 
 resource amlResource 'Microsoft.MachineLearningServices/workspaces@2021-04-01' existing = {
