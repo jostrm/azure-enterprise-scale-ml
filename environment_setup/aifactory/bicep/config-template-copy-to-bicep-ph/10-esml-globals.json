@@ -3,10 +3,19 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "aifactorySuffixRG": {
-            "value": "-001"
+            "value": "-005"
         },
         "commonRGNamePrefix":{
-			"value": "abc-def-"
+			"value": "bcd-efg-"
+		},
+        "commonResourceSuffix": {
+            "value": "-001"
+        },
+        "resourceSuffix": {
+            "value": "-001"
+        },
+        "commonLakeNamePrefixMax8chars":{
+			"value": "bcdefg"
 		},
         "locationSuffix": {
             "value": "weu"
@@ -14,11 +23,11 @@
         "location": {
             "value": "westeurope"
         },
-        "technicalContactId": {
-            "value": "todo_ad_user_ObjectID"
+        "hybridBenefit":{
+            "value": true
         },
-        "technicalContactEmail": {
-            "value": "batman@gothamcity.dc"
+        "vnetNameBase": {
+            "value": "vnt-esmlcmn"
         },
         "tags": {
             "value": {
