@@ -1,7 +1,10 @@
 
 param (
     # required
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the arm parameters file")][string]$armParameters,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar1,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar2,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar3,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar4,
     [Parameter(Mandatory=$true, HelpMessage="Where to place the parameters.json file")][string]$filePath,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory environment [dev,test,prod]")][string]$env,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory subscription id for environment [dev,test,prod]")][string]$subscriptionId,
@@ -39,9 +42,18 @@ function Set-DeployedOnTag {
 Import-Module -Name "./modules/pipelineFunctions.psm1"
 Import-Dependencies
 
-$jsonParameters = Get-Content -Path $armParameters | ConvertFrom-Json
-Set-DeployedOnTag -InputObject $jsonParameters
-ConvertTo-Variables -InputObject $jsonParameters
+$jsonParameters1 = Get-Content -Path $bicepPar1 | ConvertFrom-Json
+ConvertTo-Variables -InputObject $jsonParameters1
+
+$jsonParameters2 = Get-Content -Path $bicepPar2 | ConvertFrom-Json
+ConvertTo-Variables -InputObject $jsonParameters2
+
+$jsonParameters3 = Get-Content -Path $bicepPar3 | ConvertFrom-Json
+ConvertTo-Variables -InputObject $jsonParameters3
+
+$jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
+Set-DeployedOnTag -InputObject $jsonParameters4
+ConvertTo-Variables -InputObject $jsonParameters4
 
 ## $tenantId comes from Parameters.json  - the rest is INPUT, as ADO parameters (see top of file)
 $authSettings = @{
