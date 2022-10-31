@@ -9,6 +9,7 @@ param inputCommonSPSecretKey string
 @description('AI Factory suffix. If you have multiple instances')
 param aifactorySuffixRG string=''
 param commonResourceSuffix string
+param resourceSuffix string = ''
 @secure()
 @description('The password that is saved to keyvault and used by local admin user on VM')
 param adminPassword string
