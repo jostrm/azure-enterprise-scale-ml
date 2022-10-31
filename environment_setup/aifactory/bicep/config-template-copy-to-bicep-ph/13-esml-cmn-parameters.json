@@ -1,0 +1,91 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "aifactorySuffixRG": {
+            "value": "-001"
+        },
+        "locationSuffix": {
+            "value": "weu"
+        },
+        "location": {
+            "value": "westeurope"
+        },
+        "resourceSuffix": {
+            "value": "-001"
+        },
+        "commonRGNamePrefix":{
+			"value": "abc-def-"
+		},
+        "tags": {
+            "value": {
+                "Application Name": "Enterprise Scale ML (ESML)",
+                "BA ID": "NA",
+                "BCIO": "Robin",
+                "Business Area": "NA",
+                "Cost Center": "123456",
+                "Resource Managed By":"The Riddler",
+                "TechnicalContact": "batman@gothamcity.dc",
+                "Project": "Batcave upgrade",     
+                "Description": "ESML AI Factory"
+            }
+        },
+        "vnetNameBase": {
+            "value": "vnt-esmlcmn"
+        },
+        "common_subnet_name": {
+			"value": "snet-esml-cmn-001"
+		},
+        "commonLakeNamePrefixMax8chars":{
+			"value": "abcweu"
+		},
+		"lakeContainerName":{
+			"value": "lake3"
+		},
+        "adminUsername": {
+            "value": "esmladmin"
+        },
+        "enableVmPubIp": {
+            "value": false
+        },
+        "tenantId": {
+            "value": "todo_tenantID"
+        },
+        "hybridBenefit":{
+            "value": true
+        },
+        "technicalContactId": {
+            "value": "todo_technicalContact_ADUser_IOD"
+        },
+        "technicalContactEmail": {
+            "value": "batman@gothamcity.dc"
+        },
+        "commonServicePrincipleOID": {
+            "value": "todo_esml-common-sp-oid"
+        },
+        "databricksOID": {
+            "value": "todo_databricks-sp-OID_Search4_AzureDatabricks"
+        },
+        "inputKeyvault": {
+            "value": "done_from_ADO_var"
+        },
+        "inputKeyvaultSubscription": {
+            "value": "done_from_ADO_var_subscriptionID-4common-kv"
+        },
+        "inputKeyvaultResourcegroup": {
+            "value": "done_from_ADO_var"
+        },
+        "inputCommonSPIDKey": {
+            "value": "esml-common-sp-id"
+        },
+        "inputCommonSPSecretKey": {
+            "value": "esml-common-sp-secret"
+        },
+        "IPwhiteList": {
+            "value": "xx.xxx.xxx.xx"
+        },
+        "centralDnsZoneByPolicyInHub": {
+            "value": false
+        }
+    }
+}
