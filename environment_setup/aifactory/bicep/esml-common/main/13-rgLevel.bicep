@@ -8,7 +8,7 @@ param inputCommonSPIDKey string
 param inputCommonSPSecretKey string
 @description('AI Factory suffix. If you have multiple instances')
 param aifactorySuffixRG string=''
-param resourceSuffix string
+param commonResourceSuffix string
 @secure()
 @description('The password that is saved to keyvault and used by local admin user on VM')
 param adminPassword string
@@ -85,13 +85,13 @@ resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01'
 }
 // Create a short, unique suffix, that will be unique to each AI Factorys common env (Dev,Test,Prod)
 var uniqueInAIFenv = substring(uniqueString(esmlCommonResourceGroup.id), 0, 5)
-var vnetNameFull ='${vnetNameBase}-${locationSuffix}-${env}${resourceSuffix}'  // vnt-esmlcmn-weu-dev-001
+var vnetNameFull ='${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
 var cmnName = 'cmn' // needs to be short. KV, ADF, LA, STORAGE needs to be globally unique
-var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${resourceSuffix}' //kv-cmn-prod-12345-004 (21/24)
-var kvNameCommonAdmin = 'kv-${cmnName}adm${env}-${uniqueInAIFenv}${resourceSuffix}' // kv-cmnadm-prod-12345-004 (24, 24max)
+var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}' //kv-cmn-prod-12345-004 (21/24)
+var kvNameCommonAdmin = 'kv-${cmnName}adm${env}-${uniqueInAIFenv}${commonResourceSuffix}' // kv-cmnadm-prod-12345-004 (24, 24max)
 var vnetId = '${subscription().id}/resourceGroups/${commonResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var defaultSubnet = common_subnet_name
-var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(resourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
+var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
 var privDnsResourceGroup = commonResourceGroupName
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
@@ -152,7 +152,7 @@ var privateLinksDnsZones = {
 }
 
 // Log analytics WORKSPACE (dev,test,prod - 3 in the AI Factory, one per landingzone/environment)
-var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep' = {
   scope: esmlCommonResourceGroup
   name: 'LogAnCmn4${uniqueInAIFenv}'
@@ -179,7 +179,7 @@ module wsQueries '../../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyti
 }
 
 
-var adfName = 'adf-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // globally unique: adf-cmn-weu-prod-1234-004 (25/63)
+var adfName = 'adf-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}' // globally unique: adf-cmn-weu-prod-1234-004 (25/63)
 module adf '../../modules/dataFactory.bicep' = if(sweden_central_adf_missing== false) {
   scope: esmlCommonResourceGroup
   name: 'DataFactoryCmn'
@@ -214,7 +214,7 @@ resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' ex
   scope: esmlCommonResourceGroup
 }
 
-var common_bastion_host_name = 'bastion-${locationSuffix}-${env}${resourceSuffix}'
+var common_bastion_host_name = 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'
 module bastionHost '../modules-common/bastionHostCommon.bicep' = {
   scope: esmlCommonResourceGroup
   name: common_bastion_host_name
@@ -481,7 +481,7 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp 
     hybridBenefit:hybridBenefit
     vmSize: 'Standard_DS3_v2'
     location: location
-    vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${resourceSuffix}'
+    vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${commonResourceSuffix}'
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: tags
@@ -503,7 +503,7 @@ module vmPublic '../../modules/virtualMachinePublic.bicep' = if(enableVmPubIp ==
     hybridBenefit:hybridBenefit
     vmSize: 'Standard_DS3_v2'
     location: location
-    vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${resourceSuffix}'
+    vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${commonResourceSuffix}'
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: tags
