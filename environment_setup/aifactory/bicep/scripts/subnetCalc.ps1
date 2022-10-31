@@ -6,7 +6,10 @@
 
 param (
     # required parameters
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the arm parameters file")][string]$armParameters,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar1,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar2,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar3,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar4,
     [Parameter(Mandatory = $true, HelpMessage = "Where to place the parameters.json file")][string]$filePath,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory environment [dev,test,prod]")][string]$env,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory subscription id for environment [dev,test,prod]")][string]$subscriptionId,
@@ -357,10 +360,17 @@ Import-Module -Name "./modules/pipelineFunctions.psm1"
 Import-Dependencies
 
 # This function will convert the parameters nest of the arm tempate parameters file to global variables
-$jsonParameters = Get-Content -Path $armParameters | ConvertFrom-Json
+$jsonParameters1 = Get-Content -Path $bicepPar1 | ConvertFrom-Json
+$jsonParameters2 = Get-Content -Path $bicepPar2 | ConvertFrom-Json
+$jsonParameters3 = Get-Content -Path $bicepPar3 | ConvertFrom-Json
+$jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
+
 
 # all values that are present in parameters.json will be converted to variables
-ConvertTo-Variables -InputObject $jsonParameters
+ConvertTo-Variables -InputObject $jsonParameters1
+ConvertTo-Variables -InputObject $jsonParameters2
+ConvertTo-Variables -InputObject $jsonParameters3
+ConvertTo-Variables -InputObject $jsonParameters4
 
 $authSettings = @{
     useServicePrincipal = $useServicePrincipal
