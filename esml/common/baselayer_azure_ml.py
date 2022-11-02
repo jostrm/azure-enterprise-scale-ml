@@ -378,7 +378,7 @@ class ComputeFactory():
                 tags=aks_tags, # eval(self.aks_config['tags']),
                 description=self.aks_config['description'],
                 enable_app_insights=self.aks_config['enable_app_insights'],
-                collect_model_data=self.aks_config['collect_model_data'] 
+                collect_model_data=self.aks_config['collect_model_data']
                 #,scoring_timeout_ms # default: 60 000ms = 1minut
                 #,replica_max_concurrent_requests #  default=1, maximum concurrent  per node to allow for the web service.  my_dict.get(some_key, 0)
                 ,scoring_timeout_ms=self.aks_config.get('scoring_timeout_ms',300000), # default: 60 000ms = 1min, ESML default = 5min, 300 000ms(is max)
@@ -410,7 +410,7 @@ class ComputeFactory():
         return aks_deploy_config
 
 
-    def _get_aks_cluster(self,target_workspace):
+    def _get_aks_cluster(self,target_workspace,ssl_cert_pem_file=None,ssl_key_pem_file=None,ssl_cname=None):
         aks_target = None
         first_time_bug_string = "ServicePrincipalNotFound"
         try:
@@ -418,28 +418,56 @@ class ComputeFactory():
             if (self.aks_name not in target_workspace.compute_targets):
                 #aks_target = AksCompute(target_workspace,self.aks_name)
                 
-                print('Creating AKS cluster {} in aks-mode DevTest={}'.format(self.aks_name ,self.aks_dev_test))
+                print('ESML: AKS as compute target does not exist. Trying to attach PRIVATE AKS cluster created by ESML BICEP, called: {} in aks-mode DevTest={}'.format(self.aks_name ,self.aks_dev_test))
+                try:
+                    resource_group = self.project.ws.resource_group
+                    #load_balancer_subnet = "snt"+self.aks_name # aks-subnet is default
+                    load_balancer_type = "InternalLoadBalancer"
 
-                prov_config = AksCompute.provisioning_configuration(
-                            cluster_purpose=self.cluster_purpose, # AksCompute.ClusterPurpose.DEV_TEST
-                            vm_size=self.aks_config['aks_vm_size'],
-                            agent_count=self.aks_config['aks_agent_count'],
-                            location=self.aks_config['location']
-                        )
-                rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
-                if((len(subnet_name) > 0)):
-                    prov_config.vnet_resourcegroup_name = rg_name
-                    prov_config.vnet_name = vnet_name
-                    prov_config.subnet_name = subnet_name
-                    prov_config.service_cidr = self.aks_config['service_cidr']
-                    prov_config.dns_service_ip = self.aks_config['dns_service_ip']
-                    prov_config.docker_bridge_cidr = self.aks_config['docker_bridge_cidr']
-                
-                prov_config.enable_ssl(leaf_domain_label=self.aks_config['leaf_domain_label'])
-                aks_target = ComputeTarget.create(workspace=target_workspace, name=self.aks_name, provisioning_configuration=prov_config)
-                aks_target.wait_for_completion(show_output=True)
-                print(aks_target.provisioning_state)
-                print(aks_target.provisioning_errors)
+                    attach_config = AksCompute.attach_configuration(resource_group = resource_group,
+                                                            cluster_name = self.aks_name,
+                                                            cluster_purpose = AksCompute.ClusterPurpose.DEV_TEST,
+                                                            load_balancer_type=load_balancer_type)
+                                                            #,load_balancer_subnet=load_balancer_subnet) # aks-subnet is default
+
+                    # If own SSL is enabled.
+                    if(ssl_cert_pem_file is not None):
+                        attach_config.enable_ssl(
+                            ssl_cert_pem_file=ssl_cert_pem_file, # "cert.pem",
+                            ssl_key_pem_file=ssl_key_pem_file, # "key.pem",
+                            ssl_cname=ssl_cname) #self.aks_config['leaf_domain_label'])
+                    # Note:Cannot use Microsoft SSL: Auto SSL certificate cannot be used with a private IP address.
+                    #attach_config.enable_ssl(leaf_domain_label = p.ComputeFactory.aks_config['leaf_domain_label'])
+                    
+                    attach_config.validate_configuration()
+                    aks_target = ComputeTarget.attach(target_workspace, self.aks_name, attach_config)
+                    aks_target.wait_for_completion(show_output=True)
+                    print(aks_target.provisioning_state)
+                    print(aks_target.provisioning_errors)
+                except Exception as e:
+                    print('ESML: Could not attach PRIVATE cluster, probably since not pre-created by ESML BICEP. Now Creating AKS cluster {} in aks-mode DevTest={}. Note that this will not be PRIAVTE, but in vNet.'.format(self.aks_name ,self.aks_dev_test))
+                    print(e)
+
+                    prov_config = AksCompute.provisioning_configuration(
+                                cluster_purpose=self.cluster_purpose, # AksCompute.ClusterPurpose.DEV_TEST
+                                vm_size=self.aks_config['aks_vm_size'],
+                                agent_count=self.aks_config['aks_agent_count'],
+                                location=self.aks_config['location']
+                            )
+                    rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
+                    if((len(subnet_name) > 0)):
+                        prov_config.vnet_resourcegroup_name = rg_name
+                        prov_config.vnet_name = vnet_name
+                        prov_config.subnet_name = subnet_name
+                        prov_config.service_cidr = self.aks_config['service_cidr']
+                        prov_config.dns_service_ip = self.aks_config['dns_service_ip']
+                        prov_config.docker_bridge_cidr = self.aks_config['docker_bridge_cidr']
+                    
+                    prov_config.enable_ssl(leaf_domain_label=self.aks_config['leaf_domain_label'])
+                    aks_target = ComputeTarget.create(workspace=target_workspace, name=self.aks_name, provisioning_configuration=prov_config)
+                    aks_target.wait_for_completion(show_output=True)
+                    print(aks_target.provisioning_state)
+                    print(aks_target.provisioning_errors)
             else: # Get existing
                 aks_target = ComputeTarget(target_workspace, self.aks_name)
                 print('Found existing cluster, {}, using it.'.format(self.aks_name))
@@ -450,7 +478,7 @@ class ComputeFactory():
         except Exception as e:
             if (first_time_bug_string in e.message):
                 custom_help = "Looks like this is the 1st AKS-cluster in this workpsace. There is a 1st time BUG, see errormessage about {}."\
-                    "\n - Solution: Create a dummy cluster via Azure portal UI, then this works".format(first_time_bug_string)
+                    "\n - Solution: Create a dummy cluster via Azure portal UI or via BICEP, then this will probably work.".format(first_time_bug_string)
                 raise Exception(custom_help) from e
 
 

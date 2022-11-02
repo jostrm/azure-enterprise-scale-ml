@@ -15,8 +15,12 @@ param adminUsername string
 param dbxPubSubnetName string
 @description('Specifies the name of the private databricks subnet that should be used by new databricks instance')
 param dbxPrivSubnetName string
+
 @description('Specifies the id of the AKS subnet that should be used by new AKS instance')
 param aksSubnetId string
+param aksDnsServiceIP string
+param aksServiceCidr string
+
 @description('Specifies the tags2 that should be applied to newly created resources')
 param tags object
 @description('Deployment location.')
@@ -504,6 +508,8 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     keyVault: kv1.outputs.keyvaultId
     applicationInsights: (sweden_central_appInsight_classic_missing == true)? applicationInsightSWC.outputs.ainsId: applicationInsight.outputs.ainsId 
     aksSubnetId: aksSubnetId
+    aksDnsServiceIP:aksDnsServiceIP
+    aksServiceCidr: aksServiceCidr
     tags: tags2
     vnetId: vnetId
     subnetName: defaultSubnet

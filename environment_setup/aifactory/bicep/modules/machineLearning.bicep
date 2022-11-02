@@ -21,6 +21,18 @@ param env string
 
 @description('Subnet id')
 param aksSubnetId string
+param aksServiceCidr string = '10.0.0.0/16'
+param aksDnsServiceIP string = '10.0.0.10'
+param aksDockerBridgeCidr string = '172.17.0.1/16'
+
+@description('AKS own SSL on private cluster. MS auto SSL is not possible since private cluster')
+param ownSSL string = 'disabled' //enabled
+param aksCert string = ''
+param aksCname string = ''
+param aksCertKey string = ''
+param aksSSLOverwriteExistingDomain bool = false
+param aksSSLstatus string = ''
+
 @description('Specifies the skuname of the machine learning studio')
 param skuName string
 
@@ -58,9 +70,9 @@ param amlPrivateDnsZoneID string
 @description('Resource name ID on DnsZone')
 param notebookPrivateDnsZoneID string
 @description('AKS Kubernetes version and AgentPool orchestrator version')
-param kubernetesVersionAndOrchestrator string = '1.24.3' // 2022-09-11: 1.23.3 not supported anymore in West Europe (az aks get-versions --location westeurope --output table). Supported >='1.23.5'
+param kubernetesVersionAndOrchestrator string = '1.24.6' //'1.24.3' // 2022-09-11: 1.23.3 not supported anymore in West Europe (az aks get-versions --location westeurope --output table). Supported >='1.23.5'
 
-@description('AKS Kubernetes version and AgentPool orchestrator version')
+@description('Azure ML allowPublicAccessWhenBehindVnet')
 param allowPublicAccessWhenBehindVnet bool = false
 
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
@@ -73,6 +85,7 @@ var subnetRef = '${vnetId}/subnets/${subnetName}'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
 param aks_dev_defaults array = [
+  'Standard_B4ms' // 4 cores, 16GB, 32GB storage: Burstable (2022-11 this was the default in Azure portal)
   'Standard_A4m_v2' // 4cores, 32GB, 40GB storage (quota:100)
   'Standard_D3_v2' // 4 cores, 14GB RAM, 200GB storage
 ] 
@@ -163,20 +176,22 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
   }
 }
 
-var aksName = 'esml${projectNumber}-${locationSuffix}-${env}' // esml-prj001-weu-prod (20/16) VS esml001-weu-prod (16/16)
+var aksName = 'esml${projectNumber}-${locationSuffix}-${env}' // esml001-weu-prod (20/16) VS esml001-weu-prod (16/16)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
 module aksDev 'aksCluster.bicep'  = if(env == 'dev'){
   //scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLAKSDev4${uniqueDepl}'
   params: {
-    name: aksName //'aks-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+    name: aksName // esml001-weu-prod
     tags: tags
     location: location
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table    // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns'
     enableRbac: true
     nodeResourceGroup: nodeResourceGroupName // 'esml-${replace(projectName, 'prj', 'project')}-aksnode-${env}-rg'
+    aksDnsServiceIP:aksDnsServiceIP
+    aksServiceCidr:aksServiceCidr
     agentPoolProfiles: [
       {
         name: toLower('agentpool')
@@ -203,13 +218,15 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod'){
   //scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLAKSTestProd4${uniqueDepl}'
   params: {
-    name: aksName // 'aks-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
+    name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
     tags: tags
     location: location
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table  1.22.6 and 1.23.3(preview) // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns' // 'aks-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
     enableRbac: true
     nodeResourceGroup: nodeResourceGroupName //'esml-${replace(projectName, 'prj', 'project')}-aksnode-${env}-rg'
+    aksDnsServiceIP:aksDnsServiceIP
+    aksServiceCidr:aksServiceCidr
     agentPoolProfiles: [
       {
         name: 'agentpool'
@@ -230,8 +247,8 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod'){
   ]
 }
 
-//AKS attach compute
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = {
+//AKS attach compute PRIVATE cluster, without SSL
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = if(ownSSL == 'disabled') {
   name: '${machineLearningStudio.name}/${aksName}'
   location: location
   properties: {
@@ -243,10 +260,15 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
       agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
-
+      loadBalancerType: 'InternalLoadBalancer'
       aksNetworkingConfiguration:  {
         subnetId: aksSubnetId
+        dnsServiceIP:aksDnsServiceIP
+        dockerBridgeCidr:aksDockerBridgeCidr
+        serviceCidr:aksServiceCidr
       }
+      loadBalancerSubnet: 'aks-subnet' // aks-subnet is default
+      
     }
   }
   dependsOn:[
@@ -254,7 +276,46 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   ]
 }
 
-/* jostrm-DEBUG: testa ta bort detta så länge..verkar "tima out" - An error occurred while sending the request. */
+//AKS attach compute, PRIVATE cluster, with SSL
+//Error: he resource 'Microsoft.MachineLearningServices/workspaces/aml-prj003-weu-dev-002/computes/esml003-weu-dev4' at line '181' and column '9' is defined multiple times in a template. 
+
+/*
+resource machineLearningComputeSSL 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = if(ownSSL == 'enabled') {
+  name: '${machineLearningStudio.name}/${aksName}'
+  location: location
+  properties: {
+    computeType: 'AKS'
+    computeLocation: location
+    description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    resourceId: ((env =='dev') ? aksDev.outputs.aksId : aksTestProd.outputs.aksId)  
+    properties: {
+      agentCount:  ((env =='dev') ? 1 :  3)
+      clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
+      agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
+      loadBalancerType: 'InternalLoadBalancer'
+      aksNetworkingConfiguration:  {
+        subnetId: aksSubnetId
+        dnsServiceIP:aksDnsServiceIP
+        dockerBridgeCidr:aksDockerBridgeCidr
+        serviceCidr:aksServiceCidr
+      }
+      loadBalancerSubnet: 'aks-subnet' // aks-subnet is default
+      sslConfiguration:{
+        cert:aksCert
+        cname:aksCname
+        key:aksCertKey
+        overwriteExistingDomain:aksSSLOverwriteExistingDomain
+        status:aksSSLstatus
+      }
+      
+    }
+  }
+  dependsOn:[
+    machineLearningPrivateEndpoint
+  ]
+}
+
+*/
 
 //CI
 

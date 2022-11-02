@@ -14,7 +14,7 @@ var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
 
 //-- Needed if connnecting from Databricks to Azure ML workspace
-module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = {
+module rbackSPfromDBX2AML '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/machinelearningRBAC.bicep' = {
   name: 'rbacDBX2AazureMLwithProjectSP${projectNumber}${locationSuffix}${env}'
   params: {
     amlName:amlName
@@ -27,7 +27,7 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = {
 
   ]
 }
-module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = {
+module rbackSPfromDBX2AMLSWC '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/machinelearningRBAC.bicep' = {
   name: 'rbacDBX2AMLProjectSPSWC${projectNumber}${locationSuffix}${env}'
   params: {
     amlName:amlName
@@ -41,7 +41,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = {
   ]
 }
 
-module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = {
+module rbacADFfromUser '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/datafactoryRBAC.bicep' = {
   name: 'rbacADFFromAMLorProjSP${projectNumber}${locationSuffix}${env}'
   params: {
     datafactoryName:adfName

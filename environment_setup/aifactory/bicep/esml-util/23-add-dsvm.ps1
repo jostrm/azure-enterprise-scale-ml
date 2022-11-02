@@ -35,7 +35,7 @@ $vnetNameBase = 'vnt-esmlcmn'
 Write-Host "Kicking off the BICEP..."
 #Set-AzDefault -ResourceGroupName $rg
 
-New-AzResourceGroupDeployment -TemplateFile "23-add-dsvm.bicep" `
+New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\23-add-dsvm.bicep" `
 -Name $deplName `
 -ResourceGroupName $rg `
 -projectNumber $projectNumber `

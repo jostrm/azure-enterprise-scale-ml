@@ -25,7 +25,7 @@ $deplName = '100-aml-rbac-bicep'
 Write-Host "Kicking off the BICEP..."
 #Set-AzDefault -ResourceGroupName $rg
 
-New-AzResourceGroupDeployment -TemplateFile "./esml-util/100-aml-rbac.bicep" `
+New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\100-aml-rbac.bicep" `
 -Name $deplName `
 -ResourceGroupName $rg `
 -env $env `

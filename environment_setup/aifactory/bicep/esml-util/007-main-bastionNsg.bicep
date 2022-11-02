@@ -18,7 +18,7 @@ param tags object = default_tags
 param common_bastion_subnet_cidr string = default_common_bastion_subnet_cidr
 
 // nsg-snet-esml-cmn-001
-module nsgCommon '../esml-common/modules-common/nsgCommon.bicep' = {
+module nsgCommon '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-common/modules-common/nsgCommon.bicep' = {
   name: 'nsg-${common_subnet_name}'
   scope: resourceGroup()
   params: {
