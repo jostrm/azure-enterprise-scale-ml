@@ -421,7 +421,7 @@ class ComputeFactory():
                 print('ESML: AKS as compute target does not exist. Trying to attach PRIVATE AKS cluster created by ESML BICEP, called: {} in aks-mode DevTest={}'.format(self.aks_name ,self.aks_dev_test))
                 try:
                     resource_group = self.project.ws.resource_group
-                    #load_balancer_subnet = "snt"+self.aks_name # aks-subnet is default
+                    load_balancer_subnet = "snt-prj"+self.project.ProjectXXX+"-aks" # aks-subnet is default, will fail if set. snt-prj002-aks
                     load_balancer_type = "InternalLoadBalancer"
 
                     attach_config = AksCompute.attach_configuration(resource_group = resource_group,
