@@ -239,7 +239,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             protocol: 'Tcp'
             sourcePortRange: '*'
             destinationPortRange: '80'
-            sourceAddressPrefix: '*'
+            sourceAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
             priority: 220
             direction: 'Outbound'
