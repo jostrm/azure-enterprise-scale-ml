@@ -232,6 +232,20 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           direction: 'Outbound'
         }
       }
+      {
+        name: 'AKS_private_loadbalancer_call_from_DSVM_in_vNet'
+        properties: {
+            description: 'Required for communication from private DSVM to call private AKS cluster endpoints. Needed for Azure ML inferencing.'
+            protocol: 'Tcp'
+            sourcePortRange: '*'
+            destinationPortRange: '80'
+            sourceAddressPrefix: '*'
+            access: 'Allow'
+            priority: 220
+            direction: 'Outbound'
+            destinationAddressPrefix: 'VirtualNetwork'
+        }
+      }
     ]
   }
 }
