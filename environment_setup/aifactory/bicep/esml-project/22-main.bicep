@@ -18,8 +18,9 @@ param dbxPrivSubnetName string
 
 @description('Specifies the id of the AKS subnet that should be used by new AKS instance')
 param aksSubnetId string
-param aksDnsServiceIP string
-param aksServiceCidr string
+param aksServiceCidr string = '10.0.0.0/16'
+param aksDnsServiceIP string = '10.0.0.10'
+param aksDockerBridgeCidr string = '172.17.0.1/16'
 
 @description('Specifies the tags2 that should be applied to newly created resources')
 param tags object
