@@ -489,6 +489,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 }
 
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureMachineLearning4${deploymentProjSpecificUniqueSuffix}'
@@ -509,6 +510,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     keyVault: kv1.outputs.keyvaultId
     applicationInsights: (sweden_central_appInsight_classic_missing == true)? applicationInsightSWC.outputs.ainsId: applicationInsight.outputs.ainsId 
     aksSubnetId: aksSubnetId
+    aksSubnetName:aksSubnetName
     aksDnsServiceIP:aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
     tags: tags2

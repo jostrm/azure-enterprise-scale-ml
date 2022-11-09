@@ -19,8 +19,10 @@ param env string
 //@description('Example: esmldev')
 //param aksLeafDomainLabel string
 
-@description('Subnet id')
+@description('Subnet id, also with vnet in path etc, for AKS')
 param aksSubnetId string
+@description('Subnet name for aks')
+param aksSubnetName string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
@@ -267,7 +269,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
         dockerBridgeCidr:aksDockerBridgeCidr
         serviceCidr:aksServiceCidr
       }
-      loadBalancerSubnet: 'aks-subnet' // aks-subnet is default
+      loadBalancerSubnet: aksSubnetName // aks-subnet is default
       
     }
   }
