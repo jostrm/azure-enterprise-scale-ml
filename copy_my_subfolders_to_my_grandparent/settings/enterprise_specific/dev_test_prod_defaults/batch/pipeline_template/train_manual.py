@@ -147,9 +147,9 @@ def init():
         esml_training_day_date_out = date_infolder.strftime('%Y/%m/%d')
         run_id = run.parent.id #run.id
         #historic_path = args.esml_train_lake_template.format(date_folder = esml_training_day_date_out,id_folder= run_id)
-        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{id}/
+        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{"8e9792b1f7e84d40b3dd29dbc5a91a37"}/
         historic_path = args.esml_train_lake_template.format(id_folder=run_id)
-        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{id}/
+        # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{8e9792b1f7e84d40b3dd29dbc5a91a37}/
         
 
         logger.info("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")
@@ -217,7 +217,13 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
     # ITrainer: Defaults to using AutoML. Optionally you can implement this. Else you need to implement ITrainer in 'YourTrainer' class
     trainer = Trainer(model_name,esml_modelname,esml_model_alias, esml_current_env, ml_type,train_ds,validate_ds,test_ds)
-    train_run, model,fitted_model_new = trainer.train(train_ds,validate_ds)
+    train_run, aml_model,fitted_model,full_local_path = trainer.train(train_ds,validate_ds,target_column_name)
+
+    # Set AutoML equivalent
+    automl_step_run = run # Current run
+    automl_step_run_id = run_id # Current run.id
+    best_run = run # current run
+    fitted_model_1 = fitted_model # current trained model
 
     # CUSTOMIZE ###############
 
@@ -225,13 +231,13 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     time_stamp = str(datetime.datetime.now())
     ml_flow_stage = IESMLController._get_flow_equivalent(IESMLController.esml_status_new)
     tags = {"esml_time_updated": time_stamp,"status_code": IESMLController.esml_status_new,"mflow_stage":ml_flow_stage, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
-        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "AutoMLStep"}
+        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "ManualPython"}
 
     ##3) Register NEW model in CURRENT env
-    model = controller._register_aml_model(full_local_path=None,model_name=model_name,tags=tags,target_ws=ws,description_in="")
+    model = controller._register_aml_model(full_local_path=full_local_path,model_name=model_name,tags=tags,target_ws=ws,description_in="")
 
     #4) Calculate Testset scoring on NEW model
-    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, dummy = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_new,train_run,model)
+    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, class_matthews,class_plt = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
     print("Scoring for NEW model is: {},{},{},{}, {}".format(rmse,r2,mean_abs_percent_error,mae,spearman_correlation))
     a_scoring = ""
     if (controller.ESMLTestScoringFactory.ml_type == "regression"):
@@ -250,7 +256,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     target_ws = controller.get_target_workspace(current_environment = esml_current_env, current_ws = ws, target_environment = esml_current_env)
 
     promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
-        new_run_id =train_run.id, # pipeline_run_id, #main_run.id,
+        new_run_id =automl_step_run_id, # pipeline_run_id, #main_run.id,
         current_ws = ws,
         current_environment = esml_current_env,
         target_environment = esml_current_env,
@@ -259,9 +265,9 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
    ## 6) REGISTER model, if better than all else, in same environment = DEV
 
-    print("INNER LOOP  dev to dev - PROMOTE")
+    print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
-        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=train_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
+        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
         print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
@@ -269,14 +275,14 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
         print("OUTER LOOP(dev-test): Now trying to compare with models in environment: {}".format(next_environment))
         try:
             promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
-                new_run_id = train_run.id,
+                new_run_id = automl_step_run_id,
                 current_ws = ws,
                 current_environment = esml_current_env,
                 target_environment = next_environment,
                 target_workspace = target_ws,
                 experiment_name = controller.experiment_name)
 
-            print("OUTER LOOP  dev to test: Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
+            print("OUTER LOOP (dev-test): Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
 
             if (promote_new_model == True):
                 print("Now registering model in TARGET environment {}".format(next_environment))

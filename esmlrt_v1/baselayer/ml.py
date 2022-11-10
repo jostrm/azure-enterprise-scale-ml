@@ -37,7 +37,6 @@ def get_4_regression_metrics(test_set, label,fitted_model):
     
     # Calculate root-mean-square error
     y_actual = y_test.values.flatten().tolist()
-
     rmse = None
     try:
         rmse = sqrt(mean_squared_error(y_actual, y_predict))

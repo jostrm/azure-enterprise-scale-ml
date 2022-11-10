@@ -68,7 +68,7 @@ class ESMLTestScoringFactory(IESMLTestScoringFactory):
         model.add_tags(tags = model.tags)
         
         if(source_best_run is not None):
-           source_best_run.log_image("ESML_GOLD_TestSet_ActualPredicted", plot=plt)
+           source_best_run.log_image("ESML_GOLD_TestSet_AcutalPredicted", plot=plt)
         
         if (plt is not None):
             pass

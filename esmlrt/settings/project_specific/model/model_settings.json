@@ -8,14 +8,13 @@
     "Log_loss_weight": 0.0,
     "Matthews_promote_weight": -0.1,
 
-    "regression_compare_metrics": ["RMSE_promote_weight","R2_promote_weight","Spearman_promote_weight"],
-    "RMSE_promote_weight": 0.3,
+    "regression_compare_metrics": ["RMSE_promote_weight","R2_promote_weight"],
+    "RMSE_promote_weight": 3.9,
     "MAPE_promote_weight": 10.0,
     "MAE_promote_weight": 0.3,
     "R2_promote_weight": -0.5,
     "Spearman_promote_weight": -0.3,
 
-    "docs1": "AUC_promote_weight= 0.2 meaning: new trained model must be 0.2 BETTER, to win the game.",
     "docs2": "AUC_promote_weight= -0.2 meaning: new trained model can be 0.2 WORSE...but will still win the game, be promoted",
     "docs3": "If same scoring, no promotion will be done, A < B is the behaviour. If you want to force promotion, use WEIGHTS, or env-flag, dev_test_prod_override/train/.../debug_always_promote_model=True",
     "docs4_regression_compare_metrics":"RMSE_promote_weight,R2_promote_weight,Spearman_promote_weight",

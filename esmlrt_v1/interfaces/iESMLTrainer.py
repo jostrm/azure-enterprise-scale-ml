@@ -41,7 +41,7 @@ class IESMLTrainer:
         return self._experiment_name
 
     ###
-    # returns: train_run, aml_model,fitted_model,full_local_path
+    # returns: train_run, aml_model,fitted_model
     # Track with MLFlow: https://docs.microsoft.com/en-us/azure/machine-learning/tutorial-train-deploy-notebook
     ###
     @abstractmethod

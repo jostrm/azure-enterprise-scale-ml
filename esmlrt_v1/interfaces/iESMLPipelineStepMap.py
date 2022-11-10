@@ -120,8 +120,6 @@ class IESMLPipelineStepMap:
                     step_name = m['step_name']
                     map_step=m
                     break
-                else:
-                    has_dbx = False
 
         return has_dbx,step_name,map_step
 

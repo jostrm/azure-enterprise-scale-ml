@@ -788,7 +788,7 @@ class IESMLController:
             tags = {**tags, **extra_model_tags}
             #tags.update(extra_model_tags) # status_code : {'status_code': 'esml_newly_trained', 'trained_with': 'AutoMLRun'}
 
-        print("model_name at remote_run.register_model: ", model_name)
+        print("model_name at emote_run.register_model: ", model_name)
         model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
         
         #model_path = "outputs/model.pkl"
