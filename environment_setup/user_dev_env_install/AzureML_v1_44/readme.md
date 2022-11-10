@@ -8,6 +8,6 @@
 - 1.44
 # Tested OK history: fresh install on DSVM, with MiniConda, started in Admin mode
 - 2022-09~01: Ok
-- 2022-09-12: Breaking (partner reported, Azure ML/AutoML cannot be installed on DSVM)
+- 2022-09-12: Breaking (report came in: Azure ML/AutoML cannot be installed on DSVM)
 - 2022-09-13: Ok (MS CSU + PG fixed it)
 - Next test: 2022-12-01: -
