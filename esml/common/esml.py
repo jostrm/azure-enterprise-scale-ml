@@ -1169,6 +1169,20 @@ class ESMLProject():
     def Lakestore(self):
         return self.datastore
 
+    # projects/project002/11_diabetes_model_reg/train/ds01_diabetes/out/silver/dev/
+    # projects/p.project_folder_name/p.model_folder_name/train/ds01_diabetes/out/silver/dev/
+    def path_in2silver_template(self,inference=False):
+        baseline = ""
+
+        if (inference):
+            baseline = 'projects/{}/{}/{}/'.format(self.project_folder_name,self.model_folder_name,'inference')
+            baseline = baseline+'{model_version}/{esml_dataset}/out/silver/{esml_env}/'
+        else:
+            baseline = 'projects/{}/{}/{}/'.format(self.project_folder_name,self.model_folder_name,'train')
+            baseline = baseline+'{esml_dataset}/out/silver/{esml_env}/'
+        
+        return baseline
+
     #
     # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{8e9792b1f7e84d40b3dd29dbc5a91a37}/
     # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{2020/01/01}/{8e9792b1f7e84d40b3dd29dbc5a91a37}/

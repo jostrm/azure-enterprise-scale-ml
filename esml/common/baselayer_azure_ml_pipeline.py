@@ -36,14 +36,21 @@ from azureml.pipeline.core import TrainingOutput
 from azureml.pipeline.core import PipelineData
 from azureml.core import Datastore
 from azureml.core.model import Model
+from azureml.core.compute import ComputeTarget
+from azureml.core.compute import DatabricksCompute
+from azureml.exceptions import ComputeTargetException
+from azureml.pipeline.steps import DatabricksStep
+from azureml.data.data_reference import DataReference
 import sys
 
 try:
     sys.path.insert(0, "../azure-enterprise-scale-ml/")
     from esmlrt.interfaces.iESMLController import IESMLController # works from Notebook, Windows
+    from esmlrt.interfaces.iESMLPipelineStepMap import IESMLPipelineStepMap
 except ModuleNotFoundError:
     sys.path.insert(0, "../../azure-enterprise-scale-ml/")
     from esmlrt.interfaces.iESMLController import IESMLController # Works from mlops, Linux
+    from esmlrt.interfaces.iESMLPipelineStepMap import IESMLPipelineStepMap
 
 #from ...esmlrt.interfaces.iESMLController import IESMLController # does not work.
 
@@ -90,6 +97,7 @@ class ESMLPipelineFactory():
     _target_column_name = None
     _esml_pipeline_type = None
     _script_names_dic = {}
+    _dbx_compute_dic = {}
     _script_template_enterprise = "../../../settings/enterprise_specific/dev_test_prod_defaults/batch/pipeline_template"
     _script_template_enterprise_runtime = "../../esmlrt"
     _script_template_project_settings = "../../../settings/project_specific/model"
@@ -109,6 +117,7 @@ class ESMLPipelineFactory():
 
     _in2bronze_filename = "in2bronze.py" # Not used in In2Silver2Gold data model
     _bronze2silver_filename = "bronze2silver.py" # Not used In2Silver2Gold data model
+    _iesml_pipelinestep_map = None
 
 #endregion
 
@@ -213,6 +222,49 @@ class ESMLPipelineFactory():
 #endregion
 
 #region PUBLIC Methods
+
+    def create_compute_via_map(self, map, all_envs_in=None):
+        all_envs = None
+        self._dbx_compute_dic = {}
+        if (all_envs_in is None): 
+            all_envs = self.p.get_all_envs()
+        else:
+            all_envs = all_envs_in
+
+        # ESML params
+        env = self.p.dev_test_prod
+        ws = self.p.ws
+        # ESML 
+        compute_dic = {}
+
+        db_resource_group=all_envs[env]['resource_group'] # Databricks resource group
+        db_workspace_name=all_envs[env]['workspace_name']  # Databricks workspace name
+        db_access_token=all_envs[env]['access_token']  # Databricks access token
+        
+        compute_names = self._iesml_pipelinestep_map.get_all_compute_clusters(map)
+        if (all_envs[env]['compute_name'] is not None): # override user mapping with user environment array (if different in different environment, but same map)
+            compute_names = all_envs[env]['compute_name'] 
+
+        for n in compute_names:
+            db_compute_name=n
+            
+            try:
+                databricks_compute = DatabricksCompute(workspace=ws, name=db_compute_name)
+                self._dbx_compute_dic[db_compute_name]=databricks_compute
+                print('Compute target {} already exists'.format(db_compute_name))
+            except ComputeTargetException:
+                print('Compute not found, will use below parameters to attach new one')
+                print('db_compute_name {}'.format(db_compute_name))
+                print('db_resource_group {}'.format(db_resource_group))
+                print('db_workspace_name {}'.format(db_workspace_name))
+                #print('db_access_token {}'.format(db_access_token))
+            
+                config = DatabricksCompute.attach_configuration(
+                    resource_group = db_resource_group,
+                    workspace_name = db_workspace_name,
+                    access_token= db_access_token)
+                databricks_compute=ComputeTarget.attach(ws, db_compute_name, config)
+                self._dbx_compute_dic[db_compute_name]=databricks_compute.wait_for_completion(True)
 
     def publish_pipeline(self, pipeline, name_suffix=""):
         #name_pipeline = self.name_batch_pipeline
@@ -390,8 +442,22 @@ class ESMLPipelineFactory():
                 print("Edit at {}".format(initpy))
             self._script_names_dic["Custom code"] = initpy
 
-            # your_train_code.PY
+            # your_train_code.PY (optional: only needed to be implemented/used if not using AutoML)
             source_file = "your_train_code.py"
+            source = self._script_template_enterprise + "/your_code/" + source_file
+            target_file = self._snapshot_folder + "your_code/" + source_file
+            if(not only_info):
+                shutil.copy(source, target_file)
+
+            # iESMLPipelineStepMap (optional: only needed to be implemented/used if overriding compute, for certain steps)
+            source_file = "ESMLPipelineStepMap.py"
+            source = self._script_template_enterprise + "/your_code/" + source_file
+            target_file = self._snapshot_folder + "your_code/" + source_file
+            if(not only_info):
+                shutil.copy(source, target_file)
+
+            # iESMLSplitter (optional: only needed to be implemented/used if overriding ESMLSplitter logic)
+            source_file = "ESMLYourSplitter.py"
             source = self._script_template_enterprise + "/your_code/" + source_file
             target_file = self._snapshot_folder + "your_code/" + source_file
             if(not only_info):
@@ -424,6 +490,37 @@ class ESMLPipelineFactory():
         finally:
             os.chdir(old_loc)
         return self._script_names_dic
+
+    def use_advanced_compute_settings(self, iesml_pipelinestep_map, all_envs_in=None):
+        self._iesml_pipelinestep_map = iesml_pipelinestep_map
+
+        if(self._iesml_pipelinestep_map == None):
+            print("Now disabling ADVANCED COMPUTE SETTINGS,since setting self._iesml_pipelinestep_map=None")
+            return 
+
+        all_envs = None
+        dataset_folder_names = self.p.active_model['model_folder_name']
+
+        # Create & Attach Databricks compute based on map        
+        if (all_envs_in is None): 
+            all_envs = self.p.get_all_envs()
+        else:
+            all_envs = all_envs_in
+
+        if(self.p.inference_mode):
+            specific_mapping = iesml_pipelinestep_map.get_inference_map(dataset_folder_names)
+        else:
+            specific_mapping = iesml_pipelinestep_map.get_train_map(dataset_folder_names)
+
+        if(self._iesml_pipelinestep_map.has_dbx(specific_mapping)):
+            if (all_envs[self.p.dev_test_prod]['access_token'] == None or len(all_envs[self.p.dev_test_prod]['access_token']) <3):
+                secret_name = 'esml-project-dbx-token'
+                print("ESML info: No Databricks access token exists for environment config array {}. Now auto-fetching token from project keuvault, with secret name {}. Be sure you have a valid token here.".format(self.p.dev_test_prod,secret_name))
+                self.p.ws = self.p.get_workspace_from_config()
+                dbx_token = self.p.ws.get_default_keyvault().get_secret(name=secret_name)
+                all_envs['test']['access_token'] = dbx_token
+
+        self.create_compute_via_map(specific_mapping, all_envs)
 
     def create_batch_pipeline(self, pipeline_type=esml_pipeline_types.IN_2_GOLD_SCORING, same_compute_for_all=True, cpu_gpu_databricks="cpu", allow_reuse=True):
         p = self.p
@@ -540,16 +637,13 @@ class ESMLPipelineFactory():
         os.makedirs(self._snapshot_folder, exist_ok=True)
         m = None
 
-        if(pipeline_type != esml_pipeline_types.IN_2_GOLD): # Don't fetch model If we only want to REFINE data
-            #model = self.p.get_best_model_via_experiment_name(self.p.ws) 
-            model = self.p.get_best_model_via_modeltags_only(self.p.ws,self.p.experiment_name, filter_on_version=1) # Version=1 is the TEMPLATE "LakeStructure"...hence Model=1 and not 2...since placegolder data is always model_version=1
-            #self._batch_pipeline_parameters[0].default_value = model.version # If we are in DEV and have registered Model in TEST - seting default_value to LATEST model version (2,3,4), requires placeholder Data in Lake for VERSION
-            #print("Model version (get_best_model_via_modeltags_only): {}".format(model.version))
-
-            if(model is None):
-                print("Could not fetch BEST MODEL from Azure ML Studo - remotely.This might be the first time training model. \n - Now trying with local cache model.")
-                model =  self.p.BestModel
-            m = model.download(target_dir=self.get_snapshot_dir_relative(), exist_ok=True)
+        #if(pipeline_type != esml_pipeline_types.IN_2_GOLD): # Don't fetch model If we only want to REFINE data, or if we want to TRAIN a model. Only if we want to SCORE with model
+        #    model = self.p.get_best_model_via_modeltags_only(self.p.ws,self.p.experiment_name, filter_on_version=1) # Version=1 is the TEMPLATE "LakeStructure"...hence Model=1 and not 2...since placegolder data is always model_version=1
+        #
+        #    if(model is None):
+        #        print("Could not fetch BEST MODEL from Azure ML Studo - remotely.This might be the first time training model. \n - Now trying with local cache model.")
+        #        model =  self.p.BestModel
+        #    m = model.download(target_dir=self.get_snapshot_dir_relative(), exist_ok=True)
         return m
 
     def _create_parameters(self):
@@ -609,54 +703,55 @@ class ESMLPipelineFactory():
                 if(pipeline_type != esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type != esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
                     train=False
 
+                folder_names = self.p.active_model['dataset_folder_names']
+                advanced_mode = False
+                if(self._iesml_pipelinestep_map is not None):
+                    advanced_mode = True
+
+                ## LOOP Datasets
+                datasets_with_dbx = []
+                
                 for d in p.Datasets:
-                    if(same_compute_for_all and compute is not None):
-                        print("Reusing existing compute...")
-                        pass # we alreday have compute and runconfig
-                    elif(same_compute_for_all and compute is None):
-                        print("ESML will auto-create a compute...")
-                        if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
-                            if(d.cpu_gpu_databricks == "cpu"):
-                                compute, runconfig = self.init_cpu_environment(train,self._use_curated_automl_environment)
-                            elif(d.cpu_gpu_databricks == "databricks"):
-                                compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment)
-                            elif(d.cpu_gpu_databricks == "gpu"):
-                                compute, runconfig = self.init_gpu_environment(self._use_curated_automl_environment)
-                        else:  # User user configured RunConfig and compute. Custom
-                            runconfig = d.runconfig  # Each dataset can have different compute or environment
-                            compute = d.runconfig.target
-                    elif(same_compute_for_all == False):
-                        print("ESML will create separate compute, per SILVER-step to run in parallell...")
-                        compute_suffix_str = str(compute_suffix)
+                    if(advanced_mode):
+                        map = None
+                        if(self.p.inference_mode):
+                            map = self._iesml_pipelinestep_map.get_inference_map(folder_names)
+                        else:
+                            map = self._iesml_pipelinestep_map.get_train_map(folder_names)
 
-                        if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
-                            if(d.cpu_gpu_databricks == "cpu"):
-                                compute, runconfig = self.init_cpu_environment(train,self._use_curated_automl_environment,compute_suffix_str)
-                            elif(d.cpu_gpu_databricks == "databricks"):
-                                compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment,compute_suffix_str)
-                            elif(d.cpu_gpu_databricks == "gpu"):
-                                compute, runconfig = self.init_gpu_environment(self._use_curated_automl_environment,compute_suffix_str)
-                        else:  # User user configured RunConfig and compute. Custom
-                            runconfig = d.runconfig  # Each dataset can have different compute or environment
-                            compute = d.runconfig.target
-
-                        compute_suffix = compute_suffix+1
-
-                    # 1) Silver datasets (multiple)
-                    step_array.append(self.create_esml_step(d, compute,runconfig,esml_step_types.IN_2_SILVER)) 
-
+                        has_dbx,step_name,map_step = self._iesml_pipelinestep_map.get_dbx_map_step(map,d.Name)
+                        if(has_dbx):
+                            print("Dataset: {} has advanced mapping - an Azure Databricks mapping".format(d.Name))
+                            datasets_with_dbx.append(d.Name)
+                            compute_name = map_step['compute_name']
+                            dbx_compute = self._dbx_compute_dic[compute_name]
+                            step_array.append(self.create_dbx_step_in_2_silver(map=map,databricks_compute=dbx_compute,map_step=map_step,dataset=d,step_key=step_name)) # (d, compute,runconfig,esml_step_types.IN_2_SILVER))
+                        else:
+                            print("Dataset: {} has no advanced mapping.".format(d.Name))
+                            compute, runconfig = self.add_in2silver_step(same_compute_for_all, step_array, compute, compute_suffix, train, d)
+                    else:
+                        compute, runconfig = self.add_in2silver_step(same_compute_for_all, step_array, compute, compute_suffix, train, d)
+            
             gold_to_score= None
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
                 # 2) Gold to score (merge all silver datasets)
-                gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array)
+                if(advanced_mode):
+                    print("ESML advanced mode: with advanced compute mappings")
+                    gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array,datasets_with_dbx)
+                else:
+                    print("ESML regular mode")
+                    gold_to_score = self.create_gold_to_score_step(compute,runconfig,step_array)
                 step_array.append(gold_to_score)
             
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.GOLD_SCORING): # SCORING
                 if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
-                    step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
+                    if(advanced_mode):
+                        step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
+                    else:
+                        step_array.append(self.create_score_gold_step(compute,runconfig,gold_to_score))
                 elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
                     raise NotImplementedError("Not suppported in your ESML version. Please ask admin for private preview, or run IN_2_GOLD_SCORING instead of only GOLD_SCORING")
                     path_gold_to_score_template_latest = p.path_gold_to_score_template()
@@ -683,15 +778,60 @@ class ESMLPipelineFactory():
              self.p.inference_mode = old_mode
         return pipeline
 
-    def get_silver_as_inputs(self,silver_steps):
+    def add_in2silver_step(self, same_compute_for_all, step_array, compute, compute_suffix, train, d):
+        runconfig = None
+        compute = None
+
+        if(same_compute_for_all and compute is not None):
+            print("Reusing existing compute...")
+            pass # we alreday have compute and runconfig
+        elif(same_compute_for_all and compute is None):
+            print("ESML will auto-create a compute...")
+            if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
+                if(d.cpu_gpu_databricks == "cpu"):
+                    compute, runconfig = self.init_cpu_environment(train,self._use_curated_automl_environment)
+                elif(d.cpu_gpu_databricks == "databricks"):
+                    compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment)
+                elif(d.cpu_gpu_databricks == "gpu"):
+                    compute, runconfig = self.init_gpu_environment(self._use_curated_automl_environment)
+            else:  # User user configured RunConfig and compute. Custom
+                runconfig = d.runconfig  # Each dataset can have different compute or environment
+                compute = d.runconfig.target
+        elif(same_compute_for_all == False):
+            print("ESML will create separate compute, per SILVER-step to run in parallell...")
+            compute_suffix_str = str(compute_suffix)
+
+            if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
+                if(d.cpu_gpu_databricks == "cpu"):
+                    compute, runconfig = self.init_cpu_environment(train,self._use_curated_automl_environment,compute_suffix_str)
+                elif(d.cpu_gpu_databricks == "databricks"):
+                    compute, runconfig = self.init_databricks_environment(self._use_curated_automl_environment,compute_suffix_str)
+                elif(d.cpu_gpu_databricks == "gpu"):
+                    compute, runconfig = self.init_gpu_environment(self._use_curated_automl_environment,compute_suffix_str)
+            else:  # User user configured RunConfig and compute. Custom
+                runconfig = d.runconfig  # Each dataset can have different compute or environment
+                compute = d.runconfig.target
+
+            compute_suffix = compute_suffix+1
+
+                        # 1) Silver datasets (multiple)
+        step_array.append(self.create_esml_step(d, compute,runconfig,esml_step_types.IN_2_SILVER))
+        return compute,runconfig
+
+    def get_silver_as_inputs(self,silver_steps,datasets_with_dbx=None):
         silver_input_array = []
         silver_names = []
         for step in silver_steps:
-            out_ds = step._outputs[0] # Get output of step
-            name = out_ds.name
-            out_as_input = out_ds.as_input(name) # Convert as input
-            silver_names.append(name)
-            silver_input_array.append(out_as_input)
+            try:
+                out_ds = step._outputs[0] # Get output of step
+                name = out_ds.name
+                out_as_input = out_ds.as_input(name) # Convert as input
+                silver_names.append(name)
+                silver_input_array.append(out_as_input)
+            except Exception as e:
+                if(datasets_with_dbx is None):
+                    raise e
+
         return silver_input_array,silver_names
 
     def create_split_gold_step(self,compute, runconfig, gold_to_split_step):
@@ -715,7 +855,7 @@ class ESMLPipelineFactory():
         validate_path_out = validate_path.format(id_folder="{run-id}")
         test_path_out = test_path.format(id_folder="{run-id}")
         
-        print("ESML-train_path_out = ".format(train_path_out))
+        print("ESML-train_path_out = {}".format(train_path_out))
 
         #train_path = train_path + '*.parquet' # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/8e9792b1f7e84d40b3dd29dbc5a91a37/*.parquet
         #validate_path = validate_path + '*.parquet'
@@ -819,9 +959,9 @@ class ESMLPipelineFactory():
             "--par_aml_model_name", aml_model_name,
             "--project_number", p.project_folder_name,
             "--ml_type", p.active_model["ml_type"],
-            "--secret_name_tenant", esml_project.LakeAccess.storage_config["tenant"],
-            "--secret_name_sp_id",  esml_project.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-id"],
-            "--secret_name_sp_secret", esml_project.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-secret"],
+            "--secret_name_tenant", p.LakeAccess.storage_config["tenant"],
+            "--secret_name_sp_id",  p.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-id"],
+            "--secret_name_sp_secret", p.LakeAccess.storage_config["kv-secret-esml-projectXXX-sp-secret"],
             "--dev_resourcegroup_id", all_envs["dev"]["resourcegroup_id"],
             "--dev_workspace_name", all_envs["dev"]["workspace_name"],
             "--dev_subscription_id", all_envs["dev"]["subscription_id"],
@@ -1044,12 +1184,28 @@ class ESMLPipelineFactory():
         return step_score_gold
 
     
-    def create_gold_to_score_step(self,compute, runconfig, silver_steps):
+    def create_gold_to_score_step(self,compute, runconfig, silver_steps,datasets_with_dbx=None):
         p = self.p
+        datasets_list_with_dbx = None
+        previous_step_is_databricks_step = False
+        esml_input_lake_template = p.path_in2silver_template(p.inference_mode)
+
+        for n in datasets_with_dbx:
+            print(n)
+
+        if (datasets_with_dbx is not None and len(datasets_with_dbx) > 0):
+            datasets_list_with_dbx = ' '.join(datasets_with_dbx)
+            previous_step_is_databricks_step = True
+
+        print("datasets_list_with_dbx", datasets_list_with_dbx)
+
         next_step_is_databricks_step = False # TODO: Figure this via "runconfig.target = amlcompute or databricks"
 
         # INPUT - All silver outputs as input
-        silver_input_array,silver_names = self.get_silver_as_inputs(silver_steps)
+        if(previous_step_is_databricks_step):
+            silver_input_array,silver_names = self.get_silver_as_inputs(silver_steps,datasets_with_dbx)
+        else:
+            silver_input_array,silver_names = self.get_silver_as_inputs(silver_steps)
 
         # OUT: gold_to_score_folder = gold_to_score_path+'{run-id}'
         gold_to_score_folder = ""
@@ -1073,7 +1229,6 @@ class ESMLPipelineFactory():
             else: 
                 gold_to_score_folder = gold_to_score_folder + "1_latest/"
 
-
         gold_to_score = (
             OutputFileDatasetConfig(name=gold_to_score_name,destination=(self._datalake,gold_to_score_folder))
             .as_upload(overwrite=True) # as_mount() also works
@@ -1094,7 +1249,9 @@ class ESMLPipelineFactory():
             "--esml_output_lake_template",path_gold_to_score_template_pars,
             "--par_esml_env", self.batch_pipeline_parameters[3], # optional - good for logging purpose
             "--par_esml_inference_mode", self.batch_pipeline_parameters[4], #
-            "--esml_optional_unique_scoring_folder", self.batch_pipeline_parameters[2] # optional parameter
+            "--esml_optional_unique_scoring_folder", self.batch_pipeline_parameters[2], # optional parameter
+            "--steps_with_dbx", datasets_list_with_dbx,
+            "--esml_input_lake_template", esml_input_lake_template
             ],
             inputs=silver_input_array,
             outputs=[gold_to_score],
@@ -1236,6 +1393,67 @@ class ESMLPipelineFactory():
         print("Environment {} exists".format(self._esml_automl_lts_env_name))
         return automl_esml_env
 
+    def create_dbx_step_in_2_silver(self,map,databricks_compute,map_step,dataset,step_key = "in2silver_ds01_diabetes",
+    par_date_utc="1000-01-01 10:35:01.243860",
+    par_model_version=0,
+    par_inference_mode=0,
+    par_env="1000-01-01 10:35:01.243860"
+    ):
+        # IN Dataset: Can be .csv or .parquet
+        in_template, in_name, input_path, out_name, out_path, script_name_template,ds_IN = self.set_step_vars(dataset, esml_step_types.IN_2_SILVER)
+        #print("Scoring IN full path, template: {}".format(input_path))
+
+        # OUT Dataset always .parquet
+        path = out_path + "{run-id}/"
+        ds_OUT = (
+            OutputFileDatasetConfig(
+                name=out_name,
+                destination=(self._datalake, path))  # partition_format='/{PipelineUniqueRunId}/silver.parquet'
+            .as_upload(overwrite=True)
+            .read_parquet_files()
+            .register_on_complete(name=out_name)
+        )
+
+        #  IN/OUT datastores 2 - datastore = Datastore(p.ws, 'workspaceblobstore')
+        data_store = self.p.Lakestore
+        in_dataref_dummy = DataReference(datastore=data_store, path_on_datastore=input_path,data_reference_name=in_name)
+        out_data_ref_real = PipelineData(name=out_name, datastore=data_store, pipeline_output_name=out_name)
+
+        # END
+
+        # ESML date_time folder
+        param_date = PipelineParameter(name="esml_date", default_value=par_date_utc)
+        param_model_version = PipelineParameter(name="esml_model_version", default_value=par_model_version)
+        param_inference = PipelineParameter(name="esml_inference_mode", default_value=par_inference_mode)
+        param_env = PipelineParameter(name="esml_env", default_value=par_date_utc)
+
+        #my_path = map[step_key]['code']
+        my_path = map_step['code']
+        dbx_notebook_name = os.path.basename(os.path.normpath(my_path))
+        dbx_notebook_name = dbx_notebook_name.replace(" ", "_")
+
+        #step_key = 'in2silver_{}'.format(step_index) # ds01_diabetes
+        notebook_path=my_path # Databricks notebook path
+        cluster_id = map_step['cluster_id']
+        compute_name_conf = map_step['compute_name']
+
+        if(compute_name_conf != databricks_compute.name):
+            raise UserErrorException("NB! compute_name_conf != databricks_compute.name - strange?")
+
+        name = step_key # + "_"+dbx_notebook_name
+        dbNbStep = DatabricksStep(
+            name=name,
+            inputs=[in_dataref_dummy], # [ds_IN.as_named_input(in_name)],
+            outputs=[ds_OUT],  # optional, adds to
+            notebook_path=notebook_path,
+            notebook_params={'esml_date': param_date ,'esml_model_version': param_model_version,'esml_inference_mode': param_inference,'esml_env': param_env},
+            run_name=dbx_notebook_name,
+            compute_target=databricks_compute,
+            allow_reuse=True,
+            existing_cluster_id=cluster_id,
+            permit_cluster_restart=True
+        )
+        return dbNbStep
     def init_databricks_environment(self):
         pass
 
@@ -1295,11 +1513,6 @@ class ESMLPipelineFactory():
 
 #endregion
 
-#region TRAIN pipeline
-    def create_training_pipe(self):
-        pass
-
-#endregion
 
 #region PUBLIC - Util
     def describe(self):

@@ -9,6 +9,7 @@ class IESMLTrainer:
     _esml_model_alias = "M10"
     _esml_current_env = "dev"
     _ml_type = "classification"
+    _label = None
 
     _df_train = None
     _df_validate = None
@@ -16,7 +17,7 @@ class IESMLTrainer:
     _df_other = None
     _scoring_dictionary = {}
     
-    def __init__(self, aml_model_name,esml_model_name, esml_model_alias, esml_current_env, ml_type, train_df,validate_df,test_df, other_df=None):
+    def __init__(self, aml_model_name,esml_model_name, esml_model_alias, esml_current_env, ml_type, train_df,validate_df,test_df, target_column_name=None, other_df=None):
         self._model_name = aml_model_name
         self._esml_model_name = esml_model_name
         self._esml_model_alias = esml_model_alias
@@ -29,6 +30,7 @@ class IESMLTrainer:
         
         self._df_other = other_df
         self._experiment_name = self._esml_model_name #+ "_TRAIN"
+        self._label = target_column_name
 
     @classmethod
     def version(self): return "1.4"
@@ -43,7 +45,7 @@ class IESMLTrainer:
     # Track with MLFlow: https://docs.microsoft.com/en-us/azure/machine-learning/tutorial-train-deploy-notebook
     ###
     @abstractmethod
-    def train(self,train_aml_ds, validate_aml_ds):raise NotImplementedError
+    def train(self,train_aml_ds, validate_aml_ds,target_column_name=None):raise NotImplementedError
 
     #@abstractmethod
     #def compare_scoring_current_vs_new_model(self, target_environment = None): raise NotImplementedError
