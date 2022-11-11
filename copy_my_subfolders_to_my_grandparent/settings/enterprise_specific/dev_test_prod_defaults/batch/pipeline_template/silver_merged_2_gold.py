@@ -37,9 +37,14 @@ esml_scoring_date_out = date_infolder.strftime('%Y/%m/%d') #  Save scoring same 
 
 has_dbx = False
 if (steps_with_dbx_array is not None and len(steps_with_dbx_array) > 0):
-    has_dbx = True
     print("Looping: steps_with_dbx_array:")
     for step_name in steps_with_dbx_array:
+        if(len(step_name)> 2):
+            has_dbx = True
+        else:
+            has_dbx = False
+            print(" Invalid Databricks step name - needs to be more than 2 characters")
+            break
         print(" - {}".format(step_name))
 
 run = Run.get_context()
