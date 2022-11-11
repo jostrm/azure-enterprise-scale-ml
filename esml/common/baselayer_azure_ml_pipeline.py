@@ -1194,7 +1194,7 @@ class ESMLPipelineFactory():
             datasets_list_with_dbx = ' '.join(datasets_with_dbx)
             previous_step_is_databricks_step = True
         else:
-            datasets_list_with_dbx = ""
+            datasets_list_with_dbx = "" # Else "None" will be sent as at dataset name...
 
         print("datasets_list_with_dbx", datasets_list_with_dbx)
 
