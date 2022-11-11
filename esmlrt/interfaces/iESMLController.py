@@ -663,7 +663,7 @@ class IESMLController:
 # returns: model_registered_in_target
 ###
 
-    def register_model(self,source_ws, target_env, source_model=None, run=None, esml_status=None,extra_model_tags=None):
+    def register_model(self,source_ws, target_env, source_model=None, run=None, esml_status=None,model_path=None,extra_model_tags=None):
         #input
         source_env = self.dev_test_prod
         source_ws_name = source_ws.name
@@ -713,7 +713,7 @@ class IESMLController:
                 #    print(e)
 
                 #print("registering model with name: {}, from run.".format(model_name))
-                model_registered_in_target = self._register_model_on_run(source_model,model_name,source_env,source_ws_name,run,experiment,esml_status,extra_model_tags)
+                model_registered_in_target = self._register_model_on_run(source_model,model_name,source_env,source_ws_name,run,experiment,esml_status,model_path,extra_model_tags)
             else: # fall back...
                 model_registered_in_target, model_source = self._register_model_in_correct_workspace("dev", dev_workspace, "dev",new_model=model,esml_status=esml_status)
 
@@ -747,7 +747,7 @@ class IESMLController:
             ml_flow_stage = "Production"
         return ml_flow_stage
 
-    def _register_model_on_run(self,source_model_to_copy_tags_from,model_name, source_env,source_ws_name, remote_run, experiment, esml_status=None, extra_model_tags=None):
+    def _register_model_on_run(self,source_model_to_copy_tags_from,model_name, source_env,source_ws_name, remote_run, experiment, esml_status=None,model_path=None, extra_model_tags=None):
         #remote_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific) # 2022-08-08 do not READ anything to disk/file
         #  # 2022-05-02: best_run.run_id -> AttributeError: 'Run' object has no attribute 'run_id'
 
@@ -789,7 +789,13 @@ class IESMLController:
             #tags.update(extra_model_tags) # status_code : {'status_code': 'esml_newly_trained', 'trained_with': 'AutoMLRun'}
 
         print("model_name at remote_run.register_model: ", model_name)
-        model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
+        print("model_path (will override model_name when register) at remote_run.register_model: ", model_path)
+        model = None
+        if(model_path is not None):
+            model = remote_run.register_model(model_name=model_name,model_path=model_path, tags=tags, description="") # Works, if manual ML you need to specify path where you saved model.
+        else:
+            model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
+            
         
         #model_path = "outputs/model.pkl"
         #print("model_name: before remote_run.register_model {} and model_path {}".format(model_name,model_path))

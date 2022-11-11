@@ -7,7 +7,7 @@
 # Azure ML and AutoML version (2022-11-10)
 - 1.47
 # Tested OK history: fresh install on DSVM, with MiniConda, started in Admin mode
-- 2022-11-10: 1st test. 
+- 2022-11-10: 1st test. Error:
     - 1) `Vanilla Azure ML AutoML 1.47 install` (no ESML pip to fix datalake gen2, keyvault). Before: p.ws.update(v1_legacy_mode=True)
         - Error: `ModuleNotFoundError: No module named 'azure.keyvault'`
         - ---> 26 from azure.keyvault.secrets import SecretClient
@@ -17,8 +17,14 @@
         - Error: `ModuleNotFoundError: No module named 'azure.keyvault'`
     - 3) After: `ESML pip install fix:kv` (adding Azure keyvault dependencies, but not pip for azure-datalake)
         - Error: `ModuleNotFoundError: No module named 'azure.storage.filedatalake`
+            - esml/common/`storage_factory.py`
+            - 33 from baselayer_azure import AzureBase
     - 4) After: `ESML pip install fix:kv+lake` ()
+        - lake: 12.6.0
+        - secrets==4.3.0
+        - keyvault==4.10
+        - Error (duet to ESML dependency): `ModuleNotFoundError: No module named seaborn`
+            - `esml/common/baselayer_ml.py:13`
+    - 5) After adding seaborn: 
+        - 
     
-
-ModuleNotFoundError: No module named 'azure.keyvault'
-- Next test: 2022-12-01:

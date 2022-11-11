@@ -29,7 +29,7 @@ dependencies:
   - azure-keyvault-keys==4.4.0
   - azure-keyvault-secrets==4.3.0
   - azure-keyvault-certificates~=4.3.0
-  #- seaborn==0.11.1 # ESML optional for reporting (todo remove this dependancy)
+  - seaborn==0.11.1 # ESML optional for reporting (todo remove this dependancy)
   - azure-storage-file-datalake==12.6.0 # ESML required to write files to GEN 2 - Bronze,Silver,Gold
   # ESML END
   # Required packages for AzureML execution, history, and data preparation.

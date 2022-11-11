@@ -2,7 +2,7 @@
 $deplName = '24-add-aks'
 $commonRGNamePrefix = 'abc-def-'
 $commonResourceSuffix = '-001'
-$aifactorySuffixRG = '-004'
+$aifactorySuffixRG = '-001'
 
 $tags = @{
     "Application Name" = "Enterprise Scale ML (ESML)"
@@ -17,10 +17,10 @@ $tags = @{
    }
 
 $location = 'westeurope'
-$projectNumber = '003'
+$projectNumber = '001'
 $env = 'dev'
 $locationSuffix = 'weu'
-$prjResourceSuffix = '-002'
+$prjResourceSuffix = '-001'
 
 $rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
 Write-Host "RG" $rg
@@ -28,7 +28,7 @@ Write-Host "RG" $rg
 $vnetNameBase = 'vnt-esmlcmn'
 
 ####### AKS Specific
-$aksSuffix = '4'
+$aksSuffix = '' # 1 char only
 
 $ownSSL = 'disabled'
 $aksCert = ''

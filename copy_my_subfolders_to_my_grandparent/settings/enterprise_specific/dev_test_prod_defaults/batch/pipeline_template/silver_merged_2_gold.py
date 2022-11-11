@@ -35,13 +35,12 @@ steps_with_dbx_array = args.steps_with_dbx
 date_infolder = datetime.datetime.strptime(args.par_esml_scoring_date, '%Y-%m-%d %H:%M:%S.%f')
 esml_scoring_date_out = date_infolder.strftime('%Y/%m/%d') #  Save scoring same date as IN-data 'in/2020/01/01' for 'gold_scored/2020/01/01'
 
-print("Looping: steps_with_dbx_array:")
-for step_name in steps_with_dbx_array:
-    print(" - {}".format(step_name))
-
 has_dbx = False
 if (steps_with_dbx_array is not None and len(steps_with_dbx_array) > 0):
     has_dbx = True
+    print("Looping: steps_with_dbx_array:")
+    for step_name in steps_with_dbx_array:
+        print(" - {}".format(step_name))
 
 run = Run.get_context()
 ws = run.experiment.workspace

@@ -70,7 +70,7 @@ class ESMLController(IESMLController):
         else:
             model_source = new_model
 
-        # GET PICKLE MODEL
+        # GET PICKLE MODEL - Save locally. Does not matter what path or name. 
         full_local_path = os.path.join(temp_dir, "esml",self._esml_project_folder_name,self._esml_model_alias)
         full_local_path = os.path.join(full_local_path, pkl_name)
         m = model_source.download(target_dir=full_local_path, exist_ok=True)

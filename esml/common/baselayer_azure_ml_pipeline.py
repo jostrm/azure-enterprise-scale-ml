@@ -1190,9 +1190,6 @@ class ESMLPipelineFactory():
         previous_step_is_databricks_step = False
         esml_input_lake_template = p.path_in2silver_template(p.inference_mode)
 
-        for n in datasets_with_dbx:
-            print(n)
-
         if (datasets_with_dbx is not None and len(datasets_with_dbx) > 0):
             datasets_list_with_dbx = ' '.join(datasets_with_dbx)
             previous_step_is_databricks_step = True

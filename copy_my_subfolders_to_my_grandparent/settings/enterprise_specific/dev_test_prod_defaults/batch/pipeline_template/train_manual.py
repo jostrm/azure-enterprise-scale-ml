@@ -267,7 +267,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
     print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
-        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
+        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=full_local_path)
         print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
