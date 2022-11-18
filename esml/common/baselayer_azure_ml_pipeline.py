@@ -1223,10 +1223,11 @@ class ESMLPipelineFactory():
             path_gold_to_score_template_pars = p.path_gold_to_score_template(False,True,False) # projects/project002/11_diabetes_model_reg/train/gold/dev/{id_folder}/
             gold_to_score_name = p.dataset_gold_name_azure
             gold_to_score_folder = p.path_gold_to_score_template(False,False,False)
-            if(next_step_is_databricks_step):
-                gold_to_score_folder = gold_to_score_folder + "gold_dbx.parquet"
-            else: 
-                gold_to_score_folder = gold_to_score_folder + "1_latest/"
+            
+        if(next_step_is_databricks_step):
+            gold_to_score_folder = gold_to_score_folder + "gold_dbx.parquet"
+        else: 
+            gold_to_score_folder = gold_to_score_folder + "1_latest/"
 
         gold_to_score = (
             OutputFileDatasetConfig(name=gold_to_score_name,destination=(self._datalake,gold_to_score_folder))
@@ -1428,6 +1429,9 @@ class ESMLPipelineFactory():
 
         #my_path = map[step_key]['code']
         my_path = map_step['code']
+        dataset_filename_ending = map_step['dataset_filename_ending']
+        dataset_folder_names = map_step['dataset_folder_names']
+
         dbx_notebook_name = os.path.basename(os.path.normpath(my_path))
         dbx_notebook_name = dbx_notebook_name.replace(" ", "_")
 
@@ -1445,7 +1449,9 @@ class ESMLPipelineFactory():
             inputs=[in_dataref_dummy], # [ds_IN.as_named_input(in_name)],
             outputs=[ds_OUT],  # optional, adds to
             notebook_path=notebook_path,
-            notebook_params={'esml_date': param_date ,'esml_model_version': param_model_version,'esml_inference_mode': param_inference,'esml_env': param_env},
+            notebook_params={'esml_date': param_date ,'esml_model_version': param_model_version,'esml_inference_mode': param_inference,
+            'esml_env': param_env,'dataset_filename_ending':dataset_filename_ending,'dataset_names_in':dataset_folder_names
+            },
             run_name=dbx_notebook_name,
             compute_target=databricks_compute,
             allow_reuse=True,

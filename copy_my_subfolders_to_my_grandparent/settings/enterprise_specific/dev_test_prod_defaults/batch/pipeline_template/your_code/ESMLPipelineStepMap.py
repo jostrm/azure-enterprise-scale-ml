@@ -29,12 +29,15 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
         step4 = 'silver_merged_2_gold'
         #step5 = 'train_split_and_register'
         step6 = 'train_manual'
+        dataset_folder_names_str = self.get_dataset_folders_as_csv_string(dataset_folder_names)
+        star_csv = "*.csv"
+        star_parquet = "*.parquet"
 
         self.IN_2_GOLD_TRAIN_notebook_mapping= [
-           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'compute_name':'s-p001-aml-rt91','cluster_id':'1234-999888-wimps123'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
-           #{'step_name': step2, 'code': script,'compute_type':self._compute_type_py, 'date_folder_or': '2021-01-01 10:35:01.243860','compute_name':'s-p001-aml-rt91', 'cluster_id':'1234-999888-wimps123'},
-           {'step_name': step4,'code': nb4,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'compute_name':'s-p001-aml-rt91','cluster_id':'1234-999888-wimps123'}, # MERGE 2 GOLD
-           {'step_name': step6,'code': nb6,'compute_type':self._compute_type_dbx,'date_folder_or': None, 'compute_name':'s-p001-aml-rt91','cluster_id':'1234-999888-wimps123'} # TRAIN & Register model
+           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
+           #{'step_name': step2, 'code': script,'compute_type':self._compute_type_py, 'date_folder_or': '2021-01-01 10:35:01.243860', 'dataset_folder_names':dataset_folder_names,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'},
+           {'step_name': step4,'code': nb4,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'}, # MERGE 2 GOLD
+           {'step_name': step6,'code': nb6,'compute_type':self._compute_type_dbx,'date_folder_or': None, 'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'} # TRAIN & Register model
         ]
 
         return self.IN_2_GOLD_TRAIN_notebook_mapping
@@ -54,11 +57,14 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
        step1 = 'in2silver_{}'.format(dataset_folder_names[0])
        step2 = 'in2silver_{}'.format(dataset_folder_names[1])
        step4 = 'silver_merged_2_gold'
+       dataset_folder_names_str = self.get_dataset_folders_as_csv_string(dataset_folder_names)
+       star_csv = "*.csv"
+       star_parquet = "*.parquet"
 
        self.IN_2_GOLD_SCORE_notebook_mapping = [
-           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'compute_name':'s-p001-aml-rt91', 'cluster_id':'1234-999888-wimps123'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
-           #{'step_name': step2,  'code': script,'compute_type':self._compute_type_py, 'date_folder_or': '2021-01-01 10:35:01.243860','compute_name':'s-p001-aml-rt91', 'cluster_id':'1234-999888-wimps123'},
-           {'step_name': step4, 'code': nb4,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'compute_name':'s-p001-aml-rt91', 'cluster_id':'1234-999888-wimps123'} # MERGE 2 GOLD
+           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91', 'cluster_id':'0912-204847-wimps924'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
+           #{'step_name': step2,  'code': script,'compute_type':self._compute_type_py, 'date_folder_or': '2021-01-01 10:35:01.243860','compute_name':'s-p002-aml-rt91', 'cluster_id':'0912-204847-wimps924'},
+           {'step_name': step4, 'code': nb4,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91', 'cluster_id':'0912-204847-wimps924'} # MERGE 2 GOLD
            #Note: SCORE GOLD & SAVE - is done by ESML PythonscriptStep in pipeline
        ]
 
