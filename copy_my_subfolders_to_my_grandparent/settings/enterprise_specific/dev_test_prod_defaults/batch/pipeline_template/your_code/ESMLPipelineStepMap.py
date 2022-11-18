@@ -29,7 +29,7 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
         step4 = 'silver_merged_2_gold'
         #step5 = 'train_split_and_register'
         step6 = 'train_manual'
-        dataset_folder_names_str = self.get_dataset_folders_as_csv_string(dataset_folder_names)
+        dataset_folder_names_str = ESMLPipelineStepMap.get_dataset_folders_as_csv_string(dataset_folder_names)
         star_csv = "*.csv"
         star_parquet = "*.parquet"
 
@@ -57,7 +57,7 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
        step1 = 'in2silver_{}'.format(dataset_folder_names[0])
        step2 = 'in2silver_{}'.format(dataset_folder_names[1])
        step4 = 'silver_merged_2_gold'
-       dataset_folder_names_str = self.get_dataset_folders_as_csv_string(dataset_folder_names)
+       dataset_folder_names_str = ESMLPipelineStepMap.get_dataset_folders_as_csv_string(dataset_folder_names)
        star_csv = "*.csv"
        star_parquet = "*.parquet"
 
@@ -69,3 +69,11 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
        ]
 
        return self.IN_2_GOLD_SCORE_notebook_mapping
+
+    @staticmethod
+    def get_dataset_folders_as_csv_string(dataset_folder_names):
+        if (dataset_folder_names is not None and len(dataset_folder_names) > 0):
+            dataset_folder_names = ','.join(dataset_folder_names)
+        else:
+            dataset_folder_names = ""
+        return dataset_folder_names
