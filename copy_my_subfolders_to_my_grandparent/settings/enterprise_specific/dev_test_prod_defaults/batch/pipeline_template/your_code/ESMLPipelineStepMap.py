@@ -36,8 +36,8 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
         self.IN_2_GOLD_TRAIN_notebook_mapping= [
            {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
            #{'step_name': step2, 'code': script,'compute_type':self._compute_type_py, 'date_folder_or': '2021-01-01 10:35:01.243860', 'dataset_folder_names':dataset_folder_names,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'},
-           {'step_name': step4,'code': nb4,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'}, # MERGE 2 GOLD
-           {'step_name': step6,'code': nb6,'compute_type':self._compute_type_dbx,'date_folder_or': None, 'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'} # TRAIN & Register model
+           #{'step_name': step4,'code': nb4,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'}, # MERGE 2 GOLD
+           #{'step_name': step6,'code': nb6,'compute_type':self._compute_type_dbx,'date_folder_or': None, 'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'} # TRAIN & Register model
         ]
 
         return self.IN_2_GOLD_TRAIN_notebook_mapping
