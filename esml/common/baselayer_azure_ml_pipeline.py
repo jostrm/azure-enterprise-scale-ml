@@ -1140,7 +1140,11 @@ class ESMLPipelineFactory():
         name_incl_env = name_auto + " ["+self.batch_pipeline_parameters[3].default_value +"]"
         name_incl_env = "TRAIN in "+ " ["+self.batch_pipeline_parameters[3].default_value +"]" +", COMPARE & REGISTER model in " + "["+self.batch_pipeline_parameters[3].default_value +"] & PROMOTE to [test]"
 
+        print("Fetching all ESML environments")
+
         all_envs = p.get_all_envs()
+
+        print("Environments fetched")
         step_train_gold = PythonScriptStep(
             runconfig=runconfig,
             script_name=self._train_manual_filename,
@@ -1177,6 +1181,7 @@ class ESMLPipelineFactory():
             allow_reuse=self._allow_reuse
         )
 
+        print("PythonScriptStep TRAIN created")
         return step_train_gold
 
     def create_post_AutoMLStep(self,compute, runconfig, gold_to_split_step, train_automl_step,model_data,metrics_data):
