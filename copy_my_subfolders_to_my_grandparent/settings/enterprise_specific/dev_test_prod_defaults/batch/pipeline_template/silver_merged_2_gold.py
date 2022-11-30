@@ -93,7 +93,7 @@ if(has_dbx):
         suffix = "silver_dbx.parquet/*.parquet"
         
         # 1) DATABRICKS generated PARQUET
-        dataset_name = steps_with_dbx_array[0] # TODO: EDIT/ADD how many datasets from databricks you want to work with
+        dataset_name = steps_with_dbx_array[0] # TODO 4 YOU: EDIT/ADD how many datasets from databricks you want to work with
         if(esml_inference_mode == True): # res.format(esml_dataset='ds01_diabetes',esml_env='dev')
             input_path = args.esml_input_lake_template.format(esml_dataset=dataset_name, esml_env=esml_env,model_version=esml_model_version)
         else:
@@ -133,7 +133,7 @@ if(has_dbx):
         df2 = aml_ds2.to_pandas_dataframe()
     
 else:
-    # CPU STEPS
+    # AML COMPUTE STEPS only
     aml_ds = next(iter(run.input_datasets.items()))[1] 
     df = aml_ds.to_pandas_dataframe()
 

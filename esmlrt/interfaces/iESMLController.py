@@ -67,7 +67,7 @@ class IESMLController:
     mflow_stage_none = "None" # esml_status_new = newly trained model in Dev environment, e.g. R&D phase.
     mflow_stage_staging = "Staging" # esml_status_promoted_in_dev esml_status_promoted_2_test  = (Promoted in "Dev" or to "Test" environmet. MLFlow model registry does not have this granularity)
     mflow_stage_production = "Production" # esml_status_promoted_2_prod
-    mflow_stage_none = "Archive" # esml_status_not_new = To demote a model.
+    mflow_stage_archive = "Archive" # esml_status_not_new = To demote a model.
 
     @classmethod
     def version(self): return "1.4"
