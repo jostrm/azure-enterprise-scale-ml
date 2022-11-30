@@ -1,13 +1,6 @@
-import json
-import logging
 import os
-import pickle
 import numpy as np
 import pandas as pd
-import joblib
-import azureml.automl.core
-from azureml.automl.core.shared import logging_utilities, log_server
-from azureml.telemetry import INSTRUMENTATION_KEY
 import argparse
 from azureml.core import Run
 from azureml.data.dataset_factory import FileDatasetFactory
@@ -21,15 +14,7 @@ from esmlrt.interfaces.iESMLTrainer import IESMLTrainer
 from esmlrt.runtime.ESMLController import ESMLController
 from esmlrt.runtime.ESMLModelCompare2 import ESMLModelCompare
 from esmlrt.runtime.ESMLTestScoringFactory2 import ESMLTestScoringFactory
-
 from your_code.your_custom_code import In2GoldProcessor
-
-try: # not needed, but since AutoML scoring script copied, we'll keep this logging.
-    log_server.enable_telemetry(INSTRUMENTATION_KEY)
-    log_server.set_verbosity('INFO')
-    logger = logging.getLogger('azureml.automl.core.scoring_script')
-except:
-    pass
 
 def init():
     global model, probabilities, gold_to_score_df, output_scored_gold,datastore,historic_path,last_gold_run,run_id,active_folder,date_in,model_version_in
@@ -100,7 +85,7 @@ def init():
 
         gold_to_score = next(iter(run.input_datasets.items()))[1] # Get DATASET
         #gold_to_score = Dataset.get_by_name(workspace=ws, name=args.input_gold_name) # Fetch registered dataset to SCORE
-        logger.info("Azure Dataset GOLD to score, loaded successfully. {}".format(gold_to_score.name))
+        print("Azure Dataset GOLD to score, loaded successfully. {}".format(gold_to_score.name))
         
         # PATHS - save in 2 places
         # 1) Save LATEST GOLD_SCORED - for Azure Data factory able to know the PATH, since static in time, able to "WriteBack" scored data
@@ -133,16 +118,13 @@ def init():
         
         ################### EDIT optional things to do before scoring END #########################
 
-        logger.info("scoring_gold.py.init() success")
         print("scoring_gold.py.init() success")
         return True # Went OK
     except Exception as e:
-        logging_utilities.log_traceback(e, logger)
         raise
 
 def run(gold_to_score_df):
     try:
-        logger.info("model.predict with gold_to_score")
         data = gold_to_score_df.reset_index(drop=True) # Make sure index is gone
         result = model.predict(data)
 
@@ -176,12 +158,12 @@ def run(gold_to_score_df):
         df_out = custom_code.scored_gold_post_process_M11_DEMO()
         # ###############  Custom code above  #####################
         
-        logger.info("Saving prediction to GOLD_SCORED dataset")
+        print("Saving prediction to GOLD_SCORED dataset")
         if not (output_scored_gold is None):
             os.makedirs(output_scored_gold, exist_ok=True)
             print("%s created" % output_scored_gold)
             path = output_scored_gold + "/gold_scored.parquet"
-            logger.info("Saving result as PARQUET at: {}".format(path))
+            print("Saving result as PARQUET at: {}".format(path))
             written_df = df_out.to_parquet(path,engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
             # Alt 2) Note: This can also be done by Azure Data factory instead of this CPU cluster node. In a ADF Copy activity, post this pipeline, using 'latest_batch_score_run.csv file that has the 'historic_path'
@@ -193,7 +175,7 @@ def run(gold_to_score_df):
             os.makedirs(last_gold_run, exist_ok=True)
             print("%s created" % last_gold_run)
             path_last_gold_run = last_gold_run + "/"+last_gold_run_filename
-            logger.info("Saving last_gold_run.csv at: {}".format(path_last_gold_run))
+            print("Saving last_gold_run.csv at: {}".format(path_last_gold_run))
 
             # create the pandasd dataframe with meta, save to .csv for "Azure datafactory WriteBack pipeline/step" to use
             date_now_str = str(datetime.datetime.now())
@@ -209,7 +191,6 @@ def run(gold_to_score_df):
             path_active_folder = active_folder + "/"+last_gold_run_filename
             written_df3 = df2.to_csv(path_active_folder, encoding='utf-8',index=False) # DUMMY 2nd Write needed?
     except Exception as e:
-        logging_utilities.log_traceback(e, logger)
         raise
 
 from scipy.sparse import issparse

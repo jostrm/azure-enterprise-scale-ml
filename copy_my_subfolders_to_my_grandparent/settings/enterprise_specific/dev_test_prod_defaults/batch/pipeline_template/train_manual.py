@@ -1,14 +1,5 @@
-from ctypes import wstring_at
-import json
-import logging
 import os
-import pickle
-import numpy as np
 import pandas as pd
-import joblib
-import azureml.automl.core
-from azureml.automl.core.shared import logging_utilities, log_server
-from azureml.telemetry import INSTRUMENTATION_KEY
 import argparse
 from azureml.core import Run
 from azureml.data.dataset_factory import FileDatasetFactory
@@ -23,14 +14,6 @@ from esmlrt.runtime.ESMLModelCompare2 import ESMLModelCompare
 from esmlrt.runtime.ESMLTestScoringFactory2 import ESMLTestScoringFactory
 from your_code.your_train_code import Trainer
 from azureml.core import Dataset
-import tempfile
-
-try: # not needed, but since AutoML scoring script copied, we'll keep this logging.
-    log_server.enable_telemetry(INSTRUMENTATION_KEY)
-    log_server.set_verbosity('INFO')
-    logger = logging.getLogger('azureml.automl.core.scoring_script')
-except:
-    pass
 
 def init():
     global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws
@@ -70,7 +53,7 @@ def init():
        
     
     args = parser.parse_args()
-    logger.info("init() started...")
+    print("init() started - train manual...")
 
     try:
         model_version_in = int(args.par_esml_model_version) # Model version to compare scoring with (MLOps INNER LOOOP)
@@ -105,11 +88,11 @@ def init():
 
         if_user_implmeneted_model_compare = False
         if(if_user_implmeneted_model_compare):
-            logger.info("Loading model version {} from path: model.pkl to compare the future trained model with (version 0 if first time)".format(model_version_in))
+            print("Loading model version {} from path: model.pkl to compare the future trained model with (version 0 if first time)".format(model_version_in))
             try:
                 # ###############  Custom code below - Load model. Tip: Look at how ESML loads model with AutoML automatically
                 #prev_model = joblib.load("model.pkl")
-                logger.info("Loading previous registered (current winning model) - success - model.pkl")
+                print("Loading previous registered (current winning model) - success - model.pkl")
                 # ###############  Custom code below -  Load model
             except:
                 pass
@@ -124,7 +107,6 @@ def init():
         validate_ds = next(it1)[1] # Get 2nd DATASET: GOLD_VALIDATE
         test_ds = next(it1)[1] # Get 3rd DATASET: GOLD_TEST
 
-        logger.info("Azure ML Dataset Train, Validate, Test loaded successfully. {}, {}, {}".format(train_ds.name,validate_ds.name,test_ds.name))
         print("Azure ML Dataset Train, Validate, Test loaded successfully. {}, {}, {}".format(train_ds.name,validate_ds.name,test_ds.name))
         print("Azure ML Dataset Tran is of TYPE: {}".format(type(train_ds)))
 
@@ -152,15 +134,13 @@ def init():
         # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{8e9792b1f7e84d40b3dd29dbc5a91a37}/
         
 
-        logger.info("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")
+        print("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")
 
     except Exception as e:
-        logging_utilities.log_traceback(e, logger)
         raise
 
 def train(train_ds,validate_ds,test_ds):
     try:
-        logger.info("train() started...")
         print("train() started...")
         test_scoring = None # IESMLTestScoringFactory
         comparer = None # IESMLModelCompare
@@ -182,7 +162,6 @@ def train(train_ds,validate_ds,test_ds):
 
 
     except Exception as e:
-        logging_utilities.log_traceback(e, logger)
         raise
 
 def train_test_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_current_env, train_ds,validate_ds,test_ds, ml_type):
@@ -298,13 +277,12 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
 def save_results():
     try:
-        logger.info("Saving training metadata: scoring etc to dataset")
         last_gold_run_filename = "last_train_run.csv"
         if not (last_gold_training_run is None):
             os.makedirs(last_gold_training_run, exist_ok=True)
             print("%s created" % last_gold_training_run)
             path_last_gold_run = last_gold_training_run + "/"+last_gold_run_filename
-            logger.info("Saving last_gold_run.csv at: {}".format(path_last_gold_run))
+            print("Saving last_gold_run.csv at: {}".format(path_last_gold_run))
 
             # create the Pandas dataframe with meta, save to .csv for "Azure datafactory WriteBack pipeline/step" to use
             date_now_str = str(datetime.datetime.now())
@@ -316,7 +294,6 @@ def save_results():
             print("Pipeline ID (Steps runcontext.parent.id) {}".format(run_id))
 
     except Exception as e:
-        logging_utilities.log_traceback(e, logger)
         raise
 
 if __name__ == "__main__":

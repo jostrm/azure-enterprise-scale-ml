@@ -1,25 +1,9 @@
-#import json
-import logging
 import os
-#import pickle
 import pandas as pd
-#import joblib
-#import azureml.automl.core
-from azureml.automl.core.shared import logging_utilities, log_server
-from azureml.telemetry import INSTRUMENTATION_KEY
 import argparse
 from azureml.core import Run
 from azureml.data.dataset_factory import FileDatasetFactory
-#import datetime
-#import uuid
 from your_code.your_train_code import Trainer
-
-try: # not needed, but since AutoML scoring script copied, we'll keep this logging.
-    log_server.enable_telemetry(INSTRUMENTATION_KEY)
-    log_server.set_verbosity('INFO')
-    logger = logging.getLogger('azureml.automl.core.scoring_script')
-except:
-    pass
 
 def split():
     global gold_to_split,train,validate,test,datastore,train_ds,validate_ds,test_ds,esml_output_lake_template_train,esml_output_lake_template_validate,esml_output_lake_template_test
@@ -50,8 +34,7 @@ def split():
         datastore = ws.get_default_datastore()
 
         gold_to_split = next(iter(run.input_datasets.items()))[1] # Get DATASET
-        logger.info("Azure Dataset GOLD to SPLIT, loaded successfully. {}".format(gold_to_split.name))
-        print(" Azure ML Dataset, golgold_to_splitd_to_score, is = {}".format(gold_to_split))
+        print("Azure ML Dataset, golgold_to_splitd_to_score, is = {}".format(gold_to_split))
         
         
         # 1) Register TRAIN df as dataset
@@ -73,10 +56,9 @@ def split():
 
         ################### 1) end EDIT: SPLIT the GOLD data, as you wish = Done #########################
 
-        logger.info("SPLIT_GOLD.init() success: Splitted GOLD, and registered Datasets, now lets REGISTER them in the run() method")
+        print("SPLIT_GOLD.init() success: Splitted GOLD, and registered Datasets, now lets REGISTER them in the run() method")
 
     except Exception as e:
-        logging_utilities.log_traceback(e, logger)
         raise
 
 def register(train,validate,test):
@@ -95,14 +77,14 @@ def register(train,validate,test):
         validate_file = 'gold_validate.parquet'
         test_file = 'gold_test.parquet'
 
-        logger.info("Registering TRAIN dataframe as Azure ML Dataset")
+        print("Registering TRAIN dataframe as Azure ML Dataset")
         if not (train_ds is None):
             os.makedirs(train_ds, exist_ok=True)
             print("%s created" % train_ds)
             
             path = train_ds + "/"+ train_file
 
-            logger.info("Saving result as PARQUET at: {}".format(path))
+            print("Saving result as PARQUET at: {}".format(path))
             print ("train_ds.path is: {}".format(path))
             print("Local Path from run.output_datasets[train_ds]:{}/{}'".format(train_ds,train_file))
 
@@ -112,7 +94,7 @@ def register(train,validate,test):
             #print ("esml_output_lake_template path: {}".format(new_path))
             #FileDatasetFactory.upload_directory(src_dir=train_ds, target=(datastore, new_path), pattern=None, overwrite=True, show_progress=False)
 
-            logger.info("Registering VALIDATE dataframe as Azure ML Dataset")
+            print("Registering VALIDATE dataframe as Azure ML Dataset")
         if not (validate_ds is None):
             os.makedirs(validate_ds, exist_ok=True)
             print("%s created" % validate_ds)
@@ -122,13 +104,12 @@ def register(train,validate,test):
             print("Local Path from run.output_datasets[validate_ds]:{}/{}'".format(validate_ds,validate_file))
 
             write_df2 = validate_df.to_parquet(path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-            logger.info("Saving result as PARQUET at: {}".format(path))
+            print("Saving result as PARQUET at: {}".format(path))
 
             #new_path = esml_output_lake_template_validate.format(id_folder=run_id)
             #print ("esml_output_lake_template path: {}".format(new_path))
             #FileDatasetFactory.upload_directory(src_dir=train_ds, target=(datastore, new_path), pattern=None, overwrite=True, show_progress=False)
 
-            logger.info("Registering TEST dataframe as Azure ML Dataset")
         if not (test_ds is None):
             os.makedirs(test_ds, exist_ok=True)
             print("%s created" % test_ds)
@@ -138,14 +119,13 @@ def register(train,validate,test):
             print("Local Path from run.output_datasets[validate_ds]:{}/{}'".format(test_ds,test_file))
 
             write_df3 = test_df.to_parquet(path, engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
-            logger.info("Saving result as PARQUET at: {}".format(path))
+            print("Saving result as PARQUET at: {}".format(path))
 
             #new_path = esml_output_lake_template_test.format(id_folder=run_id)
             #print ("esml_output_lake_template path: {}".format(new_path))
             #FileDatasetFactory.upload_directory(src_dir=train_ds, target=(datastore, new_path), pattern=None, overwrite=True, show_progress=False)
 
     except Exception as e:
-        logging_utilities.log_traceback(e, logger)
         raise
 
 if __name__ == "__main__":

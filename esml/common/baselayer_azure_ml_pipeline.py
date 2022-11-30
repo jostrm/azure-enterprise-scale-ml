@@ -698,6 +698,7 @@ class ESMLPipelineFactory():
         compute = None
         runconfig = None
         old_mode = p.inference_mode
+        curated_environment = None
         try:
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML): # TRAINING
                 self.p.inference_mode = False
@@ -1552,6 +1553,7 @@ class ESMLPipelineFactory():
                 self.p.ws = self.p.get_workspace_from_config()
 
             automl_esml_env = Environment.get(workspace=self.p.ws,name=self._esml_automl_lts_env_name)
+            print("Environment {} exists".format(self._esml_automl_lts_env_name))
         except Exception as e:
             s = str(e)
             if ("No environment exists for name" in s):
@@ -1561,10 +1563,13 @@ class ESMLPipelineFactory():
                 b_details = env_esml_v2.build(self.p.ws)
                 
                 while (b_details.status != 'Succeeded'):
-                    time.sleep(10)
+                    time.sleep(15)
                     print("Still building image for {}...".format(self._esml_automl_lts_env_name))
+                
+                print("Environment {} is now created.".format(self._esml_automl_lts_env_name))
+                #automl_esml_env = env_esml_v2
+                automl_esml_env = Environment.get(workspace=self.p.ws,name=self._esml_automl_lts_env_name)
 
-        print("Environment {} exists".format(self._esml_automl_lts_env_name))
         return automl_esml_env
 
     def create_dbx_step_in_2_silver(self,map,databricks_compute,map_step,dataset,step_key = "in2silver_ds01_diabetes",
