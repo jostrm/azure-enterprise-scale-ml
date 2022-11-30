@@ -974,7 +974,8 @@ class ESMLPipelineFactory():
 
         if(same_compute_for_all and compute is not None):
             print("Reusing existing compute...")
-            pass # we alreday have compute and runconfig
+            runconfig = self.init_run_config(compute,curated_environment)
+            # we alreday have compute and runconfig
         elif(same_compute_for_all and compute is None):
             print("ESML will auto-create a compute...")
             if (d.runconfig is None):  # Create default RunConfig, based on ESML settings
@@ -1981,6 +1982,10 @@ class ESMLPipelineFactory():
                 else:
                     aml_compute = self.p.get_batch_aml_compute(self.p.ws, False,suffix_char) # Create or Get compute, for active environment.
 
+        aml_run_config = self.init_run_config(aml_compute,curated_environment)
+        return aml_compute, aml_run_config
+
+    def init_run_config(self,aml_compute,curated_environment):
         aml_run_config = RunConfiguration()
         # `compute_target` as defined in "Azure Machine Learning compute" section above
         aml_run_config.target = aml_compute
@@ -2006,7 +2011,8 @@ class ESMLPipelineFactory():
 
             docker_config = DockerConfiguration(use_docker=True)
             aml_run_config.docker = docker_config
-        return aml_compute, aml_run_config
+            
+        return aml_run_config
 
 #endregion
 
