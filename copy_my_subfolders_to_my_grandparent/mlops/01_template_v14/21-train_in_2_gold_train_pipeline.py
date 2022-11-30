@@ -33,6 +33,16 @@ import argparse
 from esml import ESMLProject
 from baselayer_azure_ml_pipeline import esml_pipeline_types
 from baselayer_azure_ml_pipeline import ESMLPipelineFactory
+
+advanced_mode = True # ADVANCDE MODE (DatabricksSteps also) + Manual ML (or AutoML if defined in Databricks notebook)
+use_automl = True # SIMPLE MODE + AutoMLStep (if True)Manual ML Step (if False)
+
+if advanced_mode:
+    sys.path.insert(0, "../../azure-enterprise-scale-ml/")
+    from esmlrt.interfaces.iESMLPipelineStepMap import IESMLPipelineStepMap
+    sys.path.insert(0, "../../01_pipelines/batch/M11/your_code/") # Advanced Mode. TODO 4 you - edit M11 in path below
+    from ESMLPipelineStepMap import ESMLPipelineStepMap
+
 print("SDK Version:", azureml.core.VERSION)
 
 # IN PARAMETERS
@@ -55,9 +65,20 @@ p_factory = ESMLPipelineFactory(p)
 p_factory.batch_pipeline_parameters[1].default_value = esml_date_utc # overrides ESMLProject.date_scoring_folder.
 p_factory.describe()
 
-## BUILD
-print ("Building pipeline (estimated: 10 min)")
-batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML) # Training: AutoMLStep or ManualMLStep
+## Optional - Advanced mode: If DatabricksSteps in pipeline
+if(advanced_mode):
+    map = ESMLPipelineStepMap()
+    p_factory.use_advanced_compute_settings(map)
+    print ("Building pipeline - ADVANCED MODE (Mixed compute: Databricks/Spark, AML CPU, GPU)")
+    print (" - Needs Databricks snapshot folder with ESML Databricks notebook templates + ESMLPipelineStepMap with your defined mappings.")
+    batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL) # Training: Databricks notebooks
+else:
+    ## BUILD
+    print ("Building pipeline - SIMPLE MODE")
+    if(use_automl):
+        batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML) # Training: AutoMLStep or ManualMLStep
+    else:
+        batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL) # Training: AutoMLStep or ManualMLStep
 
 ## RUN training
 print ("Running pipeline (estimated time: 10-XXX min)")
