@@ -7,10 +7,14 @@ from esmlrt.interfaces.iESMLPipelineStepMap import esml_snapshot_step_names
 class ESMLPipelineStepMap(IESMLPipelineStepMap):
     def __init__(self, step_filter_whitelist = None, all_dbx_envs = None):
         if(all_dbx_envs is None):
+
+            dev_rg = 'your-project-resource-group'
+            dev_workspace = 'your-databricks-workspace-name'
+
             all_dbx_envs = {
-                'dev': {'compute_name': None,'resource_group': 'MSFT-WEU-EAP_PROJECT02_AI-DEV-RG', 'workspace_name': 'msft-weu-dev-eap-proj02_ai-dbx'},
-                'test': {'compute_name': None,'resource_group': 'abc-def-esml-project002-weu-test-004-rg', 'workspace_name': 'z'},
-                'prod': {'compute_name': None,'resource_group': 'abc-def-esml-project002-weu-prod-004-rg', 'workspace_name': 'z'}
+                'dev': {'resource_group': dev_rg,dev_rg: dev_workspace},
+                'test': {'resource_group': 'xyz-xyz-esml-project001-weu-test-001-rg', 'workspace_name': 'z'},
+                'prod': {'resource_group': 'xyz-xyz-esml-project001-weu-prod-001-rg', 'workspace_name': 'z'}
             }
         super().__init__(step_filter_whitelist,all_dbx_envs)
 
@@ -46,12 +50,14 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
         # silver_merged_2_gold
         all_dataset_folder_names_str = IESMLPipelineStepMap.get_dataset_folders_as_csv_string(dataset_folder_names)
 
+        my_dbx_cluster_friendly = 's-p001-m01-rt91' # note needs to be short <16 chars
+        my_dbx_cluster_url_name = '1234-333666-wimps924' # See web browser URL when having cluster selected
         TRAIN_notebook_mapping= [
-           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':ds_01_in2silver_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
-           {'step_name': step2, 'code': nb2,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':ds_02_in2silver_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'},
-           {'step_name': step3, 'code': nb3,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':all_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'},
-           {'step_name': step4, 'code': nb4,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'},
-           {'step_name': step5, 'code': nb5,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'0912-204847-wimps924'},
+           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':ds_01_in2silver_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly,'cluster_id':my_dbx_cluster_url_name}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
+           {'step_name': step2, 'code': nb2,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':ds_02_in2silver_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly,'cluster_id':my_dbx_cluster_url_name},
+           {'step_name': step3, 'code': nb3,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':all_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly,'cluster_id':my_dbx_cluster_url_name},
+           {'step_name': step4, 'code': nb4,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly,'cluster_id':my_dbx_cluster_url_name},
+           {'step_name': step5, 'code': nb5,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly,'cluster_id':my_dbx_cluster_url_name},
         ]
 
         return TRAIN_notebook_mapping
@@ -76,10 +82,12 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
        star_csv = "*.csv"
        star_parquet = "*.parquet"
 
+       my_dbx_cluster_friendly = 's-p001-m01-rt91' # note needs to be short <16 chars
+       my_dbx_cluster_url_name = '1234-333666-wimps924' # See web browser URL when having cluster selected
        INFERENCE_notebook_mapping = [
-           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91', 'cluster_id':'0912-204847-wimps924'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
-           #{'step_name': step2,  'code': script,'compute_type':self._compute_type_py, 'date_folder_or': '2021-01-01 10:35:01.243860','compute_name':'s-p002-aml-rt91', 'cluster_id':'0912-204847-wimps924'},
-           {'step_name': step3, 'code': nb3,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91', 'cluster_id':'0912-204847-wimps924'} # MERGE 2 GOLD
+           {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly, 'cluster_id':my_dbx_cluster_url_name}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
+           #{'step_name': step2,  'code': script,'compute_type':self._compute_type_py, 'date_folder_or': '2021-01-01 10:35:01.243860','compute_name':my_dbx_cluster_friendly, 'cluster_id':my_dbx_cluster_url_name},
+           {'step_name': step3, 'code': nb3,'compute_type':self._compute_type_dbx, 'date_folder_or': None,'dataset_folder_names':dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly, 'cluster_id':my_dbx_cluster_url_name} # MERGE 2 GOLD
            #Note: SCORE GOLD & SAVE - is done by ESML PythonscriptStep in pipeline
        ]
 
