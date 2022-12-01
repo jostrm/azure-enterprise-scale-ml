@@ -8,7 +8,7 @@ global azure_rg_project_number
 
 esml_env = "dev"
 esml_resource_group="abc-def-esml-project{}-weu-{}-001-rg" # abc-def-esml-project001-weu-dev-001-rg  
-emsl_workspace_name="aml-prj{}-eap-proj-weu-{}-001" # aml-prj001-weu-dev-001
+emsl_workspace_name="aml-prj{}-weu-{}-001" # aml-prj002-weu-dev-001
 esml_workspace_projectNumberFirst = True
 esml_workspace_projectNumberXXX = True
 esml_lake_projectNumberXXX = True
