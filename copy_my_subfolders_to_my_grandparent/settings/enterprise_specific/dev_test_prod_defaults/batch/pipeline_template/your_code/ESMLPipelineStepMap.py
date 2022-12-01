@@ -12,7 +12,7 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
             dev_workspace = 'your-databricks-workspace-name'
 
             all_dbx_envs = {
-                'dev': {'resource_group': dev_rg,dev_rg: dev_workspace},
+                'dev': {'resource_group': dev_rg, 'workspace_name':dev_workspace},
                 'test': {'resource_group': 'xyz-xyz-esml-project001-weu-test-001-rg', 'workspace_name': 'z'},
                 'prod': {'resource_group': 'xyz-xyz-esml-project001-weu-prod-001-rg', 'workspace_name': 'z'}
             }
