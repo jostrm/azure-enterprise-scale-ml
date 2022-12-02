@@ -299,8 +299,10 @@ train_run = None
 aml_model = None
 fitted_model = None
 full_local_path = None
-model_name = experiment_name
-#leading_model_name_pkl = "model.pkl"
+
+model_name = experiment_name # The NAME in MODEL registry (Not that model_name TAG - may be different - you choose)
+model_name_tag = experiment_name # A) If you want to keep Model comparison (compare best model) separate considering AutoML runs VS Manual runs
+model_name_tag = esml_parameters.esml_aml_model_name # B) If you want to compare all Models under same Experiment - never mind if AutoML was used or Manual ML
 
 if(remote_run is None):
   train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, False,remote_run)
@@ -411,7 +413,7 @@ model_path = full_local_path
 
 # 1) Register model with 'esml_status_new'
 time_stamp = str(datetime.datetime.now())
-tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":ESMLStatus.mflow_stage_none.value, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_env, 
+tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":ESMLStatus.mflow_stage_none.value, "run_id": run_id, "model_name": model_name_tag, "trained_in_environment": esml_env, 
         "trained_in_workspace": ws.name, "experiment_name": experiment_name, "trained_with": "ManualPysparkDatabricks"}
 
 def register_aml_model_on_run(model_name,model_path,tags):
@@ -464,7 +466,7 @@ except Exception as e:
 # MAGIC 
 # MAGIC # 1) Register model with 'esml_status_new'
 # MAGIC time_stamp = str(datetime.datetime.now())
-# MAGIC tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":"None", "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_env, 
+# MAGIC tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":"None", "run_id": run_id, "model_name": model_name_tag, "trained_in_environment": esml_env, 
 # MAGIC         "trained_in_workspace": ws.name, "experiment_name": experiment_name, "trained_with": "ManualPysparkDatabricks"}
 # MAGIC     
 # MAGIC 
