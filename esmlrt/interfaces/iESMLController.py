@@ -363,23 +363,39 @@ class IESMLController:
             best_run, fitted_model = run.get_output()
         except: # elif(run_type == "pipeline_automl_step"):
             if(debug_print):
-                print("ESML INFO: except PipelineRun")
+                print("ESML INFO: Trying as PipelineRun (AML or DatabricksStep)")
             pipeline_run = PipelineRun(experiment=exp, run_id=run_id)
             #pipeline_run = run.parent # Parent is the pipeline run, current is the current step.
+
+            ## TODO
+            # If AutoML run. If TRAIN - not if INFERENCE
+            ##
             step_list = list(pipeline_run.get_steps())
             step_len = len(step_list) # 6
-            automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
+            if(step_len == 0): # StepRun = Manual
+                run = pipeline_run.parent
+                best_run = pipeline_run
 
-            automl_run_step_by_index = step_list[automl_step_id]
-            if(debug_print):
-                print("automl_run_step_by_index: {} and type {}".format(automl_run_step_by_index.id,type(automl_run_step_by_index)))
-            automl_step_run_id = automl_run_step_by_index.id
-            if(debug_print):
-                print("automl_step_run_id:{} which is 'new_run_id' in comparer.compare_scoring_current_vs_new_model".format(automl_step_run_id))
-            
-            experiment_run = ws.experiments[experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
-            automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
-            best_run, fitted_model = automl_step_run.get_output()
+                model_name = best_run.experiment.tags['model_name']
+                best_model_version = best_run.experiment.tags['best_model_version'] # latest promoted
+                m = Model(workspace=ws,name=model_name, version=best_model_version)
+
+                model_path = 'outputs_or_other/{}.pkl'.format(m.name) # does not matter what path, it is the local target
+                m_path = m.download(target_dir=model_path, exist_ok=True)
+                fitted_model = joblib.load(m_path)
+            else: # AutoML pipeline
+                automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
+
+                automl_run_step_by_index = step_list[automl_step_id]
+                if(debug_print):
+                    print("automl_run_step_by_index: {} and type {}".format(automl_run_step_by_index.id,type(automl_run_step_by_index)))
+                automl_step_run_id = automl_run_step_by_index.id
+                if(debug_print):
+                    print("automl_step_run_id:{} which is 'new_run_id' in comparer.compare_scoring_current_vs_new_model".format(automl_step_run_id))
+                
+                experiment_run = ws.experiments[experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
+                automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
+                best_run, fitted_model = automl_step_run.get_output()
             '''
             elif(run_type == "notebook_manual_run"):
                 pass
