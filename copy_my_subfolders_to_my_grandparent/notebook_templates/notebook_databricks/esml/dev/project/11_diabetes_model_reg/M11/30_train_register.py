@@ -135,48 +135,147 @@ gold_test_df = (spark.read.option("header","true").parquet(esml_lake.gold_test))
 
 # COMMAND ----------
 
+# MAGIC %md ## REMOTE RUN - we are going to hydrate THIS
+
+# COMMAND ----------
+
+remote_run = None # This is going to be initiated from Azure ML parameters
+
+# COMMAND ----------
+
+# MAGIC %md # IGNORE - This is boilerplate - to fetch Azure ML Run
+
+# COMMAND ----------
+
 from azureml.core import Run
-import argparse
 import os
 
+try:
+  dbutils.widgets.text("--AZUREML_RUN_TOKEN","a token", "AZUREML_RUN_TOKEN")
+  AZUREML_RUN_TOKEN_w = dbutils.widgets.get("--AZUREML_RUN_TOKEN")
+  AZUREML_RUN_TOKEN = getArgument("--AZUREML_RUN_TOKEN")
+  #print ("--AZUREML_RUN_TOKEN:",AZUREML_RUN_TOKEN)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_RUN_TOKEN_EXPIRY","a token ecpiry", "AZUREML_RUN_TOKEN_EXPIRY")
+  AZUREML_RUN_TOKEN_EXPIRY_w = dbutils.widgets.get("--AZUREML_RUN_TOKEN_EXPIRY")
+  AZUREML_RUN_TOKEN_EXPIRY = getArgument("--AZUREML_RUN_TOKEN_EXPIRY")
+  print ("--AZUREML_RUN_TOKEN_EXPIRY:",AZUREML_RUN_TOKEN_EXPIRY)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_RUN_ID","a run id", "AZUREML_RUN_ID")
+  AZUREML_RUN_ID_w = dbutils.widgets.get("--AZUREML_RUN_ID")
+  AZUREML_RUN_ID = getArgument("--AZUREML_RUN_ID")
+  print ("--AZUREML_RUN_ID:",AZUREML_RUN_ID)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_ARM_SUBSCRIPTION","a rg", "AZUREML_ARM_SUBSCRIPTION")
+  AZUREML_ARM_SUBSCRIPTION_w = dbutils.widgets.get("--AZUREML_ARM_SUBSCRIPTION")
+  AZUREML_ARM_SUBSCRIPTION = getArgument("--AZUREML_ARM_SUBSCRIPTION")
+  print ("--AZUREML_ARM_SUBSCRIPTION:",AZUREML_ARM_SUBSCRIPTION)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_ARM_RESOURCEGROUP","a rg", "AZUREML_ARM_RESOURCEGROUP")
+  AZUREML_ARM_RESOURCEGROUP_w = dbutils.widgets.get("--AZUREML_ARM_RESOURCEGROUP")
+  AZUREML_ARM_RESOURCEGROUP = getArgument("--AZUREML_ARM_RESOURCEGROUP")
+  print ("--AZUREML_ARM_RESOURCEGROUP:",AZUREML_ARM_RESOURCEGROUP)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_ARM_WORKSPACE_NAME","a rg", "AZUREML_ARM_WORKSPACE_NAME")
+  AZUREML_ARM_WORKSPACE_NAME_w = dbutils.widgets.get("--AZUREML_ARM_WORKSPACE_NAME")
+  AZUREML_ARM_WORKSPACE_NAME = getArgument("--AZUREML_ARM_WORKSPACE_NAME")
+  print ("--AZUREML_ARM_WORKSPACE_NAME:",AZUREML_ARM_WORKSPACE_NAME)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_ARM_PROJECT_NAME","a rg", "AZUREML_ARM_PROJECT_NAME")
+  AZUREML_ARM_PROJECT_NAME_w = dbutils.widgets.get("--AZUREML_ARM_PROJECT_NAME")
+  AZUREML_ARM_PROJECT_NAME = getArgument("--AZUREML_ARM_PROJECT_NAME")
+  print ("--AZUREML_ARM_PROJECT_NAME:",AZUREML_ARM_PROJECT_NAME)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_SERVICE_ENDPOINT","a rg", "AZUREML_SERVICE_ENDPOINT")
+  AZUREML_SERVICE_ENDPOINT_w = dbutils.widgets.get("--AZUREML_SERVICE_ENDPOINT")
+  AZUREML_SERVICE_ENDPOINT = getArgument("--AZUREML_SERVICE_ENDPOINT")
+  print ("--AZUREML_SERVICE_ENDPOINT:",AZUREML_SERVICE_ENDPOINT)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_WORKSPACE_ID","a rg", "AZUREML_WORKSPACE_ID")
+  AZUREML_WORKSPACE_ID_w = dbutils.widgets.get("--AZUREML_WORKSPACE_ID")
+  AZUREML_WORKSPACE_ID = getArgument("--AZUREML_WORKSPACE_ID")
+  print ("--AZUREML_WORKSPACE_ID:",AZUREML_WORKSPACE_ID)
+except Exception as e:
+  print(e)
+  
+try:
+  dbutils.widgets.text("--AZUREML_EXPERIMENT_ID","a rg", "AZUREML_EXPERIMENT_ID")
+  AZUREML_EXPERIMENT_ID_w = dbutils.widgets.get("--AZUREML_EXPERIMENT_ID")
+  AZUREML_EXPERIMENT_ID = getArgument("--AZUREML_EXPERIMENT_ID")
+  print ("--AZUREML_EXPERIMENT_ID:",AZUREML_EXPERIMENT_ID)
+except Exception as e:
+  print(e)
+  
+ # The AZUREML_SCRIPT_DIRECTORY_NAME argument will be filled in if the DatabricksStep was run using a local source_directory and python_script_name
+try:
+  dbutils.widgets.text("--AZUREML_SCRIPT_DIRECTORY_NAME","a rg", "AZUREML_SCRIPT_DIRECTORY_NAME")
+  AZUREML_SCRIPT_DIRECTORY_NAME_w = dbutils.widgets.get("--AZUREML_SCRIPT_DIRECTORY_NAME")
+  AZUREML_SCRIPT_DIRECTORY_NAME = getArgument("--AZUREML_SCRIPT_DIRECTORY_NAME")
+  print ("--AZUREML_SCRIPT_DIRECTORY_NAME:",AZUREML_SCRIPT_DIRECTORY_NAME)
+except Exception as e:
+  print(e)
+  
+remote_run = None
+
 # Note that this workaround is not required for job clusters, e.g. not needed if using Azure ML pipeline via ESML
-def populate_environ():
-    parser = argparse.ArgumentParser(description='Process arguments passed to script')
-
-    # The AZUREML_SCRIPT_DIRECTORY_NAME argument will be filled in if the DatabricksStep
-    # was run using a local source_directory and python_script_name
-    parser.add_argument('--AZUREML_SCRIPT_DIRECTORY_NAME')
-
-    # Remaining arguments are filled in for all databricks jobs and can be used to build the run context
-    parser.add_argument('--AZUREML_RUN_TOKEN')
-    parser.add_argument('--AZUREML_RUN_TOKEN_EXPIRY')
-    parser.add_argument('--AZUREML_RUN_ID')
-    parser.add_argument('--AZUREML_ARM_SUBSCRIPTION')
-    parser.add_argument('--AZUREML_ARM_RESOURCEGROUP')
-    parser.add_argument('--AZUREML_ARM_WORKSPACE_NAME')
-    parser.add_argument('--AZUREML_ARM_PROJECT_NAME')
-    parser.add_argument('--AZUREML_SERVICE_ENDPOINT')
-    parser.add_argument('--AZUREML_WORKSPACE_ID')
-    parser.add_argument('--AZUREML_EXPERIMENT_ID')
-
-    (args, extra_args) = parser.parse_known_args()
-    os.environ['AZUREML_RUN_TOKEN'] = args.AZUREML_RUN_TOKEN
-    os.environ['AZUREML_RUN_TOKEN_EXPIRY'] = args.AZUREML_RUN_TOKEN_EXPIRY
-    os.environ['AZUREML_RUN_ID'] = args.AZUREML_RUN_ID
-    os.environ['AZUREML_ARM_SUBSCRIPTION'] = args.AZUREML_ARM_SUBSCRIPTION
-    os.environ['AZUREML_ARM_RESOURCEGROUP'] = args.AZUREML_ARM_RESOURCEGROUP
-    os.environ['AZUREML_ARM_WORKSPACE_NAME'] = args.AZUREML_ARM_WORKSPACE_NAME
-    os.environ['AZUREML_ARM_PROJECT_NAME'] = args.AZUREML_ARM_PROJECT_NAME
-    os.environ['AZUREML_SERVICE_ENDPOINT'] = args.AZUREML_SERVICE_ENDPOINT
-    os.environ['AZUREML_WORKSPACE_ID'] = args.AZUREML_WORKSPACE_ID
-    os.environ['AZUREML_EXPERIMENT_ID'] = args.AZUREML_EXPERIMENT_ID
+def rehydrate_azureml_run():
+    print("populate_environ: AZUREML_RUN_ID {}".format(AZUREML_RUN_ID))
+    os.environ['AZUREML_RUN_TOKEN'] = AZUREML_RUN_TOKEN
+    os.environ['AZUREML_RUN_TOKEN_EXPIRY'] = AZUREML_RUN_TOKEN_EXPIRY
+    os.environ['AZUREML_RUN_ID'] = AZUREML_RUN_ID #args.AZUREML_RUN_ID
+    os.environ['AZUREML_ARM_SUBSCRIPTION'] = AZUREML_ARM_SUBSCRIPTION
+    os.environ['AZUREML_ARM_RESOURCEGROUP'] = AZUREML_ARM_RESOURCEGROUP
+    os.environ['AZUREML_ARM_WORKSPACE_NAME'] =AZUREML_ARM_WORKSPACE_NAME
+    os.environ['AZUREML_ARM_PROJECT_NAME'] = AZUREML_ARM_PROJECT_NAME
+    os.environ['AZUREML_SERVICE_ENDPOINT'] = AZUREML_SERVICE_ENDPOINT
+    os.environ['AZUREML_WORKSPACE_ID'] = AZUREML_WORKSPACE_ID
+    os.environ['AZUREML_EXPERIMENT_ID'] = AZUREML_EXPERIMENT_ID
 
 try:
-  populate_environ()
-  run = Run.get_context(allow_offline=False)
-  print(run.parent.id)
+    rehydrate_azureml_run()
+    remote_run = Run.get_context(allow_offline=False)
+    if(remote_run is not None):
+      print("1) populate_environ() - Get Run Success(online): remote_run.id: {}".format(remote_run.id))
+      print("1) populate_environ() - Get Run Success(online): remote_run.parent.id: {}".format(remote_run.parent.id))
 except Exception as e: 
-  print("Warning: populate_environ() failed {}".format(e))
+    print("Warning 1: populate_environ() failed {}".format(e))
+    try:
+        remote_run = Run.get_context(allow_offline=False)
+        if(remote_run is not None):
+          print("2) Get Run Success(online): remote_run.id: {}".format(remote_run.id))
+          print("2) Get Run Success(online): remote_run.parent.id: {}".format(remote_run.parent.id))
+    except Exception as e2:
+        print("Warning 2: Run.get_context(allow_offline=False) failed: {}".format(e2))
+        try:
+            remote_run = Run.get_context() # Run.get_context(allow_offline=False)
+            if(remote_run is not None):
+              print("3) Get Run (offline) Success: remote_run.id: {}".format(remote_run.id))
+        except Exception as e3:
+            print("Warning 3: Run.get_context() failed: {}".format(e3))
 
 
 # COMMAND ----------
@@ -189,13 +288,26 @@ gold_train_df.printSchema()
 
 # COMMAND ----------
 
-# MAGIC %md ## TRAIN MODEL
+# MAGIC %md ## TRAIN MODEL - TODO 4 YOU
+# MAGIC - TODO 5 YOU: implement the method `train_df` in <a href="$./30_train_code/your_train_code"> ./30_train_code/your_train_code</a> notebook
+# MAGIC - `train_df(..) is called below from this notebook, referencing `your_train_code` in <a href="$./30_train_code/your_train_code"> ./30_train_code/your_train_code</a>
 
 # COMMAND ----------
 
 ## TODO 5 YOU - implement the method train in './30_train_code/your_train_code' notebook
+train_run = None
+aml_model = None
+fitted_model = None
+full_local_path = None
+model_name = experiment_name
+#leading_model_name_pkl = "model.pkl"
 
-train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, False)
+if(remote_run is None):
+  train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, False,remote_run)
+else:
+  train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, True,remote_run)
+  
+train_run.upload_file(name = model_name, path_or_stream = full_local_path)
 
 # COMMAND ----------
 
@@ -228,18 +340,25 @@ print ("Workspace name", workspace_name)
 
 # COMMAND ----------
 
-# ESML status / stages
-print(ESMLStatus.esml_status_new)  # Something to compare with the LEADING model. Registered to be able to TAGS Test_scoring = mlflow.None
-print(ESMLStatus.esml_status_new.value)
-
-print(ESMLStatus.mflow_stage_none) # Equivalent almist to esml_status_new
+# MAGIC %md ## Get Run.id
 
 # COMMAND ----------
 
-#run = Run.get_context(allow_offline=False)
-#run_id = run.parent.id
 run_id = 0
-model_name = experiment_name
+if(remote_run is not None):
+  try:
+    run_id = remote_run.parent.id
+  except Exception as e:
+    print(e)
+    print("Warning 6: Could not fetch Run.parent.id (online) from Run (not None) - Now trying remote_run.id instead of remote_run.parent.id")
+    run_id = remote_run.id
+
+# COMMAND ----------
+
+# MAGIC %md # Define REGISTRATION of MODEL
+# MAGIC - Docs / trouble shooting
+# MAGIC   - https://learn.microsoft.com/en-us/answers/questions/162055/register-azure-ml-model-from-databricksstep.html
+# MAGIC   - https://github.com/MicrosoftDocs/azure-docs/issues/45773
 
 # COMMAND ----------
 
@@ -280,7 +399,9 @@ def get_default_localPath(project_number,esml_model_experiment):
 
 # COMMAND ----------
 
-# TODO: Only register model. Then Nothing. Next pipeline-step in the Azure ML pipeline will do all MLOps INNER / OUTER Loop logic
+# MAGIC %md # REGISTER MODEL
+# MAGIC - Trying to register on RUN & Model registry first, as fallback - only in Model registry
+# MAGIC - TODO 4 YOU: Only register model. Then Nothing. Next pipeline-step in the Azure ML pipeline will do all MLOps INNER / OUTER Loop logic
 
 # COMMAND ----------
 
@@ -303,11 +424,13 @@ def register_aml_model_on_run(model_name,model_path,tags):
       model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
 
 try:
-  register_aml_model_on_run(model_name,model_path,tags)
+  #register_aml_model_on_run(model_name,model_path,tags)
+  register_aml_model_on_run(model_name,None,tags)
 except Exception as e:
   print("Warning ESML: Could not register_aml_model_on_run, not trying registration on Model registry instead")
   print(e)
-  register_aml_model(model_path,model_name,tags,ws,"002",experiment_name)
+  print("ESML Fallback: Now registeirng MODEL in MODEL registry directly (since registering via RUN was not possible)")
+  register_aml_model(model_path,model_name,tags,ws,projectNumber,experiment_name)
       
   
 
