@@ -124,6 +124,7 @@ class ESMLPipelineFactory():
     _at_least_1_ptyhonScriptStep = False
     _dbx_token_secret_name = 'esml-project-dbx-token'
     _is_training = False
+    _dbx_exp_suffix = "_DBX"
 
 #endregion
 
@@ -252,6 +253,9 @@ class ESMLPipelineFactory():
             db_compute_name=n
 
             try:
+                print("Azure ML Workspace:".format(ws.name))
+                print("Attached Databricks db_compute_name:".format(db_compute_name))
+
                 databricks_compute = DatabricksCompute(workspace=ws, name=db_compute_name)
                 self._dbx_compute_dic[db_compute_name]=databricks_compute
                 print('Compute target {} already exists'.format(db_compute_name))
@@ -757,7 +761,7 @@ class ESMLPipelineFactory():
                             datasets_with_dbx.append(d.Name)
                             compute_name = map_step['compute_name']
                             dbx_compute = self._dbx_compute_dic[compute_name]
-                            step_array.append(self.create_dbx_step_in_2_silver(map=map,databricks_compute=dbx_compute,map_step=map_step,dataset=d,step_key=step_name)) # (d, compute,runconfig,esml_step_types.IN_2_SILVER))
+                            step_array.append(self.create_dbx_step_in_2_silver(map_in=map,databricks_compute=dbx_compute,map_step=map_step,dataset=d,step_key=step_name)) # (d, compute,runconfig,esml_step_types.IN_2_SILVER))
                             dbx_esml_datasets.append(d)
                             previous_step_is_databricks = 1 # at least 1 step is Databricks
                         else:
@@ -1573,7 +1577,7 @@ class ESMLPipelineFactory():
 
         return automl_esml_env
 
-    def create_dbx_step_in_2_silver(self,map,databricks_compute,map_step,dataset,step_key = "in2silver_ds01_diabetes",
+    def create_dbx_step_in_2_silver(self,map_in,databricks_compute,map_step,dataset,step_key = "in2silver_ds01_diabetes",
     par_date_utc="1000-01-01 10:35:01.243860",
     par_model_version=0,
     par_inference_mode=0,
@@ -1607,7 +1611,7 @@ class ESMLPipelineFactory():
         param_inference = PipelineParameter(name="esml_inference_mode", default_value=par_inference_mode)
         param_env = PipelineParameter(name="esml_environment_dev_test_prod", default_value=par_env)
 
-        #my_path = map[step_key]['code']
+        #my_path = map_in[step_key]['code']
         my_path = map_step['code']
         if ('dataset_filename_ending' not in map_step):
             map_step['dataset_filename_ending'] = '*.parquet'
@@ -1615,7 +1619,7 @@ class ESMLPipelineFactory():
         dataset_filename_ending = map_step['dataset_filename_ending']
         dataset_folder_names = map_step['dataset_folder_names']
 
-        param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
+        #param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
         #param_dataset_folder_names = PipelineParameter(name="esml_dataset_name", default_value=dataset_folder_names) # NB - dataset_folder_names is an csv array
 
         dbx_notebook_name = os.path.basename(os.path.normpath(my_path))
@@ -1626,8 +1630,21 @@ class ESMLPipelineFactory():
         cluster_id = map_step['cluster_id']
         compute_name_conf = map_step['compute_name']
 
-        if(compute_name_conf != databricks_compute.name):
-            raise UserErrorException("NB! compute_name_conf != databricks_compute.name - strange?")
+        if(databricks_compute is not None):
+            if(compute_name_conf != databricks_compute.name):
+                raise UserErrorException("NB! compute_name_conf: {} != databricks_compute.name - strange?".format(compute_name_conf))
+        else: # Refresh COMPUTE dictionary
+            all_envs = self._iesml_pipelinestep_map.all_dbx_envs
+            folder_names = self.p.active_model['dataset_folder_names']
+            if(self.p.inference_mode):
+                specific_mapping = self._iesml_pipelinestep_map.get_inference_map(dataset_folder_names)
+            else:
+                specific_mapping = self._iesml_pipelinestep_map.get_train_map(dataset_folder_names)
+            self.create_compute_via_map(specific_mapping, all_envs)
+            databricks_compute = self._dbx_compute_dic[compute_name_conf] # Get COMPUTE again
+
+            if(databricks_compute is None):
+                raise UserErrorException("Error could not get COMPUTE with name in config: {} for step {} - strange?".format(compute_name_conf,step_key))
 
         name = step_key # + "_"+dbx_notebook_name
         dbNbStep = DatabricksStep(
@@ -1636,7 +1653,7 @@ class ESMLPipelineFactory():
             outputs=[ds_OUT],  # optional, adds to
             notebook_path=notebook_path,
             notebook_params={'esml_training_folder_date': param_date ,'esml_inference_model_version': param_model_version,'esml_inference_mode': param_inference,
-            'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':param_filename_ending,'esml_dataset_name':dataset_folder_names
+            'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':dataset_filename_ending,'esml_dataset_name':dataset_folder_names
             },
             run_name=dbx_notebook_name,
             compute_target=databricks_compute,
@@ -1747,7 +1764,7 @@ class ESMLPipelineFactory():
         param_inference = PipelineParameter(name="esml_inference_mode", default_value=par_inference_mode)
         param_env = PipelineParameter(name="esml_environment_dev_test_prod", default_value=par_env)
         param_target_column_name = PipelineParameter(name="esml_target_column_name", default_value=target_column_name)
-        param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
+        #param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
         param_date_folder_utc = PipelineParameter(name="esml_training_folder_date", default_value=par_date_utc)
         param_model_version = PipelineParameter(name="esml_inference_model_version", default_value=par_model_version)
         param_model_name = PipelineParameter(name="esml_aml_model_name", default_value=esml_aml_model_name)
@@ -1757,7 +1774,7 @@ class ESMLPipelineFactory():
             inputs=[train_out.as_input(train_out.name),validate_out.as_input(validate_out.name),test_out.as_input(test_out.name)], 
             outputs=[last_gold_training_run], 
             notebook_path=notebook_path,
-            notebook_params={'esml_inference_mode': param_inference,'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':param_filename_ending,
+            notebook_params={'esml_inference_mode': param_inference,'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':dataset_filename_ending,
             'esml_target_column_name':param_target_column_name,'esml_previous_step_is_databricks':param_previous_step_is_databricks,
             'esml_training_folder_date':param_date_folder_utc,'esml_inference_model_version':param_model_version,'esml_aml_model_name':param_model_name
             },
@@ -1842,14 +1859,14 @@ class ESMLPipelineFactory():
         param_split_percentage  = PipelineParameter(name="esml_split_percentage", default_value=split_percentage)
 
         # optional
-        param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
+        #param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
 
         dbNbStep = DatabricksStep(
             name=name_w_split_per,
             inputs=[gold_to_split.as_input(gold_to_split.name)],
             outputs=[train_ds,validate_ds,test_ds],
             notebook_path=notebook_path,
-            notebook_params={'esml_inference_mode': param_inference,'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':param_filename_ending,
+            notebook_params={'esml_inference_mode': param_inference,'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':dataset_filename_ending,
             'esml_target_column_name':param_target_column_name,'esml_split_percentage':param_split_percentage,'esml_previous_step_is_databricks':param_previous_step_is_databricks
             },
             run_name=dbx_notebook_name,
@@ -1919,7 +1936,7 @@ class ESMLPipelineFactory():
         dataset_filename_ending = map_step['dataset_filename_ending']
         dataset_folder_names = map_step['dataset_folder_names']
 
-        param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
+        #param_filename_ending = PipelineParameter(name="esml_dataset_filename_ending", default_value=dataset_filename_ending)
         param_dataset_folder_names = PipelineParameter(name="esml_dataset_names_to_merge", default_value=dataset_folder_names)
         param_previous_step_is_databricks = PipelineParameter(name="esml_previous_step_is_databricks", default_value=previous_step_is_databricks)
         #param_path_gold_to_score_template_path = PipelineParameter(name="path_gold_to_score_template_path", default_value=path_gold_to_score_template_path)
@@ -1947,7 +1964,7 @@ class ESMLPipelineFactory():
             outputs=[gold_to_score],  # optional, adds to
             notebook_path=notebook_path,
             notebook_params={'esml_training_folder_date': param_date ,'esml_inference_model_version': param_model_version,'esml_inference_mode': param_inference,
-            'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':param_filename_ending,'esml_dataset_names_to_merge':param_dataset_folder_names,
+            'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':dataset_filename_ending,'esml_dataset_names_to_merge':param_dataset_folder_names,
             'esml_previous_step_is_databricks':param_previous_step_is_databricks
             #,'path_gold_to_score_template_path':param_path_gold_to_score_template_path
             #,'esml_optional_unique_scoring_folder':param_optional_unique_scoring_folder

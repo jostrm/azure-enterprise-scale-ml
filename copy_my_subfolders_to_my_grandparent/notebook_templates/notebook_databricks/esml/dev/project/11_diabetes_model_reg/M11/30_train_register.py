@@ -229,17 +229,10 @@ print ("Workspace name", workspace_name)
 # COMMAND ----------
 
 # ESML status / stages
-esml_status_new = "esml_newly_trained" # Something to compare with the LEADING model. Registered to be able to TAGS Test_scoring = mlflow.None
-esml_status_demoted_or_archive = "demoted_or_archive" # Filter out during comparision ~ To demote a model. E.g. model already lost to LEADING model, already compared mlflow.? maybe mlflow.Archived is equivalent?
-esml_status_promoted_2_dev = "esml_promoted_2_dev" # INNER LOOP: A model that WON at some point in time in DEV-stage. The latest registered promoted model is the LEADING model.
-esml_status_promoted_2_test = "esml_promoted_2_test" # OUTER LOOP: A model that WON at some point in time in TEST-stage.
-esml_status_promoted_2_prod = "esml_promoted_2_prod" # OUTER LOOP: A model that WON at some point in time in PROD-stage.
+print(ESMLStatus.esml_status_new)  # Something to compare with the LEADING model. Registered to be able to TAGS Test_scoring = mlflow.None
+print(ESMLStatus.esml_status_new.value)
 
-# MLFlow states: ESML supports MFFlow (and suggestion to AML v2 central registry) uses MLFlow stating: Staging|Archived|Production|None) as below, mapped to ESML
-mflow_stage_none = "None" # esml_status_new = newly trained model in Dev environment, e.g. R&D phase.
-mflow_stage_staging = "Staging" # esml_status_promoted_in_dev esml_status_promoted_2_test  = (Promoted in "Dev" or to "Test" environmet. MLFlow model registry does not have this granularity)
-mflow_stage_production = "Production" # esml_status_promoted_2_prod
-mflow_stage_archive = "Archive" # esml_status_not_new = To demote a model.
+print(ESMLStatus.mflow_stage_none) # Equivalent almist to esml_status_new
 
 # COMMAND ----------
 

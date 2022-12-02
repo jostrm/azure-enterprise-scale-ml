@@ -26,11 +26,19 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
 
         script = "in2silver_ds02_other.py" # Add/CPU: Since static date_folder, "lookup data", but keep CPU
 
-        nb1 = "/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds01_diabetes" #Override/Databricks: IN_2_SILVER
-        nb2 = "/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds02_other"
-        nb3 = "/esml/dev/project/11_diabetes_model_reg/M11/20_merge_2_gold" # # Databricks: MERGE_2_GOLD (or Ignore in map: Use CPU since small/mediuem/large data, and use default global date_folder)
-        nb4 = "/esml/dev/project/11_diabetes_model_reg/M11/21_split_GOLD_and_register_datasets" # Databricks: split dataset
-        nb5 = "/esml/dev/project/11_diabetes_model_reg/M11/30_train_register" #Databricks: TRAIN & REGISER model: Here we need to register and TAG modela according to ESML / MLFlow
+        # Just FYI - Below is a correct path if you do not have connected Azure Databricks to "Repos", e.g. if you are at "Workspace"
+        nb1_not_GIT_connected_correct_url = "/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds01_diabetes" #Override/Databricks: IN_2_SILVER
+
+        # TODO 4 YOU - Hower over notebooks name and copy/paste to get the below prefix. You cannot get this by "righ click on notebook/copy file path relative to root"
+        prefix_error_1_need_to_remove_Workpace = "Workspace/Repos/jostrm@microsoft.com/esml-aifactory002-prj002/notebook_databricks"
+        prefix_error_2_need_to_add_forward_slash = "Repos/jostrm@microsoft.com/esml-aifactory002-prj002/notebook_databricks"
+        prefix_correct = "/Repos/jostrm@microsoft.com/esml-aifactory002-prj002/notebook_databricks"
+
+        nb1 = prefix_correct+"/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds01_diabetes" #Override/Databricks: IN_2_SILVER
+        nb2 = prefix_correct+"/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds02_other"
+        nb3 = prefix_correct+"/esml/dev/project/11_diabetes_model_reg/M11/20_merge_2_gold" # # Databricks: MERGE_2_GOLD (or Ignore in map: Use CPU since small/mediuem/large data, and use default global date_folder)
+        nb4 = prefix_correct+"/esml/dev/project/11_diabetes_model_reg/M11/21_split_GOLD_and_register_datasets" # Databricks: split dataset
+        nb5 = prefix_correct+"/esml/dev/project/11_diabetes_model_reg/M11/30_train_register" #Databricks: TRAIN & REGISER model: Here we need to register and TAG modela according to ESML / MLFlow
 
         step1 = esml_snapshot_step_names.in2silver_template.value.format(dataset_folder_names[0])
         step2 = esml_snapshot_step_names.in2silver_template.value.format(dataset_folder_names[1])
