@@ -5,15 +5,6 @@
         "commonResourceSuffix": {
             "value": "-001"
         },
-        "resourceSuffix": {
-            "value": "-001"
-        },
-        "commonLakeNamePrefixMax8chars":{
-			"value": "bcdefg"
-		},
-        "hybridBenefit":{
-            "value": true
-        },
         "vnetNameBase": {
             "value": "vnt-esmlcmn"
         }

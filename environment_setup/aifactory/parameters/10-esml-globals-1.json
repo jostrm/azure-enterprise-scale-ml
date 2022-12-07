@@ -3,10 +3,10 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "aifactorySuffixRG": {
-            "value": "-005"
+            "value": "-001"
         },
         "commonRGNamePrefix":{
-			"value": "bcd-efg-"
+			"value": "xxx-yyy-"
 		},
         "locationSuffix": {
             "value": "weu"
@@ -22,7 +22,7 @@
                 "Business Area": "NA",
                 "Cost Center": "123456",
                 "Resource Managed By":"The Riddler",
-                "TechnicalContact": "batman@gothamcity.dc",
+                "TechnicalContact": "batman@gothamcity.dc_",
                 "Project": "Batcave upgrade",     
                 "Description": "ESML AI Factory"
             }

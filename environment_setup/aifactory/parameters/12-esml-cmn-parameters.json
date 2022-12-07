@@ -1,0 +1,27 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "common_vnet_cidr":{ 
+			"value": "10.XX.0.0/16"
+		},
+        "common_subnet_cidr": {
+			"value": "10.XX.0.0/20"
+		},
+        "common_subnet_scoring_cidr": {
+			"value": "10.XX.16.0/20"
+		},
+        "common_pbi_subnet_name": {
+			"value": "snet-esml-cmn-pbi-001"
+		},
+        "common_pbi_subnet_cidr": {
+			"value": "10.XX.32.0/24"
+		},
+        "common_bastion_subnet_name": {
+			"value": "AzureBastionSubnet"
+		},
+        "common_bastion_subnet_cidr": {
+			"value": "10.XX.33.0/26"
+		}
+    }
+}

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourceSuffix": {
+            "value": "-001"
+        },
+        "commonLakeNamePrefixMax8chars":{
+			"value": "xxxyyy"
+		},
+        "hybridBenefit":{
+            "value": true
+        },
+        "lakeContainerName":{
+			"value": "lake3"
+		},
+        "adminUsername": {
+            "value": "esmladmin"
+        },
+        "IPwhiteList": {
+            "value": "XX.XXX.XXX.XX"
+        },
+        "centralDnsZoneByPolicyInHub": {
+            "value": false
+        },
+        "tenantId": {
+            "value": "todo_guid"
+        }
+    }
+}
