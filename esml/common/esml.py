@@ -793,7 +793,7 @@ class ESMLProject():
         if(model is None): # guard
             #print("No best model found in this Azure ML Studio, for this ESMLProject and ESMLModel. 1st time")
             return None,None,None,None,None
-        else:
+        else: # Fallback to trry as an AutoML run
             model_name = model.tags["model_name"]
             run_id = model.tags["run_id"]
             experiment = Experiment(self.ws, self.experiment_name)
@@ -953,6 +953,9 @@ class ESMLProject():
         deploy_config = self._compute_factory.get_deploy_config(self, self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
         return deploy_config
     # Returns [service,api_uri, self.kv_aks_api_secret] - the api_secret is stored in your keyvault
+    def deploy_model_as_private_aks_online_endpoint(self, model,inference_config, overwrite_endpoint=True,deployment_config=None):
+        return self.deploy_automl_model_to_aks(model,inference_config, overwrite_endpoint,deployment_config)
+
     def deploy_automl_model_to_aks(self, model,inference_config, overwrite_endpoint=True,deployment_config=None):
 
         if(model is None):

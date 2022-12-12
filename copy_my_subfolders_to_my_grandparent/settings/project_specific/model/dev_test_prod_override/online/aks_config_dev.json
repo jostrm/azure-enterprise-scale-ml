@@ -17,7 +17,7 @@
   "autoscale_refresh_seconds":1,
 
   "aks_agent_count": 1,
-  "aks_vm_size": "Standard_DS13-2_v2",
+  "aks_vm_size": "Standard_B4ms",
   "location": "westeurope",
   "ssl_cert_pem_file": "",
   "ssl_key_pem_file": "",
@@ -30,7 +30,7 @@
   "collect_model_data": false,
   "key_auth_enabled": true,
   "token_auth_enabled": false,
-  "aks_cpu_cores": 1,
+  "aks_cpu_cores": 2,
   "aks_memory_gb": 8,
   "enable_app_insights": false,
   "description": "AKS webserice in DEV environment.",

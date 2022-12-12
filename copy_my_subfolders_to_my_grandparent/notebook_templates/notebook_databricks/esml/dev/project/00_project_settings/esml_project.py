@@ -6,16 +6,18 @@ global emsl_workspace_name
 global esml_workspace_projetNumberFirst
 global azure_rg_project_number
 
+## TODO 4 YOU - START
 esml_env = "dev"
 esml_resource_group="abc-def-esml-project{}-weu-{}-001-rg" # abc-def-esml-project001-weu-dev-001-rg  
 emsl_workspace_name="aml-prj{}-weu-{}-001" # aml-prj002-weu-dev-001
+file_system_name = "lake3"
+adl_name = "todo001{}".format(esml_env) # Storage account name for datalake. Example: 'xxxyyy001{}' becomes 'xxxyyy001dev', xxxyyy001test, xxxyyy001prod
+## TODO 4 YOU END - then goto Cmd 2
+
 esml_workspace_projectNumberFirst = True
 esml_workspace_projectNumberXXX = True
 esml_lake_projectNumberXXX = True
 
-file_system_name = "lake3"
-adl_name = "xxxyyy001{}" # Storage account name for datalake. Example: 'xxxyyy001{}' becomes 'xxxyyy001dev', xxxyyy001test, xxxyyy001prod
-adl_name = adl_name.format(esml_env)
 fs_url = "abfss://"+file_system_name+"@"+adl_name+".dfs.core.windows.net/"
 
 global physical_master
@@ -31,6 +33,7 @@ mount_project_template = "/mnt/prj{}"
 # COMMAND ----------
 
 # DBTITLE 1,Setttings/Project (Who: ESML core team, when onboarding a project)
+## TODO 4 YOU
 azure_rg_project_number = "002"
 
 # COMMAND ----------

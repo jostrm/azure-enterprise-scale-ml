@@ -10,9 +10,10 @@ else:
     import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
+from math import sqrt
 from azureml.core import Run
 import os
-import datetime
+from datetime import datetime
 #import mlflow
 #import mlflow.sklearn
 
@@ -72,6 +73,7 @@ class Trainer(IESMLTrainer):
             
             latest_mse = None
             best_mse = None
+            best_rmse = None
             best_model_file_path = None
 
             '''
@@ -89,8 +91,11 @@ class Trainer(IESMLTrainer):
 
                 preds = reg.predict(data["test"]["X"])
                 mse = mean_squared_error(preds, data["test"]["y"])
+                rmse = sqrt(mse)
                 train_run.log('alpha', alpha)
                 train_run.log('mse', mse)
+                train_run.log('rmse', rmse)
+
                 #mlflow.log_metric("alpha", alpha)
                 #mlflow.log_metric("mse", mse)
 
@@ -103,14 +108,14 @@ class Trainer(IESMLTrainer):
                 #print('ESML Manual training: Current alpha is {0:.2f}, and mse is {1:0.2f}'.format(alpha, mse))
 
                 # Keep track on BEST fitting
-                if(latest_mse is None):
-                    latest_mse = mse
-                    best_mse = latest_mse
+                if(best_mse is None):
+                    best_mse = mse
+                    best_rmse = rmse
                     best_model_file_path = latest_path
                 elif(best_mse is not None):
-                    if(mse <= best_mse):
-                        latest_mse = mse
-                        best_mse = latest_mse
+                    if(mse <= best_mse and rmse < best_rmse):
+                        best_mse = mse
+                        best_rmse = rmse
                         best_model_file_path = latest_path
 
             print("ESML Manual training: Best fitted model is now: {}, since MSE = {}".format(best_model_file_path,best_mse))
@@ -119,7 +124,6 @@ class Trainer(IESMLTrainer):
             try:
                 fitted_model = joblib.load(best_model_file_path)
                 print("ESML Manual training:load Model with joblib.load, name model.pkl SUCCESS for {}".format(best_model_file_path))
-
             except Exception as e:
                 print("ESML Manual training: Cannot load Model with name {}".format(best_model_file_path))
 
@@ -139,10 +143,52 @@ class Trainer(IESMLTrainer):
             )
             mlflow.end_run() # Stop Logging
             '''
+        scoring_tags = self.calculate_test_set_scoring_tags(best_rmse) # passing best_rmse just for DEMO purpose..you need to calculate on self._df_test
+        return train_run, aml_model,fitted_model,best_model_file_path,scoring_tags
 
-        return train_run, aml_model,fitted_model,best_model_file_path
+    def calculate_test_set_scoring_tags(self,best_rmse=None):
 
-    
+        # TODO 4 YOU Calculate your own Test_set scoring, using self._df_test
+        # Alternatively - you can use ESMLTestScoringFactory()
+
+        tags = {}
+        date_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+        def_value_not_set = -1
+        matrix = "[[][]]"
+
+        # Set default values
+        tags["test_set_Accuracy"] ="{:.6f}".format(def_value_not_set)
+        tags["test_set_ROC_AUC"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_Precision"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_Recall"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_F1_Score"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_Matthews_Correlation"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_CM"] = str(matrix)
+        tags["test_set_RMSE"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_R2"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_MAPE"] = "{:.6f}".format(def_value_not_set)
+        tags["test_set_Spearman_Correlation"] = "{:.6f}".format(def_value_not_set)
+        tags["esml_time_updated"] = "{}".format(date_time)
+        tags["ml_type"] = self._ml_type
+
+        # TODO 4 YOU - Add the values you've calculated. Best is to calculate all of them
+        if(self._ml_type == 'classification'):
+            tags["test_set_Accuracy"] ="{:.6f}".format(def_value_not_set)
+            tags["test_set_ROC_AUC"] = "{:.6f}".format(def_value_not_set)
+            tags["test_set_Precision"] = "{:.6f}".format(def_value_not_set)
+            tags["test_set_Recall"] = "{:.6f}".format(def_value_not_set)
+            tags["test_set_F1_Score"] = "{:.6f}".format(def_value_not_set)
+            tags["test_set_Matthews_Correlation"] = "{:.6f}".format(def_value_not_set)
+            tags["test_set_CM"] = str(matrix)
+        elif(self._ml_type == 'regression'):
+            tags["test_set_RMSE"] = "{:.6f}".format(best_rmse) # DEMO - setting this
+            tags["test_set_R2"] = "{:.6f}".format(def_value_not_set)
+            tags["test_set_MAPE"] = "{:.6f}".format(def_value_not_set)
+            tags["test_set_Spearman_Correlation"] = "{:.6f}".format(def_value_not_set)
+            tags["esml_time_updated"] = "{}".format(date_time)
+        
+        return tags
+        
     ##
     # If you want to use AutoML, and not AutoMLStep via ESML and IN_2_GOLD_TRAIN_AUTOML_PIPELINE
     # Then you can override 100% and implement your own AutoML. Example for Image classification, or NLP

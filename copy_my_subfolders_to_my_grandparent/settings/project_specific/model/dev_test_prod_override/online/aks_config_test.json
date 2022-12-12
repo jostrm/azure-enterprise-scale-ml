@@ -16,7 +16,7 @@
   "autoscale_refresh_seconds":1,
 
   "aks_agent_count": 3,
-  "aks_vm_size": "Standard_DS3_v2",
+  "aks_vm_size": "Standard_DS13-2_v2",
   "location": "westeurope",
   "ssl_cert_pem_file": "",
   "ssl_key_pem_file": "",

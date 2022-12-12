@@ -14,6 +14,7 @@ from esmlrt.runtime.ESMLModelCompare2 import ESMLModelCompare
 from esmlrt.runtime.ESMLTestScoringFactory2 import ESMLTestScoringFactory
 from your_code.your_train_code import Trainer
 from azureml.core import Dataset
+import joblib
 
 def init():
     global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws
@@ -50,6 +51,12 @@ def init():
     parser.add_argument('--prod_resourcegroup_id', dest='prod_resourcegroup_id', type=str, required=True)
     parser.add_argument('--prod_workspace_name', dest='prod_workspace_name', type=str, required=True)
     parser.add_argument('--prod_subscription_id', dest='prod_subscription_id', type=str, required=True)
+
+    # optional
+    parser.add_argument('--previous_step_is_databricks', dest='previous_step_is_databricks',help='Flag=1 if previous step is a DatabriksStep',required=False, type=int)
+    parser.add_argument('--esml_gold_train_databricks_path', dest='esml_gold_train_databricks_path',help='Path to Databricks GOLD TRAIN',required=False, type=str)
+    parser.add_argument('--esml_gold_validate_databricks_path', dest='esml_gold_validate_databricks_path',help='Path to Databricks GOLD VALIDATE',required=False, type=str)
+    parser.add_argument('--esml_gold_test_databricks_path', dest='esml_gold_test_databricks_path',help='Path to Databricks GOLD TRAIN TEST',required=False, type=str)
        
     
     args = parser.parse_args()
@@ -196,34 +203,67 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
     # ITrainer: Defaults to using AutoML. Optionally you can implement this. Else you need to implement ITrainer in 'YourTrainer' class
     trainer = Trainer(model_name,esml_modelname,esml_model_alias, esml_current_env, ml_type,train_ds,validate_ds,test_ds)
-    train_run, aml_model,fitted_model,full_local_path = trainer.train(train_ds,validate_ds,target_column_name)
+    train_run, aml_model,fitted_model,full_local_path,new_model_scoring_tags = trainer.train(train_ds,validate_ds,target_column_name)
 
     # Set AutoML equivalent
-    automl_step_run = run # Current run
-    automl_step_run_id = run_id # Current run.id
+    manual_step_run = run # Current run
+    manual_step_run_id = run.id # run_id # Current run.id
     best_run = run # current run
     fitted_model_1 = fitted_model # current trained model
 
-    # CUSTOMIZE ###############
+    # CUSTOMIZE END ###############
+
+    # Upload Scoring script - Only needed if MAnual ML, since AutoML does this automatically TODO 4 YOU - implement this ./your_code/your_scoring_file_v_1_0_0.py
+    path_scoring_file_in_snapshot_folder = './your_code/your_{}'.format(IESMLController.get_known_scoring_file_name())
+    train_run.upload_file(IESMLController.get_known_scoring_file_name(), path_scoring_file_in_snapshot_folder)
+
+    # Copy LEADING model - to known model name and known location = Same thing happens IF Databricks notebooks, passing IESMLController.get_known_model_name_pkl()
+    with open(IESMLController.get_known_model_name_pkl(), "wb") as file:
+        joblib.dump(value=fitted_model, filename='./outputs/'+IESMLController.get_known_model_name_pkl())
 
     ##2 ) Register NEW TRAINED model, with TAG status_code=esml_new_trained
     time_stamp = str(datetime.datetime.now())
     ml_flow_stage = IESMLController._get_flow_equivalent(IESMLController.esml_status_new)
     tags = {"esml_time_updated": time_stamp,"status_code": IESMLController.esml_status_new,"mflow_stage":ml_flow_stage, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
-        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "ManualPython"}
+        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "ManualPython", "ml_type":ml_type}
+
+    # CLEAR scoring & Add potentially new manually calculated TEST_SET SCORING from tags
+    if("test_set_ROC_AUC" in new_model_scoring_tags):
+        tags["test_set_Accuracy"] = new_model_scoring_tags.get("test_set_Accuracy")
+        tags["test_set_ROC_AUC"] = new_model_scoring_tags.get("test_set_ROC_AUC")
+        tags["test_set_Precision"] = new_model_scoring_tags.get("test_set_Precision")
+        tags["test_set_Recall"] = new_model_scoring_tags.get("test_set_Recall")
+        tags["test_set_F1_Score"] = new_model_scoring_tags.get("test_set_F1_Score")
+        tags["test_set_Matthews_Correlation"] = new_model_scoring_tags.get("test_set_Matthews_Correlation")
+        tags["test_set_CM"] = new_model_scoring_tags.get("test_set_CM")
+    if("test_set_RMSE" in new_model_scoring_tags):
+        tags["test_set_RMSE"] = new_model_scoring_tags.get("test_set_RMSE")
+        tags["test_set_R2"] = new_model_scoring_tags.get("test_set_R2")
+        tags["test_set_MAPE"] = new_model_scoring_tags.get("test_set_MAPE")
+        tags["test_set_Spearman_Correlation"] = new_model_scoring_tags.get("test_set_Spearman_Correlation")
+        tags["esml_time_updated"] = time_stamp
 
     ##3) Register NEW model in CURRENT env
     model = controller._register_aml_model(full_local_path=full_local_path,model_name=model_name,tags=tags,target_ws=ws,description_in="")
 
     #4) Calculate Testset scoring on NEW model
-    model, rmse, r2, mean_abs_percent_error,mae,spearman_correlation,plt, class_matthews,class_plt = test_scoring.get_test_scoring_8(ws,target_column_name,test_ds,fitted_model_1,best_run,model)
-    print("Scoring for NEW model is: {},{},{},{}, {}".format(rmse,r2,mean_abs_percent_error,mae,spearman_correlation))
+    model, val_1, val_2, val_3,val_4,val_5,reg_plt_6, val_7,class_plt_8 = controller.ESMLTestScoringFactory.get_test_scoring_8(
+        ws,
+        target_column_name,
+        test_ds,
+        fitted_model_1,
+        best_run, # run or best_run
+        model)
+    print("Scoring for NEW model is::")
+    controller.ESMLTestScoringFactory.print_test_scoring(val_1, val_2, val_2, val_3,val_4,val_5,reg_plt_6,val_7)
+
     a_scoring = ""
     if (controller.ESMLTestScoringFactory.ml_type == "regression"):
-        a_scoring = model.tags.get("test_set_R2")
+        a_scoring = model.tags.get("test_set_RMSE")
+        print("Verifying that at least 1 scoring exists, test_set_RMSE, in TAGS on model: {}".format(a_scoring))
     elif (controller.ESMLTestScoringFactory.ml_type == "classification"):
         a_scoring = model.tags.get("test_set_Accuracy")
-    print("Verifying that at least 1 scoring exists in TAGS on model: {}".format(a_scoring))
+        print("Verifying that at least 1 scoring exists,test_set_Accuracy, in TAGS on model: {}".format(a_scoring))
 
     next_environment = controller.get_next_environment()
 
@@ -235,18 +275,19 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     target_ws = controller.get_target_workspace(current_environment = esml_current_env, current_ws = ws, target_environment = esml_current_env)
 
     promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
-        new_run_id =automl_step_run_id, # pipeline_run_id, #main_run.id,
+        new_run_id =manual_step_run_id, # pipeline_run_id, #main_run.id,
         current_ws = ws,
         current_environment = esml_current_env,
         target_environment = esml_current_env,
         target_workspace = target_ws,
-        experiment_name = controller.experiment_name)
+        experiment_name = controller.experiment_name,
+        new_model = None)
 
    ## 6) REGISTER model, if better than all else, in same environment = DEV
 
     print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
-        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=full_local_path)
+        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=manual_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=full_local_path)
         print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
@@ -254,12 +295,13 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
         print("OUTER LOOP(dev-test): Now trying to compare with models in environment: {}".format(next_environment))
         try:
             promote_new_model,source_model_name,source_run_id,source_best_run,source_model,leading_model = comparer.compare_scoring_current_vs_new_model(
-                new_run_id = automl_step_run_id,
+                new_run_id = manual_step_run_id,
                 current_ws = ws,
                 current_environment = esml_current_env,
                 target_environment = next_environment,
                 target_workspace = target_ws,
-                experiment_name = controller.experiment_name)
+                experiment_name = controller.experiment_name,
+                new_model = None)
 
             print("OUTER LOOP (dev-test): Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
 

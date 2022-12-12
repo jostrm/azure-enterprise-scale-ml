@@ -4,6 +4,10 @@
 
 # COMMAND ----------
 
+#%pip install --upgrade --force-reinstall -r https://aka.ms/automl_linux_requirements.txt
+
+# COMMAND ----------
+
 #dbutils.widgets.removeAll()
 
 # COMMAND ----------
@@ -16,6 +20,7 @@ esml_previous_step_is_databricks = 1 # 1=True, 0=False
 esml_dataset_filename_ending = "*.parquet" # *.parquet | gold_dbx.parquet
 
 esml_aml_model_name = None
+esml_model_name_pkl = 'model.pkl'
 esml_target_column_name = "my_col_name"
 
 try:
@@ -83,6 +88,14 @@ try:
 except Exception as e:
   print(e)
 
+try:
+  dbutils.widgets.text("esml_model_name_pkl","model.pkl", "esml_model_name_pkl")
+  esml_model_name_pkl = dbutils.widgets.get("esml_model_name_pkl")
+  esml_model_name_pkl = getArgument("esml_model_name_pkl")
+  print ("esml_model_name_pkl:",esml_model_name_pkl)
+except Exception as e:
+  print(e)
+
 # COMMAND ----------
 
 # MAGIC %run ../00_model_settings/01_dataset_paths
@@ -97,7 +110,12 @@ except Exception as e:
 
 # COMMAND ----------
 
-print(esml_parameters.esml_target_column_name)
+print("esml_aml_model_name: ".format(esml_parameters.esml_aml_model_name))
+print("esml_model_name_pkl: ".format(esml_parameters.esml_model_name_pkl))
+
+# COMMAND ----------
+
+print("esml_target_column_name: ".format(esml_parameters.esml_target_column_name))
 
 # COMMAND ----------
 
@@ -135,7 +153,45 @@ gold_test_df = (spark.read.option("header","true").parquet(esml_lake.gold_test))
 
 # COMMAND ----------
 
-# MAGIC %md ## REMOTE RUN - we are going to hydrate THIS
+# MAGIC %run ../../../common/azure_functions
+
+# COMMAND ----------
+
+# MAGIC %md # READ splitted data - as Azure ML Datasets (points at same GOLD_TRAIN, ...)
+# MAGIC - You can get the data via your Azure ML workspace also - verisoned Azure ML Datasets
+
+# COMMAND ----------
+
+from azureml.core import Dataset
+resource_group, workspace_name, in_data, out_path,physical_raw_prj01_in,physical_prj01 = getProjectEnvironment(azure_rg_project_number)
+ws = getAzureMLWorkspace()
+
+train_aml_dataset = Dataset.get_by_name(ws,esml_lake.gold_train_dataset_name)
+validate_aml_dataset = Dataset.get_by_name(ws,esml_lake.gold_validate_dataset_name)
+test_aml_dataset = Dataset.get_by_name(ws,esml_lake.gold_test_dataset_name)
+
+# COMMAND ----------
+
+# MAGIC %md ## You can convert an Azure ML Dataset -  to Spark dataframe, or other
+
+# COMMAND ----------
+
+train_aml_dataset
+
+# COMMAND ----------
+
+try: # Only works if Databricks notebook '21_split_GOLD_and_register', did register the Datasets 
+   pandas_df = train_aml_dataset.to_pandas_dataframe()
+   spark_df = train_aml_dataset.to_spark_dataframe()  
+except Exception as e:
+    pass
+    # 'FileDataset' object has no attribute 'to_pandas_dataframe'  azureml/1eb25ff4-7789-4b9f-9897-01a197928be2/M11_GOLD_TRAIN
+    # If pipeline is registering the Dataset - the path will be similar to: 'azureml/1eb25ff4-7789-4b9f-9897-01a197928be2/M11_GOLD_TRAIN'
+
+# COMMAND ----------
+
+# MAGIC %md ## REMOTE Azure ML RUN - we are going to rehydrate THIS
+# MAGIC - If this notebook is called from an Azure ML Pipeline, as a DatabricksStep - we want to hydrate this (to register Model, Metrics & keep lineage)
 
 # COMMAND ----------
 
@@ -301,15 +357,16 @@ fitted_model = None
 full_local_path = None
 
 model_name = experiment_name # The NAME in MODEL registry (Not that model_name TAG - may be different - you choose)
-model_name_tag = experiment_name # A) If you want to keep Model comparison (compare best model) separate considering AutoML runs VS Manual runs
-model_name_tag = esml_parameters.esml_aml_model_name # B) If you want to compare all Models under same Experiment - never mind if AutoML was used or Manual ML
+model_name_tag = experiment_name # A) If you want to keep Model comparison separate considering AutoML runs VS Manual runs
+model_name_tag = esml_parameters.esml_aml_model_name # B) If you want to compare all Models - never mind if AutoML was used or Manual ML
+
 
 if(remote_run is None):
   train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, False,remote_run)
 else:
   train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, True,remote_run)
   
-train_run.upload_file(name = model_name, path_or_stream = full_local_path)
+train_run.upload_file(name = esml_parameters.esml_model_name_pkl, path_or_stream = full_local_path)
 
 # COMMAND ----------
 
@@ -319,10 +376,6 @@ train_run.upload_file(name = model_name, path_or_stream = full_local_path)
 
 # MAGIC %md ### Option A & B, both will benefit of the ESML bootstrap gives you the `Azure ML Workspace`
 # MAGIC - Even though you want to do the MLOps yourself (test-setscoring, promote or not..), ESML gives you "some" acceleration here - the workspace.
-
-# COMMAND ----------
-
-# MAGIC %run ../../../common/azure_functions
 
 # COMMAND ----------
 
@@ -407,13 +460,31 @@ def get_default_localPath(project_number,esml_model_experiment):
 
 # COMMAND ----------
 
+if("test_set_ROC_AUC" in model_source.tags):
+  tags["test_set_Accuracy"] = model_source.tags["test_set_Accuracy"]
+  tags["test_set_ROC_AUC"] = model_source.tags["test_set_ROC_AUC"]
+  tags["test_set_Precision"] = model_source.tags["test_set_Precision"]
+  tags["test_set_Recall"] = model_source.tags["test_set_Recall"]
+  tags["test_set_F1_Score"] = model_source.tags["test_set_F1_Score"]
+  tags["test_set_Matthews_Correlation"] = model_source.tags["test_set_Matthews_Correlation"]
+  tags["test_set_CM"] = model_source.tags["test_set_CM"]
+if("test_set_RMSE" in model_source.tags):
+  tags["test_set_RMSE"] = model_source.tags["test_set_RMSE"]
+  tags["test_set_R2"] = model_source.tags["test_set_R2"]
+  tags["test_set_MAPE"] = model_source.tags["test_set_MAPE"]
+  tags["test_set_Spearman_Correlation"] = model_source.tags["test_set_Spearman_Correlation"]
+if("esml_time_updated " in model_source.tags):
+  tags["esml_time_updated"] = model_source.tags["esml_time_updated"]
+
+# COMMAND ----------
+
 import datetime
 
 model_path = full_local_path
 
 # 1) Register model with 'esml_status_new'
 time_stamp = str(datetime.datetime.now())
-tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":ESMLStatus.mflow_stage_none.value, "run_id": run_id, "model_name": model_name_tag, "trained_in_environment": esml_env, 
+tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":ESMLStatus.mflow_stage_none.value, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_env, 
         "trained_in_workspace": ws.name, "experiment_name": experiment_name, "trained_with": "ManualPysparkDatabricks"}
 
 def register_aml_model_on_run(model_name,model_path,tags):
@@ -434,7 +505,7 @@ except Exception as e:
   print("ESML Fallback: Now registeirng MODEL in MODEL registry directly (since registering via RUN was not possible)")
   register_aml_model(model_path,model_name,tags,ws,projectNumber,experiment_name)
       
-  
+
 
 # COMMAND ----------
 
@@ -466,7 +537,7 @@ except Exception as e:
 # MAGIC 
 # MAGIC # 1) Register model with 'esml_status_new'
 # MAGIC time_stamp = str(datetime.datetime.now())
-# MAGIC tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":"None", "run_id": run_id, "model_name": model_name_tag, "trained_in_environment": esml_env, 
+# MAGIC tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":"None", "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_env, 
 # MAGIC         "trained_in_workspace": ws.name, "experiment_name": experiment_name, "trained_with": "ManualPysparkDatabricks"}
 # MAGIC     
 # MAGIC 

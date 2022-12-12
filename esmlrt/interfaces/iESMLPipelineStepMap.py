@@ -80,9 +80,9 @@ class IESMLPipelineStepMap:
         your_train_map = [
            #{'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':ds_01_str,"dataset_filename_ending":star_csv,'compute_name':'x-p002-aml-rt91','cluster_id':'1234-200000-wimps924'}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
            #{'step_name': step2, 'code': nb2,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':ds_02_str,"dataset_filename_ending":star_csv,'compute_name':'x-p002-aml-rt91','cluster_id':'0912-200000-wimps924'},
-           #{'step_name': step3, 'code': nb3,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':all_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':'x-p002-aml-rt91','cluster_id':'1234-200000-wimps924'},
-           #{'step_name': step4, 'code': nb4,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'1234-200000-wimps924'},
-           #{'step_name': step5, 'code': nb5,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_csv,'compute_name':'s-p002-aml-rt91','cluster_id':'1234-200000-wimps924'},
+           #{'step_name': step3, 'code': nb3,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':all_dataset_folder_names_str,"dataset_filename_ending":star_parquet,'compute_name':'x-p002-aml-rt91','cluster_id':'1234-200000-wimps924'},
+           #{'step_name': step4, 'code': nb4,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'1234-200000-wimps924'},
+           #{'step_name': step5, 'code': nb5,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':"","dataset_filename_ending":star_parquet,'compute_name':'s-p002-aml-rt91','cluster_id':'1234-200000-wimps924'},
         ]
 
         #################### TODO 4 YOU - END ################################
@@ -105,7 +105,7 @@ class IESMLPipelineStepMap:
         if(self._step_filter_whitelist is not None and len(self._step_filter_whitelist) > 0):
            counter = 0
            for white_step_name in self._step_filter_whitelist:
-               step_dic = self.IN_2_GOLD_TRAIN_notebook_mapping[0]
+               step_dic = self.IN_2_GOLD_TRAIN_notebook_mapping[counter]
                if(len(step_dic)> 0):
                     if(white_step_name == step_dic['step_name']):
                         newMapping.append(step_dic)

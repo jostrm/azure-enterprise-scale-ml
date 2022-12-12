@@ -4,6 +4,7 @@ import argparse
 from azureml.core import Run
 from azureml.data.dataset_factory import FileDatasetFactory
 from your_code.your_train_code import Trainer
+from azureml.core import Dataset
 
 def split():
     global gold_to_split,train,validate,test,datastore,train_ds,validate_ds,test_ds,esml_output_lake_template_train,esml_output_lake_template_validate,esml_output_lake_template_test
@@ -16,8 +17,10 @@ def split():
     parser.add_argument('--esml_output_lake_template_train', dest='esml_output_lake_template_train',help='Template path with place holders to write TRAIN dataset',required=True)
     parser.add_argument('--esml_output_lake_template_validate', dest='esml_output_lake_template_validate',help='Template path with place holders to write VALIDATE dataset',required=True)
     parser.add_argument('--esml_output_lake_template_test', dest='esml_output_lake_template_test',help='Template path with place holders to write TEST dataset',required=True)
-
+    
     #Optional
+    parser.add_argument('--previous_step_is_databricks', dest='previous_step_is_databricks',help='Flag=1 if previous step is a DatabriksStep',required=False, type=int)
+    parser.add_argument('--esml_gold_databricks_path', dest='esml_gold_databricks_path',help='Path to Databricks GOLD',required=False, type=str)
     parser.add_argument('--par_esml_env', type=str, help='ESML environment: dev,test,prod', required=False)
         
     args = parser.parse_args()
@@ -28,13 +31,28 @@ def split():
         esml_output_lake_template_train = args.esml_output_lake_template_train
         esml_output_lake_template_validate = args.esml_output_lake_template_validate
         esml_output_lake_template_test = args.esml_output_lake_template_test
+        previous_step_is_databricks = args.previous_step_is_databricks
+        esml_gold_databricks_path = args.esml_gold_databricks_path
 
         run = Run.get_context()
         ws = run.experiment.workspace
         datastore = ws.get_default_datastore()
 
-        gold_to_split = next(iter(run.input_datasets.items()))[1] # Get DATASET
-        print("Azure ML Dataset, golgold_to_splitd_to_score, is = {}".format(gold_to_split))
+        gold_to_split = None # AML Dataset
+
+        if(previous_step_is_databricks is not None):
+            previous_step_is_databricks_bool = bool(int(previous_step_is_databricks))
+            if(previous_step_is_databricks_bool):
+                #projects/project002/11_diabetes_model_reg/train/gold/dev/gold_dbx.parquet/*.parquet
+                print("Full path to Databricks parquet file {}".format(esml_gold_databricks_path))
+                gold_to_split = Dataset.Tabular.from_parquet_files(path = [(datastore, esml_gold_databricks_path)])
+            else:
+                gold_to_split = next(iter(run.input_datasets.items()))[1] # Get DATASET
+                print(" Azure ML Dataset, golgold_to_splitd_to_score, is = {}".format(gold_to_split))
+        else:
+            gold_to_split = next(iter(run.input_datasets.items()))[1] # Get DATASET
+            print(" Azure ML Dataset, golgold_to_splitd_to_score, is = {}".format(gold_to_split))
+
         
         
         # 1) Register TRAIN df as dataset
@@ -84,7 +102,6 @@ def register(train,validate,test):
             
             path = train_ds + "/"+ train_file
 
-            print("Saving result as PARQUET at: {}".format(path))
             print ("train_ds.path is: {}".format(path))
             print("Local Path from run.output_datasets[train_ds]:{}/{}'".format(train_ds,train_file))
 
@@ -94,7 +111,6 @@ def register(train,validate,test):
             #print ("esml_output_lake_template path: {}".format(new_path))
             #FileDatasetFactory.upload_directory(src_dir=train_ds, target=(datastore, new_path), pattern=None, overwrite=True, show_progress=False)
 
-            print("Registering VALIDATE dataframe as Azure ML Dataset")
         if not (validate_ds is None):
             os.makedirs(validate_ds, exist_ok=True)
             print("%s created" % validate_ds)

@@ -42,6 +42,7 @@ from azureml.exceptions import ComputeTargetException
 from azureml.pipeline.steps import DatabricksStep
 from azureml.data.data_reference import DataReference
 import sys
+import uuid
 
 try:
     sys.path.insert(0, "../azure-enterprise-scale-ml/")
@@ -337,7 +338,7 @@ class ESMLPipelineFactory():
                 par_dic = {
                     parameters[0].name: parameters[0].default_value, # esml_inference_model_version
                     parameters[1].name: parameters[1].default_value,# esml_scoring_folder_date | par_esml_training_date
-                    parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
+                    #parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
                     parameters[3].name: parameters[3].default_value, # par_esml_dev_test_prod
                     parameters[4].name: parameters[4].default_value # par_esml_inference_mode
                 }
@@ -354,7 +355,7 @@ class ESMLPipelineFactory():
                 par_dic = {
                     parameters[0].name: parameters[0].default_value, # esml_inference_model_version
                     parameters[1].name: parameters[1].default_value,# esml_scoring_folder_date | par_esml_training_date
-                    parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
+                    #parameters[2].name: parameters[2].default_value, # esml_optional_unique_scoring_folder # par_esml_dev_test_prod
                     parameters[3].name: parameters[3].default_value, # par_esml_dev_test_prod
                     parameters[4].name: parameters[4].default_value, # par_esml_inference_mode
                     parameters[5].name: parameters[5].default_value # par_esml_split_percentage
@@ -469,8 +470,17 @@ class ESMLPipelineFactory():
             if(not only_info):
                 shutil.copy(source, target_file)
 
-            # iESMLPipelineStepMap (optional: only needed to be implemented/used if overriding compute, for certain steps)
+            # BACKUP iESMLPipelineStepMap (optional: only needed to be implemented/used if overriding compute, for certain steps)
+            uid = uuid.uuid4().hex
+            # BACKUP - ESMLPipelineStepMap if exists
             source_file = "ESMLPipelineStepMap.py"
+            bak_name = "{}.bak_{}".format(source_file,uid[0:5])
+            target_file = self._snapshot_folder + "your_code/" + source_file
+            backup_file = self._snapshot_folder + "your_code/" + bak_name
+            if os.path.exists(target_file):
+                if(not only_info):
+                    shutil.copy(target_file, backup_file)
+            # COPY new file from template
             source = self._script_template_enterprise + "/your_code/" + source_file
             target_file = self._snapshot_folder + "your_code/" + source_file
             if(not only_info):
@@ -777,6 +787,7 @@ class ESMLPipelineFactory():
                             print("Initiated DEFAULT compute - for DATASETS")
                         compute, runconfig = self.add_in2silver_step(same_compute_for_all, step_array, self._default_compute, compute_suffix, self._is_training, d,curated_environment)
                         self._at_least_1_ptyhonScriptStep = True
+                        previous_step_is_databricks = 0
                     compute_suffix = compute_suffix+1
             
             gold_to_score= None
@@ -813,6 +824,7 @@ class ESMLPipelineFactory():
                             self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
                         gold_to_score = self.create_gold_to_score_step(self._default_compute,runconfig,step_array,datasets_with_dbx)
                         self._at_least_1_ptyhonScriptStep = True
+                        previous_step_is_databricks = 0
                 else:
                     print("ESML regular mode")
                     if(self._default_compute is None): # Create initial compute
@@ -820,6 +832,7 @@ class ESMLPipelineFactory():
                         self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
                     gold_to_score = self.create_gold_to_score_step(self._default_compute,runconfig,step_array)
                     self._at_least_1_ptyhonScriptStep = True
+                    previous_step_is_databricks = 0
 
                 step_array.append(gold_to_score)
             
@@ -833,21 +846,22 @@ class ESMLPipelineFactory():
                             print(" - Step: {} has advanced mapping - an Azure Databricks mapping for: {}".format(esml_snapshot_step_names.silver_merged_2_gold.value,esml_pipeline_types.IN_2_GOLD_SCORING))
                             # TODO: 
                             print("TODO - this is not implemented yet: IN_2_GOLD_SCORING DataBricksStep")
-                            is_step_before_databricks = True
+                            previous_step_is_databricks = 1
                         else:
-                            is_step_before_databricks = False
                             if(self._default_compute is None): # Create initial compute
                                 #is_train = False if self.p.inference_mode else True
                                 print("Initiated DEFAULT compute - for step {}  (since not initiated before at in_2_silver steps creation)".format("GOLD_SCORING"))
                                 self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
                             step_array.append(self.create_score_gold_step(self._default_compute,runconfig,gold_to_score))
                             self._at_least_1_ptyhonScriptStep = True
+                            previous_step_is_databricks = 0
                     else:
                         if(self._default_compute is None): # Create initial compute
                             print("Initiated DEFAULT compute - for step {}  (since not initiated before at in_2_silver steps creation)".format("GOLD_SCORING"))
                             self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
                         step_array.append(self.create_score_gold_step(self._default_compute,runconfig,gold_to_score))
                         self._at_least_1_ptyhonScriptStep = True
+                        previous_step_is_databricks = 0
 
                 elif(pipeline_type == esml_pipeline_types.GOLD_SCORING):
                     raise NotImplementedError("Not suppported in your ESML version. Please ask admin for private preview, or run IN_2_GOLD_SCORING instead of only GOLD_SCORING")
@@ -874,20 +888,20 @@ class ESMLPipelineFactory():
                             step_key = esml_snapshot_step_names.train_split_and_register.value,
                             previous_step_is_databricks=previous_step_is_databricks
                         )
-                        is_step_before_databricks = True
+                        previous_step_is_databricks = 1
                     else:
                         if(self._default_compute is None): # Create initial compute
                             print("Initiated DEFAULT compute - for step {} ".format(esml_snapshot_step_names.train_split_and_register.value))
                             self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
-                        split_gold = self.create_split_gold_step(self._default_compute,runconfig,gold_to_score)
-                        is_step_before_databricks = False
+                        split_gold = self.create_split_gold_step(self._default_compute,runconfig,gold_to_score,previous_step_is_databricks)
+                        previous_step_is_databricks = 0
                         self._at_least_1_ptyhonScriptStep = True
                 else:
                     if(self._default_compute is None): # Create initial compute
                         print("Initiated DEFAULT compute - for step {} ".format(esml_snapshot_step_names.train_split_and_register.value))
                         self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
-                    split_gold = self.create_split_gold_step(self._default_compute,runconfig,gold_to_score)
-                    is_step_before_databricks = False
+                    split_gold = self.create_split_gold_step(self._default_compute,runconfig,gold_to_score,previous_step_is_databricks)
+                    previous_step_is_databricks = 0
                     self._at_least_1_ptyhonScriptStep = True
 
                 step_array.append(split_gold)
@@ -913,20 +927,21 @@ class ESMLPipelineFactory():
                                 )
 
                             step_array.append(train_manual_dbx_step)
-                            is_step_before_databricks = True
+                            previous_step_is_databricks = 1
                         else:
                             if(self._default_compute is None): # Create initial compute
                                 print("Initiated DEFAULT compute - for step {} ".format("IN_2_GOLD_TRAIN_MANUAL"))
                                 self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
-                            step_array.append(self.create_train_gold_step_manual(self._default_compute,runconfig,split_gold))
-                            is_step_before_databricks = False
+                            step_array.append(self.create_train_gold_step_manual(self._default_compute,runconfig,split_gold,previous_step_is_databricks))
+                            previous_step_is_databricks = 0
                             self._at_least_1_ptyhonScriptStep = True
                     else:
                         if(self._default_compute is None): # Create initial compute
                             print("Initiated DEFAULT compute - for step {} ".format("IN_2_GOLD_TRAIN_MANUAL"))
                             self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
-                        step_array.append(self.create_train_gold_step_manual(self._default_compute,runconfig,split_gold))
+                        step_array.append(self.create_train_gold_step_manual(self._default_compute,runconfig,split_gold,previous_step_is_databricks))
                         self._at_least_1_ptyhonScriptStep = True
+                        previous_step_is_databricks = 0
 
                 elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
                     if(advanced_mode):
@@ -934,11 +949,12 @@ class ESMLPipelineFactory():
                             print("Initiated DEFAULT compute - for step {} ".format("IN_2_GOLD_TRAIN_AUTOML"))
                             self._default_compute,runconfig = self.create_compute(same_compute_for_all=True, compute=self._default_compute, compute_suffix = "", train=self._is_training, curated_environment=curated_environment)
 
-                        # TODO: pass: is_step_before_databricks
+                        # TODO: pass: previous_step_is_databricks
                         train_automl_step,model_data,metrics_data = self.create_train_automl_step(self._default_compute,runconfig,split_gold)
                         step_array.append(train_automl_step)
                         step_array.append(self.create_post_AutoMLStep(self._default_compute,runconfig,split_gold,train_automl_step,model_data,metrics_data))
                         self._at_least_1_ptyhonScriptStep = True
+                        previous_step_is_databricks = 0
                     else:
                         if(self._default_compute is None): # Create initial compute
                             print("Initiated DEFAULT compute - for step {} ".format("IN_2_GOLD_TRAIN_AUTOML"))
@@ -947,6 +963,7 @@ class ESMLPipelineFactory():
                         step_array.append(train_automl_step)
                         step_array.append(self.create_post_AutoMLStep(self._default_compute,runconfig,split_gold,train_automl_step,model_data,metrics_data))
                         self._at_least_1_ptyhonScriptStep = True
+                        previous_step_is_databricks = 0
             
             '''
             if (advanced_mode):
@@ -1038,14 +1055,16 @@ class ESMLPipelineFactory():
 
         return silver_input_array,silver_names
 
-    def create_split_gold_step(self,compute, runconfig, gold_to_split_step):
+    def create_split_gold_step(self,compute, runconfig, gold_to_split_step,previous_step_is_databricks=0):
         p = self.p
-        
+
         # IN: Gold to score
         if(type(gold_to_split_step) is OutputFileDatasetConfig):  # esml_pipeline_type.SCORE_GOLD 
             gold_to_split = gold_to_split_step # gives us the "OutputFileDatasetConfig"
         else: # esml_pipeline_type.IN_2_GOLD_SCORING
             gold_to_split = gold_to_split_step._outputs[0] # gives us the "OutputFileDatasetConfig"
+
+        gold_to_score,path_gold_to_score_template_path,gold_to_score_name = self.create_output_gold_2_score(self.p, is_databricks=True)
 
         # OUT: Splitted datasets
 
@@ -1101,9 +1120,12 @@ class ESMLPipelineFactory():
             "--par_esml_inference_mode", self.batch_pipeline_parameters[4], # does not need to be a parameter that changes runtime...but at DEFINITION time.
             "--esml_output_lake_template_train",train_path,
             "--esml_output_lake_template_validate",validate_path,
-            "--esml_output_lake_template_test",test_path
+            "--esml_output_lake_template_test",test_path,
+            "--previous_step_is_databricks",previous_step_is_databricks, # optional
+            "--esml_gold_databricks_path",p.GoldPathDatabricks # optional
             ],
-            inputs=[gold_to_split.as_input(gold_to_split.name)], 
+            inputs=[gold_to_split.as_input(gold_to_split.name)],
+            #inputs=input_array,
             outputs=[train_ds,validate_ds,test_ds], 
             source_directory=self.get_snapshot_dir_relative(),
             compute_target=compute,
@@ -1112,7 +1134,7 @@ class ESMLPipelineFactory():
 
         return step_split_gold
 
-    def create_train_gold_step_manual(self,compute, runconfig, gold_to_split_step):
+    def create_train_gold_step_manual(self,compute, runconfig, gold_to_split_step, previous_step_is_databricks=0):
         p = self.p
 
         # Get model name info, and current model info
@@ -1122,6 +1144,15 @@ class ESMLPipelineFactory():
         train_folder_template_with_date_and_run_id = p.path_gold_scored_template(date_folder=False,id_folder=True, inference_mode = False)
         print("train_folder_template_with_date_id: {}".format(train_folder_template_with_date_and_run_id))
 
+        esml_gold_train_databricks_path = ""
+        esml_gold_validate_databricks_path = ""
+        esml_gold_test_databricks_path = ""
+        if(previous_step_is_databricks):
+            train_path,validate_path,test_path = p.path_gold_train_splitted_template() # projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{id_folder}}/
+            esml_gold_train_databricks_path = train_path.format(id_folder="gold_train_dbx.parquet")+ '*.parquet'  # gold_train_dbx.parquet
+            esml_gold_validate_databricks_path = validate_path.format(id_folder="gold_validate_dbx.parquet")+ '*.parquet'  # gold_validate_dbx.parquet
+            esml_gold_test_databricks_path = esml_gold_test_databricks_path.format(id_folder="gold_test_dbx.parquet")+ '*.parquet'  # gold_test_dbx.parquet
+        
         train_out = None
         validate_out = None
         test_out = None
@@ -1178,7 +1209,11 @@ class ESMLPipelineFactory():
             "--test_subscription_id",  all_envs["test"]["subscription_id"],
             "--prod_resourcegroup_id", all_envs["prod"]["resourcegroup_id"],
             "--prod_workspace_name", all_envs["prod"]["workspace_name"],
-            "--prod_subscription_id", all_envs["prod"]["subscription_id"]
+            "--prod_subscription_id", all_envs["prod"]["subscription_id"],
+            "--previous_step_is_databricks", previous_step_is_databricks,
+            "--esml_gold_train_databricks_path", esml_gold_train_databricks_path,
+            "--esml_gold_validate_databricks_path", esml_gold_validate_databricks_path,
+            "--esml_gold_test_databricks_path", esml_gold_test_databricks_path
             ],
             inputs=[train_out.as_input(train_out.name),validate_out.as_input(validate_out.name),test_out.as_input(test_out.name)], 
             outputs=[last_gold_training_run], 
@@ -1776,7 +1811,8 @@ class ESMLPipelineFactory():
             notebook_path=notebook_path,
             notebook_params={'esml_inference_mode': param_inference,'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':dataset_filename_ending,
             'esml_target_column_name':param_target_column_name,'esml_previous_step_is_databricks':param_previous_step_is_databricks,
-            'esml_training_folder_date':param_date_folder_utc,'esml_inference_model_version':param_model_version,'esml_aml_model_name':param_model_name
+            'esml_training_folder_date':param_date_folder_utc,'esml_inference_model_version':param_model_version,'esml_aml_model_name':param_model_name,
+            'esml_model_name_pkl':IESMLController.get_known_model_name_pkl()
             },
             run_name=dbx_notebook_name,
             compute_target=databricks_compute,

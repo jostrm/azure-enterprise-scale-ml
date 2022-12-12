@@ -15,6 +15,8 @@ from azureml.exceptions import ProjectSystemException
 import joblib
 import time
 import datetime
+import os
+from azureml.core.model import InferenceConfig
 
 class IESMLController:
     __metaclass__ = ABCMeta
@@ -114,6 +116,13 @@ class IESMLController:
 
         self.dev_test_prod = "dev" # Set default value
 
+    @staticmethod
+    def get_known_model_name_pkl():
+        return 'model.pkl'#'esml_leading_model.pkl'
+    @staticmethod
+    def get_known_scoring_file_name(version_number=0):
+        return 'scoring_file_v_1_0_{}.py'.format(version_number)
+        
     ###
     # properties
     ###
@@ -345,7 +354,40 @@ class IESMLController:
         return experiment, aml_model, main_run, best_automl_run,fitted_model # self._esml_model_name
 
     @staticmethod
-    def init_run(ws,experiment_name, run_id, run_type="automl_run"):
+    def get_best_model_inference_config(ws,experiment_name):
+        current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,experiment_name)
+        run,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, run_id_tag,current_model)
+        the_run = best_run
+        inference_config = None
+
+        old_loc = os.getcwd()
+        try:
+            os.chdir(os.path.dirname(__file__))
+            script_file_local = "../../../settings/project_specific/model/dev_test_prod/train/ml/scoring_file_{}.py".format(model_name)
+            try:
+                target_path = 'outputs/'+IESMLController.get_known_scoring_file_name()
+                the_run.download_file(target_path, script_file_local)
+                print("Downloaded scoring file from outputs/ successfully")
+            except:
+                target_path = IESMLController.get_known_scoring_file_name()
+                the_run.download_file(target_path, script_file_local)
+                print("Downloaded scoring file from ./ successfully")
+
+
+            script_file_abs = os.path.abspath(script_file_local)
+            inference_config = InferenceConfig(environment=the_run.get_environment(), entry_script=script_file_abs)
+        except Exception as e:
+            print("Error: If best model is a MANUAL model, you need to have created and uploaded a SCORING_FILE, at your training pipeline run, at {}.".format(target_path))
+            print("- The name of the scoring file you can retrieve with {}, example of location now missing: {}".format(target_path))
+            print("- Note: If AutoML is the BEST model, then AutoML have created a scoring_file automatcally, and this error would not occur")
+            print ("- Run:{} and Model name: {} with model-version {}".format(run_id_tag,current_model.name,current_model.version))
+            print(e)
+        finally:
+             os.chdir(old_loc)
+        return inference_config, current_model, the_run
+
+    @staticmethod
+    def init_run(ws,experiment_name, run_id, best_model = None):
         exp = Experiment(workspace=ws, name=experiment_name)
         run = None
         best_run = None # AutoML only
@@ -367,22 +409,38 @@ class IESMLController:
             pipeline_run = PipelineRun(experiment=exp, run_id=run_id)
             #pipeline_run = run.parent # Parent is the pipeline run, current is the current step.
 
-            ## TODO
-            # If AutoML run. If TRAIN - not if INFERENCE
+            ##
+            # If AutoML run or Manual step. If TRAIN - not if INFERENCE
             ##
             step_list = list(pipeline_run.get_steps())
             step_len = len(step_list) # 6
             if(step_len == 0): # StepRun = Manual
                 run = pipeline_run.parent
                 best_run = pipeline_run
+                try:
+                    model_name = best_run.experiment.tags['model_name']
+                    best_model_version = best_run.experiment.tags['best_model_version'] # latest promoted
+                    m = None
 
-                model_name = best_run.experiment.tags['model_name']
-                best_model_version = best_run.experiment.tags['best_model_version'] # latest promoted
-                m = Model(workspace=ws,name=model_name, version=best_model_version)
+                    m = Model(workspace=ws,name=model_name, version=best_model_version)
+                    m2 = best_model
+                    if (m.name != m2.name):
+                        print("ESML Warning - best_model.name != best_run.experiment.tags['model_name'] - choosing run name")
+                    
+                    #if(best_model is None):
+                    #    m = Model(workspace=ws,name=model_name, version=best_model_version)
+                    #else:
+                    #    m = best_model
+               
+                    model_path = 'outputs_or_other/{}.pkl'.format(m.name) # does not matter what path, it is the local target
+                    m_path = m.download(target_dir=model_path, exist_ok=True)
+                    fitted_model = joblib.load(m_path)
+                except Exception as e:
+                    print("ESML VARNING: Could not load FITTED model via Experiment model tag and via Model() - now trying to dowload .pkl with default name: ESML_LEADING_MODEL.pkl, directly from RUN")
+                    best_run.download_files() #  (target_dir=wrong_model_path, exist_ok=True)
+                    m_path = './outputs/'+IESMLController.get_known_model_name_pkl()
+                    fitted_model = joblib.load(m_path)
 
-                model_path = 'outputs_or_other/{}.pkl'.format(m.name) # does not matter what path, it is the local target
-                m_path = m.download(target_dir=model_path, exist_ok=True)
-                fitted_model = joblib.load(m_path)
             else: # AutoML pipeline
                 automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
 

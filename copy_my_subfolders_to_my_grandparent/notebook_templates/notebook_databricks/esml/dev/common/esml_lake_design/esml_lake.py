@@ -1,10 +1,14 @@
 # Databricks notebook source
-model_folder_name = '/11_diabetes_model_reg'
-datasets = {"ds01_diabetes","ds02_other"}
+import pathlib
 
-active_in_train = "2021/01/01"
-active_in_scoring = "2021/01/01"
-active_model_version = "1"
+# COMMAND ----------
+
+#model_folder_name = '/11_diabetes_model_reg'
+#datasets = {"ds01_diabetes","ds02_other"}
+
+#active_in_train = "2021/01/01"
+#active_in_scoring = "2021/01/01"
+#active_model_version = "1"
 
 # COMMAND ----------
 
@@ -27,6 +31,7 @@ class ESMLLake(object):
   _train_gold_test = None
   _train_gold_validate = None
   _train_gold_test = None
+  _model_alias = None
   
   @property
   def inference_mode(self):
@@ -68,22 +73,30 @@ class ESMLLake(object):
   @property
   def gold_test(self):
       return self._train_gold_test
+  @property
+  def gold_train_dataset_name(self):
+      return self._model_alias + '_GOLD_TRAIN'
+  @property
+  def gold_test_dataset_name(self):
+      return self._model_alias + '_GOLD_TEST'
+  @property
+  def gold_validate_dataset_name(self):
+      return self._model_alias + '_GOLD_VALIDATE'
     
   def __init__(self, lake_version="1.3"):
     resource_group, workspace_name, mount_master, mount_project,physical_master,physical_project = getProjectEnvironment(azure_rg_project_number)
     self.mount_project = mount_project
     self.lake_version = lake_version
       
-  def init_esml_lake_design(self,azure_rg_project_number="02",model_folder_name='/11_diabetes_model_reg'):
-
+  def init_esml_lake_design(self,azure_rg_project_number="02",model_folder_name='/11_diabetes_model_reg', model_alias='M01'):
     self.esml_train = self.mount_project+model_folder_name+ "/train"
     self.esml_inference = self.mount_project+model_folder_name+ "/inference"
-
 
     self._train_gold = self.esml_train +"/gold/" +esml_env+ "/" + "gold_dbx.parquet"
     self._train_gold_train = self.esml_train +"/gold/" +esml_env+ "/Train/" + "gold_train_dbx.parquet"
     self._train_gold_validate = self.esml_train +"/gold/" +esml_env+ "/Validate/" + "gold_validate_dbx.parquet"
     self._train_gold_test = self.esml_train +"/gold/" +esml_env+ "/Test/" + "gold_test_dbx.parquet"
+    self._model_alias = model_alias
 
     active_in_folder = self.esml_train +"/active/active_in_folder.json" # datefolder
     active_scoring_in_folder =  self.esml_inference +"/active/active_scoring_in_folder.json" # modelversion, datafolder
@@ -120,3 +133,11 @@ class ESMLLake(object):
     #inference_in = dict()
     #inference_out_bronze = dict()
     #inference_out_silver = dict()
+    
+  def get_physical_path(self,physical_project_path,mount_dataset_path):
+    p = pathlib.Path(mount_dataset_path)
+    p.parts[3:]
+    physical_p = physical_project_path + '/' + str(pathlib.Path(*p.parts[3:]))
+    physical_rel = physical_p[physical_p.index('.net')+4:] +'/'
+    physical_rel_full = physical_rel + '*.parquet'
+    return physical_rel_full
