@@ -1988,7 +1988,7 @@ class ESMLProject():
             try:
                 self.inference_mode = False
                 train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
-                full_path = validate_path.format(id_folder="gold_validate_dbx.parquet")
+                full_path = validate_path.format(id_folder="gold_validate_dbx.parquet/*.parquet")
                 aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.lakestore, full_path)])
                 df_test = aml_dataset_in.to_pandas_dataframe()
             finally:
@@ -2020,7 +2020,7 @@ class ESMLProject():
             try:
                 self.inference_mode = False
                 train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
-                full_path = validate_path.format(id_folder="gold_validate_dbx.parquet")
+                full_path = validate_path.format(id_folder="gold_validate_dbx.parquet/*.parquet")
                 aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.lakestore, full_path)])
                 df_test = aml_dataset_in.to_pandas_dataframe()
             finally:
