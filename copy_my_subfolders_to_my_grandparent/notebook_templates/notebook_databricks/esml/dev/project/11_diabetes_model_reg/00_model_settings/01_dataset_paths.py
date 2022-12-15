@@ -76,7 +76,7 @@ else:
 if('esml_model_name_pkl' in vars() or 'esml_model_name_pkl' in globals() and esml_model_name_pkl is not None):
   print("esml_model_name_pkl:",esml_model_name_pkl)
 else:
-  esml_model_name_pkl = None
+  esml_model_name_pkl = 'model.pkl'
   
 print("")
 print("ESML INPUT PARAMETERS - for PIPELINE, END") 
@@ -130,8 +130,9 @@ class ESMLParameters(object):
   _esml_target_column_name = None
   _esml_aml_model_name = None
   _esml_model_name_pkl = None
+  _esml_dbfs_model_path = None
   
-  def __init__(self,esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending,
+  def __init__(self,esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending,dbfs_model_path,
               esml_dataset_names=None, esml_date_folder=None,esml_split_percentage=None,esml_target_column_name=None,esml_aml_model_name=None,esml_model_name_pkl=None):
     
     self._esml_date_folder = esml_date_folder
@@ -145,7 +146,12 @@ class ESMLParameters(object):
     self._esml_target_column_name = esml_target_column_name
     self._esml_aml_model_name = esml_aml_model_name
     self._esml_model_name_pkl = esml_model_name_pkl
+    self._esml_dbfs_model_path = dbfs_model_path
     
+  @property
+  def esml_dbfs_model_path(self):
+    return self._esml_dbfs_model_path
+
   @property
   def esml_aml_model_name(self):
     return self._esml_aml_model_name
@@ -177,7 +183,8 @@ class ESMLParameters(object):
   def esml_target_column_name(self):
     return self._esml_target_column_name
   
-esml_parameters = ESMLParameters(esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending
+dbfs_model_path = '/dbfs' + mount_project_template.format(azure_rg_project_number) +'/'+ experiment_name + '/train/model/'
+esml_parameters = ESMLParameters(esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending,dbfs_model_path
                                  ,esml_dataset_names, esml_date_folder,esml_split_percentage,esml_target_column_name,esml_aml_model_name,esml_model_name_pkl)
 
 # COMMAND ----------

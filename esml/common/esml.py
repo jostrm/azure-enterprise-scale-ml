@@ -1980,7 +1980,15 @@ class ESMLProject():
                     label = gt.tags["label"]
                 except:
                     raise UserErrorException("You need to provide LABEL as argument, since Azure Dataset {} TAGS,  did not contain the label info.".format(self.GoldValidate.name))
-        df_test = gt.to_pandas_dataframe()
+        df_test = None
+        try:
+            df_test = gt.to_pandas_dataframe()
+        except Exception as e:
+            train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
+            full_path = validate_path.format(id_folder="gold_validate_dbx.parquet")
+            aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.self.lakestore, full_path)])
+            df_test = aml_dataset_in.to_pandas_dataframe()
+
         print("{} : {}".format(self.GoldValidate.name, df_test.shape))
         X_test = df_test.drop([label], axis=1)
         print("X_test ",X_test.shape)
@@ -1998,7 +2006,16 @@ class ESMLProject():
                 label = gt.tags["label"]
             except:
                 raise UserErrorException("You need to provide LABEL as argument, since Azure Dataset {} TAGS,  did not contain the label info.".format(self.GoldTest.name))
-        df_test = gt.to_pandas_dataframe()
+        
+        df_test = None
+        try:
+            df_test = gt.to_pandas_dataframe()
+        except Exception as e:
+            train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
+            full_path = test_path.format(id_folder="gold_test_dbx.parquet")
+            aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.self.lakestore, full_path)])
+            df_test = aml_dataset_in.to_pandas_dataframe()
+
         print("{} : {}".format(self.GoldTest.name, df_test.shape))
         X_test = df_test.drop([label], axis=1)
         print("X_test ",X_test.shape)

@@ -12,6 +12,15 @@
 
 # COMMAND ----------
 
+notebook_user_interactive_mode = False
+
+# COMMAND ----------
+
+import azureml.core
+print(azureml.core.VERSION)
+
+# COMMAND ----------
+
 esml_date_folder_utc = None
 esml_model_version = 0
 esml_inference_mode = 1 # train = 1, inference=0 (not relevant here)
@@ -112,9 +121,6 @@ except Exception as e:
 
 print("esml_aml_model_name: ".format(esml_parameters.esml_aml_model_name))
 print("esml_model_name_pkl: ".format(esml_parameters.esml_model_name_pkl))
-
-# COMMAND ----------
-
 print("esml_target_column_name: ".format(esml_parameters.esml_target_column_name))
 
 # COMMAND ----------
@@ -207,7 +213,7 @@ from azureml.core import Run
 import os
 
 try:
-  dbutils.widgets.text("--AZUREML_RUN_TOKEN","a token", "AZUREML_RUN_TOKEN")
+  dbutils.widgets.text("--AZUREML_RUN_TOKEN","ignore this", "AZUREML_RUN_TOKEN")
   AZUREML_RUN_TOKEN_w = dbutils.widgets.get("--AZUREML_RUN_TOKEN")
   AZUREML_RUN_TOKEN = getArgument("--AZUREML_RUN_TOKEN")
   #print ("--AZUREML_RUN_TOKEN:",AZUREML_RUN_TOKEN)
@@ -215,7 +221,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_RUN_TOKEN_EXPIRY","a token ecpiry", "AZUREML_RUN_TOKEN_EXPIRY")
+  dbutils.widgets.text("--AZUREML_RUN_TOKEN_EXPIRY","ignore this", "AZUREML_RUN_TOKEN_EXPIRY")
   AZUREML_RUN_TOKEN_EXPIRY_w = dbutils.widgets.get("--AZUREML_RUN_TOKEN_EXPIRY")
   AZUREML_RUN_TOKEN_EXPIRY = getArgument("--AZUREML_RUN_TOKEN_EXPIRY")
   print ("--AZUREML_RUN_TOKEN_EXPIRY:",AZUREML_RUN_TOKEN_EXPIRY)
@@ -223,7 +229,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_RUN_ID","a run id", "AZUREML_RUN_ID")
+  dbutils.widgets.text("--AZUREML_RUN_ID","ignore this", "AZUREML_RUN_ID")
   AZUREML_RUN_ID_w = dbutils.widgets.get("--AZUREML_RUN_ID")
   AZUREML_RUN_ID = getArgument("--AZUREML_RUN_ID")
   print ("--AZUREML_RUN_ID:",AZUREML_RUN_ID)
@@ -231,15 +237,16 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_ARM_SUBSCRIPTION","a rg", "AZUREML_ARM_SUBSCRIPTION")
+  dbutils.widgets.text("--AZUREML_ARM_SUBSCRIPTION","ignore this", "AZUREML_ARM_SUBSCRIPTION")
   AZUREML_ARM_SUBSCRIPTION_w = dbutils.widgets.get("--AZUREML_ARM_SUBSCRIPTION")
   AZUREML_ARM_SUBSCRIPTION = getArgument("--AZUREML_ARM_SUBSCRIPTION")
   print ("--AZUREML_ARM_SUBSCRIPTION:",AZUREML_ARM_SUBSCRIPTION)
+  print("Verride with sub_id_not_redacted")
 except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_ARM_RESOURCEGROUP","a rg", "AZUREML_ARM_RESOURCEGROUP")
+  dbutils.widgets.text("--AZUREML_ARM_RESOURCEGROUP","ignore this", "AZUREML_ARM_RESOURCEGROUP")
   AZUREML_ARM_RESOURCEGROUP_w = dbutils.widgets.get("--AZUREML_ARM_RESOURCEGROUP")
   AZUREML_ARM_RESOURCEGROUP = getArgument("--AZUREML_ARM_RESOURCEGROUP")
   print ("--AZUREML_ARM_RESOURCEGROUP:",AZUREML_ARM_RESOURCEGROUP)
@@ -247,7 +254,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_ARM_WORKSPACE_NAME","a rg", "AZUREML_ARM_WORKSPACE_NAME")
+  dbutils.widgets.text("--AZUREML_ARM_WORKSPACE_NAME","ignore this", "AZUREML_ARM_WORKSPACE_NAME")
   AZUREML_ARM_WORKSPACE_NAME_w = dbutils.widgets.get("--AZUREML_ARM_WORKSPACE_NAME")
   AZUREML_ARM_WORKSPACE_NAME = getArgument("--AZUREML_ARM_WORKSPACE_NAME")
   print ("--AZUREML_ARM_WORKSPACE_NAME:",AZUREML_ARM_WORKSPACE_NAME)
@@ -255,7 +262,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_ARM_PROJECT_NAME","a rg", "AZUREML_ARM_PROJECT_NAME")
+  dbutils.widgets.text("--AZUREML_ARM_PROJECT_NAME","ignore this", "AZUREML_ARM_PROJECT_NAME")
   AZUREML_ARM_PROJECT_NAME_w = dbutils.widgets.get("--AZUREML_ARM_PROJECT_NAME")
   AZUREML_ARM_PROJECT_NAME = getArgument("--AZUREML_ARM_PROJECT_NAME")
   print ("--AZUREML_ARM_PROJECT_NAME:",AZUREML_ARM_PROJECT_NAME)
@@ -263,7 +270,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_SERVICE_ENDPOINT","a rg", "AZUREML_SERVICE_ENDPOINT")
+  dbutils.widgets.text("--AZUREML_SERVICE_ENDPOINT","ignore this", "AZUREML_SERVICE_ENDPOINT")
   AZUREML_SERVICE_ENDPOINT_w = dbutils.widgets.get("--AZUREML_SERVICE_ENDPOINT")
   AZUREML_SERVICE_ENDPOINT = getArgument("--AZUREML_SERVICE_ENDPOINT")
   print ("--AZUREML_SERVICE_ENDPOINT:",AZUREML_SERVICE_ENDPOINT)
@@ -271,7 +278,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_WORKSPACE_ID","a rg", "AZUREML_WORKSPACE_ID")
+  dbutils.widgets.text("--AZUREML_WORKSPACE_ID","ignore this", "AZUREML_WORKSPACE_ID")
   AZUREML_WORKSPACE_ID_w = dbutils.widgets.get("--AZUREML_WORKSPACE_ID")
   AZUREML_WORKSPACE_ID = getArgument("--AZUREML_WORKSPACE_ID")
   print ("--AZUREML_WORKSPACE_ID:",AZUREML_WORKSPACE_ID)
@@ -279,7 +286,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("--AZUREML_EXPERIMENT_ID","a rg", "AZUREML_EXPERIMENT_ID")
+  dbutils.widgets.text("--AZUREML_EXPERIMENT_ID","ignore this", "AZUREML_EXPERIMENT_ID")
   AZUREML_EXPERIMENT_ID_w = dbutils.widgets.get("--AZUREML_EXPERIMENT_ID")
   AZUREML_EXPERIMENT_ID = getArgument("--AZUREML_EXPERIMENT_ID")
   print ("--AZUREML_EXPERIMENT_ID:",AZUREML_EXPERIMENT_ID)
@@ -288,7 +295,7 @@ except Exception as e:
   
  # The AZUREML_SCRIPT_DIRECTORY_NAME argument will be filled in if the DatabricksStep was run using a local source_directory and python_script_name
 try:
-  dbutils.widgets.text("--AZUREML_SCRIPT_DIRECTORY_NAME","a rg", "AZUREML_SCRIPT_DIRECTORY_NAME")
+  dbutils.widgets.text("--AZUREML_SCRIPT_DIRECTORY_NAME","ignore this", "AZUREML_SCRIPT_DIRECTORY_NAME")
   AZUREML_SCRIPT_DIRECTORY_NAME_w = dbutils.widgets.get("--AZUREML_SCRIPT_DIRECTORY_NAME")
   AZUREML_SCRIPT_DIRECTORY_NAME = getArgument("--AZUREML_SCRIPT_DIRECTORY_NAME")
   print ("--AZUREML_SCRIPT_DIRECTORY_NAME:",AZUREML_SCRIPT_DIRECTORY_NAME)
@@ -302,14 +309,16 @@ def rehydrate_azureml_run():
     print("populate_environ: AZUREML_RUN_ID {}".format(AZUREML_RUN_ID))
     os.environ['AZUREML_RUN_TOKEN'] = AZUREML_RUN_TOKEN
     os.environ['AZUREML_RUN_TOKEN_EXPIRY'] = AZUREML_RUN_TOKEN_EXPIRY
-    os.environ['AZUREML_RUN_ID'] = AZUREML_RUN_ID #args.AZUREML_RUN_ID
-    os.environ['AZUREML_ARM_SUBSCRIPTION'] = AZUREML_ARM_SUBSCRIPTION
+    os.environ['AZUREML_RUN_ID'] = AZUREML_RUN_ID
+    os.environ['AZUREML_ARM_SUBSCRIPTION'] = AZUREML_ARM_SUBSCRIPTION # REDACTED
     os.environ['AZUREML_ARM_RESOURCEGROUP'] = AZUREML_ARM_RESOURCEGROUP
     os.environ['AZUREML_ARM_WORKSPACE_NAME'] =AZUREML_ARM_WORKSPACE_NAME
     os.environ['AZUREML_ARM_PROJECT_NAME'] = AZUREML_ARM_PROJECT_NAME
-    os.environ['AZUREML_SERVICE_ENDPOINT'] = AZUREML_SERVICE_ENDPOINT
     os.environ['AZUREML_WORKSPACE_ID'] = AZUREML_WORKSPACE_ID
     os.environ['AZUREML_EXPERIMENT_ID'] = AZUREML_EXPERIMENT_ID
+    
+    if(notebook_user_interactive_mode == False):
+        os.environ['AZUREML_SERVICE_ENDPOINT'] = AZUREML_SERVICE_ENDPOINT
 
 try:
     rehydrate_azureml_run()
@@ -336,17 +345,18 @@ except Exception as e:
 
 # COMMAND ----------
 
+train_aml_dataset = Dataset.get_by_name(ws,esml_lake.gold_train_dataset_name)
 gold_train_df.printSchema()
-
-# COMMAND ----------
-
-# MAGIC %run ./30_train_code/your_train_code
 
 # COMMAND ----------
 
 # MAGIC %md ## TRAIN MODEL - TODO 4 YOU
 # MAGIC - TODO 5 YOU: implement the method `train_df` in <a href="$./30_train_code/your_train_code"> ./30_train_code/your_train_code</a> notebook
 # MAGIC - `train_df(..) is called below from this notebook, referencing `your_train_code` in <a href="$./30_train_code/your_train_code"> ./30_train_code/your_train_code</a>
+
+# COMMAND ----------
+
+# MAGIC %run ./30_train_code/your_train_code
 
 # COMMAND ----------
 
@@ -359,14 +369,33 @@ full_local_path = None
 model_name = experiment_name # The NAME in MODEL registry (Not that model_name TAG - may be different - you choose)
 model_name_tag = experiment_name # A) If you want to keep Model comparison separate considering AutoML runs VS Manual runs
 model_name_tag = esml_parameters.esml_aml_model_name # B) If you want to compare all Models - never mind if AutoML was used or Manual ML
-
+dbfs_model_out_path = esml_parameters.esml_dbfs_model_path # '/dbfs/mnt/prj002/11_diabetes_model_reg/train/model/'
 
 if(remote_run is None):
-  train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, False,remote_run)
+  train_run, aml_model,fitted_model,full_local_path,new_model_scoring_tags = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name,dbfs_model_out_path, False,remote_run)
 else:
-  train_run, aml_model,fitted_model,full_local_path = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name, True,remote_run)
-  
-train_run.upload_file(name = esml_parameters.esml_model_name_pkl, path_or_stream = full_local_path)
+  train_run, aml_model,fitted_model,full_local_path,new_model_scoring_tags = train_df(gold_train_df,gold_validate_df,esml_parameters.esml_target_column_name,dbfs_model_out_path, True,remote_run)
+
+# COMMAND ----------
+
+# MAGIC %md ## Upload Fitted model to KNOWN location (to automate scoring pipeline later on)
+
+# COMMAND ----------
+
+model_output_folder='./outputs/'
+model_full_dbfs_path =  esml_parameters.esml_dbfs_model_path + 'outputs/'
+model_full_dbfs_file_path =  model_full_dbfs_path + esml_parameters.esml_model_name_pkl
+
+if(train_run is not None):
+  train_run.upload_file(name = model_output_folder+esml_parameters.esml_model_name_pkl, path_or_stream = full_local_path)
+  #train_run.upload_file(name = esml_parameters.esml_model_name_pkl, path_or_stream = full_local_path)
+else:
+   try:
+     os.makedirs(os.path.dirname(model_full_dbfs_file_path), exist_ok=True)
+     pickle.dump(fitted_model, open(model_full_dbfs_file_path, 'wb'))
+     print("Copy model to known location and name: {}{}".format(model_full_dbfs_path,esml_parameters.esml_model_name_pkl))
+   except Exception as e:
+     print("Error - could not Copy model to known location {}{}".format(model_full_dbfs_path,esml_parameters.esml_model_name_pkl))
 
 # COMMAND ----------
 
@@ -422,21 +451,24 @@ import sklearn
 from azureml.core import Model
 from azureml.core.resource_configuration import ResourceConfiguration
 
-def register_aml_model(full_local_path,model_name,tags,target_ws,project_number,esml_model_experiment, description_in=""):
-  full_local_path = "."
-  if(full_local_path is None):
-      full_local_path = get_default_localPath(project_number,esml_model_experiment)
+def register_aml_model(full_local_path_in,model_name,tags,target_ws,project_number,esml_model_experiment, description_in=""):
+  if(full_local_path_in is None):
+      full_local_path_in = get_default_localPath(project_number,esml_model_experiment)
   
   _resource_configuration = ResourceConfiguration(cpu=1, memory_in_gb=0.5)
-  model = Model.register(model_path=full_local_path, # Local file to upload and register as a model.
-                  model_name=model_name,
-                  model_framework=Model.Framework.SCIKITLEARN,  # Framework used to create the model.
-                  model_framework_version=sklearn.__version__,  # Version of scikit-learn used to create the model.
-                  resource_configuration= _resource_configuration, # ESML-Default: ResourceConfiguration(cpu=1, memory_in_gb=0.5)
-                  tags=tags,
-                  properties=tags,
-                  description=description_in,
-                  workspace=target_ws)
+  model = None
+  try:
+    model = Model.register(model_path=full_local_path_in, # Local file to upload and register as a model.
+                    model_name=model_name,
+                    model_framework=Model.Framework.SCIKITLEARN,  # Framework used to create the model.
+                    model_framework_version=sklearn.__version__,  # Version of scikit-learn used to create the model.
+                    resource_configuration= _resource_configuration, # ESML-Default: ResourceConfiguration(cpu=1, memory_in_gb=0.5)
+                    tags=tags,
+                    properties=tags,
+                    description=description_in,
+                    workspace=target_ws)
+  except Exception as e:
+    raise e
   return model
 
 def get_default_localPath(project_number,esml_model_experiment):
@@ -444,6 +476,7 @@ def get_default_localPath(project_number,esml_model_experiment):
   temp_dir = tempfile.gettempdir()
   full_local_path = os.path.join(temp_dir, "esml",project_number,esml_model_experiment)
   full_local_path = os.path.join(full_local_path, pkl_name)
+  print("ESML 32 - get_default_localPath = {}".format(full_local_path))
   return full_local_path
 
 # COMMAND ----------
@@ -460,32 +493,43 @@ def get_default_localPath(project_number,esml_model_experiment):
 
 # COMMAND ----------
 
-if("test_set_ROC_AUC" in model_source.tags):
-  tags["test_set_Accuracy"] = model_source.tags["test_set_Accuracy"]
-  tags["test_set_ROC_AUC"] = model_source.tags["test_set_ROC_AUC"]
-  tags["test_set_Precision"] = model_source.tags["test_set_Precision"]
-  tags["test_set_Recall"] = model_source.tags["test_set_Recall"]
-  tags["test_set_F1_Score"] = model_source.tags["test_set_F1_Score"]
-  tags["test_set_Matthews_Correlation"] = model_source.tags["test_set_Matthews_Correlation"]
-  tags["test_set_CM"] = model_source.tags["test_set_CM"]
-if("test_set_RMSE" in model_source.tags):
-  tags["test_set_RMSE"] = model_source.tags["test_set_RMSE"]
-  tags["test_set_R2"] = model_source.tags["test_set_R2"]
-  tags["test_set_MAPE"] = model_source.tags["test_set_MAPE"]
-  tags["test_set_Spearman_Correlation"] = model_source.tags["test_set_Spearman_Correlation"]
-if("esml_time_updated " in model_source.tags):
-  tags["esml_time_updated"] = model_source.tags["esml_time_updated"]
+print("AML Model name (for search and compare): " + model_name)
+print("User location" + full_local_path)
+print("Known location:" + model_full_dbfs_path + esml_parameters.esml_model_name_pkl)
+
 
 # COMMAND ----------
 
-import datetime
+# MAGIC %md ## CREATE TAGS - Testset SCORING etc
 
-model_path = full_local_path
+# COMMAND ----------
 
 # 1) Register model with 'esml_status_new'
-time_stamp = str(datetime.datetime.now())
+from datetime import datetime
+time_stamp = str(datetime.now())
 tags = {"esml_time_updated": time_stamp,"status_code": ESMLStatus.esml_status_new.value,"mflow_stage":ESMLStatus.mflow_stage_none.value, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_env, 
         "trained_in_workspace": ws.name, "experiment_name": experiment_name, "trained_with": "ManualPysparkDatabricks"}
+
+# CLEAR scoring & Add potentially new manually calculated TEST_SET SCORING from tags
+if("test_set_ROC_AUC" in new_model_scoring_tags):
+    tags["test_set_Accuracy"] = new_model_scoring_tags.get("test_set_Accuracy")
+    tags["test_set_ROC_AUC"] = new_model_scoring_tags.get("test_set_ROC_AUC")
+    tags["test_set_Precision"] = new_model_scoring_tags.get("test_set_Precision")
+    tags["test_set_Recall"] = new_model_scoring_tags.get("test_set_Recall")
+    tags["test_set_F1_Score"] = new_model_scoring_tags.get("test_set_F1_Score")
+    tags["test_set_Matthews_Correlation"] = new_model_scoring_tags.get("test_set_Matthews_Correlation")
+    tags["test_set_CM"] = new_model_scoring_tags.get("test_set_CM")
+if("test_set_RMSE" in new_model_scoring_tags):
+    tags["test_set_RMSE"] = new_model_scoring_tags.get("test_set_RMSE")
+    tags["test_set_R2"] = new_model_scoring_tags.get("test_set_R2")
+    tags["test_set_MAPE"] = new_model_scoring_tags.get("test_set_MAPE")
+    tags["test_set_Spearman_Correlation"] = new_model_scoring_tags.get("test_set_Spearman_Correlation")
+    
+tags
+
+# COMMAND ----------
+
+model_path = full_local_path
 
 def register_aml_model_on_run(model_name,model_path,tags):
   print("model_name at remote_run.register_model: ", model_name)
@@ -498,12 +542,32 @@ def register_aml_model_on_run(model_name,model_path,tags):
 
 try:
   #register_aml_model_on_run(model_name,model_path,tags)
+  print("ESML 20 - REGISTER MODEL on RUN - without folder_path")
   register_aml_model_on_run(model_name,None,tags)
+  print("ESML 20 - REGISTER MODEL on RUN - SUCCESS!")
 except Exception as e:
-  print("Warning ESML: Could not register_aml_model_on_run, not trying registration on Model registry instead")
-  print(e)
-  print("ESML Fallback: Now registeirng MODEL in MODEL registry directly (since registering via RUN was not possible)")
-  register_aml_model(model_path,model_name,tags,ws,projectNumber,experiment_name)
+  print("ESML 20 - WARNING: Could not register_aml_model_on_run, not trying registration on Model registry instead")
+  print(" - Tried register on RUN without azure_run_path - did not work. Now trying register on RUN with AZURE_RUN_PATH / outputs / esml_parameters.esml_model_name_pkl \n")
+  try:
+    print("ESML 21 - REGISTER MODEL on RUN - with folder_path")
+    azure_run_path = './outputs/'+esml_parameters.esml_model_name_pkl
+    register_aml_model_on_run(model_name,azure_run_path,tags)
+    print("ESML 21 - REGISTER MODEL on RUN - SUCCESS! \n")
+  except Exception as e2:
+    print("ESML 21 - WARNING: Tried register on RUN with azure_run_path - did not work. Now trying register direcly in MODEL REGISTRY")
+    print(" - Fallback: Now register MODEL in MODEL registry directly (since registering via RUN was not possible) - register_aml_model, with model_path = / outputs / \n")
+    
+    dbfs_file_path_full =  model_full_dbfs_path + esml_parameters.esml_model_name_pkl
+    print("ESML 22 - REGISTER MODEL on MODEL - path: {}".format(dbfs_file_path_full))
+    try:
+      register_aml_model(dbfs_file_path_full,model_name,tags,ws,projectNumber,experiment_name)
+      print("ESML 22 - SUCCESS! \n")
+    except Exception as e3:
+      #print(e3)
+      print("ESML 23 - REGISTER MODEL on MODEL - with local DBX path")
+      print(" - Path: {}".format(full_local_path))
+      register_aml_model(full_local_path,model_name,tags,ws,projectNumber,experiment_name)
+      print("ESML 23 - SUCCESS! \n")
       
 
 
