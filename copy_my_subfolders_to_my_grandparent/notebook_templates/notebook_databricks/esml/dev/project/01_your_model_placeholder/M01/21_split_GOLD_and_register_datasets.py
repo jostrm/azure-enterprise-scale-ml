@@ -92,9 +92,6 @@ print(esml_parameters.esml_target_column_name)
 print(esml_lake.gold_train)
 print(esml_lake.gold_test)
 print(esml_lake.gold_validate)
-print(esml_lake.gold_train_dataset_name)
-print(esml_lake.gold_test_dataset_name)
-print(esml_lake.gold_validate_dataset_name)
 
 # COMMAND ----------
 
@@ -157,7 +154,7 @@ print("test", df_test.count())
 
 # COMMAND ----------
 
-# MAGIC %md ### ESML Auto-Saves the splitted data to lake
+# MAGIC %md ### Saves the splitted data to lake
 
 # COMMAND ----------
 
@@ -171,56 +168,8 @@ df_test.write.mode("overwrite").parquet(esml_lake.gold_test)
 
 # COMMAND ----------
 
-# MAGIC %md ## ESML Auto-registers DATASETS: as Azure ML Datasets (needed in using AutoML in Azure ML from Databricks)
+# MAGIC %md ### Optional: Also Register data as Azure ML Datasets (needed in using AutoML in Azure ML from Databricks)
 
 # COMMAND ----------
 
-# MAGIC %run ../../../common/azure_functions
 
-# COMMAND ----------
-
-resource_group, workspace_name, in_data, out_path,physical_raw_prj01_in,physical_prj01 = getProjectEnvironment(azure_rg_project_number)
-ws = getAzureMLWorkspace()
-datastore = ws.get_default_datastore()
-print(datastore.account_name)
-
-# COMMAND ----------
-
-physical_test = esml_lake.get_physical_path(physical_prj01,esml_lake.gold_test)
-physical_test
-
-# COMMAND ----------
-
-from azureml.core.dataset import Dataset 
-
-physical_train = esml_lake.get_physical_path(physical_prj01,esml_lake.gold_train)
-physical_validate = esml_lake.get_physical_path(physical_prj01,esml_lake.gold_validate)
-physical_test = esml_lake.get_physical_path(physical_prj01,esml_lake.gold_test)
-
-dataset_train = Dataset.Tabular.from_parquet_files(path = [(datastore, physical_train)])
-dataset_validate = Dataset.Tabular.from_parquet_files(path = [(datastore, physical_train)]) 
-dataset_test = Dataset.Tabular.from_parquet_files(path = [(datastore, physical_train)]) 
-
-train_dataset = dataset_train.register(workspace = ws,
-                                 name = esml_lake.gold_validate_dataset_name,
-                                 description = 'GOLD_VALIDATE dataset registered from Azure Databricks',
-                                 create_new_version=True)
-
-validate_dataset = dataset_validate.register(workspace = ws,
-                                 name = esml_lake.gold_train_dataset_name,
-                                 description = 'GOLD_TRAIN dataset registered from Azure Databricks',
-                                 create_new_version=True)
-
-test_dataset = dataset_test.register(workspace = ws,
-                                 name = esml_lake.gold_test_dataset_name,
-                                 description = 'GOLD_TEST dataset registered from Azure Databricks',
-                                 create_new_version=True)
-
-# COMMAND ----------
-
-train_dataset
-
-# COMMAND ----------
-
-train_again = Dataset.get_by_name(ws,esml_lake.gold_train_dataset_name) # Gets v14
-train_again
