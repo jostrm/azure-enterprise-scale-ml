@@ -9,6 +9,7 @@
 
 import datetime
 date_folder = None
+esml_model_version_set = None
 print("ESML INPUT PARAMETERS - for PIPELINE")
 print("")
     
@@ -32,6 +33,7 @@ else:
 
 if('esml_model_version' in vars() or 'esml_model_version' in globals() and esml_model_version is not None):
   print("esml_model_version:",esml_model_version)
+  esml_model_version_set = esml_model_version
 else:
   esml_model_version = None
 if('esml_inference_mode' in vars() or 'esml_inference_mode' in globals() and esml_inference_mode is not None):
@@ -66,9 +68,53 @@ if('esml_target_column_name' in vars() or 'esml_target_column_name' in globals()
 else:
   esml_target_column_name = None
   
+if('esml_aml_model_name' in vars() or 'esml_aml_model_name' in globals() and esml_aml_model_name is not None):
+  print("esml_aml_model_name:",esml_aml_model_name)
+else:
+  esml_aml_model_name = None
+
+if('esml_model_name_pkl' in vars() or 'esml_model_name_pkl' in globals() and esml_model_name_pkl is not None):
+  print("esml_model_name_pkl:",esml_model_name_pkl)
+else:
+  esml_model_name_pkl = 'model.pkl'
+  
 print("")
 print("ESML INPUT PARAMETERS - for PIPELINE, END") 
 
+
+# COMMAND ----------
+
+# MAGIC %md # TODO 4 YOU
+
+# COMMAND ----------
+
+# DBTITLE 1,Settings/User - Configure per model (Who: data scientist/data engineer)
+experiment_name = '11_diabetes_model_reg'
+model_folder_name = '/'+experiment_name
+model_alias = 'M11'
+experiment_name_train = experiment_name+'_pipe_IN_2_GOLD_TRAIN'
+
+datasets = {"ds01_diabetes","ds02_other"}
+
+active_in_train = None
+active_in_scoring = None
+active_model_version = None
+
+if (date_folder is not None):
+  active_in_train = esml_date_folder # override with parameter
+  active_in_scoring = esml_date_folder # override with parameter
+else:
+  active_in_train = "1000/01/01" # defaults
+  active_in_scoring = "1000/01/01" # defaults
+
+if(esml_model_version_set is not None):
+  active_model_version = esml_model_version_set
+else:
+  active_model_version = 0
+
+# COMMAND ----------
+
+# MAGIC %md # TODO 4 YOU - END
 
 # COMMAND ----------
 
@@ -82,9 +128,12 @@ class ESMLParameters(object):
   # Split, Train
   _esml_split_percentage = None
   _esml_target_column_name = None
+  _esml_aml_model_name = None
+  _esml_model_name_pkl = None
+  _esml_dbfs_model_path = None
   
-  def __init__(self,esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending,
-              esml_dataset_names=None, esml_date_folder=None,esml_split_percentage=None,esml_target_column_name=None):
+  def __init__(self,esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending,dbfs_model_path,
+              esml_dataset_names=None, esml_date_folder=None,esml_split_percentage=None,esml_target_column_name=None,esml_aml_model_name=None,esml_model_name_pkl=None):
     
     self._esml_date_folder = esml_date_folder
     self._esml_model_version = esml_dataset_filename_ending
@@ -95,7 +144,20 @@ class ESMLParameters(object):
     
     self._esml_split_percentage = esml_split_percentage
     self._esml_target_column_name = esml_target_column_name
+    self._esml_aml_model_name = esml_aml_model_name
+    self._esml_model_name_pkl = esml_model_name_pkl
+    self._esml_dbfs_model_path = dbfs_model_path
     
+  @property
+  def esml_dbfs_model_path(self):
+    return self._esml_dbfs_model_path
+
+  @property
+  def esml_aml_model_name(self):
+    return self._esml_aml_model_name
+  @property
+  def esml_model_name_pkl(self):
+    return self._esml_model_name_pkl
   @property
   def esml_date_folder(self):
     return self._esml_date_folder
@@ -121,8 +183,9 @@ class ESMLParameters(object):
   def esml_target_column_name(self):
     return self._esml_target_column_name
   
-esml_parameters = ESMLParameters(esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending
-                                 ,esml_dataset_names, esml_date_folder,esml_split_percentage,esml_target_column_name)
+dbfs_model_path = '/dbfs' + mount_project_template.format(azure_rg_project_number) +'/'+ experiment_name + '/train/model/'
+esml_parameters = ESMLParameters(esml_model_version,esml_inference_mode,esml_env,esml_dataset_filename_ending,dbfs_model_path
+                                 ,esml_dataset_names, esml_date_folder,esml_split_percentage,esml_target_column_name,esml_aml_model_name,esml_model_name_pkl)
 
 # COMMAND ----------
 
@@ -143,27 +206,9 @@ class ESMLStatus(str, Enum):
 
 # COMMAND ----------
 
-# DBTITLE 1,Settings/User - Configure per model (Who: data scientist/data engineer)
-experiment_name = '11_diabetes_model_reg'
-model_folder_name = '/'+experiment_name
-experiment_name_train = experiment_name+'_pipe_IN_2_GOLD_TRAIN'
-
-datasets = {"ds01_diabetes","ds02_other"}
-
-if (date_folder is not None):
-  active_in_train = "1000/01/01" # date_folder defaults
-  active_in_scoring = "1000/01/01" # date_folder defaults
-else:
-  active_in_train = "1000/01/01" # defaults
-  active_in_scoring = "1000/01/01" # defaults
-
-active_model_version = "0"
-
-# COMMAND ----------
-
 # DBTITLE 1,---- END user setting ----
 esml_lake = ESMLLake()
-esml_lake.init_esml_lake_design(azure_rg_project_number,model_folder_name)
+esml_lake.init_esml_lake_design(azure_rg_project_number,model_folder_name, model_alias)
 esml_lake.esml_generate_dataset_arrays(datasets,active_in_train,active_in_scoring,active_model_version)
 
 # COMMAND ----------
