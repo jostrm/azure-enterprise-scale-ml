@@ -1984,10 +1984,15 @@ class ESMLProject():
         try:
             df_test = gt.to_pandas_dataframe()
         except Exception as e:
-            train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
-            full_path = validate_path.format(id_folder="gold_validate_dbx.parquet")
-            aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.lakestore, full_path)])
-            df_test = aml_dataset_in.to_pandas_dataframe()
+            old_mode = self.inference_mode
+            try:
+                self.inference_mode = False
+                train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
+                full_path = validate_path.format(id_folder="gold_validate_dbx.parquet")
+                aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.lakestore, full_path)])
+                df_test = aml_dataset_in.to_pandas_dataframe()
+            finally:
+                self.inference_mode = old_mode
 
         print("{} : {}".format(self.GoldValidate.name, df_test.shape))
         X_test = df_test.drop([label], axis=1)
@@ -2011,10 +2016,15 @@ class ESMLProject():
         try:
             df_test = gt.to_pandas_dataframe()
         except Exception as e:
-            train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
-            full_path = test_path.format(id_folder="gold_test_dbx.parquet")
-            aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.lakestore, full_path)])
-            df_test = aml_dataset_in.to_pandas_dataframe()
+            old_mode = self.inference_mode
+            try:
+                self.inference_mode = False
+                train_path,validate_path,test_path = self.path_gold_train_splitted_template() 
+                full_path = validate_path.format(id_folder="gold_validate_dbx.parquet")
+                aml_dataset_in = Dataset.Tabular.from_parquet_files(path = [(self.lakestore, full_path)])
+                df_test = aml_dataset_in.to_pandas_dataframe()
+            finally:
+                self.inference_mode = old_mode
 
         print("{} : {}".format(self.GoldTest.name, df_test.shape))
         X_test = df_test.drop([label], axis=1)
