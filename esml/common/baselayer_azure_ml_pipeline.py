@@ -474,7 +474,8 @@ class ESMLPipelineFactory():
             uid = uuid.uuid4().hex
             # BACKUP - ESMLPipelineStepMap if exists
             source_file = "ESMLPipelineStepMap.py"
-            bak_name = "{}.bak_{}".format(source_file,uid[0:5])
+            taget_file = "ESMLPipelineStepMap"
+            bak_name = "{}_{}bak.py".format(taget_file,uid[0:5])
             target_file = self._snapshot_folder + "your_code/" + source_file
             backup_file = self._snapshot_folder + "your_code/" + bak_name
             if os.path.exists(target_file):
