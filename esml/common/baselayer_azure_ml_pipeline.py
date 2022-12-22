@@ -487,6 +487,12 @@ class ESMLPipelineFactory():
             if(not only_info):
                 shutil.copy(source, target_file)
 
+            source_file = 'your_scoring_file_v_1_0_0.py'
+            source = self._script_template_enterprise + "/your_code/" + source_file
+            target_file = self._snapshot_folder + "your_code/" + source_file
+            if(not only_info):
+                shutil.copy(source, target_file)
+
             # iESMLSplitter (optional: only needed to be implemented/used if overriding ESMLSplitter logic)
             source_file = "ESMLYourSplitter.py"
             source = self._script_template_enterprise + "/your_code/" + source_file
