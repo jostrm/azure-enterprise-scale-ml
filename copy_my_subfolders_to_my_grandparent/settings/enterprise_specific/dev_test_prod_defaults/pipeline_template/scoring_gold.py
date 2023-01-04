@@ -166,9 +166,15 @@ def run(gold_to_score_df):
             print("Saving result as PARQUET at: {}".format(path))
             written_df = df_out.to_parquet(path,engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
 
-            # Alt 2) Note: This can also be done by Azure Data factory instead of this CPU cluster node. In a ADF Copy activity, post this pipeline, using 'latest_batch_score_run.csv file that has the 'historic_path'
+            # Alt 2) Note: This can also be done by Azure Data factory instead of this CPU cluster node. In a ADF Copy activity, post this pipeline, using 'lates            #### 2023-01-04 - START: removed due to 'ValueError("This pipeline didn't have the RawDeserializer policy; can't deserialize")'
+            
+            #### - TODO: Remove this is an error that can be ignored...but it takes a lot of time for SCORING activity to finish AND also it will log 'train_manual.py' by weird reason?? (old cached log?)
             print("Also save to HISTORIC path, output_scored_gold is {}".format(output_scored_gold))
-            FileDatasetFactory.upload_directory(src_dir=output_scored_gold, target=(datastore, historic_path), pattern=None, overwrite=True, show_progress=False)
+            try:
+                FileDatasetFactory.upload_directory(src_dir=output_scored_gold, target=(datastore, historic_path), pattern=None, overwrite=True, show_progress=False)
+            except:
+                pass
+            #### 2023-01-04 - END
 
         last_gold_run_filename = "last_gold_run.csv"
         if not (last_gold_run is None):
