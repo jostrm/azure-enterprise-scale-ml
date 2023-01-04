@@ -42,9 +42,6 @@ print("Project number: {}".format(p.project_folder_name))
 print("Model number: {} , esml_date_utc: {}".format(model_number, scoring_date))
 
 print("DEPLOY model on to a PRIVATE AKS cluster / endpoint...")
-inference_config, model, best_run = p.get_active_model_inference_config(p.ws)
-service,api_uri, kv_aks_api_secret= p.deploy_model_as_private_aks_online_endpoint(model,inference_config)
-
 inference_config, model, best_run = IESMLController.get_best_model_inference_config(p.ws, p.model_folder_name, p.ModelAlias)
 service,api_uri, kv_aks_api_secret= p.deploy_model_as_private_aks_online_endpoint(model,inference_config,overwrite_endpoint=True)
 

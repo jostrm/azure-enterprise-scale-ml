@@ -540,6 +540,14 @@ def register_aml_model_on_run(model_name,model_path,tags):
   else:
       model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
 
+  try:
+    #if(tags["status_code"] == IESMLController.esml_status_promoted_2_dev or tags["status_code"] == IESMLController.esml_status_promoted_2_test or tags["status_code"] == IESMLController.esml_status_promoted_2_prod):
+    tags = {'model_name':model_name, 'best_model_version': str(model.version)}
+    experiment = remote_run.experiment 
+    experiment.set_tags(tags)
+  except Exception as e:
+    print(str(e))
+
 try:
   #register_aml_model_on_run(model_name,model_path,tags)
   print("ESML 20 - REGISTER MODEL on RUN - without folder_path")
