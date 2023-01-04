@@ -214,7 +214,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     # CUSTOMIZE END ###############
 
     # Upload Scoring script - Only needed if MAnual ML, since AutoML does this automatically TODO 4 YOU - implement this ./your_code/your_scoring_file_v_1_0_0.py
-    path_scoring_file_in_snapshot_folder = './your_code/your_{}'.format(IESMLController.get_known_scoring_file_name())
+    path_scoring_file_in_snapshot_folder = './esmlrt/settings/project_specific/model/your_{}'.format(IESMLController.get_known_scoring_file_name())
     train_run.upload_file(IESMLController.get_known_scoring_file_name(), path_scoring_file_in_snapshot_folder)
 
     # Copy LEADING model - to known model name and known location = Same thing happens IF Databricks notebooks, passing IESMLController.get_known_model_name_pkl()

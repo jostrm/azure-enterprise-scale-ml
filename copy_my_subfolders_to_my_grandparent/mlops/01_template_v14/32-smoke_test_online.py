@@ -26,6 +26,7 @@ POSSIBILITY OF SUCH DAMAGE.
 import sys
 sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
 import azureml.core
+import pandas as pd
 from esml import ESMLProject
 print("SDK Version:", azureml.core.VERSION)
 
@@ -44,9 +45,10 @@ print("Get testdata to do a smoke test with")
 X_test, y_test, tags = p.get_gold_validate_Xy() # Get the X_test data |  ESML knows the SPLIT and LABEL already (due to training)
 print(tags)
 
-#inference_config, model, best_run = p.get_active_model_inference_config(ws) # Get Model to call other pecific MODEL version, than latest |
-
 print("Call webservice - http request to AKS endpoint over PRIVATE ip/endpoint")
 caller_user_id = '81965d9c-40ca-4e47-9723-5a608a32a0e4' # Optional: Connect scoring to a caller/user | globally for all rows
-df = p.call_webservice(p.ws, X_test,caller_user_id, False) # Call and save results to version-folder | Auto-fetch key, model_version from keyvault | #  (p.ws, X_test,caller_user_id, False, model.version)
+df = p.call_webservice(ws=p.ws, pandas_X_test=X_test.iloc[:1],user_id=caller_user_id,firstRowOnly=True,save_2_lake_also=False)
+#df = p.call_webservice(p.ws, X_test,caller_user_id, False) # Call and save results to version-folder | Auto-fetch key, model_version from keyvault | #  (p.ws, X_test,caller_user_id, False, model.version)
+
+pd.set_option('display.max_colwidth', None)
 print(df.head())

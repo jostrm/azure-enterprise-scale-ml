@@ -25,9 +25,7 @@ POSSIBILITY OF SUCH DAMAGE.
 """
 from ctypes import ArgumentError
 import json
-import sys
 import os
-import math
 from azureml.core.dataset import Dataset 
 from azureml.core import Workspace
 from azureml.core.model import Model
@@ -45,7 +43,6 @@ import shutil
 from collections import defaultdict
 from azureml.core.authentication import ServicePrincipalAuthentication
 import argparse
-from azureml.train.automl.exceptions import NotFoundException
 from azureml.core import Experiment
 from azureml.train.automl.run import AutoMLRun
 from pathlib import Path
@@ -927,7 +924,8 @@ class ESMLProject():
         if (save_2_lake_also): 
             result = self.save_scored_result(model_version,pandas_X_test,df_result, user_id)
         else:
-            result = df_result
+            result = pandas_X_test.join(df_result)
+            #result = df_result
 
         return result
     
@@ -953,7 +951,11 @@ class ESMLProject():
         deploy_config = self._compute_factory.get_deploy_config(self, self.override_enterprise_settings_with_model_specific, self._projectNoString,self._modelNrString)
         return deploy_config
     # Returns [service,api_uri, self.kv_aks_api_secret] - the api_secret is stored in your keyvault
-    def deploy_model_as_private_aks_online_endpoint(self, model,inference_config, overwrite_endpoint=True,deployment_config=None):
+    def deploy_model_as_private_aks_online_endpoint(self, model,inference_config, overwrite_endpoint=True,validation_guard=True,deployment_config=None):
+        if(validation_guard and (self.active_model['model_folder_name'] != model.tags['experiment_name'])):  # Guard
+            raise Exception("ESML info: you need to deploy a Model of the same type as p.active_model. Look in Model registry in Tags, to find correct/compatible model. \
+                \n INFO: p.active_model={} and model.tags[experiment_name]={}. TODO: they must match!".format(self.active_model['model_folder_name'],model.tags['experiment_name']))
+
         return self.deploy_automl_model_to_aks(model,inference_config, overwrite_endpoint,deployment_config)
 
     def deploy_automl_model_to_aks(self, model,inference_config, overwrite_endpoint=True,deployment_config=None):

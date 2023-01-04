@@ -24,10 +24,12 @@ ARISING IN ANY WAY OUT OF THE USE OF THE SOFTWARE CODE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 import sys
-sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
+sys.path.insert(0, "../../azure-enterprise-scale-ml/")
+from esmlrt.interfaces.iESMLController import IESMLController
+#sys.path.insert(0, "../../azure-enterprise-scale-ml/esml/common/")
+from esml.common import ESMLProject
 import azureml.core
 import argparse
-from esml import ESMLProject
 print("SDK Version:", azureml.core.VERSION)
 
 p,scoring_date,model_number = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
@@ -42,4 +44,8 @@ print("Model number: {} , esml_date_utc: {}".format(model_number, scoring_date))
 print("DEPLOY model on to a PRIVATE AKS cluster / endpoint...")
 inference_config, model, best_run = p.get_active_model_inference_config(p.ws)
 service,api_uri, kv_aks_api_secret= p.deploy_model_as_private_aks_online_endpoint(model,inference_config)
+
+inference_config, model, best_run = IESMLController.get_best_model_inference_config(p.ws, p.model_folder_name, p.ModelAlias)
+service,api_uri, kv_aks_api_secret= p.deploy_model_as_private_aks_online_endpoint(model,inference_config,overwrite_endpoint=True)
+
 print("Finished!")

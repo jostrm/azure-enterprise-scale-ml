@@ -88,7 +88,8 @@ class ESMLPipelineFactory():
     _conda_dependencies_object = None
 
     # https://docs.microsoft.com/en-us/azure/machine-learning/resource-curated-environments
-    _esml_automl_lts_env_name = "ESML-AzureML-144-AutoML_126" # 2022-10-23: AutoMLStep PARAMETERS says BaseDockerIMage is: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:20220708.v1 
+
+    _esml_automl_lts_env_name = IESMLController.get_esml_environment_name() # 2022-10-23: AutoMLStep PARAMETERS says BaseDockerIMage is: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:20220708.v1 
     # # 2022-10-23: AutoMLStep PARAMETERS says CondaDependencies are: {"name": "project_environment", "dependencies": ["python=3.8.13", {"pip": ["azureml-defaults"]}], "channels": ["anaconda", "conda-forge"]}
     _environment_name = _esml_automl_lts_env_name # "AzureML-AutoML-DNN" # # Training[ "AzureML-AutoML","AzureML-AutoML-DNN", "AzureML-lightgbm-3.2-ubuntu18.04-py37-cpu"]  Inference["AzureML-sklearn-0.24.1-ubuntu18.04-py37-cpu-inference",]
     
@@ -101,14 +102,14 @@ class ESMLPipelineFactory():
     _esml_pipeline_type = None
     _script_names_dic = {}
     _dbx_compute_dic = {}
-    _script_template_enterprise = "../../../settings/enterprise_specific/dev_test_prod_defaults/batch/pipeline_template"
+    _script_template_enterprise = "../../../settings/enterprise_specific/dev_test_prod_defaults/pipeline_template"
     _script_template_enterprise_runtime = "../../esmlrt"
     _script_template_project_settings = "../../../settings/project_specific/model"
 
     #region(collapsed) TODO
     #script_template_user = "../../../settings/project_specific/model/dev_test_prod_override/batch/pipeline_template"
     #endregion
-    _snapshot_folder = "../../../01_pipelines/batch/"
+    _snapshot_folder = "../../../01_pipelines/"
 
 #region USER CUSTOMIZATION - EDIT the code in THESE files. Init files with "create_dataset_scripts_from_template()"
     _in2silver_filename = "in2silver.py"
@@ -487,12 +488,6 @@ class ESMLPipelineFactory():
             if(not only_info):
                 shutil.copy(source, target_file)
 
-            source_file = 'your_scoring_file_v_1_0_0.py'
-            source = self._script_template_enterprise + "/your_code/" + source_file
-            target_file = self._snapshot_folder + "your_code/" + source_file
-            if(not only_info):
-                shutil.copy(source, target_file)
-
             # iESMLSplitter (optional: only needed to be implemented/used if overriding ESMLSplitter logic)
             source_file = "ESMLYourSplitter.py"
             source = self._script_template_enterprise + "/your_code/" + source_file
@@ -523,6 +518,15 @@ class ESMLPipelineFactory():
             if(not only_info):
                 os.makedirs(os.path.dirname(target_folder), exist_ok=True)
                 shutil.copy(source, target_file)
+
+            # Scoring script file
+            source_file = 'your_{}'.format(IESMLController.get_known_scoring_file_name()) # 'your_scoring_file_v_1_0_0.py'
+            source = self._script_template_enterprise + "/your_code/" + source_file
+            target_file = self._snapshot_folder + "your_code/" + source_file
+            target_file = self._snapshot_folder + "esmlrt/settings/project_specific/model/" + source_file
+            if(not only_info):
+                if(os.path.exists(target_file) == False): # only overwrite if not existing. (user may have created a snapshot folder already, due to ONLINE deployment)
+                    shutil.copy(source, target_file)
                 
         finally:
             os.chdir(old_loc)

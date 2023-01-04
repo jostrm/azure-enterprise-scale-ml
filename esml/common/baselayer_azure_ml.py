@@ -292,11 +292,23 @@ class ComputeFactory():
             raise UserErrorException("No webservice found at {}.\n"\
                 "Make sure you have deployd the model to a webservice in Azure ML Studio, and that the API URL in keyvault matches this webservice.".format(api_uri))
 
-        res_dict = json.loads(resp.text)
-        
+        try:
+            res_dict = json.loads(resp.text)
+        except Exception as e:
+            if(json.JSONDecodeError is type(e)):
+                raise Exception(resp.text) from e
+            else:
+                raise Exception(resp.text) from e
         
         if (pandas_result):
-            df_results = pd.read_json(res_dict) # to pandas
+            try:
+                df_results = pd.read_json(res_dict) # to pandas
+            except Exception as e:
+                if(ValueError is type(e)):
+                    print(res_dict)
+                    raise Exception(resp.text) from e
+                else:
+                    raise Exception(resp.text) from e
         else:
             #res_dict_ast = ast.literal_eval(res_dict)
             #print("result", res_dict_ast['result'])
