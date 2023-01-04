@@ -40,7 +40,7 @@ use_automl = True # SIMPLE MODE + AutoMLStep (if True)Manual ML Step (if False)
 if advanced_mode:
     sys.path.insert(0, "../../azure-enterprise-scale-ml/")
     from esmlrt.interfaces.iESMLPipelineStepMap import IESMLPipelineStepMap
-    sys.path.insert(0, "../../01_pipelines/batch/M11/your_code/") # Advanced Mode. TODO 4 you - edit M11 in path below
+    sys.path.insert(0, "../../01_pipelines/M11/your_code/") # Advanced Mode. TODO 4 you - edit M11 in path below
     from ESMLPipelineStepMap import ESMLPipelineStepMap
 
 print("SDK Version:", azureml.core.VERSION)

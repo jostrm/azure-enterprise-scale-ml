@@ -30,9 +30,9 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
         nb1_not_GIT_connected_correct_url = "/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds01_diabetes" #Override/Databricks: IN_2_SILVER
 
         # TODO 4 YOU - Hower over notebooks name and copy/paste to get the below prefix. You cannot get this by "righ click on notebook/copy file path relative to root"
-        prefix_error_1_need_to_remove_Workpace = "Workspace/Repos/jostrm@microsoft.com/esml-aifactory002-prj002/notebook_databricks"
-        prefix_error_2_need_to_add_forward_slash = "Repos/jostrm@microsoft.com/esml-aifactory002-prj002/notebook_databricks"
-        prefix_correct = "/Repos/jostrm@microsoft.com/esml-aifactory002-prj002/notebook_databricks"
+        prefix_error_1_need_to_remove_Workpace = "Workspace/Repos/yourname@yourorg/adoinfo/notebook_databricks"
+        prefix_error_2_need_to_add_forward_slash = "Repos/yourname@yourorg/adoinfo/notebook_databricks"
+        prefix_correct = "/Repos/yourname@yourorg/adoinfo/notebook_databricks"
 
         nb1 = prefix_correct+"/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds01_diabetes" #Override/Databricks: IN_2_SILVER
         nb2 = prefix_correct+"/esml/dev/project/11_diabetes_model_reg/M11/10_in2silver_ds02_other"
@@ -58,7 +58,7 @@ class ESMLPipelineStepMap(IESMLPipelineStepMap):
         # silver_merged_2_gold
         all_dataset_folder_names_str = IESMLPipelineStepMap.get_dataset_folders_as_csv_string(dataset_folder_names)
 
-        my_dbx_cluster_friendly = 's-p001-m01-rt91' # note needs to be short <16 chars
+        my_dbx_cluster_friendly = 's-p001-m01-rt91' # note needs to be short <16 chars. Feel free to use this name, or rename for your cluster in Databricks
         my_dbx_cluster_url_name = '1234-333666-wimps924' # See web browser URL when having cluster selected
         TRAIN_notebook_mapping= [
            {'step_name': step1, 'code': nb1,'compute_type':self._compute_type_dbx,'date_folder_or': None,'dataset_folder_names':ds_01_in2silver_dataset_folder_names_str,"dataset_filename_ending":star_csv,'compute_name':my_dbx_cluster_friendly,'cluster_id':my_dbx_cluster_url_name}, # IN_2_SILVER note: date_folder_override: Showcase static lookup data. Overrides main date_folder, which all other steps reads from
