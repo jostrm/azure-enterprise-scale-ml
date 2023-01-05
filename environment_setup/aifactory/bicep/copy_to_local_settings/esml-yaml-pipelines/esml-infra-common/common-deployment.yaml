@@ -1,0 +1,62 @@
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+- template: ./variables/variables.yaml
+
+stages:
+- stage: Dev
+  displayName: Deploying common to Dev environment
+  jobs:
+    - deployment: Dev
+      displayName: deploy ESML common with Bicep to dev
+      pool:
+        vmImage: windows-latest
+      environment: Dev  
+      variables:
+        dev_test_prod: "dev"
+        dev_test_prod_sub_id: $(dev_sub_id)
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./environments/dev.yaml
+
+- stage: Test
+  dependsOn: dev
+  displayName: Deploying common environment to Test environment
+  jobs:
+    - deployment: Test
+      displayName: deploy ESML common with Bicep to test
+      pool:
+        vmImage: windows-latest
+      environment: Test
+      variables:
+        dev_test_prod: "test"
+        dev_test_prod_sub_id: $(test_sub_id)
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./environments/test.yaml
+
+- stage: Prod
+  dependsOn: Test
+  displayName: Deploying common environment to Prod environment
+  jobs:
+    - deployment: Prod
+      displayName: deploy ESML common with Bicep to prod
+      pool:
+        vmImage: windows-latest
+      environment: Prod
+      variables:
+        dev_test_prod: "prod"
+        dev_test_prod_sub_id: $(prod_sub_id)
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./environments/prod.yaml
+  
