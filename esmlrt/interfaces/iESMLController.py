@@ -395,6 +395,19 @@ class IESMLController:
         return env
 
     @staticmethod
+    def get_any_model_inference_config(ws,model_folder_name,model_alias, model_name,model_version, run_id = None):
+        print(" INFO: get_best_model_inference_config: model_name {} | version {} | run_id: {}".format(model_name,model_version,run_id))
+        model = Model(workspace=ws,name=model_name, version=model_version)
+        experiment = Experiment(ws,model_folder_name)
+        best_run = None
+        if(run_id is not None):
+            main_run = PipelineRun(experiment=experiment, run_id=run_id)
+            best_run = main_run
+        inference_config, model, best_run = IESMLController.get_best_model_inference_config(
+            ws, model_folder_name, model_alias,scoring_script_folder_local=None, current_model=model,run_id_tag=run_id, best_run = best_run)
+        return inference_config, model, best_run
+
+    @staticmethod
     def get_best_model_inference_config(ws,model_folder_name, model_alias="M10", scoring_script_folder_local=None, current_model=None,run_id_tag=None, best_run = None):
         if(current_model is None and run_id_tag is None and best_run is None):
             current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,model_folder_name)
