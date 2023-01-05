@@ -542,7 +542,7 @@ class IESMLController:
 
             try:
                 pipeline_run = PipelineRun(experiment=exp, run_id=run_id)
-                best_run = main_run
+                best_run = pipeline_run
                 if(debug_print):
                     print(" ## ESML: PipelineRun = TRUE")
             except Exception as e:
