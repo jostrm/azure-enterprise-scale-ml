@@ -17,7 +17,7 @@ from esmlrt.runtime.ESMLTestScoringFactory2 import ESMLTestScoringFactory
 from your_code.your_custom_code import In2GoldProcessor
 
 def init():
-    global model, probabilities, gold_to_score_df, output_scored_gold,datastore,historic_path,last_gold_run,run_id,active_folder,date_in,model_version_in
+    global model,current_model, probabilities, gold_to_score_df, output_scored_gold,datastore,historic_path,last_gold_run,run_id,active_folder,date_in,model_version_in
 
     parser = argparse.ArgumentParser("Scoring the model")
     parser.add_argument('--target_column_name', dest="target_column_name", type=str, required=True)
@@ -186,8 +186,9 @@ def run(gold_to_score_df):
             # create the pandasd dataframe with meta, save to .csv for "Azure datafactory WriteBack pipeline/step" to use
             date_now_str = str(datetime.datetime.now())
 
-            last_gold_run_data = [[run_id, historic_path,date_in,date_now_str,model_version_in]]
-            df2 = pd.DataFrame(last_gold_run_data, columns = ['pipeline_run_id', 'scored_gold_path', 'date_in_parameter', 'date_at_pipeline_run','model_version'])
+            used_model_version_str = str(current_model.version)
+            last_gold_run_data = [[run_id, historic_path,date_in,date_now_str,model_version_in, used_model_version_str, current_model.name]]
+            df2 = pd.DataFrame(last_gold_run_data, columns = ['pipeline_run_id', 'scored_gold_path', 'date_in_parameter', 'date_at_pipeline_run','model_version','used_model_version','used_model_name'])
             written_df2 = df2.to_csv(path_last_gold_run, encoding='utf-8',index=False)
             print("Pipeline ID (Steps runcontext.parent.id) {}".format(run_id))
 
