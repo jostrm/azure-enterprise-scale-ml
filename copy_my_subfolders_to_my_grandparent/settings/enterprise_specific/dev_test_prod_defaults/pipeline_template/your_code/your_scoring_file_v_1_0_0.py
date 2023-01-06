@@ -71,13 +71,14 @@ def run(data):
                 if isinstance(data, pd.DataFrame):
                     result = model.predict(data) # as expected if having @input_schema
                     if (model is not None and (hasattr(model, 'predict_proba') == False)):
-                        result = result[0]
+                        info_message_init = info_message_init + "03:Has @input_schema and data is DataFrame. has_predict_proba=False"
+                        result = result # result[0] TODO 4 you: FYI: you probably want to pass a list here, not a scalar value (otherwise error when converting to DataFrame)
                 else: # if not @input_schema, you need to handle this
                     d1 = convert_to_list(data)
                     pd_data = pd.DataFrame(d1)
                     result = model.predict(pd_data)
                     if (model is not None and (hasattr(model, 'predict_proba') == False)):
-                        result = result[0]
+                        result = result[0] # TODO 4 you: FYI: you probably want to pass a scalar value here, not a list (otherwise value in dataframe column is presented as [123.55] not 123.55)
 
             except Exception as e8:
                 # if you don't have an @input_schema and pass a list - you need to convert to numpy array and reshape
