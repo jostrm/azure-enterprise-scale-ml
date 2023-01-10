@@ -14,11 +14,14 @@
         "technicalContactEmail": {
             "value": "batman@gothamcity.dc_"
         },
-        "projectServicePrincipleOID": {
-            "value": "done_oid_from_ADO_var_"
+        "projectServicePrincipleOID_SeedingKeyvaultName": {
+            "value": "esml-project001-sp-oid"
         },
-        "projectServicePrincipleAppID": {
-            "value": "done_appid_from_ADO_var"
+        "projectServicePrincipleAppID_SeedingKeyvaultName": {
+            "value": "esml-project001-sp-id"
+        },
+        "projectServicePrincipleSecretKey_SeedingKeyvaultName": {
+            "value": "esml-project001-sp-secret"
         }
         
     }

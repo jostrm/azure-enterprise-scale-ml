@@ -1,7 +1,11 @@
 variables:
   admin_aifactorySuffixRG: "-001"
-  admin_bicep_kv_fw: "" # Input key vault name
-  admin_bicep_kv_fw_rg: "" # Input key vault resource group
+  admin_bicep_input_keyvault_subscription: "" # seeding keuvyalt: subscription id
+  admin_bicep_kv_fw: "" # seeding keuvyalt: name
+  admin_bicep_kv_fw_rg: "" #seeding keuvyalt: resource group
+  project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt
+  project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt
+  project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
   admin_commonResourceSuffix: "-001"
   admin_hybridBenefit: "false"
   esml-admcommon-001: "-001"
@@ -17,7 +21,5 @@ variables:
   prod_sub_id: "" # SubscriptionID prod
   project_IP_whitelist: ""
   project_number_000: "" # Project number (3 digits)
-  project_service_principal_AppID: "" 
-  project_service_principal_OID: ""
   technical_admins_ad_object_id: ""
   technical_admins_email: ""

@@ -54,9 +54,9 @@ steps:
      az deployment group create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj" \
      --subscription "$(prod_sub_id)" \
-     --resource-group "$(cat "..\..\..\..\aifactory\subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"")" \
+     --resource-group "$(cat "..\..\..\..\aifactory\parameters\subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"")" \
      --template-file "esml-project\21-network.bicep" \
-     --parameters @"..\..\..\..\aifactory\subnetParameters.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\subnetParameters.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)"
      
@@ -89,13 +89,13 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-project\22-main.bicep" \
      --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
-     --parameters @"..\..\..\..\aifactory\10-esml-globals-1.json" \
-     --parameters @"..\..\..\..\aifactory\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\..\..\..\aifactory\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\..\..\..\aifactory\10-esml-globals-5-13_23.json" \
-     --parameters @"..\..\..\..\aifactory\21-22-esml-prj-parameters.json" \
-     --parameters @"..\..\..\..\aifactory\dynamicNetworkParams.json" \
-     --parameters @"..\..\..\..\aifactory\23-esml-prj-rbac-parameters.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-2-12_13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-4-13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-5-13_23.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\21-22-esml-prj-parameters.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\dynamicNetworkParams.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\23-esml-prj-rbac-parameters.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -105,8 +105,12 @@ steps:
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
-     --parameters projectServicePrincipleOID="$(project_service_principal_OID)" \
-     --parameters projectServicePrincipleAppID="$(project_service_principal_AppID)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters projectServicePrincipleAppID_SeedingKeyvaultName="$(project_service_principal_AppID_seeding_kv_name)" \
+     --parameters projectServicePrincipleSecretKey_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

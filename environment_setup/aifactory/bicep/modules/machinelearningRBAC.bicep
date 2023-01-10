@@ -1,3 +1,4 @@
+@secure()
 param projectSP string
 param adfSP string
 param projectADuser string

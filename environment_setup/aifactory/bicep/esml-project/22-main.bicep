@@ -1,5 +1,10 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+@description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
+param inputKeyvault string
+param inputKeyvaultResourcegroup string
+param inputKeyvaultSubscription string
+
 @description('Allow Azure ML Studio UI or not. Dataplane is always private, private endpoint - Azure backbone ')
 param AMLStudioUIPrivate bool = true
 @description('Databricks with PRIVATE endpoint or with SERVICE endpoint. Either way controlplane is on Azure backbone network ')
@@ -65,10 +70,14 @@ param technicalContactEmail string
 param technicalContactId string
 @description('Specifies the tenant id')
 param tenantId string
-@description('Project specific service principle for RBAC - Object ID') // OID: Get it by using Get-AzADUser or Get-AzADServicePrincipal cmdlet
-param projectServicePrincipleOID string // Specifies the object ID of a user, service principal or security group in the Azure AD. The object ID must be unique for the list of access policies. 
-@description('Project specific service principle to be added in kv - Application ID')
-param projectServicePrincipleAppID string
+
+@description('Project specific service principle  KEYVAULT secret NAME for RBAC purpose - Object ID') // OID: Get it by using Get-AzADUser or Get-AzADServicePrincipal cmdlet
+param projectServicePrincipleOID_SeedingKeyvaultName string // Specifies the object ID of a user, service principal or security group in the Azure AD. The object ID must be unique for the list of access policies. 
+@description('Project specific service principle KEYVAULT secret NAME to be added in kv for - Application ID ')
+param projectServicePrincipleSecret_SeedingKeyvaultName string
+@description('Project specific service principle KEYVAULT secret NAME for - Secret value')
+param projectServicePrincipleAppID_SeedingKeyvaultName string
+
 @description('AzureDatabricks enterprise application')
 param databricksOID string
 
@@ -105,6 +114,7 @@ param commonRGNamePrefix string
 
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
 var commonResourceGroup = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // change this to correct rg
+
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
 var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
@@ -417,13 +427,19 @@ module kv1 '../modules/keyVault.bicep' = {
     projectResourceGroup
   ]
 }
+// Note: az keyvault update  --name msft-weu-dev-cmnai-kv --enabled-for-template-deployment true
+resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription,inputKeyvaultResourcegroup)
+}
 
 module addSecret '../modules/kvSecretsPrj.bicep' = {
   name: '${keyvaultName}addSecrect2ProjectKV${projectNumber}${locationSuffix}${env}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
-    spAppIDValue:projectServicePrincipleAppID //externalKv.getSecret(inputCommonSPIDKey)
-    spOIDValue:projectServicePrincipleOID
+    spAppIDValue:externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) //projectServicePrincipleAppID_SeedingKeyvaultName 
+    spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)  // projectServicePrincipleOID_SeedingKeyvaultName
+    spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
     keyvaultName: keyvaultName
   }
   dependsOn: [
@@ -705,7 +721,7 @@ module spProjectSPAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if(dat
     keyVaultPermissions: secretGet
     keyVaultResourceName: keyvaultName
     policyName: 'add'
-    principalId: projectServicePrincipleOID
+    principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds:[]
   }
   dependsOn: [
@@ -764,7 +780,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvFromCommon.name
     policyName: 'add'
-    principalId: projectServicePrincipleOID
+    principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds:[]
   }
   dependsOn: [
@@ -827,7 +843,7 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_cen
   name: 'rbacDBX2AazureMLwithProjectSP${projectNumber}${locationSuffix}${env}'
   params: {
     amlName:amlName
-    projectSP:projectServicePrincipleOID
+    projectSP:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     adfSP:adf.outputs.principalId
     projectADuser:technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
@@ -843,7 +859,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(sweden_
   name: 'rbacDBX2AMLProjectSPSWC${projectNumber}${locationSuffix}${env}'
   params: {
     amlName:amlName
-    projectSP:projectServicePrincipleOID
+    projectSP:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     adfSP:'null' // this duplicate will be ignored
     projectADuser:technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
