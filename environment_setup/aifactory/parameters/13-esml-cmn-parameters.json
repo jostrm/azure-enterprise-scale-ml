@@ -2,9 +2,6 @@
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "commonServicePrincipleOID": {
-            "value": "TODO_commonServicPrincpleObjectID"
-        },
         "inputKeyvault": {
             "value": "done_from_ADO_var"
         },
@@ -19,6 +16,9 @@
         },
         "inputCommonSPSecretKey": {
             "value": "esml-common-sp-secret"
+        },
+        "commonServicePrincipleOIDKey": {
+            "value": "esml-common-sp-oid"
         }
     }
 }

@@ -1,6 +1,7 @@
 @description('Name of the KeyVault resource ex. kv-myservice.')
 param keyVaultResourceName string
 @description('Principal Id of the Azure resource (Managed Identity).')
+@secure()
 param principalId string
 @description('Assigned permissions for Principal Id (Managed Identity)')
 param keyVaultPermissions object

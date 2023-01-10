@@ -62,8 +62,8 @@ param hybridBenefit bool
 param technicalContactEmail string
 @description('Specifies project owner objectId and will be used for tagging and RBAC')
 param technicalContactId string
-@description('Common service principle for RBAC - object id')
-param commonServicePrincipleOID string
+@description('Common service principle keuvault secret key name for Object ID')
+param commonServicePrincipleOIDKey string
 param databricksOID string
 @description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
 param commonRGNamePrefix string = ''
@@ -294,7 +294,11 @@ module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if
     kvCmn
   ]
 }
-
+// Note: az keyvault update  --name msft-weu-dev-cmnai-kv --enabled-for-template-deployment true
+resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription,inputKeyvaultResourcegroup)
+}
 module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = {
   scope: esmlCommonResourceGroup
   name: 'spCmnAccessPolicyGet'
@@ -302,7 +306,7 @@ module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = {
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvNameCommon
     policyName: 'add'
-    principalId: commonServicePrincipleOID
+    principalId: externalKv.getSecret(commonServicePrincipleOIDKey) // commonServicePrincipleOID
     additionalPrincipalIds:[]
   }
   dependsOn: [
@@ -344,18 +348,15 @@ module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bi
     adfAccessPolicyGet
   ]
 }
-// Note: az keyvault update  --name msft-weu-dev-cmnai-kv --enabled-for-template-deployment true
-resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
-  name: inputKeyvault
-  scope: resourceGroup(inputKeyvaultSubscription,inputKeyvaultResourcegroup)
-}
+
 module addSecret '../modules-common/kvSecretsCmn.bicep' = {
   name: '${kvNameCommonNoDash}addSecrect2CommonKV'
   scope: esmlCommonResourceGroup
   params: {
     esmlCommonSpIDSecret: externalKv.getSecret(inputCommonSPIDKey)
     esmlCommonSpSecretValue:externalKv.getSecret(inputCommonSPSecretKey)
-    esmlCommonSpOIDValue: commonServicePrincipleOID
+    esmlCommonSpOIDValue:externalKv.getSecret(commonServicePrincipleOIDKey)
+    //esmlCommonSpOIDValue: commonServicePrincipleOID
     keyvaultName: kvNameCommon
   }
   dependsOn: [
@@ -417,7 +418,7 @@ module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommonAdmin
     policyName: 'add'
-    principalId: commonServicePrincipleOID
+    principalId: externalKv.getSecret(commonServicePrincipleOIDKey) //commonServicePrincipleOID
     additionalPrincipalIds:[]
   }
   dependsOn: [
