@@ -1,0 +1,557 @@
+{
+  "properties": {
+    "lenses": {
+      "0": {
+        "order": 0,
+        "parts": {
+          "0": {
+            "position": {
+              "x": 2,
+              "y": 0,
+              "colSpan": 6,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# AI Factory 1 - DEV",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "1": {
+            "position": {
+              "x": 8,
+              "y": 0,
+              "colSpan": 5,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# AI Factory 1 - TEST",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "2": {
+            "position": {
+              "x": 14,
+              "y": 0,
+              "colSpan": 5,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# AI Factory 1 - PROD",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "3": {
+            "position": {
+              "x": 19,
+              "y": 0,
+              "colSpan": 7,
+              "rowSpan": 3
+            },
+            "metadata": {
+              "inputs": [
+                {
+                  "name": "resourceGroup",
+                  "isOptional": true
+                },
+                {
+                  "name": "id",
+                  "value": "/subscriptions/50ef5835-c45a-4c2e-a596-2a9e0e2a0a33/resourcegroups/esml-seeding-weu-001",
+                  "isOptional": true
+                }
+              ],
+              "type": "Extension/HubsExtension/PartType/ResourceGroupMapPinnedPart"
+            }
+          },
+          "4": {
+            "position": {
+              "x": 2,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Keyvault",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "5": {
+            "position": {
+              "x": 3,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "DSVM",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "6": {
+            "position": {
+              "x": 4,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Lake",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "7": {
+            "position": {
+              "x": 5,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "vNet",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "8": {
+            "position": {
+              "x": 6,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "NSG",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "9": {
+            "position": {
+              "x": 7,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "NSG 2",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "10": {
+            "position": {
+              "x": 0,
+              "y": 2,
+              "colSpan": 2,
+              "rowSpan": 3
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### ESML COMMON\r\n`Team:` ESML core team & data ingestion team\r\n\r\n`Owner:` Head of AI and analytics\r\n\r\n`Budget:` 3000$/mon\r\n\r\n`Responsibilities:` Onboard new ESML PRojects. Ingest data from data sources to datalake MASTER folder, for projects to subscribe to",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "11": {
+            "position": {
+              "x": 2,
+              "y": 2,
+              "colSpan": 5,
+              "rowSpan": 3
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: COMMON resource group\r\n\r\nExample resource group name: `abc-def-esml-common-weu-dev-001`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "12": {
+            "position": {
+              "x": 7,
+              "y": 2,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Data factory\r\n",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "13": {
+            "position": {
+              "x": 8,
+              "y": 2,
+              "colSpan": 5,
+              "rowSpan": 3
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: COMMON resource group\r\n\r\n`abc-def-esml-common-weu-TEST-001`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "14": {
+            "position": {
+              "x": 14,
+              "y": 2,
+              "colSpan": 5,
+              "rowSpan": 3
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: COMMON resource group placeholder\r\n`abc-def-esml-common-weu-PROD-001`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "15": {
+            "position": {
+              "x": 19,
+              "y": 3,
+              "colSpan": 7,
+              "rowSpan": 10
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# HOWTO: Add a new ESML Project\r\n\r\n ## Seeding keyvault / External keyvault:\r\n - Purpose: For AAD ADMIN to add 1-250 project service principles. 2022 we can reuse the SP's from the old projects 1-12.   External keyvault: `kv-esml-common-ext`\r\n\r\n ## Add new PROJECT Process: 1-3 (ex:005)\r\n - 1) AAD ADMIN creates a new service principle in AAD, and saves in EXTERNAL keyvault `'kv-esml-common-ext'` the 3 values\r\n \t- esml-project005-sp-id\r\n \t- esml-project005-sp-oid\r\n \t- esml-project005-sp-secret\r\n \r\n - 2) ESML ADMIN, configures the Azure Devope \"esml-project\" RELEASE pipeline, 4 VARIABLES need to be set. /Edit release/ Note that 2 valus is copied from external keuvaylt. Then run the RELEASE pipeline.\r\n\r\n\t`project_number_000 = 005`\r\n\r\n\t`project_service_principal_AppID` = ref001\r\n\r\n\t`project_service_principal_OID` =  ref002\r\n\r\n\t`technical_admins_ad_object_id` = ref003\r\n\r\n\t- ref001= esml-project005-sp-id\r\n\t- ref002= esml-project005-sp-id\r\n\t- ref003= AD user Object Id's for all project members, in a comma-separeted list: `asdf123,asd24,234f3`\r\n\r\n\t#### Click \"deploy\"...wait 30min..DONE!\r\n\r\n- 3) AAD ADMIN or ESML ADMIN copies the SP SECRET manually from This EXTERNAL  KEYVAULT(A), to the newly created project specific KEYVAULT (B) `kv-p005-weu-dev-abcym01`\r\n\r\n*The SP secret value is for security reason copied manually by the \"admin\" from External keyvault. (The BICEP can, but will not do that)\r\n",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "16": {
+            "position": {
+              "x": 0,
+              "y": 5,
+              "colSpan": 2,
+              "rowSpan": 17
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### ESML PROJECTS\r\n## PROJECT 001\r\n`Team:` Batman & Robin\r\n\r\n`Owner:` Donald Duck\r\n\r\n`Budget:` 10$/mon\r\n\r\n`Use case:` Predict fighting power\r\n\r\n`Datamesh:` Share back refined hero silver data to MASTER lake\r\n\r\n<br>\r\n\r\n## PROJECT 002\r\n`Team:` HR analytics\r\n\r\n`Owner:` Head of HR\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Predict employee churn\r\n\r\n`Datamesh:` Share back refined silver HR-data to MASTER lake\r\n\r\n<br><br><br><br>\r\n\r\n## PROJECT 003\r\n\r\n`Team:` External consultants\r\n\r\n`Owner:` BU factory analytics\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Detect harzards with computer vision in factory\r\n\r\n<br><br><br><br>\r\n\r\n## PROJECT 004\r\n\r\n`Team:` Dr Snuggles, Norpan, Grävlis\r\n\r\n`Owner:` Pippi Longstockings\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Predict fighting power\r\n\r\n<br><br><br><br>",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "17": {
+            "position": {
+              "x": 2,
+              "y": 5,
+              "colSpan": 5,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Project resourse group\r\n`abc-def-esml-project001-weu-dev-001-rg`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "18": {
+            "position": {
+              "x": 7,
+              "y": 5,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "DSVM Shortcut",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "19": {
+            "position": {
+              "x": 8,
+              "y": 5,
+              "colSpan": 5,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Project resourse group\r\n`abc-def-esml-project001-weu-test-001-rg`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "20": {
+            "position": {
+              "x": 14,
+              "y": 5,
+              "colSpan": 5,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Project resourse group\r\n`abc-def-esml-project001-weu-prod-001-rg`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "21": {
+            "position": {
+              "x": 7,
+              "y": 6,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "keuvault",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "22": {
+            "position": {
+              "x": 7,
+              "y": 7,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Data factory",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "23": {
+            "position": {
+              "x": 7,
+              "y": 8,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Databricks",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "24": {
+            "position": {
+              "x": 2,
+              "y": 9,
+              "colSpan": 5,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Project 002 resourse group\r\n`abc-def-esml-project002-weu-dev-001-rg`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "model": {
+        "timeRange": {
+          "value": {
+            "relative": {
+              "duration": 24,
+              "timeUnit": 1
+            }
+          },
+          "type": "MsPortalFx.Composition.Configuration.ValueTypes.TimeRange"
+        }
+      }
+    }
+  },
+  "name": "ESML-AIFactory-1",
+  "type": "Microsoft.Portal/dashboards",
+  "location": "INSERT LOCATION",
+  "tags": {
+    "hidden-title": "ESML-AIFactory-1"
+  },
+  "apiVersion": "2015-08-01-preview"
+}

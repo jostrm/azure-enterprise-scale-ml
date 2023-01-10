@@ -1,0 +1,493 @@
+{
+  "properties": {
+    "lenses": {
+      "0": {
+        "order": 0,
+        "parts": {
+          "0": {
+            "position": {
+              "x": 2,
+              "y": 0,
+              "colSpan": 19,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# AI Factory 1 - DEV",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "1": {
+            "position": {
+              "x": 2,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Keyvault",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "2": {
+            "position": {
+              "x": 3,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "DSVM",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "3": {
+            "position": {
+              "x": 4,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Lake",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "4": {
+            "position": {
+              "x": 5,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "vNet",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "5": {
+            "position": {
+              "x": 6,
+              "y": 1,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "NSG",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "6": {
+            "position": {
+              "x": 8,
+              "y": 1,
+              "colSpan": 6,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Cost Analysis for ESML-COMMON-DEV\r\n- Show cost graph/month",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "7": {
+            "position": {
+              "x": 14,
+              "y": 1,
+              "colSpan": 7,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: ACTIVITY & HEALTH (Azure monitor)\r\n#### Azure Datafactory\r\n- Number of PROJECTS served with data today\r\n- Number of success pipelines/day\r\n- Number of failed pipelines/day\r\n\r\n\r\n#### IoT Hub\r\n- Computer vision / Edge status\r\n\t- Pulse / health of Edge devices\r\n\t- Ingestion status",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "8": {
+            "position": {
+              "x": 0,
+              "y": 2,
+              "colSpan": 2,
+              "rowSpan": 3
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### ESML COMMON\r\n`Team:` ESML core team & data ingestion team\r\n\r\n`Owner:` Head of AI and analytics\r\n\r\n`Budget:` 3000$/mon\r\n\r\n`Responsibilities:` Onboard new ESML PRojects. Ingest data from data sources to datalake MASTER folder, for projects to subscribe to",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "9": {
+            "position": {
+              "x": 2,
+              "y": 2,
+              "colSpan": 5,
+              "rowSpan": 3
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: COMMON resource group\r\n\r\nExample resource group name: `abc-def-esml-common-weu-dev-001`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "10": {
+            "position": {
+              "x": 7,
+              "y": 2,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Data factory\r\n",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "11": {
+            "position": {
+              "x": 0,
+              "y": 5,
+              "colSpan": 2,
+              "rowSpan": 17
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### ESML PROJECTS\r\n## PROJECT 001\r\n`Team:` Batman & Robin\r\n\r\n`Owner:` Donald Duck\r\n\r\n`Budget:` 10$/mon\r\n\r\n`Use case:` Predict fighting power\r\n\r\n`Datamesh:` Share back refined hero silver data to MASTER lake\r\n\r\n<br>\r\n\r\n## PROJECT 002\r\n`Team:` HR analytics\r\n\r\n`Owner:` Head of HR\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Predict employee churn\r\n\r\n`Datamesh:` Share back refined silver HR-data to MASTER lake\r\n\r\n<br><br><br><br>\r\n\r\n## PROJECT 003\r\n\r\n`Team:` External consultants\r\n\r\n`Owner:` BU factory analytics\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Detect harzards with computer vision in factory\r\n\r\n<br><br><br><br>\r\n\r\n## PROJECT 004\r\n\r\n`Team:` Dr Snuggles, Norpan, Grävlis\r\n\r\n`Owner:` Pippi Longstockings\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Predict fighting power\r\n\r\n<br><br><br><br>",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "12": {
+            "position": {
+              "x": 2,
+              "y": 5,
+              "colSpan": 5,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Project resourse group\r\n`abc-def-esml-project001-weu-dev-001-rg`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "13": {
+            "position": {
+              "x": 7,
+              "y": 5,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "DSVM Shortcut",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "14": {
+            "position": {
+              "x": 8,
+              "y": 5,
+              "colSpan": 6,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Cost Analysis for PROJECT001\r\n- Show cost graph/month",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "15": {
+            "position": {
+              "x": 14,
+              "y": 5,
+              "colSpan": 7,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: ACTIVITY & HEALTH (Azure monitor)\r\n#### Azure machine learning activity = project activity\r\n- Endpoints (serving ML models)\r\n\t- E.g. What OS called the ednpoint, what data was input, any errors, what was the result.\r\n- Pipelines: Number of Azure ML pipelines & its status\r\n- Number of registered models , over month\r\n- Active compute cores/day, over month\r\n- Failed deployments\r\n\r\n#### Azure Datafactory\r\n- Number of success pipelines/day\r\n- Number of failed pipelines/day\r\n\r\n#### IoT Hub\r\n- Computer vision / Edge status\r\n\t- Number of detected objects / day by ML-model",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "16": {
+            "position": {
+              "x": 7,
+              "y": 6,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "keuvault",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "17": {
+            "position": {
+              "x": 7,
+              "y": 7,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Data factory",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "18": {
+            "position": {
+              "x": 7,
+              "y": 8,
+              "colSpan": 1,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "Databricks",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "19": {
+            "position": {
+              "x": 2,
+              "y": 9,
+              "colSpan": 5,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Project 002 resourse group\r\n`abc-def-esml-project002-weu-dev-001-rg`",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "20": {
+            "position": {
+              "x": 8,
+              "y": 9,
+              "colSpan": 6,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER: Cost Analysis for PROJECT002",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          "21": {
+            "position": {
+              "x": 14,
+              "y": 9,
+              "colSpan": 7,
+              "rowSpan": 4
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "### PLACEHOLDER:ACTIVITY & HEALTH (Azure monitor)\r\n#### Azure machine learning activity = project activity\r\n- Endpoints (serving ML models)\r\n\t- E.g. What OS called the ednpoint, what data was input, any errors, what was the result.\r\n- Number of registered models , over month\r\n- Active compute cores/day, over month\r\n- Failed deployments\r\n\r\n#### Azure Datafactory\r\n- Number of success pipelines/day\r\n- Number of failed pipelines/day\r\n\r\n#### IoT Hub\r\n- Computer vision / Edge status\r\n\t- Number of detected objects / day by ML-model",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "model": {
+        "timeRange": {
+          "value": {
+            "relative": {
+              "duration": 24,
+              "timeUnit": 1
+            }
+          },
+          "type": "MsPortalFx.Composition.Configuration.ValueTypes.TimeRange"
+        }
+      }
+    }
+  },
+  "name": "ESML-AIFactory-DEV",
+  "type": "Microsoft.Portal/dashboards",
+  "location": "INSERT LOCATION",
+  "tags": {
+    "hidden-title": "ESML-AIFactory-DEV"
+  },
+  "apiVersion": "2015-08-01-preview"
+}

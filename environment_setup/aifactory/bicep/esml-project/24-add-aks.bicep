@@ -164,7 +164,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
         dockerBridgeCidr:aksDockerBridgeCidr
         serviceCidr:aksServiceCidr
       }
-      loadBalancerSubnet: 'aks-subnet' // aks-subnet is default
+      loadBalancerSubnet:aksSubnetName // aks-subnet is default
       
     }
   }
