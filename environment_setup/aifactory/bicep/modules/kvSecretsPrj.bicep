@@ -1,4 +1,4 @@
-@description('Common KEYVAULT for ESML coreteam')
+@description(' KEYVAULT for ESML coreteam or PROJECT team')
 param keyvaultName string
 
 // is added manually by AAD admin in project KV
@@ -6,13 +6,13 @@ param keyvaultName string
 param spIDKey string = 'esml-project-sp-id'
 @secure()
 @description('value of service principle ID')
-param spAppIDValue string = 'Added from ADO variable, or manually'
+param spAppIDValue string //= 'Added from ADO variable, or manually'
 
 @description('secret name of for service principle App ID')
 param spSecret string = 'esml-project-sp-secret'
 @secure()
 @description('value of service principle secret')
-param spSecretValue string = 'Is added manually by AAD admin'
+param spSecretValue string //'Is added manually by AAD admin'
 
 @description('secret value of Tenant ID')
 param esmlTenantID string = 'esml-tenant-id'
@@ -34,7 +34,7 @@ param expiration_date_default_2025_01_10_epoch int = 1736467877
 param spOIDKey string = 'esml-project-sp-oid'
 @secure()
 @description('value of service principle ObjectID')
-param spOIDValue string = 'Added from ADO variable, or manually'
+param spOIDValue string //= 'Added from ADO variable, or manually'
 
 // SP APP ID - from ADO Variable
 resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
