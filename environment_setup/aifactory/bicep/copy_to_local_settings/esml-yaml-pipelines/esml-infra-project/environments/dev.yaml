@@ -107,7 +107,7 @@ steps:
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters projectServicePrincipleAppID_SeedingKeyvaultName="$(project_service_principal_AppID_seeding_kv_name)" \
-     --parameters projectServicePrincipleSecretKey_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
+     --parameters projectServicePrincipleSecret_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \

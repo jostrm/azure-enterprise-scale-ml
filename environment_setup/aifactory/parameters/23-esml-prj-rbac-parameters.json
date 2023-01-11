@@ -20,7 +20,7 @@
         "projectServicePrincipleAppID_SeedingKeyvaultName": {
             "value": "esml-project001-sp-id"
         },
-        "projectServicePrincipleSecretKey_SeedingKeyvaultName": {
+        "projectServicePrincipleSecret_SeedingKeyvaultName": {
             "value": "esml-project001-sp-secret"
         }
         
