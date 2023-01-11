@@ -6,7 +6,8 @@
 - 3.8.13
 # Azure ML and AutoML version (2022-11-10)
 - 1.47
-# Tested OK history: fresh install on DSVM, with MiniConda, started in Admin mode
+# Tested OK or NOT - history: fresh install on DSVM, with MiniConda, started in Admin mode
+- STATUS: not OK, after below fixes:
 - 2022-11-10: 1st test. Error:
     - 1) `Vanilla Azure ML AutoML 1.47 install` (no ESML pip to fix datalake gen2, keyvault). Before: p.ws.update(v1_legacy_mode=True)
         - Error: `ModuleNotFoundError: No module named 'azure.keyvault'`
@@ -23,8 +24,8 @@
         - lake: 12.6.0
         - secrets==4.3.0
         - keyvault==4.10
-        - Error (duet to ESML dependency): `ModuleNotFoundError: No module named seaborn`
-            - `esml/common/baselayer_ml.py:13`
-    - 5) After adding seaborn: 
-        - 
+    - 5) SB / `pygmentize.exe` error during install:
+        - Error: ERROR: Could not install packages due to an EnvironmentError: [WinError 5] Access is denied: 'C:\\Users\\esmladmin\\AppData\\Local\\Temp\\2\\pip-uninstall-iu93hpmr\\pygmentize.exe'
+
+ 
     

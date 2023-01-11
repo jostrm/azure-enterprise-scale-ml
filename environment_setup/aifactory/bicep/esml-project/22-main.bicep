@@ -837,6 +837,8 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
 }
 
 
+// TODO-2023: Principals of type Application cannot validly be used in role assignments
+
 //-- Needed if connnecting from Databricks to Azure ML workspace
 // Note: SP OID: it must be the OBJECT ID of a service principal, not the OBJECT ID of an Application, different thing, and I have to agree it is very confusing.
 module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing== false){
