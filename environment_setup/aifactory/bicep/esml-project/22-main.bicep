@@ -439,8 +439,9 @@ module addSecret '../modules/kvSecretsPrj.bicep' = {
   params: {
     spAppIDValue:externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) //projectServicePrincipleAppID_SeedingKeyvaultName 
     spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)  // projectServicePrincipleOID_SeedingKeyvaultName
+
     spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
-    keyvaultName: keyvaultName
+    keyvaultName: kv1.outputs.keyvaultName
   }
   dependsOn: [
     kv1
