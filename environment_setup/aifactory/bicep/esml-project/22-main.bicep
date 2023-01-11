@@ -460,7 +460,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   name: '${keyvaultName}APTechContact${projectNumber}${locationSuffix}${env}'
   params: {
     keyVaultPermissions: secretGetListSet
-    keyVaultResourceName: keyvaultName
+    keyVaultResourceName: kv1.outputs.keyvaultName
     policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds:technicalAdminsObjectID_array_safe
@@ -720,7 +720,7 @@ module spProjectSPAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if(dat
   name: 'spProjectSPAccessGet${projectNumber}${locationSuffix}${env}' //'${keyvaultName}/add'
   params: {
     keyVaultPermissions: secretGet
-    keyVaultResourceName: keyvaultName
+    keyVaultResourceName: kv1.outputs.keyvaultName
     policyName: 'add'
     principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds:[]
@@ -736,7 +736,7 @@ module adfAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if((databricks
   name: 'adfAccessPolicyGet${projectNumber}${locationSuffix}${env}'
   params: {
     keyVaultPermissions: secretGet
-    keyVaultResourceName: keyvaultName
+    keyVaultResourceName: kv1.outputs.keyvaultName
     policyName: 'add'
     principalId: adf.outputs.principalId
     additionalPrincipalIds:[]
@@ -754,7 +754,7 @@ module spDatabricksAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = i
   name: 'spDBXAccessPolicyGetList${projectNumber}${locationSuffix}${env}'
   params: {
     keyVaultPermissions: secretGetList
-    keyVaultResourceName: keyvaultName
+    keyVaultResourceName: kv1.outputs.keyvaultName
     policyName: 'add'
     principalId: databricksOID
     additionalPrincipalIds:[]
