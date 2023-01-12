@@ -775,6 +775,7 @@ class ESMLPipelineFactory():
                     else:
                         curated_environment = Environment.get(workspace=self.p.ws, name=self.environment_name) # "AzureML-AutoML" or your OWN environment
 
+                print("Using Azure ML Environment: '{}' as primary environment for PythonScript Steps".format(self.environment_name))
                 for d in p.Datasets:
                     if(advanced_mode):
                         has_dbx,step_name,map_step = self._iesml_pipelinestep_map.get_dbx_map_step(map,d.Name)
