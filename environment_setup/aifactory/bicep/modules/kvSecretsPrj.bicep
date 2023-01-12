@@ -28,13 +28,28 @@ param esmlSubscriptionID string = 'esml-subscription-id'
 param esmlSubscriptionIDSecret string = subscription().subscriptionId
 
 @description('default keyvault secret expiration date in inteter, EPOC, seconds after 1970')
-param expiration_date_default_2025_01_10_epoch int = 1736467877
+param expiration_date_default_2025_01_10_epoch int = 1736467877 // 2025 if created 2022 (3yr)
 
 @description('secret name of Object ID for service principle')
 param spOIDKey string = 'esml-project-sp-oid'
 @secure()
 @description('value of service principle ObjectID')
 param spOIDValue string //= 'Added from ADO variable, or manually'
+
+var esml_project_dbx_token_key = 'esml-project-dbx-token'
+
+// SP APP ID - from ADO Variable
+resource kvSecretDatabricksToken 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
+  name: '${keyvaultName}/${esml_project_dbx_token_key}'
+  properties: {
+    value:'TODO Databricks token'
+    contentType: 'ESML generated. TODO:Databricks token - needed for Azure ML pipelines with DatabricksSteps'//'ESML generated dummy.SP-AppId. AAD-admin need to add real service-principle AppID guid.'
+    attributes: {
+      enabled: true
+      exp:expiration_date_default_2025_01_10_epoch
+    }
+  }
+}
 
 // SP APP ID - from ADO Variable
 resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {

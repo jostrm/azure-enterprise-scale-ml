@@ -84,6 +84,7 @@ class esml_step_types():
 class ESMLPipelineFactory():
     p = None
     _use_curated_automl_environment = True
+    _default_base_image = "mcr.microsoft.com/azureml/curated/azureml-automl:126"
     _override_compute_target = None
     _conda_dependencies_object = None
 
@@ -1597,7 +1598,24 @@ class ESMLPipelineFactory():
 
 #region PRIVATE environments
 
-    def create_automl_lts_environment_if_not_exists(self):
+    def create_automl_lts_environment(self,base_image_in, environment_name = None):
+        if(environment_name is None):
+            environment_name = self._esml_automl_lts_env_name
+        env_esml_v2 = Environment(name=environment_name)
+        env_esml_v2.docker.base_image = base_image_in
+        env_esml_v2.python.user_managed_dependencies = True
+        b_details = env_esml_v2.build(self.p.ws)
+        
+        while (b_details.status != 'Succeeded'):
+            time.sleep(15)
+            print("Still building image for {}...".format(self._esml_automl_lts_env_name))
+        
+        print("Environment {} is now created.".format(self._esml_automl_lts_env_name))
+        #automl_esml_env = env_esml_v2
+        automl_esml_env = Environment.get(workspace=self.p.ws,name=self._esml_automl_lts_env_name)
+        return automl_esml_env
+
+    def create_automl_lts_environment_if_not_exists(self,base_image_in = None):
         automl_esml_env = None
         try:
             if (self.p.ws == None):
@@ -1608,19 +1626,10 @@ class ESMLPipelineFactory():
         except Exception as e:
             s = str(e)
             if ("No environment exists for name" in s):
-                env_esml_v2 = Environment(name=self._esml_automl_lts_env_name)
-                env_esml_v2.docker.base_image = "mcr.microsoft.com/azureml/curated/azureml-automl:126"
-                env_esml_v2.python.user_managed_dependencies = True
-                b_details = env_esml_v2.build(self.p.ws)
-                
-                while (b_details.status != 'Succeeded'):
-                    time.sleep(15)
-                    print("Still building image for {}...".format(self._esml_automl_lts_env_name))
-                
-                print("Environment {} is now created.".format(self._esml_automl_lts_env_name))
-                #automl_esml_env = env_esml_v2
-                automl_esml_env = Environment.get(workspace=self.p.ws,name=self._esml_automl_lts_env_name)
-
+                base_image_name = self._default_base_image
+                if(base_image_in is not None):
+                    base_image_name = base_image_in
+                automl_esml_env = self.create_automl_lts_environment(base_image_name)
         return automl_esml_env
 
     def create_dbx_step_in_2_silver(self,map_in,databricks_compute,map_step,dataset,step_key = "in2silver_ds01_diabetes",
