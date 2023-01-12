@@ -161,6 +161,7 @@ class LakeAccess():
         print("-client_id {}".format(sp_id_1))
         print("-subscription_id {}".format(sub_id))
         print("-workspace {}".format(self.ws.name))
+        print("-resource_group {}".format(rg_name))
 
         datastore = Datastore.register_azure_data_lake_gen2(workspace=self.ws,
                                                             datastore_name=datastore_name,
