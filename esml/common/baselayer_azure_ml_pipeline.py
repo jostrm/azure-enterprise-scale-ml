@@ -1608,11 +1608,11 @@ class ESMLPipelineFactory():
         
         while (b_details.status != 'Succeeded'):
             time.sleep(15)
-            print("Still building image for {}...".format(self._esml_automl_lts_env_name))
+            print("Still building image for {}...".format(environment_name))
         
-        print("Environment {} is now created.".format(self._esml_automl_lts_env_name))
+        print("Environment {} is now created.".format(environment_name))
         #automl_esml_env = env_esml_v2
-        automl_esml_env = Environment.get(workspace=self.p.ws,name=self._esml_automl_lts_env_name)
+        automl_esml_env = Environment.get(workspace=self.p.ws,name=environment_name)
         return automl_esml_env
 
     def create_automl_lts_environment_if_not_exists(self,base_image_in = None):
