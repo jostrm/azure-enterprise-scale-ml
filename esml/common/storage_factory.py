@@ -153,14 +153,14 @@ class LakeAccess():
         # Error & CONTINUE...No Datastore Lets create one. We need IAM: BLOB STORAGE CONTRIBUTOR, which COMMON-SP should have (Interactive Admin might alos have this, but not project-SP)
         #2 API to READ 
 
-        if(self.suppress_logging==False):
-            print("Register ESML lake as Datastore, as {}".format(datastore_name))
-            print("-account_name {}".format(sa_name))
-            print("-file_system_name {}".format(file_system_name))
-            print("-tenantId {}".format(tenantId))
-            print("-client_id {}".format(sp_id_1))
-            print("-subscription_id {}".format(sub_id))
-            print("-workspace {}".format(self.ws.name))
+        #if(self.suppress_logging==False):
+        print("Register ESML lake as Datastore, as {}".format(datastore_name))
+        print("-account_name {}".format(sa_name))
+        print("-file_system_name {}".format(file_system_name))
+        print("-tenantId {}".format(tenantId))
+        print("-client_id {}".format(sp_id_1))
+        print("-subscription_id {}".format(sub_id))
+        print("-workspace {}".format(self.ws.name))
 
         datastore = Datastore.register_azure_data_lake_gen2(workspace=self.ws,
                                                             datastore_name=datastore_name,
