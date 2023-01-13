@@ -201,6 +201,18 @@ class ESMLPipelineFactory():
     def batch_pipeline_parameters(self):
         return self._batch_pipeline_parameters
 
+    def is_advancede_mode_and_databricks(self):
+        advanced_dbx_mode = False
+        if(self._iesml_pipelinestep_map is not None):
+            dataset_folder_names = self.p.active_model['dataset_folder_names']
+            if(self.p.inference_mode):
+                specific_mapping = self._iesml_pipelinestep_map.get_inference_map(dataset_folder_names)
+            else:
+                specific_mapping = self._iesml_pipelinestep_map.get_train_map(dataset_folder_names)
+            
+            advanced_dbx_mode = self._iesml_pipelinestep_map.has_dbx(specific_mapping)
+        return advanced_dbx_mode
+
     # PIPELINE - Name, endpoint, description etc
     @property
     def name_batch_pipeline(self):
@@ -213,7 +225,15 @@ class ESMLPipelineFactory():
             else:
                 return self.p.experiment_name + "_pipe_IN_2_GOLD_TRAIN" # 4_TRAIN_or_PBI
         elif(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML or self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL):
-            return self.p.experiment_name + "_pipe_IN_2_GOLD_TRAIN"
+            experiment_name = None
+            if(self.is_advancede_mode_and_databricks()):
+                experiment_name = self.p.experiment_name + "_pipe_IN_2_GOLD_TRAIN_DBX"
+            else:
+                experiment_name = self.p.experiment_name + "_pipe_IN_2_GOLD_TRAIN"
+            if(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
+                experiment_name = experiment_name + "_AUTOML"
+            return experiment_name
+
         elif(self._esml_pipeline_type ==  esml_pipeline_types.GOLD_SCORING):
             return self.p.experiment_name + "_pipe_GOLD_SCORING"
         else:
