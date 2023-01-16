@@ -94,6 +94,12 @@ param hybridBenefit bool
 param commonLakeNamePrefixMax8chars string
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
+//Override paramenters
+param commonResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+
 // ENABLE/DISABLE: Optional exclusions in deployment
 @description('Azure ML workspace can only be called once from BICEP, otherwise COMPUTE name will give error 2nd time. ')
 param enableAML bool = true
@@ -105,7 +111,7 @@ param enableVmPubIp bool = false
 
 // ENABLE/DISABLE end
 
-var vnetNameFull = '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetNameFull = vnetNameFull_param != '' ? vnetNameFull_param : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
 @description('Meta. Needed to calculate subnet: subnetCalc and genDynamicNetworkParamFile')
 param vnetResourceGroupBase string
@@ -113,8 +119,7 @@ param vnetResourceGroupBase string
 param commonRGNamePrefix string
 
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
-var commonResourceGroup = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // change this to correct rg
-
+var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
 var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
@@ -643,8 +648,7 @@ module dbxMI '../modules/databricksManagedIdentityRBAC.bicep' = if(databricksPri
   ]
 }
 
-
-var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
+var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
 resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
   name: datalakeName
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
@@ -767,7 +771,7 @@ module spDatabricksAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = i
 }
 
 var cmnName = 'cmn'
-var kvNameFromCOMMON = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var kvNameFromCOMMON = kvNameFromCOMMON_param != '' ? kvNameFromCOMMON_param : 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 
 resource kvFromCommon 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
