@@ -80,7 +80,7 @@ module nsg '../modules/databricksNsg.bicep' = {
     name: 'dbx-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
     tags: {
-      'Description': 'databricks Nsg'
+      Description: 'databricks Nsg'
     }
   }
 }
@@ -91,7 +91,7 @@ module nsgAKS '../modules/aksNsg.bicep' = {
     name: 'aks-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
     tags: {
-      'Description': 'AKS Nsg'
+      Description: 'AKS Nsg'
     }
   }
 }

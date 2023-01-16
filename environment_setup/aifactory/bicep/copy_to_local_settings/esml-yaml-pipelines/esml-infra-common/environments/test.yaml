@@ -1,0 +1,88 @@
+steps:
+
+- checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
+  submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
+  continueOnError: false # Continue running even on failure?.  (false,n,no,off,on,true,y,yes)
+  displayName: GIT # Human-readable name for the task. 
+  enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
+  name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
+
+- task: AzureCLI@2
+  displayName: '11-Common RG and RBAC'
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az deployment sub create \
+     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(aifactorySuffixRG)-DeplRG" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-common\main\11-rgCommon.bicep" \
+     --parameters @"..\..\..\..\aifactory\parameters\11-esml-globals-11_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters location="$(admin_location)" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters aifactorySuffixRG="$(aifactorySuffixRG)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+
+- task: AzureCLI@2
+  displayName: '12-Common-Networking'
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az deployment sub create \
+     --name "esml-cmn$(dev_test_prod)-$(aifactorySuffixRG)-$(aiResourceSuffix)Subnets" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-common\main\12-networkCommon.bicep" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-2-12_13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-3-12_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\12-esml-cmn-parameters.json" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters location="$(admin_location)" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters cidr_range="$(cidr_range)" \
+     --parameters aifactorySuffixRG="$(aifactorySuffixRG)" \
+     --parameters commonResourceSuffix="$(aiResourceSuffix)" \
+     --parameters IPwhiteList="$(technical_admins_bastion_IP_whitelist)"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+
+- task: AzureCLI@2
+  displayName: '13-Deploy resources '
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az deployment sub create \
+     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(aifactorySuffixRG)-$(aiResourceSuffix)-DeplRes" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-common\main\13-rgLevel.bicep" \
+     --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-2-12_13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-3-12_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-4-13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-5-13_23.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\11-esml-globals-11_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\13-esml-cmn-parameters.json" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters location="$(admin_location)" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters aifactorySuffixRG="$(aifactorySuffixRG)" \
+     --parameters resourceSuffix="$(aiResourceSuffix)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters IPwhiteList="$(technical_admins_bastion_IP_whitelist)" \
+     --parameters inputKeyvaultSubscription="$(admin_input_keyvault_subscription)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_input_keyvault_rg)" \
+     --parameters inputKeyvault="$(admin_input_keyvault_name)"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'

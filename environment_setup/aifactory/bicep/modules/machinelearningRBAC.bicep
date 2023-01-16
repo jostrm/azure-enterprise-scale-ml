@@ -1,9 +1,20 @@
 @secure()
 param projectSP string
+
+@description('Specifies the objectId of the Data factory managed identity')
 param adfSP string
+
+@description('Specifies the objectId of the technical contact')
 param projectADuser string
+
+@description('Specifies the name the azure machine learning resource')
 param amlName string
-var contributorRole = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+
+@description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
+resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
+  scope: subscription()
+  name: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+}
 
 @description('Additional optional Object ID of more people to access Resource group')
 param additionalUserIds array
@@ -16,9 +27,9 @@ resource amlNameResource 'Microsoft.MachineLearningServices/workspaces@2021-04-0
 }
 
 resource contributorSP 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid('${projectSP}-${contributorRole}-${amlName}-${resourceGroup().id}')
+  name: guid('${projectSP}-contributor-${amlName}-${resourceGroup().id}')
   properties: {
-    roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${contributorRole}'
+    roleDefinitionId: contributorRoleDefinition.id
     principalId: projectSP
     principalType: 'ServicePrincipal'
     description:'Contributor to service principal ${projectSP} for Azure ML ${amlName}'
@@ -26,9 +37,9 @@ resource contributorSP 'Microsoft.Authorization/roleAssignments@2020-04-01-previ
   scope:amlNameResource
 }
 resource contributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if(adfSP!='null') {
-  name: guid('${adfSP}-${contributorRole}-${amlName}-${resourceGroup().id}')
+  name: guid('${adfSP}-contributor-${amlName}-${resourceGroup().id}')
   properties: {
-    roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${contributorRole}'
+    roleDefinitionId: contributorRoleDefinition.id
     principalId: adfSP
     principalType: 'ServicePrincipal'
     description:'Contributor to Azure datafactory ${adfSP} to run Azure ML pipelines ${amlName}'
@@ -42,7 +53,7 @@ resource contributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-prev
 resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(all_users)):{
   name: guid('${all_users[i]}-${amlName}-${resourceGroup().id}')
   properties: {
-    roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${contributorRole}'
+    roleDefinitionId: contributorRoleDefinition.id
     principalId: all_users[i]
     principalType: 'User'
     description:'Contributor to USER with OID  ${all_users[i]} for Azure ML ${amlName}'
@@ -53,3 +64,4 @@ resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-pre
     contributorADF
   ]
 }]
+ 
