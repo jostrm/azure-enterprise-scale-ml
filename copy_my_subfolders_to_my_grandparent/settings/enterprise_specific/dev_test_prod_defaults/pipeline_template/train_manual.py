@@ -178,7 +178,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
     controller.dev_test_prod = esml_current_env
     model_name = None
-    main_run = run.parent # Parent is the pipeline run, current 'run' is just the current step in pipeline.
+    main_run = run.parent # Parent is the pipeline run, current 'run' is just the current step in pipeline. 234
 
     ##1 ) Get "current" BEST mpodel 
     current_model,run_id_tag, model_name = "","",""
