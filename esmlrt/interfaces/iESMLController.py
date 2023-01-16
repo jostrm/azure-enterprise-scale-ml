@@ -1179,7 +1179,13 @@ class IESMLController:
         if(model_path is not None):
             model = remote_run.register_model(model_name=model_name,model_path=model_path, tags=tags, description="") # Works, if manual ML you need to specify path where you saved model.
         else:
-            model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
+            try:
+                print("ESML - now trying: remote_run.register_model")
+                model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
+            except Exception:
+                print("ESML - now trying: remote_run.parent.register_model")
+                model = remote_run.parent.register_model(model_name=model_name, tags=tags, description="")
+                print("ESML -remote_run.parent.register_model: SUCCESS!")
             
         #model_path = "outputs/model.pkl"
         #print("model_name: before remote_run.register_model {} and model_path {}".format(model_name,model_path))

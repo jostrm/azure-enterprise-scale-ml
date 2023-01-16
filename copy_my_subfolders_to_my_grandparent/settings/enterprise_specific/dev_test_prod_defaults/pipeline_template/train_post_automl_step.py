@@ -17,6 +17,7 @@ from azureml.core import Dataset
 
 from azureml.core.run import _OfflineRun
 from azureml.core import Workspace
+from azureml.pipeline.core import PipelineRun
 from azureml.core.model import Model
 #from azureml.pipeline.steps import AutoMLStep # ModuleNotFoundError: No module named 'azureml.pipeline.steps'
 from azureml.train.automl.run import AutoMLRun
@@ -141,14 +142,14 @@ def init():
         # Example: projects/project002/11_diabetes_model_reg/train/gold/dev/Train/{"2020/01/01"}/{id}/
         historic_path = args.esml_train_lake_template.format(id_folder=run_id)
 
-        print("train_gold.py.init() success: Fetched INPUT and OUTPUT datasets - now lets TRAIN in the train() method")
+        print("train_post_automl_step.py.init() success: Fetched INPUT and OUTPUT datasets - now lets COMPARE in the compare(test_ds) method, and then INNER / OUTER LOOP")
 
     except Exception as e:
         raise
 
 def compare(test_ds):
     try:
-        print("train() started...")
+        print("compare() started...")
         test_scoring = None # IESMLTestScoringFactory
         comparer = None # IESMLModelCompare
         #trainer = None # IESMLTrainer
@@ -166,6 +167,7 @@ def compare(test_ds):
 
         controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias,all_envs, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
         calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, test_ds,ml_type)
+        print("compare() - calc_test_scoring_compare_register() - SUCCESS!")
     except Exception as e:
         print(e)
         raise
@@ -217,9 +219,22 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 ####################### Get AutoMLRun from AutoMLStep and best_trained_model etc #####################
     step_name = "AutoML TRAIN in [{}]".format(esml_current_env)
     print("step_name: {}".format(step_name))
-    pipeline_run = run.parent # Parent is the pipeline run, current is the current step.
-    
-    step_list = list(pipeline_run.get_steps())
+
+
+    pipeline_run = PipelineRun(run.experiment, run_id = run.parent.id)
+    #2023: does not work anymore  ->> pipeline_run = run.parent # It will return Run() instead of PipelineRun()... Parent is the pipeline run, current is the current step.
+    ## ERROR: '_SubmittedRun' object has no attribute 'get_steps'
+    ## ERROR: AttributeError: 'Run' object has no attribute 'get_steps' # Need to typecast, or just reydrate PipelineRun from run.id
+
+    try:
+        step_list = list(pipeline_run.get_steps())
+        print("INFO: pipeline_run = run.parent")
+    except:
+        print("Error: ESML info: This should not happen, since Pipleine with AutoMLStep")
+        pipeline_run = PipelineRun(run.experiment, run_id = run.id)
+        step_list = list(pipeline_run.get_steps())
+        print("INFO: pipeline_run = run")
+
     step_len = len(step_list) # 6
     automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
 
@@ -265,6 +280,7 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
     print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
+        print("Promoted model! in environment {}".format(esml_current_env))
         model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
         print("Promoted model! in environment {}".format(esml_current_env))
 

@@ -217,9 +217,10 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     path_scoring_file_in_snapshot_folder = './esmlrt/settings/project_specific/model/your_{}'.format(IESMLController.get_known_scoring_file_name())
     train_run.upload_file(IESMLController.get_known_scoring_file_name(), path_scoring_file_in_snapshot_folder)
 
-    # Copy LEADING model - to known model name and known location = Same thing happens IF Databricks notebooks, passing IESMLController.get_known_model_name_pkl()
+    # Copy NEW LEADING model - to known model name and known location = Same thing happens IF Databricks notebooks, passing IESMLController.get_known_model_name_pkl()
+    pkl_path = 'outputs/'+IESMLController.get_known_model_name_pkl()
     with open(IESMLController.get_known_model_name_pkl(), "wb") as file:
-        joblib.dump(value=fitted_model, filename='./outputs/'+IESMLController.get_known_model_name_pkl())
+        joblib.dump(value=fitted_model, filename=pkl_path)
 
 
     ##2 ) Register NEW TRAINED model, with TAG status_code=esml_new_trained
@@ -282,13 +283,16 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
         target_environment = esml_current_env,
         target_workspace = target_ws,
         experiment_name = controller.experiment_name,
-        new_model = None)
+        new_model = model) # 2023: new_model = None --> new_model = model
 
    ## 6) REGISTER model, if better than all else, in same environment = DEV
 
     print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
-        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=manual_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=full_local_path)
+        print("full_local_path: {}".format(full_local_path))
+        print("pkl_path: {}".format(pkl_path))
+
+        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=manual_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=pkl_path)
         print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
@@ -302,14 +306,14 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
                 target_environment = next_environment,
                 target_workspace = target_ws,
                 experiment_name = controller.experiment_name,
-                new_model = None)
+                new_model = model_registered_in_target) # 2023: new_model = None --> new_model = model_registered_in_target
 
             print("OUTER LOOP (dev-test): Compared 2nd time - Outer loop: Success comparing, promote_model is: {}".format(promote_new_model))
 
             if (promote_new_model == True):
                 print("Now registering model in TARGET environment {}".format(next_environment))
-                #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test)
-                model_registered_in_target = controller.register_model(source_ws=ws, target_env=next_environment, source_model=model,run=None)
+                model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test,model_path=pkl_path)
+                #model_registered_in_target = controller.register_model(source_ws=ws, target_env=next_environment, source_model=model,run=None)
                 print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
 
         except Exception as e1:

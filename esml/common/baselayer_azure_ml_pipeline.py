@@ -1636,14 +1636,20 @@ class ESMLPipelineFactory():
         automl_esml_env = Environment.get(workspace=self.p.ws,name=environment_name)
         return automl_esml_env
 
-    def create_automl_lts_environment_if_not_exists(self,base_image_in = None):
+    def create_automl_lts_environment_if_not_exists(self,base_image_in = None, environment_name = None):
         automl_esml_env = None
         try:
             if (self.p.ws == None):
                 self.p.ws = self.p.get_workspace_from_config()
 
-            automl_esml_env = Environment.get(workspace=self.p.ws,name=self._esml_automl_lts_env_name)
-            print("Environment {} exists".format(self._esml_automl_lts_env_name))
+            env_name = None
+            if(environment_name is None):
+                env_name = self._esml_automl_lts_env_name
+            else:
+                env_name = environment_name
+            
+            automl_esml_env = Environment.get(workspace=self.p.ws,name=env_name)
+            print("Environment {} exists".format(env_name))
         except Exception as e:
             s = str(e)
             if ("No environment exists for name" in s):
