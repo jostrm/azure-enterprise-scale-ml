@@ -23,6 +23,8 @@ param vnetNameBase string = 'vnt-esmlcmn'
 //Override parameters
 param commonResourceGroup_param string = ''
 param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
 
 var projectName = 'prj${projectNumber}'
 var subscriptionIdDevTestProd = subscription().subscriptionId

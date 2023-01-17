@@ -35,6 +35,8 @@ param vnetNameBase string = 'vnt-esmlcmn'
 //Override parameters
 param commonResourceGroup_param string = ''
 param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
 
 var defaultSubnet = 'snet-esml-cmn-001'
 var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
