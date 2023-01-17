@@ -28,7 +28,7 @@ param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
 
 @description('Specifies the tags2 that should be applied to newly created resources')
-param tags object
+param projecttags object
 @description('Deployment location.')
 param location string
 @description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')
@@ -139,7 +139,7 @@ var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
 var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
 
-var tags2 = tags
+var tags2 = projecttags
 /*
 var tags2 = {
   CostCenter: tags.CostCenter
