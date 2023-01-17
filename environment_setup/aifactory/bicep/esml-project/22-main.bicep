@@ -27,6 +27,8 @@ param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
 
+@description('tags')
+param tags object
 @description('Specifies the tags2 that should be applied to newly created resources')
 param projecttags object
 @description('Deployment location.')
