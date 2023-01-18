@@ -1175,22 +1175,47 @@ class IESMLController:
 
         print("model_name at remote_run.register_model: ", model_name)
         print("model_path (will override model_name when register) at remote_run.register_model: ", model_path)
+        print("ESML - now trying: remote_run.register_model")
+        print("remote_run.id", remote_run.id)
+        print("remote_run type",type(remote_run))
+        print("")
+        if(remote_run.parent is not None):
+            print("remote_run.parent.id", remote_run.parent.id)
+            print("remote_run.parent type",type(remote_run.parent))
+            
         model = None
         if(model_path is not None):
-            model = remote_run.register_model(model_name=model_name,model_path=model_path, tags=tags, description="") # Works, if manual ML you need to specify path where you saved model.
-        else:
             try:
-                print("ESML - now trying: remote_run.register_model")
-                model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
-            except Exception:
-                print("ESML - now trying: remote_run.parent.register_model")
-                model = remote_run.parent.register_model(model_name=model_name, tags=tags, description="")
-                print("ESML -remote_run.parent.register_model: SUCCESS!")
-            
-        #model_path = "outputs/model.pkl"
-        #print("model_name: before remote_run.register_model {} and model_path {}".format(model_name,model_path))
-        #model = remote_run.register_model(model_name=model_name,model_path=model_path, tags=tags,properties=tags, description="") #  TypeError: register_model() got an unexpected keyword argument 'model_path'
+                print("ESML 1) - register_model: with model_path as parameter")
+                model = remote_run.register_model(model_name=model_name,model_path=model_path, tags=tags, description="") # Works, if manual ML you need to specify path where you saved model.
+            except:
+                try:
+                    print("ESML Fallback 1a) - register_model on remote_run.parent, with model_path {}".format(model_path))
+                    model = remote_run.parent.register_model(model_name=model_name,model_path=model_path, tags=tags, description="") # Works, if manual ML you need to specify path where you saved model.
+                except: 
+                    print("ESML Fallback 1b - register_model as AutoMLRun.get_output().best_run.parent")
+                    print("- ESML now trying to typecast 'remote_run' to AutoMLRun (since AutoMLStepRun() - automl_run.register_model(), with hardcoded model_path='outputs', if this works then wrong model_path: '{}' is passed ".format(model_path))
+                    run_id = IESMLController.get_safe_automl_parent_run_id(remote_run.id)
+                    automl_run = AutoMLRun(experiment, run_id = run_id) # typecast
+                    best_run, fitted_model = automl_run.get_output()
+                    model = best_run.parent.register_model(model_name=model_name,model_path='outputs', tags=tags, description="")
+                    print("- It worked. Wrong model_path: '{}' is passed as input. 'outputs' worked instead".format(model_path))
+                    # got an unexpected keyword argument 'model_path
+        else:   
+            try:
+                #model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Worked 2022-12-->2023-01: If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
+                print("ESML - 2)Register model as remote_run - model_path is None, at input")
+                print("- ESML now trying register 'remote_run' without passing model_path (Worked 2022-12-->2023-01) - remote_run.register_model(model_name=model_name, tags=tags, description="")  ")
+                model = remote_run.register_model(model_name=model_name, tags=tags, description="")
+            except: # Try casting as AutoMLRun Step (2023 above stopped working)
+                print("ESML Fallback 2a) - register_model with model_path='outputs' hardcoded, and typecasted to AutoMLRun via - IESMLController.init_run / best_run.parent")
+                run_id = IESMLController.get_safe_automl_parent_run_id(remote_run.id)
+                run,best_run,fitted_model = IESMLController.init_run(experiment.workspace,experiment.name, run_id)
+                print("- ESML now trying to typecast 'remote_run' to AutoMLRun (since AutoMLStepRun() - automl_run.register_model(), with hardcoded model_path='outputs'")
+                model = best_run.parent.register_model(model_name=model_name,model_path='outputs', tags=tags, description="") # Worked 2023-01->: If AutoML, outputs is the folder, pass the MAIN_RUN (StepRun) of AutoML that has AutoMLSettings property
+
         print("model.version", model.version)
+
 
         # Also TAG Experiemnt with model and version - if this is the leading model
         if(tags["status_code"] == IESMLController.esml_status_promoted_2_dev or tags["status_code"] == IESMLController.esml_status_promoted_2_test or tags["status_code"] == IESMLController.esml_status_promoted_2_prod):

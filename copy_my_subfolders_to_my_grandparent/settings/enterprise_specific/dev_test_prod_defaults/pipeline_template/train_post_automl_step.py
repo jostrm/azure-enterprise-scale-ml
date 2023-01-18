@@ -21,6 +21,7 @@ from azureml.pipeline.core import PipelineRun
 from azureml.core.model import Model
 #from azureml.pipeline.steps import AutoMLStep # ModuleNotFoundError: No module named 'azureml.pipeline.steps'
 from azureml.train.automl.run import AutoMLRun
+import joblib
 
 def init():
     global prev_model,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws,model_path,model_name
@@ -222,9 +223,9 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
 
     pipeline_run = PipelineRun(run.experiment, run_id = run.parent.id)
-    #2023: does not work anymore  ->> pipeline_run = run.parent # It will return Run() instead of PipelineRun()... Parent is the pipeline run, current is the current step.
+    #2023: does not work anymore  ->> pipeline_run = run.parent # Assunme Parent is the pipeline run (it usually is), current is the current step.
     ## ERROR: '_SubmittedRun' object has no attribute 'get_steps'
-    ## ERROR: AttributeError: 'Run' object has no attribute 'get_steps' # Need to typecast, or just reydrate PipelineRun from run.id
+    ## ERROR: AttributeError: 'Run' object has no attribute 'get_steps'
 
     try:
         step_list = list(pipeline_run.get_steps())
@@ -237,22 +238,43 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
     step_len = len(step_list) # 6
     automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
-
+    
     automl_run_step_by_index = step_list[automl_step_id]
+    last_StepRun_by_index = step_list[0]
     print("automl_run_step_by_index: {} and type {}".format(automl_run_step_by_index.id,type(automl_run_step_by_index)))
     automl_step_run_id = automl_run_step_by_index.id
     print("automl_step_run_id:{} which is 'new_run_id' in comparer.compare_scoring_current_vs_new_model".format(automl_step_run_id))
-    
-    experiment_run = ws.experiments[controller.experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
-    automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
-    best_run, fitted_model_1 = automl_step_run.get_output()
-    #automl_step_run.register_model()
 
-####################################
+    print("last_StepRun_by_index: {} and type {}".format(last_StepRun_by_index.id,type(last_StepRun_by_index)))
+    print("-Should be same as current run: {} and type {}".format(run.id,type(run)))
+    
+    # AutoMLStepRun
+    experiment_run = ws.experiments[controller.experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
+    #automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
+    #best_run, fitted_model_1 = automl_step_run.get_output()
+    
+    automl_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
+    best_run, fitted_model_1 = automl_run.get_output()
+    automl_step_run = best_run.parent
+    automl_step_run_id = automl_step_run.id # Ensure we point at same thing
+
+    #pkl_path = 'outputs/'+IESMLController.get_known_model_name_pkl()
+    #pkl_path = IESMLController.get_known_model_name_pkl()
+    #with open(IESMLController.get_known_model_name_pkl(), "wb") as file:
+    #    joblib.dump(value=fitted_model_1, filename=pkl_path)
+
+    ####################################
     print("Registered version {0} of model {1}".format(model.version, model.name))
     print("model_path: {}".format(model_path))
     print("model_name: {}".format(model_name))
     print("Model returned after Model.register of type {}".format(type(model)))
+    print("source_best_run.properties['model_name']: {}".format(best_run.properties['model_name']))
+    print("")
+    print("best_run ")
+    print(best_run)
+    print("")
+    print("best_run.parent = automl_step_run (passed forward)")
+    print(best_run.parent)
     #print("Model")
     #print(model)
 
@@ -278,10 +300,19 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
         target_workspace = target_ws,
         experiment_name = controller.experiment_name)
 
+    
+    pkl_path = "outputs" #+controller.experiment_name +"/"+IESMLController.get_known_model_name_pkl()
+    print("AutoML pkl_path:", pkl_path)
+
     print("INNER LOOP (dev->dev) - PROMOTE?")
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
-        print("Promoted model! in environment {}".format(esml_current_env))
-        model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev) 
+        model_registered_in_target = None
+        try:
+            model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=pkl_path)
+        except:
+            print("INNER LOOP (dev->dev) - PROMOTE - Cloud not REGISTER on AutoML run, ESML will now try to register directly in MODEL REGISTRY....")
+            model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=None,esml_status=IESMLController.esml_status_promoted_2_dev)
+            #model = controller._register_aml_model(model_path,model_name,tags,ws,"")
         print("Promoted model! in environment {}".format(esml_current_env))
 
         # Better than all in DEV, Lets check if its better than all in TEST? (or prod)
@@ -300,7 +331,7 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
             if (promote_new_model == True):
                 print("Now registering model in TARGET environment {}".format(next_environment))
-                #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test)
+                #model_registered_in_target = controller.register_model(source_ws=ws, target_env="test", source_model=model,run=None,esml_status=IESMLController.esml_status_promoted_2_test,model_path=pkl_path)
                 model_registered_in_target = controller.register_model(source_ws=ws, target_env=next_environment, source_model=model,run=None)
                 print("Registered model {} with version {} in TEST".format(model_registered_in_target.name,model_registered_in_target.version))
 
