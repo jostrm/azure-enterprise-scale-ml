@@ -149,8 +149,8 @@ var tags2 = {
 */
 
 var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
-var sweden_central_adf_missing =  (location == 'swedencentral')?true:false
-var sweden_central_dbx_missing = (location == 'swedencentral')?true:false
+var sweden_central_adf_missing =  false // (location == 'swedencentral')?true:false
+var sweden_central_dbx_missing = false // (location == 'swedencentral')?true:false
 var sweden_central_appInsight_classic_missing = (location == 'swedencentral')?true:false
 
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')

@@ -98,7 +98,7 @@ var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
 var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
-var sweden_central_adf_missing = (location == 'swedencentral')?true:false
+var sweden_central_adf_missing = false // (location == 'swedencentral')?true:false
 
 // Config regarding private DNS zones (Microsoft private DNS. If you have your ownd DNS server, see here: https://docs.microsoft.com/en-us/azure/machine-learning/how-to-custom-dns?tabs=azure-cli)
 var privateDnsZoneName =  {
