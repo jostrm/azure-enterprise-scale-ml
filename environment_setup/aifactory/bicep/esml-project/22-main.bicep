@@ -27,6 +27,9 @@ param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
 
+@description('Common default subnet')
+param common_subnet_name string
+
 @description('tags')
 param tags object
 @description('Specifies the tags2 that should be applied to newly created resources')
@@ -125,7 +128,7 @@ var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
 var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
-var defaultSubnet = 'snet-esml-cmn-001' //'snet-esmlcmn-001'
+var defaultSubnet = common_subnet_name //'snet-esmlcmn-001'
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
 
 // ADO comma separated VARIABLE to ARRAY

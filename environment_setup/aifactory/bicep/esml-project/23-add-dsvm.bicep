@@ -12,6 +12,8 @@ param adminUsername string = 'esmladmin'
 
 @description('ESML COMMON Resource Group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
 param commonRGNamePrefix string
+@description('Common default subnet')
+param common_subnet_name string
 @description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')
 param locationSuffix string
 @description('AI Factory suffix. If you have multiple instances, -001')
@@ -38,7 +40,6 @@ param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 
-var defaultSubnet = 'snet-esml-cmn-001'
 var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
 var projectName = 'prj${projectNumber}'
 var subscriptionIdDevTestProd = subscription().subscriptionId
@@ -72,7 +73,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = {
     vmSize: 'Standard_DS3_v2'
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${dsvmSuffix}'
-    subnetName: defaultSubnet
+    subnetName: common_subnet_name
     vnetId: vnetId
     tags: tags
     keyvaultName: keyvaultName

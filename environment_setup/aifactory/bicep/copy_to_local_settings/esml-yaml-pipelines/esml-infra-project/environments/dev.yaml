@@ -92,6 +92,7 @@ steps:
      --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-2-12_13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-3-12_13.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-4-13_21_22.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-5-13_23.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
