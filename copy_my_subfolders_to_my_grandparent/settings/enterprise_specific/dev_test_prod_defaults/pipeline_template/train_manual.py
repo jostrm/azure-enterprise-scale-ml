@@ -178,7 +178,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
 
     controller.dev_test_prod = esml_current_env
     model_name = None
-    main_run = run.parent # Parent is the pipeline run, current 'run' is just the current step in pipeline. 234
+    main_run = run.parent # Parent is the pipeline run, current 'run' is just the current step in pipeline.
 
     ##1 ) Get "current" BEST mpodel 
     current_model,run_id_tag, model_name = "","",""
@@ -227,7 +227,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     time_stamp = str(datetime.datetime.now())
     ml_flow_stage = IESMLController._get_flow_equivalent(IESMLController.esml_status_new)
     tags = {"esml_time_updated": time_stamp,"status_code": IESMLController.esml_status_new,"mflow_stage":ml_flow_stage, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
-        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "ManualPython", "ml_type":ml_type}
+        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "ManualPython", "ml_type":ml_type, "experiment_pipleline_run_name":run.experiment.name}
 
     # CLEAR scoring & Add potentially new manually calculated TEST_SET SCORING from tags
     if("test_set_ROC_AUC" in new_model_scoring_tags):
@@ -246,7 +246,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
         tags["esml_time_updated"] = time_stamp
 
     ##3) Register NEW model in CURRENT env
-    model = controller._register_aml_model(full_local_path=full_local_path,model_name=model_name,tags=tags,target_ws=ws,description_in="")
+    model = controller._register_aml_model(full_local_path=full_local_path,model_name=model_name,tags=tags,target_ws=ws,description_in=run.experiment.name)
 
     #4) Calculate Testset scoring on NEW model
     model, val_1, val_2, val_3,val_4,val_5,reg_plt_6, val_7,class_plt_8 = controller.ESMLTestScoringFactory.get_test_scoring_8(

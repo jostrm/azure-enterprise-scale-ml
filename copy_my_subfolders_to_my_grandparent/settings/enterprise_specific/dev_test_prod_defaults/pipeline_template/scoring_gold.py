@@ -44,18 +44,19 @@ def init():
         current_model = None
         model_name = None
         fitted_model = None
-        experiment_name = args.model_folder_name 
+        experiment_name_search = args.model_folder_name
+        experiment_name = run.experiment.name
 
         print("Fetching BEST MODEL that is promoted. To get its name")
-        current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,experiment_name)
+        current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,experiment_name_search)
         if(current_model is None):
-            print("No existing model with experiment name {}. The Model name will now be same as experiment name".format(experiment_name))
+            print("No existing model with experiment name {}. The Model name will now be same as experiment name = model_folder_name in ESML".format(experiment_name_search))
         if(model_version_in_int == 0):
             print("Initiating BEST MODEL - PROMOTED leading model (since model_version=0). Hydrating to get its run and fitted model.")
             
             run_id = current_model.tags.get("run_id")
             safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
-            run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)
+            run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id,current_model)
             model = fitted_model
             print("Model loading success")
         else:
@@ -71,10 +72,11 @@ def init():
                 if (current_model is not None):
                     run_id = current_model.tags.get("run_id")
                     print("ESML will now try model_version=0, to see if we have any model promote, e.g. best latest registered model...")
+                    aml_model = current_model
             finally:
                 if(run_id is not None):
                     safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
-                    run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id)
+                    run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id,aml_model)
                     model = fitted_model
                     print("Model loading success: Latest-promoted model")
 

@@ -515,7 +515,23 @@ class IESMLController:
         return fitted_model,if_get_pickle_success
 
     @staticmethod
-    def init_run(ws,experiment_name, run_id, best_model = None, debug_print=True):
+    def contains_automl_step(pipeline, debug = True):
+        step_list = list(pipeline.get_steps())
+        contains_AutoMLStep = False
+        str_automl = "AutoML"
+        for pt in step_list:
+            if(str_automl in pt.name):
+                contains_AutoMLStep = True
+            if(debug):
+                print(pt.name)
+
+        if(debug):
+            print("Contains AutoML step: {}".format(contains_AutoMLStep))
+
+        return contains_AutoMLStep
+
+    @staticmethod
+    def init_run(ws,experiment_name, run_id, best_model, debug_print=True):
         exp = Experiment(workspace=ws, name=experiment_name)
         run = None
         best_run = None # AutoML only
@@ -563,28 +579,21 @@ class IESMLController:
             ##
             # Initiate MODEL from run.tags, or override with MODEL from parameter
             ##
-            model_name = None
-            best_model_version = None
-            active_model = None
-
-            if(best_run is not None):
-                model_name = best_run.experiment.tags.get('model_name')
-                best_model_version = best_run.experiment.tags.get('best_model_version') # latest promoted
-            if(best_model is not None):
-                active_model = best_model
-                if(model_name is not None and best_model_version is not None): # Should not crash code, since just verifying
-                    m_test = Model(workspace=ws,name=model_name, version=best_model_version)
-                    if (m_test.name != best_model.name and m_test.version != best_model.version):
-                        print("ESML Warning - m_test.name != best_model.name and m_test.version != best_model.version -> ESML will choose your injected 'best_model'")
-            else:
-                active_model = Model(workspace=ws,name=model_name, version=best_model_version)
+            active_model = best_model
             ##
             # If Pipeline with ManualStep - TRAIN PIPELINE (not if INFERENCE)
             ##
             if (pipeline_run is not None):
+
                 step_list = list(pipeline_run.get_steps())
-                step_len = len(step_list) # 6
-                if(step_len == 0): # StepRun = Manual
+                step_len = len(step_list) # 5-6 steps
+                print("ESML PipelineRun step_len: {}".format(step_len))
+                if(step_len == 0): # Guard, if child/step is passed instead of parent PipelineRun (For Manual Python pipeline - this is the case)
+                    pipeline_run = pipeline_run.parent
+
+                if(IESMLController.contains_automl_step(pipeline_run) == False): # StepRun = Manual or Databricks
+                    if(best_model is None):
+                        raise Exception("ESML Guard: ArgumentNoneException: best_model must be set if not AutoMLRun. This, since we meed to donwload fitted_model ourselves if PipelineRun.")
                     #run = pipeline_run.parent
                     best_run = pipeline_run
                     fitted_model, if_get_pickle_success = IESMLController.download_fitted_model(active_model, best_run, exp.name)
@@ -602,6 +611,8 @@ class IESMLController:
                     automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
                     best_run, fitted_model = automl_step_run.get_output()
             elif(main_run is not None):
+                if(best_model is None):
+                    raise Exception("ESML Guard: ArgumentNoneException: best_model must be set if not AutoMLRun. This, since we meed to donwload fitted_model ourselves if manual Run()")
                 fitted_model, if_get_pickle_success = IESMLController.download_fitted_model(active_model, best_run, exp.name)
                 raise NotImplementedError("ESML Unhandled: Since it was not a PipelineRun, AutoMLRun, just a Run - this is not handled by ESML")
 
@@ -683,97 +694,7 @@ class IESMLController:
         finally:
              os.chdir(old_loc)
         return inference_config, current_model, the_run
-
-    @staticmethod
-    def init_run_old(ws,experiment_name, run_id, best_model = None):
-        exp = Experiment(workspace=ws, name=experiment_name)
-        run = None
-        best_run = None # AutoML only
-        fitted_model = None
-        debug_print = True
-        run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
-        
-        try: # if (run_type == "automl_run" or run_type == "notebook_automl"):
-            if(debug_print):
-                print("ESML INFO: try: automl_run or notebook_automl")
-                print("Experiment name: {}".format(experiment_name))
-                print("ws name: {}".format(ws.name))
-                print("run_id: {}".format(run_id))
-            run = AutoMLRun(experiment=exp, run_id=run_id)
-            best_run, fitted_model = run.get_output()
-        except: # elif(run_type == "pipeline_automl_step"):
-            if(debug_print):
-                print("ESML INFO: Trying as PipelineRun (AML or DatabricksStep)")
-            pipeline_run = PipelineRun(experiment=exp, run_id=run_id)
-            #pipeline_run = run.parent # Parent is the pipeline run, current is the current step.
-
-            ##
-            # If AutoML run or Manual step. If TRAIN - not if INFERENCE
-            ##
-            step_list = list(pipeline_run.get_steps())
-            step_len = len(step_list) # 6
-            if(step_len == 0): # StepRun = Manual
-                run = pipeline_run.parent
-                best_run = pipeline_run
-                try:
-                    model_name = best_run.experiment.tags['model_name']
-                    best_model_version = best_run.experiment.tags['best_model_version'] # latest promoted
-                    m = None
-
-                    m = Model(workspace=ws,name=model_name, version=best_model_version)
-                    m2 = best_model
-                    if (m.name != m2.name):
-                        print("ESML Warning - best_model.name != best_run.experiment.tags['model_name'] - choosing run name")
-                    
-                    #if(best_model is None):
-                    #    m = Model(workspace=ws,name=model_name, version=best_model_version)
-                    #else:
-                    #    m = best_model
-               
-                    model_path = 'outputs_or_other/{}.pkl'.format(m.name) # does not matter what path, it is the local target
-                    m_path = m.download(target_dir=model_path, exist_ok=True)
-                    print("Pickle path: {}".format(m_path))
-                    fitted_model = joblib.load(m_path)
-                except Exception as e:
-                    def_name = IESMLController.get_known_model_name_pkl()
-                    print("ESML VARNING: Could not load FITTED model via Experiment model tag and via Model() - now trying to dowload .pkl with default name: {}, directly from RUN".format(def_name))
-                    best_run.download_files() #  (target_dir=wrong_model_path, exist_ok=True)
-                    
-                    print("Pickle path earlier that failed, with default name: {}".format(m_path))
-                    m_path = './outputs/'+def_name
-                    print("Pickle path, new with default name: {}".format(m_path))
-                    print("Run id: {}".format(run_id))
-                    print("best_run id: {}".format(best_run.id))
-                    print("Model name: {}".format(model_name))
-                    print("experiment_name name: {}".format(experiment_name))
-                    print("joblib version: {}".format(joblib.__version__))
-                    try:
-                        fitted_model = joblib.load(m_path)
-                    except Exception as e3:
-                        print(e3)
-
-            else: # AutoML pipeline
-                automl_step_id = 1 #  The second last step. This current step, is the last step with index 0
-
-                automl_run_step_by_index = step_list[automl_step_id]
-                if(debug_print):
-                    print("automl_run_step_by_index: {} and type {}".format(automl_run_step_by_index.id,type(automl_run_step_by_index)))
-                automl_step_run_id = automl_run_step_by_index.id
-                if(debug_print):
-                    print("automl_step_run_id:{} which is 'new_run_id' in comparer.compare_scoring_current_vs_new_model".format(automl_step_run_id))
-                
-                experiment_run = ws.experiments[experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
-                automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
-                best_run, fitted_model = automl_step_run.get_output()
-            '''
-            elif(run_type == "notebook_manual_run"):
-                pass
-            elif(run_type == "pipeline_manual_run"):
-                pass
-            '''
-        
-        return run,best_run,fitted_model
-
+   
     def check_if_test_scoring_exists_as_tags(self, model):
         a_scoring = ""
         exists = False
@@ -1077,10 +998,10 @@ class IESMLController:
         
         model_name = None
         model = None
-        if(source_model is not None): # no model
+        if(source_model is not None): # Model, but no Run
             model_name = source_model.name
             model = source_model
-        elif(run is None):  #no run
+        elif(run is None):  #No Run, No Model ...
             print("source_model_to_copy_tags_from is None...1st time")
             current_model,run_id_tag, model_name_tag = IESMLController.get_best_model_via_modeltags_only_DevTestProd(dev_workspace,self.experiment_name)
             #experiment, source_model_to_copy_tags_from, main_run,best_automl_run, fitted_model = IESMLController.get_best_model_run_fitted_model_Dev(dev_workspace,self.experiment_name)
@@ -1168,7 +1089,9 @@ class IESMLController:
             tags["mflow_stage"] = IESMLController._get_flow_equivalent(tags["status_code"])
         except: 
             print ("Warning: Could not map MFLow stages from ESML status. Hence to tag for this. Source: IESMLController._get_flow_equivalent(esml_status_code)")
-
+        
+        tags["experiment_pipleline_run_name"] = remote_run.experiment.name
+        
         if(extra_model_tags is not None):
             tags = {**tags, **extra_model_tags}
             #tags.update(extra_model_tags) # status_code : {'status_code': 'esml_newly_trained', 'trained_with': 'AutoMLRun'}
@@ -1215,7 +1138,6 @@ class IESMLController:
                 model = best_run.parent.register_model(model_name=model_name,model_path='outputs', tags=tags, description="") # Worked 2023-01->: If AutoML, outputs is the folder, pass the MAIN_RUN (StepRun) of AutoML that has AutoMLSettings property
 
         print("model.version", model.version)
-
 
         # Also TAG Experiemnt with model and version - if this is the leading model
         if(tags["status_code"] == IESMLController.esml_status_promoted_2_dev or tags["status_code"] == IESMLController.esml_status_promoted_2_test or tags["status_code"] == IESMLController.esml_status_promoted_2_prod):

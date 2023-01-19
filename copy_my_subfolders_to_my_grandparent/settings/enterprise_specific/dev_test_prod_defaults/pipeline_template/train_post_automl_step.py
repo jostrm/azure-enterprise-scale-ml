@@ -201,10 +201,10 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     time_stamp = str(datetime.datetime.now())
     ml_flow_stage = IESMLController._get_flow_equivalent(IESMLController.esml_status_new)
     tags = {"esml_time_updated": time_stamp,"status_code": IESMLController.esml_status_new,"mflow_stage":ml_flow_stage, "run_id": run_id, "model_name": model_name, "trained_in_environment": esml_current_env, 
-        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "AutoMLStep"}
+        "trained_in_workspace": ws.name, "experiment_name": controller.experiment_name, "trained_with": "AutoMLStep", "experiment_pipleline_run_name":run.experiment.name}
 
     ##2b) Register NEW model in CURRENT env
-    model = controller._register_aml_model(model_path,model_name,tags,ws,"")
+    model = controller._register_aml_model(model_path,model_name,tags,ws,run.experiment.name)
     fitted_model_1 = None
     
     #2c) Get fitted_model_1, best_automl_run,model
@@ -249,7 +249,9 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     print("-Should be same as current run: {} and type {}".format(run.id,type(run)))
     
     # AutoMLStepRun
-    experiment_run = ws.experiments[controller.experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
+    print("run.experiment.name = {}".format(run.experiment))
+    experiment_run = ws.experiments[run.experiment.name]
+    #experiment_run = ws.experiments[controller.experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
     #automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
     #best_run, fitted_model_1 = automl_step_run.get_output()
     
