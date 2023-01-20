@@ -22,7 +22,8 @@ param (
     # optional parameters
     [Parameter(Mandatory = $false, HelpMessage = "Use service principal")][switch]$useServicePrincipal = $false,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the object id for service principal")][string]$spObjId,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5
 )
 
 filter ConvertTo-BinaryIP {
@@ -364,6 +365,7 @@ $jsonParameters1 = Get-Content -Path $bicepPar1 | ConvertFrom-Json
 $jsonParameters2 = Get-Content -Path $bicepPar2 | ConvertFrom-Json
 $jsonParameters3 = Get-Content -Path $bicepPar3 | ConvertFrom-Json
 $jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
+$jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
 
 
 # all values that are present in parameters.json will be converted to variables
@@ -371,6 +373,7 @@ ConvertTo-Variables -InputObject $jsonParameters1
 ConvertTo-Variables -InputObject $jsonParameters2
 ConvertTo-Variables -InputObject $jsonParameters3
 ConvertTo-Variables -InputObject $jsonParameters4
+ConvertTo-Variables -InputObject $jsonParameters5
 
 $authSettings = @{
     useServicePrincipal = $useServicePrincipal
@@ -397,7 +400,15 @@ if ($(Get-AzContext).Subscription -ne "") {
     write-host "-DYNAMIC (as input to vnetName and vnetResourceGroup): Dynamic parameters as INPUT from ADO parameters: env,locationSuffixADO, commonResourceSuffixADO,aifactorySuffixRGADO"
 
     $vnetName = "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO" # '${vnetNameBase}-$locationSuffix-${env}${commonResourceSuffix}'
-    $vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # esml-common-weu-dev-001
+    
+    $vnetResourceGroup = if ( $commonResourceGroup_param -eq $null -or $commonResourceGroup_param -eq "" )
+    {
+        "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
+    }
+    else {
+        $commonResourceGroup_param
+    }
+
     $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
 
     #$lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObjSubnetsAddressPrefix | Sort-Object { $_.split("/")[0] -as [Version]} -Bottom 1).split("/") # JOSTRM fixed SORTING (int/version and no CIDR, instead of "string sort" and CIDR)
