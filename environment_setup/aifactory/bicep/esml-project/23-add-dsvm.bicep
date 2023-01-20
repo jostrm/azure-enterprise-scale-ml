@@ -12,6 +12,8 @@ param adminUsername string = 'esmladmin'
 
 @description('ESML COMMON Resource Group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
 param commonRGNamePrefix string
+@description('Common default subnet')
+param common_subnet_name string
 @description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')
 param locationSuffix string
 @description('AI Factory suffix. If you have multiple instances, -001')
@@ -32,15 +34,19 @@ param commonResourceSuffix string // sdf
 @description('Specifies the virtual network name')
 param vnetNameBase string = 'vnt-esmlcmn'
 
+//Override parameters
+param commonResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
 
-var defaultSubnet = 'snet-esml-cmn-001'
 var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
 var projectName = 'prj${projectNumber}'
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
-var commonResourceGroup = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // change this to correct rg
+var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 
-var vnetNameFull = '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 var vnetId = '${subscription().id}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
@@ -67,7 +73,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = {
     vmSize: 'Standard_DS3_v2'
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${dsvmSuffix}'
-    subnetName: defaultSubnet
+    subnetName: common_subnet_name
     vnetId: vnetId
     tags: tags
     keyvaultName: keyvaultName
