@@ -17,7 +17,7 @@ from azureml.core import Dataset
 import joblib
 
 def init():
-    global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws
+    global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,model_name,target_column_name,ws
     global project_number,ml_type,secret_name_tenant,secret_name_sp_id,secret_name_sp_secret
     global dev_resourcegroup_id,dev_workspace_name,dev_subscription_id,test_resourcegroup_id,test_workspace_name,test_subscription_id,prod_resourcegroup_id,prod_workspace_name,prod_subscription_id
 
@@ -165,9 +165,8 @@ def train(train_ds,validate_ds,test_ds):
         # Optional CUSTOMIZE END ###############
         controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias,all_envs, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
 
-        train_test_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, train_ds,validate_ds,test_ds,ml_type)
-
-
+        model_registered_in_target = train_test_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, train_ds,validate_ds,test_ds,ml_type)
+        return model_registered_in_target
     except Exception as e:
         raise
 
@@ -179,6 +178,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     controller.dev_test_prod = esml_current_env
     model_name = None
     main_run = run.parent # Parent is the pipeline run, current 'run' is just the current step in pipeline.
+    model_registered_in_target = None
 
     ##1 ) Get "current" BEST mpodel 
     current_model,run_id_tag, model_name = "","",""
@@ -321,8 +321,9 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
             print(e1)
 
     print("Done: INNER and OUTER loop to Test is done automatically. See human approval gate in Azure Devops staging to get TEST to PROD")
+    return model_registered_in_target
 
-def save_results():
+def save_results(model_registered_in_target):
     try:
         last_gold_run_filename = "last_train_run.csv"
         if not (last_gold_training_run is None):
@@ -334,9 +335,15 @@ def save_results():
             # create the Pandas dataframe with meta, save to .csv for "Azure datafactory WriteBack pipeline/step" to use
             date_now_str = str(datetime.datetime.now())
 
-            model_version_new = (model_version_in+1)
-            last_gold_run_data = [[run_id, historic_path,date_in,date_now_str,model_version_in,model_version_new]]
-            df2 = pd.DataFrame(last_gold_run_data, columns = ['pipeline_run_id', 'training_data_used', 'training_data_source_date', 'date_at_pipeline_run','model_version_current','model_version_newly_trained'])
+            model_version_new= -1
+            model_name_save = model_name
+
+            if(model_registered_in_target is not None):
+                model_version_new = model_registered_in_target.version
+                model_name_save = model_registered_in_target.name
+
+            last_gold_run_data = [[run_id, historic_path,date_in,date_now_str,model_name_save,model_version_in, model_version_new]]
+            df2 = pd.DataFrame(last_gold_run_data, columns = ['pipeline_run_id', 'training_data_used', 'training_data_source_date', 'date_at_pipeline_run','model_name','model_version_current','model_version_newly_trained'])
             written_df2 = df2.to_csv(path_last_gold_run, encoding='utf-8',index=False)
             print("Pipeline ID (Steps runcontext.parent.id) {}".format(run_id))
 
@@ -345,5 +352,5 @@ def save_results():
 
 if __name__ == "__main__":
     init()
-    train(train_ds,validate_ds,test_ds)
-    save_results()
+    model_registered_in_target = train(train_ds,validate_ds,test_ds)
+    save_results(model_registered_in_target)
