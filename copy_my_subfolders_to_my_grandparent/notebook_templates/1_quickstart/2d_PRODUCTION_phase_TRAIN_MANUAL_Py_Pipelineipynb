@@ -204,7 +204,7 @@
     "## batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL, same_compute_for_all=True, cpu_gpu_databricks=\"cpu\", allow_reuse=True)\n",
     "\n",
     "## BUILD (takes ~10-12minutes)\n",
-    "batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL)\n",
+    "batch_pipeline = p_factory.create_batch_pipeline(esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML)\n",
     "# ...which Trains a model on data via date_folder parameters, upload the generated python scripts., and your custom code and ESML runtime, to Azure embedded in the pipeline, using Dockerized image. "
    ]
   },
