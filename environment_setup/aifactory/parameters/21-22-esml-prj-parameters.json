@@ -10,6 +10,19 @@
         },
         "AMLStudioUIPrivate":{
             "value": true
+        },
+        "projecttags": {
+            "value": {
+                "Application Name": "Enterprise Scale ML (ESML)",
+                "BA ID": "NA",
+                "BCIO": "Robin",
+                "Business Area": "NA",
+                "Cost Center": "123456",
+                "Resource Managed By":"The Riddler",
+                "TechnicalContact": "batman@gothamcity.dc_",
+                "Project": "Batcave upgrade",     
+                "Description": "ESML AI Factory"
+            }
         }
     }
 }

@@ -5,7 +5,7 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar2,
     [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar3,
     [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar4,
-    [Parameter(Mandatory=$true, HelpMessage="Where to place the parameters.json file")][string]$filePath,
+    [Parameter(Mandatory = $true, HelpMessage="Where to place the parameters.json file")][string]$filePath,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory environment [dev,test,prod]")][string]$env,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory subscription id for environment [dev,test,prod]")][string]$subscriptionId,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$aifactorySuffixRGADO,
@@ -13,9 +13,10 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML projectNumber -makes a deployment unique per proj and env")][string]$projectNumber,
     
     # optional
-    [Parameter(Mandatory=$false, HelpMessage="Use service principal")][switch]$useServicePrincipal=$false,
-    [Parameter(Mandatory=$false, HelpMessage="Specifies the object id for service principal")][string]$spObjId,
-    [Parameter(Mandatory=$false, HelpMessage="Specifies the secret for service principal")][string]$spSecret
+    [Parameter(Mandatory = $false, HelpMessage="Use service principal")][switch]$useServicePrincipal=$false,
+    [Parameter(Mandatory = $false, HelpMessage="Specifies the object id for service principal")][string]$spObjId,
+    [Parameter(Mandatory = $false, HelpMessage="Specifies the secret for service principal")][string]$spSecret,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5
 )
 
 function Set-DeployedOnTag {
@@ -55,6 +56,9 @@ $jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
 Set-DeployedOnTag -InputObject $jsonParameters4
 ConvertTo-Variables -InputObject $jsonParameters4
 
+$jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
+ConvertTo-Variables -InputObject $jsonParameters5
+
 ## $tenantId comes from Parameters.json  - the rest is INPUT, as ADO parameters (see top of file)
 $authSettings = @{
     useServicePrincipal = $useServicePrincipal
@@ -77,9 +81,14 @@ write-host "PARAMETERS: Static and Dynamic used::"
 write-host "-STATIC (vnetResourceGroup): Static parameters: [commonRGNamePrefix,vnetResourceGroupBase, locationSuffix] (from PARAMETERS.json)"
 write-host "-DYNAMIC (vnetResourceGroup): Dynamic parameters as INPUT (from ADO parameters UI): [env,locationSuffixADO,aifactorySuffixRGADO] this Powershell generates(dynamicNetworkParams.json)"
 
+$vnetResourceGroup = if ( $commonResourceGroup_param -eq $null -or $commonResourceGroup_param -eq "" )
+{
+    "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
+}
+else {
+    $commonResourceGroup_param
+}
 
-#$vnetResourceGroup =  "$vnetResourceGroupBase-$locationSuffix-$env$aifactorySuffixRG" # "esml-common-weu-test-002"
-$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # msft[esml-common]-swc-dev-001
 write-host "RESULT (vnetResourceGroup): $($vnetResourceGroup)"
 write-host "Deployment to lookup (earlier subnets): $($deploymentPrefix)SubnetDeplProj" # Deployment to lookup (earlier subnets): esml-p001-dev-swc-001SubnetDeplProj
 

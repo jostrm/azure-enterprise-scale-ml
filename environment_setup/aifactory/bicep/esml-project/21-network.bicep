@@ -34,7 +34,14 @@ param commonResourceSuffix string
 
 @description('Meta. Needed from ADO. To be grep from ADO in the az deployement call')
 param vnetResourceGroup string
-var vnetNameFull = '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+
+//Override paramenter
+param commonResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+
+var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB

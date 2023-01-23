@@ -8,8 +8,8 @@ param vnetId string
 param subnetName string
 @description('Common resource group')
 param commonResourceGroup string
-@description('Common resource group')
-param defaultSubnet string // 'snet-esml-cmn-001'
+@description('Common default subnet')
+param common_subnet_name string
 
 ///////////////////
 var newSubnetID = '${vnetId}/subnets/${subnetName}'
@@ -53,7 +53,7 @@ module dataLake '../modules/dataLake.bicep' = {
     skuName: keepSku
     location: keepLocation
     vnetId: vnetId
-    subnetName: defaultSubnet
+    subnetName: common_subnet_name
     blobPrivateEndpointName: 'pend-${keepDatalakeName}-blob-to-vnt-esmlcmn'
     filePrivateEndpointName: 'pend-${keepDatalakeName}-file-to-vnt-esmlcmn'
     dfsPrivateEndpointName: 'pend-${keepDatalakeName}-dfs-to-vnt-esmlcmn'
