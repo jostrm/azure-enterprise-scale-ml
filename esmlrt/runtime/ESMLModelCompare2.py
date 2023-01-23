@@ -146,13 +146,13 @@ class ESMLModelCompare(IESMLModelCompare):
                     try:
                         if (new_run_id is not None):
                             source_run_id = IESMLController.get_safe_automl_parent_run_id(new_run_id)
-                            run,best_run,fitted_model = IESMLController.init_run(source_workspace,experiment_name, source_run_id) # Parameter
+                            run,best_run,fitted_model = IESMLController.init_run(source_workspace,experiment_name, source_run_id,source_model) # Parameter
                         elif(source_run_id is not None):
                             source_run_id = IESMLController.get_safe_automl_parent_run_id(source_run_id)
-                            run,best_run,fitted_model = IESMLController.init_run(source_workspace,experiment_name, source_run_id) # Afte rLookup of model
+                            run,best_run,fitted_model = IESMLController.init_run(source_workspace,experiment_name, source_run_id,source_model) # Afte rLookup of model
                         else:
                             source_run_id = IESMLController.get_safe_automl_parent_run_id(source_model.tags.get("run_id"))
-                            run,best_run,fitted_model = IESMLController.init_run(source_workspace,experiment_name, source_run_id) # Tag
+                            run,best_run,fitted_model = IESMLController.init_run(source_workspace,experiment_name, source_run_id,source_model) # Tag
                         source_best_run = run # Not: not bset_run , we need parent run, that has AMLSettings in properties
                     except Exception as e:
                         print("ESML Note:002: Hydration did not work. We can manage without it. Errormessage:")

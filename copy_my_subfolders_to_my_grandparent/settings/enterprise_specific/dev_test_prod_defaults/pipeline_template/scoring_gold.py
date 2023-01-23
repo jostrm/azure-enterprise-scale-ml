@@ -64,7 +64,6 @@ def init():
             aml_model =  None
             try:
                 aml_model = Model(ws, name=model_name, version=model_version_in_int)
-                #run_id_user = aml_model.tags.get("run_id")
                 run_id = aml_model.tags.get("run_id")
                 print("Model loading success with specific VERSION = {}".format(model_version_in_int))
             except Exception as e:
@@ -78,7 +77,7 @@ def init():
                     safe_run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
                     run_1,best_run,fitted_model = IESMLController.init_run(ws,experiment_name, safe_run_id,aml_model)
                     model = fitted_model
-                    print("Model loading success: Latest-promoted model")
+                    print("Fitted Model loading success. Model: {} version {}".format(aml_model.name,aml_model.version))
 
         if(current_model is None and run_id is None):
             print("scoring_gold.py.init() no success - ESML Could not find any model to score with in workspace {}.")

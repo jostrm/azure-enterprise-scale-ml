@@ -167,8 +167,9 @@ def compare(test_ds):
         # OptionalCUSTOMIZE END ###############
 
         controller = ESMLController(comparer,test_scoring,project_number,esml_modelname, esml_model_alias,all_envs, secret_name_tenant,secret_name_sp_id,secret_name_sp_secret) # IESMLController: you do not have to change/implemen this class. Dependency injects default or your class.
-        calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, test_ds,ml_type)
+        model_registered = calc_test_scoring_compare_register(controller,ws,target_column_name,esml_modelname,esml_model_alias, esml_env, test_ds,ml_type)
         print("compare() - calc_test_scoring_compare_register() - SUCCESS!")
+        return model_registered
     except Exception as e:
         print(e)
         raise
@@ -180,6 +181,7 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
 
     ##1 ) Get "current" BEST mpodel 
     current_model,run_id_tag, model_name = "","",""
+    model_registered_in_target = None
 
     current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,controller.experiment_name)
     if(current_model is None):
@@ -257,13 +259,25 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     
     automl_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
     best_run, fitted_model_1 = automl_run.get_output()
-    automl_step_run = best_run.parent
+    automl_step_run = best_run #best_run.parent
     automl_step_run_id = automl_step_run.id # Ensure we point at same thing
 
     #pkl_path = 'outputs/'+IESMLController.get_known_model_name_pkl()
-    #pkl_path = IESMLController.get_known_model_name_pkl()
-    #with open(IESMLController.get_known_model_name_pkl(), "wb") as file:
-    #    joblib.dump(value=fitted_model_1, filename=pkl_path)
+    pkl_path = IESMLController.get_known_model_name_pkl()
+    with open(IESMLController.get_known_model_name_pkl(), "wb") as file:
+        joblib.dump(value=fitted_model_1, filename=pkl_path) # Save to known locatiom on Cluster VM.
+
+    # Upload in 3 places - model.pkl
+    pipeline_run.upload_file(IESMLController.get_known_model_name_pkl(), pkl_path) # Upload model.pkl to AutoMLStep = run, to a known location, able to rehydrate later at scoring_script (AutoMLStep does no do this anymore, 2023-01)
+    automl_run.upload_file(IESMLController.get_known_model_name_pkl(), pkl_path)
+    run.upload_file(IESMLController.get_known_model_name_pkl(), pkl_path)
+    
+    # Upload in 3 places - outputs/
+    out_pkl_path = 'outputs/'+IESMLController.get_known_model_name_pkl()
+    pipeline_run.upload_file(out_pkl_path, pkl_path) # Upload model.pkl to AutoMLStep = run, to a known location, able to rehydrate later at scoring_script (AutoMLStep does no do this anymore, 2023-01)
+    automl_run.upload_file(out_pkl_path, pkl_path)
+    run.upload_file(out_pkl_path, pkl_path)
+    
 
     ####################################
     print("Registered version {0} of model {1}".format(model.version, model.name))
@@ -310,6 +324,7 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
     if (promote_new_model == True): # Better than all in DEV?! (Dev or Test,  is usually current_env) - model or current_model
         model_registered_in_target = None
         try:
+            #model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=pkl_path)
             model_registered_in_target = controller.register_model(source_ws=ws, target_env=esml_current_env, source_model=model, run=automl_step_run,esml_status=IESMLController.esml_status_promoted_2_dev,model_path=pkl_path)
         except:
             print("INNER LOOP (dev->dev) - PROMOTE - Cloud not REGISTER on AutoML run, ESML will now try to register directly in MODEL REGISTRY....")
@@ -342,8 +357,9 @@ def calc_test_scoring_compare_register(controller,ws,target_column_name,esml_mod
             print(e1)
 
     print("Done: INNER and OUTER loop to Test is done automatically. See human approval gate in Azure Devops staging to get TEST to PROD")
+    return model_registered_in_target
 
-def save_results():
+def save_results(model_registered_in_target):
     try:
         print("Saving training metadata: scoring etc to dataset")
         last_gold_run_filename = "last_train_run.csv"
@@ -355,10 +371,15 @@ def save_results():
 
             # create the Pandas dataframe with meta, save to .csv for "Azure datafactory WriteBack pipeline/step" to use
             date_now_str = str(datetime.datetime.now())
+            model_version_new= -1
+            model_name_save = model_name
 
-            model_version_new = (model_version_in+1)
-            last_gold_run_data = [[run_id, historic_path,date_in,date_now_str,model_version_in,model_version_new]]
-            df2 = pd.DataFrame(last_gold_run_data, columns = ['pipeline_run_id', 'training_data_used', 'training_data_source_date', 'date_at_pipeline_run','model_version_current','model_version_newly_trained'])
+            if(model_registered_in_target is not None):
+                model_version_new = model_registered_in_target.version
+                model_name_save = model_registered_in_target.name
+
+            last_gold_run_data = [[run_id, historic_path,date_in,date_now_str,model_name_save,model_version_in, model_version_new]]
+            df2 = pd.DataFrame(last_gold_run_data, columns = ['pipeline_run_id', 'training_data_used', 'training_data_source_date', 'date_at_pipeline_run','model_name','model_version_current','model_version_newly_trained'])
             written_df2 = df2.to_csv(path_last_gold_run, encoding='utf-8',index=False)
             print("Pipeline ID (Steps runcontext.parent.id) {}".format(run_id))
 
@@ -367,5 +388,5 @@ def save_results():
 
 if __name__ == "__main__":
     init()
-    compare(test_ds)
-    save_results()
+    model_registered_in_target = compare(test_ds)
+    save_results(model_registered_in_target)

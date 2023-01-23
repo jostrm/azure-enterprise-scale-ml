@@ -122,8 +122,9 @@ class IESMLController:
         self.dev_test_prod = "dev" # Set default value
 
     @staticmethod
-    def get_esml_environment_name(): 
-        return "ESML-AzureML-144-AutoML_126"
+    def get_esml_environment_name(suffix_version="131"):
+        return "ESML-AzureML-144-AutoML_{}".format(suffix_version)
+        #return "ESML-AzureML-144-AutoML_126"
     
     @staticmethod
     def get_known_model_name_pkl():
@@ -388,30 +389,48 @@ class IESMLController:
             env = Environment.get(workspace=ws, name=IESMLController.get_esml_environment_name()) 
         else:
             try:
-                the_run.get_environment()
+                env = the_run.get_environment()
             except Exception as e5:
                 print("ESML: Could not fetch Environment from Run() - now getting ESML default Azure ML Environment")
                 env = Environment.get(workspace=ws, name=IESMLController.get_esml_environment_name())
         return env
 
     @staticmethod
-    def get_any_model_inference_config(ws,model_folder_name,model_alias, model_name,model_version, run_id = None):
+    def get_any_model_inference_config(ws,experiment_name, model_folder_name,model_alias, model_name,model_version, run_id = None):
         print(" INFO: get_best_model_inference_config: model_name {} | version {} | run_id: {}".format(model_name,model_version,run_id))
         model = Model(workspace=ws,name=model_name, version=model_version)
-        experiment = Experiment(ws,model_folder_name)
+        experiment = Experiment(ws,experiment_name)
         best_run = None
         if(run_id is not None):
             main_run = PipelineRun(experiment=experiment, run_id=run_id)
             best_run = main_run
         inference_config, model, best_run = IESMLController.get_best_model_inference_config(
-            ws, model_folder_name, model_alias,scoring_script_folder_local=None, current_model=model,run_id_tag=run_id, best_run = best_run)
+            ws, experiment_name,model_folder_name, model_alias,scoring_script_folder_local=None, current_model=model,run_id_tag=run_id, best_run = best_run)
         return inference_config, model, best_run
 
     @staticmethod
-    def get_best_model_inference_config(ws,model_folder_name, model_alias="M10", scoring_script_folder_local=None, current_model=None,run_id_tag=None, best_run = None):
+    def get_best_model_inference_config(ws,model_folder_name, model_alias="M10",experiment_name=None, scoring_script_folder_local=None, current_model=None,run_id_tag=None, best_run = None):
         if(current_model is None and run_id_tag is None and best_run is None):
             current_model,run_id_tag, model_name = IESMLController.get_best_model_via_modeltags_only_DevTestProd(ws,model_folder_name)
-            run,best_run,fitted_model = IESMLController.init_run(ws,model_folder_name, run_id_tag,current_model)
+
+            print("Best Model name: {}".format(current_model.name))
+            print("Best Model version: {}".format(current_model.version))
+            print("Best Model born from Run id: {}".format(run_id_tag))
+
+            main_run_exp_name = best_run
+            run_id = run_id_tag
+            exp_name_pipe = None
+            if(experiment_name is not None):  # May override
+                exp_name_pipe = experiment_name
+            else:
+                exp_name_pipe = current_model.tags.get("experiment_pipleline_run_name")
+                print("experiment_pipleline_run_name: {}".format(exp_name_pipe))
+
+            if(best_run is not None and best_run.parent is not None):
+                main_run_exp_name = best_run.parent.experment.name
+                run_id = best_run.parent.id
+
+            run,best_run,fitted_model = IESMLController.init_run(ws,exp_name_pipe, run_id,current_model)
             the_run = best_run
         else:
             the_run = best_run
@@ -429,6 +448,7 @@ class IESMLController:
 
             script_file_abs = os.path.abspath(script_file_local)
             env = IESMLController.get_default_environment_if_run_env_not_exists(the_run,ws)
+            print("ESML Initating EnviromentConfig with environment: {}".format(env.name))
             inference_config = InferenceConfig(environment=env, entry_script=script_file_abs)
         except Exception as e2:
             #print(e2)
@@ -607,7 +627,7 @@ class IESMLController:
                     if(debug_print):
                         print("automl_step_run_id:{} which is 'new_run_id' in comparer.compare_scoring_current_vs_new_model".format(automl_step_run_id))
                     
-                    experiment_run = ws.experiments[experiment_name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
+                    experiment_run = ws.experiments[pipeline_run.experiment.name] # Get the experiment. Alternatively: Experiment(workspace=source_workspace, name=experiment_name)
                     automl_step_run = AutoMLRun(experiment_run, run_id = automl_step_run_id)
                     best_run, fitted_model = automl_step_run.get_output()
             elif(main_run is not None):
@@ -1011,7 +1031,7 @@ class IESMLController:
         # 2a) Register model (If DEV to DEV, we can get more lineage and metadata, since an actual RUN exists (Run, AutoMLRun, AutoMLStep that has an AutoMLRun))
         if(target_env == "dev"): 
             if(run is not None): # Probably Run from notebook, not pipelinerun
-                experiment = dev_workspace.experiments[self.experiment_name]
+                experiment = dev_workspace.experiments[run.experiment.name]
                 #try:
                 #    model_name = run.properties['model_name']
                 #except Exception as e:
@@ -1019,7 +1039,7 @@ class IESMLController:
                 #    print(e)
 
                 #print("registering model with name: {}, from run.".format(model_name))
-                model_registered_in_target = self._register_model_on_run(source_model,model_name,source_env,source_ws_name,run,experiment,esml_status,model_path,extra_model_tags)
+                model_registered_in_target = self._register_model_on_run(source_model,model_name,source_env,source_ws_name,run,experiment,self.experiment_name,esml_status,model_path,extra_model_tags)
             else: # fall back...
                 model_registered_in_target, model_source = self._register_model_in_correct_workspace("dev", dev_workspace, "dev",new_model=model,esml_status=esml_status)
 
@@ -1053,7 +1073,7 @@ class IESMLController:
             ml_flow_stage = "Production"
         return ml_flow_stage
 
-    def _register_model_on_run(self,source_model_to_copy_tags_from,model_name, source_env,source_ws_name, remote_run, experiment, esml_status=None,model_path=None, extra_model_tags=None):
+    def _register_model_on_run(self,source_model_to_copy_tags_from,model_name, source_env,source_ws_name, remote_run, experiment,experiment_name, esml_status=None,model_path=None, extra_model_tags=None):
         #remote_run, experiment = self._get_active_model_run_and_experiment(target_workspace,target_env, override_enterprise_settings_with_model_specific) # 2022-08-08 do not READ anything to disk/file
         #  # 2022-05-02: best_run.run_id -> AttributeError: 'Run' object has no attribute 'run_id'
 
@@ -1061,7 +1081,7 @@ class IESMLController:
 
         time_stamp = str(datetime.datetime.now())
         tags = {"esml_time_updated": time_stamp, "run_id": run_id, "model_name": model_name, "trained_in_environment": source_env, 
-        "trained_in_workspace": source_ws_name, "experiment_name": experiment.name}
+        "trained_in_workspace": source_ws_name, "experiment_name": experiment_name}
 
         if(source_model_to_copy_tags_from is not None):
             if("test_set_ROC_AUC" in source_model_to_copy_tags_from.tags):
@@ -1131,9 +1151,9 @@ class IESMLController:
                 print("- ESML now trying register 'remote_run' without passing model_path (Worked 2022-12-->2023-01) - remote_run.register_model(model_name=model_name, tags=tags, description="")  ")
                 model = remote_run.register_model(model_name=model_name, tags=tags, description="")
             except: # Try casting as AutoMLRun Step (2023 above stopped working)
-                print("ESML Fallback 2a) - register_model with model_path='outputs' hardcoded, and typecasted to AutoMLRun via - IESMLController.init_run / best_run.parent")
-                run_id = IESMLController.get_safe_automl_parent_run_id(remote_run.id)
-                run,best_run,fitted_model = IESMLController.init_run(experiment.workspace,experiment.name, run_id)
+                print("ESML Fallback 2a) - register_model on run.PARENT - with model_path='outputs' hardcoded, and typecasted to AutoMLRun via - IESMLController.init_run / best_run.parent")
+                #run_id = IESMLController.get_safe_automl_parent_run_id(remote_run.id)
+                run,best_run,fitted_model = IESMLController.init_run(experiment.workspace,experiment.name, run_id,model)
                 print("- ESML now trying to typecast 'remote_run' to AutoMLRun (since AutoMLStepRun() - automl_run.register_model(), with hardcoded model_path='outputs'")
                 model = best_run.parent.register_model(model_name=model_name,model_path='outputs', tags=tags, description="") # Worked 2023-01->: If AutoML, outputs is the folder, pass the MAIN_RUN (StepRun) of AutoML that has AutoMLSettings property
 
