@@ -65,7 +65,8 @@ def init():
             try:
                 aml_model = Model(ws, name=model_name, version=model_version_in_int)
                 run_id = aml_model.tags.get("run_id")
-                print("Model loading success with specific VERSION = {}".format(model_version_in_int))
+                current_model = aml_model
+                print("Model loading success with specific VERSION = {} and NAME: {}".format(model_version_in_int,model_name))
             except Exception as e:
                 print("Model not found with name {} and specific VERSION = {}. If you pass model_version=0 instead then ESML will search for Latest-promoted model, with fallback of Latest model not promoted (if no promoted exists) ")
                 if (current_model is not None):
