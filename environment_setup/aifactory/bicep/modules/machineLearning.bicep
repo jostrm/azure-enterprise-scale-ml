@@ -278,88 +278,6 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   ]
 }
 
-//AKS attach compute, PRIVATE cluster, with SSL
-//Error: he resource 'Microsoft.MachineLearningServices/workspaces/aml-prj003-weu-dev-002/computes/esml003-weu-dev4' at line '181' and column '9' is defined multiple times in a template. 
-
-/*
-resource machineLearningComputeSSL 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = if(ownSSL == 'enabled') {
-  name: '${machineLearningStudio.name}/${aksName}'
-  location: location
-  properties: {
-    computeType: 'AKS'
-    computeLocation: location
-    description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
-    resourceId: ((env =='dev') ? aksDev.outputs.aksId : aksTestProd.outputs.aksId)  
-    properties: {
-      agentCount:  ((env =='dev') ? 1 :  3)
-      clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
-      agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
-      loadBalancerType: 'InternalLoadBalancer'
-      aksNetworkingConfiguration:  {
-        subnetId: aksSubnetId
-        dnsServiceIP:aksDnsServiceIP
-        dockerBridgeCidr:aksDockerBridgeCidr
-        serviceCidr:aksServiceCidr
-      }
-      loadBalancerSubnet: 'aks-subnet' // aks-subnet is default
-      sslConfiguration:{
-        cert:aksCert
-        cname:aksCname
-        key:aksCertKey
-        overwriteExistingDomain:aksSSLOverwriteExistingDomain
-        status:aksSSLstatus
-      }
-      
-    }
-  }
-  dependsOn:[
-    machineLearningPrivateEndpoint
-  ]
-}
-
-*/
-
-//CI
-
-resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = {
-  name: '${machineLearningStudio.name}/p${projectNumber}-m01-${uniqueSalt5char}-${env}-ci01' // p001-m01-12345-prod-ci01 (24/24)(The name needs to be unique within an Azure region)
-  location: location
-  tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    computeType: 'ComputeInstance'
-    computeLocation: location
-    description: ' Azure Compute Instance (CI),Default and shared, to power notebooks, for ${projectName} in ESML-${env} AI Factory environment. Defaults: Dev=${ciVmSku_dev}. TestProd=${ciVmSku_testProd}'
-    disableLocalAuth: true
-    properties: {
-      applicationSharingPolicy: 'Shared'//'Personal'
-      computeInstanceAuthorizationType: 'personal'
-      sshSettings: {
-        sshPublicAccess: 'Disabled'
-      }
-      subnet: {
-        id: subnetRef
-      }
-      vmSize:  ((env =='dev') ? ciVmSku_dev : ciVmSku_testProd)
-    }
-  }
-  dependsOn:[
-    machineLearningPrivateEndpoint
-  ]
-}
-      /*
-      sslConfiguration: { // ssl.cert must be specified if status is Enabled +AKS
-        leafDomainLabel:aksLeafDomainLabel
-        status:'Enabled'
-        overwriteExistingDomain:true
-        cert:''
-        cname:''
-        key:''
-      }
-      */
-
 //CPU Cluster
 resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = {
   name: '${machineLearningStudio.name}/p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
@@ -392,6 +310,38 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
   }
   dependsOn:[
     machineLearningPrivateEndpoint
+  ]
+}
+
+//Compute instance
+resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = {
+  name: '${machineLearningStudio.name}/p${projectNumber}-m01-${uniqueSalt5char}-${env}-ci01' // p001-m01-12345-prod-ci01 (24/24)(The name needs to be unique within an Azure region)
+  location: location
+  tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    computeType: 'ComputeInstance'
+    computeLocation: location
+    description: ' Azure Compute Instance (CI),Default and shared, to power notebooks, for ${projectName} in ESML-${env} AI Factory environment. Defaults: Dev=${ciVmSku_dev}. TestProd=${ciVmSku_testProd}'
+    disableLocalAuth: true
+    properties: {
+      applicationSharingPolicy: 'Shared'//'Personal'
+      computeInstanceAuthorizationType: 'personal'
+      sshSettings: {
+        sshPublicAccess: 'Disabled'
+      }
+      subnet: {
+        id: subnetRef
+      }
+      vmSize:  ((env =='dev') ? ciVmSku_dev : ciVmSku_testProd)
+    }
+  }
+  dependsOn:[
+    machineLearningPrivateEndpoint
+    machineLearningCluster001
+    machineLearningCompute
   ]
 }
 
