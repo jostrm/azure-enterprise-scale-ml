@@ -89,7 +89,7 @@ resource lake 'Microsoft.Storage/storageAccounts@2021-02-01'= {
     // isNfsV3Enabled: false // Not supported if DATALAKE
     encryption: {
       keySource: 'Microsoft.Storage'
-      requireInfrastructureEncryption: false
+      //requireInfrastructureEncryption: false
       services: {
         blob: {
           enabled: encryptionEnabled
