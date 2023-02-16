@@ -10,19 +10,41 @@ except Exception as e:
 
 # COMMAND ----------
 
-
-#COMMON - ADMIN will use and know this, to mount project folders.
-
-# Best is to use an ADMIN service principle, Alternatively (current setup) ADMIN can use the project service principle, but temporary have "Storage Blob Cosntributor" on lake, while mounting.
-
-#scope_admin = 'scope-admai-kv'
-#kv_tenant_id='kv-secret-tenantId'
-#kv_acc_key_lake='kv-secret-cmnai-saKey' # 'esml-lake-storageaccount-key'
+# DBTITLE 1,Import project specific paths 
+# MAGIC %run ../project/00_project_settings/esml_project
 
 # COMMAND ----------
 
-# DBTITLE 1,Import project specific paths 
-# MAGIC %run ../project/00_project_settings/esml_project
+# MAGIC %md ## TODO 4 you: Retrieve credentials (to Mount storage)
+# MAGIC ### WHO: Administrator. Not project member
+# MAGIC 1) Perequsites: Add Azure keuvault backed secret scope
+# MAGIC   - https://learn.microsoft.com/en-us/azure/databricks/security/secrets/secret-scopes
+# MAGIC   - Suggestion: Use the project specific scope, and use the secrect scope name 'esml-project-scope'
+# MAGIC     - Why? If chosing that name, then you have correct config in [notebook_databricks/esml/dev/project/00_project_settings/esml_project](notebook_databricks/esml/dev/project/00_project_settings/esml_project) notebook
+# MAGIC 2) Add the storage account access key as a secret in the keyvault, with name `esml-lake-storageaccount-key`
+# MAGIC 3) Below cell: Point at the secrect scope, and what secret name to fetch, `esml-lake-storageaccount-key`, to get access key to the datalake (the esml-common storage account) when mounting
+# MAGIC 4) Run the notebook: `1_Lake_init_mount` 
+# MAGIC   - [notebook_databricks/esml/dev/00_esmladmin_scripts/1_Lake_init_mount](notebook_databricks/esml/dev/00_esmladmin_scripts/1_Lake_init_mount)
+# MAGIC     
+# MAGIC 5) Admin Remove the secret in the keyvault, with name `esml-lake-storageaccount-key`, since not needed anymore.
+
+# COMMAND ----------
+
+#TODO4you: Mount lake. Do this once only. Before 1st ESML project is onboarded.  ADMIN will use and know this, to mount project folders.
+
+# Alt 1) Mount with Service principle - that has Storage Blob Data Contributor
+# Alt 1a) Having credentials in the ADMIN keuvaylt: 'kv-cmnadmdev-..'
+# Alt 1b) Having credentials in the 1st PROJECT keuvaylt: 'kv-p001-weu-dev', since this is needed to be added as secrect-scope anyhow. Then remove secret.
+#Note:  Best is to use an ADMIN keuvault and service principle, but an ADMIN can use the project service principle, that temporary have "Storage Blob Cosntributor" on lake, while mounting.
+
+# Alt 2) Use Storage account access key - from Project keyvault
+scope_admin = scope_name_project # Points at a Azure keyvault
+kv_tenant_id= kv_project_tenant_id
+kv_acc_key_lake='kv-secret-cmnai-saKey' # 'esml-lake-storageaccount-key'
+
+# COMMAND ----------
+
+# MAGIC %md ## TODO 4 you: END
 
 # COMMAND ----------
 
@@ -58,7 +80,7 @@ Only need to executed once per file system
 """
 def initLake():
   #ADMIN sa key for mounting - admin/creatpr only that can access this scope
-  return "Lake alreay initiated"
+  #return "Lake alreay initiated"
   sa_key =  dbutils.secrets.get(scope = scope_admin, key = kv_acc_key_lake)  # Managed Principal = Creator
   
   spark.conf.set("fs.azure.account.key."+adl_name+".dfs.core.windows.net", sa_key)

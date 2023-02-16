@@ -34,13 +34,14 @@ mount_project_template = "/mnt/prj{}"
 
 # DBTITLE 1,Setttings/Project (Who: ESML core team, when onboarding a project)
 ## TODO 4 YOU
-azure_rg_project_number = "002"
+azure_rg_project_number = "001"
 
 # COMMAND ----------
 
-global scope_name
-global sp_id_sa_prj_rxe
-global kv_name_amls
+global kv_project_tenant_id
+global scope_name_project
+global kv_project_azureml_sp_id
+global kv_project_azureml_sp_secret
 
 
 """

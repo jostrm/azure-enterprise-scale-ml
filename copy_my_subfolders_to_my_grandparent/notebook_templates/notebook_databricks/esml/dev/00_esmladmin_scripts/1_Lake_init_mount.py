@@ -9,7 +9,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,1a Init lake - import helper function
-# MAGIC %run /esml/dev/common/azure_functions
+# MAGIC %run ../common/azure_functions
 
 # COMMAND ----------
 
@@ -43,8 +43,8 @@ dbutils.fs.mounts()
 # COMMAND ----------
 
 # DBTITLE 1,Mount 2 folders
-projectNumber = "002" # 002 or 02 depends on your lake design
-dbutils.notebook.run("/esml/dev/common/azure_functions",600, {"projectNumber": projectNumber})
+projectNumber = "001" # 002 or 02 depends on your lake design
+dbutils.notebook.run("../common/azure_functions",600, {"projectNumber": projectNumber})
 
 # COMMAND ----------
 
@@ -57,21 +57,17 @@ dbutils.fs.mounts()
 
 # COMMAND ----------
 
-test_file = '/mnt/prj002/10_titanic_model_clas/train/ds01_titanic/in/dev/2021/01/01/'
+test_file = '/mnt/prj'+projectNumber+'/11_diabetes_model_reg/train/ds01_diabetes/in/dev/1000/01/01/'
 dbutils.fs.ls(test_file) # File exists
 df = (spark.read.option("header","true").csv(test_file)) # Spark DF
 
 # COMMAND ----------
 
-dbutils.fs.mounts() # Check mounts
+# MAGIC %md ## Check Azure ML Studio access for project
 
 # COMMAND ----------
 
-# Check Azure ML Studio access for project
-
-# COMMAND ----------
-
-projectNumber = "02"
+projectNumber = projectNumber # "001"
 resource_group, workspace_name, in_data, out_path,physical_raw_prj01_in,physical_prj01 = getProjectEnvironment(projectNumber)
 ws = getAzureMLWorkspace() # msft-weu-dev-eap-proj02_ai-amls
 print(ws)
