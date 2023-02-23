@@ -11,6 +11,15 @@
         "AMLStudioUIPrivate":{
             "value": true
         },
+        "dbxPubSubnetCidrMask":{
+            "value": "23"
+        },        
+        "dbxPrivSubnetCidrMask":{
+            "value": "23"
+        },   
+        "aksSubnetCidrMask":{
+            "value": "24"
+        },   
         "projecttags": {
             "value": {
                 "Application Name": "Enterprise Scale ML (ESML)",

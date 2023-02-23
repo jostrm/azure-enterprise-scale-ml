@@ -390,9 +390,9 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     # This PSObject must be sorted by value in ascending order  
     $requiredSubnets = [PsObject]@{
-        dbxPubSubnetCidr  = '23'
-        dbxPrivSubnetCidr = '23'
-        aksSubnetCidr     = '24'
+        aksSubnetCidr     = "$aksSubnetCidrMask"
+        dbxPubSubnetCidr  = "$dbxPubSubnetCidrMask"
+        dbxPrivSubnetCidr = "$dbxPrivSubnetCidrMask"
     }
 
     write-host "VARIABLES:"
