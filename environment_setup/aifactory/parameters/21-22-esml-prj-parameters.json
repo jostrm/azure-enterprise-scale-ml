@@ -8,6 +8,9 @@
         "databricksPrivate":{
             "value": false
         },
+        "skuNameDatabricks":{
+            "value": "standard"
+        },
         "AMLStudioUIPrivate":{
             "value": true
         },

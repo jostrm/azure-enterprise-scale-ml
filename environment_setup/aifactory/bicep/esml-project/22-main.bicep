@@ -16,6 +16,13 @@ param databricksPrivate bool = false
 param adminPassword string
 @description('The username of the local admin that is created on VM')
 param adminUsername string
+
+@allowed([
+  'standard'
+  'premium'
+])
+@description('Specifies the SKU that should be used by new databricks instance')
+param skuNameDatabricks string
 @description('Specifies the name of the public databricks subnet that should be used by new databricks instance')
 param dbxPubSubnetName string
 @description('Specifies the name of the private databricks subnet that should be used by new databricks instance')
@@ -593,7 +600,7 @@ module dbx '../modules/dataBricks.bicep'  = if(databricksPrivate == false) {
     name: databricksName
     amlWorkspaceId:aml.outputs.amlId
     location: location
-    skuName: 'standard'
+    skuName: skuNameDatabricks
     managedResourceGroupId:databricksManagedRGId
     databricksPrivateSubnet: dbxPrivSubnetName
     databricksPublicSubnet: dbxPubSubnetName
@@ -616,7 +623,7 @@ module dbxPrivate '../modules/databricksPrivate.bicep' = if(databricksPrivate ==
     location: location
     managedResourceGroupId: databricksManagedRGId
     name: databricksNameP
-    skuName: 'standard'
+    skuName: skuNameDatabricks
     tags: tags2
     vnetId: vnetId
   }
