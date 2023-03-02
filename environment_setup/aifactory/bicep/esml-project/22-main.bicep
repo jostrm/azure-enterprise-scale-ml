@@ -108,6 +108,7 @@ var subscriptionIdDevTestProd = subscription().subscriptionId
 
 //Override paramenters
 param commonResourceGroup_param string = ''
+param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
@@ -134,7 +135,7 @@ param commonRGNamePrefix string
 var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
 var subscriptions_subscriptionId = subscription().id
-var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroup_param}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var defaultSubnet = common_subnet_name //'snet-esmlcmn-001'
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
 

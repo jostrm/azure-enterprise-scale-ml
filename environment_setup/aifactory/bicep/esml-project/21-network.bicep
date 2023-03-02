@@ -37,6 +37,7 @@ param vnetResourceGroup string
 
 //Override paramenter
 param commonResourceGroup_param string = ''
+param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''

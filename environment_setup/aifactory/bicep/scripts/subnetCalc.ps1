@@ -401,12 +401,12 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     $vnetName = "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO" # '${vnetNameBase}-$locationSuffix-${env}${commonResourceSuffix}'
     
-    $vnetResourceGroup = if ( $commonResourceGroup_param -eq $null -or $commonResourceGroup_param -eq "" )
+    $vnetResourceGroup = if ( $vnetResourceGroup_param -eq $null -or $vnetResourceGroup_param -eq "" )
     {
         "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
     }
     else {
-        $commonResourceGroup_param
+        $vnetResourceGroup_param
     }
 
     $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
