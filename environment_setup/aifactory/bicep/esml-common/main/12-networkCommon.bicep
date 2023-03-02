@@ -70,7 +70,7 @@ resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' exist
 
 module nsgCommon '../modules-common/nsgCommon.bicep' = {
   name: 'nsg-${common_subnet_name}'
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}'
     tags: tags
@@ -81,7 +81,7 @@ module nsgCommon '../modules-common/nsgCommon.bicep' = {
 
 module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
   name: 'nsg-${common_subnet_name}-scoring'
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}-scoring'
     tags: tags
@@ -91,7 +91,7 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = {
   name: 'nsg-${common_bastion_subnet_name}'
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
     tags: tags
@@ -101,7 +101,7 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = {
 }
 
 module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   name: 'nsg-${common_pbi_subnet_name}-depl'
   params: {
     name: 'nsg-${common_pbi_subnet_name}'
