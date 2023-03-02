@@ -75,6 +75,7 @@ param technicalAdminsEmail string = 'null'
 param IPwhiteList string = ''
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj 
+param vnetResourceGroup_param string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
@@ -90,7 +91,7 @@ var vnetNameFull ='${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffi
 var cmnName = 'cmn' // needs to be short. KV, ADF, LA, STORAGE needs to be globally unique
 var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}' //kv-cmn-prod-12345-004 (21/24)
 var kvNameCommonAdmin = 'kv-${cmnName}adm${env}-${uniqueInAIFenv}${commonResourceSuffix}' // kv-cmnadm-prod-12345-004 (24, 24max)
-var vnetId = '${subscription().id}/resourceGroups/${commonResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroup_param}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var defaultSubnet = common_subnet_name
 var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
 var privDnsResourceGroup = commonResourceGroupName
