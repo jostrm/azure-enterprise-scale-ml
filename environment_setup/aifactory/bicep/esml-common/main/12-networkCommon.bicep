@@ -42,6 +42,13 @@ param IPwhiteList string = ''
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jå
 
+//Override paramenter
+param commonResourceGroup_param string = ''
+param vnetResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
 var common_subnet_cidr_v = replace(common_subnet_cidr,'XX',cidr_range)
@@ -53,6 +60,11 @@ var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix
 
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
   name: commonResourceGroupName
+  scope:subscription(subscriptionIdDevTestProd)
+}
+
+resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
+  name: vnetResourceGroup_param
   scope:subscription(subscriptionIdDevTestProd)
 }
 
@@ -98,8 +110,8 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
   }
 }
 module vNetCommon '../modules-common/vNetCommon.bicep' = {
-  scope: esmlCommonResourceGroup
-  name: vnetNameFull
+  scope: vnetResourceGroup
+  name: vnetNameFull_param
   params: {
     location: location
     common_pbi_subnet_cidr: common_pbi_subnet_cidr_v
@@ -111,7 +123,7 @@ module vNetCommon '../modules-common/vNetCommon.bicep' = {
     common_bastion_subnet_name: common_bastion_subnet_name
     common_bastion_subnet_cidr: common_bastion_subnet_cidr_v
     tags: tags
-    vnetNameFull: vnetNameFull
+    vnetNameFull: vnetNameFull_param
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
   dependsOn: [
