@@ -13,13 +13,17 @@ variables:
   admin_location: "westeurope"
   admin_locationSuffix: "weu"
   admin_prjResourceSuffix: "-001"
-  azureSubscription_dev: "" # Name of service connection dev
-  azureSubscription_test: "" # Name of service connection test
-  azureSubscription_prod: "" # Name of service connection prod
+  azureSubscription_dev: "" # Name of DevOps service connection dev
+  azureSubscription_test: "" # Name of DevOps service connection test
+  azureSubscription_prod: "" # Name of DevOps service connection prod
   dev_sub_id: "" # SubscriptionID dev
   test_sub_id: "" # SubscriptionID test
   prod_sub_id: "" # SubscriptionID prod
+  cidr_dev: "" # Diffrence between environment in CIDR. Example: 10.xx.00.0 if 10 in this value then 10.10.00.0
+  cidr_test: "" # Diffrence between environment in CIDR. Example: 10.xx.00.0 if 11 in this value then 10.11.00.0
+  cidr_prod: "" # Diffrence between environment in CIDR. Example: 10.xx.00.0 if 12 in this value then 10.12.00.0
   project_IP_whitelist: ""
   project_number_000: "" # Project number (3 digits)
   technical_admins_ad_object_id: ""
   technical_admins_email: ""
+  technical_admins_bastion_IP_whitelist: ""

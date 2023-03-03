@@ -399,8 +399,14 @@ if ($(Get-AzContext).Subscription -ne "") {
     write-host "-STATIC (as incput to vnetName and vnetResourceGroup): Static from PARAMETERS.json: commonRGNamePrefix,vnetResourceGroupBase"
     write-host "-DYNAMIC (as input to vnetName and vnetResourceGroup): Dynamic parameters as INPUT from ADO parameters: env,locationSuffixADO, commonResourceSuffixADO,aifactorySuffixRGADO"
 
-    $vnetName = "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO" # '${vnetNameBase}-$locationSuffix-${env}${commonResourceSuffix}'
-    
+    $vnetName = if ( $vnetNameFull_param -eq $null -or $vnetNameFull_param -eq "" ) 
+    {
+    "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO"
+    }
+    else {
+        $vnetNameFull_param
+    }
+
     $vnetResourceGroup = if ( $vnetResourceGroup_param -eq $null -or $vnetResourceGroup_param -eq "" )
     {
         "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
