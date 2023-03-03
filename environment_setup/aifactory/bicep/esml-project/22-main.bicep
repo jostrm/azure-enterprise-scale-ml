@@ -9,6 +9,13 @@ param inputKeyvaultSubscription string
 param AMLStudioUIPrivate bool = true
 @description('Databricks with PRIVATE endpoint or with SERVICE endpoint. Either way controlplane is on Azure backbone network ')
 param databricksPrivate bool = false
+@description('Databricks host subnet mask.')
+param dbxPubSubnetCidrMask string
+@description('Databricks container subnet mask.')
+param dbxPrivSubnetCidrMask string
+@description('Azure Kubernetes service subnet mask.')
+param aksSubnetCidrMask string
+
 @secure()
 //@minLength(8)
 //@maxLength(128)
