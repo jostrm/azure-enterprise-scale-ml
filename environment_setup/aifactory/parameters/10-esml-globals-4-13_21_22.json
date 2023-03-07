@@ -11,6 +11,9 @@
         "hybridBenefit":{
             "value": true
         },
+        "addBastionHost":{
+            "value": true
+        },
         "lakeContainerName":{
 			"value": "lake3"
 		},

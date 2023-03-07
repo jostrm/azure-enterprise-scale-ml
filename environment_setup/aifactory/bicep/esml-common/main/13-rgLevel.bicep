@@ -58,6 +58,8 @@ param enableVmPubIp bool = false
 param common_subnet_name string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
+@description('(Required) true if Bastion Host should be created')
+param addBastionHost bool
 @description('Specifies project owner email and will be used for tagging and RBAC')
 param technicalContactEmail string
 @description('Specifies project owner objectId and will be used for tagging and RBAC')
@@ -217,13 +219,13 @@ resource subnetCommonDefaultResource 'Microsoft.Network/virtualNetworks/subnets@
 }
 
 var bastion_subnet_name = 'AzureBastionSubnet'
-resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = {
+resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = if(addBastionHost == true) {
   name:'${vnetId}/${bastion_subnet_name}'
   scope: esmlCommonResourceGroup
 }
 
 var common_bastion_host_name = 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'
-module bastionHost '../modules-common/bastionHostCommon.bicep' = {
+module bastionHost '../modules-common/bastionHostCommon.bicep' = if(addBastionHost == true) { 
   scope: esmlCommonResourceGroup
   name: common_bastion_host_name
   params: {

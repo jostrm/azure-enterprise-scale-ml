@@ -109,6 +109,8 @@ param commonResourceSuffix string
 param resourceSuffix string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
+@description('(Required) true if Bastion Host should be created')
+param addBastionHost bool
 @description('Datalake GEN 2 storage account prefix. Max 8 chars.Example: If prefix is "marvel", then "marvelesml001[random5]dev",marvelesml001[random5]test,marvelesml001[random5]prod')
 param commonLakeNamePrefixMax8chars string
 var subscriptionIdDevTestProd = subscription().subscriptionId
