@@ -25,13 +25,21 @@ param commonRGNamePrefix string = ''
 param technicalAdminsObjectID string = 'null'
 @description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')
 param technicalAdminsEmail string = 'null'
+
+//Override paramenters
+param commonResourceGroup_param string = ''
+param vnetResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
 var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
-var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // aaa-bbb-esml-common-weu-dev-002 (31/90 chars)
+var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // aaa-bbb-esml-common-weu-dev-002 (31/90 chars)
 
 module rgCommon '../../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)

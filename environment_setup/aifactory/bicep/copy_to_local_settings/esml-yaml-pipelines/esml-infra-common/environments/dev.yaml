@@ -21,6 +21,7 @@ steps:
      --template-file "esml-common\main\11-rgCommon.bicep" \
      --parameters @"..\..\..\..\aifactory\parameters\11-esml-globals-11_13.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
      --parameters env="$(dev_test_prod)" \

@@ -86,7 +86,7 @@ param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
-var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
+var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
 
 // DEPENDENCIES - should exist
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
