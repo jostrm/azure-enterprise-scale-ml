@@ -51,7 +51,7 @@ resource databricksPrivate 'Microsoft.Databricks/workspaces@2021-04-01-preview' 
   
   properties: {
     publicNetworkAccess: 'Disabled' // value to disabled to access workspace only via private link.
-    requiredNsgRules: 'AllRules' // ['AllRules','NoAzureDatabricksRules' 'NoAzureServiceRules']  whether data plane (clusters) to control plane communication happen over private endpoint. 
+    requiredNsgRules: 'NoAzureDatabricksRules' // ['AllRules','NoAzureDatabricksRules' 'NoAzureServiceRules']  whether data plane (clusters) to control plane communication happen over private endpoint. 
     managedResourceGroupId: managedResourceGroupId
     parameters: {
       amlWorkspaceId: {
