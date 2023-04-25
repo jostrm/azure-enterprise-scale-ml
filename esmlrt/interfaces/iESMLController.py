@@ -529,6 +529,7 @@ class IESMLController:
                 fitted_model = joblib.load(m_path)
                 if_get_pickle_success = True
             except Exception as e:
+                s1 = str(e)
                 if(FileNotFoundError is type(e)):
                     print("FileNotFoundError")
                 elif(EOFError is type(e)):
@@ -536,7 +537,6 @@ class IESMLController:
                     print("Error - the .pkl file written is corrupt. This may happen if you have WRITTEN (joblib.dump) it with a pickle/joblib library version, and now trying to LOAD ( joblib.load ) with another version")
                     raise e
                 elif(OSError is type(e)):
-                    s1 = str(e)
                     print("OSError")
                     print("ESML Warning 1 - probably trying to load to Spark file system. Ignore load then. You need to handle the loading of Model to pickle yourself, since file operations.")
                 elif("Function not implemented:" in s1):
