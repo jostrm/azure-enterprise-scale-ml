@@ -424,7 +424,13 @@ class IESMLController:
                 exp_name_pipe = experiment_name
             else:
                 exp_name_pipe = current_model.tags.get("experiment_pipleline_run_name")
-                print("experiment_pipleline_run_name: {}".format(exp_name_pipe))
+            
+            if(exp_name_pipe is None): # It is a manual AutoML run / run - no pipeline
+                exp_name_pipe = current_model.tags.get("experiment_name")
+                if(exp_name_pipe is None): # It is strange - and we will set a default name
+                    raise Exception("ESML Error - strange: Cannot get experiment name from Model tag - please create a tag on Model in registry manaul. 'experiment_name:11_diabetes_model_reg', or if pipelinerun: experiment_pipleline_run_name : 11_diabetes_model_reg_pipe_IN_2_GOLD_TRAIN")
+                
+            print("experiment_pipleline_run_name: {}".format(exp_name_pipe))
 
             if(best_run is not None and best_run.parent is not None):
                 main_run_exp_name = best_run.parent.experment.name
@@ -489,7 +495,7 @@ class IESMLController:
                     print(" ## ESML: now trying with IESMLController.get_known_model_name_pkl()")
                     print(" ## ESML:")
                     def_name = IESMLController.get_known_model_name_pkl()
-                    print("ESML VARNING: Could not load FITTED model via Experiment model tag and via Model() - now trying to dowload .pkl with default name: {}, from Model.download()".format(def_name))
+                    print("ESML VARNING 1: Could not load FITTED model via Experiment model tag and via Model() - now trying to dowload .pkl with default name: {}, from Model.download()".format(def_name))
                     print("Pickle path earlier that failed, with default name: {}".format(m_path))
                     m_path = './outputs/'+def_name
                     print("New pickle path: {}".format(m_path))
@@ -499,6 +505,9 @@ class IESMLController:
                     print("EOFError")
                     print("Error - the .pkl file written is corrupt. This may happen if you have WRITTEN (joblib.dump) it with a pickle/joblib library version, and now trying to LOAD ( joblib.load ) with another version")
                     raise e
+                elif(OSError is type(e)):
+                   print("OSError")
+                   print("ESML Warning - provably trying to load to Spark file system. Ignore load then. You need to handle the loading of Model to pickle yourself, since file operations.")
                 else:
                     raise e
         except Exception as e:
@@ -508,9 +517,7 @@ class IESMLController:
                 print(" ## ESML:")
 
                 def_name = IESMLController.get_known_model_name_pkl()
-                print("ESML VARNING: Could not load FITTED model via Experiment model tag and via Model() - now trying to dowload .pkl with default name: {}, directly from RUN.download_files()".format(def_name))
-                best_run.download_files() #  (target_dir=wrong_model_path, exist_ok=True)
-                        
+                print("ESML VARNING 2: Could not load FITTED model via Experiment model tag and via Model() - now trying to dowload .pkl with default name: {}, directly from RUN.download_files()".format(def_name))
                 print("Pickle path earlier that failed, with default name: {}".format(m_path))
                 m_path = './outputs/'+def_name
                 print("Pickle path, new with default name: {}".format(m_path))
@@ -518,6 +525,7 @@ class IESMLController:
                 print("Model name: {}".format(model.name))
                 print("experiment_name: {}".format(experiment_name))
                 print("joblib version: {}".format(joblib.__version__))
+                best_run.download_files() #  (target_dir=wrong_model_path, exist_ok=True)
                 fitted_model = joblib.load(m_path)
                 if_get_pickle_success = True
             except Exception as e:
@@ -527,8 +535,14 @@ class IESMLController:
                     print("EOFError")
                     print("Error - the .pkl file written is corrupt. This may happen if you have WRITTEN (joblib.dump) it with a pickle/joblib library version, and now trying to LOAD ( joblib.load ) with another version")
                     raise e
+                elif(OSError is type(e)):
+                    print("OSError")
+                    print("ESML Warning 1 - probably trying to load to Spark file system. Ignore load then. You need to handle the loading of Model to pickle yourself, since file operations.")
+                elif("Function not implemented:" in e.message):
+                    print("ESML Warning 2 - probably trying to load to Spark file system. Ignore load then. You need to handle the loading of Model to pickle yourself, since file operations.")
                 else:
-                    raise e
+                    print("ESML Warning 3 - probably trying to load to Spark file system. Ignore load then. You need to handle the loading of Model to pickle yourself, since file operations.")
+                    #raise e
 
         if(if_get_pickle_success):
             print("SUCCESS! Fitted model downloaded and extracted!")
@@ -558,6 +572,7 @@ class IESMLController:
         fitted_model = None
         run_id = IESMLController.get_safe_automl_parent_run_id(run_id)
         pipeline_run = None
+        if_get_pickle_success = False
         
         try: # if (run_type == "automl_run" or run_type == "notebook_automl"):
             if(debug_print):
