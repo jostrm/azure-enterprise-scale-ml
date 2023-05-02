@@ -68,7 +68,7 @@ def calculate_test_set_scoring_tags(best_rmse=None):
 def train_df(df, validate_df,target_column_name,dbfs_model_out_path, use_run_logging=True, train_run = None):
   aml_model = None
   fitted_model = None
-  out_path = '/dbfs/mnt/prj002/11_diabetes_model_reg/train/model/' # /esml/dev/project/11_diabetes_model_reg/M11/30_train_code/your_train_code
+  #out_path = '/dbfs/mnt/prj002/11_diabetes_model_reg/train/model/' # /esml/dev/project/11_diabetes_model_reg/M11/30_train_code/your_train_code
   
   if(use_run_logging):
     #train_run = Run.get_context() # Run.get_context(allow_offline=False)

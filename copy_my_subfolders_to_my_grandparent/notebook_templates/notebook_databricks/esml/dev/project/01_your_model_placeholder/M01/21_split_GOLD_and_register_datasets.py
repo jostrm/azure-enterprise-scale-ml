@@ -8,7 +8,7 @@
 
 # COMMAND ----------
 
-esml_inference_mode = 1 # train = 1, inference=0
+esml_inference_mode = 1 # train = 0, inference=1
 esml_env = "dev" # test, prod
 esml_previous_step_is_databricks = 1 # 1=True, 0=False
 esml_dataset_filename_ending = "*.parquet" # *.parquet | gold_dbx.parquet
@@ -25,7 +25,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("esml_inference_mode","0", "esml_inference_mode=1, if scoring")
+  dbutils.widgets.text("esml_inference_mode","1", "esml_inference_mode=1, if scoring")
   esml_inference_mode = dbutils.widgets.get("esml_inference_mode")
   esml_inference_mode = getArgument("esml_inference_mode")
   print ("esml_inference_mode: ",esml_inference_mode)
@@ -188,6 +188,21 @@ print(datastore.account_name)
 
 physical_test = esml_lake.get_physical_path(physical_prj01,esml_lake.gold_test)
 physical_test
+
+# COMMAND ----------
+
+physical_prj01
+
+# COMMAND ----------
+
+esml_lake.gold_train
+
+# COMMAND ----------
+
+from azureml.core.dataset import Dataset 
+
+physical_train = esml_lake.get_physical_path(physical_prj01,esml_lake.gold_train)
+print(physical_train)
 
 # COMMAND ----------
 

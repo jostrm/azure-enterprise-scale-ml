@@ -555,11 +555,18 @@ class IESMLController:
         contains_AutoMLStep = False
         str_automl = "AutoML"
         for pt in step_list:
-            if(str_automl in pt.name):
-                contains_AutoMLStep = True
             if(debug):
-                print(pt.name)
-
+                print("str(pt) is:", str(pt))
+                try:
+                    print("pt.name is is:", pt.name)
+                except:
+                    pass
+            try:
+                if(str_automl in pt.name):
+                    contains_AutoMLStep = True
+            except:
+                if(str_automl in str(pt)):
+                    contains_AutoMLStep = True
         if(debug):
             print("Contains AutoML step: {}".format(contains_AutoMLStep))
 
