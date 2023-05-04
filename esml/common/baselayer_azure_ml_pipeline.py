@@ -1656,11 +1656,10 @@ class ESMLPipelineFactory():
 
     def create_automl_lts_environment_if_not_exists(self,base_image_in = None, environment_name = None):
         automl_esml_env = None
+        env_name = None
         try:
             if (self.p.ws == None):
                 self.p.ws = self.p.get_workspace_from_config()
-
-            env_name = None
             if(environment_name is None):
                 env_name = self._esml_automl_lts_env_name
             else:
@@ -1674,7 +1673,7 @@ class ESMLPipelineFactory():
                 base_image_name = self._default_base_image
                 if(base_image_in is not None):
                     base_image_name = base_image_in
-                automl_esml_env = self.create_automl_lts_environment(base_image_name)
+                automl_esml_env = self.create_automl_lts_environment(base_image_name, env_name)
         return automl_esml_env
 
     def create_dbx_step_in_2_silver(self,map_in,databricks_compute,map_step,dataset,step_key = "in2silver_ds01_diabetes",
