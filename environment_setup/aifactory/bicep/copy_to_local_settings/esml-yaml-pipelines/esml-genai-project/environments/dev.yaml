@@ -1,0 +1,60 @@
+steps:
+ 
+- checkout: self # Required as first property. Alias of the repository resource to check out or 'none'.
+  submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
+  continueOnError: false # Continue running even on failure?.  (false,n,no,off,on,true,y,yes)
+  displayName: GIT # Human-readable name for the task.
+  enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
+  name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
+ 
+- task: AzureCLI@2
+  displayName: '10_Get ADO IP for agent'
+  inputs:
+    azureSubscription: '$(azureSubscription_dev)'
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+     $resp = $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
+             Write-Host $resp
+             Write-Host "##vso[task.setvariable variable=admin_ip_fw]$resp"
+             $ipAddr = $resp
+             Write-Host ipAddr is: $admin_ip_fw
+ 
+- task: AzureCLI@2
+  displayName: '10_Set ADO IP to keyvault FW whitelist'
+  inputs:
+    azureSubscription: '$(azureSubscription_prod)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: 'az keyvault network-rule add --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
+ 
+- task: AzureKeyVault@2
+  displayName: '10_download_keyvault_secrets'
+  inputs:
+    azureSubscription: '$(azureSubscription_prod)'
+    KeyVaultName: '$(admin_bicep_kv_fw)'
+ 
+- task: AzureCLI@2
+  displayName: '22_Deploy genai project'
+  inputs:
+    azureSubscription: '$(azureSubscription_dev)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl" \
+     --subscription "$(dev_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-genai\main.bicep" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters @"esml-genai\main.parameters.json" \
+     --parameters @"esml-genai\abbreviations.json" \
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+ 
+- task: AzureCLI@1
+  displayName: '10_Remove ADO IP from keyvault FW whitelist'
+  inputs:
+    azureSubscription: '$(azureSubscription_prod)'
+    scriptLocation: inlineScript
+    inlineScript: 'az keyvault network-rule remove --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
+  condition: always()

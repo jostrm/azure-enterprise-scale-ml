@@ -1,0 +1,126 @@
+steps:
+
+- checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
+  submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
+  continueOnError: false # Continue running even on failure?.  (false,n,no,off,on,true,y,yes)
+  displayName: GIT # Human-readable name for the task. 
+  enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
+  name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
+
+- task: AzureCLI@2
+  displayName: '10_Get ADO IP for agent'
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+     $resp = $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
+             Write-Host $resp
+             Write-Host "##vso[task.setvariable variable=admin_ip_fw]$resp"
+             $ipAddr = $resp
+             Write-Host ipAddr is: $admin_ip_fw
+
+- task: AzureCLI@2
+  displayName: '10_Set ADO IP to keyvault FW whitelist'
+  inputs:
+    azureSubscription: '$(azureSubscription_prod)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: 'az keyvault network-rule add --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
+
+- task: AzureKeyVault@2
+  displayName: '10_download_keyvault_secrets'
+  inputs:
+    azureSubscription: '$(azureSubscription_prod)'
+    KeyVaultName: '$(admin_bicep_kv_fw)'
+
+- task: AzurePowerShell@4
+  displayName: '20_Calculate subnet allocations_PS'
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc.ps1'
+    ScriptArguments: '-bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -spObjId "$(esml-common-sp-id)" -spSecret "$(esml-common-sp-secret)" -env "$(dev_test_prod)" -subscriptionId "$(test_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -useServicePrincipal'
+    preferredAzurePowerShellVersion: 3.5.0
+    pwsh: true
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
+
+- task: AzureCLI@2
+  displayName: '21_Deploy subnets and NSG'
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az deployment group create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj" \
+     --subscription "$(test_sub_id)" \
+     --resource-group "$(cat "..\..\..\..\aifactory\parameters\subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"")" \
+     --template-file "esml-project\21-network.bicep" \
+     --parameters @"..\..\..\..\aifactory\parameters\subnetParameters.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)"
+     
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+
+- task: AzureCLI@2
+  displayName: '21_to_22_Generate network parameters'
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    scriptType: pscore
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
+    arguments: '-spObjId "$(esml-common-sp-id)" -spSecret "$(esml-common-sp-secret)" -useServicePrincipal -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(test_sub_id)"'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
+
+- powershell: |
+   write-host "Waiting for subnets to fully register to subscription"
+   Start-Sleep 60
+  displayName: '30_Sleep for 1 minute'
+
+- task: AzureCLI@2
+  displayName: '22_Deploy esml project'
+  inputs:
+    azureSubscription: '$(azureSubscription_test)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl" \
+     --subscription "$(test_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-project\22-main.bicep" \
+     --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-2-12_13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-4-13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-4-13_21_22.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-5-13_23.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\21-22-esml-prj-parameters.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\dynamicNetworkParams.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\23-esml-prj-rbac-parameters.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters projectServicePrincipleAppID_SeedingKeyvaultName="$(project_service_principal_AppID_seeding_kv_name)" \
+     --parameters projectServicePrincipleSecret_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters IPwhiteList="$(project_IP_whitelist)"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+
+- task: AzureCLI@1
+  displayName: '10_Remove ADO IP from keyvault FW whitelist'
+  inputs:
+    azureSubscription: '$(azureSubscription_prod)'
+    scriptLocation: inlineScript
+    inlineScript: 'az keyvault network-rule remove --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
+  condition: always()
