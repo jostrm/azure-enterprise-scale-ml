@@ -43,7 +43,7 @@ class ESMLSplitter1(IESMLSplitter):
     # validateset_and_testset_percentage_together - If train=0.8 then this is 0.2
     # left_per_set - 0.5 meaning will be 10% each if 20% validateset_and_testset_percentage_together
     # NB! In StratifiedShuffleSplit it can and will overlap as a default behaviour. (hence below impl.)
-    def split_stratified(gold_data, validateset_and_testset_percentage_together=0.2,left_per_set=0.5, y_label=None, seed=42):
+    def split_stratified(self,gold_data, validateset_and_testset_percentage_together=0.2,left_per_set=0.5, y_label=None, seed=42):
 
         s1 = StratifiedShuffleSplit(n_splits=1, test_size=validateset_and_testset_percentage_together, random_state=seed)
 
