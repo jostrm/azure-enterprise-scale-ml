@@ -34,7 +34,7 @@ class IESMLPipelineStepMap:
     def get_train_map(self, dataset_folder_names,step_filter_whitelist=None):
 
         self.IN_2_GOLD_TRAIN_notebook_mapping = self.your_train_map(dataset_folder_names)
-        self.IN_2_GOLD_TRAIN_notebook_mapping = self.use_only_whitelisted_steps()
+        self.IN_2_GOLD_TRAIN_notebook_mapping = self.use_only_whitelisted_steps(True)
         return self.IN_2_GOLD_TRAIN_notebook_mapping
 
     ###
@@ -43,7 +43,7 @@ class IESMLPipelineStepMap:
     def get_inference_map(self, dataset_folder_names):
 
         self.IN_2_GOLD_SCORE_notebook_mapping = self.your_inferenc_map(dataset_folder_names)
-        self.IN_2_GOLD_SCORE_notebook_mapping = self.use_only_whitelisted_steps()
+        self.IN_2_GOLD_SCORE_notebook_mapping = self.use_only_whitelisted_steps(False)
         return self.IN_2_GOLD_SCORE_notebook_mapping
 
     @abstractmethod
@@ -100,21 +100,29 @@ class IESMLPipelineStepMap:
          #################### TODO 4 YOU - END ################################
         return your_infernece_map
 
-    def use_only_whitelisted_steps(self):
+    def use_only_whitelisted_steps(self, train_map=True):
         newMapping = []
         if(self._step_filter_whitelist is not None and len(self._step_filter_whitelist) > 0):
-           counter = 0
-           for white_step_name in self._step_filter_whitelist:
-               step_dic = self.IN_2_GOLD_TRAIN_notebook_mapping[counter]
-               if(len(step_dic)> 0):
+            counter = 0
+            for white_step_name in self._step_filter_whitelist:
+                if(train_map):
+                    step_dic = self.IN_2_GOLD_TRAIN_notebook_mapping[counter]
+                else:
+                    step_dic = self.IN_2_GOLD_SCORE_notebook_mapping[counter]
+                if(len(step_dic)> 0):
                     if(white_step_name == step_dic['step_name']):
                         newMapping.append(step_dic)
-               else:
+                else:
                     break
-               counter = counter+1
+                counter = counter+1
         else:
-            newMapping = self.IN_2_GOLD_TRAIN_notebook_mapping
-            
+            if(train_map):
+                newMapping = self.IN_2_GOLD_TRAIN_notebook_mapping
+            else:
+                newMapping = self.IN_2_GOLD_SCORE_notebook_mapping
+        
+        if(newMapping is None):
+            print("Kalle none")
         return newMapping
 
     @staticmethod

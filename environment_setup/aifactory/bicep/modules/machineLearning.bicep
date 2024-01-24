@@ -133,7 +133,7 @@ param ciVmSku_testProd string = ci_devTest_defaults[0]
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 
-resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-05-01' = {
+resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
   name: name
   location: location
   identity: {
@@ -250,7 +250,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod'){
 }
 
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = if(ownSSL == 'disabled') {
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(ownSSL == 'disabled') {
   name: '${machineLearningStudio.name}/${aksName}'
   location: location
   properties: {
@@ -279,7 +279,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
 }
 
 //CPU Cluster
-resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = {
+resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
   name: '${machineLearningStudio.name}/p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
   location: location
   tags: tags
@@ -314,7 +314,7 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
 }
 
 //Compute instance
-resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/workspaces/computes@2021-07-01' = {
+resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
   name: '${machineLearningStudio.name}/p${projectNumber}-m01-${uniqueSalt5char}-${env}-ci01' // p001-m01-12345-prod-ci01 (24/24)(The name needs to be unique within an Azure region)
   location: location
   tags: tags
@@ -329,6 +329,7 @@ resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/wo
     properties: {
       applicationSharingPolicy: 'Shared'//'Personal'
       computeInstanceAuthorizationType: 'personal'
+      enableNodePublicIp: false
       sshSettings: {
         sshPublicAccess: 'Disabled'
       }

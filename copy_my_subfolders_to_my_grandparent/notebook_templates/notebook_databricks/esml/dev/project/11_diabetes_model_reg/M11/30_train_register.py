@@ -379,6 +379,7 @@ else:
 # COMMAND ----------
 
 # MAGIC %md ## Upload Fitted model to KNOWN location (to automate scoring pipeline later on)
+# MAGIC - TODO: Create ESML functio to get PATH
 
 # COMMAND ----------
 
@@ -539,14 +540,6 @@ def register_aml_model_on_run(model_name,model_path,tags):
       model = remote_run.register_model(model_name=model_name,model_path=model_path, tags=tags, description="") # Works, if manual ML you need to specify path where you saved model.
   else:
       model = remote_run.register_model(model_name=model_name, tags=tags, description="") # Works. If AutoML, pass the MAIN_RUN of AutoML that has AutoMLSettings property
-
-  try:
-    #if(tags["status_code"] == IESMLController.esml_status_promoted_2_dev or tags["status_code"] == IESMLController.esml_status_promoted_2_test or tags["status_code"] == IESMLController.esml_status_promoted_2_prod):
-    tags = {'model_name':model_name, 'best_model_version': str(model.version)}
-    experiment = remote_run.experiment 
-    experiment.set_tags(tags)
-  except Exception as e:
-    print(str(e))
 
 try:
   #register_aml_model_on_run(model_name,model_path,tags)

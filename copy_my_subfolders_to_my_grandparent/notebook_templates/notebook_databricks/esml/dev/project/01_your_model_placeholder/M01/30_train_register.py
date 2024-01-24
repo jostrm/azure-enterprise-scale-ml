@@ -379,6 +379,7 @@ else:
 # COMMAND ----------
 
 # MAGIC %md ## Upload Fitted model to KNOWN location (to automate scoring pipeline later on)
+# MAGIC - TODO: Create ESML functio to get PATH
 
 # COMMAND ----------
 

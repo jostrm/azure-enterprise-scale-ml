@@ -61,6 +61,7 @@ except ModuleNotFoundError:
 #region(collapsed) Enumerators
 class esml_pipeline_types():
     IN_2_GOLD_SCORING = "IN_2_GOLD_SCORING"
+    IN_2_GOLD_SCORING_DBX = "IN_2_GOLD_SCORING_DBX"
     IN_2_GOLD = "IN_2_GOLD"
     GOLD_SCORING = "GOLD_SCORING"
     IN_2_GOLD_TRAIN_AUTOML= "IN_2_GOLD_TRAIN_AUTOML"
@@ -110,7 +111,7 @@ class ESMLPipelineFactory():
     #region(collapsed) TODO
     #script_template_user = "../../../settings/project_specific/model/dev_test_prod_override/batch/pipeline_template"
     #endregion
-    _snapshot_folder = "../../../01_pipelines/"
+    _snapshot_folder = "../../../pipelines/"
 
 #region USER CUSTOMIZATION - EDIT the code in THESE files. Init files with "create_dataset_scripts_from_template()"
     _in2silver_filename = "in2silver.py"
@@ -217,7 +218,11 @@ class ESMLPipelineFactory():
     @property
     def name_batch_pipeline(self):
 
-        if(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_SCORING):
+        if(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_SCORING_DBX):
+            if(self.is_advancede_mode_and_databricks() == False or self.p.inference_mode==False):
+                raise Exception("ESML Error - you need to also specify the Databricks configurations (all steps should be Databricks) if choosing esml_pipeline_types.IN_2_GOLD_SCORING_DBX. Alternatively choose another pipelinetype: IN_2_GOLD_SCORING")
+            return self.p.experiment_name + "_pipe_IN_2_GOLD_SCORING_DBX"
+        elif(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_SCORING):
             return self.p.experiment_name + "_pipe_IN_2_GOLD_SCORING"
         elif(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD):
             if(self.p.inference_mode == True):
@@ -233,9 +238,6 @@ class ESMLPipelineFactory():
             if(self._esml_pipeline_type ==  esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
                 experiment_name = experiment_name + "_AUTOML"
             return experiment_name
-
-        elif(self._esml_pipeline_type ==  esml_pipeline_types.GOLD_SCORING):
-            return self.p.experiment_name + "_pipe_GOLD_SCORING"
         else:
             return self.p.experiment_name + "_pipeline_OTHER"
 
@@ -612,6 +614,9 @@ class ESMLPipelineFactory():
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
                 p.inference_mode = True
                 pipe = self._create_pipeline(pipeline_type,same_compute_for_all,aml_compute)
+            elif(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING_DBX):
+                p.inference_mode = True
+                pipe = self._create_pipeline(pipeline_type,same_compute_for_all,aml_compute)
             elif(pipeline_type == esml_pipeline_types.IN_2_GOLD):
                 p.inference_mode = True
                 pipe = self._create_pipeline(pipeline_type,same_compute_for_all,aml_compute)
@@ -757,6 +762,7 @@ class ESMLPipelineFactory():
                 self.batch_pipeline_parameters[4] = par_esml_inference_mode
 
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
+               pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING_DBX or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
@@ -804,7 +810,10 @@ class ESMLPipelineFactory():
                             datasets_with_dbx.append(d.Name)
                             compute_name = map_step['compute_name']
                             dbx_compute = self._dbx_compute_dic[compute_name]
-                            step_array.append(self.create_dbx_step_in_2_silver(map_in=map,databricks_compute=dbx_compute,map_step=map_step,dataset=d,step_key=step_name)) # (d, compute,runconfig,esml_step_types.IN_2_SILVER))
+
+                            model_version_user = self.batch_pipeline_parameters[0].default_value
+                            
+                            step_array.append(self.create_dbx_step_in_2_silver(par_model_version=model_version_user,map_in=map,databricks_compute=dbx_compute,map_step=map_step,dataset=d,step_key=step_name)) # (d, compute,runconfig,esml_step_types.IN_2_SILVER))
                             dbx_esml_datasets.append(d)
                             previous_step_is_databricks = 1 # at least 1 step is Databricks
                         else:
@@ -826,6 +835,7 @@ class ESMLPipelineFactory():
             gold_to_score= None
             has_dbx_silver_merged_2_gold_step = False
             if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or 
+               pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING_DBX or
                 pipeline_type == esml_pipeline_types.IN_2_GOLD or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_MANUAL or 
                 pipeline_type == esml_pipeline_types.IN_2_GOLD_TRAIN_AUTOML):
@@ -869,16 +879,24 @@ class ESMLPipelineFactory():
 
                 step_array.append(gold_to_score)
             
-            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.GOLD_SCORING): # SCORING
+            if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING_DBX or pipeline_type == esml_pipeline_types.GOLD_SCORING): # SCORING
                 print("Adding inference step, creating...")
-                if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING):
+                if(pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING or pipeline_type == esml_pipeline_types.IN_2_GOLD_SCORING_DBX):
                     if(advanced_mode):
-                        has_dbx_silver_merged_2_gold_step,step_name,map_step = self._iesml_pipelinestep_map.get_dbx_map_step(map,esml_snapshot_step_names.scoring_gold.value)
+                        has_scoring_gold,step_name,map_step = self._iesml_pipelinestep_map.get_dbx_map_step(map,esml_snapshot_step_names.scoring_gold.value)
 
-                        if(has_dbx_silver_merged_2_gold_step):
-                            print(" - Step: {} has advanced mapping - an Azure Databricks mapping for: {}".format(esml_snapshot_step_names.silver_merged_2_gold.value,esml_pipeline_types.IN_2_GOLD_SCORING))
-                            # TODO: 
-                            print("TODO - this is not implemented yet: IN_2_GOLD_SCORING DataBricksStep")
+                        if(has_scoring_gold):
+                            print(" - Step: {} has advanced mapping - an Azure Databricks mapping for: {}".format(esml_snapshot_step_names.scoring_gold.value,esml_pipeline_types.IN_2_GOLD_SCORING_DBX))
+                            scoring_gold_dbx = self.create_dbx_step_scoring_gold(map=map,databricks_compute=dbx_compute,map_step=map_step,
+                                gold_to_score_step=gold_to_score,
+                                step_key = esml_snapshot_step_names.scoring_gold.value,
+                                par_date_utc=self.batch_pipeline_parameters[1].default_value,
+                                par_model_version=self.batch_pipeline_parameters[0].default_value, # 0,1,2,3
+                                par_inference_mode=self.batch_pipeline_parameters[4].default_value, # 0 / 1
+                                par_env=self.batch_pipeline_parameters[3].default_value,
+                                previous_step_is_databricks=previous_step_is_databricks
+                            )
+                            step_array.append(scoring_gold_dbx)
                             previous_step_is_databricks = 1
                         else:
                             if(self._default_compute is None): # Create initial compute
@@ -1638,11 +1656,10 @@ class ESMLPipelineFactory():
 
     def create_automl_lts_environment_if_not_exists(self,base_image_in = None, environment_name = None):
         automl_esml_env = None
+        env_name = None
         try:
             if (self.p.ws == None):
                 self.p.ws = self.p.get_workspace_from_config()
-
-            env_name = None
             if(environment_name is None):
                 env_name = self._esml_automl_lts_env_name
             else:
@@ -1656,7 +1673,7 @@ class ESMLPipelineFactory():
                 base_image_name = self._default_base_image
                 if(base_image_in is not None):
                     base_image_name = base_image_in
-                automl_esml_env = self.create_automl_lts_environment(base_image_name)
+                automl_esml_env = self.create_automl_lts_environment(base_image_name, env_name)
         return automl_esml_env
 
     def create_dbx_step_in_2_silver(self,map_in,databricks_compute,map_step,dataset,step_key = "in2silver_ds01_diabetes",
@@ -1688,6 +1705,7 @@ class ESMLPipelineFactory():
         # END
 
         # ESML date_time folder
+        par_inference_mode = self.p.inference_mode
         param_date = PipelineParameter(name="esml_training_folder_date", default_value=par_date_utc)
         param_model_version = PipelineParameter(name="esml_inference_model_version", default_value=par_model_version)
         param_inference = PipelineParameter(name="esml_inference_mode", default_value=par_inference_mode)
@@ -1795,7 +1813,7 @@ class ESMLPipelineFactory():
         # Get model name info, and current model info
         aml_model,aml_model_name, current_fitted_model, esml_model_name = self.getBestModel()
 
-        esml_aml_model_name = ""
+        esml_aml_model_name = p.active_model["model_folder_name"]
         if(aml_model_name is not None):
             esml_aml_model_name = aml_model_name
 
@@ -1960,7 +1978,128 @@ class ESMLPipelineFactory():
         )
         return dbNbStep
 
+    def create_dbx_step_scoring_gold(self,map,databricks_compute,map_step,
+    gold_to_score_step,
+    step_key =  esml_snapshot_step_names.silver_merged_2_gold.value,
+    par_date_utc="1000-01-01 10:35:01.243860",
+    par_model_version=0,
+    par_inference_mode=0,
+    par_env="dev",
+    previous_step_is_databricks=1
+    ):
+        if(previous_step_is_databricks):
+            print("previous_step_is_databricks = {}".format(previous_step_is_databricks))
 
+        p = self.p
+        model_version_chosen = par_model_version
+        model_version_user = par_model_version
+        aml_model,aml_model_name, current_fitted_model, esml_model_name = None,None,None,None
+        if (model_version_user == 0): # Get Latest model, with TAG that says it is promoted "esml_promoted_2_dev, or "
+            print("ESML INFO: LEADING MODEL: model_version in-parameter from user is 0 - hence overridden with BEST LATEST = PROMOTED leading model is used (model.version=13 as an example)")
+            print("Tip: This is good for R&D and smoke testing of pipeline. You only need DATA in one place, under .../inference/0/ but will get LATEST & BEST model to score with...")
+            print(" - 1) GOLD to SCORE will be saved temporary by pipeline here: .../inference/0/gold/dev/*.parquet (e.g. overwritten each run)")
+            print(" - 2) SCORED GOLD data will be saved in .../inference/0/scored/dev/run_id/*.parquet (e.g. not overwritten each run, saved for each run)")
+            print(" - 3) LATEST SCORED GOLD data will be saved in .../inference/0/scored/dev/run_id/*.parquet (e.g. not overwritten since run_folder. version_folder, for easy retrieval from external systems)")
+            print("Tip 2: If you set model_version=1 e.g. batch_pipeline_parameters[0] = 1 it will fetch model version 1, and READ IN DATA from .../inference/1/... folder structure")
+            aml_model,aml_model_name, current_fitted_model, esml_model_name = self.getBestModel()
+            model_version_chosen = aml_model.version
+        else:
+            print("ESML INFO: SPECIFIC (maybe leading) MODEL: model_version in-parameter from user is {}, hence no guarantee that BEST LATEST PROMOTED model.version is used. User decided version is used".format(model_version_user))
+            print("ESML INFO: model_version is {} e.g. batch_pipeline_parameters[0] = {} meaning, it will fetch model.version={}, and READ IN DATA from .../inference/{}/ folder structure".format(
+            model_version_user,
+            model_version_user,
+            model_version_user,
+            model_version_user))
+            print(" - 1) GOLD to SCORE will be saved temporary by pipeline here: .../inference/0/gold/dev/*.parquet (e.g. overwritten each run)")
+            print(" - 2) SCORED GOLD data will be saved in .../inference/{}/scored/dev/run_id/*.parquet (e.g. not overwritten since run_folder, saved for each run)".format(model_version_user))
+            print(" - 3) LATEST SCORED GOLD data will be saved in .../inference/0/scored/dev/run_id/*.parquet (e.g. not overwritten since run_folder. version_folder, for easy retrieval from external systems)")
+
+        esml_aml_model_name = p.active_model["model_folder_name"]
+        if(aml_model_name is not None):
+            esml_aml_model_name = aml_model_name
+
+        # IN: Gold to score
+        latest_scored_folder = p.path_gold_scored_template().format(model_version=0) # 0=Always use latest scored folder, since run_id is known.
+        latest_gold_scored_path = latest_scored_folder + "gold_scored_dbx.parquet"
+        #scored_folder_template = p.path_gold_scored_template(True,True)
+        scored_folder_template = "projects/project{esml_project_no}/{model_folder_name}/inference/{model_version}/scored/dev/{date_folder}/{id_folder}/"
+
+        if(type(gold_to_score_step) is OutputFileDatasetConfig):  # esml_pipeline_type.SCORE_GOLD 
+            gold_to_score = gold_to_score_step # gives us the "OutputFileDatasetConfig"
+        else: # esml_pipeline_type.IN_2_GOLD_SCORING
+            gold_to_score = gold_to_score_step._outputs[0] # gives us the "OutputFileDatasetConfig"
+
+        # OUT:
+        scored_gold = (
+            OutputFileDatasetConfig(name= p.dataset_gold_scored_name_azure,destination=(self._datalake,latest_gold_scored_path))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_parquet_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name= p.dataset_gold_scored_name_azure)
+        )
+
+        last_gold_run = (
+            OutputFileDatasetConfig(name=p.dataset_gold_scored_runinfo_name_azure,destination=(self._datalake,p.path_inference_gold_scored_runinfo))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name=p.dataset_gold_scored_runinfo_name_azure)
+        )
+
+        active_folder = (
+            OutputFileDatasetConfig(name=p.dataset_active_name_azure,destination=(self._datalake, p.path_inference_active))
+            .as_upload(overwrite=True) # as_mount() also works
+            .read_delimited_files()  # To promote File to Tabular Dataset. This, or .read_delimited_files()  will return/converts to an "OutputTabularDatasetConfig"
+            .register_on_complete(name=p.dataset_active_name_azure)
+        )
+
+        #Genereic info
+        print("par_date_utc:",par_date_utc)
+        param_date = PipelineParameter(name="esml_training_folder_date", default_value=par_date_utc)
+
+        # Exception: Graph already has pipeline parameter with same name esml_inference_model_version but different default values 0, 5
+        param_model_version = PipelineParameter(name="esml_inference_model_version", default_value=par_model_version)
+        param_inference = PipelineParameter(name="esml_inference_mode", default_value=par_inference_mode)
+        param_env = PipelineParameter(name="esml_environment_dev_test_prod", default_value=par_env)
+
+        # Databricks info        
+        dbx_notebook_name = os.path.basename(os.path.normpath(map_step['code']))
+        dbx_notebook_name = dbx_notebook_name.replace(" ", "_")
+        if ('dataset_filename_ending' not in map_step):
+            map_step['dataset_filename_ending'] = '*.parquet'
+        
+        # Data format info
+        dataset_filename_ending = map_step['dataset_filename_ending']
+        dataset_folder_names = map_step['dataset_folder_names']
+        param_previous_step_is_databricks = PipelineParameter(name="esml_previous_step_is_databricks", default_value=previous_step_is_databricks)
+        cluster_id = map_step['cluster_id']
+        compute_name_conf = map_step['compute_name']
+
+        if(compute_name_conf != databricks_compute.name):
+            raise UserErrorException("NB! compute_name_conf != databricks_compute.name - strange?")
+
+        target_column_name = p.active_model["label"]
+        param_target_column_name = PipelineParameter(name="esml_target_column_name", default_value=target_column_name)
+        param_model_name = PipelineParameter(name="esml_aml_model_name", default_value=esml_aml_model_name)
+
+        name = step_key # + "_"+dbx_notebook_name
+        dbNbStep = DatabricksStep(
+            name=name,
+            inputs=[gold_to_score.as_input(gold_to_score.name)], 
+            outputs=[scored_gold,last_gold_run,active_folder], 
+            notebook_path=map_step['code'],
+            notebook_params={'esml_date_folder_utc': param_date ,'esml_inference_model_version': param_model_version,'esml_inference_mode': param_inference,
+            'esml_environment_dev_test_prod': param_env,'esml_dataset_filename_ending':dataset_filename_ending,
+            'esml_previous_step_is_databricks':param_previous_step_is_databricks, 'esml_target_column_name':param_target_column_name, 'esml_aml_model_name':param_model_name,
+            'esml_model_name_pkl':IESMLController.get_known_model_name_pkl(), 'esml_output_lake_template': scored_folder_template
+            },
+            run_name=dbx_notebook_name,
+            compute_target=databricks_compute,
+            allow_reuse=self._allow_reuse,
+            existing_cluster_id=cluster_id,
+            permit_cluster_restart=True
+        )
+        return dbNbStep
+
+        
     def create_dbx_step_silver_merged_2_gold(self,map,databricks_compute,map_step,silver_steps,dbx_esml_datasets, 
     step_key =  esml_snapshot_step_names.silver_merged_2_gold.value,
     par_date_utc="1000-01-01 10:35:01.243860",

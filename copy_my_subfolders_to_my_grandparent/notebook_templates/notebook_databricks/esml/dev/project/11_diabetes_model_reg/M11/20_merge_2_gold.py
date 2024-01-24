@@ -10,7 +10,7 @@
 
 esml_date_folder_utc = None
 esml_model_version = 0
-esml_inference_mode = 0 # train = 1
+esml_inference_mode = 1 # 0=train, inference=1
 esml_env = "dev" # test, prod
 esml_dataset_names_in = None
 esml_dataset_filename_ending = "*.parquet" # *.parquet | ds01_diabetes.parquet
@@ -84,6 +84,8 @@ except Exception as e:
 #  except Exception as e:
 #    print(e)
 
+#esml_inference_mode_int = int(esml_inference_mode)
+
 # COMMAND ----------
 
 # MAGIC %run ../00_model_settings/01_dataset_paths
@@ -91,9 +93,9 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md ## Use `esml_parameters` to get auto-completion on ESML specific input parameters
-# MAGIC 
+# MAGIC
 # MAGIC Example: `esml_parameters.`  CTRL+SPACE
-# MAGIC 
+# MAGIC
 # MAGIC - esml_parameters.esml_dataset_names
 
 # COMMAND ----------
@@ -128,9 +130,14 @@ print(esml_lake.gold)
 
 # COMMAND ----------
 
-print(esml_lake.gold_train)
-print(esml_lake.gold_test)
-print(esml_lake.gold_validate)
+if (esml_inference_mode):
+    print(esml_lake.gold_train)
+    print(esml_lake.gold_test)
+    print(esml_lake.gold_validate)
+    print(esml_lake.gold)
+else:
+    print(esml_lake.gold_2_score)
+    print(esml_lake.gold_2_score_dataset_name)
 
 # COMMAND ----------
 
@@ -173,6 +180,7 @@ print("After merge", df_all.count())
 # COMMAND ----------
 
 from pyspark.sql.types import IntegerType,BooleanType,FloatType,DateType
+from pyspark.sql.functions import col,lit
 
 df = df_all
 # Convert String to Integer Type
@@ -186,7 +194,11 @@ df = df.withColumn("S3",df.S3.cast(FloatType()))
 df = df.withColumn("S4",df.S4.cast(FloatType()))
 df = df.withColumn("S5",df.S5.cast(FloatType()))
 df = df.withColumn("S6",df.S6.cast(FloatType()))
-df = df.withColumn("Y",df.Y.cast(FloatType()))
+
+if 'Y' not in df.columns:
+  df = df.withColumn('Y', lit(0).cast(FloatType()))
+else:
+  df = df.withColumn("Y",df.Y.cast(FloatType()))
 
 # COMMAND ----------
 
@@ -198,6 +210,11 @@ df.printSchema()
 
 # COMMAND ----------
 
-gold_file = esml_lake.gold
+gold_file = None 
+if (esml_inference_mode == True):
+    gold_file = esml_lake.gold
+else:
+    gold_file = esml_lake.gold_2_score
+
 #df_all.write.mode("overwrite").parquet(gold_file) # The real thing to do...but we dont want duplicates, hence we simulate...just read 1 dataset
 df.write.mode("overwrite").parquet(gold_file)

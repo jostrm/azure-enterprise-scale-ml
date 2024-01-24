@@ -75,9 +75,9 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md ## Use `esml_parameters` to get auto-completion on ESML specific input parameters
-# MAGIC 
+# MAGIC
 # MAGIC Example: `esml_parameters.`  CTRL+SPACE
-# MAGIC 
+# MAGIC
 # MAGIC - esml_parameters.esml_dataset_names
 
 # COMMAND ----------
@@ -171,7 +171,9 @@ df = df.withColumn("S3",df.S3.cast(FloatType()))
 df = df.withColumn("S4",df.S4.cast(FloatType()))
 df = df.withColumn("S5",df.S5.cast(FloatType()))
 df = df.withColumn("S6",df.S6.cast(FloatType()))
-df = df.withColumn("Y",df.Y.cast(FloatType()))
+
+if(esml_parameters.esml_inference_mode == False):
+  df = df.withColumn("Y",df.Y.cast(FloatType()))
 
 df.write.mode("overwrite").parquet(silver_file)
 

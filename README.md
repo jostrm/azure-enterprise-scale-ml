@@ -1,4 +1,6 @@
-# azure-enterprise-scale-ml (ESML)
+# azure-enterprise-scale-ml (ESML) 
+### *Non-breaking MLOps pipelines since 2019*
+
 Enterprise Scale ML (ESML) - AI Factory on Azure
 - A solution accelerator, for `Enterprise Scale Machine Learning` & `MLOps`, based on best & proven practices for organizational scale, across projects. 
     - Best practice: `CAF/AI Factory`: https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#mlops-at-organizational-scale-ai-factories
@@ -11,6 +13,18 @@ Enterprise Scale ML (ESML) - AI Factory on Azure
     - That said, the scaling roof is on IP-plan, and ESML has its own IP-calculator (allocated IP-ranges for 250 is just the default)
 - `Enterprise "cockpit"` over ALL your projects & models. 
     - See what `state` a project are in (Dev,Test,Prod states) with `cost dashboard` per project/environment
+
+# NEWS TABLE
+
+|Date     |Category   | What   | Link   |
+|---------|-----------|--------|--------|
+|2023-03|Networking|No Public IP: Virtual private cloud - updated networking rules| https://learn.microsoft.com/en-us/azure/machine-learning/v1/how-to-secure-workspace-vnet?view=azureml-api-1&preserve-view=true&tabs=required%2Cpe%2Ccli|
+|2023-02|ESML Pipeline templates|Azure Databricks: Training and Batch inference pipeline templates updated to have 100% same support as Azure ML pipeline templates, ESML inner/outer loop|-|
+|2022-08|ESML infra (IaC)|Bicep now support yaml as well|-|
+|2022-10|ESML MLOps |ESML MLOps v3 engine has advanced mode, with added support for Spark pipelines ( Databricks notebooks as Azure ML pipeline steps )|-|
+
+# TEMPLATES for PIPELINES (TRAINING & INFERENCE pipelines) is 1 of 5 template types in ESML:
+![](./esml/images/23_esml_pipeline_overview_intro.png)
 
 # THE Challenge
 Innovating with AI and Machine Learning, multiple voices expressed the need to have an `Enterprise Scale AI & Machine Learning Platform` with `end-2-end` turnkey `DataOps` and `MLOps`.
@@ -34,6 +48,10 @@ An open source initiative could help all at once, this open-source accelerator E
 -	`Challenge 2 solved:` Dev, Test, Prod Azure environments/Azure subscriptions
 -	`Challenge 3 solved:` Turnkey: Datalake, DataOps,  INNER & OUTER LOOP MLOps
 `ESML marries multiple best practices` into one `solution accelerator`, with 100% infrastructure-as-code
+
+## ESML 4 main components:
+  ![](./esml/images/23_ESML_4_main_components.png)
+
 ## ESML AI Factory - 4 step process: 
 ![](./esml/images/esml-s02e01-4steps.png)
  # ESML AI Factory "Oneslider": Dev,Test,Prod environments - Enterprise Scale LandingZones
