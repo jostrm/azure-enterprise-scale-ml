@@ -400,6 +400,7 @@ if ($(Get-AzContext).Subscription -ne "") {
     write-host "-DYNAMIC (as input to vnetName and vnetResourceGroup): Dynamic parameters as INPUT from ADO parameters: env,locationSuffixADO, commonResourceSuffixADO,aifactorySuffixRGADO"
 
     $vnetName = "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO" # '${vnetNameBase}-$locationSuffix-${env}${commonResourceSuffix}'
+    #$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # esml-common-weu-dev-001
     
     $vnetResourceGroup = if ( $commonResourceGroup_param -eq $null -or $commonResourceGroup_param -eq "" )
     {
