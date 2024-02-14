@@ -1,3 +1,6 @@
+## BICEP and Seeding Keyvault enable for template deployment
+- az keyvault update  --name esml-seeding-weu-001 --enabled-for-template-deployment true
+
 ## Tip: Use the Azure Data science Virtual Machine, to install the ESML SDK on, "jump host & client - all at once" 
 - You have an easy way of "governance" for onboarding consultants easy - all is preinstalled (comes with ESML bicep)
   - You can have AAD login (Virtual Machine Administrator Login or Virtual Machine User Login)
