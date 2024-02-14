@@ -1,4 +1,4 @@
-## BICEP and Seeding Keyvault enable for template deployment
+## BICEP and Azure Devops pipeline - Seeding Keyvault enable for template deployment
 - az keyvault update  --name esml-seeding-weu-001 --enabled-for-template-deployment true
 
 ## Tip: Use the Azure Data science Virtual Machine, to install the ESML SDK on, "jump host & client - all at once" 
