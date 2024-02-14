@@ -1,3 +1,14 @@
+# ESML AutoML docs
+- Q: How to see which AUtoML image version that fits to Azure ML SDK version
+- a: Change the version (trial and error) in url (AutoML image version), and you will see the docker image where AML SDK version is seen
+    - Example: AutoML 139 is compatible with AML SDK v1.48
+
+https://ml.azure.com/environments/AzureML-AutoML/version/126?wsid=/subscriptions/50ef5835-c45a-4c2e-a596-2a9e0e2a0a33/resourceGroups/dc-heroes-esml-project001-weu-dev-001-rg/providers/Microsoft.MachineLearningServices/workspaces/aml-prj001-weu-dev-001&tid=846f02b7-f92a-4053-9a99-094e5ba2e1a4
+
+https://ml.azure.com/environments/ESML-AzureML-144-AutoML_140/version/1?wsid=/subscriptions/50ef5835-c45a-4c2e-a596-2a9e0e2a0a33/resourceGroups/dc-heroes-esml-project001-weu-dev-001-rg/providers/Microsoft.MachineLearningServices/workspaces/aml-prj001-weu-dev-001&tid=846f02b7-f92a-4053-9a99-094e5ba2e1a4
+
+
+
 # Table of Contents
 1. [Automated ML Introduction](#introduction)
 1. [Setup using Compute Instances](#jupyter)
