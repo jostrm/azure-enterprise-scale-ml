@@ -23,7 +23,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
     Flow_Type: 'Bluefield'
     ForceCustomerStorageForProfiler: false
     //ImmediatePurgeDataOn30Days: true // Not available in Sweden Central. Error: ImmediatePurgeDataOn30Days cannot be set on current api-version
-    IngestionMode: 'ApplicationInsights'
+    IngestionMode: 'LogAnalytics' // Cannot set ApplicationInsights as IngestionMode on consolidated applications
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Disabled'
     Request_Source: 'rest'
