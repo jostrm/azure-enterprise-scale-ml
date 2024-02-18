@@ -244,9 +244,9 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
 }
 
 var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-resource logAnalyticsWorkspaceOpInsight 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
-  name: commonResourceGroup
-  scope:subscription(subscriptionIdDevTestProd)
+resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2020-08-01' existing = {
+  name: laName
+  scope:commonResourceGroupRef
 }
 
 /* MOVED to ESML-COMMON
@@ -298,7 +298,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(sw
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-    logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id //logAnalyticsWorkspaceOpInsight.outputs.logAnalyticsWkspId # TODO-Check
+    logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.properties.customerId // a guid logAnalyticsWorkspaceOpInsight.id
     tags: tags2
     location: location
   }
