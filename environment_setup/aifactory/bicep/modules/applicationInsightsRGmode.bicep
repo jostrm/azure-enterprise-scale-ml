@@ -10,7 +10,7 @@ param location string
 @description('Specifies the location where application insights should be deployed')
 param logAnalyticsWorkspaceID string
 
-resource applicationInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: name
   tags: tags
   location: location
