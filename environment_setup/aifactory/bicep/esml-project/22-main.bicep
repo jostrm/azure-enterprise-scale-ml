@@ -298,7 +298,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(sw
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-    logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.properties.customerId // a guid logAnalyticsWorkspaceOpInsight.id
+    logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
     tags: tags2
     location: location
   }

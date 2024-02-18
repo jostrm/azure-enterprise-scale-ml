@@ -41,6 +41,6 @@ resource alyt 'Microsoft.OperationalInsights/workspaces@2020-08-01' = {
 var keyObj = listKeys(resourceId('Microsoft.OperationalInsights/workspaces', name), '2020-10-01')
 
 // output logAnalyticsWkspId string = wsSearch.id
-output logAnalyticsWkspId string = alyt.properties.customerId
+output logAnalyticsWkspId string = alyt.id
 output primarySharedKey string = keyObj.primarySharedKey
 output secondarySharedKey string = keyObj.secondarySharedKey
