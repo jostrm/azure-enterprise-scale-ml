@@ -60,15 +60,23 @@ $jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
 ConvertTo-Variables -InputObject $jsonParameters5
 
 ## $tenantId comes from Parameters.json  - the rest is INPUT, as ADO parameters (see top of file)
-$authSettings = @{
-    useServicePrincipal = $useServicePrincipal
-    tenantId            = $tenantId
-    spObjId             = $spObjId
-    spSecret            = $spSecret
-    subscriptionId      = $subscriptionId
-}
 
-Connect-AzureContext @authSettings
+if ( $useServicePrincipal -eq $null -or $useServicePrincipal -eq "" -or $useServicePrincipal -eq $false )
+{
+    $useServicePrincipal = $false
+}
+else:
+{
+    $authSettings = @{
+        useServicePrincipal = $useServicePrincipal
+        tenantId            = $tenantId
+        spObjId             = $spObjId
+        spSecret            = $spSecret
+        subscriptionId      = $subscriptionId
+    }
+
+    Connect-AzureContext @authSettings
+}
 
 $templateName = "dynamicNetworkParams.json"
 #$deploymentPrefix = Get-Date -Format "yyyyMMddHH" # ADO --name "$(date +%Y%m%d%H)SubnetDeployment" \
