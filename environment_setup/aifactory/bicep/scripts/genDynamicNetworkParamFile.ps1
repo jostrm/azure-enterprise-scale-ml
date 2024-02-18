@@ -65,7 +65,7 @@ if ( $useServicePrincipal -eq $null -or $useServicePrincipal -eq "" -or $useServ
 {
     $useServicePrincipal = $false
 }
-else:
+else
 {
     $authSettings = @{
         useServicePrincipal = $useServicePrincipal
