@@ -60,15 +60,23 @@ $jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
 ConvertTo-Variables -InputObject $jsonParameters5
 
 ## $tenantId comes from Parameters.json  - the rest is INPUT, as ADO parameters (see top of file)
-$authSettings = @{
-    useServicePrincipal = $useServicePrincipal
-    tenantId            = $tenantId
-    spObjId             = $spObjId
-    spSecret            = $spSecret
-    subscriptionId      = $subscriptionId
-}
 
-Connect-AzureContext @authSettings
+if ( $useServicePrincipal -eq $null -or $useServicePrincipal -eq "" -or $useServicePrincipal -eq $false )
+{
+    $useServicePrincipal = $false
+}
+else
+{
+    $authSettings = @{
+        useServicePrincipal = $useServicePrincipal
+        tenantId            = $tenantId
+        spObjId             = $spObjId
+        spSecret            = $spSecret
+        subscriptionId      = $subscriptionId
+    }
+
+    Connect-AzureContext @authSettings
+}
 
 $templateName = "dynamicNetworkParams.json"
 #$deploymentPrefix = Get-Date -Format "yyyyMMddHH" # ADO --name "$(date +%Y%m%d%H)SubnetDeployment" \
@@ -80,6 +88,8 @@ $deploymentPrefix = "esml-p$projectNumber-$env-$locationSuffixADO$aifactorySuffi
 write-host "PARAMETERS: Static and Dynamic used::"
 write-host "-STATIC (vnetResourceGroup): Static parameters: [commonRGNamePrefix,vnetResourceGroupBase, locationSuffix] (from PARAMETERS.json)"
 write-host "-DYNAMIC (vnetResourceGroup): Dynamic parameters as INPUT (from ADO parameters UI): [env,locationSuffixADO,aifactorySuffixRGADO] this Powershell generates(dynamicNetworkParams.json)"
+
+#$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # msft[esml-common]-swc-dev-001
 
 $vnetResourceGroup = if ( $commonResourceGroup_param -eq $null -or $commonResourceGroup_param -eq "" )
 {
