@@ -170,7 +170,7 @@ All use cases are supported. But use cases that falls into category C, are not A
             - MASTER/.../SAP/OUT/SILVER/global_silver.parquet
 
 ### IMAGE - IN_2_GOLD_SCORING
-<img src="./esml/images/aml-pipeline_batch_ppt-4.png" alt="drawing" width="50%"/>
+<img src="./esml/images/aml-pipeline_batch_ppt-4.png" alt="drawing" width="80%"/>
 
 ## ROLE: ESML CORE TEAM - onboard DATA from external systemns to ESML lake
 - TOOLS: Usually Data Factory only (Option 1) is sufficient enough
