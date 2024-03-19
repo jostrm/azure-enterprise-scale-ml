@@ -1,6 +1,6 @@
 # AI factory for AI & ML - Use Case Scenarios AND "What to test out first"
 
-Independent of seniority the order of the USE CASE CATETORIES: A,B,C,D below is the recommended path to test out the AI Factory.
+Independent of seniority, the recommendation of "which order" to try out the USE CASE CATEGORIES is: A,B and then C,D
 
 <div class="warning" style='background-color:#E9D8FD; color: #69337A; border-left: solid #805AD5 4px; border-radius: 4px; padding:0.7em;'>
 <span>
