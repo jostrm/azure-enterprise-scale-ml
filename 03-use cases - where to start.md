@@ -1,6 +1,6 @@
 # AI factory for AI & ML - Use Case Scenarios AND "What to test out first"
 
-Independant of seniority the order of the USE CASE CATETORIES: A,B,C,D below is the recommended path to test out the AI Factory.
+Independent of seniority the order of the USE CASE CATETORIES: A,B,C,D below is the recommended path to test out the AI Factory.
 
 <div class="warning" style='background-color:#E9D8FD; color: #69337A; border-left: solid #805AD5 4px; border-radius: 4px; padding:0.7em;'>
 <span>
@@ -168,6 +168,9 @@ All use cases are supported. But use cases that falls into category C, are not A
         - OUTPUTS: 
             - MASTER/.../SAP/OUT/SILVER/project002/silver.parquet
             - MASTER/.../SAP/OUT/SILVER/global_silver.parquet
+
+### IMAGE - IN_2_GOLD_SCORING
+<img src="./esml/images/aml-pipeline_batch_ppt-4.png" alt="drawing" width="50%"/>
 
 ## ROLE: ESML CORE TEAM - onboard DATA from external systemns to ESML lake
 - TOOLS: Usually Data Factory only (Option 1) is sufficient enough
