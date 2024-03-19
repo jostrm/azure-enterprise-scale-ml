@@ -118,7 +118,7 @@ All use cases are supported. But use cases that falls into category C, are not A
 |DataEngineer/Analyst |B,C | https://learn.microsoft.com/en-us/azure/machine-learning/tutorial-pipeline-python-sdk?view=azureml-api-1 |
 
 
-<div class="warning" style='background-color:#78c7fe; color: #003279; border-left: solid #805AD5 4px; border-radius: 4px; padding:0.7em;'>
+<div class="warning" style='background-color:#78c7fe; color: #003279; border-left: solid #010da2 4px; border-radius: 4px; padding:0.7em;'>
 <span>
 <p style='margin-top:1em; text-align:left'>
 <b>Note: Since many enterprises have requirements on PRIVATE ENDPOINTS (No public IP policy), also AzureML SDK v1 is supported (and highly prioritized to accelerate)</b>
@@ -169,9 +169,6 @@ All use cases are supported. But use cases that falls into category C, are not A
             - MASTER/.../SAP/OUT/SILVER/project002/silver.parquet
             - MASTER/.../SAP/OUT/SILVER/global_silver.parquet
 
-### IMAGE - IN_2_GOLD_SCORING
-<img src="./esml/images/aml-pipeline_batch_ppt-4.png" alt="drawing" width="50%"/>
-
 ## ROLE: ESML CORE TEAM - onboard DATA from external systemns to ESML lake
 - TOOLS: Usually Data Factory only (Option 1) is sufficient enough
     - Option 1) Data Factory ESML template
@@ -187,3 +184,41 @@ All use cases are supported. But use cases that falls into category C, are not A
 
 ## ROLE: ESML PROJECT TEAM - Build Promptflow, use GEnerativeAI such as GPT-4 with Azure OpenAI
 - TOOLS: Azure OpenAI, Azure Machine Learning/promptflow, AI Search
+
+# IMAGES - Appendix
+
+End-2-End: DataOps+MLOps: IN_2_GOLD_SCORING pipeline:
+<img src="./esml/images/aml-pipeline_batch_ppt-4.png" alt="drawing" width="80%"/>
+-----
+LESS configurations: Autosplit data, Auto-registers Datasets, Config per environment Dev,Test, Prod for AutoML
+<img src="./esml/images/split_gold_and_train_automl_small.png" alt="drawing" width="80%"/>
+
+-----
+
+LESS code to construct Azure ML Pipelines: 
+
+<img src="./esml/images/templates-aml.png" alt="drawing" width="80%"/>
+
+-----
+
+-----
+
+LESS code - autocalculation of Testset scoring since 2019, based on Scikit-Learns Model Evaluation: https://scikit-learn.org/stable/modules/model_evaluation.html
+- Similar as now exists since 2022 in Azure Machine Learning ModelEvaluation
+
+<img src="./esml/images/esml-testset-scoring.png" alt="drawing" width="80%"/>
+
+-----
+-----
+
+LESS configuration. Turnkey datalake. Turnkey Dev, Test, Prod environments.
+
+Project & Model based way of working:
+
+<img src="./esml/images/esml-settings-3.png" alt="drawing" width="80%"/>
+
+Model evaluation - via configuration, you can set "weights", and choose metrics, to trigger "a promotion"
+
+<img src="./esml/images/01_setup_model_3.png" alt="drawing" width="80%"/>
+
+-----
