@@ -3,7 +3,7 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
     [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies the tenant for service principal and AI Factory")][string]$tenantID,
     [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
     # OID's: User OID's including project SP OID, project AD group, Common SP, Common AD group
     [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string[]]$userObjectIds,
