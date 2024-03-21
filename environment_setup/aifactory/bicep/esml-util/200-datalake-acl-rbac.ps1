@@ -1,32 +1,36 @@
 param (
     # required parameters
-    [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
-    [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies the tenant for service principal and AI Factory")][string]$tenantID,
-    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
-    # OID's: User OID's including project SP OID, project AD group, Common SP, Common AD group
-    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string[]]$userObjectIds,
-    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectADGroupObjectId,
-    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$commonSPObjectID,
-    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$commonADgroupObjectID,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
+    [Parameter(Mandatory=$false, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
+    # user OID's
+    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string[]]$userObjectIds,
+    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$projectADGroupObjectId,
+    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$commonSPObjectID,
+    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$commonADgroupObjectID,
 
-    # optional parameter: If other name on filesystem/container
+    # optional override parameters
     [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem
 )
 
+# USAGE: .\aifactory\esml-util\200-datalake-acl-rbac.ps1 -spSecret "abc"
+
 Import-Module Az.Storage
 
-# $storageAccount ="TODO: esml datalake name"
-# $spID ="TODO AppID for SP with Storage Blob Data Owner role" # Storage Blob Data Owner role
-# $spSecret ="TODO - do not check in SECRET" # TODO: Pass as parameter
-# $tenantID ="TODO tenantID"
-# $adlsgen2filesystem ="lake3"
-# $projectXXX = "TODO project001" #project001, project002, etc
-# $userObjectIds = @("TODO objectID of user1","TODO objectID of user2","TODO objectID of project001-sp-oid") # users + project001-sp-oid
-# $projectADGroupObjectId = "TODO objectID of projectXXX-AD-group" # AD group: esml-project002
-# $commonSPObjectID = "TODO objectID of esml-common-sp" # esml-common-sp
-# $commonADgroupObjectID = "TODO objectOD of esml-common AD group for coreteam" # AD group: esml-common-coreteam 
+#### Trouble shoot ####
+$storageAccount ="TODO"
+$spID ="TODO SP AppID - with Storage Blob Data Owner role" # Storage Blob Data Owner role
+$tenantID ="TODO"
+$adlsgen2filesystem ="lake3"
+$projectXXX = "project001"
+$projectSPObjectID = "TODO ObjectID"
+$userObjectIds = @("TODO ObjectID","TODO ObjectID","TODO ObjectID",$projectSPObjectID) # users + project001-sp-oid
+$projectADGroupObjectId = "TODO ObjectID" # AD group: esml-project002
+$commonSPObjectID = "TODO ObjectID" # esml-common-sp
+$commonADgroupObjectID = "TODO ObjectID" # AD group: esml-common-coreteam 
+#### Trouble shoot END ####
 
 $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
@@ -64,46 +68,47 @@ for ($i=0; $i -lt $userObjectIds.Length; $i++) {
     # container: PROJECT USER - EXECUTE - container
     $aclContainerUser = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem).ACL
     $aclContainerUser = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -InputObject $aclContainerUser
-    $aclContainerUser = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -DefaultScope -InputObject $aclContainerUser
+    #$aclContainerUser = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -DefaultScope -InputObject $aclContainerUser
     Update-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Acl $aclContainerUser
 
     # 1) READ & EXECUTE (Default) - active logging
-    $aclProjectReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject).ACL
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission r-x -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission r-x -DefaultScope -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -DefaultScope -InputObject $aclProjectReadExecute
+    $aclActiveReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $active).ACL
+    $aclActiveReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission rwx -InputObject $aclActiveReadExecute
+    $aclActiveReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission rwx -DefaultScope -InputObject $aclActiveReadExecute
+    $aclActiveReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -InputObject $aclActiveReadExecute
+    $aclActiveReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -DefaultScope -InputObject $aclActiveReadExecute
     # 2) Update permission of a new ACL entry (if ACL entry with same AccessControlType/EntityId/DefaultScope not exist, will add a new ACL entry, else update permission of existing ACL entry)
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission r-x -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission r-x -DefaultScope -InputObject $aclProjectReadExecute
+    $aclActiveReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission rwx -InputObject $aclActiveReadExecute
+    $aclActiveReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission rwx -DefaultScope -InputObject $aclActiveReadExecute
     # 3) Set the new acl to the directory
-    Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $active -Acl $aclProjectReadExecute # If not resursive, use Update-AzDataLakeGen2Item instead, to commit the ACL
+    Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $active -Acl $aclActiveReadExecute # If not resursive, use Update-AzDataLakeGen2Item instead, to commit the ACL
         # Update-AzDataLakeGen2Item -FileSystem "filesystem1" -Path 'dir1/dir3/' -ACL $acl
 
-    $aclProjectReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging).ACL
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission r-x -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission r-x -DefaultScope -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -DefaultScope -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission r-x -InputObject $aclProjectReadExecute
-    $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission r-x -DefaultScope -InputObject $aclProjectReadExecute
-    Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging -Acl $aclProjectReadExecute
+    $aclLoggingReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging).ACL
+    $aclLoggingReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission r-x -InputObject $aclLoggingReadExecute
+    $aclLoggingReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -Permission r-x -DefaultScope -InputObject $aclLoggingReadExecute
+    $aclLoggingReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -InputObject $aclLoggingReadExecute
+    $aclLoggingReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType other -Permission "---" -DefaultScope -InputObject $aclLoggingReadExecute
+    $aclLoggingReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission r-x -InputObject $aclLoggingReadExecute
+    $aclLoggingReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission r-x -DefaultScope -InputObject $aclLoggingReadExecute
+    Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging -Acl $aclLoggingReadExecute
 
     # myproject: EXECUTE (Default) - master, projects
-    $aclProjectExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $master).ACL
-    $aclProjectExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -DefaultScope -InputObject $aclProjectExecute
-    $aclProjectExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -InputObject $aclProjectExecute
-    Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $master -Acl $aclProjectExecute
+    $aclMasterExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $master).ACL
+    $aclMasterExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -DefaultScope -InputObject $aclMasterExecute
+    $aclMasterExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -InputObject $aclMasterExecute
+    Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $master -Acl $aclMasterExecute
     
-    $aclProjectExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects).ACL
-    $aclProjectExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -DefaultScope -InputObject $aclProjectExecute
-    $aclProjectExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -InputObject $aclProjectExecute
-    Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects -Acl $aclProjectExecute
+    $aclProjectsExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects).ACL
+    #$aclProjectsExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -DefaultScope -InputObject $aclProjectsExecute
+    $aclProjectsExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission --x -InputObject $aclProjectsExecute
+    Update-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects -Acl $aclProjectsExecute
 
     # myproject: RWE (Default) - myproject
     $aclProjectRWE = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject).ACL
     $aclProjectRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission rwx -DefaultScope -InputObject $aclProjectRWE
     $aclProjectRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $userID -Permission rwx -InputObject $aclProjectRWE
+    #Update-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject -Acl $aclProjectRWE
     Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject -Acl $aclProjectRWE
 }
 
@@ -120,33 +125,48 @@ Write-Host " 3) All USERS OID's for PROJECT FOLDER + $myproject is updated."
  Update-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Acl $aclContainerUser
 
  # active, logging: READ & EXECUTE (Default)
- $aclProjectReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $active).ACL
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission r-x -DefaultScope -InputObject $aclProjectReadExecute
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission r-x -InputObject $aclProjectReadExecute
- Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $active -Acl $aclProjectReadExecute # If not resursive, use Update-AzDataLakeGen2Item instead, to commit the ACL
+ $aclActiveADReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $active).ACL
+ $aclActiveADReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission rwx -DefaultScope -InputObject $aclActiveADReadExecute
+ $aclActiveADReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission rwx -InputObject $aclActiveADReadExecute
+ Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $active -Acl $aclActiveADReadExecute # If not resursive, use Update-AzDataLakeGen2Item instead, to commit the ACL
 
- $aclProjectReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging).ACL
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission r-x -DefaultScope -InputObject $aclProjectReadExecute
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission r-x -InputObject $aclProjectReadExecute
- Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging -Acl $aclProjectReadExecute
+ $aclLoggingADReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging).ACL
+ $aclLoggingADReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission r-x -DefaultScope -InputObject $aclLoggingADReadExecute
+ $aclLoggingADReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission r-x -InputObject $aclLoggingADReadExecute
+ Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $logging -Acl $aclLoggingADReadExecute
 
  # master,projects: EXECUTE (Default)
- $aclProjectReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $master).ACL
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -DefaultScope -InputObject $aclProjectReadExecute
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -InputObject $aclProjectReadExecute
- Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $master -Acl $aclProjectReadExecute
+ $aclMasterADExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $master).ACL
+ $aclMasterADExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -DefaultScope -InputObject $aclMasterADExecute
+ $aclMasterADExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -InputObject $aclMasterADExecute
+ Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $master -Acl $aclMasterADExecute
 
- $aclProjectReadExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects).ACL
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -DefaultScope -InputObject $aclProjectReadExecute
- $aclProjectReadExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -InputObject $aclProjectReadExecute
- Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects -Acl $aclProjectReadExecute
+ $aclProjectsADExecute = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects).ACL
+ $aclProjectsADExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -DefaultScope -InputObject $aclProjectsADExecute
+ $aclProjectsADExecute = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission --x -InputObject $aclProjectsADExecute
+ Update-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects -Acl $aclProjectsADExecute
  
- # myproject: RWE
- $aclProjectRWE = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject).ACL
- $aclProjectRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission rwx -DefaultScope -InputObject $aclProjectRWE
- Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject -Acl $aclProjectRWE
+ # myproject: RWE (project AD group)
+ $aclProjectADRWE = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject).ACL
+ $aclProjectADRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission rwx -DefaultScope -InputObject $aclProjectADRWE
+ $aclProjectADRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectADGroupObjectId -Permission rwx -InputObject $aclProjectADRWE
+ Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject -Acl $aclProjectADRWE
 
 Write-Host " 4) PROJECT AD group OID  for PROJECT FOLDER + $myproject is updated."
+
+$aclProjectCmnSPRWE = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject).ACL
+$aclProjectCmnSPRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $commonSPObjectID -Permission rwx -DefaultScope -InputObject $aclProjectCmnSPRWE
+$aclProjectCmnSPRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $commonSPObjectID -Permission rwx -InputObject $aclProjectCmnSPRWE
+Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject -Acl $aclProjectCmnSPRWE
+
+Write-Host " 5) COMMON Service Principle - esml-common-sp (OID for MYPROJECT FOLDER) + $myproject is updated."
+
+$aclMyProjectSPRWE = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject).ACL
+$aclMyProjectSPRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectSPObjectID -Permission rwx -DefaultScope -InputObject $aclMyProjectSPRWE
+$aclMyProjectSPRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $projectSPObjectID -Permission rwx -InputObject $aclMyProjectSPRWE
+Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $myproject -Acl $aclMyProjectSPRWE
+
+Write-Host " 5) PROJECT Service Principle - projectXXX-sp (OID for MYPROJECT FOLDER) + $myproject is updated."
 
 # Common SP root: RWE
 $aclCommonRWE = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $active).ACL
@@ -164,10 +184,4 @@ $aclCommonRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityI
 $aclCommonRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $projectADGroupObjectId -Permission rwx -InputObject $aclCommonRWE
 Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $master -Acl $aclCommonRWE
 
-$aclCommonRWE = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects).ACL
-$aclCommonRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $projectADGroupObjectId -Permission rwx -DefaultScope -InputObject $aclCommonRWE
-$aclCommonRWE = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $projectADGroupObjectId -Permission rwx -InputObject $aclCommonRWE
-Update-AzDataLakeGen2AclRecursive -Context $ctx -FileSystem $adlsgen2filesystem -Path $projects -Acl $aclCommonRWE
-
-
-Write-Host " 5) FINISHED! COMMON AD group & COMMON SP ACL's are updated."
+Write-Host " 6) FINISHED! COMMON AD group & COMMON SP ACL's are updated."
