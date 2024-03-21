@@ -122,8 +122,8 @@ class IESMLController:
         self.dev_test_prod = "dev" # Set default value
 
     @staticmethod
-    def get_esml_environment_name(suffix_version="131"):
-        return "ESML-AzureML-144-AutoML_{}".format(suffix_version)
+    def get_esml_environment_name(suffix_version="167"):
+        return "ESML-AzureML-155-AutoML_{}".format(suffix_version)
         #return "ESML-AzureML-144-AutoML_126"
     
     @staticmethod

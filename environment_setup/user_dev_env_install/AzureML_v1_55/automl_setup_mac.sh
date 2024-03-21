@@ -8,7 +8,7 @@ CHECK_CONDA_VERSION_SCRIPT="check_conda_version.py"
 
 if [ "$CONDA_ENV_NAME" == "" ]
 then
-  CONDA_ENV_NAME="azure_automl"
+  CONDA_ENV_NAME="azure_automl_esml_v155"
 fi
 
 if [ "$AUTOML_ENV_FILE" == "" ]
