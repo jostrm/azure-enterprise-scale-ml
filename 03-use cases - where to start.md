@@ -38,11 +38,13 @@ A) ESML project type: Classical ML - Working from <b>VS Code</b> with <b>Azure M
     - `Environment ESML managed`: Pipelines, BuildAgent/MLOps, User laptop: AzureML SDKv1.55 including AutoML.
     - `AutoML` for `classification, regression` - TestSet scoring / Model evaluation, is auto-calculated
         - AutoML link: https://learn.microsoft.com/en-us/azure/machine-learning/concept-automated-ml?view=azureml-api-1
+        - AutoML GITHUB: https://github.com/Azure/MachineLearningNotebooks/tree/master/how-to-use-azureml
     - `ManualML` for whatever scenario: `classification, regression, forecasting, computer vision (with or witout AutoML)`, with libraries for AzureML SDKv1 including AutoML v1.55
         - ManualML pipeline link: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-create-machine-learning-pipelines?view=azureml-api-1
         - NB! Need to manually calculate TestSet scoring / Model evaluation, according to a template, for MLOps template to work.
             - DEMO model exists for this for regression, classification, including calculating testset-scoring
         - NB! No template notebook exists for forecasting or computer vision.
+            - Docs: Various Machine Learning notebooks: https://github.com/Azure/azureml-examples/
 
 
 <div class="warning" style='background-color:#2f016d; color: #FFFFFF; border-left: solid #805AD5 4px; border-radius: 4px; padding:0.7em;'>
