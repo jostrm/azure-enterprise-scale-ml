@@ -80,7 +80,7 @@ jobs:
 
         conda env list
 
-        conda activate azure_automl_esml_v144
+        conda activate azure_automl_esml_v155
   - task: AzureCLI@2
     displayName: 10-Test libs & Networking - access to workspace
     inputs:
@@ -90,7 +90,7 @@ jobs:
       inlineScript: >-
         eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
 
-        conda activate azure_automl_esml_v144
+        conda activate azure_automl_esml_v155
 
         echo "echo env: " $(esml_environment)
 
@@ -108,7 +108,7 @@ jobs:
       inlineScript: >-
         eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
 
-        conda activate azure_automl_esml_v144
+        conda activate azure_automl_esml_v155
 
 
         python -m 21-train_in_2_gold_train_pipeline --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number $(esml_model_number) --esml_date_utc "$(esml_date_folder_utc)"
@@ -122,7 +122,7 @@ jobs:
       inlineScript: >-
         eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
 
-        conda activate azure_automl_esml_v144
+        conda activate azure_automl_esml_v155
 
 
         python -m 31-deploy_and_smoketest_batch_scoring --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number $(esml_model_number) --esml_date_utc "$(esml_date_folder_utc)"
@@ -137,7 +137,7 @@ jobs:
       inlineScript: >-
         eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
 
-        conda activate azure_automl_esml_v144
+        conda activate azure_automl_esml_v155
 
 
         python -m 32-deploy_online_aks --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number $(esml_model_number) --esml_date_utc "$(esml_date_folder_utc)"
@@ -152,7 +152,7 @@ jobs:
       inlineScript: >-
         eval "$(command conda 'shell.bash' 'hook' 2> /dev/null)"
 
-        conda activate azure_automl_esml_v144
+        conda activate azure_automl_esml_v155
 
 
         python -m 32-smoke_test_online --esml_environment "dev" --tenant_id  "$(esml_tenant_id)" --sp_id "$(esml_project_sp_id)" --sp_secret "$(esml_project_sp_secret)" --esml_model_number $(esml_model_number) --esml_date_utc "$(esml_date_folder_utc)"
