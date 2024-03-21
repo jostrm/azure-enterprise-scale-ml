@@ -1,24 +1,37 @@
+param (
+    # required parameters
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
+    [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
+    # OID's: User OID's including project SP OID, project AD group, Common SP, Common AD group
+    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string[]]$userObjectIds,
+    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectADGroupObjectId,
+    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$commonSPObjectID,
+    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$commonADgroupObjectID,
+
+    # optional parameter: If other name on filesystem/container
+    [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem
+)
+
 Import-Module Az.Storage
 
-$storageAccount ="TODO: esml datalake name"
-$spID ="TODO AppID for SP with Storage Blob Data Owner role" # Storage Blob Data Owner role
-$spSecret ="TODO secret for SP with Storage Blob Data Owner role"
-$tenantID ="TODO tenantID"
-$adlsgen2filesystem ="lake3"
+# $storageAccount ="TODO: esml datalake name"
+# $spID ="TODO AppID for SP with Storage Blob Data Owner role" # Storage Blob Data Owner role
+# $spSecret ="TODO - do not check in SECRET" # TODO: Pass as parameter
+# $tenantID ="TODO tenantID"
+# $adlsgen2filesystem ="lake3"
+# $projectXXX = "TODO project001" #project001, project002, etc
+# $userObjectIds = @("TODO objectID of user1","TODO objectID of user2","TODO objectID of project001-sp-oid") # users + project001-sp-oid
+# $projectADGroupObjectId = "TODO objectID of projectXXX-AD-group" # AD group: esml-project002
+# $commonSPObjectID = "TODO objectID of esml-common-sp" # esml-common-sp
+# $commonADgroupObjectID = "TODO objectOD of esml-common AD group for coreteam" # AD group: esml-common-coreteam 
+
 $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
 Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
-
 $ctx = New-AzStorageContext -StorageAccountName $storageAccount -UseConnectedAccount
-
-# USERS OID: Define the users and groups to give access
-$projectXXX = "TODO project001" #project001, project002, etc
-
-$userObjectIds = @("TODO objectID of user1","TODO objectID of user2","TODO objectID of project001-sp-oid") # users + project001-sp-oid
-$projectADGroupObjectId = "TODO objectID of projectXXX-AD-group" # AD group: esml-project002
-
-$commonSPObjectID = "TODO objectID of esml-common-sp" # esml-common-sp
-$commonADgroupObjectID = "TODO objectOD of esml-common AD group for coreteam" # AD group: esml-common-coreteam 
 
 # FOLDERS
 $active = "active/"
