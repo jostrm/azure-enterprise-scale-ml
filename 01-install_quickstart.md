@@ -8,9 +8,9 @@
   - Bastion host avaialble in the `ESML bicep provisioining`, including native RDP.
 # 1) Install ESML Python SDK that includes Azure ML with AutoML
 - Install MiniConda (>v 4.7), and open the MiniConda command prompt on your computer
-  - Windows computer:  [environment_setup/user_dev_env_install/AzureML_v1_43/automl_setup.cmd](./environment_setup/user_dev_env_install/AzureML_v1_43/automl_setup.cmd)
-  - Mac computer:  [environment_setup/user_dev_env_install/AzureML_v1_43/automl_setup_mac.sh](./environment_setup/user_dev_env_install/AzureML_v1_43/automl_setup_mac.sh)
-  - Linux computer [environment_setup/user_dev_env_install/AzureML_v1_43/automl_setup_linux.sh](./environment_setup/user_dev_env_install/AzureML_v1_43/automl_setup_linux.sh)
+  - Windows computer:  [environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup.cmd](./environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup.cmd)
+  - Mac computer:  [environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_mac.sh](./environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_mac.sh)
+  - Linux computer [environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_linux.sh](./environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_linux.sh)
 # 2 (Alt A) NEW Azure Devops project - "link" ESML (GIT subclassing)
 
 -  Add ESML as a GIT Submodule "linked" to your GIT repo

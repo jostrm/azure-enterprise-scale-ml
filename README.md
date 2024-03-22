@@ -4,13 +4,27 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 
 ## Main purpose: 
 1) `Marry mutliple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
+    - All `PRIVATE` networking: Private endpoints for all services such as Azure Machine Learning, private AKS cluster, private Container registry, Storage, Azure data factory, Monitoring etc
+        - Both for creating artifacts, training, and inference. To avoid data exfiltration, and have high network isolation
+        - Docs: Securing Azure Machine Learning & its compute: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-secure-training-vnet?view=azureml-api-1&tabs=instance%2Crequired
 2) `Plug-and-play`: Dynamicallly create infra-resources per team, including networking dynamically, and RBAC dynamically
     - Example of dynamicall: Subnet/IP calculator, ACL permission on the datalake for a project team, services "glued together"
 4) `Template way of working & Project way of working:` The AI Factory is `project based` (cost control, privacy, scalability per project) and provides <b>multiple templates</b> besides infrastructure template: `DataLake template, DataOps templates, MLOps templates`, with selectable project types.
     - Sub-purpose: `Same MLOps` - weather data scientists chooses to work from Azure Databricks or Azure Machine Learning` - same MLOps template is used.
     - Sub-purpose: `Common way of working, common toolbox, a flexible one`: A toolbox with a LAMBDA architecture with tools such as: Azure Datafactory, Azure Databricks, Azure Machine Learning, Eventhubs, AKS
 5) `Enterprise scale & security & battle tested`: Used by customers and partners with MLOps since 2019 (see LINKS) to accelerate the development and delivery of AI solutions, with common tooling & marrying multiple best practices. Private networking (private endpoints), as default.
-6) 
+
+## Public links/blogs for more info / usage
+-	`AI factory - setup in 60h` - End-2-End pipelines for use case: Howto
+    - https://customers.microsoft.com/en-us/story/1653030140221000726-epiroc-manufacturing-azure-machine-learning
+
+-   `AI factory` - Technical BLOG
+    - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
+
+-	`Microsoft: AI Factory` documentation (CAF/MLOps): Machine learning operations - Cloud Adoption Framework | Microsoft Learn
+    - https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations
+    
+
 
 ## Best practices implemented & benefits
 - Based on best & proven practices for organizational scale, across projects. 
@@ -28,11 +42,14 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 # NEWS TABLE
 
 |Date     |Category   | What   | Link   |
-|---------|-----------|--------|--------|
-|2023-03|Networking|No Public IP: Virtual private cloud - updated networking rules| https://learn.microsoft.com/en-us/azure/machine-learning/v1/how-to-secure-workspace-vnet?view=azureml-api-1&preserve-view=true&tabs=required%2Cpe%2Ccli|
-|2023-02|ESML Pipeline templates|Azure Databricks: Training and Batch inference pipeline templates updated to have 100% same support as Azure ML pipeline templates, ESML inner/outer loop|-|
-|2022-08|ESML infra (IaC)|Bicep now support yaml as well|-|
-|2022-10|ESML MLOps |ESML MLOps v3 engine has advanced mode, with added support for Spark pipelines ( Databricks notebooks as Azure ML pipeline steps )|-|
+|------------|-----------|--------|--------|
+|2024-03  |Tutorial | End-user tutorial  | [03-use_cases-where_to_start.md](./03-use_cases-where_to_start.md)|
+|2024-02  |Tutorial | End-user installation Compute Instance | [Readme_Install_VSCode_or_ComputeInstance.md](./environment_setup/user_dev_env_install/Readme_Install_VSCode_or_ComputeInstance.md) |
+|2024-02  |Datalake - Onboarding |Auto-ACL on PROJECT folder in lakel|-|
+|2023-03  |Networking|No Public IP: Virtual private cloud - updated networking rules| https://learn.microsoft.com/en-us/azure/machine-learning/v1/how-to-secure-workspace-vnet?view=azureml-api-1&preserve-view=true&tabs=required%2Cpe%2Ccli|
+|2023-02  |ESML Pipeline templates|Azure Databricks: Training and Batch  pipeline templates. 100% same support as AML pipeline templates (inner/outer loop MLOps)|-|
+|2022-08  |ESML infra (IaC)|Bicep now support yaml as well|-|
+|2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
 # TEMPLATES for PIPELINES (TRAINING & INFERENCE pipelines) is 1 of 5 template types in ESML:
 ![](./esml/images/23_esml_pipeline_overview_intro.png)
