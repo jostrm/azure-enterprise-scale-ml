@@ -78,9 +78,9 @@ param tenantId string
 
 @description('Project specific service principle  KEYVAULT secret NAME for RBAC purpose - Object ID') // OID: Get it by using Get-AzADUser or Get-AzADServicePrincipal cmdlet
 param projectServicePrincipleOID_SeedingKeyvaultName string // Specifies the object ID of a user, service principal or security group in the Azure AD. The object ID must be unique for the list of access policies. 
-@description('Project specific service principle KEYVAULT secret NAME to be added in kv for - Application ID ')
+@description('Project specific service principle KEYVAULT secret NAME to be added in kv for - Secret value ')
 param projectServicePrincipleSecret_SeedingKeyvaultName string
-@description('Project specific service principle KEYVAULT secret NAME for - Secret value')
+@description('Project specific service principle KEYVAULT secret NAME for - App ID')
 param projectServicePrincipleAppID_SeedingKeyvaultName string
 
 @description('AzureDatabricks enterprise application')
@@ -175,6 +175,12 @@ var privateLinksDnsZones = {
   }
   dfs: {
     id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
+  }
+  queue: {
+    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
+  }
+  table: {
+    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
   }
   registry: {
     id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // ${environment().suffixes.acrLoginServer}'
@@ -400,7 +406,9 @@ module sacc '../modules/storageAccount.bicep' = {
     vnetId: vnetId
     subnetName: defaultSubnet
     blobPrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
-    filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn' 
+    filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
+    queuePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
+    tablePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-table-to-vnt-mlcmn'
     tags: tags2
   }
 
@@ -688,6 +696,8 @@ module dataLake '../modules/dataLake.bicep' = {
     blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-vnt-esmlcmn'
     filePrivateEndpointName: 'pend-${datalakeName}-file-to-vnt-esmlcmn'
     dfsPrivateEndpointName: 'pend-${datalakeName}-dfs-to-vnt-esmlcmn'
+    queuePrivateEndpointName: 'pend-${datalakeName}-queue-to-vnt-esmlcmn'
+    tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
     tags: keepTags
     virtualNetworkRules: mergeVirtualNetworkRulesMerged
   }

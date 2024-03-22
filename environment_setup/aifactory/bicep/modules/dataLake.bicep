@@ -37,8 +37,14 @@ param blobPrivateEndpointName string
 @description('Specifies the name of the file service private endpoint')
 param filePrivateEndpointName string
 
-@description('Specifies the name of the file service private endpoint')
+@description('Specifies the name of the dfs service private endpoint')
 param dfsPrivateEndpointName string
+
+@description('Specifies the name of the queue service private endpoint')
+param queuePrivateEndpointName string
+
+@description('Specifies the name of the table service private endpoint')
+param tablePrivateEndpointName string
 
 @description('Specifies the tags that should be applied to the storage acocunt resources')
 param tags object
@@ -69,6 +75,14 @@ var groupIds = [
   {
     name: dfsPrivateEndpointName
     gid: 'dfs'
+  }
+  {
+    name: queuePrivateEndpointName
+    gid: 'queue'
+  }
+  {
+    name: tablePrivateEndpointName
+    gid: 'table'
   }
 ]
 
@@ -182,6 +196,16 @@ output dnsConfig array = [
   {
     name: pendSacc[2].name
     type: 'dfs'
+    id: lake.id
+  }
+  {
+    name: pendSacc[3].name
+    type: 'queue'
+    id: lake.id
+  }
+  {
+    name: pendSacc[4].name
+    type: 'table'
     id: lake.id
   }
 ]
