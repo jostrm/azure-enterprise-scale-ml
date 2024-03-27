@@ -36,23 +36,12 @@ resource projectResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' ex
 
 // ########### COMMON PARAMETERS end
 
-// ############# AKS VARS
-param aks_dev_defaults array = [
-  'Standard_B4ms' // 4 cores, 16GB, 32GB storage: Burstable (2022-11 this was the default in Azure portal)
-  'Standard_A4m_v2' // 4cores, 32GB, 40GB storage (quota:100)
-  'Standard_D3_v2' // 4 cores, 14GB RAM, 200GB storage
-] 
-param aks_testProd_defaults array = [
-  'Standard_DS13-2_v2' // 8 cores, 14GB, 112GB storage
-  'Standard_A8m_v2' // 8 cores, 64GB RAM, 80GB storage (quota:100)
-]
-
 // ############## AKS PARAMS
-param kubernetesVersionAndOrchestrator string = '1.27.9' // 2023-03-14 LTS
+param kubernetesVersionAndOrchestrator string = '1.27.9' // 2024-03-14 LTS Earlier: (1.27.3 | 2024-01-25 to 2024-03-14) az aks get-versions --location westeurope --output table). Supported >='1.23.5'
 @description('DEV default  VM size for the default AKS cluster:Standard_D12. More: Standard_D3_v2(4,14)')
-param aksVmSku_dev string = aks_dev_defaults[0]
+param aksVmSku_dev string// = aks_dev_defaults[0]
 @description('DEV default  VM size for the default AKS cluster:Standard_D12. More: Standard_D3_v2(4,14)')
-param aksVmSku_testProd string = aks_testProd_defaults[0]
+param aksVmSku_testProd string// = aks_testProd_defaults[0]
 
 
 @description('EMSL will use default subnetID, built on projectname example: ork/virtualNetworks/vnetNameFull/subnets/snt-prj003-aks')

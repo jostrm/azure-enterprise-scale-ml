@@ -22,6 +22,19 @@ $env = 'dev'
 $locationSuffix = 'weu'
 $prjResourceSuffix = '-001'
 
+############# AKS VARS
+$aks_dev_defaults = ( 
+  'Standard_B4ms', # 4 cores, 16GB, 32GB storage: Burstable (2022-11 this was the default in Azure portal)
+  'Standard_A4m_v2', # 4cores, 32GB, 40GB storage (quota:100)
+  'Standard_D3_v2' # 4 cores, 14GB RAM, 200GB storage
+)
+
+$aks_testProd_defaults = (
+  'Standard_DS13-2_v2', # 8 cores, 14GB, 112GB storage
+  'Standard_A8m_v2' # 8 cores, 64GB RAM, 80GB storage (quota:100)
+)
+
+
 $rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
 Write-Host "RG" $rg
 
@@ -59,6 +72,8 @@ New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\24-add-aks.bice
 -aksCertKey $aksCertKey `
 -aksSSLstatus $aksSSLstatus `
 -aksSuffix $aksSuffix `
+-aksVmSku_dev $aks_dev_defaults[0] `
+-aksVmSku_testProd $aks_testProd_defaults[0] `
 -Verbose
 
 Write-Host "BICEP success!"
