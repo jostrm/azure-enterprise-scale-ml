@@ -85,18 +85,6 @@ var subnetRef = '${vnetId}/subnets/${subnetName}'
 // See Azure VM Sku: https://docs.microsoft.com/en-us/azure/virtual-machines/sizes-general
 // Standard DSv2 Family vCPUs in West Europe 
 
-// AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
-param aks_dev_defaults array = [
-  'Standard_B4ms' // 4 cores, 16GB, 32GB storage: Burstable (2022-11 this was the default in Azure portal)
-  'Standard_A4m_v2' // 4cores, 32GB, 40GB storage (quota:100)
-  'Standard_D3_v2' // 4 cores, 14GB RAM, 200GB storage
-] 
-
-param aks_testProd_defaults array = [
-  'Standard_DS13-2_v2' // 8 cores, 14GB, 112GB storage
-  'Standard_A8m_v2' // 8 cores, 64GB RAM, 80GB storage (quota:100)
-]
-
 param aml_dev_defaults array = [
   'Standard_DS3_v2' // 	4 cores, 14GB ram, 28GB storage = 0.27$ [Classical ML model training on small datasets]
   'Standard_F8s_v2' //  (8,16,64) 0.39$
@@ -122,9 +110,9 @@ param amlComputeDefaultVmSize_dev string = aml_dev_defaults[0] // 'Standard_D3_v
 param amlComputeDefaultVmSize_testProd string = aml_testProd_defaults[1] // 'STANDARD_D4' //// STANDARD_D4(4,16b ram) Standard_D14 (16 cores,112 ram) 
 
 @description('DEV default  VM size for the default AKS cluster:Standard_D12. More: Standard_D3_v2(4,14)')
-param aksVmSku_dev string = aks_dev_defaults[0]
+param aksVmSku_dev string
 @description('TestProd default  VM size for the default AKS cluster:Standard_D12(4,28,200GB)')
-param aksVmSku_testProd string = aks_testProd_defaults[0] //'Standard_DS13-2_v2' ////Standard_D12 (4,28,200GB) 'Standard_DS13-2_v2' // Standard_D14 (16 cores,112 ram)
+param aksVmSku_testProd string
 
 @description('DEV default VM size for the default Compute Instance cluster:Standard_D4_v3(4,16,100)')
 param ciVmSku_dev string = ci_dev_defaults[0] 
@@ -182,7 +170,6 @@ var aksName = 'esml${projectNumber}-${locationSuffix}-${env}' // esml001-weu-pro
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
 module aksDev 'aksCluster.bicep'  = if(env == 'dev'){
-  //scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLAKSDev4${uniqueDepl}'
   params: {
     name: aksName // esml001-weu-prod

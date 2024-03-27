@@ -105,6 +105,9 @@ param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 
+param aks_dev_sku_override string = ''
+param aks_test_prod_sku_override string = ''
+
 // ENABLE/DISABLE: Optional exclusions in deployment
 @description('Azure ML workspace can only be called once from BICEP, otherwise COMPUTE name will give error 2nd time. ')
 param enableAML bool = true
@@ -525,6 +528,22 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
+
+// AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
+param aks_dev_defaults array = [
+  'Standard_B4ms' // 4 cores, 16GB, 32GB storage: Burstable (2022-11 this was the default in Azure portal)
+  'Standard_A4m_v2' // 4cores, 32GB, 40GB storage (quota:100)
+  'Standard_D3_v2' // 4 cores, 14GB RAM, 200GB storage
+] 
+
+param aks_testProd_defaults array = [
+  'Standard_DS13-2_v2' // 8 cores, 14GB, 112GB storage
+  'Standard_A8m_v2' // 8 cores, 64GB RAM, 80GB storage (quota:100)
+]
+
+var aks_dev_sku_param = aks_dev_sku_override != '' ? aks_dev_sku_override : aks_dev_defaults[0]
+var aks_test_prod_sku_param = aks_test_prod_sku_override != '' ? aks_test_prod_sku_override : aks_testProd_defaults[0]
+
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureMachineLearning4${deploymentProjSpecificUniqueSuffix}'
@@ -556,6 +575,8 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     notebookPrivateDnsZoneID:privateLinksDnsZones['notebooks'].id
     allowPublicAccessWhenBehindVnet:(AMLStudioUIPrivate == true)? false:true
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+    aksVmSku_dev: aks_dev_sku_param
+    aksVmSku_testProd: aks_test_prod_sku_param
   }
 
   dependsOn: [
