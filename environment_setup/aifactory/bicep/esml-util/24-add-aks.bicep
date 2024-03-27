@@ -18,6 +18,7 @@ param locationSuffix string
 param locationAks string
 @description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')
 param locationSuffixAks string
+param subscriptionIdAks string
 
 @description('-001,-002, etc')
 param prjResourceSuffix string  // sdf
@@ -36,12 +37,12 @@ var vnetId = '${subscription().id}/resourceGroups/${commonResourceGroup}/provide
 var uniqueDepl = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
 
 // AKS cross-region
-var subscriptionIdDevTestProd_AKS = 'TODO SubscriptionID AKS' // TODO-AKS-Crossregion : change to correct subscription
+var subscriptionIdDevTestProd_AKS = subscriptionIdAks // TODO-AKS-Crossregion : change to correct subscription
 var targetResourceGroup_AKS = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffixAks}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
 var commonResourceGroup_AKS = '${commonRGNamePrefix}esml-common-${locationSuffixAks}-${env}${aifactorySuffixRG}' // change this to correct rg
 
 var vnetNameFull_AKS = '${vnetNameBase}-${locationSuffixAks}-${env}${commonResourceSuffix}'
-var vnetId_AKS = '${subscriptionIdDevTestProd_AKS}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+var vnetId_AKS = '${subscriptionIdDevTestProd_AKS}/resourceGroups/${commonResourceGroup_AKS}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull_AKS}'
 var uniqueDepl_AKS = '${projectName}${locationSuffixAks}${env}${aifactorySuffixRG}'
 resource projectResourceGroupAKS 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup_AKS

@@ -17,9 +17,15 @@ $tags = @{
    }
 
 $location = 'westeurope'
+$locationSuffix = 'weu'
+
+# Cross-region AKS (can be in another Subscription, in another vNet adn region - than Azure ML workspace)
+$locationAks = 'westeurope'
+$locationSuffixAks = 'weu'
+$subscriptionIdAks = 'TODO AKS subscription ID-000000000000'
+
 $projectNumber = '001'
 $env = 'dev'
-$locationSuffix = 'weu'
 $prjResourceSuffix = '-001'
 
 ############# AKS VARS
@@ -59,10 +65,13 @@ New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\24-add-aks.bice
 -projectNumber $projectNumber `
 -env $env `
 -commonRGNamePrefix $commonRGNamePrefix `
+-location $location `
 -locationSuffix $locationSuffix `
+-locationAks $locationAks `
+-locationSuffixAks $locationSuffixAks `
+-subscriptionIdAks $subscriptionIdAks `
 -aifactorySuffixRG $aifactorySuffixRG `
 -tags $tags `
--location $location `
 -prjResourceSuffix $prjResourceSuffix `
 -commonResourceSuffix $commonResourceSuffix `
 -vnetNameBase $vnetNameBase `
