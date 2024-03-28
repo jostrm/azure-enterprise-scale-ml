@@ -253,10 +253,11 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             protocol: 'Udp'
             sourcePortRange: '*'
             destinationPortRange: '5831'
-            sourceAddressPrefix: 'AzureMachineLearning'
+            sourceAddressPrefix: '*'
             access: 'Allow'
             priority: 230
             direction: 'Outbound'
+            destinationAddressPrefix: 'AzureMachineLearning'
         }
       }
       {
@@ -266,10 +267,11 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             protocol: 'Tcp'
             sourcePortRange: '*'
             destinationPortRange: '5831'
-            sourceAddressPrefix: 'BatchNodeManagement.${location}'
+            sourceAddressPrefix: '*'
             access: 'Allow'
             priority: 1320
             direction: 'Outbound'
+            destinationAddressPrefix: 'BatchNodeManagement.${location}'
         }
       }
       {
@@ -282,10 +284,11 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
               '8787'
               '18881'
             ]
-            sourceAddressPrefix: 'AzureMachineLearning'
+            sourceAddressPrefix: '*'
             access: 'Allow'
             priority: 250
             direction: 'Outbound'
+            destinationAddressPrefix: 'AzureMachineLearning'
         }
       }
     ]
