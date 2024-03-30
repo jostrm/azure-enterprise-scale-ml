@@ -72,7 +72,7 @@ param amlPrivateDnsZoneID string
 @description('Resource name ID on DnsZone')
 param notebookPrivateDnsZoneID string
 @description('AKS Kubernetes version and AgentPool orchestrator version')
-param kubernetesVersionAndOrchestrator string = '1.27.9' // 2024-03-14 LTS Earlier: (1.27.3 | 2024-01-25 to 2024-03-14) az aks get-versions --location westeurope --output table). Supported >='1.23.5'
+param kubernetesVersionAndOrchestrator string
 
 @description('Azure ML allowPublicAccessWhenBehindVnet')
 param allowPublicAccessWhenBehindVnet bool = false
@@ -85,39 +85,28 @@ var subnetRef = '${vnetId}/subnets/${subnetName}'
 // See Azure VM Sku: https://docs.microsoft.com/en-us/azure/virtual-machines/sizes-general
 // Standard DSv2 Family vCPUs in West Europe 
 
-param aml_dev_defaults array = [
-  'Standard_DS3_v2' // 	4 cores, 14GB ram, 28GB storage = 0.27$ [Classical ML model training on small datasets]
-  'Standard_F8s_v2' //  (8,16,64) 0.39$
-  'Standard_DS12_v2' // 4 cores, 28GB RAM, 56GB storage = 0.38 [Data manipulation and training on medium-sized datasets (1-10GB)
-]
-
-param aml_testProd_defaults array = [
-  'Standard_D13_v2' // 	(8 cores, 56GB, 400GB storage) = 0.76$ [Data manipulation and training on large datasets (>10 GB)]
-  'Standard_D4_v2' // (8 cores, 28GB RAM, 400GB storage) = 0.54$
-  'Standard_F16s_v2' //  (16 cores, 32GB RAM, 128GB storage) = 0.78$
-]
-
-param ci_dev_defaults array = [
-  'Standard_DS11_v2' // 2 cores, 14GB RAM, 28GB storage
-]
-param ci_devTest_defaults array = [
-  'Standard_D11_v2'
-]
-
 @description('DEV default VM size for the default compute cluster: STANDARD_D3')
-param amlComputeDefaultVmSize_dev string = aml_dev_defaults[0] // 'Standard_D3_v2' //// STANDARD_D4(4,16b ram) Standard_D14 (16 cores,112 ram) 
+param amlComputeDefaultVmSize_dev string// 'Standard_D3_v2' //// STANDARD_D4(4,16b ram) Standard_D14 (16 cores,112 ram) 
 @description('TestProd default VM size for the default compute cluster: STANDARD_D4')
-param amlComputeDefaultVmSize_testProd string = aml_testProd_defaults[1] // 'STANDARD_D4' //// STANDARD_D4(4,16b ram) Standard_D14 (16 cores,112 ram) 
+param amlComputeDefaultVmSize_testProd string // 'STANDARD_D4' //// STANDARD_D4(4,16b ram) Standard_D14 (16 cores,112 ram) 
+@description('Dev Max nodes: 0-Max')
+param amlComputeMaxNodex_dev int
+@description('TestProd Max nodes: 0-Max')
+param amlComputeMaxNodex_testProd int
 
 @description('DEV default  VM size for the default AKS cluster:Standard_D12. More: Standard_D3_v2(4,14)')
 param aksVmSku_dev string
 @description('TestProd default  VM size for the default AKS cluster:Standard_D12(4,28,200GB)')
 param aksVmSku_testProd string
+@description('Dev Agentpool agents/nodes: 1 as default for Dev')
+param aksNodes_dev int
+@description('Dev Agentpool agents/nodes: 3 as default for Test or Prod')
+param aksNodes_testProd int
 
 @description('DEV default VM size for the default Compute Instance cluster:Standard_D4_v3(4,16,100)')
-param ciVmSku_dev string = ci_dev_defaults[0] 
+param ciVmSku_dev string
 @description('TestProd default VM size for the default Compute Instance cluster:Standard_D4_v3. More: Standard_D14 (16 cores,112 ram)')
-param ciVmSku_testProd string = ci_devTest_defaults[0]
+param ciVmSku_testProd string
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 
@@ -142,8 +131,8 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     applicationInsights: applicationInsights
     
     // configuration for workspaces with private link endpoint
-    imageBuildCompute: 'cluster001'
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet // todo later..test set to TRUE?
+    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     publicNetworkAccess: 'Disabled'
 
     // If sensitive data
@@ -184,7 +173,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev'){
     agentPoolProfiles: [
       {
         name: toLower('agentpool')
-        count: 1
+        count: aksNodes_dev
         vmSize: aksVmSku_dev
         osType: 'Linux'
         osSKU: 'Ubuntu'
@@ -219,7 +208,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod'){
     agentPoolProfiles: [
       {
         name: 'agentpool'
-        count: 3
+        count: aksNodes_testProd
         vmSize: aksVmSku_testProd
         osType: 'Linux'
         osSKU: 'Ubuntu'
@@ -287,7 +276,7 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
       remoteLoginPortPublicAccess: 'Disabled'
       scaleSettings: {
         minNodeCount: 0
-        maxNodeCount: 3
+        maxNodeCount: ((env =='dev') ? amlComputeMaxNodex_dev :  amlComputeMaxNodex_testProd)
         nodeIdleTimeBeforeScaleDown: 'PT120S'
       }
       subnet: {
@@ -311,7 +300,7 @@ resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/wo
   properties: {
     computeType: 'ComputeInstance'
     computeLocation: location
-    description: ' Azure Compute Instance (CI),Default and shared, to power notebooks, for ${projectName} in ESML-${env} AI Factory environment. Defaults: Dev=${ciVmSku_dev}. TestProd=${ciVmSku_testProd}'
+    description: ' Azure Compute Instance (CI),Default and shared, to power notebooks, for ${projectName} in ESML-${env} AI Factory environment. Dev=${ciVmSku_dev}. TestProd=${ciVmSku_testProd}'
     disableLocalAuth: true
     properties: {
       applicationSharingPolicy: 'Shared'//'Personal'

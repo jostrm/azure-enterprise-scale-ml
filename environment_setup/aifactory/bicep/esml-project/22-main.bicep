@@ -99,14 +99,28 @@ param hybridBenefit bool
 param commonLakeNamePrefixMax8chars string
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
-//Override paramenters
+//Override RG, vnet, datalakename, kvNameFromCOMMON
 param commonResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 
+// Override: AML: AKS cluster
 param aks_dev_sku_override string = ''
 param aks_test_prod_sku_override string = ''
+param aks_version_override string = ''
+param aks_dev_nodes_override int = -1
+param aks_test_prod_nodes_override int = -1
+
+// Override: AML Compute Instance
+param aml_ci_dev_sku_override string = ''
+param aml_ci_test_prod_sku_override string = ''
+
+// Override: AML Compute Custer
+param aml_cluster_dev_sku_override string = ''
+param aml_cluster_test_prod_sku_override string = ''
+param aml_cluster_dev_nodes_override int = -1
+param aml_cluster_test_prod_nodes_override int = -1
 
 // ENABLE/DISABLE: Optional exclusions in deployment
 @description('Azure ML workspace can only be called once from BICEP, otherwise COMPUTE name will give error 2nd time. ')
@@ -541,8 +555,42 @@ param aks_testProd_defaults array = [
   'Standard_A8m_v2' // 8 cores, 64GB RAM, 80GB storage (quota:100)
 ]
 
+param aml_dev_defaults array = [
+  'Standard_DS3_v2' // 	4 cores, 14GB ram, 28GB storage = 0.27$ [Classical ML model training on small datasets]
+  'Standard_F8s_v2' //  (8,16,64) 0.39$
+  'Standard_DS12_v2' // 4 cores, 28GB RAM, 56GB storage = 0.38 [Data manipulation and training on medium-sized datasets (1-10GB)
+]
+
+param aml_testProd_defaults array = [
+  'Standard_D13_v2' // 	(8 cores, 56GB, 400GB storage) = 0.76$ [Data manipulation and training on large datasets (>10 GB)]
+  'Standard_D4_v2' // (8 cores, 28GB RAM, 400GB storage) = 0.54$
+  'Standard_F16s_v2' //  (16 cores, 32GB RAM, 128GB storage) = 0.78$
+]
+
+param ci_dev_defaults array = [
+  'Standard_DS11_v2' // 2 cores, 14GB RAM, 28GB storage
+]
+param ci_devTest_defaults array = [
+  'Standard_D11_v2'
+]
+
+// AML AKS Cluster: defaults & overrides
 var aks_dev_sku_param = aks_dev_sku_override != '' ? aks_dev_sku_override : aks_dev_defaults[0]
 var aks_test_prod_sku_param = aks_test_prod_sku_override != '' ? aks_test_prod_sku_override : aks_testProd_defaults[0]
+
+var aks_version_param = aks_version_override != '' ? aks_version_override : '1.27.9' // 2024-03-14 LTS Earlier: (1.27.3 | 2024-01-25 to 2024-03-14) az aks get-versions --location westeurope --output table). Supported >='1.23.5'
+var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
+var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
+
+// AML Compute Instance: defaults & overrides
+var aml_ci_dev_sku_param = aml_ci_dev_sku_override != '' ? aml_ci_dev_sku_override : ci_dev_defaults[0]
+var aml_ci_test_prod_sku_param = aml_ci_test_prod_sku_override != '' ? aml_ci_test_prod_sku_override : ci_devTest_defaults[0]
+
+// AML cluster: defaults & overrides
+var aml_cluster_dev_sku_param = aml_cluster_dev_sku_override != '' ? aml_cluster_dev_sku_override : aml_dev_defaults[0]
+var aml_cluster_test_prod_sku_param = aml_cluster_test_prod_sku_override != '' ? aml_cluster_test_prod_sku_override : aml_testProd_defaults[1]
+var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
+var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -577,6 +625,15 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
     aksVmSku_testProd: aks_test_prod_sku_param
+    aksNodes_dev:aks_dev_nodes_param
+    aksNodes_testProd:aks_test_prod_nodes_param
+    kubernetesVersionAndOrchestrator:aks_version_param
+    amlComputeDefaultVmSize_dev: aml_cluster_dev_sku_param
+    amlComputeDefaultVmSize_testProd: aml_cluster_test_prod_sku_param
+    amlComputeMaxNodex_dev: aml_cluster_dev_nodes_param
+    amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
+    ciVmSku_dev: aml_ci_dev_sku_param
+    ciVmSku_testProd: aml_ci_test_prod_sku_param
   }
 
   dependsOn: [

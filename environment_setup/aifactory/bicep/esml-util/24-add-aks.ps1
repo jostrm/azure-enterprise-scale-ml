@@ -1,3 +1,23 @@
+param (
+    # required parameters
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
+    [Parameter(Mandatory=$false, HelpMessage="Specifies the App id for service principal")][string]$spID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID
+)
+
+if (-not [String]::IsNullOrEmpty($spID)) {
+  Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal,$spID, as credential in tenant:$tenantID !"
+
+  $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
+  $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
+  Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
+} else {
+  # The $spID parameter is null or empty
+  Write-Host "The spID parameter is null or empty. Running under other authentication that SP"
+}
+
+
+
 ## EDIT per DSVM you want to deploy
 $deplName = '24-add-aks'
 $commonRGNamePrefix = 'abc-def-'

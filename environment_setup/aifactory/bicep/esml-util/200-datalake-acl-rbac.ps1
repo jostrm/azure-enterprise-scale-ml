@@ -21,7 +21,7 @@ Import-Module Az.Storage
 
 #### Trouble shoot ####
 $storageAccount ="TODO"
-$spID ="TODO SP AppID - with Storage Blob Data Owner role" # Storage Blob Data Owner role
+$spID ="TODO SP AppID - with Storage Blob Data Owner role" # Storage Blob Data Owner role. (esml-common-sp)
 $tenantID ="TODO"
 $adlsgen2filesystem ="lake3"
 $projectXXX = "project001"
