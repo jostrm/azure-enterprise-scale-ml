@@ -27,7 +27,7 @@ dependencies:
   - azure-identity~=1.15.0
 # END AzureML v2
 # Extra
-  - dotenv
+  - python-dotenv
 # Extra end
   # Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.55.0
