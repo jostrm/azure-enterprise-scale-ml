@@ -25,6 +25,9 @@ dependencies:
   - azure-ai-ml~=1.15.0
   - azure-identity~=1.15.0
 # END AzureML v2
+# Extra
+  - dotenv
+# Extra end
   # Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.55.0
   - azureml-defaults~=1.55.0

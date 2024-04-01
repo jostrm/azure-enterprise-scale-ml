@@ -28,6 +28,9 @@ dependencies:
   - seaborn==0.11.1 # ESML optional for reporting (todo remove this dependancy)
   - azure-storage-file-datalake==12.6.0 # ESML required to write files to GEN 2 - Bronze,Silver,Gold
 # ESML END
+# Extra
+  - dotenv
+# Extra end
   # Required packages for AzureML execution, history, and data preparation.
   - azureml-widgets~=1.55.0
   - azureml-defaults~=1.55.0
