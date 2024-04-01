@@ -16,8 +16,6 @@ if (-not [String]::IsNullOrEmpty($spID)) {
   Write-Host "The spID parameter is null or empty. Running under other authentication that SP"
 }
 
-
-
 ## EDIT per DSVM you want to deploy
 $deplName = '24-add-aks'
 $commonRGNamePrefix = 'abc-def-'

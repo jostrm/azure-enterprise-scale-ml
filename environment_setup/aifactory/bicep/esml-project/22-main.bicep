@@ -156,7 +156,7 @@ param technicalAdminsEmail string = 'null'
 @description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
 param IPwhiteList string = ''
 
-var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
+var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
 var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
@@ -271,35 +271,6 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   name: laName
   scope:commonResourceGroupRef
 }
-
-/* MOVED to ESML-COMMON
-var laName = 'la-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-module logAnalyticsWorkspaceOpInsight '../modules/logAnalyticsWorkspace.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'LogAnalyticsWS4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: laName
-    tags: tags2
-    location: location
-  }
-
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
-module wsQueries '../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyticsQueries == true){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'logAnalyticsQs${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    logAnalyticsName:laName
-  }
-  dependsOn: [
-    logAnalyticsWorkspaceOpInsight
-  ]
-}
- MOVED to ESML-COMMON, end
-*/
-
 
 module applicationInsight '../modules/applicationInsights.bicep'= if(sweden_central_appInsight_classic_missing== false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -934,9 +905,7 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
 }
 
 
-// TODO-2023: Principals of type Application cannot validly be used in role assignments
-
-//-- Needed if connnecting from Databricks to Azure ML workspace
+// Needed if connnecting from Databricks to Azure ML workspace
 // Note: SP OID: it must be the OBJECT ID of a service principal, not the OBJECT ID of an Application, different thing, and I have to agree it is very confusing.
 module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing== false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -983,3 +952,19 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_ad
     rbackSPfromDBX2AML
   ]
 }
+
+module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
+  params: {
+    additionalUserIds: technicalAdminsObjectID_array_safe
+    vNetName: vnetNameFull
+    common_bastion_subnet_name: 'AzureBastionSubnet'
+  }
+  dependsOn: [
+    aml
+    rbackSPfromDBX2AML
+    vmPrivate
+  ]
+}
+
