@@ -3,6 +3,7 @@ $deplName = '25-add-user-to-bastion'
 $commonRGNamePrefix = 'abc-def-'
 $commonResourceSuffix = '-001'
 $aifactorySuffixRG = '-001'
+$technicalAdminsObjectID = '' # Comma separated ObjectIDs of users
 
 $tags = @{
     "Application Name" = "Enterprise Scale ML (ESML)"
@@ -43,6 +44,7 @@ New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\24-add-aks.bice
 -prjResourceSuffix $prjResourceSuffix `
 -commonResourceSuffix $commonResourceSuffix `
 -vnetNameBase $vnetNameBase `
+-technicalAdminsObjectID $technicalAdminsObjectID `
 -Verbose
 
 Write-Host "BICEP success!"
