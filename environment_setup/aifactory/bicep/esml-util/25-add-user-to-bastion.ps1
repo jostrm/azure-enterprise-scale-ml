@@ -3,7 +3,7 @@ $deplName = '25-add-user-to-bastion'
 $commonRGNamePrefix = 'abc-def-'
 $commonResourceSuffix = '-001'
 $aifactorySuffixRG = '-001'
-$technicalAdminsObjectID = '' # Comma separated ObjectIDs of users
+$technicalAdminsObjectID = '' # Comma separated ObjectIDs of users. 
 
 $tags = @{
     "Application Name" = "Enterprise Scale ML (ESML)"
@@ -31,7 +31,7 @@ $vnetNameBase = 'vnt-esmlcmn'
 Write-Host "Kicking off the BICEP..."
 #Set-AzDefault -ResourceGroupName $rg
 
-New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\24-add-aks.bicep" `
+New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\25-add-user-to-bastion.bicep" `
 -Name $deplName `
 -ResourceGroupName $rg `
 -projectNumber $projectNumber `
