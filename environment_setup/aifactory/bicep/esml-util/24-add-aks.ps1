@@ -1,16 +1,21 @@
+# USAGE: .\aifactory\esml-util\24-add-aks.ps1 -spSecret 'your_secret' -spID 'your_id' -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id'
 param (
     # required parameters
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
     [Parameter(Mandatory=$false, HelpMessage="Specifies the App id for service principal")][string]$spID,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$subscriptionID
 )
 
-if (-not [String]::IsNullOrEmpty($spID)) {
-  Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal,$spID, as credential in tenant:$tenantID !"
+if (-not [String]::IsNullOrEmpty($spSecret)) {
+  Write-Host "The spSecret parameter is not null or empty. trying to authenticate to Azure with Service principal"
 
   $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
   $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
   Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
+
+  $context = Get-AzSubscription -SubscriptionId $subscriptionID
+  Set-AzContext $context
 } else {
   # The $spID parameter is null or empty
   Write-Host "The spID parameter is null or empty. Running under other authentication that SP"
@@ -58,8 +63,8 @@ $aks_testProd_defaults = (
   'Standard_A8m_v2' # 8 cores, 64GB RAM, 80GB storage (quota:100)
 )
 
-
-$rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
+$projectRg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
+$rg = "${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}"
 Write-Host "RG" $rg
 
 $vnetNameBase = 'vnt-esmlcmn'
