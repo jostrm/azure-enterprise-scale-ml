@@ -2,6 +2,7 @@
 param vNetName string
 param common_bastion_subnet_name string
 param bastion_service_name string
+param common_kv_name string
 
 var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
@@ -75,5 +76,20 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
     description:'Reader to USER with OID  ${all_principals[i]} for Bastion service: ${bastion_service_name}'
   }
   scope:resBastion4project
+}]
+
+// Common Keyvault "bastion-uks-dev-001" - READER
+resource commonKvReader 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+  name: common_kv_name
+}
+resource readerUserCommonKv 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(all_principals)):{
+  name: guid('${all_principals[i]}-reader-${common_kv_name}-${resourceGroup().id}')
+  properties: {
+    roleDefinitionId: readerRoleDefinition.id
+    principalId: all_principals[i]
+    principalType: 'User'
+    description:'Reader to USER with OID  ${all_principals[i]} for keyvault: ${common_kv_name}'
+  }
+  scope:commonKvReader
 }]
 

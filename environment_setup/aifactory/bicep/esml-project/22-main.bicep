@@ -983,6 +983,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
+    common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
   }
   dependsOn: [
     aml
@@ -990,4 +991,3 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
     vmPrivate
   ]
 }
-
