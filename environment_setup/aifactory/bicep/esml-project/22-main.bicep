@@ -484,7 +484,7 @@ resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 }
 
 module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: '${kvNameCommon}GetList${projectNumber}${locationSuffix}${env}'
   params: {
     keyVaultPermissions: secretGetList

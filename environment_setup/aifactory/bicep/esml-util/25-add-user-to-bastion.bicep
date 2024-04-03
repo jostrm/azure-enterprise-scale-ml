@@ -60,7 +60,7 @@ var secretGetList = {
 }
 
 module kvCommonAccessPolicyGetListUtil '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/kvCmnAccessPolicys.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: '${cmndevKeyvault}GetListUtil${projectNumber}${locationSuffix}${env}'
   params: {
     keyVaultPermissions: secretGetList

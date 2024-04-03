@@ -34,19 +34,3 @@ resource keyVaultAccessPolicyAdditional 'Microsoft.KeyVault/vaults/accessPolicie
     }]
   }
 }
-
-/*
-resource keyVaultAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = {
-  parent:keyVault
-  name:policyName
-  properties: {
-    accessPolicies: [
-      {
-        objectId: principalId
-        permissions: keyVaultPermissions
-        tenantId: subscription().tenantId
-      }
-    ]
-  }
-}
-*/
