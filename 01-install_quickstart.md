@@ -7,13 +7,17 @@
   - VM inside of vNet already (no point-2-site gateway setup needed, no personal laptops to join to AAD)
   - Bastion host avaialble in the `ESML bicep provisioining`, including native RDP.
 # 1) Install ESML Python SDK that includes Azure ML with AutoML
-- Install MiniConda (>v 4.7), and open the MiniConda command prompt on your computer
-  - Windows computer:  [environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup.cmd](./environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup.cmd)
-  - Mac computer:  [environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_mac.sh](./environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_mac.sh)
-  - Linux computer [environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_linux.sh](./environment_setup/user_dev_env_install/AzureML_v1_55/automl_setup_linux.sh)
+1) Install/Open miniconda (exists already on DSVM)
+    - Install MiniConda (>v 4.7), and open the MiniConda command prompt on your computer
+    - https://docs.conda.io/projects/conda/en/latest/user-guide/install/windows.html
+2) Open terminal in VS Code, or your MiniConda terminal on your laptop
+3) Options:
+    - a) AML SDKv1 - CD to `azure-enterprise-scale-ml\environment_setup\user_dev_env_install\AzureML_v1_55\`
+    - b) AML SDKv1+SDKv2 - CD to `azure-enterprise-scale-ml\environment_setup\user_dev_env_install\AzureML_v1_55_and_v2_1_15\`
+4) RUN `automl_setup.cmd` (If you are on Windows, otherwise on MAC `automl_setup_mac.sh` or on Linux: `automl_setup_linux.sh` )
 # 2 (Alt A) NEW Azure Devops project - "link" ESML (GIT subclassing)
 
--  Add ESML as a GIT Submodule "linked" to your GIT repo
+- Add ESML as a GIT Submodule "linked" to your GIT repo
 - Creat a "project001" folder on local machine, open GIT command prompt there, then run:
 > git config --system core.longpaths true
 

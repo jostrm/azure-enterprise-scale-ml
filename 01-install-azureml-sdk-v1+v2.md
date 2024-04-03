@@ -6,6 +6,7 @@
 3) Options:
     - a) AML SDKv1 - CD to `azure-enterprise-scale-ml\environment_setup\user_dev_env_install\AzureML_v1_55\`
     - b) AML SDKv1+SDKv2 - CD to `azure-enterprise-scale-ml\environment_setup\user_dev_env_install\AzureML_v1_55_and_v2_1_15\`
+        - Python interpreter / Kernel will be named (which you select in your Jupyter Notebooks in VS code): `azure_automl_esml_v155_v115`
 4) RUN `automl_setup.cmd` (If you are on Windows, otherwise on MAC `automl_setup_mac.sh` or on Linux: `automl_setup_linux.sh` )
 
 # 2) Install on Azure Machine Learning - Compute Instance, and run AzureML Notebooks
