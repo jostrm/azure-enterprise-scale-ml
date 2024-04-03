@@ -984,6 +984,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
     common_bastion_subnet_name: 'AzureBastionSubnet'
     bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
     aml

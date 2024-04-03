@@ -3,6 +3,8 @@ param vNetName string
 param common_bastion_subnet_name string
 param bastion_service_name string
 param common_kv_name string
+@secure()
+param project_service_principle string
 
 var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
@@ -34,6 +36,19 @@ resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@202
     principalId: all_principals[i]
     principalType: 'User'
     description:'Network Contributor to USER with OID  ${all_principals[i]} for vNet: ${vNetName}'
+  }
+  scope:vNetNameResource
+}]
+
+var service_principle_array = project_service_principle == ''? []: array(split(project_service_principle,','))
+
+resource networkContributorSPVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(service_principle_array)):{
+  name: guid('${service_principle_array[i]}-nwContribSP-${vNetName}-${resourceGroup().id}')
+  properties: {
+    roleDefinitionId: networkContributorRoleDefinition.id
+    principalId: service_principle_array[i]
+    principalType: 'ServicePrincipal'
+    description:'Network Contributor to SERVICE PRINCIPLE with OID  ${service_principle_array[i]} for vNet: ${vNetName}'
   }
   scope:vNetNameResource
 }]
