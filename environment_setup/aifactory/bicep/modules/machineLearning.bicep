@@ -109,6 +109,7 @@ param ciVmSku_dev string
 param ciVmSku_testProd string
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
+var aml_create_ci=false
 
 resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
   name: name
@@ -290,7 +291,7 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
 }
 
 //Compute instance
-resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
+resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(aml_create_ci==true) {
   name: '${machineLearningStudio.name}/p${projectNumber}-m01-${uniqueSalt5char}-${env}-ci01' // p001-m01-12345-prod-ci01 (24/24)(The name needs to be unique within an Azure region)
   location: location
   tags: tags
