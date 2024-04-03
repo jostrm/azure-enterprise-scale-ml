@@ -1,4 +1,3 @@
-// ########### COMMON PARAMS
 @description('Specifies the project number, such as a string "005". This is used to generate the projectName to embed in resources such as "prj005"')
 param projectNumber string
 @description('Specifies the name of the environment [dev,test,prod]. This name is reflected in resource group and sub-resources')
@@ -7,14 +6,8 @@ param env string
 param commonRGNamePrefix string
 @description('AI Factory suffix. If you have multiple instances, -001')
 param aifactorySuffixRG string
-@description('Specifies the tags2 that should be applied to newly created resources')
-param tags object
-@description('Deployment location.')
-param location string
 @description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')
 param locationSuffix string
-@description('-001,-002, etc')
-param prjResourceSuffix string  // sdf
 @description('Resource group where your vNet resides')
 param commonResourceSuffix string // sdf
 @description('Specifies the virtual network name')
@@ -23,12 +16,12 @@ param vnetNameBase string = 'vnt-esmlcmn'
 param technicalAdminsObjectID string
 @description('Specifies the kv-cmndec-xys name')
 param cmndevKeyvault string
+@description('null, or commaseparated list. Specifies a project specific service principles OID comma separated list: asdfbsf,asdfasdf,')
+param projectSP_OID_list string
 
-var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
+param technicalAdminsObjectID_array array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
 var subscriptionIdDevTestProd = subscription().subscriptionId
-var projectName = 'prj${projectNumber}'
-var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
 var commonResourceGroup = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // change this to correct rg
 var vnetNameFull = '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
@@ -42,6 +35,7 @@ module rbacReadUsersToCmnVnetBastion '../../azure-enterprise-scale-ml/environmen
   name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
   params: {
     additionalUserIds: technicalAdminsObjectID_array_safe
+    project_service_principle: projectSP_OID_list
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
@@ -59,6 +53,10 @@ var secretGetList = {
   ]
 }
 
+var projectSP_OID_list_array = array(split(projectSP_OID_list,','))
+var projectSP_OIDs_array_safe = projectSP_OID_list == 'null'? []: projectSP_OID_list_array
+var users_and_serviceprincipals = union(technicalAdminsObjectID_array_safe, projectSP_OIDs_array_safe)
+
 module kvCommonAccessPolicyGetListUtil '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: '${cmndevKeyvault}GetListUtil${projectNumber}${locationSuffix}${env}'
@@ -66,13 +64,10 @@ module kvCommonAccessPolicyGetListUtil '../../azure-enterprise-scale-ml/environm
     keyVaultPermissions: secretGetList
     keyVaultResourceName: cmndevKeyvault
     policyName: 'add'
-    principalId: technicalAdminsObjectID_array_safe[0]
-    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+    principalId: users_and_serviceprincipals[0]
+    additionalPrincipalIds:users_and_serviceprincipals
   }
   dependsOn: [
     commonResourceGroupResource
   ]
 }
-
-
-

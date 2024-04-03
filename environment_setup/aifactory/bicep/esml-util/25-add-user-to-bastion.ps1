@@ -27,6 +27,7 @@ $commonRGNamePrefix = 'abc-def-'
 $commonResourceSuffix = '-001'
 $aifactorySuffixRG = '-001'
 $technicalAdminsObjectID = '' # Comma separated ObjectIDs of users. 
+$projectSP_OIDs = 'null'# Comma separated ObjectIDs of project service principals, usually only 1, `esml-project004-sp-oid`
 
 $tags = @{
     "Application Name" = "Enterprise Scale ML (ESML)"
@@ -61,16 +62,13 @@ New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\25-add-user-to-
 -projectNumber $projectNumber `
 -env $env `
 -commonRGNamePrefix $commonRGNamePrefix `
--location $location `
 -locationSuffix $locationSuffix `
 -aifactorySuffixRG $aifactorySuffixRG `
--tags $tags `
--prjResourceSuffix $prjResourceSuffix `
 -commonResourceSuffix $commonResourceSuffix `
 -vnetNameBase $vnetNameBase `
 -technicalAdminsObjectID $technicalAdminsObjectID `
 -cmndevKeyvault $cmndev_keyvault_name `
+-projectSP_OID_list $projectSP_OIDs `
 -Verbose
 
 Write-Host "BICEP success!"
-
