@@ -21,6 +21,8 @@ param commonResourceSuffix string // sdf
 param vnetNameBase string = 'vnt-esmlcmn'
 @description('Specifies the OID array of users')
 param technicalAdminsObjectID string
+@description('Specifies the kv-cmndec-xys name')
+param cmndevKeyvault string
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
@@ -42,8 +44,13 @@ module rbacReadUsersToCmnVnetBastion '../../azure-enterprise-scale-ml/environmen
     additionalUserIds: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
+    bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
+    common_kv_name:cmndevKeyvault
   }
   dependsOn: [
     commonResourceGroupResource
   ]
 }
+
+
+

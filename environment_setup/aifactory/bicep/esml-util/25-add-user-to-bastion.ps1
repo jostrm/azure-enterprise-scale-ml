@@ -45,6 +45,7 @@ $locationSuffix = 'weu'
 $projectNumber = '001'
 $env = 'dev'
 $prjResourceSuffix = '-001'
+$cmndev_keyvault_name = 'kv-cmndev-pgvr2-001'
 
 $rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
 Write-Host "RG" $rg
@@ -68,6 +69,7 @@ New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\25-add-user-to-
 -commonResourceSuffix $commonResourceSuffix `
 -vnetNameBase $vnetNameBase `
 -technicalAdminsObjectID $technicalAdminsObjectID `
+-cmndevKeyvault $cmndev_keyvault_name `
 -Verbose
 
 Write-Host "BICEP success!"
