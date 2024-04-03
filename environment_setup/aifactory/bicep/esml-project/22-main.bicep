@@ -477,6 +477,28 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   ]
 }
 
+var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+  name: kvNameCommon
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+}
+
+module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: '${kvNameCommon}GetList${projectNumber}${locationSuffix}${env}'
+  params: {
+    keyVaultPermissions: secretGetList
+    keyVaultResourceName: kvNameCommon
+    policyName: 'add'
+    principalId: technicalContactId
+    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    commonKv
+  ]
+}
+
+
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
@@ -960,6 +982,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
     additionalUserIds: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
+    bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
   }
   dependsOn: [
     aml
