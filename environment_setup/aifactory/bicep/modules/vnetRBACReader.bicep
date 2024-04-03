@@ -92,4 +92,3 @@ resource readerUserCommonKv 'Microsoft.Authorization/roleAssignments@2020-04-01-
   }
   scope:commonKvReader
 }]
-

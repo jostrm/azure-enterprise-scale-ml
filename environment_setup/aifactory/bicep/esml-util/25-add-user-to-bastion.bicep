@@ -52,5 +52,27 @@ module rbacReadUsersToCmnVnetBastion '../../azure-enterprise-scale-ml/environmen
   ]
 }
 
+var secretGetList = {
+  secrets: [ 
+    'get'
+    'list'
+  ]
+}
+
+module kvCommonAccessPolicyGetListUtil '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/kvCmnAccessPolicys.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: '${cmndevKeyvault}GetListUtil${projectNumber}${locationSuffix}${env}'
+  params: {
+    keyVaultPermissions: secretGetList
+    keyVaultResourceName: cmndevKeyvault
+    policyName: 'add'
+    principalId: technicalAdminsObjectID_array_safe[0]
+    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    commonResourceGroupResource
+  ]
+}
+
 
 

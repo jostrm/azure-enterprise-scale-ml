@@ -73,3 +73,4 @@ New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\25-add-user-to-
 -Verbose
 
 Write-Host "BICEP success!"
+
