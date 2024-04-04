@@ -97,10 +97,12 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
 
 # Contributing to ESML AIFactory?
 This repository is a push-only mirror. Ping Joakim Åström for contributions / ideas. 
-Since "mirror-only" design, Pull requests are not possible, except for ESML admins. See LICENCE file (open source, MIT license)Speaking of: 
-    - Credit to Kim Berg and Ben Kooijman for contributing! (kudos to the ESML IP calculator and Bicep for esml-project)
-    - Credit to Christofer Högvall for contributing! (kudos to the Powershell script, to enable Resource providers, if not exits)
-        - azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1
+
+Since "mirror-only" design, Pull requests are not possible, except for ESML admins. See LICENCE file (open source, MIT license) 
+Speaking of open source, contributors: <br>
+- Credit to `Kim Berg` and `Ben Kooijman` for contributing! (kudos to the ESML IP calculator and Bicep for esml-project)
+- Credit to `Christofer Högvall` for contributing! (kudos to the Powershell script, to enable Resource providers, if not exits)
+    - `azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1`
 
 # Q: Is this for you? DataOps married with MLOps? Whats the benefits of the `ESML Controlplane SDK?`
 - ESML "marries" DataOps + MLOps, with `templates` for both Azure Data factory and Azure machine learning pipeline templates - `ESML autogenereated Azure ML Pipelines`
