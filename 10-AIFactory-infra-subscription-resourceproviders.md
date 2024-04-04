@@ -2,10 +2,12 @@
 
 If you have a blank Azure subscription, the resrouce providers for all services needs. 
 
-- Here: https://portal.azure.com/#todo/resource/subscriptions/todo-subscription-id/resourceproviders
-- TBA: A Powershell script to `register if not exists`
+- Powershell script to `register if not exists` exists here: azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1
+    - 
+- About resource providers: https://portal.azure.com/#todo/resource/subscriptions/todo-subscription-id/resourceproviders
 
-# NEW: AIFactory needs these:
+# INFO - What resource providers are we talking about:
+## NEW: AIFactory needs these:
 
 - Microsoft.Security
 - microsoft.insights
@@ -33,7 +35,7 @@ If you have a blank Azure subscription, the resrouce providers for all services 
 - Microsoft.Batch
 - Microsoft.ManagedServices
 
-# To check: Are usually registered, already:
+## To check: Are usually registered, already:
 
 - Microsoft.OperationsManagement
 - Microsoft.Management
