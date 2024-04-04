@@ -95,6 +95,13 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
 
 ![](./esml/images/esml-arch-small.png)
 
+# Contributing to ESML AIFactory?
+This repository is a push-only mirror. Ping Joakim Åström for contributions / ideas. 
+Since "mirror-only" design, Pull requests are not possible, except for ESML admins. See LICENCE file (open source, MIT license)Speaking of: 
+    - Credit to Kim Berg and Ben Kooijman for contributing! (kudos to the ESML IP calculator and Bicep for esml-project)
+    - Credit to Christofer Högvall for contributing! (kudos to the Powershell script, to enable Resource providers, if not exits)
+        - azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1
+
 # Q: Is this for you? DataOps married with MLOps? Whats the benefits of the `ESML Controlplane SDK?`
 - ESML "marries" DataOps + MLOps, with `templates` for both Azure Data factory and Azure machine learning pipeline templates - `ESML autogenereated Azure ML Pipelines`
 - ESML Auto-provisions the AI Factory, with 100% BICEP, where you can `1-click` a new ESMLProject in Azure Devops, serviecs glued together with `private endpoints` (network & identity)
@@ -103,12 +110,6 @@ Based on this reference architecture: https://docs.microsoft.com/en-us/azure/arc
     - See image: 
 ![](./esml/images/esml-s01e01-3.png)
 
-# Contributing to ESML AIFactory?
-This repository is a push-only mirror. Pull requests are ignored. See LICEENCE file (open source, MIT license)
-- Ping Joakim Åström for contributions / ideas. Speaking of: 
-    - Credit to Kim Berg and Ben Kooijman for contributing! (kudos to the ESML IP calculator and Bicep for esml-project)
-    - Credit to Christofer Högvall for contributing! (kudos to the Powershell script, to enable Resource providers, if not exits)
-        - azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1
 
 # INTRO - Is this for you: refine data? AutoML or manual ML? R&D phase? 
 **Q1:I want to use Azure AutoML, with MLOps ready to be `turned ON`** , with datalake design automatically generated for me, including `BRONZE, SILVER, GOLD` concept
