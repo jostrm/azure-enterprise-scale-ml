@@ -15,8 +15,10 @@
     - Option a) Download the latest install folder `AzureML_v1_55_and_v2_1_15.zip`
     - Option b) Clone your repo, containing the `azure-enterprise-scale-ml` repo
 3) Go to the install folder in  `azure-enterprise-scale-ml`:
-    - a) AML SDKv1 - CD to `azure-enterprise-scale-ml\environment_setup\install_sdk\user_dev_env_install\AzureML_v1_55`
-    - b) AML SDKv1+SDKv2 - CD to `azure-enterprise-scale-ml\environment_setup\install_sdk\user_dev_env_install\AzureML_v1_55_and_v2_1_15`
+    - Option a) AML SDKv1+SDKv2 - CD to `azure-enterprise-scale-ml\environment_setup\install_sdk\user_dev_env_install\AzureML_v1_55_and_v2_1_15`
+        - [Link to AzureML_v1_55_and_v2_1_15](../../azure-enterprise-scale-ml/environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/)
+    - Option b) AML SDKv1 - CD to `azure-enterprise-scale-ml\environment_setup\install_sdk\user_dev_env_install\AzureML_v1_55`
+        - [Link to AzureML_v1_55 ](../../azure-enterprise-scale-ml/environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/)
 4) RUN `automl_setup.cmd`If you are on Windows (10 or 11)
     - Windows: `automl_setup.cmd` 
         - Choose this optiom for BUILD AGENT. 
