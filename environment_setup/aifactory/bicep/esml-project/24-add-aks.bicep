@@ -54,7 +54,7 @@ param aks_testProd_defaults array = [
 ]
 
 // ############## AKS PARAMS
-param kubernetesVersionAndOrchestrator string = '1.24.6' // 2022-11-02
+param kubernetesVersionAndOrchestrator string = '1.27.9' // 2024-03-14 LTS Earlier: (1.27.3 | 2024-01-25 to 2024-03-14) az aks get-versions --location westeurope --output table). Supported >='1.23.5'
 @description('DEV default  VM size for the default AKS cluster:Standard_D12. More: Standard_D3_v2(4,14)')
 param aksVmSku_dev string = aks_dev_defaults[0]
 @description('DEV default  VM size for the default AKS cluster:Standard_D12. More: Standard_D3_v2(4,14)')

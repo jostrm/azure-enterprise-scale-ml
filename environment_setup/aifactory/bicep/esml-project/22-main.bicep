@@ -78,9 +78,9 @@ param tenantId string
 
 @description('Project specific service principle  KEYVAULT secret NAME for RBAC purpose - Object ID') // OID: Get it by using Get-AzADUser or Get-AzADServicePrincipal cmdlet
 param projectServicePrincipleOID_SeedingKeyvaultName string // Specifies the object ID of a user, service principal or security group in the Azure AD. The object ID must be unique for the list of access policies. 
-@description('Project specific service principle KEYVAULT secret NAME to be added in kv for - Application ID ')
+@description('Project specific service principle KEYVAULT secret NAME to be added in kv for - Secret value ')
 param projectServicePrincipleSecret_SeedingKeyvaultName string
-@description('Project specific service principle KEYVAULT secret NAME for - Secret value')
+@description('Project specific service principle KEYVAULT secret NAME for - App ID')
 param projectServicePrincipleAppID_SeedingKeyvaultName string
 
 @description('AzureDatabricks enterprise application')
@@ -99,11 +99,28 @@ param hybridBenefit bool
 param commonLakeNamePrefixMax8chars string
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
-//Override paramenters
+//Override RG, vnet, datalakename, kvNameFromCOMMON
 param commonResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
+
+// Override: AML: AKS cluster
+param aks_dev_sku_override string = ''
+param aks_test_prod_sku_override string = ''
+param aks_version_override string = ''
+param aks_dev_nodes_override int = -1
+param aks_test_prod_nodes_override int = -1
+
+// Override: AML Compute Instance
+param aml_ci_dev_sku_override string = ''
+param aml_ci_test_prod_sku_override string = ''
+
+// Override: AML Compute Custer
+param aml_cluster_dev_sku_override string = ''
+param aml_cluster_test_prod_sku_override string = ''
+param aml_cluster_dev_nodes_override int = -1
+param aml_cluster_test_prod_nodes_override int = -1
 
 // ENABLE/DISABLE: Optional exclusions in deployment
 @description('Azure ML workspace can only be called once from BICEP, otherwise COMPUTE name will give error 2nd time. ')
@@ -139,7 +156,7 @@ param technicalAdminsEmail string = 'null'
 @description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
 param IPwhiteList string = ''
 
-var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
+var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
 var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
@@ -175,6 +192,12 @@ var privateLinksDnsZones = {
   }
   dfs: {
     id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
+  }
+  queue: {
+    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
+  }
+  table: {
+    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
   }
   registry: {
     id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // ${environment().suffixes.acrLoginServer}'
@@ -248,35 +271,6 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   name: laName
   scope:commonResourceGroupRef
 }
-
-/* MOVED to ESML-COMMON
-var laName = 'la-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-module logAnalyticsWorkspaceOpInsight '../modules/logAnalyticsWorkspace.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'LogAnalyticsWS4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: laName
-    tags: tags2
-    location: location
-  }
-
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
-module wsQueries '../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyticsQueries == true){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'logAnalyticsQs${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    logAnalyticsName:laName
-  }
-  dependsOn: [
-    logAnalyticsWorkspaceOpInsight
-  ]
-}
- MOVED to ESML-COMMON, end
-*/
-
 
 module applicationInsight '../modules/applicationInsights.bicep'= if(sweden_central_appInsight_classic_missing== false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -400,7 +394,9 @@ module sacc '../modules/storageAccount.bicep' = {
     vnetId: vnetId
     subnetName: defaultSubnet
     blobPrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
-    filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn' 
+    filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
+    queuePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
+    tablePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-table-to-vnt-mlcmn'
     tags: tags2
   }
 
@@ -481,6 +477,28 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   ]
 }
 
+var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+  name: kvNameCommon
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+}
+
+module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: '${kvNameCommon}GetList${projectNumber}${locationSuffix}${env}'
+  params: {
+    keyVaultPermissions: secretGetList
+    keyVaultResourceName: kvNameCommon
+    policyName: 'add'
+    principalId: technicalContactId
+    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    commonKv
+  ]
+}
+
+
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
@@ -517,6 +535,56 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
+
+// AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
+param aks_dev_defaults array = [
+  'Standard_B4ms' // 4 cores, 16GB, 32GB storage: Burstable (2022-11 this was the default in Azure portal)
+  'Standard_A4m_v2' // 4cores, 32GB, 40GB storage (quota:100)
+  'Standard_D3_v2' // 4 cores, 14GB RAM, 200GB storage
+] 
+
+param aks_testProd_defaults array = [
+  'Standard_DS13-2_v2' // 8 cores, 14GB, 112GB storage
+  'Standard_A8m_v2' // 8 cores, 64GB RAM, 80GB storage (quota:100)
+]
+
+param aml_dev_defaults array = [
+  'Standard_DS3_v2' // 	4 cores, 14GB ram, 28GB storage = 0.27$ [Classical ML model training on small datasets]
+  'Standard_F8s_v2' //  (8,16,64) 0.39$
+  'Standard_DS12_v2' // 4 cores, 28GB RAM, 56GB storage = 0.38 [Data manipulation and training on medium-sized datasets (1-10GB)
+]
+
+param aml_testProd_defaults array = [
+  'Standard_D13_v2' // 	(8 cores, 56GB, 400GB storage) = 0.76$ [Data manipulation and training on large datasets (>10 GB)]
+  'Standard_D4_v2' // (8 cores, 28GB RAM, 400GB storage) = 0.54$
+  'Standard_F16s_v2' //  (16 cores, 32GB RAM, 128GB storage) = 0.78$
+]
+
+param ci_dev_defaults array = [
+  'Standard_DS11_v2' // 2 cores, 14GB RAM, 28GB storage
+]
+param ci_devTest_defaults array = [
+  'Standard_D11_v2'
+]
+
+// AML AKS Cluster: defaults & overrides
+var aks_dev_sku_param = aks_dev_sku_override != '' ? aks_dev_sku_override : aks_dev_defaults[0]
+var aks_test_prod_sku_param = aks_test_prod_sku_override != '' ? aks_test_prod_sku_override : aks_testProd_defaults[0]
+
+var aks_version_param = aks_version_override != '' ? aks_version_override : '1.27.9' // 2024-03-14 LTS Earlier: (1.27.3 | 2024-01-25 to 2024-03-14) az aks get-versions --location westeurope --output table). Supported >='1.23.5'
+var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
+var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
+
+// AML Compute Instance: defaults & overrides
+var aml_ci_dev_sku_param = aml_ci_dev_sku_override != '' ? aml_ci_dev_sku_override : ci_dev_defaults[0]
+var aml_ci_test_prod_sku_param = aml_ci_test_prod_sku_override != '' ? aml_ci_test_prod_sku_override : ci_devTest_defaults[0]
+
+// AML cluster: defaults & overrides
+var aml_cluster_dev_sku_param = aml_cluster_dev_sku_override != '' ? aml_cluster_dev_sku_override : aml_dev_defaults[0]
+var aml_cluster_test_prod_sku_param = aml_cluster_test_prod_sku_override != '' ? aml_cluster_test_prod_sku_override : aml_testProd_defaults[1]
+var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
+var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
+
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureMachineLearning4${deploymentProjSpecificUniqueSuffix}'
@@ -548,6 +616,17 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     notebookPrivateDnsZoneID:privateLinksDnsZones['notebooks'].id
     allowPublicAccessWhenBehindVnet:(AMLStudioUIPrivate == true)? false:true
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+    aksVmSku_dev: aks_dev_sku_param
+    aksVmSku_testProd: aks_test_prod_sku_param
+    aksNodes_dev:aks_dev_nodes_param
+    aksNodes_testProd:aks_test_prod_nodes_param
+    kubernetesVersionAndOrchestrator:aks_version_param
+    amlComputeDefaultVmSize_dev: aml_cluster_dev_sku_param
+    amlComputeDefaultVmSize_testProd: aml_cluster_test_prod_sku_param
+    amlComputeMaxNodex_dev: aml_cluster_dev_nodes_param
+    amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
+    ciVmSku_dev: aml_ci_dev_sku_param
+    ciVmSku_testProd: aml_ci_test_prod_sku_param
   }
 
   dependsOn: [
@@ -688,6 +767,8 @@ module dataLake '../modules/dataLake.bicep' = {
     blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-vnt-esmlcmn'
     filePrivateEndpointName: 'pend-${datalakeName}-file-to-vnt-esmlcmn'
     dfsPrivateEndpointName: 'pend-${datalakeName}-dfs-to-vnt-esmlcmn'
+    queuePrivateEndpointName: 'pend-${datalakeName}-queue-to-vnt-esmlcmn'
+    tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
     tags: keepTags
     virtualNetworkRules: mergeVirtualNetworkRulesMerged
   }
@@ -846,9 +927,7 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
 }
 
 
-// TODO-2023: Principals of type Application cannot validly be used in role assignments
-
-//-- Needed if connnecting from Databricks to Azure ML workspace
+// Needed if connnecting from Databricks to Azure ML workspace
 // Note: SP OID: it must be the OBJECT ID of a service principal, not the OBJECT ID of an Application, different thing, and I have to agree it is very confusing.
 module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing== false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -893,5 +972,23 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_ad
   dependsOn: [
     adf
     rbackSPfromDBX2AML
+  ]
+}
+
+module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
+  params: {
+    additionalUserIds: technicalAdminsObjectID_array_safe
+    vNetName: vnetNameFull
+    common_bastion_subnet_name: 'AzureBastionSubnet'
+    bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
+    common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+    aml
+    rbackSPfromDBX2AML
+    vmPrivate
   ]
 }

@@ -9,7 +9,7 @@
     "external_keyvault_url_suffix_dev":"suffix_placeholder", 
     "external_keyvault_url_suffix_test":"", 
     "external_keyvault_url_suffix_prod":"",
-    "external_keyvault_url": "https://todo{dev_test_prod_placeholder}-abc-{suffix_placeholder}.vault.azure.net/",
+    "external_keyvault_url": "https://todo{}-abc-{}.vault.azure.net/",
 
     "kv-secret-esml-projectXXX-sp-id":"esml-project-sp-id",
     "kv-secret-esml-projectXXX-sp-secret":"esml-project-sp-secret",

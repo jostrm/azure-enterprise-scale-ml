@@ -126,6 +126,14 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
     name:'privatelink.dfs.${environment().suffixes.storage}'
   }
+  queue: {
+    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
+    name:'privatelink.queue.${environment().suffixes.storage}'
+  }
+  table: {
+    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
+    name:'privatelink.table.${environment().suffixes.storage}'
+  }
   registry: {
     id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // privatelink.${environment().suffixes.acrLoginServer}' // # E
     name:'privatelink.azurecr.io'
@@ -465,6 +473,8 @@ module dataLake '../../modules/dataLake.bicep' = {
     blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-vnt-esmlcmn'
     filePrivateEndpointName: 'pend-${datalakeName}-file-to-vnt-esmlcmn'
     dfsPrivateEndpointName: 'pend-${datalakeName}-dfs-to-vnt-esmlcmn'
+    queuePrivateEndpointName: 'pend-${datalakeName}-queue-to-vnt-esmlcmn'
+    tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
     tags: tags
     virtualNetworkRules:virtualNetworkRules2Add
   }

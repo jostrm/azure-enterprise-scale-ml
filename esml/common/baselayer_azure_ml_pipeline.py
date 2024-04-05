@@ -85,7 +85,7 @@ class esml_step_types():
 class ESMLPipelineFactory():
     p = None
     _use_curated_automl_environment = True
-    _default_base_image = "mcr.microsoft.com/azureml/curated/azureml-automl:126"
+    _default_base_image = "mcr.microsoft.com/azureml/curated/azureml-automl:167"
     _override_compute_target = None
     _conda_dependencies_object = None
 

@@ -28,25 +28,9 @@ resource keyVaultAccessPolicyAdditional 'Microsoft.KeyVault/vaults/accessPolicie
   name:policyName
   properties: {
     accessPolicies: [for userOID in all_principals:{
-      objectId: principalId // object id (required) and if service principle also OID, not AppId
+      objectId: userOID // object id (required) and if service principle also OID, not AppId
       permissions: keyVaultPermissions
       tenantId: subscription().tenantId
     }]
   }
 }
-
-/*
-resource keyVaultAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = {
-  parent:keyVault
-  name:policyName
-  properties: {
-    accessPolicies: [
-      {
-        objectId: principalId
-        permissions: keyVaultPermissions
-        tenantId: subscription().tenantId
-      }
-    ]
-  }
-}
-*/

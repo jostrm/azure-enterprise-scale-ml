@@ -48,7 +48,7 @@ except Exception as e:
   print(e)
   
 try:
-  dbutils.widgets.text("esml_dataset_name","ds01_diabetes", "ESML dataset")
+  dbutils.widgets.text("esml_dataset_name","ds02_other", "ESML dataset")
   esml_dataset_names_in = dbutils.widgets.get("esml_dataset_name")
   esml_dataset_names_in = getArgument("esml_dataset_name")
   print ("esml_dataset_name:",esml_dataset_names_in)

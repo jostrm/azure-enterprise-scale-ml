@@ -27,19 +27,6 @@ module rbackSPfromDBX2AML '../../azure-enterprise-scale-ml/environment_setup/aif
 
   ]
 }
-module rbackSPfromDBX2AMLSWC '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/machinelearningRBAC.bicep' = {
-  name: 'rbacDBX2AMLProjectSPSWC${projectNumber}${locationSuffix}${env}'
-  params: {
-    amlName:amlName
-    projectSP:projectServicePrincipleOID
-    adfSP:'null'
-    projectADuser:technicalContactId
-    additionalUserIds: technicalAdminsObjectID_array_safe
-  }
-  dependsOn: [
-
-  ]
-}
 
 module rbacADFfromUser '../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/datafactoryRBAC.bicep' = {
   name: 'rbacADFFromAMLorProjSP${projectNumber}${locationSuffix}${env}'

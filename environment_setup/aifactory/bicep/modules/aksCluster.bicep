@@ -32,10 +32,16 @@ param aksDnsServiceIP string = '10.0.0.10'
 //param privateDNSZone string
 //param authorizedIPRanges array
 
+//skuName: 'basic' // basic -> 2023-02-01: 'base'
+//skuTier: 'paid' // free, paid -> 2023-02-01: free, standard
 resource aksCluster 'Microsoft.ContainerService/managedClusters@2021-03-01' = {
   name: name
   tags: tags
   location: location
+  sku: {
+    name: 'Basic' // 'basic' (basic) -> 2023-02-01: ()'base')
+    tier: 'Paid' //'paid' (free, paid) -> 2023-02-01: (free, standard)
+  }
   identity: {
     type: 'SystemAssigned'
   }

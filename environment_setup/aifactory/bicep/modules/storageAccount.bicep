@@ -7,6 +7,12 @@ param blobPrivateEndpointName string
 @description('Specifies the name of the file service private endpoint')
 param filePrivateEndpointName string
 
+@description('Specifies the name of the queue service private endpoint')
+param queuePrivateEndpointName string
+
+@description('Specifies the name of the table service private endpoint')
+param tablePrivateEndpointName string
+
 @allowed([
   'Standard_LRS'
   'Standard_ZRS'
@@ -39,6 +45,14 @@ var groupIds = [
   {
     name: filePrivateEndpointName
     gid: 'file'
+  }
+  {
+    name: queuePrivateEndpointName
+    gid: 'queue'
+  }
+  {
+    name: tablePrivateEndpointName
+    gid: 'table'
   }
 ]
 
@@ -130,6 +144,16 @@ output dnsConfig array = [
   {
     name: pendSacc[1].name
     type: 'file'
+    id:sacc.id
+  }
+  {
+    name: pendSacc[2].name
+    type: 'queue'
+    id:sacc.id
+  }
+  {
+    name: pendSacc[3].name
+    type: 'table'
     id:sacc.id
   }
 ]

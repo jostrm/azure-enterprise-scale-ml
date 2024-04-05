@@ -1,3 +1,25 @@
+# USAGE: .\aifactory\esml-util\23-add-dsvm.ps1 -spSecret -spID xyz -tenantID abc -subscriptionID xyz
+param (
+    # required parameters
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
+    [Parameter(Mandatory=$false, HelpMessage="Specifies the App id for service principal")][string]$spID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$subscriptionID
+)
+
+if (-not [String]::IsNullOrEmpty($spSecret)) {
+
+  $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
+  $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
+  Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
+
+  $context = Get-AzSubscription -SubscriptionId $subscriptionID
+  Set-AzContext $context
+} else {
+  # The $spID parameter is null or empty
+  Write-Host "The spID parameter is null or empty. Running under other authentication that SP"
+}
+
 $Password = New-Object -TypeName PSObject
 $Password | Add-Member -MemberType ScriptProperty -Name "Password" -Value { ("!@#$%^&*0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz".tochararray() | sort {Get-Random})[0..8] -join '' }
 
@@ -23,13 +45,13 @@ $tags = @{
     "Description"="ESML AI Factory"
    }
 
-$location = 'westeurope'
-$projectNumber = '001'
+$location = 'uksouth'
+$projectNumber = '002'
 $env = 'dev'
-$locationSuffix = 'weu'
+$locationSuffix = 'uks'
 $prjResourceSuffix = '-001'
 
-$rg = '${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${prjResourceSuffix}-rg'
+$rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${prjResourceSuffix}-rg"
 $vnetNameBase = 'vnt-esmlcmn'
 
 Write-Host "Kicking off the BICEP..."
@@ -50,6 +72,7 @@ New-AzResourceGroupDeployment -TemplateFile "aifactory\esml-util\23-add-dsvm.bic
 -dsvmSuffix $dsvmNumber `
 -commonResourceSuffix $commonResourceSuffix `
 -vnetNameBase $vnetNameBase `
+-common_subnet_name $common_subnet_name `
 -Verbose
 
 Write-Host "BICEP success!"

@@ -31,6 +31,7 @@ resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing 
 
 var existingRules = esmlCommonLake.properties.networkAcls.virtualNetworkRules
 var keepSku = esmlCommonLake.sku.name
+// 'Standard_ZRS'
 var keepLocation = esmlCommonLake.location
 var keepTags = esmlCommonLake.tags
 
@@ -50,13 +51,15 @@ module dataLake '../modules/dataLake.bicep' = {
   params: {
     storageAccountName: keepDatalakeName
     containerName: lakeContainerName // Only update VirtualNetworkRulesMerged...we dont want to trigger a new RESOURCE creation of container
-    skuName: keepSku
+    skuName: 'Standard_ZRS' // keepSku 
     location: keepLocation
     vnetId: vnetId
     subnetName: common_subnet_name
     blobPrivateEndpointName: 'pend-${keepDatalakeName}-blob-to-vnt-esmlcmn'
     filePrivateEndpointName: 'pend-${keepDatalakeName}-file-to-vnt-esmlcmn'
     dfsPrivateEndpointName: 'pend-${keepDatalakeName}-dfs-to-vnt-esmlcmn'
+    queuePrivateEndpointName: 'pend-${keepDatalakeName}-queue-to-vnt-esmlcmn'
+    tablePrivateEndpointName: 'pend-${keepDatalakeName}-table-to-vnt-esmlcmn'
     tags: keepTags
     virtualNetworkRules: mergeVirtualNetworkRulesMerged
     //subnetName2AddAsVnetRule: dbxPubSubnetName
