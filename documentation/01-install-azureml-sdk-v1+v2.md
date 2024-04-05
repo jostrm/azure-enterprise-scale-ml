@@ -7,9 +7,9 @@
     - Option b) Clone your repo, containing the `azure-enterprise-scale-ml` repo
 3) Go to the install folder in  `azure-enterprise-scale-ml`:
     - Option a) AML SDKv1+SDKv2 - CD to `azure-enterprise-scale-ml\environment_setup\install_sdk\user_dev_env_install\AzureML_v1_55_and_v2_1_15`
-        - [Link to AzureML_v1_55_and_v2_1_15](../azure-enterprise-scale-ml/environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/)
+        - [Link to AzureML_v1_55_and_v2_1_15](../../azure-enterprise-scale-ml/environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55_and_v2_1_15/)
     - Option b) AML SDKv1 - CD to `azure-enterprise-scale-ml\environment_setup\install_sdk\user_dev_env_install\AzureML_v1_55`
-        - [Link to AzureML_v1_55 ](../azure-enterprise-scale-ml/environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/)
+        - [Link to AzureML_v1_55 ](../../azure-enterprise-scale-ml/environment_setup/install_sdk/user_dev_env_install/AzureML_v1_55/)
 
 4) RUN `automl_setup.cmd`If you are on Windows (10 or 11)
     - Windows: `automl_setup.cmd` 
@@ -47,7 +47,7 @@ Here a CONDA installation, without any start-script works, and the Linux YML fil
         - `%%bashconda activate azure_automl_esml_v155`
 
 It should look like something below: 
-<img src="../../esml/images/Install_Readme_ComputeInstance_Conda.png" alt="drawing" width="100%"/>
+<img src="../esml/images/Install_Readme_ComputeInstance_Conda.png" alt="drawing" width="100%"/>
 
     
 

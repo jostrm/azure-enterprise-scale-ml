@@ -1,9 +1,12 @@
-# ESML quickstart: Existing ADO/GIT project, configured by coreteam
+# QUICKSTART: Existing ADO/GIT project, configured by coreteam
 Hi Project team. Maybe you just cloned the ADO repo to your laptop, or your DSVM (via Bastion)
 Here is how to get started.
 
 The below is instructions if you have a DSVM, or laptop, and needs to get the SDK up and running, and accelerator templates/MLOps/DataOps/Notebooks started.
 
+...or if above is NOT the case: Do you want to install SDK on your OWN computer: See here: 
+- If you want to isntall the SDK on your own local computer, or install the conda again, on a VM or BUILD AGENT, go to this README: 
+- [01-install-azureml-sdk-v1+v2.md](./azure-enterprise-scale-ml/environment_setup/install_sdk/user_dev_env_install/01-install-azureml-sdk-v1+v2.md)
 
 # 1a) INIT GIT submodule
 - Project already has the `submodule` called `azure-enterprise-scale-ml`, if this is just an empty folder with an `S` - do the below: 

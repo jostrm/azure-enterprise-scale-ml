@@ -3,6 +3,13 @@
 - A: You have to enable the checkbox in Azure Devops pipeline to * [x] `Checkout from submodule`
 - See more: https://stackoverflow.com/questions/53616942/how-to-setup-submodules-azure-devops
 
+## Q: Azure Datafactory & DataOps - How to work with Azure DataFactory, and branching? naming convention on IR etc
+- A: Same name of Your Integration Runtime on all 3 Datafactories: Dev, Test, Prod
+- A: Only connect the DEV data factory to GIT/Azure Devops
+- A: Use GLOBAL variable "esml_environment" with values [dev,test,prod] in all Data factories
+
+More info: https://learn.microsoft.com/en-us/azure/data-factory/continuous-integration-delivery
+
 ## Q: Why does my training run "timeout" in Azure Devops. Works from mY computer?
 - A:  Might be due to: Capabilities and limitations of Microsoft-hosted agents, if you use the FREE tier of Azure Devops.
   - **Public project**: 10 free Microsoft-hosted parallel jobs that can run for up to 360 minutes (6 hours) each time
@@ -31,6 +38,9 @@
       - TEST and PROD pipeline/online-AKS is in different subscriptions. 
       - Ther is STAGING between TEST and PROD - with a human GATE before PROD release.
       > ![](./esml/images/mlops-release-gate.png)
+
+
+
       
 
 
