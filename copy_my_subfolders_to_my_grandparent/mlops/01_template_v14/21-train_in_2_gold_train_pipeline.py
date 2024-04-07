@@ -49,7 +49,7 @@ print("SDK Version:", azureml.core.VERSION)
 esml_date_utc = '1000-01-01 10:35:01.243860' # In parameter: You can override what training data to use. 
 esml_model_number = 11
 
-p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
+p,esml_date_utc,esml_model_number,esml_model_version_int = ESMLProject.get_project_from_env_command_line() # Alt A)
 if(p is None): # Alt B) Just for DEMO purpose..its never None
     p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment
 

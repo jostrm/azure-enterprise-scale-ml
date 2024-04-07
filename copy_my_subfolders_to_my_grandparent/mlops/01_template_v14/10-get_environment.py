@@ -32,7 +32,7 @@ import argparse
 from esml import ESMLProject
 print("SDK Version:", azureml.core.VERSION)
 
-p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
+p,esml_date_utc,esml_model_number,esml_model_version_int = ESMLProject.get_project_from_env_command_line() # Alt A)
 if(p is None): # Alt B) Just for DEMO purpose..its never None
     p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment
 
