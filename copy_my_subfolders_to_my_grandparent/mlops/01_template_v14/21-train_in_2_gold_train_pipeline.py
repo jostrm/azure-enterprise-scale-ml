@@ -34,7 +34,7 @@ from esml import ESMLProject
 from baselayer_azure_ml_pipeline import esml_pipeline_types
 from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 
-advanced_mode = True # ADVANCDE MODE (DatabricksSteps also) + Manual ML (or AutoML if defined in Databricks notebook)
+advanced_mode = False # ADVANCDE MODE (DatabricksSteps also) + Manual ML (or AutoML if defined in Databricks notebook)
 use_automl = True # SIMPLE MODE + AutoMLStep (if True)Manual ML Step (if False)
 
 if advanced_mode:
