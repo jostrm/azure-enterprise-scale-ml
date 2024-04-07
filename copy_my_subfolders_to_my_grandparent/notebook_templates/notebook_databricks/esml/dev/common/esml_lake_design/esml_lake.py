@@ -169,11 +169,11 @@ class ESMLLake(object):
     self._inf_out_silver = dict()
     
     for ds in self._datasets:
-      self._inf_in[ds] = self.esml_inference +"/"+active_model_version+"/"+ds+"/in/"+esml_env+ "/"+active_in_train+"/"
+      self._inf_in[ds] = self.esml_inference +"/"+str(active_model_version)+"/"+ds+"/in/"+esml_env+ "/"+active_in_train+"/"
     for ds in self._datasets:
-      self._inf_out_bronze[ds] = self.esml_inference +"/"+active_model_version+ "/"+ds+"/out/bronze/"+esml_env+ "/" + self.bronze_filename
+      self._inf_out_bronze[ds] = self.esml_inference +"/"+str(active_model_version)+ "/"+ds+"/out/bronze/"+esml_env+ "/" + self.bronze_filename
     for ds in self._datasets:
-      self._inf_out_silver[ds] = self.esml_inference +"/"+active_model_version+ "/"+ds+"/out/silver/"+esml_env+ "/" + self.silver_filename
+      self._inf_out_silver[ds] = self.esml_inference +"/"+str(active_model_version)+ "/"+ds+"/out/silver/"+esml_env+ "/" + self.silver_filename
     
   def get_physical_path(self,physical_project_path,mount_dataset_path, file_suffix='*.parquet'):
     p = pathlib.Path(mount_dataset_path)
