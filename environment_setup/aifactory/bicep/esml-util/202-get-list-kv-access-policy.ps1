@@ -7,13 +7,14 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory keyvault name")][string]$keyvaultName,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory subscription id")][string]$subscription_id
 )
-$context = Get-AzSubscription -SubscriptionId $subscriptionID
-Set-AzContext $context
 
 # Login with the service principal
 $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
 Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
+
+$context = Get-AzSubscription -SubscriptionId $subscriptionID
+Set-AzContext $context
 
 # Set the Key Vault access policy
 Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $target_spOID -PermissionsToSecrets get,list -BypassObjectIdValidation
