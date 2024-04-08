@@ -1786,7 +1786,7 @@ class ESMLPipelineFactory():
         if(is_databricks):
             gold_to_score_folder = gold_to_score_folder + "gold_to_score_dbx.parquet/*.parquet"
         else:
-            gold_to_score_folder = gold_to_score_folder + "1_latest/gold_to_score.parquet" #2024-04-08 - from 1_latest/ to 1_latest/gold_to_score.parquet
+            gold_to_score_folder = gold_to_score_folder + "1_latest/" #2024-04-08 - from 1_latest/ to 1_latest/gold_to_score.parquet
 
         gold_to_score = (
             OutputFileDatasetConfig(name=gold_to_score_name,destination=(self._datalake,gold_to_score_folder))
