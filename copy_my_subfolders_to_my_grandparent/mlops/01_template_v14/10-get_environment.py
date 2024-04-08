@@ -39,4 +39,4 @@ if(p is None): # Alt B) Just for DEMO purpose..its never None
 ws = p.ws
 print(ws.name, ws.resource_group, ws.location, ws.subscription_id, sep="\n")
 print("Project number: {}".format(p.project_folder_name))
-print("Model number: {} , esml_date_utc: {}".format(esml_model_number, esml_date_utc))
+print("Model number (MXX): {} , esml_date_utc: {} model_version_int: {}".format(esml_model_number, esml_date_utc,str(esml_model_version_int)))

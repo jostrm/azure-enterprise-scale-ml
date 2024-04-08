@@ -1429,6 +1429,7 @@ class ESMLPipelineFactory():
         latest_gold_scored_path = latest_scored_folder + "{run-id}"
         scored_folder_template = p.path_gold_scored_template(True,True)
 
+        # projects/project002/11_diabetes_model_reg/inference/0/gold/dev/1_latest/
         if(type(gold_to_score_step) is OutputFileDatasetConfig):  # esml_pipeline_type.SCORE_GOLD 
             gold_to_score = gold_to_score_step # gives us the "OutputFileDatasetConfig"
         else: # esml_pipeline_type.IN_2_GOLD_SCORING
@@ -1783,9 +1784,9 @@ class ESMLPipelineFactory():
             gold_to_score_folder = p.path_gold_to_score_template(False,False,False)
             
         if(is_databricks):
-            gold_to_score_folder = gold_to_score_folder + "gold_dbx.parquet/*.parquet"
+            gold_to_score_folder = gold_to_score_folder + "gold_to_score_dbx.parquet/*.parquet"
         else:
-            gold_to_score_folder = gold_to_score_folder + "1_latest/"
+            gold_to_score_folder = gold_to_score_folder + "1_latest/gold_to_score.parquet" #2024-04-08 - from 1_latest/ to 1_latest/gold_to_score.parquet
 
         gold_to_score = (
             OutputFileDatasetConfig(name=gold_to_score_name,destination=(self._datalake,gold_to_score_folder))
