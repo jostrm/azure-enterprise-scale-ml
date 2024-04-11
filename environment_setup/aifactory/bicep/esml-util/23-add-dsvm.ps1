@@ -32,6 +32,7 @@ $deplName = '23-add-dsvm'
 $commonRGNamePrefix = 'abc-def-'
 $commonResourceSuffix = '-001'
 $aifactorySuffixRG = '-001'
+$common_subnet_name = 'snet-esml-cmn-001'
 
 $tags = @{
     "Application Name" = "Enterprise Scale ML (ESML)"

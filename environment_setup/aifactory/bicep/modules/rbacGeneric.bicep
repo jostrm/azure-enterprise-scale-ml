@@ -1,21 +1,14 @@
-@description('ObjectId')
-param objectId string
-@description('roleDefinition ID')
-param roleDefinitionId string
-@description('bicep resource XYZ ')
-param scopeResourceName string
+@description('Additional optional Object ID of more people to access Resource group')
+param user_object_ids array
+param role_definition_id string
+var sub_role = substring(role_definition_id,0,5)
 
-/*
-resource scopeObject 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
-  name: scopeResourceName
-}
-
-resource rbacRole 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid('${roleDefinitionId}-rbac-${resourceGroup().name}')
+resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
+  name: guid('${user_object_ids[i]}-role ${sub_role}-${resourceGroup().id}')
   properties: {
-    roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${roleDefinitionId}'
-    principalId: objectId
+    roleDefinitionId: role_definition_id
+    principalId: user_object_ids[i]
+    principalType: 'User'
+    description: 'Role ${role_definition_id} to user to get Contributor on resource group: ${resourceGroup().name}'
   }
-  scope:scopeObject
-}
-*/
+}]

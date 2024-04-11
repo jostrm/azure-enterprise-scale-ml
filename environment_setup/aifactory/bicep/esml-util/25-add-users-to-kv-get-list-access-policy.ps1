@@ -3,9 +3,9 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal, to login with")][string]$spSecret,
     [Parameter(Mandatory=$true, HelpMessage="Specifies the app id for service principal, to login with")][string]$spID,
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
-    [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, to assign GET, LIST Access policy")][string]$target_spOID,
+    [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, to assign GET, LIST Access policy")][string]$targetObjectID,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory keyvault name")][string]$keyvaultName,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory subscription id")][string]$subscription_id
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory subscription id")][string]$subscriptionID
 )
 
 # Login with the service principal
@@ -17,4 +17,4 @@ $context = Get-AzSubscription -SubscriptionId $subscriptionID
 Set-AzContext $context
 
 # Set the Key Vault access policy
-Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $target_spOID -PermissionsToSecrets get,list -BypassObjectIdValidation
+Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list -BypassObjectIdValidation

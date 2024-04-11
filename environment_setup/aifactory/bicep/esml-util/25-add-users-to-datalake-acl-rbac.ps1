@@ -1,36 +1,39 @@
+# USAGE: .\aifactory\esml-util\25-add-users-to-datalake-acl-rbac.ps1 -spSecret "abc" -spID "abc" -tenantID "abc" -storageAccount "abcd" -adlsgen2filesystem "lake3" -projectXXX "project001" -userObjectIds a,b,c -projectSPObjectID "a" -commonSPObjectID "abc" -commonADgroupObjectID "TODO" -projectADGroupObjectId "TODO"
 param (
     # required parameters
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
     [Parameter(Mandatory=$false, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
+    [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
     [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
     # user OID's
-    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string[]]$userObjectIds,
-    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$projectADGroupObjectId,
-    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$commonSPObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$commonADgroupObjectID,
-
-    # optional override parameters
-    [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem
+    [Parameter(Mandatory = $false, HelpMessage = "Array of user Object Ids")][string[]]$userObjectIds,
+    [Parameter(Mandatory = $false, HelpMessage = "Project service principle OID esml-project001-sp-oid")][string]$projectSPObjectID,
+    [Parameter(Mandatory = $false, HelpMessage = "Common service principle OID common")][string]$commonSPObjectID,
+    [Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID,
+    [Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId
 )
 
 # USAGE: .\aifactory\esml-util\200-datalake-acl-rbac.ps1 -spSecret "abc"
 
 Import-Module Az.Storage
 
+
 #### Trouble shoot ####
-$storageAccount ="TODO"
-$spID ="TODO SP AppID - with Storage Blob Data Owner role" # Storage Blob Data Owner role. (esml-common-sp)
-$tenantID ="TODO"
-$adlsgen2filesystem ="lake3"
-$projectXXX = "project001"
-$projectSPObjectID = "TODO ObjectID"
-$userObjectIds = @("TODO ObjectID","TODO ObjectID","TODO ObjectID",$projectSPObjectID) # users + project001-sp-oid
-$commonSPObjectID = "TODO ObjectID" # esml-common-sp
-$commonADgroupObjectID = "TODO" # AD group: esml-common-coreteam 
-$projectADGroupObjectId = "TODO" # AD group: esml-project002
+#$adlsgen2filesystem ="lake3"
+#$storageAccount ="TODO"
+#$spID ="TODO SP AppID - with Storage Blob Data Owner role" # Storage Blob Data Owner role. (esml-common-sp)
+#$tenantID ="TODO"
+#$projectXXX = "project001"
+#$projectSPObjectID = "TODO ObjectID"
+#$userObjectIds = @("TODO ObjectID","TODO ObjectID","TODO ObjectID") # users + project001-sp-oid
+#$commonSPObjectID = "TODO ObjectID" # esml-common-sp
+#$commonADgroupObjectID = "TODO" # AD group: esml-common-coreteam 
+#$projectADGroupObjectId = "TODO" # AD group: esml-project002
 #### Trouble shoot END ####
+
+$userObjectIds += $projectSPObjectID
 
 $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd

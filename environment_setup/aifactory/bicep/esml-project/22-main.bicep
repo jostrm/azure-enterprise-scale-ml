@@ -979,7 +979,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
   params: {
-    additionalUserIds: technicalAdminsObjectID_array_safe
+    user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
