@@ -8,10 +8,10 @@
 // Separete powershell: AccessPolicy on Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1
 
 @description('Specifies the name the datafactory resource')
-param vNetName string
+param vnet_name string
 param common_bastion_subnet_name string = 'AzureBastionSubnet'
 param bastion_service_name string
-param common_kv_name string
+param keyvault_name string
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
 param dashboard_resourcegroup_name string = ''
 param project_resourcegroup_name string
@@ -53,27 +53,27 @@ resource vmAdminLoginRoleDefinition 'Microsoft.Authorization/roleDefinitions@201
 // vNet - Network Contributor: Reader was not enough. Network Contributor is needed, to be able to JOIN subnets
 // subet - Microsoft.Network/virtualNetworks/subnets/join/action
 resource vNetNameResource 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
-  name: vNetName
+  name: vnet_name
 }
 
 resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-nwContributor-${vNetName}-${resourceGroup().id}')
+  name: guid('${user_object_ids[i]}-nwContributor-${vnet_name}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: networkContributorRoleDefinition.id
     principalId: user_object_ids[i]
     principalType: 'User'
-    description:'Network Contributor to USER with OID  ${user_object_ids[i]} for vNet: ${vNetName}'
+    description:'Network Contributor to USER with OID  ${user_object_ids[i]} for vNet: ${vnet_name}'
   }
   scope:vNetNameResource
 }]
 
 resource networkContributorSPVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(service_principle_array)):{
-  name: guid('${service_principle_array[i]}-nwContribSP-${vNetName}-${resourceGroup().id}')
+  name: guid('${service_principle_array[i]}-nwContribSP-${vnet_name}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: networkContributorRoleDefinition.id
     principalId: service_principle_array[i]
     principalType: 'ServicePrincipal'
-    description:'Network Contributor to SERVICE PRINCIPLE with OID  ${service_principle_array[i]} for vNet: ${vNetName}'
+    description:'Network Contributor to SERVICE PRINCIPLE with OID  ${service_principle_array[i]} for vNet: ${vnet_name}'
   }
   scope:vNetNameResource
 }]
@@ -113,18 +113,18 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
 }]
 
 // Common Keyvault "bastion-uks-dev-001" - READER
-resource commonKvReader 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
-  name: common_kv_name
+resource kvReader 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+  name: keyvault_name
 }
 resource readerUserCommonKv 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-reader-${common_kv_name}-${resourceGroup().id}')
+  name: guid('${user_object_ids[i]}-reader-${keyvault_name}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: readerRoleDefinition.id
     principalId: user_object_ids[i]
     principalType: 'User'
-    description:'Reader to USER with OID  ${user_object_ids[i]} for keyvault: ${common_kv_name}'
+    description:'Reader to USER with OID  ${user_object_ids[i]} for keyvault: ${keyvault_name}'
   }
-  scope:commonKvReader
+  scope:kvReader
 }]
 
 // RG's

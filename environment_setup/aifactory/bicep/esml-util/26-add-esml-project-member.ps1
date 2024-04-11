@@ -7,8 +7,9 @@
 # Separate powershell: ACL on Datalake: 25-add-users-to-datalake-acl-rbac.ps1
 # Separete powershell: AccessPolicy on Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1
 
+# USAGE: 
+# .\26-add-esml-project-member.ps1 -spSecret 'abc' -spID 'abc' -tenantID 'abc' -subscriptionID 'abc' -storageAccount 'abc' -adlsgen2filesystem 'abc' -projectXXX 'abc' -userObjectIds 'x','y','z' -projectSPObjectID 'abc' -commonSPObjectID 'abc' -commonADgroupObjectID 'abc' -projectADGroupObjectId 'abc'
 
-# USAGE: .\aifactory\esml-util\25-add-user-to-bastion.ps1 -spSecret 'your_secret' -spID 'your_id' -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id' 
 param (
     # required parameters
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
@@ -24,7 +25,13 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID,
     [Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId,
     [Parameter(Mandatory=$false, HelpMessage="Specifies the object id for service principal, to assign GET, LIST Access policy")][string]$targetObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory keyvault name")][string]$keyvaultName
+    [Parameter(Mandatory = $false, HelpMessage = "keyvault name: [kv-prj001-pgvr2-001, kv-cmndev-pgvr2-001]")][string]$projectKeyvaultName,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory suffix. What suffix on common resources: abc-def-")][string]$commonRGNamePrefix,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory suffix. What suffix on common resource group: -001")][string]$commonResourceSuffix,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory suffix. What suffix on common resource group: -001")][string]$aifactorySuffixRG,
+    [Parameter(Mandatory = $false, HelpMessage = "Region location prefix in ESML settings: [weu,uks,swe,sdc]")][string]$locationSuffix,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML Projectnumber, three digits: 001")][string]$projectNumber,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {
@@ -43,31 +50,12 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
 
 ## EDIT per DSVM you want to deploy
 $deplName = '26-add-esml-project-member'
-$commonRGNamePrefix = 'abc-def-'
-$commonResourceSuffix = '-001'
-$aifactorySuffixRG = '-001'
-$technicalAdminsObjectID = '' # Comma separated ObjectIDs of users. 
-$projectSP_OIDs = ''# Comma separated ObjectIDs of project service principals, usually only 1, `esml-project004-sp-oid`
-
-$tags = @{
-    "Application Name" = "Enterprise Scale ML (ESML)"
-    "BA ID" = "NA"
-    "BCIO"= "Robin"
-    "Business Area"= "NA"
-    "Cost Center"="123456"
-    "Resource Managed By"="The Riddler"
-    "TechnicalContact"="batman@gothamcity.dc"
-    "Project"="Batcave upgrade"
-    "Description"="ESML AI Factory"
-   }
-
-$location = 'westeurope'
-$locationSuffix = 'weu'
-$projectNumber = '001'
-$env = 'dev'
-$prjResourceSuffix = '-001'
-$cmndev_keyvault_name = 'kv-cmndev-pgvr2-001'
-$project_keyvault_name = 'kv-prj001-pgvr2-001'
+#$commonRGNamePrefix = 'abc-def-'
+#$commonResourceSuffix = '-001'
+#$aifactorySuffixRG = '-001'
+#$locationSuffix = 'weu'
+#$projectNumber = '001'
+#$env = 'dev'
 
 $rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
 Write-Host "RG" $rg
@@ -81,14 +69,14 @@ Write-Host "Kicking off the BICEP..."
 #Set-AzDefault -ResourceGroupName $rg
 
 # 1) Kickoff BICEP 1
-New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/26-add-esml-project-member.bicep" `
+New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
 -Name $deplName `
 -project_resourcegroup_name $rg `
 -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
 -project_service_principle $projectSPObjectID `
--vNetName $vnetNameFull `
+-vnet_name $vnetNameFull `
 -user_object_ids $userObjectIds `
--common_kv_name $cmndev_keyvault_name `
+-keyvault_name $projectKeyvaultName `
 -bastion_service_name $bastion_service_name
 -Verbose
 
@@ -108,7 +96,7 @@ Write-Host "BICEP success! Now running powershell scripts for ACL on Datalake: 2
 
 
 #[Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, to assign GET, LIST Access policy")][string]$targetObjectID,
-#[Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory keyvault name")][string]$keyvaultName,
+#[Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory keyvault name")][string]$projectKeyvaultName,
 #[Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory subscription id")][string]$subscriptionID
 
-$ ".\25-add-users-to-kv-get-list-access-policy.ps1" -spSecret @spSecret -spID @spID -tenantID @tenantID -subscriptionID @subscriptionID -targetObjectID $targetObjectID -keyvaultName $keyvaultName
+$ ".\25-add-users-to-kv-get-list-access-policy.ps1" -spSecret @spSecret -spID @spID -tenantID @tenantID -subscriptionID @subscriptionID -targetObjectID $targetObjectID -keyvaultName $projectKeyvaultName
