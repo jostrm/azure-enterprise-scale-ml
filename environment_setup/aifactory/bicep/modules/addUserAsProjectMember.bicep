@@ -15,11 +15,10 @@ param keyvault_name string
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
 param dashboard_resourcegroup_name string = ''
 param project_resourcegroup_name string
-@secure()
-param project_service_principle string
+param project_service_principle_oid string
 param user_object_ids array
 
-var service_principle_array = project_service_principle == ''? []: array(split(project_service_principle,','))
+var service_principle_array = project_service_principle_oid == ''? []: array(split(project_service_principle_oid,','))
 
 // READER
 var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
