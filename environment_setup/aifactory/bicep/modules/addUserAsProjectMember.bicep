@@ -11,12 +11,13 @@
 param vnet_name string
 param common_bastion_subnet_name string = 'AzureBastionSubnet'
 param bastion_service_name string
-param keyvault_name string
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
 param dashboard_resourcegroup_name string = ''
 param project_resourcegroup_name string
 param project_service_principle_oid string
 param user_object_ids array
+//param common_rg_name string
+//param subscription_id string
 
 var service_principle_array = project_service_principle_oid == ''? []: array(split(project_service_principle_oid,','))
 
@@ -53,6 +54,7 @@ resource vmAdminLoginRoleDefinition 'Microsoft.Authorization/roleDefinitions@201
 // subet - Microsoft.Network/virtualNetworks/subnets/join/action
 resource vNetNameResource 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
   name: vnet_name
+  //scope: subscription() //resourceGroup(subscription_id, common_rg_name)
 }
 
 resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
@@ -111,20 +113,6 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
   scope:resBastion4project
 }]
 
-// Common Keyvault "bastion-uks-dev-001" - READER
-resource kvReader 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
-  name: keyvault_name
-}
-resource readerUserCommonKv 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-reader-${keyvault_name}-${resourceGroup().id}')
-  properties: {
-    roleDefinitionId: readerRoleDefinition.id
-    principalId: user_object_ids[i]
-    principalType: 'User'
-    description:'Reader to USER with OID  ${user_object_ids[i]} for keyvault: ${keyvault_name}'
-  }
-  scope:kvReader
-}]
 
 // RG's
 resource project_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
