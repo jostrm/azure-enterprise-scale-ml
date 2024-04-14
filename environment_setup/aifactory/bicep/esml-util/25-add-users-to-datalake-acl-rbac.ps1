@@ -1,24 +1,22 @@
 # USAGE: .\aifactory\esml-util\25-add-users-to-datalake-acl-rbac.ps1 -spSecret "abc" -spID "abc" -tenantID "abc" -storageAccount "abcd" -adlsgen2filesystem "lake3" -projectXXX "project001" -userObjectIds a,b,c -projectSPObjectID "a" -commonSPObjectID "abc" -commonADgroupObjectID "TODO" -projectADGroupObjectId "TODO"
+
 param (
     # required parameters
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
-    [Parameter(Mandatory=$false, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
-    [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
-    [Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
-    # user OID's
-    [Parameter(Mandatory = $false, HelpMessage = "Array of user Object Ids")][string[]]$userObjectIds,
-    [Parameter(Mandatory = $false, HelpMessage = "Project service principle OID esml-project001-sp-oid")][string]$projectSPObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "Common service principle OID common")][string]$commonSPObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId
+    [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
+    [Parameter(Mandatory=$true, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
+    [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
+    [Parameter(Mandatory = $true, HelpMessage = "Array of user Object Ids")][string[]]$userObjectIds,
+    [Parameter(Mandatory = $true, HelpMessage = "Project service principle OID esml-project001-sp-oid")][string]$projectSPObjectID,
+    [Parameter(Mandatory = $true, HelpMessage = "Common service principle OID common")][string]$commonSPObjectID,
+    # optional
+    [Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID = 'TODO',
+    [Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId = 'TODO'
 )
 
 # USAGE: .\aifactory\esml-util\200-datalake-acl-rbac.ps1 -spSecret "abc"
-
-Import-Module Az.Storage
-
 
 #### Trouble shoot ####
 #$adlsgen2filesystem ="lake3"
@@ -34,11 +32,37 @@ Import-Module Az.Storage
 #### Trouble shoot END ####
 
 $userObjectIds += $projectSPObjectID
+$ctx = $null
 
-$SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
-$credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
-Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
-$ctx = New-AzStorageContext -StorageAccountName $storageAccount -UseConnectedAccount
+if (-not [String]::IsNullOrEmpty($spSecret)) {
+    Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal"
+    Write-Host "The spID: ${spID}"
+    Write-Host "The tenantID: ${tenantID}"
+  
+    $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
+    $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
+    Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
+    $ctx = New-AzStorageContext -StorageAccountName $storageAccount -UseConnectedAccount
+  
+    if ($(Get-AzContext).Subscription -ne "") {
+      write-host "Successfully logged in as $($(Get-AzContext).Account) to $($(Get-AzContext).Subscription)"
+      #$ctx = New-AzStorageContext -StorageAccountName $storageAccount -UseConnectedAccount
+    }
+    else {
+      Write-Host "Failed to login to Azure with Service Principal. Exiting..."
+    }
+} else {
+    # The $spID parameter is null or empty
+    Write-Host "The spID parameter is null or empty. Running under other authentication that SP"
+}
+
+Write-Host "userObjectIds again: $userObjectIds"
+# userObjectIds again: 64fd2935-96c6-4a50-9d47-a3bd59adffba esml-project001-sp-oid
+
+if (-not [String]::IsNullOrEmpty($ctx)) {
+    Write-Host "ctx is not null or empty."
+    Write-Host "ctx is  $ctx"
+}
 
 # FOLDERS
 $active = "active/"
@@ -48,13 +72,43 @@ $projects = "projects/"
 $myproject = "projects/$projectXXX/"
 
 Write-Host " 1)INIT status: container ACLs for $adlsgen2filesystem"
+if ($null -eq $ctx) {
+    Write-Host "Could not get ctx $ctx"
+    exit 1
+}
+
+Write-Host $PSVersionTable.PSVersion
+$PSVersionTable.PSVersion
+Get-Module -Name Az -ListAvailable | Select-Object -Property Name,Version
+
 $filesystem = Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem
-$filesystem.ACL
+
+if ($null -eq $filesystem) {
+    Write-Host "Could not get filesystem $adlsgen2filesystem"
+} 
 
 # Common SP container: Execute (Default)
-$aclContainerEDefault = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem).ACL
+#$aclContainerEDefault = (Get-AzDataLakeGen2Item -Context $ctx -FileSystem $adlsgen2filesystem).ACL
+$aclContainerEDefault = $filesystem.ACL
+
+if ($null -eq $aclContainerEDefault) {
+    Write-Host "NULL -  aclContainerEDefault $aclContainerEDefault"
+    Write-Host "Possible reason A - You have not installed the POwershell module: Install-Module Az.Storage -Repository PSGallery -Scope CurrentUser -Force"
+    Write-Host "Possible reason B - The storage account is note reachable networking wise, from the build agent / executing machine. Check firewall rules on storage account, or use a buildagent inside vNet"
+    Write-Host "Possible reason C - Either wrong Powershell version (tested on 7.2.18) or Az module version for Get-AzDataLakeGen2Item (tested on Az 5.2.0, Az 7.3.0). Run as inline with: pwsh -Command {} "
+    Write-Host "Possible reason D - Service principal role:: Blob Storage Data Owner, is needed. The exectuting service principal / user, needs to have RBAC role to read the ACLs on the datalake filesystem, meaning role: Blob Storage Data Owner"
+    Write-Host "FAILURE will happen here: This command will fail - Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId _commonSPObjectID -Permission --x -DefaultScope -InputObject _aclContainerEDefault "
+    Write-Host " - Since null on _aclContainerEDefault"
+    Write-Host "ERROR message will be: Cannot bind argument to parameter 'InputObject' because it is null."
+}
+if ($null -eq $commonSPObjectID) {
+    Write-Host "NULL -  commonSPObjectID $commonSPObjectID"
+} 
+
 $aclContainerEDefault = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $commonSPObjectID -Permission --x -DefaultScope -InputObject $aclContainerEDefault
+Write-Host "DEBUG 3"
 $aclContainerEDefault = Set-AzDataLakeGen2ItemAclObject -AccessControlType user -EntityId $commonSPObjectID -Permission --x -InputObject $aclContainerEDefault
+Write-Host "DEBUG 4"
 
 if ($commonADgroupObjectID -ne "TODO") {
     $aclContainerEDefault = Set-AzDataLakeGen2ItemAclObject -AccessControlType group -EntityId $commonADgroupObjectID -Permission --x -DefaultScope -InputObject $aclContainerEDefault
