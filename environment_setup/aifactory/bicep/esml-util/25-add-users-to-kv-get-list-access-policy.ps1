@@ -4,14 +4,16 @@ param (
     [Parameter(Mandatory=$true, HelpMessage="Specifies the app id for service principal, to login with")][string]$spID,
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
     [Parameter(Mandatory=$true, HelpMessage="An array / list of object id's for users and service principals, to assign GET, LIST Access policy")][string[]]$userObjectIds,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory keyvault name")][string]$keyvaultName,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory subscription id")][string]$subscriptionID
+    [Parameter(Mandatory = $true, HelpMessage = "project = GET,LIST , coreteam = GET,LIST,SET")][string]$projectOrCoreteam = 'project',
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory keyvault name")][string]$keyvaultName,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory subscription id")][string]$subscriptionID
+
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {
     Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal"
-    Write-Host "The spID: ${spID}"
-    Write-Host "The tenantID: ${tenantID}"
+    #Write-Host "The spID: ${spID}"
+    #Write-Host "The tenantID: ${tenantID}"
   
     $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
     $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
@@ -34,5 +36,10 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
 # All users in project
 for ($i=0; $i -lt $userObjectIds.Length; $i++) {
     $targetObjectID = $userObjectIds[$i]
-    Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list -BypassObjectIdValidation
+    if ($projectOrCoreteam == "project") {
+        Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list -BypassObjectIdValidation
+    } elseif ($projectOrCoreteam == "coreteam") {
+        Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list,set -BypassObjectIdValidation
+    }
+    
 }

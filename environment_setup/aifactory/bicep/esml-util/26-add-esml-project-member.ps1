@@ -1,13 +1,5 @@
-# BICEP 1: CONTRIBUTOR to PROJECT RG(aml, dsvm, kv, adf)
-# BICEP 1: CONTRIBUTOR to DASHBOARD RG
-# BICEP 1: READER on Bastion (in COMMON RG)
-# BICEP 1: CONTRIBUTOR on Bastion NSG
-# BICEP 1: networkContributorRoleDefinition on vNET
-# Separate powershell: ACL on Datalake: 25-add-users-to-datalake-acl-rbac.ps1
-# Separete powershell: AccessPolicy on Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1
-
 # USAGE: 
-# .\26-add-esml-project-member.ps1 -spSecret 'abc' -spID 'abc' -tenantID 'abc' -subscriptionID 'abc' -storageAccount 'abc' -adlsgen2filesystem 'abc' -projectXXX 'abc' -userObjectIds 'x','y','z' -projectSPObjectID 'abc' -commonSPObjectID 'abc' -commonADgroupObjectID 'abc' -projectADGroupObjectId 'abc' -keyvaultGetListObjectID 'abc' -projectKeyvaultName 'abc' -commonRGNamePrefix 'abc-def-' -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix 'weu' -projectNumber '001' -env 'dev
+# .\26-add-esml-project-member.ps1 -spSecret 'abc' -spID 'abc' -tenantID 'abc' -subscriptionID 'abc' -storageAccount 'abc' -adlsgen2filesystem 'abc' -userObjectIds 'x','y','z' -projectSPObjectID 'abc' -commonSPObjectID 'abc' -commonADgroupObjectID 'abc' -projectADGroupObjectId 'abc' -keyvaultGetListObjectID 'abc' -projectKeyvaultName 'abc' -commonRGNamePrefix 'abc-def-' -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix 'weu' -projectNumber '001' -env 'dev
 
 param (
     # required parameters
@@ -23,7 +15,7 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID,
     [Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId,
     [Parameter(Mandatory=$false, HelpMessage="Specifies the object id for user or service principal, to assign GET, LIST Access policy")][string]$keyvaultGetListObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "keyvault name: [kv-prj001-abvr4-001, kv-cmndev-abvr4-001]")][string]$projectKeyvaultName,
+    [Parameter(Mandatory = $false, HelpMessage = "keyvault name: [kv-prj001-abvr4-001]")][string]$projectKeyvaultName,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory suffix. What suffix on common resources: abc-def-")][string]$commonRGNamePrefix,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory suffix. What suffix on common resource group: -001")][string]$commonResourceSuffix,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory suffix. What suffix on common resource group: -001")][string]$aifactorySuffixRG,
@@ -35,8 +27,8 @@ param (
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {
   Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal"
-  Write-Host "The spID: ${spID}"
-  Write-Host "The tenantID: ${tenantID}"
+  #Write-Host "The spID: ${spID}"
+  #Write-Host "The tenantID: ${tenantID}"
     
   $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
   $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
@@ -54,19 +46,11 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
 
   
 }else {
-  # The $spID parameter is null or empty
   Write-Host "The spID parameter is null or empty. Running under other authentication that SP"
 }
 
-## EDIT per DSVM you want to deploy
+# EDIT per your convention if it differs from ESML AIFactory defaults
 $deplName = '26-add-esml-project-member'
-#$commonRGNamePrefix = 'abc-def-'
-#$commonResourceSuffix = '-001'
-#$aifactorySuffixRG = '-001'
-#$locationSuffix = 'weu'
-#$projectNumber = '001'
-#$env = 'dev'
-
 $projectXXX = "project"+$projectNumber
 $common_rg = "${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}" # dc-heroes-esml-common-weu-dev-001
 $project_rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
@@ -78,7 +62,7 @@ $vnetNameFull = "${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}
 $bastion_service_name = "bastion-${locationSuffix}-${env}${aifactorySuffixRG}"
 $dashboard_resourcegroup_name = 'dashboards'
 
-####### AKS specic end
+# EDIT end
 Write-Host "Kicking off the BICEP..."
 #Set-AzDefault -ResourceGroupName $rg
 
@@ -91,13 +75,6 @@ Write-Host "userIds : ${userObjectIds}"
 Write-Host "kv : ${projectKeyvaultName}"
 Write-Host "bastion : ${bastion_service_name}"
 
-
-# 1) Kickoff BICEP 1
-#New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
-#-ResourceGroupName $rg `
-
-# New-AzSubscriptionDeployment  -Location "westeurope" -SubscriptionId $subscriptionID -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
-
 New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
 -Name $deplName `
 -ResourceGroupName $common_rg `
@@ -109,7 +86,6 @@ New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/env
 -bastion_service_name $bastion_service_name `
 -Verbose
 
-
 $inUserObjectIdsArray = $userObjectIds -split ','
 
 $emptyArray = @()
@@ -117,17 +93,6 @@ $userObjectIdsArray = ($inUserObjectIdsArray + $emptyArray) | Sort-Object -Uniqu
 
 Write-Host "BICEP success! Now running powershell scripts for ACL on Datalake: 25-add-users-to-datalake-acl-rbac.ps1 and AccessPolicy on Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1"
 
-#[Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
-#[Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
-#[Parameter(Mandatory = $false, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
-#[Parameter(Mandatory = $false, HelpMessage = "Array of user Object Ids")][string[]]$userObjectIds,
-#[Parameter(Mandatory = $false, HelpMessage = "Project service principle OID esml-project001-sp-oid")][string]$projectSPObjectID,
-#[Parameter(Mandatory = $false, HelpMessage = "Common service principle OID common")][string]$commonSPObjectID,
-#[Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID,
-#[Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId,
-#[Parameter(Mandatory=$false, HelpMessage="Specifies the object id for service principal, to assign GET, LIST Access policy")][string]$targetObjectID,
-
-Write-Host "spSecret: $spSecret"
 Write-Host "spID: $spID"
 Write-Host "tenantID: $tenantID"
 Write-Host "storageAccount: $storageAccount"
@@ -140,11 +105,11 @@ Write-Host "commonADgroupObjectID: $commonADgroupObjectID"
 Write-Host "projectADGroupObjectId: $projectADGroupObjectId"
 
 Write-Host "Not running add-users-to-datalake-acl"
-# T3 (current = works. Azure hosted agent, needs to add IP to firewall for storage. self-hosted agent, no need, but need BICEP)
+
 & ".\25-add-users-to-datalake-acl-rbac.ps1" -spSecret $spSecret -spID $spID -tenantID $tenantID -storageAccount $storageAccount -adlsgen2filesystem $adlsgen2filesystem -projectXXX $projectXXX -userObjectIds $userObjectIdsArray -projectSPObjectID $projectSPObjectID -commonSPObjectID $commonSPObjectID -commonADgroupObjectID $commonADgroupObjectID -projectADGroupObjectId $projectADGroupObjectId
 
 Write-Host "25-add-users-to-kv-get-list-access-policy"
 
-& ".\25-add-users-to-kv-get-list-access-policy.ps1" -spSecret $spSecret -spID $spID -tenantID $tenantID -subscriptionID $subscriptionID -userObjectIds $userObjectIdsArray -keyvaultName $projectKeyvaultName
+& ".\25-add-users-to-kv-get-list-access-policy.ps1" -spSecret $spSecret -spID $spID -tenantID $tenantID -subscriptionID $subscriptionID -userObjectIds $userObjectIdsArray -projectOrCoreteam 'project' -keyvaultName $projectKeyvaultName
 
 Write-Host "Finished!"
