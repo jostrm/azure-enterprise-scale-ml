@@ -69,7 +69,7 @@ Write-Host "common adm kv : ${commonAdmKeyvaultName}"
 
 Write-Host "Kicking off the BICEP..."
 
-New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
+New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsCoreteam.bicep" `
 -Name $deplName `
 -ResourceGroupName $common_rg `
 -common_resourcegroup_name $common_rg `
