@@ -14,14 +14,17 @@
 
 @description('Resource group where user gets OWNER permission. ESML-COMMON-RG')
 param common_resourcegroup_name string = ''
-@description('Object ID array of 1 or more people to access Resource group')
-param user_object_ids array
+@description('Comma separated string of Object ID of 1 or more people to access Resource group')
+param user_object_ids string
 @description('Datalake storage account to get RWE on both MASTER and PROEJCTS. Note: Even if OWNER permission on RG, a user needs STORAGE BLOB DATA OWNER or STORAGE BLOB DATA CONTRIBUTOR on the storage account. Or ACLs set')
 param storage_account_name_datalake string = ''
 @description('Optional, but tip: Always pass the CORE-TEAMS project resource group: esml-project001-dev-rg is usually the DEFAULT (in DEV)Always pass the CORE-TEAMS project resource group: esml-project001-dev-rg is usually the DEFAULT (in DEV)')
 param project_resourcegroup_name string = ''
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
 param dashboard_resourcegroup_name string = ''
+
+var user_object_ids_array = array(split(replace(user_object_ids,' ',''),','))
+var user_object_ids_array_Safe = user_object_ids == ''? []: user_object_ids_array
 
 @description('This is the built-in Storage Blob Data Contributor role. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-contributor')
 resource storageBlobDataContributor 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
@@ -45,7 +48,7 @@ module projectRGOwnerPermissions './ownerRbac.bicep' = if(project_resourcegroup_
   scope: project_resourcegroup
   name: 'projectRGOwnerPerm4coremteamXY'
   params: {
-   user_object_ids: user_object_ids
+   user_object_ids: user_object_ids_array_Safe
   }
   dependsOn:[
     project_resourcegroup
@@ -61,7 +64,7 @@ module commonRGOwnerPermissions './ownerRbac.bicep' = if(common_resourcegroup_na
   scope: common_resourcegroup
   name: 'commonRGOwnerPermissions4coreteamXY'
   params: {
-   user_object_ids: user_object_ids
+   user_object_ids: user_object_ids_array_Safe
   }
   dependsOn:[
     common_resourcegroup
@@ -77,7 +80,7 @@ module dashboardRGcontributorPermissions './ownerRbac.bicep' = if(dashboard_reso
   scope: dashboard_resourcegroup
   name: 'dashboardRGcontributorPermissions4CoreXY'
   params: {
-   user_object_ids: user_object_ids
+   user_object_ids: user_object_ids_array_Safe
   }
   dependsOn:[
     dashboard_resourcegroup
@@ -88,13 +91,13 @@ resource resCommonDatalakeStorage 'Microsoft.Storage/storageAccounts@2021-04-01'
   name: storage_account_name_datalake
 }
 
-resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-reader-${storage_account_name_datalake}-${resourceGroup().id}')
+resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{
+  name: guid('${user_object_ids_array_Safe[i]}-reader-${storage_account_name_datalake}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: storageBlobDataOwner.id
-    principalId: user_object_ids[i]
+    principalId: user_object_ids_array_Safe[i]
     principalType: 'User'
-    description:'Storage Blob Data Owner to USER with OID  ${user_object_ids[i]} for storage account datalake: ${storage_account_name_datalake}'
+    description:'Storage Blob Data Owner to USER with OID  ${user_object_ids_array_Safe[i]} for storage account datalake: ${storage_account_name_datalake}'
   }
   scope:resCommonDatalakeStorage
 }]

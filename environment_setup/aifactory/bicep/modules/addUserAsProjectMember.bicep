@@ -15,9 +15,10 @@ param bastion_service_name string
 param dashboard_resourcegroup_name string = ''
 param project_resourcegroup_name string
 param project_service_principle_oid string
-param user_object_ids array
-//param common_rg_name string
-//param subscription_id string
+param user_object_ids string
+
+var user_object_ids_array = array(split(replace(user_object_ids,' ',''),','))
+var user_object_ids_array_Safe = user_object_ids == ''? []: user_object_ids_array
 
 var service_principle_array = project_service_principle_oid == ''? []: array(split(project_service_principle_oid,','))
 
@@ -57,13 +58,13 @@ resource vNetNameResource 'Microsoft.Network/virtualNetworks@2021-03-01' existin
   //scope: subscription() //resourceGroup(subscription_id, common_rg_name)
 }
 
-resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-nwContributor-${vnet_name}-${resourceGroup().id}')
+resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{
+  name: guid('${user_object_ids_array_Safe[i]}-nwContributor-${vnet_name}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: networkContributorRoleDefinition.id
-    principalId: user_object_ids[i]
+    principalId: user_object_ids_array_Safe[i]
     principalType: 'User'
-    description:'Network Contributor to USER with OID  ${user_object_ids[i]} for vNet: ${vnet_name}'
+    description:'Network Contributor to USER with OID  ${user_object_ids_array_Safe[i]} for vNet: ${vnet_name}'
   }
   scope:vNetNameResource
 }]
@@ -85,13 +86,13 @@ resource nsgBastion4project 'Microsoft.Network/networkSecurityGroups@2020-06-01'
   name: 'nsg-${common_bastion_subnet_name}'
 }
 
-resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-contributor-${common_bastion_subnet_name}-${resourceGroup().id}')
+resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{
+  name: guid('${user_object_ids_array_Safe[i]}-contributor-${common_bastion_subnet_name}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
-    principalId: user_object_ids[i]
+    principalId: user_object_ids_array_Safe[i]
     principalType: 'User'
-    description:'Contributor to USER with OID  ${user_object_ids[i]} for Bastion NSG: ${common_bastion_subnet_name}'
+    description:'Contributor to USER with OID  ${user_object_ids_array_Safe[i]} for Bastion NSG: ${common_bastion_subnet_name}'
   }
   scope:nsgBastion4project
 }]
@@ -102,13 +103,13 @@ resource resBastion4project 'Microsoft.Network/bastionHosts@2021-05-01' existing
   name: bastion_service_name
 }
 
-resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-reader-${bastion_service_name}-${resourceGroup().id}')
+resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{
+  name: guid('${user_object_ids_array_Safe[i]}-reader-${bastion_service_name}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: readerRoleDefinition.id
-    principalId: user_object_ids[i]
+    principalId: user_object_ids_array_Safe[i]
     principalType: 'User'
-    description:'Reader to USER with OID  ${user_object_ids[i]} for Bastion service: ${bastion_service_name}'
+    description:'Reader to USER with OID  ${user_object_ids_array_Safe[i]} for Bastion service: ${bastion_service_name}'
   }
   scope:resBastion4project
 }]
@@ -124,7 +125,7 @@ module projectRGcontributorPermissions './contributorRbacSimple.bicep' = {
   scope: project_resourcegroup
   name: 'projectRGcontributorPermissions123'
   params: {
-   user_object_ids: user_object_ids
+   user_object_ids: user_object_ids_array_Safe
   }
   dependsOn:[
     project_resourcegroup
@@ -135,7 +136,7 @@ module projectVmAdminRGcontributorPermissions './rbacGeneric.bicep' = {
   scope: project_resourcegroup
   name: 'projectVmAdminRGcontributorPermissions'
   params: {
-   user_object_ids: user_object_ids
+   user_object_ids: user_object_ids_array_Safe
    role_definition_id: vmAdminLoginRoleDefinition.id
   }
   dependsOn:[
@@ -152,7 +153,7 @@ module dashboardRGcontributorPermissions './contributorRbacSimple.bicep' = if(da
   scope: dashboard_resourcegroup
   name: 'dashboardRGcontributorPermissions3456'
   params: {
-   user_object_ids: user_object_ids
+   user_object_ids: user_object_ids_array_Safe
   }
   dependsOn:[
     dashboard_resourcegroup

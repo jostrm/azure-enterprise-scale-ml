@@ -38,7 +38,7 @@ for ($i=0; $i -lt $userObjectIds.Length; $i++) {
     $targetObjectID = $userObjectIds[$i]
     if ($projectOrCoreteam -eq "project") {
         Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list -BypassObjectIdValidation
-    } elseif ($projectOrCoreteam == "coreteam") {
+    } elseif ($projectOrCoreteam -eq "coreteam") {
         Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list,set -BypassObjectIdValidation
     }
     
