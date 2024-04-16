@@ -1,5 +1,5 @@
 # USAGE: 
-# .\26-add-esml-project-member.ps1 -spSecret 'abc' -spID 'abc' -tenantID 'abc' -subscriptionID 'abc' -storageAccount 'abc' -adlsgen2filesystem 'abc' -userObjectIds 'x','y','z' -projectSPObjectID 'abc' -commonSPObjectID 'abc' -commonADgroupObjectID 'abc' -projectADGroupObjectId 'abc' -keyvaultGetListObjectID 'abc' -projectKeyvaultName 'abc' -commonRGNamePrefix 'abc-def-' -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix 'weu' -projectNumber '001' -env 'dev
+# .\26-add-esml-coreteam-member.ps1 -spSecret 'abc' -spID 'abc' -tenantID 'abc' -subscriptionID 'abc' -storageAccount 'abc' -adlsgen2filesystem 'abc' -userObjectIds 'x','y','z' -projectSPObjectID 'abc' -projectKeyvaultNameSuffix '01' -commonKeyvaultNameSuffix '001' -aifactorySalt 'abcde' -commonRGNamePrefix 'abc-def-' -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix 'weu' -projectNumber '001' -env 'dev'
 
 param (
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
@@ -9,10 +9,6 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
     [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
     [Parameter(Mandatory = $false, HelpMessage = "Array of user Object Ids")][string]$userObjectIds,
-    [Parameter(Mandatory = $false, HelpMessage = "Project service principle OID esml-project001-sp-oid")][string]$projectSPObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "Common service principle OID common")][string]$commonSPObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID,
-    [Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId,
     [Parameter(Mandatory = $false, HelpMessage = "project keyvault suffix: 01 in kv-p003-uks-dev-abcde01")][string]$projectKeyvaultNameSuffix,
     [Parameter(Mandatory = $false, HelpMessage = "common keyvaults suffix: 001 in kv-cmnadm-abcde-001 and kv-cmndev-abcde-001")][string]$commonKeyvaultNameSuffix,
     [Parameter(Mandatory = $false, HelpMessage = "AIFactory salt: abcde in any resource, such as kv-cmnadm-abcde-001")][string]$aifactorySalt,
@@ -56,6 +52,10 @@ $projectKeyvaultName = "kv-p${projectNumber}-${locationSuffix}-${env}-${aifactor
 $commonKeyvaultName = "kv-cmn${env}-${aifactorySalt}-${commonKeyvaultNameSuffix}" # kv-cmndev-abcde-001
 $commonAdmKeyvaultName = "kv-cmnadm${env}-${aifactorySalt}-${commonKeyvaultNameSuffix}" # kv-cmnadmdev-abcde-001
 $dashboard_resourcegroup_name = 'dashboards'
+#$projectXXX = "project"+$projectNumber
+#$vnetNameBase = 'vnt-esmlcmn'
+#$vnetNameFull = "${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}"
+#$bastion_service_name = "bastion-${locationSuffix}-${env}${aifactorySuffixRG}"
 
 Write-Host "Common RG" $common_rg
 Write-Host "Project RG" $project_rg

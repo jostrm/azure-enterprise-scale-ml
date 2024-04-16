@@ -36,7 +36,7 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
 # All users in project
 for ($i=0; $i -lt $userObjectIds.Length; $i++) {
     $targetObjectID = $userObjectIds[$i]
-    if ($projectOrCoreteam == "project") {
+    if ($projectOrCoreteam -eq "project") {
         Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list -BypassObjectIdValidation
     } elseif ($projectOrCoreteam == "coreteam") {
         Set-AzKeyVaultAccessPolicy -VaultName $keyVaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list,set -BypassObjectIdValidation
