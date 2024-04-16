@@ -1,4 +1,4 @@
-@description('Additional optional Object ID of more people to access Resource group')
+@description('Object ID array of 1 or more people to access Resource group')
 param user_object_ids array
 
 @description('This is the built-in Owner role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')

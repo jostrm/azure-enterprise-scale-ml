@@ -1,45 +1,41 @@
+// This BICEP: STORAGE BLOB DATA OWNER to STORAGE account RG
 // Separate BICEP: OWNER to COMMON RG(aml, dsvm, kv, adf)
-// Separete BICEP: OWNER to DASHBOARD RG
-// Separate powershell: ACL on Datalake: 25-add-users-to-datalake-acl-rbac.ps1
-// Separete powershell: AccessPolicy on COMMON Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1
+// Separate BICEP: OWNER to DASHBOARD RG
+// Separate powershell: AccessPolicy on COMMON Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1
 
 // OPTIONAL: OWNER to a PROJECT RG(aml, dsvm, kv, adf)
+// OPTIONAL: Separete powershell: AccessPolicy on PROJECT Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1
 
 // NOT NEEDED: *READER on Bastion (in COMMON RG)
-// NOT NEEDED:  *CONTRIBUTOR on Keyvault (in COMMON RG)
-// NOT NEEDED: *CONTRIBUTOR on Bastion NSG
-// NOT NEEDED: *networkContributorRoleDefinition on vNET
+// NOT NEEDED: *CONTRIBUTOR on Keyvault (in COMMON RG)
+// NOT NEEDED: *CONTRIBUTOR on Bastion NSG 
+// NOT NEEDED: *networkContributorRoleDefinition on vNET 
+// NOT NEEDED: Separate powershell: ACL on Datalake MASTER: 25-add-users-to-datalake-acl-rbac.ps1
 
-
-@description('Optional: resource group where user gets OWNER permission. ESML-COMMON-RG')
+@description('Resource group where user gets OWNER permission. ESML-COMMON-RG')
 param common_resourcegroup_name string = ''
-@description('Optional: resource group where user gets OWNER permission. ESML-PROJECT001-RG')
+@description('Object ID array of 1 or more people to access Resource group')
+param user_object_ids array
+@description('Datalake storage account to get RWE on both MASTER and PROEJCTS. Note: Even if OWNER permission on RG, a user needs STORAGE BLOB DATA OWNER or STORAGE BLOB DATA CONTRIBUTOR on the storage account. Or ACLs set')
+param storage_account_name_datalake string = ''
+@description('Optional, but tip: Always pass the CORE-TEAMS project resource group: esml-project001-dev-rg is usually the DEFAULT (in DEV)Always pass the CORE-TEAMS project resource group: esml-project001-dev-rg is usually the DEFAULT (in DEV)')
 param project_resourcegroup_name string = ''
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
 param dashboard_resourcegroup_name string = ''
-param user_object_ids array
 
-// Owner
-@description('This is the built-in Owner role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
-resource ownerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
+@description('This is the built-in Storage Blob Data Contributor role. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-contributor')
+resource storageBlobDataContributor 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
-  name: '8e3af657-a8ff-443c-a75c-2fe8c4bcb635'
-}
-// contributor
-@description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
-resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
-  scope: subscription()
-  name: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+  name: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 }
 
-// VM Administator Login
-@description('This is the built-in VM Administator Login role. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/compute#virtual-machine-administrator-login')
-resource vmAdminLoginRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
+@description('This is the built-in Storage Blob Data Owner role. See https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/storage#storage-blob-data-owner')
+resource storageBlobDataOwner 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
-  name: '1c0163c0-47e6-4577-8991-ea5c82e286e4'
+  name: 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 }
 
-// RG's
+// RG: Always pass the CORE-TEAMS project resource group: esml-project001-dev-rg is usually the DEFAULT (in DEV)
 resource project_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: project_resourcegroup_name
   scope: subscription()
@@ -50,18 +46,6 @@ module projectRGOwnerPermissions './ownerRbac.bicep' = if(project_resourcegroup_
   name: 'projectRGOwnerPerm4coremteamXY'
   params: {
    user_object_ids: user_object_ids
-  }
-  dependsOn:[
-    project_resourcegroup
-  ]
-}
-
-module projectVmAdminRGPermissions4Coreteam './rbacGeneric.bicep' = {
-  scope: project_resourcegroup
-  name: 'projectVmAdminRGPermissions4Coreteam'
-  params: {
-   user_object_ids: user_object_ids
-   role_definition_id: vmAdminLoginRoleDefinition.id
   }
   dependsOn:[
     project_resourcegroup
@@ -84,18 +68,6 @@ module commonRGOwnerPermissions './ownerRbac.bicep' = if(common_resourcegroup_na
   ]
 }
 
-module commonVmAdminRGPermissions4Coreteam './rbacGeneric.bicep' = {
-  scope: common_resourcegroup
-  name: 'commonVmAdminRGPermissions4Coreteam'
-  params: {
-   user_object_ids: user_object_ids
-   role_definition_id: vmAdminLoginRoleDefinition.id
-  }
-  dependsOn:[
-    common_resourcegroup
-  ]
-}
-
 resource dashboard_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: dashboard_resourcegroup_name
   scope: subscription()
@@ -111,5 +83,20 @@ module dashboardRGcontributorPermissions './ownerRbac.bicep' = if(dashboard_reso
     dashboard_resourcegroup
   ]
 }
+
+resource resCommonDatalakeStorage 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
+  name: storage_account_name_datalake
+}
+
+resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
+  name: guid('${user_object_ids[i]}-reader-${storage_account_name_datalake}-${resourceGroup().id}')
+  properties: {
+    roleDefinitionId: storageBlobDataOwner.id
+    principalId: user_object_ids[i]
+    principalType: 'User'
+    description:'Storage Blob Data Owner to USER with OID  ${user_object_ids[i]} for storage account datalake: ${storage_account_name_datalake}'
+  }
+  scope:resCommonDatalakeStorage
+}]
 
 
