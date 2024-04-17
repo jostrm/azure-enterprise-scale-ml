@@ -89,9 +89,11 @@ param databricksOID string
 // ESML START
 @description('Specifies the virtual network name')
 param vnetNameBase string
-@description('AI Factory suffix. If you have multiple instances')
+@description('AI Factory suffix. If you have multiple instances example: -001')
 param aifactorySuffixRG string
+@description('Resources in common RG, the suffix on resources, example: -001')
 param commonResourceSuffix string
+@description('Resources in project RG, the suffix on resources, example: -001')
 param resourceSuffix string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
@@ -982,7 +984,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
-    bastion_service_name: 'bastion-${locationSuffix}-${env}${aifactorySuffixRG}'  // bastion-uks-dev-001
+    bastion_service_name: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
