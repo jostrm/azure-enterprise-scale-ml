@@ -36,7 +36,7 @@
 
 ![](./images/01/4_screenshot_rule.png)
 
-Q: How to get your PUBLIC IP ADRESS: 
+Q: How to get your PUBLIC IP ADDRESS: 
 A: Open EDGE web browser, and search for "My IP". The copy the output that Microsoft Edge provides for you (you do not need to enter any website)
 "network security group
 
