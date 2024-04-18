@@ -1,5 +1,6 @@
 # USAGE: 
-# .\26-add-esml-project-member.ps1 -spSecret 'abc' -spID 'abc' -tenantID 'abc' -subscriptionID 'abc' -storageAccount 'abc' -adlsgen2filesystem 'abc' -userObjectIds 'x','y','z' -projectSPObjectID 'abc' -commonSPObjectID 'abc' -commonADgroupObjectID 'abc' -projectADGroupObjectId 'abc' -keyvaultGetListObjectID 'abc' -projectKeyvaultName 'abc' -commonRGNamePrefix 'abc-def-' -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix 'weu' -projectNumber '001' -env 'dev
+# cd aifactory\esml-util
+# .\26-add-esml-project-member.ps1 -spSecret 'abc' -spID '96483bab-9e36-46f0-8bb7-6633c49e87a1' -tenantID '720b637a-655a-40cf-816a-f22f40755c2c' -subscriptionID '7ec8e6b8-bef0-4811-91a9-6bf389d80de2' -storageAccount 'ingkagaipgvr2esml001dev' -adlsgen2filesystem 'lake3' -userObjectIds 'x,y,z' -projectSPObjectID 'dba0c027-1f5a-4580-a22c-671e32462d9a' -commonSPObjectID '86d6895c-19a7-4b03-a753-ebf645e1a91d' -commonADgroupObjectID 'NULL' -projectADGroupObjectId 'NULL' -projectKeyvaultName 'kv-p002-uks-dev-pgvr201' -commonRGNamePrefix 'ingka-genai-' -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix 'uks' -projectNumber '002' -env 'dev'
 
 param (
     # required parameters
