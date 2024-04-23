@@ -53,7 +53,7 @@ class IESMLController:
     _resource_configuration = None
 
     esml_path_script_template_enterprise = "../../../settings/enterprise_specific/dev_test_prod_defaults/pipeline_template"
-    esml_path_snapshot_folder = "../../../01_pipelines/"
+    esml_path_snapshot_folder = "../../../pipelines/"
 
     _secret_name_tenant = "esml-tenant-id"
     _secret_name_project_sp_id = "esml-project-sp-id"

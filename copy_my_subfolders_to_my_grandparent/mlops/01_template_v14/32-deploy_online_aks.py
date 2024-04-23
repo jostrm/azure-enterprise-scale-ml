@@ -32,7 +32,7 @@ import azureml.core
 import argparse
 print("SDK Version:", azureml.core.VERSION)
 
-p,scoring_date,model_number = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
+p,scoring_date,model_number,esml_model_version_int = ESMLProject.get_project_from_env_command_line() # self-aware about its config sources
 p.describe()
 p.inference_mode = False # We want "TRAIN" mode when deploying to AKS
 

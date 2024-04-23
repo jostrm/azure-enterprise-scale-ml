@@ -16,7 +16,7 @@ param vnetNameBase string = 'vnt-esmlcmn'
 param technicalAdminsObjectID string
 @description('Specifies the kv-cmndec-xys name')
 param cmndevKeyvault string
-@description('null, or commaseparated list. Specifies a project specific service principles OID comma separated list: asdfbsf,asdfasdf,')
+@description('empty string or comma separated list. Specifies a project specific service principles OID comma separated list: asdfbsf,asdfasdf,')
 param projectSP_OID_list string
 
 param technicalAdminsObjectID_array array = array(split(technicalAdminsObjectID,','))
@@ -34,7 +34,7 @@ module rbacReadUsersToCmnVnetBastion '../../azure-enterprise-scale-ml/environmen
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
   params: {
-    additionalUserIds: technicalAdminsObjectID_array_safe
+    user_object_ids: technicalAdminsObjectID_array_safe
     project_service_principle: projectSP_OID_list
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'

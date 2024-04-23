@@ -34,13 +34,13 @@ from esml import ESMLProject
 from baselayer_azure_ml_pipeline import esml_pipeline_types
 from baselayer_azure_ml_pipeline import ESMLPipelineFactory
 
-advanced_mode = True # ADVANCDE MODE (DatabricksSteps also) + Manual ML (or AutoML if defined in Databricks notebook)
+advanced_mode = False # ADVANCDE MODE (DatabricksSteps also) + Manual ML (or AutoML if defined in Databricks notebook)
 use_automl = True # SIMPLE MODE + AutoMLStep (if True)Manual ML Step (if False)
 
 if advanced_mode:
     sys.path.insert(0, "../../azure-enterprise-scale-ml/")
     from esmlrt.interfaces.iESMLPipelineStepMap import IESMLPipelineStepMap
-    sys.path.insert(0, "../../01_pipelines/M11/your_code/") # Advanced Mode. TODO 4 you - edit M11 in path below
+    sys.path.insert(0, "../../pipelines/M11/your_code/") # Advanced Mode. TODO 4 you - edit M11 in path below
     from ESMLPipelineStepMap import ESMLPipelineStepMap
 
 print("SDK Version:", azureml.core.VERSION)
@@ -49,7 +49,7 @@ print("SDK Version:", azureml.core.VERSION)
 esml_date_utc = '1000-01-01 10:35:01.243860' # In parameter: You can override what training data to use. 
 esml_model_number = 11
 
-p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
+p,esml_date_utc,esml_model_number,esml_model_version_int = ESMLProject.get_project_from_env_command_line() # Alt A)
 if(p is None): # Alt B) Just for DEMO purpose..its never None
     p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment
 

@@ -32,11 +32,11 @@ import argparse
 from esml import ESMLProject
 print("SDK Version:", azureml.core.VERSION)
 
-p,esml_date_utc,esml_model_number = ESMLProject.get_project_from_env_command_line() # Alt A)
+p,esml_date_utc,esml_model_number,esml_model_version_int = ESMLProject.get_project_from_env_command_line() # Alt A)
 if(p is None): # Alt B) Just for DEMO purpose..its never None
     p = ESMLProject() #  B)= Reads from CONFIG instead - To control this, use GIT-branching and  .gitignore on "active_dev_test_prod.json" for each environment
 
 ws = p.ws
 print(ws.name, ws.resource_group, ws.location, ws.subscription_id, sep="\n")
 print("Project number: {}".format(p.project_folder_name))
-print("Model number: {} , esml_date_utc: {}".format(esml_model_number, esml_date_utc))
+print("Model number (MXX): {} , esml_date_utc: {} model_version_int: {}".format(esml_model_number, esml_date_utc,str(esml_model_version_int)))
