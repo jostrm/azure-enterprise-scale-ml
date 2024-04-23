@@ -2168,7 +2168,7 @@ class ESMLProject():
                     desc_in =  "IN: " + dataset_description
                     try:
                         error_path = ds.InPath
-                        in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
+                        in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths,validate=False,separator=self._csv_separator) # create the Tabular dataset with 
                         try:
                             exists_dictionary.setdefault(ds.Name, []).append("IN_Folder_has_files")
                             ds.registerIn(in_ds,desc_in,False)
@@ -2560,6 +2560,7 @@ class ESMLDataset():
     # Compute power
     _cpu_gpu_databricks = "cpu"
     _runconfig = None # Can be set manually, if None default is set
+    _csv_separator = ","
 
     # Script names
     _in2bronze_prefix = "in2bronze"
@@ -2625,6 +2626,14 @@ class ESMLDataset():
     @runconfig.setter
     def runconfig(self, runconfig):
         self._runconfig = runconfig
+    
+    @property
+    def csv_separator(self):
+        return self._csv_separator
+    
+    @csv_separator.setter
+    def csv_separator(self, separator = ","):
+        self._csv_separator = separator
 
     @property
     def cpu_gpu_databricks(self):
@@ -2712,7 +2721,7 @@ class ESMLDataset():
         if(self._project.inference_mode): # Inference path
              if (self._in_inference is None): #Lazy load
                 try:
-                    self._in_inference = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=',')
+                    self._in_inference = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=self._csv_separator)
                 except Exception as e:
                     print("ESML Note: Could not read InData (Scoring) as .CSV - Now trying as .PARQUET instead.")
                     try:
@@ -2725,7 +2734,7 @@ class ESMLDataset():
         else:
             if (self._in_train is None): # Lazy load
                 try:
-                    self._in_train = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=',')
+                    self._in_train = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=self._csv_separator)
                 except Exception as e:
                     print("ESML Note: Could not read InData as .CSV - Now trying as .PARQUET instead.")
                     try:
