@@ -43,8 +43,12 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 
 |Date     |Category   | What   | Link   |
 |------------|-----------|--------|--------|
-|2024-03  |Tutorial | End-user tutorial  | [03-use_cases-where_to_start.md](./03-use_cases-where_to_start.md)|
-|2024-02  |Tutorial | End-user installation Compute Instance | [Readme_Install_VSCode_or_ComputeInstance.md](./environment_setup/user_dev_env_install/Readme_Install_VSCode_or_ComputeInstance.md) |
+|2024-03  |Automation | Add core team member| [26-add-esml-coreteam-member.ps1](./environment_setup/aifactory/bicep/esml-util/26-add-esml-coreteam-member.ps1)|
+|2024-03  |Automation | Add project member| [26-add-esml-project-member.ps1](./environment_setup/aifactory/bicep/esml-util/26-add-esml-project-member.ps1)|
+|2024-03  |Tutorial | Core-team tutorial  | [10-AIFactory-infra-subscription-resourceproviders.md](./documentation/10-AIFactory-infra-subscription-resourceproviders.md)|
+|2024-03  |Tutorial | End-user tutorial  | [01-jumphost-vm-bastion-access.md](./documentation/01-jumphost-vm-bastion-access.md)|
+|2024-03  |Tutorial | End-user tutorial  | [03-use_cases-where_to_start.md](./documentation/03-use_cases-where_to_start.md)|
+|2024-02  |Tutorial | End-user installation Compute Instance | [R01-install-azureml-sdk-v1+v2.m](./documentation/01-install-azureml-sdk-v1+v2.md) |
 |2024-02  |Datalake - Onboarding |Auto-ACL on PROJECT folder in lakel|-|
 |2023-03  |Networking|No Public IP: Virtual private cloud - updated networking rules| https://learn.microsoft.com/en-us/azure/machine-learning/v1/how-to-secure-workspace-vnet?view=azureml-api-1&preserve-view=true&tabs=required%2Cpe%2Ccli|
 |2023-02  |ESML Pipeline templates|Azure Databricks: Training and Batch  pipeline templates. 100% same support as AML pipeline templates (inner/outer loop MLOps)|-|
