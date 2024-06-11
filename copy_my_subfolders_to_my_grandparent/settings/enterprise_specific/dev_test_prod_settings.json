@@ -5,18 +5,18 @@
     "test_subscription": "same_as_1_or_2_or_3",
     "prod_subscription": "same_as_1_or_2_or_3",
     
-    "common_rg_name": "acme-weu-esml-common-weu-{}-001",
-    "common_vnet_name": "acme-vnt-esmlcmn-weu-{}-001",
+    "common_rg_name": "acme-esml-common-weu-{}-001",
+    "common_vnet_name": "vnt-esmlcmn-weu-{}-001",
 
-    "dev_common_subnet_name": "acme-snet-esml-cmn-001",
-    "test_common_subnet_name": "acme-snet-esml-cmn-001",
-    "prod_common_subnet_name": "acme-snet-esml-cmn-001",
+    "dev_common_subnet_name": "snet-esml-cmn-001",
+    "test_common_subnet_name": "snet-esml-cmn-001",
+    "prod_common_subnet_name": "snet-esml-cmn-001",
     
     "use_aml_cluster_to_build_images": true,
 
     "project_number_XX_or_XXX": 3,
     "project_location": "westeurope",
-    "project_resource_group": "acme-weu-esml-project{}-weu-{}-001-rg",
+    "project_resource_group": "acme-esml-project{}-weu-{}-001-rg",
     "convention_project_resource_group_env_first":false,
     "project_workspace_name": "aml-prj{}-weu-{}-001",
 

@@ -170,6 +170,7 @@ if not (output_to_score_gold is None):
         path = output_to_score_gold + "/gold_to_score.parquet"
         
         # 1) Save/Overwrite "latest" data: 'projects/project002/11_diabetes_model_reg/inference/0/gold/dev/', for SCORE_GOLD step to read
+        # projects/project002/11_diabetes_model_reg/inference/0/gold/dev/1_latest/gold_to_score.parquet
         write_df = combined_df.to_parquet(path,engine='pyarrow', index=False,use_deprecated_int96_timestamps=True,allow_truncated_timestamps=False)
         
         # Copy also to a "date_folder", for history in the lake

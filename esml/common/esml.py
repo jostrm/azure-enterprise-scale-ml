@@ -2168,7 +2168,7 @@ class ESMLProject():
                     desc_in =  "IN: " + dataset_description
                     try:
                         error_path = ds.InPath
-                        in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths,validate=False) # create the Tabular dataset with 
+                        in_ds = Dataset.Tabular.from_delimited_files(path=dstore_paths,validate=False,separator=self._csv_separator) # create the Tabular dataset with 
                         try:
                             exists_dictionary.setdefault(ds.Name, []).append("IN_Folder_has_files")
                             ds.registerIn(in_ds,desc_in,False)
@@ -2475,6 +2475,7 @@ class ESMLProject():
         # ESML MLOps - date and model
         parser.add_argument('--esml_date_utc', type=str, help='ESML training date or scoring date - to determine date_folder')
         parser.add_argument('--esml_model_number', type=int, help='ESML Model number such as 1,11,12 to determine which model to load and work with M01, M11, M12')
+        parser.add_argument('--esml_model_version', type=str, help='ESML Model version such as 1,3 to determine which model version to user for INFERENCE/SCORING')
 
         args = parser.parse_args()
         esml_environment = args.esml_environment
@@ -2490,14 +2491,15 @@ class ESMLProject():
         # ESML MLOps - date and model
         esml_date_utc = args.esml_date_utc
         esml_model_number = int(args.esml_model_number)
+        inference_model_version_int = 0
 
         p = None
         if((esml_environment is not None) and (inference_model_version is None)):
             print("Scenario 01: MLOPS - RETRAIN on same data, code changed - The argparse (Azure Devops) variable 'esml_environment ' (dev, test or prod) is set to: {}".format(esml_environment))
             p = ESMLProject(esml_environment)
         elif((esml_environment is not None) and (inference_model_version is not None) and (scoring_folder_date is not None)):
-            inf_int = int(inference_model_version)
-            if (inf_int <0):
+            inference_model_version_int = int(inference_model_version)
+            if (inference_model_version_int <0):
                 raise UserErrorException("If Scenario 02: SCORING pipeline with dynamic data - inference_model_version must be set, and 0 or positive. It is now {}".format(inference_model_version))
 
             print("Scenario 02: SCORING pipeline with dynamic data.  Env:{} | Version: {} | Scoring data: {}".format(esml_environment,inference_model_version,scoring_folder_date))
@@ -2518,7 +2520,7 @@ class ESMLProject():
             ws, config_name = p.authenticate_workspace_and_write_config(auth_1)
             p.ws = ws
 
-        return p,esml_date_utc,esml_model_number
+        return p,esml_date_utc,esml_model_number,inference_model_version_int
 
 class ESMLDataset():
     #Defaults - project specicfic examples
@@ -2558,6 +2560,7 @@ class ESMLDataset():
     # Compute power
     _cpu_gpu_databricks = "cpu"
     _runconfig = None # Can be set manually, if None default is set
+    _csv_separator = ","
 
     # Script names
     _in2bronze_prefix = "in2bronze"
@@ -2623,6 +2626,14 @@ class ESMLDataset():
     @runconfig.setter
     def runconfig(self, runconfig):
         self._runconfig = runconfig
+    
+    @property
+    def csv_separator(self):
+        return self._csv_separator
+    
+    @csv_separator.setter
+    def csv_separator(self, separator = ","):
+        self._csv_separator = separator
 
     @property
     def cpu_gpu_databricks(self):
@@ -2710,7 +2721,7 @@ class ESMLDataset():
         if(self._project.inference_mode): # Inference path
              if (self._in_inference is None): #Lazy load
                 try:
-                    self._in_inference = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=',')
+                    self._in_inference = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=self._csv_separator)
                 except Exception as e:
                     print("ESML Note: Could not read InData (Scoring) as .CSV - Now trying as .PARQUET instead.")
                     try:
@@ -2723,7 +2734,7 @@ class ESMLDataset():
         else:
             if (self._in_train is None): # Lazy load
                 try:
-                    self._in_train = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=',')
+                    self._in_train = Dataset.Tabular.from_delimited_files(path = [(self._project.Lakestore, self.InPath + "*.csv")],validate=False,separator=self._csv_separator)
                 except Exception as e:
                     print("ESML Note: Could not read InData as .CSV - Now trying as .PARQUET instead.")
                     try:

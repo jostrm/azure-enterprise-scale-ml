@@ -65,12 +65,11 @@ resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
 }
 
 // SP SECRET
-//Is added MANUALLY by AAD admin
 resource kvSecretspIDValue 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
   name: '${keyvaultName}/${spSecret}'
   properties: {
     value:spSecretValue
-    contentType: 'ESML generated dummy.SP-secret.AAD admin need to add real secret.Project specific service principle secret'
+    contentType: 'ESML generated. From seeding keyvalt (esml-project-sp-secret). Project specific service principle secret'
     attributes: {
       enabled: true
       exp:expiration_date_default_2025_01_10_epoch

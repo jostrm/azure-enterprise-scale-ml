@@ -17,7 +17,7 @@ from azureml.core import Dataset
 import joblib
 
 def init():
-    global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,model_name,target_column_name,ws
+    global prev_model,train_ds,validate_ds,test_ds, last_gold_training_run,datastore,historic_path,run,run_id,active_folder,date_in,model_version_in,esml_env,esml_model_alias,esml_modelname,aml_model_name,target_column_name,ws
     global project_number,ml_type,secret_name_tenant,secret_name_sp_id,secret_name_sp_secret
     global dev_resourcegroup_id,dev_workspace_name,dev_subscription_id,test_resourcegroup_id,test_workspace_name,test_subscription_id,prod_resourcegroup_id,prod_workspace_name,prod_subscription_id
 
@@ -176,6 +176,7 @@ def train_test_compare_register(controller,ws,target_column_name,esml_modelname,
     trainer = None # IESMLTrainer
 
     controller.dev_test_prod = esml_current_env
+    global model_name
     model_name = None
     main_run = run.parent # Parent is the pipeline run, current 'run' is just the current step in pipeline.
     model_registered_in_target = None
@@ -336,7 +337,7 @@ def save_results(model_registered_in_target):
             date_now_str = str(datetime.datetime.now())
 
             model_version_new= -1
-            model_name_save = model_name
+            model_name_save = model_name # global model_name
 
             if(model_registered_in_target is not None):
                 model_version_new = model_registered_in_target.version

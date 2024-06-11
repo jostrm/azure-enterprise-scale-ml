@@ -246,6 +246,51 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationAddressPrefix: 'VirtualNetwork'
         }
       }
+      {
+        name: 'AzureMachineLearning_2023_sdkv2_1'
+        properties: {
+            description: 'Required for 2023 Mars update, to support Azure ML SDK v2'
+            protocol: 'Udp'
+            sourcePortRange: '*'
+            destinationPortRange: '5831'
+            sourceAddressPrefix: '*'
+            access: 'Allow'
+            priority: 230
+            direction: 'Outbound'
+            destinationAddressPrefix: 'AzureMachineLearning'
+        }
+      }
+      {
+        name: 'AzureMachineLearning_2023_sdkv2_2'
+        properties: {
+            description: 'Required for 2023 Mars update, to support Azure ML SDK v2'
+            protocol: 'Tcp'
+            sourcePortRange: '*'
+            destinationPortRange: '5831'
+            sourceAddressPrefix: '*'
+            access: 'Allow'
+            priority: 1320
+            direction: 'Outbound'
+            destinationAddressPrefix: 'BatchNodeManagement.${location}'
+        }
+      }
+      {
+        name: 'AzureMachineLearning_2023_sdkv2_3'
+        properties: {
+            description: 'Required for 2023 Mars update, to support Azure ML SDK v2'
+            protocol: 'Tcp'
+            sourcePortRange: '*'
+            destinationPortRanges: [
+              '8787'
+              '18881'
+            ]
+            sourceAddressPrefix: '*'
+            access: 'Allow'
+            priority: 250
+            direction: 'Outbound'
+            destinationAddressPrefix: 'AzureMachineLearning'
+        }
+      }
     ]
   }
 }

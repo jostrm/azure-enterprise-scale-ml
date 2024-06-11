@@ -10,7 +10,7 @@ param location string
 @description('Specifies the location where application insights should be deployed')
 param logAnalyticsWorkspaceID string
 
-resource applicationInsights 'Microsoft.Insights/components@2020-02-02-preview' = {
+resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: name
   tags: tags
   location: location
@@ -22,8 +22,8 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02-preview' 
     DisableLocalAuth: false
     Flow_Type: 'Bluefield'
     ForceCustomerStorageForProfiler: false
-    ImmediatePurgeDataOn30Days: true // Not available in Sweden Central. Error: ImmediatePurgeDataOn30Days cannot be set on current api-version
-    IngestionMode: 'ApplicationInsights'
+    //ImmediatePurgeDataOn30Days: true // Not available in Sweden Central. Error: ImmediatePurgeDataOn30Days cannot be set on current api-version
+    IngestionMode: 'LogAnalytics' // Cannot set ApplicationInsights as IngestionMode on consolidated applications
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Disabled'
     Request_Source: 'rest'
