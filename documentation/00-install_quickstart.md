@@ -46,7 +46,7 @@
 If you get ann errormessage about `too long paths` then you need to open the GIT CMD prompt as `Administrator` and run the below (then try again)
 > git config --system core.longpaths true
 
-3) After the CONDA is installed, and the ESML CODE is on your computer
+3) After the CONDA is installed, and the `azure-enterprise-scale-ml` submodule is on your computer, visible in your repo
 - Then after the code is on your computer, or at the ESML generated DSVM, you need to "flip" to main branch, and when running notebooks, you need to select the correct CONDA-evironment. 
 See images below: 
 
