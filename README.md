@@ -1,6 +1,6 @@
 # Project: azure-enterprise-scale-ml (ESML) AI Factory 
 The `Enterprise Scale AI Factory` is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
-- Plug and play accelerator for: DataOps, MLOps, LLMOps, enteprise scale environment.
+- Plug and play accelerator for: DataOps, MLOps, LLMOps, enterprise scale environment.
 
 ## Main purpose: 
 1) `Marry mutliple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
