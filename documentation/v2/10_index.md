@@ -19,7 +19,7 @@ This table will be used in the documentation to clarify WHAT a section covers, a
 
 | Component | In section | Focus in section | Role| Doc series
 |-----------|------------|----------------|-------|----|
-| 1) Infra:AIFactory | Y | - | CoreTeam | 20-29 |
+| 1) Infra:AIFactory | Y | - | CoreTeam | 10-19 |
 | 2) Datalake template | Y | - | All | 20-29,30-39 |
 | 3) Templates for: DataOps, MLOps, *LLMOps | Y | - | All | 20-29, 30-39 |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | - |ProjectTeam | 30-39 |
