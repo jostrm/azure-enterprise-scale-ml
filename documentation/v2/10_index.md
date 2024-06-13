@@ -2,6 +2,7 @@
 
 **Governance related** - relevant for central IT, networking team (CoreTeam: 10-29)
 
+* [End-2-End setup tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours) - Estimated setup time: 4-8h
 * [Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
 * [Infra:AIFactory: Flow diagrams (CoreTeam)](#12-infraaifactory-flow-diagrams-coreteam)
 * [Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#13-infraaifactory-roles--permissions-for-users-coreteam)
@@ -11,6 +12,7 @@
 
 **Consumer related** - relevant for developers, data scientists, data engineers (ProjectTeam: 30-39)
 
+* [End-2-End config tutorial - ESML Project, ESGenAI Project](#39-end-2-end-setup-esml-project-esgenai-project) - Estimated config time: 1-2h
 * [Usage: Dashboard, Available Tools & Services, DataOps, MLOps, Access options to AIFactory (ProjectTeam)](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam)
 * [How-to guide: Get access to the AIFactory:RBAC & Networking (ProjectTeam)](#31-how-to-guide-get-access-to-the-aifactoryrbac--networking-projectteam)
 * [Overview: Dashboards, Services & Acceleration in AIFactory (ProjectTeam, CoreTeam)](#32-overview-dashboards-services--acceleration-in-aifactory-projectteam-coreteam)
@@ -120,6 +122,12 @@ Here you can find HOWTO guides for the ESML CoreTeam, how to setup the Datalake 
 ## 23) `Templates: DataOps`: CoreTeam usage for DataOps via PIPELINE templates
 Here you can find HOWTO guides for the ESML CoreTeam,  its Dataingestion team within the CoreTeam. 
 
+## 24) `End-2-End setup tutorial: AIFactory (4-8 hours)`
+Here is an end-2-end setup turorial. 
+- Estimated time is 2-4 hours, to have the full AIFactory automation configured
+- AIFactory Common DEV + the 1st ESMLProject (type: ESML)
+
+After the setup, you can simply click on a pipeline to provision 1 or 250 AIFactory project architectures, of type ESML or ESGenAI.
 
 # 30) Usage: Dashboard, Available Tools & Services, DataOps, MLOps, Access options to AIFactory (ProjectTeam)
 Here you can find HOWTO guides for a ESML ProjectTeam, including its DataOps, MLOps, supported use cases, accelerated use cases.
@@ -182,6 +190,24 @@ It also comes with DEMO data, per project team.
 ## 36) How-to guide: DataOps
 ## 37) How-to guide: MLOps
 ## 38) How-to guide: LLMOps & RAG Chat Agent
+## 39) End-2-End setup: ESML Project, ESGenAI Project
+
+**ESML Project:** Here is an end-2-end setup tutorial, for DataOps and MLOps
+- Estimated time to setup is 1-2 hours
+- ESML project configured with both DataOps and MLOps - retrained on "data changed" and on "code changed"
+- Retraining DEMO-model on "data changed" and on "code changed" (CI/CD trigger)
+- Deployed as online endpoint, and batch endpoint
+
+[TODO - Link]
+
+**ESGenAI Project:** Here is an end-2-end setup tutorial, for ESML GenAI project
+- Estimated time to setup is 1-2 hours
+- ESGenAI project configured with "on your data" with Azure AI Search, Promptflow with multiple indexed. 
+- Re-indexed on "code changed" (CI/CD trigger on promptflow) and redeployed endpoint
+- Deployed as an online endpoint, with possibility to scale with multiple backends (round-robin)
+- Batch Evaluation & Live Monitoring
+
+[TODO - Link]
 
 # 40) FAQ
 - Q: How-to clone repo with submodule to local computer? the folder  `azure-enterprise-scale-ml` is empty? 
