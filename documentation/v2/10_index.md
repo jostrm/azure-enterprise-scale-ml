@@ -188,8 +188,16 @@ It also comes with DEMO data, per project team.
 [HOWTO - Quickstart: Configure templates, and data settings - train model with own data](../v2/30-39/35-setup-aifactory-notebook-templates-py.md)
 
 ## 36) How-to guide: DataOps
+
+[HOWTO - Quickstart: DataOps with Azure Datafactory ESML templates](../v2/30-39/36-dataops.md)
+
 ## 37) How-to guide: MLOps
+
+[HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks](../v2/30-39/37-mlops.md)
+
 ## 38) How-to guide: LLMOps & RAG Chat Agent
+
+[ !WIP! - HOWTO - Quickstart: LLMOps & RAG Chat Agent](../v2/30-39/37-mlops.md)
 ## 39) End-2-End setup: ESML Project, ESGenAI Project
 
 **ESML Project:** Here is an end-2-end setup tutorial, for DataOps and MLOps
@@ -197,8 +205,8 @@ It also comes with DEMO data, per project team.
 - ESML project configured with both DataOps and MLOps - retrained on "data changed" and on "code changed"
 - Retraining DEMO-model on "data changed" and on "code changed" (CI/CD trigger)
 - Deployed as online endpoint, and batch endpoint
+- [HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks](../v2/30-39/39-end-2-end-esml-projects.md)
 
-[TODO - Link]
 
 **ESGenAI Project:** Here is an end-2-end setup tutorial, for ESML GenAI project
 - Estimated time to setup is 1-2 hours
@@ -206,6 +214,7 @@ It also comes with DEMO data, per project team.
 - Re-indexed on "code changed" (CI/CD trigger on promptflow) and redeployed endpoint
 - Deployed as an online endpoint, with possibility to scale with multiple backends (round-robin)
 - Batch Evaluation & Live Monitoring
+- [!WIP! HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks](../v2/30-39/39-end-2-end-esml-projects.md)
 
 [TODO - Link]
 
