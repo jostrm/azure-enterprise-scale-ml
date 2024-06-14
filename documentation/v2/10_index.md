@@ -68,7 +68,7 @@ Here you will see the definition of an AIFactory via diagrams, and how to setup 
         - Firewall
         - User access: Direct via corp network, VPN from home, Bastion "jumphost" for admins
 
-[Architecture & Services - High-Level & Low Level Diagrams](../v2/10-19/11-arhitecture-diagrams.md)
+[DIAGRAMS: Architecture & Services - High-Level & Low Level Diagrams](../v2/10-19/11-arhitecture-diagrams.md)
 
 
 ## 12) `Infra:AIFactory`: Flow diagrams (CoreTeam)
