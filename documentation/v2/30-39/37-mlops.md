@@ -42,9 +42,11 @@ use_automl = True # SIMPLE MODE + AutoMLStep (if True)Manual ML Step (if False)
 # 3) Import & Configre the GHA/ADO ESML Azure Devops pipeline
 
 1) Import Pipeline from from template - [Template location ](../../../copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops)
+- Point the pipeline to your project and models branch, such as "project001_M11_dev_branch"
 2) Configure the Variables in Azure Devops / Github Actions
 
 ![](./images/37-mlops-ado-vars.png)
+
 
 
 

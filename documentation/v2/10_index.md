@@ -54,7 +54,7 @@ This table will be used in the documentation to clarify WHAT a section covers, a
 
 
 ## 11) `Infra:AIFactory`: Static documentation (CoreTeam)
-Here you will see the definition of an AIFactory via diagrams, and how to setup an AIFactory. 
+Here you will see the definition of an AIFactory via diagrams, and how to setup an AIFactory.
 
 - Pre-Requisites: To setup an AIFactory
     - Service Principal (IaC purpose) & Permission
@@ -67,6 +67,9 @@ Here you will see the definition of an AIFactory via diagrams, and how to setup 
         - Network topology: Hub/Spoke | VirtualWan (Vwan Hub)
         - Firewall
         - User access: Direct via corp network, VPN from home, Bastion "jumphost" for admins
+
+[Architecture & Services - High-Level & Low Level Diagrams](../v2/10-19/11-arhitecture-diagrams.md)
+
 
 ## 12) `Infra:AIFactory`: Flow diagrams (CoreTeam)
 
