@@ -11,4 +11,8 @@
 
 # Low level diagram - MLOps
 
+![](./images/11-architecture-detailed-llmops.png)
 
+# AIFactory scaling: Loadbalancing - RAG chat
+
+![](./images/11-architecture-ragchat-scaling.png)
