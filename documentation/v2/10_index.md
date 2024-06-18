@@ -54,22 +54,34 @@ This table will be used in the documentation to clarify WHAT a section covers, a
 
 
 ## 11) `Infra:AIFactory`: Static documentation (CoreTeam)
-Here you will see the definition of an AIFactory via diagrams, and how to setup an AIFactory.
+Here you will see the definition of an AIFactory via lists and diagrams, and workflows how to add projects or members to an AIFactory.
 
-- Pre-Requisites: To setup an AIFactory
+### How-to
+- Prerequisites: Before setting up an AIFactory
     - Service Principal (IaC purpose) & Permission
     - Azure subscriptions
-- High-Level Diagram
-- Low-Level Diagram
-    - List of services that will be provisioned using ESML/AI Factory Pipeline
-    - Integration between different services
+- Setup an AIFactory
+- Using an AIFaactory: List of services that will be provisioned using AIFactory to add `AIFactory projects`:
+    - ESML project
+        - 
+    - ESGenAI project
+        - 
+
+### Diagrams
+- [High-Level Diagram - AIFactory Capabilities ](../v2/10-19/11-architecture-diagrams.md#high-level-diagrams---architecture--capabilities)
+- [High-Level Diagram - ESML project: Overview services ](../v2/10-19/11-architecture-diagrams.md#ai-factory---esml-project-overview)
+- [High-Level Diagram - ESGenAI project: Overview services](../v2/10-19/11-architecture-diagrams.md#ai-factory---esgenai-project-overview)
+- [Mid-Level Diagram - Azure Services integration:ESML ](../v2/10-19/11-architecture-diagrams.md#high-level-diagram---services-integration-esml-project)
+- [Mid-Level Diagram - Azure Services integration:ESGenAI ](../v2/10-19/11-architecture-diagrams.md#design-patterns-supported-esgenai)
+- [Low-Level Diagram - Infrastructure & LLMOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---llmops-esgenai)
+- [Low-Level Diagram - Infrastructure & MLOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---mlops-esml)
+- [Networking Diagram - Spokes ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---mlops)
     - Network Connectivity
         - Network topology: Hub/Spoke | VirtualWan (Vwan Hub)
         - Firewall
         - User access: Direct via corp network, VPN from home, Bastion "jumphost" for admins
 
-[DIAGRAMS: Architecture & Services - High-Level & Low Level Diagrams](../v2/10-19/11-arhitecture-diagrams.md)
-
+[All Diagrams: Architecture & Services - High-Level & Low Level Diagrams](../v2/10-19/11-architecture-diagrams.md)
 
 ## 12) `Infra:AIFactory`: Flow diagrams (CoreTeam)
 
