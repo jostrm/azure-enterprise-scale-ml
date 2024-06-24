@@ -57,15 +57,13 @@ This table will be used in the documentation to clarify WHAT a section covers, a
 Here you will see the definition of an AIFactory via lists and diagrams, and workflows how to add projects or members to an AIFactory.
 
 ### How-to
-- Prerequisites: Before setting up an AIFactory
-    - Service Principal (IaC purpose) & Permission
-    - Azure subscriptions
-- Setup an AIFactory
-- Using an AIFaactory: List of services that will be provisioned using AIFactory to add `AIFactory projects`:
-    - ESML project
-        - 
-    - ESGenAI project
-        - 
+- [Prerequisites: Before setting up an AIFactory](../v2/10-19/12-prerequisites-setup.md)
+    - [Service Principal (IaC purpose) & Permission](../v2/10-19/12-prerequisites-setup.md#entraid---service-principal-iac-purpose--permission)
+    - [Azure subscriptions (ESLZ)](../v2/10-19/12-prerequisites-setup.md#azure-subscriptions--enterprise-scale-landing-zones)
+- [Setup an AIFactory](../v2/10-19/13-setup-aifactory.md)
+- [AIFactory overview](../v2/10-19/14-aifactory-overview.md) - List of services that will be provisioned using AIFactory to add AIFactory projects:
+    - **ESML project (DataOps, MLOps E2E):** Azure Datafactory, Azure Eventhubs, Azure Machine Learning, Azure Databricks, Azure Kubernetes Service (AKS)
+    - **ESGenAI project (GenAI Chatbot):** Azure OpenAI,Azure AI Search,Azure AI Studio (*WIP)
 
 ### Diagrams
 - [High-Level Diagram - AIFactory Capabilities ](../v2/10-19/11-architecture-diagrams.md#high-level-diagrams---architecture--capabilities)
