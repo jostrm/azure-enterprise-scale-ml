@@ -72,7 +72,7 @@ Here you will see the definition of an AIFactory via lists and diagrams, and wor
 - [Mid-Level Diagram - Azure Services integration:ESML ](../v2/10-19/11-architecture-diagrams.md#high-level-diagram---services-integration-esml-project)
 - [Mid-Level Diagram - Azure Services integration:ESGenAI ](../v2/10-19/11-architecture-diagrams.md#design-patterns-supported-esgenai)
 - [Low-Level Diagram - Infrastructure & LLMOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---llmops-esgenai)
-- [Low-Level Diagram - Infrastructure & MLOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---mlops-esml)
+- [Low-Level Diagram - Infrastructure & MLOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---llmops-esgenai)
 - [Networking Diagram - Spokes ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---mlops)
     - Network Connectivity
         - Network topology: Hub/Spoke | VirtualWan (Vwan Hub)
