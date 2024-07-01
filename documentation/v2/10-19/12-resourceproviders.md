@@ -3,7 +3,7 @@
 If you have a blank Azure subscription, the resource providers for all services needs. 
 
 - Powershell script to `register if not exists` exists here: 
-    - azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1
+    - [azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
 - About resource providers: https://portal.azure.com/#todo/resource/subscriptions/todo-subscription-id/resourceproviders
 
 # INFO - What resource providers are we talking about:

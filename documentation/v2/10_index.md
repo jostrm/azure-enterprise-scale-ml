@@ -137,7 +137,7 @@ Here you can find HOWTO guides for the ESML CoreTeam, how to setup the Datalake 
 Here you can find HOWTO guides for the ESML CoreTeam,  its Dataingestion team within the CoreTeam. 
 
 ## 24) `End-2-End setup tutorial: AIFactory (4-8 hours)`
-Here is an end-2-end setup turorial. 
+Here is an [end-2-end setup turorial](./20-29/24-end-2-end-setup.md)
 - Estimated time is 2-4 hours, to have the full AIFactory automation configured
 - AIFactory Common DEV + the 1st ESMLProject (type: ESML)
 
