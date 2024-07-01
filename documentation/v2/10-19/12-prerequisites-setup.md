@@ -1,5 +1,12 @@
 # Prerequisites - Before setting up an AIFactory
 
+## Create Azure Devops / Github projects
+
+1) Create a Azure Devops project
+2) Create 2 repositories
+- ESML common
+- ESML project001
+
 ## Azure subscriptions & Enterprise Scale landing zones
 1) Subscriptions: 
     - Option A (Recommended to try out the AIFactory): Created at least 1 Azure subscription (Dev)
