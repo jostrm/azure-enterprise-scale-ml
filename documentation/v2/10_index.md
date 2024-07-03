@@ -90,20 +90,9 @@ Also explains the usage.
 - MLOps Flow Diagram
 
 ## 13) `Infra:AIFactory`: Roles & Permissions for users (CoreTeam)
-EntraID Service Principal (Automation & Ops purpose) & Permission:: 
+Detailed information about Roles and permission, such as Microsoft Entra ID: Service Principals (Automation & Ops purpose) & Permissions for Users, AD groups. 
+Go here: 
 
-The `CoreTeam` has has its own Service Principal, for unattended Automation & DataOps (source to lake) purpose. 
-- Example: For elevated access to sources and datalake, compared to project teams limited access.
-
-Each `ProjectTeam` has its own Service Principal, for unatteded Automation & DataOps (lake only) and MLOps purpose. 
-- Example: For running its DataOps or MLOps pipelines unattended. Reading & Writing to their limited space in the datalake.
-
-### CoreTeam Service Principal
-    - Name: 
-    - Permissons: 
-### ProjectTeam Service Principal
-    - Name: 
-    - Permissons: 
 
 # 20) `Infra:AIFactory`: Onboarding, Roles & Permission described (CoreTeam)
 
