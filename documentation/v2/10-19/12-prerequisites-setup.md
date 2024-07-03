@@ -14,7 +14,7 @@ A) Create Subscriptions:
 B) Enable resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
     - [Tip: You can use the Powershell script to automate this](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
 
-## Step 3) Create an Azure keyvault for the admin of Microsoft Entra ID: The so called `seeding keyvault` (IaC purpose)
+## Step 3) Create an Azure keyvault for the admin of Microsoft Entra ID: The so called `seeding keyvault` (IaC purpose), and created Service principals
 - Purpose: For the admin (usually Central IT), who has access to Microsoft Entra ID to created service principals, to store information, to be consumed by AIFactory IaC pipeline.
 - [How-to guide: Create & Use the AIFactory seeding keyvault](./12-seeding-keyvault.md)
 
