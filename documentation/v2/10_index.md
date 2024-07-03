@@ -2,13 +2,13 @@
 
 **Governance related** - relevant for central IT, networking team (CoreTeam: 10-29)
 
-* [A1) End-2-End setup tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours) - Estimated setup time: 4-8h
+* [A1) End-2-End setup tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to) - Estimated setup time: 4-8h
 * [A2) Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
-* [A3) Infra:AIFactory: Flow diagrams (CoreTeam)](#12-infraaifactory-flow-diagrams-coreteam)
-* [A4) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#13-infraaifactory-roles--permissions-for-users-coreteam)
-* [A5) Infra:AIFactory: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
-* [A6) Datalake template: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template-setup-datalake--onboard-projectteam-via-pipelines)
-* [A7) Templates: CoreTeam usage for DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops-coreteam-usage-for-dataops-via-pipeline-templates)
+* [A3) Infra:AIFactory: Flow diagrams (CoreTeam)](#13-infraaifactory-flow-diagrams-coreteam)
+* [A4) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#12-infraaifactory-roles--permissions-for-users-coreteam)
+* [A5) Infra:AIFactory: How-to: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
+* [A6) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
+* [A7) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
 
 **Consumer related** - relevant for developers, data scientists, data engineers (ProjectTeam: 30-39)
 
@@ -33,7 +33,7 @@ This is the main page for all documentation, with links to underlying specifics.
 | Doc series | Role | Focus | Details|
 |------------|-----|--------|--------|
 | [10-19](#10-ai-factory-esml---about-the-documentation) | `CoreTeam`|`Governance`| Setup of AI Factory. Governance. Infrastructure, networking. Permissions |
-| [20-29](#20-infraaifactory-onboarding-roles--permission-described-coreteam) | `CoreTeam` | `Usage`| User onboarding & AI Factory usage. DataOps for the CoreTeam's data ingestion team |
+| [20-29](#20-infraaifactory---how-to-onboarding-roles--permission-described-coreteam) | `CoreTeam` | `Usage`| User onboarding & AI Factory usage. DataOps for the CoreTeam's data ingestion team |
 | [30-39](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam) | `ProjectTeam` | `Usage`| Dashboard, Available Tools & Services, DataOps, MLOps, Access options to the private AIFactory |
 | [40-49](#40-faq) | `All`|`FAQ`| Various frequently asked questions. Please look here, before contacting an ESML AIFactory mentor. |
 
@@ -45,8 +45,8 @@ This table will be used in the documentation to clarify WHAT a section covers, a
 | Component | In section | Focus in section | Role| Doc series
 |-----------|------------|----------------|-------|----|
 | 1) Infra:AIFactory | Y | - | CoreTeam | [10-19](#10-ai-factory-esml---about-the-documentation) |
-| 2) Datalake template | Y | - | All | [20-29](#20-infraaifactory-onboarding-roles--permission-described-coreteam),[30-39](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam) |
-| 3) Templates for: DataOps, MLOps, *LLMOps | Y | - | All | [20-29](#20-infraaifactory-onboarding-roles--permission-described-coreteam),[30-39](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam) |
+| 2) Datalake template | Y | - | All | [20-29](#20-infraaifactory---how-to-onboarding-roles--permission-described-coreteam),[30-39](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam) |
+| 3) Templates for: DataOps, MLOps, *LLMOps | Y | - | All | [20-29](#20-infraaifactory---how-to-onboarding-roles--permission-described-coreteam),[30-39](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam) |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | - |ProjectTeam | [30-39](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam) |
 
 
@@ -55,17 +55,6 @@ This table will be used in the documentation to clarify WHAT a section covers, a
 
 ## 11) `Infra:AIFactory`: Static documentation (CoreTeam)
 Here you will see the definition of an AIFactory via lists and diagrams, and workflows how to add projects or members to an AIFactory.
-
-### How-to
-- [Prerequisites: Before setting up an AIFactory](../v2/10-19/12-prerequisites-setup.md)
-    - [Service Principal (IaC purpose) & Permission](../v2/10-19/12-prerequisites-setup.md#entraid---service-principal-iac-purpose--permission)
-    - [Azure subscriptions (ESLZ)](../v2/10-19/12-prerequisites-setup.md#azure-subscriptions--enterprise-scale-landing-zones)
-- [Setup an AIFactory](../v2/10-19/13-setup-aifactory.md)
-- [AIFactory overview](../v2/10-19/14-aifactory-overview.md) - List of services that will be provisioned using AIFactory to add AIFactory projects:
-    - **ESML project (DataOps, MLOps E2E):** Azure Datafactory, Azure Eventhubs, Azure Machine Learning, Azure Databricks, Azure Kubernetes Service (AKS)
-    - **ESGenAI project (GenAI Chatbot):** Azure OpenAI,Azure AI Search,Azure AI Studio (*WIP)
-
-### Diagrams
 - [High-Level Diagram - AIFactory Capabilities ](../v2/10-19/11-architecture-diagrams.md#high-level-diagrams---architecture--capabilities)
 - [High-Level Diagram - ESML project: Overview services ](../v2/10-19/11-architecture-diagrams.md#ai-factory---esml-project-overview)
 - [High-Level Diagram - ESGenAI project: Overview services](../v2/10-19/11-architecture-diagrams.md#ai-factory---esgenai-project-overview)
@@ -81,33 +70,35 @@ Here you will see the definition of an AIFactory via lists and diagrams, and wor
 
 [All Diagrams: Architecture & Services - High-Level & Low Level Diagrams](../v2/10-19/11-architecture-diagrams.md)
 
-## 12) `Infra:AIFactory`: Flow diagrams (CoreTeam)
+## 12) `Infra:AIFactory`: Roles & Permissions for users (CoreTeam)
+Detailed information about Roles and permission, such as Microsoft Entra ID
 
-Flow diagram which can explains the architectural flows of the complete solution(AI Factory, MLOps Accelerator)
-Also explains the usage.
+Service Principals (Automation & Ops purpose) & Permissions for Users, AD groups. 
 
-- AI Factory Flow Diagram: from DATA to VALUE
-- MLOps Flow Diagram
+[Permissions & Roles: Coreteam VS Project team](./10-19/12-permissions-users-ad-sps.md)
 
-## 13) `Infra:AIFactory`: Roles & Permissions for users (CoreTeam)
-Detailed information about Roles and permission, such as Microsoft Entra ID: Service Principals (Automation & Ops purpose) & Permissions for Users, AD groups. 
-Go here: 
+## 13) `Infra:AIFactory`: Flow diagrams (CoreTeam)
+
+Flow diagram which can explains the workflows, how to utilize the complete solution(AI Factory, MLOps Accelerator) in different scenarios. 
+
+- [Flow Diagram - Add AIFactory project, Add users](./10-19/13-flow-diagram-1.md)
+- [Flow Diagram - DataOps Configuration](./10-19/13-flow-diagram-dataops.md.md)
 
 
-# 20) `Infra:AIFactory`: Onboarding, Roles & Permission described (CoreTeam)
+# 20) `Infra:AIFactory` - How-to: Onboarding, Roles & Permission described (CoreTeam)
 
 | Component | In section | Focus in section | Role in section | Index
 |-----------|------------|----------------|-------|----|
-| 1) Infra:AIFactory | Y | Usage & Onboard teams | CoreTeam:Infra | [21](#21-infraaifactory-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam) |
-| 2) Datalake template | Y | Setup | CoreTeam:Infra | [22](#22-datalake-template-setup-datalake--onboard-projectteam-via-pipelines) |
-| 3) Templates for: DataOps, MLOps, *LLMOps | Y | DataOps | CoreTeam: DataIngestion | [23](#23-templates-dataops-coreteam-usage-for-dataops-via-pipeline-templates) |
+| 1) Infra:AIFactory | Y | Usage & Onboard teams | CoreTeam:Infra | [21](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam) |
+| 2) Datalake template | Y | Setup | CoreTeam:Infra | [22](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines) |
+| 3) Templates for: DataOps, MLOps, *LLMOps | Y | DataOps | CoreTeam: DataIngestion | [23](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates) |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | N | - | - | - |
 
 User onboarding, permissions and usage howto. There are 2 roles in the AIFactory, here the different permissions roles have is explained.
  - AIFactory CoreTeam: 
  - AIFactory ProjectTeam: 
 
-## 21) `Infra:AIFactory`: Onboarding of CoreTeam users and ProjectMembers via PIPELINES (CoreTeam)
+## 21) `Infra:AIFactory`- How-to: Onboarding of CoreTeam users and ProjectMembers via PIPELINES (CoreTeam)
 Roles and permissions. 
 
 ### Option A) GitHub Actions workflow
@@ -119,16 +110,16 @@ Roles and permissions.
     - 1) BICEP+GithubActions
     - 2) Terraform+GithubActions
 
-## 22) `Datalake template`: Setup Datalake & Onboard ProjectTeam via PIPELINES
+## 22) `Datalake template`- How-to: Setup Datalake & Onboard ProjectTeam via PIPELINES
 Here you can find HOWTO guides for the ESML CoreTeam, how to setup the Datalake structure, and how to provide a ProjectTeam access to their datalake projectfolder, by running a pipeline (ADO, GHA)
 
-## 23) `Templates: DataOps`: CoreTeam usage for DataOps via PIPELINE templates
+## 23) `Templates: DataOps` - How-to: Setup DataOps via PIPELINE templates
 Here you can find HOWTO guides for the ESML CoreTeam,  its Dataingestion team within the CoreTeam. 
 
-## 24) `End-2-End setup tutorial: AIFactory (4-8 hours)`
-Here is an [end-2-end setup turorial](./20-29/24-end-2-end-setup.md)
-- Estimated time is 2-4 hours, to have the full AIFactory automation configured
-- AIFactory Common DEV + the 1st ESMLProject (type: ESML)
+## 24) `End-2-End setup tutorial: AIFactory (4-8 hours) - How-to`
+Here is an [End-2-End setup tutorial](./20-29/24-end-2-end-setup.md), with an estimated ~4-8 hour setup time.
+- Estimated setup time is 3-7 hours, to have the full AIFactory automation configured, and create "AIFactory Common DEV" + the 1st AIFactory project created (type:ESML)
+- Estimated setup time 1 hour: Configure AIFactory Common DEV + the 1st ESMLProject (type: ESML)
 
 After the setup, you can simply click on a pipeline to provision 1 or 250 AIFactory project architectures, of type ESML or ESGenAI.
 

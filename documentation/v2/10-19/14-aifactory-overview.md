@@ -7,3 +7,9 @@ List of services provisioned using AIFactory to add AIFactory projects:
     - Azure Keyvault, Azure container registry, Azure Application Insight
 - **ESGenAI project (GenAI Chatbot):** Azure OpenAI,Azure AI Search,Azure AI Studio (*WIP)
     - Azure Keyvault, Azure container registry, Azure Application Insight
+
+# Visual diagram view of services 
+
+## AIFactory ESML project
+
+## AIFactory GenAI project

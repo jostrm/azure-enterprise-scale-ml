@@ -1,7 +1,7 @@
 # `Infra:AIFactory`: Roles & Permissions for users, service principals, AD groups
 Detailed information about Roles and permission, such as Microsoft Entra ID: Service Principals (Automation & Ops purpose) & Permissions for Users, AD groups. 
 
-## SERVICE PRINICPALS
+## SERVICE PRINICPALS - Minimum 3 
 The `AIFactory IaC pipeline` has has its own Service Principal, for unattended Automation of IaC purpose.
 
 The `CoreTeam` has has its own Service Principal, for unattended Automation & DataOps (source to lake) purpose. 
@@ -10,24 +10,24 @@ The `CoreTeam` has has its own Service Principal, for unattended Automation & Da
 Each `ProjectTeam` has its own Service Principal, for unatteded Automation & DataOps (lake only) and MLOps purpose. 
 - Example: For running its DataOps or MLOps pipelines unattended. Reading & Writing to their limited space in the datalake.
 
-### AFactory IaC Service Principal
+### AFactory IaC Service Principal (1st)
     - Name: esml-common-bicep-sp
     - Permissons: For the ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended
-### CoreTeam Service Principal
+### Role: CoreTeam Service Principal (2nd)
     - Name: esml-common-sp
     - Permissons: For the ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended
-### ProjectTeam Service Principal
+### Role: ProjectTeam Service Principal (3rd)
     - Name: esml-project001-sp
     - Permissons: For the ESML AIFactory project teams, to be able to run their MLOps and LLMOps pipelines unattended
 
 ### Keyvaults: Storing the Service principal information - Keyvault & Secret names
 
-- The core team has its own keyuvalt.
-    - More info: This resisdes in the COMMON resource group of the AIFactory, one per environment (Dev, Test, Prod). 
+- The core team has its own 2 keyvaults: `kv-cmnadmdev-*, kv-cmndev-*`, and the secrets will be copied to the latter
+    - More info: The keyvault, `kv-cmndev-*` resisdes in the COMMON resource group of the AIFactory, one per environment (Dev, Test, Prod). 
         - The secret names will be the same as the seeding keyvault default names
         - [More info: Seeding keyvault](./12-seeding-keyvault.md)
-- Each project teams has its own keyvalt. 
-    - More info: This resisdes in the PROJECT resource group of the AIFactory, one per environment (Dev, Test, Prod). 
+- Each project teams has its own keyvalt: `kv-p00*` such as: `kv-p001-weu-dev-abcd01`
+    - More info: This keyvault resides in the PROJECT resource group of the AIFactory, one per environment (Dev, Test, Prod). 
         - The secret names will be the same as the seeding keyvault default names
         - [More info: Seeding keyvault](./12-seeding-keyvault.md)
 - The Microsoft Entra ID administrator, has its own keyuvalt. A seeding keyvault. 
