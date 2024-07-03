@@ -1,25 +1,24 @@
 # Prerequisites - Before setting up an AIFactory
 
-## Create Azure Devops / Github projects
+## Step 1) Create Azure Devops / Github projects
 
-1) Create a Azure Devops project
-2) Create 2 repositories
-- ESML common
-- ESML project001
+CODE repository: Create your Azure Devops project to store the AIFactory acceleration code (IaC, and templates)
+- Create 2 GIT repositories, in your Azure Devops project:
+    - ESML-AIFactory-Common
+    - ESML-AIFactory-Project001
 
-## Azure subscriptions & Enterprise Scale landing zones
-1) Subscriptions: 
-    - Option A (Recommended to try out the AIFactory): Created at least 1 Azure subscription (Dev)
+## Step 2) - Created Azure subscriptions & Enterprise Scale landing zones
+A) Create Subscriptions:
+    - Option A (Recommended to try out the AIFactory): Create 1 Azure subscription to act as the Dev environment. The AIFactory can simulate Test, Prod workflows (MLOps, LLMOps) with only a Dev
     - Option B (Recommended for productional use): For full AIFactory, create 3 Azure subscriptions (Dev, Stage, Prod)
-2) Resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
-        - [Tip: You can use the Powershell script to automate this](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
+B) Enable resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
+    - [Tip: You can use the Powershell script to automate this](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
 
-## How-to guide: Create a Azure keyvault - the so called `seeding keyvault` (IaC purpose)
+## Step 3) Create an Azure keyvault for the admin of Microsoft Entra ID: The so called `seeding keyvault` (IaC purpose)
+- Purpose: For the admin (usually Central IT), who has access to Microsoft Entra ID to created service principals, to store information, to be consumed by AIFactory IaC pipeline.
 - [How-to guide: Create & Use the AIFactory seeding keyvault](./12-seeding-keyvault.md)
 
-### Service Principals & Permissions explained: 
-
-## Service principals - purpose and permissions exaplained
+### INFO: Service principals - purpose and permissions exaplained: 
 ### SP AIFactory specific (IaC purpose): 
 Used for AIFactory orchestration service principal: Create 1 service principal with OWNER permission to the subscriptions: Dev, Test, Prod.
 - Purpose: For Azure Devops / Github Action to be able to provision the AIFactory, and AIFactory projects, and set permissions for users and services (RBAC, ACL, Keyvault Access Policys) to services, datalake folders, keyvaults.

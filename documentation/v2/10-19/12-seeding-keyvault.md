@@ -3,7 +3,7 @@
 Purpose: We want to split the responsibility of who to create articfacts in Microsoft Entra ID, versus the AIFactory pipeline in Azure Devops / GHA - who reads information about service principals and sets permissions.
 - Example: An admininstrator can create 10 service principals, January 1st, that will be stored in a `seeding Keyvault`, and used whenever a project manager wants to order a new AIFactory project during the year, up to 10 projects.
 
-## Create the keyvault and enable BICEP to use is
+## Step 1) Create the keyvault and enable BICEP to use is
 
 1) Create an Azure Keyvult, in the AIFactory DEV Azure subscription, in a resource group that ESML Core team administrators has access to.
 2) Enable the Keyvault to be used by BICEP, by running below command: 
@@ -13,7 +13,8 @@ The below is needed for ADO and BICEP able to use this keyvault:
  `
  - Purpose: For AAD ADMIN to add 1-250 project service principles. 2022 we can reuse the SP's from the old projects 1-12.   External keyvault: `kv-esml-common-ext`
 
-## Setup & Use the `Seeding keyvault`: Add information
+## Step 2) Setup & Use the `Seeding keyvault`: Add information
+
 
 ### Add new AIFactory PROJECT service principal information: Steps: 1-3 (ex:005)
 - 1) An ADMIN creates a new service principle in Microsoft Entra ID, and saves in EXTERNAL keyvault `'kv-esml-common-ext'` the 3 values
@@ -36,11 +37,29 @@ The below is needed for ADO and BICEP able to use this keyvault:
 	- ref003= AD user Object Id's for all project members, in a comma-separeted list: `asdf123,asd24,234f3`
 
 	#### Click "deploy"...wait 30min..DONE!
+## DONE!
 
-- 3) AAD ADMIN or ESML ADMIN copies the SP SECRET manually from This EXTERNAL  KEYVAULT(A), to the newly created project specific KEYVAULT (B) `kv-p005-weu-dev-abcym01`
+## Seeding keyvault - service principals & secrects explained
+Secret names is flexible. But if chosen the below names, no variable configuration is needed in the IaC pipeline in Azure Devops.
 
-*The SP secret value is for security reason copied manually by the "admin" from External keyvault. (The BICEP can, but will not do that)
+Service principals: Below the secret information about the service principals used in the AIFactory is explained.
 
+| Secret name | Purpose
+|--------------------------|-------------------------------------------------------|
+|esml-common-bicep-sp-id   | `Purpose: Provision ESMLAI Factory and projects`|
+| esml-common-bicep-sp-secret | `- Example: The Azure Devops service connection for AIFactory infra (esml-common, esml-project, add-members-to-project, add-members-to-coreteam), will be based on this`|
+| esml-common-sp-id | `Purpose: For ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended`|
+| esml-common-sp-oid | `-`|
+| esml-common-sp-secret | `-`|
+| esml-project001-sp-id | `Purpose: For ESML AIFactory project teams, to be able to run their MLOps and LLMOps pipelines unattended`|
+| esml-project001-sp-oid | `- Example: Will have ACL permissions on project specific datalake folders, GET accesspolicy on keyvault, Contributor on Azure ML workspace`|
+| esml-project001-sp-secret | `-`|
+| ... | `Admin of Microsoft EntraID can create multiple service principals, at one go (e.g. spend an hour), and then there is no dependency to that Admin when adding AIFactory projects`|
+| esml-project012-sp-id | `-`|
+| esml-project012-sp-oid | `-`|
+| esml-project012-sp-secret | `-`|
+
+![](./images/12-seeding-keyvault-secrets.png)
 
 ## Service principals - purpose and permissions exaplained
 ### SP AIFactory specific (IaC purpose): 
