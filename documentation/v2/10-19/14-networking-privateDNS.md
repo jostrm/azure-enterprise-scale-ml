@@ -54,7 +54,7 @@ Note: It is also possible to use SDK v2 - with some modifications, since the SDK
 
 [Read more here - how to secure Azure Machine Learning (SDK v2)](https://learn.microsoft.com/en-us/azure/machine-learning/tutorial-create-secure-workspace-vnet?view=azureml-api-2)
 
-## How-to: Configure Azure PaaS services to use private DNS zones (centralDnsZoneByPolicyInHub:true)
+## How-to: Configure Azure PaaS services to use private DNS zones (AIFactory config → centralDnsZoneByPolicyInHub:true)
 
 [Since the ESML AIFactory are using secure Azure Machine Learning workspaces, with private link, and private DNS zones](#how-to-understand-how-the-secure-azure-machine-learning-workspaces-is-setup-in-the-aifactory-automation), we need to setup and configure private DNS.
 
@@ -66,7 +66,10 @@ WE also need to create the private DNS zones in the HUB, since private endpoints
 - E.g. we want to avoid having the private DNS zones locally, which will work, but is not optimal, since manual work is needed, whenever an AIFactory projecte is created. 
 - E.g. It is not recommended for productional and scalability reasons to use local Private DNS zones.
 
-Hece, the [SOLUTION](#solution---private-dns-zones-custom-dns--azure-policy) below: 
+### Solution
+In ESML AIFactory, you need to [set the config `centralDnsZoneByPolicyInHub:true` in the parameter file here](../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json) in the [SETUP of AIFactory](../20-29/24-end-2-end-setup.md) 
+
+And, follow the [SOLUTION](#solution---private-dns-zones-custom-dns--azure-policy) below: 
 
 ### Challenge more info - Private DNS zones: Avoid manual work?
 If you do not have central Privat DNS Zones, the DNS forwarding will not work until you also add conditional forwarding manually. 
