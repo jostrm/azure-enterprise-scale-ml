@@ -13,6 +13,17 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
 - Option B (Recommended for productional use): Create a policy to create the private DNS zones in your HUB, and set the AIFactory config flag `centralDnsZoneByPolicyInHub` to `true`
     - The flag `centralDnsZoneByPolicyInHub` can be seen in [this AIFactory config file:e](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)
 
+## AIFactory Hub-Spoke - Simplified
+
+## AIFactory's Enterprise Scale Landing Zones: Virtual Wan
+
+![](./images/14-eslz-full-1.png)
+
+### Zoomed in:
+
+![](./images/14-eslz-zoomed-in-1.png)
+
+
 ## How-to: Understand how the secure Azure Machine Learning workspaces is setup in the AIFactory automation
 
 In the ESML AIFactory the Azure Machine Learning workspaces are setup accoring to the SDK v1 specification. Since this is the highest security setup (no ARM used. No public IP)
