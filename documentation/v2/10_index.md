@@ -152,7 +152,7 @@ Also how to get access to the private AIFactory.
 1) Talk to your AIFactory CoreTeam. Ask them to onboard you, as per section [20)](#20-infraaifactory---how-to-onboarding-roles--permission-described-coreteam)
 
 2) Depending on your AIFactory setup, you may need to take additional actions to get network access.
-- A) AIFactory, isolated mode (not peered): [HOWTO - Bastion acccess TODO-LINK](../v2/30-39/31-jumphost-vm-bastion-access.md)
+- A) AIFactory, isolated mode (not peered): [HOWTO - Bastion acccess](../v2/30-39/31-jumphost-vm-bastion-access.md)
 - B) AIFactory, peered mode, corp network: - No action needed. Line of sight exists already.
     - Pre-req:[Docs - Setup secure Azure machine learning on Azure](https://learn.microsoft.com/en-us/azure/machine-learning/tutorial-create-secure-workspace-vnet?view=azureml-api-1)
     - Pre-req:[Docs - Well Architected Framework on Azure](https://learn.microsoft.com/en-us/azure/well-architected/)
@@ -166,7 +166,7 @@ Also how to get access to the private AIFactory.
 
 There are multiple ESML AIFactory dashboards available, that the coreteam shared to you. 
 
-Here you can find information, and HOWTO select them, and customize them further [TODO-LINK]
+[How-to guide: IMPORT AIFacotory dashboards or select them, clone them, to customize them further](../v2/30-39/32-dashboards.md)
 
 ### 32.2 Azure services available in the AI Factory
 There are Azure services packaged both for DataOps, MLOps, and Generative AI. 
