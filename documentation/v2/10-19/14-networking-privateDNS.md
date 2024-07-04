@@ -13,7 +13,13 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
 - Option B (Recommended for productional use): Create a policy to create the private DNS zones in your HUB, and set the AIFactory config flag `centralDnsZoneByPolicyInHub` to `true`
     - The flag `centralDnsZoneByPolicyInHub` can be seen in [this AIFactory config file:e](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)
 
-## AIFactory Hub-Spoke - Simplified
+## AIFactory Hub-Spoke - Light & Simplified view
+
+![](./images/14-eslz-networking-light.png)
+
+- Simplified view
+- Not all Private DNS zones are listed. [To see all - go here](./15-aifactory-overview.md)
+- Not all networking components are shown. [To see more - go here (this doc)](#aifactorys-enterprise-scale-landing-zones-virtual-wan) and [go here (this doc)](#how-to-give-user-access-from-corp-on-premises-network---custom-dns-server-hosted-onpremises)
 
 ## AIFactory's Enterprise Scale Landing Zones: Virtual Wan
 
