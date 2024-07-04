@@ -23,6 +23,21 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
 
 ![](./images/14-eslz-zoomed-in-1.png)
 
+- 1) AIFactory Shared Governance
+    - AIFactory dashboards, Cost control over all environments in the AIFactory, Network Watcher
+- 2) AIFactory Common-Dev
+- 3) AIFactory Project001-Dev (ESML)
+- 4) AIFactory Project002-Dev (ESGenAI)
+- 5) AIFactory Common-Test
+- 6) AIFactory Project001-Test (ESML)
+- 7) AIFactory Project002-Test (ESGenAI)
+- 8) AIFactory Common-Prod
+- 9) AIFactory Project001-Prod (ESML)
+- 10) AIFactory Project002-Prod (ESGenAI)
+- 11) Platform and Devops team
+    - Core team: The code repository, where AIFactory (IaC) Automation and pipeline resides
+    - Project team: The code repository, where AIFactory (MLops,LLMOps) Automation and pipeline resides
+
 
 ## How-to: Understand how the secure Azure Machine Learning workspaces is setup in the AIFactory automation
 
