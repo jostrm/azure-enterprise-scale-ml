@@ -88,4 +88,10 @@ List of services provisioned using AIFactory to add AIFactory projects:
     - Azure VM (for networking access via Bastion), Azure Bastion
         - Naming convention (defualt): `dsvm-cmn-<region>-<env>-<instance-3>`
         - Name example: `dsvm-cmn-weu-dev-001`
+
+
+## Networking - More information: Private DNS Zones, Private endpoints, Hub/Spoke
+
+[HOWTO - Netoworking options: Hybrid access etc](./14-networking-privateDNS.md)
+
         

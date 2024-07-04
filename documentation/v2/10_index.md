@@ -5,6 +5,8 @@
 * [11) Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
 * [12) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#12-infraaifactory-roles--permissions-for-users-coreteam)
 * [13) Infra:AIFactory: Flow diagrams (CoreTeam)](#13-infraaifactory-flow-diagrams-coreteam)
+* [14) Infra:AIFactory: Networking (CoreTeam)](#14-infraaifactory-networking-private-dns-zones-hubspoke-etc-coreteam)
+* [15) Infra:AIFactory: Overview of services: Naming convention(CoreTeam)](./10-19/15-aifactory-overview.md)
 * [21) Infra:AIFactory: How-to: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
 * [22) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
 * [23) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
@@ -84,6 +86,9 @@ Flow diagram which can explains the workflows, how to utilize the complete solut
 - [Flow Diagram - Add AIFactory project, Add users](./10-19/13-flow-diagram-1.md)
 - [Flow Diagram - DataOps Configuration](./10-19/13-flow-diagram-dataops.md)
 
+## 14) `Infra:AIFactory`: Networking: Private DNS zones, Hub/Spoke etc (CoreTeam)
+
+[HOWTO - Netoworking options: Hybrid access etc](./10-19/14-networking-privateDNS.md)
 
 # 20) `Infra:AIFactory` - How-to: Onboarding, Roles & Permission described (CoreTeam)
 
@@ -161,7 +166,7 @@ Here you can find information, and HOWTO select them, and customize them further
 ### 32.2 Azure services available in the AI Factory
 There are Azure services packaged both for DataOps, MLOps, and Generative AI. 
 
-[SERVICES LIST: Overview of the services, as a list, with naming convetions](./10-19/14-aifactory-overview.md)
+[SERVICES LIST: Overview of the services, as a list, with naming convetions](./10-19/15-aifactory-overview.md)
 
 [SERVICES ARCHITECTIRE - architectural diagrams](./10-19/11-architecture-diagrams.md)
 
