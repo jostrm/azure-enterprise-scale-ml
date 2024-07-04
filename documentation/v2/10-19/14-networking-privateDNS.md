@@ -80,9 +80,9 @@ If user are on-premises and tries to connect to a public Azure Machine Learning 
 - Action 1: The custom DNS Server, needs to be in the central HUB
 - Action 2: A Policy can be assigned on MGMT group (or subscription) that for every type or private DNS zones (for PaaS) will create records, in the DNS Zone.				
     - [How-to: Create Azure Policy that adds private link records to centralized private DNZ zones automatically](https://www.azadvertizer.net/azpolicyinitiativesadvertizer/Deploy-Private-DNS-Zones.html)
-- Action 3: Create a central private endpoint for all, somewhere.This, since our Azure portals (such as Azure ML portal) are global, we need a private endpoint to that portalt. 
+- Action 3: Create a central private endpoint for all, somewhere.This, since our Azure portals (such as Azure ML portal) are global, we need a private endpoint to that portal. 
     - If you have traditional Hub/Spoke topology, create it in the Hub. 				
-    - If you have WWAN - you have a central vNet to the WWAN-hub, where Pivate DNS resolvers and DNS forward can live (for 1 or many if multi region) in WWAN hub.
+    - If you have WWAN - you have a central vNet to the WWAN-hub, where Private DNS resolvers and DNS forward can live (for 1 or many if multi region) in WWAN hub.
     - [How-to: Private DNZ zones to forward - for Azure Machine Learning portal to work](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-custom-dns?tabs=azure-cli&view=azureml-api-2#example-custom-dns-server-hosted-on-premises)
 
 ### How-to: Give user access from corp on-premises network - Custom DNS Server hosted onpremises
@@ -93,6 +93,16 @@ This is needed to avoid Bastion and VM being the only way to access the secure A
 E.g. the below scenario is what we want to achieve: 
 
 ![](./images/14-networking-dns-server.png)
+
+## FIREWALL & Ports: Needed for Azure Machine Learning (Updated: 2024-07)
+
+ For updated informatiom - go here:
+ - [How to secure Azure Machine Learning (SDK v1)](https://learn.microsoft.com/en-us/azure/machine-learning/tutorial-create-secure-workspace-vnet?view=azureml-api-1)
+ - [How to secure Azure Machine Learning (SDK v2)](https://learn.microsoft.com/en-us/azure/machine-learning/tutorial-create-secure-workspace-vnet?view=azureml-api-2)
+
+For ease, below you can see an ESML AIFActory Excel sheet with ports in the NSG's for the ESML AIFactory vNets subnet for training. 
+- Note: This setting supports both (SDK v1) and (SDK v2) currently (2024-07-05): 
+![](./images/14-ports-excel.png)
 
 # FAQ - Networking
 

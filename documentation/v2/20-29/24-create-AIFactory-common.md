@@ -7,8 +7,8 @@ This is done by ESML Core team, before creating 1st AIFactory project.
         - `mlops` folder - mlops templates
         - `settings` folder - project specific temaplates
 2) Configure all files [here](../../../../aifactory/parameters/)
-3) Import the Azure Devops / GHA pipelines
-4) Configure the pipelines
-5) Run the pipelines
+3) WIP - Import the Azure Devops / GHA pipelines
+4) WIP - Configure the pipelines
+5) WIP - Run the pipelines
 
 

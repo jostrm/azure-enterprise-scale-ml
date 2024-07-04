@@ -8,10 +8,10 @@ CODE repository: Create your Azure Devops project to store the AIFactory acceler
     - ESML-AIFactory-Project001
 
 ## Step 2) - Created Azure subscriptions & Enterprise Scale landing zones
-A) Create Subscriptions:
+- A) Create Subscriptions:
     - Option A (Recommended to try out the AIFactory): Create 1 Azure subscription to act as the Dev environment. The AIFactory can simulate Test, Prod workflows (MLOps, LLMOps) with only a Dev
     - Option B (Recommended for productional use): For full AIFactory, create 3 Azure subscriptions (Dev, Stage, Prod)
-B) Enable resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
+- B) Enable resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
     - [Tip: You can use the Powershell script to automate this](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
 
 ## Step 3) Create an Azure keyvault for the admin of Microsoft Entra ID: The so called `seeding keyvault` (IaC purpose), and created Service principals

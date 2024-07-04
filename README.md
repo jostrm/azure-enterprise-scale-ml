@@ -14,14 +14,14 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
     - Sub-purpose: `Common way of working, common toolbox, a flexible one`: A toolbox with a LAMBDA architecture with tools such as: Azure Datafactory, Azure Databricks, Azure Machine Learning, Eventhubs, AKS
 5) `Enterprise scale & security & battle tested`: Used by customers and partners with MLOps since 2019 (see LINKS) to accelerate the development and delivery of AI solutions, with common tooling & marrying multiple best practices. Private networking (private endpoints), as default.
 
-## Public links/blogs for more info / usage
--	`AI factory - setup in 60h` - End-2-End pipelines for use case: Howto
+## Public links for more info
+-	`AI factory - setup in 60h (Company: Epiroc)` - End-2-End pipelines for use case: How-to
     - https://customers.microsoft.com/en-us/story/1653030140221000726-epiroc-manufacturing-azure-machine-learning
 
 -   `AI factory` - Technical BLOG
     - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
 
--	`Microsoft: AI Factory` documentation (CAF/MLOps): Machine learning operations - Cloud Adoption Framework | Microsoft Learn
+-	`Microsoft: AI Factory (CAF/MLOps)` documentation : Machine learning operations - Cloud Adoption Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations
     
 
@@ -37,12 +37,12 @@ The [Documentation](./documentation/v2/10_index.md) is organized around ROLES vi
 
 It is also organized via the four components of the ESML AIFactory: 
 
-| Component | In section | Focus in section | Role| Doc series
-|-----------|------------|----------------|-------|----|
-| 1) Infra:AIFactory | Y | - | CoreTeam | 10-19 |
-| 2) Datalake template | Y | - | All | 20-29,30-39 |
-| 3) Templates for: DataOps, MLOps, *LLMOps | Y | - | All | 20-29, 30-39 |
-| 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | - |ProjectTeam | 30-39 |
+| Component | Role| Doc series
+|-----------|--------|----|
+| 1) Infra:AIFactory | CoreTeam | 10-19 |
+| 2) Datalake template | All | 20-29,30-39 |
+| 3) Templates for: DataOps, MLOps, *LLMOps | All | 20-29, 30-39 |
+| 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  |ProjectTeam | 30-39 |
 
 [LINK to Documentation](./documentation/v2/10_index.md)
 
@@ -75,7 +75,10 @@ It is also organized via the four components of the ESML AIFactory:
 |2022-08  |ESML infra (IaC)|Bicep now support yaml as well|-|
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
-# TEMPLATES for PIPELINES (TRAINING & INFERENCE pipelines) is 1 of 5 template types in ESML:
+# TEMPLATES for PIPELINES
+TRAINING & INFERENCE pipelines is 1 of 5 template types in ESML AIFactory that accelerates for the end-user. 
+- 0.1% percentage of the code to write, to go from R&D process, to productional Pipelines: 
+
 ![](./esml/images/23_esml_pipeline_overview_intro.png)
 
 # THE Challenge
@@ -124,7 +127,7 @@ This repository is a push-only mirror. Ping Joakim Åström for contributions / 
 
 Since "mirror-only" design, Pull requests are not possible, except for ESML admins. See LICENCE file (open source, MIT license) 
 Speaking of open source, contributors: <br>
-- Credit to `Kim Berg` and `Ben Kooijman` for contributing! (kudos to the ESML IP calculator and Bicep for esml-project)
+- Credit to `Kim Berg` and `Ben Kooijman` for contributing! (kudos to the ESML IP calculator and Bicep additions for esml-project type)
 - Credit to `Christofer Högvall` for contributing! (kudos to the Powershell script, to enable Resource providers, if not exits)
     - `azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1`
 

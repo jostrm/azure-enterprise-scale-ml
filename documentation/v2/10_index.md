@@ -69,10 +69,10 @@ Here you will see the definition of an AIFactory via lists and diagrams, and wor
 - [Mid-Level Diagram - Azure Services integration:ESGenAI ](../v2/10-19/11-architecture-diagrams.md#design-patterns-supported-esgenai)
 - [Low-Level Diagram - Infrastructure & LLMOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---llmops-esgenai)
 - [Low-Level Diagram - Infrastructure & MLOps ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---llmops-esgenai)
-- [Networking Diagram - Spokes ](../v2/10-19/11-architecture-diagrams.md#low-level-diagram---mlops)
+- [Networking Diagram - Hub-Spoke, ESLZ, Private DNS, FW ](../v2/10-19/14-networking-privateDNS.md)
     - Network Connectivity
         - Network topology: Hub/Spoke | VirtualWan (Vwan Hub)
-        - Firewall
+        - Firewall: What ports needs to be opened? 
         - User access: Direct via corp network, VPN from home, Bastion "jumphost" for admins
 
 [All Diagrams: Architecture & Services - High-Level & Low Level Diagrams](../v2/10-19/11-architecture-diagrams.md)
@@ -123,7 +123,10 @@ See [Flow Diagram - Add AIFactory project, Add users](./10-19/13-flow-diagram-1.
 
 ## 22) `Datalake template`- How-to: Setup Datalake & Onboard ProjectTeam via PIPELINES
 Here you can find HOWTO guides for the ESML CoreTeam, how to setup the Datalake structure, and how to provide a ProjectTeam access to their datalake projectfolder, by running a pipeline (ADO, GHA)
-- [Flow Diagram: Datalake access: Add users to AIFactory project, gets them correct Datalake folder access automatically ](./10-19/13-flow-diagram-1.md)
+
+
+- [What Permissions: This is the datalake access users will get](./10-19/12-permissions-users-ad-sps.md)
+- [How-to: Add users to AIFactory project, gets them correct Datalake folder access automatically ](./10-19/13-flow-diagram-1.md)
 
 ## 23) `Templates: DataOps` - How-to: Setup DataOps via PIPELINE templates
 Here you can find HOWTO guides for the ESML CoreTeam,  its Dataingestion team within the CoreTeam. 
