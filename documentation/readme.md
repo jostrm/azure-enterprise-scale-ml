@@ -1,6 +1,6 @@
 # About Documentation - Views explained
 
-The [Documentation](./v2/10_index.md) is organized around ROLES via Doc series. 
+The full [Documentation](./v2/10_index.md) is organized around ROLES via Doc series. 
 
 | Doc series | Role | Focus | Details|
 |------------|-----|--------|--------|
@@ -18,7 +18,19 @@ It is also organized via the four components of the ESML AIFactory:
 | 3) Templates for: DataOps, MLOps, *LLMOps | Y | - | All | 20-29, 30-39 |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | - |ProjectTeam | 30-39 |
 
+# Executive Summary
+
+## ESML AIFactory: The 4 main components
 ![](./v2/10-19/images/10-aifactory-4-components-2024-small.png)
 
-[LINK to Documentation](./v2/10_index.md)
+## ESML AIFactory: Enterprise Scale Landing Zones Context
+
+![](./v2/10-19/images/14-eslz-full-1.png)
+
+## ESML AIFactory: MLOps Context
+
+![](./v2/10-19/11-architecture-detailed-mlops.png)
+
+# Full Documentation
+[LINK to full Documentation](./v2/10_index.md)
 
