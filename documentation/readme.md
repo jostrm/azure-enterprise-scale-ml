@@ -29,7 +29,7 @@ It is also organized via the four components of the ESML AIFactory:
 
 ## ESML AIFactory: MLOps Context
 
-![](./v2/10-19/11-architecture-detailed-mlops.png)
+![](./v2/10-19/images/11-architecture-detailed-mlops.png)
 
 # Full Documentation
 [LINK to full Documentation](./v2/10_index.md)
