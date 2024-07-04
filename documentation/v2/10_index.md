@@ -2,26 +2,26 @@
 
 **Governance related** - relevant for central IT, networking team (CoreTeam: 10-29)
 
-* [A1) End-2-End setup tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to) - Estimated setup time: 4-8h
-* [A2) Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
-* [A3) Infra:AIFactory: Flow diagrams (CoreTeam)](#13-infraaifactory-flow-diagrams-coreteam)
-* [A4) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#12-infraaifactory-roles--permissions-for-users-coreteam)
-* [A5) Infra:AIFactory: How-to: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
-* [A6) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
-* [A7) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
+* [11) Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
+* [12) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#12-infraaifactory-roles--permissions-for-users-coreteam)
+* [13) Infra:AIFactory: Flow diagrams (CoreTeam)](#13-infraaifactory-flow-diagrams-coreteam)
+* [21) Infra:AIFactory: How-to: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
+* [22) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
+* [23) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
+* [24) End-2-End setup tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to) - Estimated setup time: 4-8h
 
 **Consumer related** - relevant for developers, data scientists, data engineers (ProjectTeam: 30-39)
 
-* [B1) End-2-End config tutorial - ESML Project, ESGenAI Project](#39-end-2-end-setup-esml-project-esgenai-project) - Estimated config time: 1-2h
-* [B2) Usage: Dashboard, Available Tools & Services, DataOps, MLOps, Access options to AIFactory (ProjectTeam)](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam)
-* [B3) How-to guide: Get access to the AIFactory:RBAC & Networking (ProjectTeam)](#31-how-to-guide-get-access-to-the-aifactoryrbac--networking-projectteam)
-* [B4) Overview: Dashboards, Services & Acceleration in AIFactory (ProjectTeam, CoreTeam)](#32-overview-dashboards-services--acceleration-in-aifactory-projectteam-coreteam)
-* [B5) Setup: Install AzureML SDK v1+v2 and ESML accelerator library](#33-setup-install-azureml-sdk-v1v2-and-esml-accelerator-library)
-* [B6) Setup: DataLake access to project folder: How-to onboard your own data](#34-setup-datalake-access-to-project-folder-how-to-onboard-your-own-data)
-* [B7) Setup: ESML SDK accelerated Notebook templates](#35-setup-esml-sdk-accelerated-notebook-templates)
-* [B8) How-to guide: DataOps](#36-how-to-guide-dataops)
-* [B9) How-to guide: MLOps](#37-how-to-guide-mlops)
-* [B10) How-to guide: LLMOps & RAG Chat Agent](#38-how-to-guide-llmops--rag-chat-agent)
+* [30) Usage: Dashboard, Available Tools & Services, DataOps, MLOps, Access options to AIFactory (ProjectTeam)](#30-usage-dashboard-available-tools--services-dataops-mlops-access-options-to-aifactory-projectteam)
+* [31) How-to guide: Get access to the AIFactory:RBAC & Networking (ProjectTeam)](#31-how-to-guide-get-access-to-the-aifactoryrbac--networking-projectteam)
+* [32) Overview: Dashboards, Services & Acceleration in AIFactory (ProjectTeam, CoreTeam)](#32-overview-dashboards-services--acceleration-in-aifactory-projectteam-coreteam)
+* [33) Setup: Install AzureML SDK v1+v2 and ESML accelerator library](#33-setup-install-azureml-sdk-v1v2-and-esml-accelerator-library)
+* [34) Setup: DataLake access to project folder: How-to onboard your own data](#34-setup-datalake-access-to-project-folder-how-to-onboard-your-own-data)
+* [35) Setup: ESML SDK accelerated Notebook templates](#35-setup-esml-sdk-accelerated-notebook-templates)
+* [36) How-to guide: DataOps](#36-how-to-guide-dataops)
+* [37) How-to guide: MLOps](#37-how-to-guide-mlops)
+* [38) How-to guide: LLMOps & RAG Chat Agent](#38-how-to-guide-llmops--rag-chat-agent)
+* [39) End-2-End config tutorial - ESML Project, ESGenAI Project](#39-end-2-end-setup-esml-project-esgenai-project) - Estimated config time: 1-2h
 
 # 10) AI Factory (ESML) - About the documentation
 This is the main page for all documentation, with links to underlying specifics. The docs pages is sorted within a number series, by role and by component.
@@ -82,7 +82,7 @@ Service Principals (Automation & Ops purpose) & Permissions for Users, AD groups
 Flow diagram which can explains the workflows, how to utilize the complete solution(AI Factory, MLOps Accelerator) in different scenarios. 
 
 - [Flow Diagram - Add AIFactory project, Add users](./10-19/13-flow-diagram-1.md)
-- [Flow Diagram - DataOps Configuration](./10-19/13-flow-diagram-dataops.md.md)
+- [Flow Diagram - DataOps Configuration](./10-19/13-flow-diagram-dataops.md)
 
 
 # 20) `Infra:AIFactory` - How-to: Onboarding, Roles & Permission described (CoreTeam)
@@ -99,19 +99,21 @@ User onboarding, permissions and usage howto. There are 2 roles in the AIFactory
  - AIFactory ProjectTeam: 
 
 ## 21) `Infra:AIFactory`- How-to: Onboarding of CoreTeam users and ProjectMembers via PIPELINES (CoreTeam)
-Roles and permissions. 
+See Roles and permissions. 
+See [Flow Diagram - Add AIFactory project, Add users](./10-19/13-flow-diagram-1.md)
 
 ### Option A) GitHub Actions workflow
 - Workflows: 
-    - 1) BICEP+GithubActions
+    - 1) [BICEP+GithubActions](./10-19/13-flow-diagram-1.md)
     - 2) Terraform+GithubActions
 ### Option B) Azure Devops workflow
 - Workflows: 
-    - 1) BICEP+GithubActions
-    - 2) Terraform+GithubActions
+    - 1) [BICEP+AzureDevops](./10-19/13-flow-diagram-1.md)
+    - 2) Terraform+AzureDevops
 
 ## 22) `Datalake template`- How-to: Setup Datalake & Onboard ProjectTeam via PIPELINES
 Here you can find HOWTO guides for the ESML CoreTeam, how to setup the Datalake structure, and how to provide a ProjectTeam access to their datalake projectfolder, by running a pipeline (ADO, GHA)
+- [Flow Diagram: Datalake access: Add users to AIFactory project, gets them correct Datalake folder access automatically ](./10-19/13-flow-diagram-1.md)
 
 ## 23) `Templates: DataOps` - How-to: Setup DataOps via PIPELINE templates
 Here you can find HOWTO guides for the ESML CoreTeam,  its Dataingestion team within the CoreTeam. 
@@ -137,12 +139,16 @@ Also how to get access to the private AIFactory.
 
 ## 31) How-to guide: Get access to the AIFactory:RBAC & Networking (ProjectTeam)
 
-1) Talk to your AIFactory CoreTeam. Ask them to onboard you, as per section [20)](#20-users---onboarding-roles--permission-ai-factory---coreteam)
+1) Talk to your AIFactory CoreTeam. Ask them to onboard you, as per section [20)](#20-infraaifactory---how-to-onboarding-roles--permission-described-coreteam)
 
 2) Depending on your AIFactory setup, you may need to take additional actions to get network access.
 - A) AIFactory, isolated mode (not peered): [HOWTO - Bastion acccess TODO-LINK](../v2/30-39/31-jumphost-vm-bastion-access.md)
-- B) AIFactory, peered mode, corp network: - No action needed. Line of sight exists
-- C) AIFactory, peered mode, corp VPN: - No action needed. Line of sight exists
+- B) AIFactory, peered mode, corp network: - No action needed. Line of sight exists already.
+    - Pre-req:[Docs - Setup secure Azure machine learning on Azure](https://learn.microsoft.com/en-us/azure/machine-learning/tutorial-create-secure-workspace-vnet?view=azureml-api-1)
+    - Pre-req:[Docs - Well Architected Framework on Azure](https://learn.microsoft.com/en-us/azure/well-architected/)
+    - Pre-req:[Docs - Well Architected Framework on Azure](https://learn.microsoft.com/en-us/azure/well-architected/)
+- C) AIFactory, peered mode, corp VPN: - No action needed. Line of sight exists already
+    - Pre-req: Same as B)
 
 ## 32) Overview: Dashboards, Services & Acceleration in AIFactory (ProjectTeam, CoreTeam)
 
@@ -155,7 +161,10 @@ Here you can find information, and HOWTO select them, and customize them further
 ### 32.2 Azure services available in the AI Factory
 There are Azure services packaged both for DataOps, MLOps, and Generative AI. 
 
-Here you can see an overview of the services - both in a list, and as architectural diagrams [TODO-LINK]
+[SERVICES LIST: Overview of the services, as a list, with naming convetions](./10-19/14-aifactory-overview.md)
+
+[SERVICES ARCHITECTIRE - architectural diagrams](./10-19/11-architecture-diagrams.md)
+
 
 ### 32.3 Supported & Accelerated use cases (AI Factory - ProjectTeam)
 Here you can find information about supported use cases, and accelerated use cases.

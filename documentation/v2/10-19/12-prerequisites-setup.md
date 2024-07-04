@@ -34,7 +34,7 @@ Tip is to create 5 or 10 in one go, to have for later.
 
 ## Network topology - Hub & Spoke & DNS Zones
 
-1) Private DNS Zones
+1) Private DNS Zones: Centrally in HUB or in AIFactory spoke:
     - Option A (Recommended to try out the AIFactory):  Run the AI Factory standalone with its own Private DNS Zone. Default behaviour, no change needed
     - Option B (Recommended for productional use): Create a policy to create the private DNS zones in your HUB, and set the AIFactory config flag `centralDnsZoneByPolicyInHub` to `true`
         - The flag `centralDnsZoneByPolicyInHub` can be seen in [this AIFactory config file:e](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)
