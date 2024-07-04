@@ -5,7 +5,7 @@
 * [11) Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
 * [12) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#12-infraaifactory-roles--permissions-for-users-coreteam)
 * [13) Infra:AIFactory: Flow diagrams (CoreTeam)](#13-infraaifactory-flow-diagrams-coreteam)
-* [14) Infra:AIFactory: Networking (CoreTeam)](#14-infraaifactory-networking-private-dns-zones-hubspoke-etc-coreteam)
+* [14) Infra:AIFactory: Networking (CoreTeam)](./10-19/14-networking-privateDNS.md)
 * [15) Infra:AIFactory: Overview of services: Naming convention(CoreTeam)](./10-19/15-aifactory-overview.md)
 * [21) Infra:AIFactory: How-to: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
 * [22) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
