@@ -1,9 +1,17 @@
+# `Infra:AIFactory`: Networking: Private DNS zones, Hub/Spoke etc (CoreTeam)
+
+## Prerequisite
+
+The ESML AIFactory will work both if you have [Hub-spoke with Azure Virtual WAN](https://learn.microsoft.com/en-us/azure/architecture/networking/architecture/hub-spoke-vwan-architecture) or [traditional Hub-Spoke](https://learn.microsoft.com/en-us/azure/architecture/networking/architecture/hub-spoke?tabs=cli)
+
+The prerequisite knowledge to gain value of this readme page: foundational knowledge exist about: Hub-spoke, DNS zones, DNS forwarding, Private Link, Private endpoints, Virtual network peering.
+
 ## Network topology - Hub & Spoke & DNS Zones
 
 You can choose to have Private DNS Zones Centrally in HUB (recommended) or in the AIFactory spoke, in its common resource group (default):
-    - Option A (Recommended to try out the AIFactory):  Run the AI Factory standalone with its own Private DNS Zone. Default behaviour, no change needed
-    - Option B (Recommended for productional use): Create a policy to create the private DNS zones in your HUB, and set the AIFactory config flag `centralDnsZoneByPolicyInHub` to `true`
-        - The flag `centralDnsZoneByPolicyInHub` can be seen in [this AIFactory config file:e](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)
+- Option A (Recommended to try out the AIFactory):  Run the AI Factory standalone with its own Private DNS Zone. Default behaviour, no change needed
+- Option B (Recommended for productional use): Create a policy to create the private DNS zones in your HUB, and set the AIFactory config flag `centralDnsZoneByPolicyInHub` to `true`
+    - The flag `centralDnsZoneByPolicyInHub` can be seen in [this AIFactory config file:e](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)
 
 ## How-to: Understand how the secure Azure Machine Learning workspaces is setup in the AIFactory automation
 
@@ -25,7 +33,7 @@ To do that, we need to peer the AIFactory spoke vNet to your HUB. And the privat
 - E.g. we want to avoid having the private DNS zones locally, which will work, but is not optimal, since manual work is needed, whenever an AIFactory projecte is created. 
 - E.g. It is not recommended for productional and scalability reasons to use local Private DNS zones.
 
-The [solution](#solution---private-dns-zones-custom-dns--azure-policy) is seen below: 
+The [SOLUTION](#solution---private-dns-zones-custom-dns--azure-policy) is seen below: 
 
 ### Challenge more info - Private DNS zones: Avoid manual work?
 If you do not have central Privat DNS Zones, the DNS forwarding will not work until you also add conditional forwarding manually. 
@@ -52,4 +60,15 @@ This is needed to avoid Bastion and VM being the only way to access the secure A
 E.g. the below scenario is what we want to achieve: 
 
 ![](./images/14-networking-dns-server.png)
+
+# FAQ - Networking
+
+## Q: How to I trouble shoot Azure Machine Learning networking? Diagnostics? Troubleshoot private endpoint connection problems? 
+
+- A: If you have problems connecting to the workspace, see Troubleshoot secure workspace connectivity.[Workspace diagnostics & Troubleshoot private endpoint connection problems](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-troubleshoot-secure-connection-workspace?view=azureml-api-2)
+
+- A: You can also run diagnostics on your workspace from Azure Machine Learning studio or the Python SDK. After diagnostics run, a list of any detected problems is returned. This list includes links to possible solutions. For more information, see [How to use workspace diagnostics](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-workspace-diagnostic-api?view=azureml-api-2)
+
+[Go here for more related FAQ](../40-49/41-FAQ-01.md)
+
 

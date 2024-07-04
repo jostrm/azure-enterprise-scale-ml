@@ -25,6 +25,11 @@
 * [38) How-to guide: LLMOps & RAG Chat Agent](#38-how-to-guide-llmops--rag-chat-agent)
 * [39) End-2-End config tutorial - ESML Project, ESGenAI Project](#39-end-2-end-setup-esml-project-esgenai-project) - Estimated config time: 1-2h
 
+**FAQ - Trouble shooting** - relevant for all
+* [FAQ - Core team & AFactory infra](#40-faq)
+* [FAQ - Data scientist & Azure ML pipelines](#40-faq)
+* [FAQ - Data engineering & Azure ML pipelines](#40-faq)
+
 # 10) AI Factory (ESML) - About the documentation
 This is the main page for all documentation, with links to underlying specifics. The docs pages is sorted within a number series, by role and by component.
 
@@ -227,10 +232,33 @@ It also comes with DEMO data, per project team.
 [TODO - Link]
 
 # 40) FAQ
+Here you can browse some Q's, and jump into relevant section. We tried to group the FAQ's into different roles & services
+
+## 41) FAQ - Core team & AFactory infra
+
+Example quetions: 
 - Q: How-to clone repo with submodule to local computer? the folder  `azure-enterprise-scale-ml` is empty? 
 - Q: Why can't it find the path in my submodule?
 - Q: DataOps: How to work with Azure DataFactory, and branching? 
 - Q: MLOps: Azure Devops and GIT Branching stragey - DEV, TEST, PROD, many models branches? 
 
-[FAQ - FAQ-01](../v2/40-49/41-FAQ-01.md)
+[FAQ - FAQ-1](../v2/40-49/41-FAQ-01.md)
+
+## 42) FAQ - Data scientist & Azure ML pipelines
+
+Example quetions: 
+- Q: How-to clone repo with submodule to local computer? the folder  `azure-enterprise-scale-ml` is empty? 
+- Q: Why can't it find the path in my submodule?
+- Q: DataOps: How to work with Azure DataFactory, and branching? 
+- Q: MLOps: Azure Devops and GIT Branching stragey - DEV, TEST, PROD, many models branches? 
+
+[FAQ - FAQ-1](../v2/40-49/41-FAQ-01.md)
+
+## 43) FAQ - Data engineering & Azure ML pipelines
+
+Example questions: 
+- Q: Why does Azure Datafactory not trigger DataMesh copy to MASTER from PROJECt, when project pipeline is finished?  
+- Q: How to setup eventdriven 
+
+[FAQ - FAQ-43](../v2/40-49/41-FAQ-01.md)
 
