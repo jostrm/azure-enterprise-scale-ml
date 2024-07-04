@@ -18,7 +18,7 @@
 * [31) How-to guide: Get access to the AIFactory:RBAC & Networking (ProjectTeam)](#31-how-to-guide-get-access-to-the-aifactoryrbac--networking-projectteam)
 * [32) Overview: Dashboards, Services & Acceleration in AIFactory (ProjectTeam, CoreTeam)](#32-overview-dashboards-services--acceleration-in-aifactory-projectteam-coreteam)
 * [33) Setup: Install AzureML SDK v1+v2 and ESML accelerator library](#33-setup-install-azureml-sdk-v1v2-and-esml-accelerator-library)
-* [34) Setup: DataLake access to project folder: How-to onboard your own data](#34-setup-datalake-access-to-project-folder-how-to-onboard-your-own-data)
+* [34) Setup: Datalake: How-to onboard your own data, to project folder R&D purpose](#34-setup-datalake---project-folder-how-to-onboard-your-own-data-projectteam---rd-purpose)
 * [35) Setup: ESML SDK accelerated Notebook templates](#35-setup-esml-sdk-accelerated-notebook-templates)
 * [36) How-to guide: DataOps](#36-how-to-guide-dataops)
 * [37) How-to guide: MLOps](#37-how-to-guide-mlops)
@@ -189,9 +189,10 @@ Here you see HOWTO install AzureML SDK v1+v2 and ESML accelerator library, local
 
 [HOWTO - install AzureML SDK v1+v2 and ESML accelerator library](../v2/30-39/33-install-azureml-sdk-v1+v2.md)
 
-## 34) Setup: DataLake access to project folder: How-to onboard your own data
+## 34) Setup: Datalake - Project folder: How-to onboard your own data (ProjectTeam - R&D purpose)
 
-[HOWTO - DataLake access to project folder: Onboard own data](../v2/30-39/34-datalake-access.md)
+1) Prerequisite: Datalake access [HOW-TO: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
+2) [HOWTO - Quickstart: Onboard own data, to the datalake](../v2/30-39/34-datalake-onboard-data.md)
 
 ## 35) Setup: ESML SDK accelerated Notebook templates
 The ESML AIFactory comes with Notebook templates, generic notebooks (not examples). See below: How to clone them, and configure them, to accelerate your projects.
