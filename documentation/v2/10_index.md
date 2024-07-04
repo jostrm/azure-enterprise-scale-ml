@@ -93,7 +93,7 @@ Flow diagram which can explains the workflows, how to utilize the complete solut
 
 ## 14) `Infra:AIFactory`: Networking: Private DNS zones, Hub/Spoke etc (CoreTeam)
 
-[HOWTO - Netoworking options: Hybrid access etc](./10-19/14-networking-privateDNS.md)
+[HOWTO - Networking: Hybrid access, Private DNS Zones, etc](./10-19/14-networking-privateDNS.md)
 
 # 20) `Infra:AIFactory` - How-to: Onboarding, Roles & Permission described (CoreTeam)
 
