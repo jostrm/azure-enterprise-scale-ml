@@ -210,7 +210,11 @@ It also comes with DEMO data, per project team.
 
 ## 37) How-to guide: MLOps
 
-[HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks](../v2/30-39/37-mlops.md)
+1) [START HERE - WHAT is accelerated & WHAT is vanilla Azure ML, Azure Databricks? ](../v2/30-39/32-use_cases-where_to_start.md)
+
+2) [HOWTO - Quickstart: Accelerate MLOps - with ESML boost on Azure Machine Learning and Databricks](../v2/30-39/37-datascientist-ml-acceleration.md)
+
+3) [HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks](../v2/30-39/37-mlops.md)
 
 ## 38) How-to guide: LLMOps & RAG Chat Agent
 
