@@ -12,13 +12,16 @@ Each `ProjectTeam` has its own Service Principal, for unatteded Automation & Dat
 
 ### AFactory IaC Service Principal (1st)
     - Name: esml-common-bicep-sp
-    - Permissons: For the ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended
+    - Permissons: OWNER on Subscriptions created in step 2
+    - Purpose: For the ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended
 ### Role: CoreTeam Service Principal (2nd)
     - Name: esml-common-sp
-    - Permissons: For the ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended
+    - Permissions: None
+    - Purpose: For the ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended
 ### Role: ProjectTeam Service Principal (3rd)
     - Name: esml-project001-sp
-    - Permissons: For the ESML AIFactory project teams, to be able to run their MLOps and LLMOps pipelines unattended
+    - Permissions: None
+    - Purpose: For the ESML AIFactory project teams, to be able to run their MLOps and LLMOps pipelines unattended
 
 ### Keyvaults: Storing the Service principal information - Keyvault & Secret names
 
