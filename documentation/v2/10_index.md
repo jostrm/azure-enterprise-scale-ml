@@ -2,6 +2,8 @@
 
 **Governance related** - relevant for central IT, networking team (CoreTeam: 10-29)
 
+[Prerequisites - to setup AIFactory](./10-19/12-prerequisites-setup.md)
+
 * [11) Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
 * [12) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#12-infraaifactory-roles--permissions-for-users-coreteam)
 * [13) Infra:AIFactory: Flow diagrams (CoreTeam)](#13-infraaifactory-flow-diagrams-coreteam)
@@ -132,6 +134,9 @@ Here you can find HOWTO guides for the ESML CoreTeam, how to setup the Datalake 
 Here you can find HOWTO guides for the ESML CoreTeam,  its Dataingestion team within the CoreTeam. 
 
 ## 24) `End-2-End setup tutorial: AIFactory (4-8 hours) - How-to`
+
+[Prerequisites - to setup AIFactory](./10-19/12-prerequisites-setup.md)
+
 Here is an [End-2-End setup tutorial](./20-29/24-end-2-end-setup.md), with an estimated ~4-8 hour setup time.
 - Estimated setup time is 3-7 hours, to have the full AIFactory automation configured, and create "AIFactory Common DEV" + the 1st AIFactory project created (type:ESML)
 - Estimated setup time 1 hour: Configure AIFactory Common DEV + the 1st ESMLProject (type: ESML)
