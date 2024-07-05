@@ -77,7 +77,7 @@ Below you can ses what access users, service principals, ad groups, are assigned
 Users in a project team gets the below: 
 - **(Get, List)** for PROJECT Keyvault (example: kv-p002-weu-dev-abcde01)
 
-Explanation of image example: 
+Explanation of `image example 1`: 
 
 - **Users -  Project team:** There are 2 project team users, esml-user1 and esml-user2
 - **Users - Core team:** There are 1 core team user, assigned to this project, Joakim Åström
@@ -89,6 +89,7 @@ Explanation of image example:
     - **esml-project001-sp** : Project specific 
     - **esml-common-sp** : Core team specific
 
+#### Image example 1
 ![](./images/12-keyvault-project-permissions.png)
 
 [Details - See script here](../../../environment_setup/aifactory/bicep/esml-util/26-add-esml-project-member.ps1)
