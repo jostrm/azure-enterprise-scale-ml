@@ -35,20 +35,20 @@ Each `ProjectTeam` has its own Service Principal, for unatteded Automation & Dat
 
 ## AD-GROUPS & USERS
 The users object-ids (or AD groups object id) is used to set permissions on
-- Specific datalake folder (ACL): Execute, Read, Write
-- Keyvault access policys: GET, SET, DELETE LIST is the highest permissions
-- Azure services
+- **Specific datalake folder (ACL):** Execute, Read, Write
+- **Keyvault access policys**: GET, SET, DELETE LIST is the highest permissions
+- **Azure services**
 
 ### Datalake folder access - project
 Below you can ses what access users, service principals, ad groups, are assigned. 
-- MASTER folder (core team only)
-- PROJECTS folder (project team specific, and core team can read from some folders, and write to some folders )
-    - IN/OUT/BAD folders
-        - Project team can READ the IN-folder, and WRITE to the OUT folder
-        - Core team can WRITE to the IN-folder, and READ the OUT folder (to share data back to MASTER / to support Datamesh)
+- **MASTER folder** (core team only)
+- **PROJECTS folder** (project team specific, and core team can read from some folders, and write to some folders )
+    - **IN/OUT/BAD** folders
+        - **Project team** can **READ** the IN-folder, and **WRITE** to the OUT folder
+        - **Core team** can **WRITE** to the IN-folder, and **READ** the OUT folder (to share data back to MASTER / to support Datamesh)
 
 #### Datalake RBAC - core team
-- Datalake: STORAGE BLOB DATA OWNER to STORAGE account
+- **Datalake:** STORAGE BLOB DATA OWNER to STORAGE account
 
 #### IMAGES folders
 ![](./images/12-datalake-permissions-root.png)
@@ -58,16 +58,16 @@ Below you can ses what access users, service principals, ad groups, are assigned
 ![](./images/12-datalake-permissions-in-out-bad.png)
 
 #### Folder permissions
-- Users: All: 
-    - E on datalake container "lake3"
-- Users Project team: 
-    - RWE on PROJECT folder
-    - R on projects IN folder
-    - W on projects OUT and BAD folder
-- Users: Core team
-    - RWE on MASTER folder
-    - R on projects OUT folder
-    - W on projects IN and BAD folder
+- **Users: All:** 
+    - **E** on datalake container "lake3"
+- **Users Project team:** 
+    - **RW**E on PROJECT folder
+    - **R** on projects IN folder
+    - **W** on projects OUT and BAD folder
+- **Users: Core team**
+    - **RWE** on MASTER folder
+    - **R** on projects OUT folder
+    - **W** on projects IN and BAD folder
 
 
 [Details - See script here](../../../environment_setup/aifactory/bicep/esml-util/25-add-users-to-datalake-acl-rbac.ps1)
@@ -75,19 +75,19 @@ Below you can ses what access users, service principals, ad groups, are assigned
 #### IMAGES
 ### Keyvault access - project team's keyvault
 Users in a project team gets the below: 
-- (Get, List) for PROJECT Keyvault (example: kv-p002-weu-dev-abcde01)
+- **(Get, List)** for PROJECT Keyvault (example: kv-p002-weu-dev-abcde01)
 
 Explanation of image example: 
 
-- Users: Project team: There are 2 project team users, esml-user1 and esml-user2
-- Users: Core team: There are 1 core team user, assigned to this project, Joakim Åström
-- Azure services: 
-    - adf-project001* : Azure data factory
-    - aml-project001* :  Azure Machine Learning
-    - AzureDatabricks : Azure Databricks
-- Service principals
-    - esml-project001-sp : Project specific 
-    - esml-common-sp : Core team specific
+- **Users -  Project team:** There are 2 project team users, esml-user1 and esml-user2
+- **Users - Core team:** There are 1 core team user, assigned to this project, Joakim Åström
+- **Azure services:**
+    - **adf-project001**: Azure data factory
+    - **aml-project001** :  Azure Machine Learning
+    - **AzureDatabricks** : Azure Databricks
+- **Service principals**
+    - **esml-project001-sp** : Project specific 
+    - **esml-common-sp** : Core team specific
 
 ![](./images/12-keyvault-project-permissions.png)
 
@@ -95,11 +95,11 @@ Explanation of image example:
 
 ### Keyvault access - core team 
 Users in a core team gets the below, on the core team's own keyvault
-- (Get, List, Set) for COMMON Keyvault (example: kv-cmndev-abcde01)
-- (Get, List, Set) for COMMON ADMIN Keyvault (example: kv-cmnadmdev-abcde01)
+- **(Get, List, Set)** for COMMON Keyvault (example: kv-cmndev-abcde01)
+- **(Get, List, Set)** for COMMON ADMIN Keyvault (example: kv-cmnadmdev-abcde01)
 
 Users in a core team, can also get permission on a project team's own keyvault
-- (Get, List, Set) for PROJECT Keyvault (example: kv-p001-weu-dev-abcde01)
+- **(Get, List, Set)** for PROJECT Keyvault (example: kv-p001-weu-dev-abcde01)
 
 [Details - See script here](../../../environment_setup/aifactory/bicep/esml-util/26-add-esml-coreteam-member.ps1)
 
