@@ -226,7 +226,7 @@ It also comes with DEMO data, per project team.
 - ESML project configured with both DataOps and MLOps - retrained on "data changed" and on "code changed"
 - Retraining DEMO-model on "data changed" and on "code changed" (CI/CD trigger)
 - Deployed as online endpoint, and batch endpoint
-- [HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks](../v2/30-39/39-end-2-end-esml-projects.md)
+- [!WIP! - Quickstart: MLOps with Azure Machine Learning and Databricks](../v2/30-39/39-end-2-end-esml-projects.md)
 
 
 **ESGenAI Project:** Here is an end-2-end setup tutorial, for ESML GenAI project
