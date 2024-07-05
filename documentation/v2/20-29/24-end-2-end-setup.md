@@ -2,10 +2,10 @@
 
 [Prerequisites](../10-19/12-prerequisites-setup.md)
 
-1) [Setup AIFactory - Infra Automation](../10-19/13-setup-aifactory.md)
+1) ! TODO: soafara TBA ! [Setup AIFactory - Infra Automation](../10-19/13-setup-aifactory.md)
 2) [Provision AIFactory Common](../20-29/24-create-AIFactory-common.md)
-3) [WIP - Provision 1st AIFactory Project](../20-29/24-create-AIFactory-project.md)
-    - [WIP - Configure 1st AIFactory Project](../20-29/24-create-AIFactory-project.md)
+3) ! TODO: jostrm TBA !  [WIP - Provision 1st AIFactory Project](../20-29/24-create-AIFactory-project.md)
+    - ! TODO: jostrm TBA !  [WIP - Configure 1st AIFactory Project](../20-29/24-create-AIFactory-project.md)
 
 This is what you got: 
 
