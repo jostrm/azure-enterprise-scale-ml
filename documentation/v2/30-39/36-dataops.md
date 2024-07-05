@@ -24,7 +24,7 @@
 - 2 Azure Machine Learning pipelines for: Training and Inference
 - 1 Online endpoint
 
-# 2) CI/CD (Python): Configure the ESML MLOps template, to use your project, model, pipelines
+# 2) Azure Datafactory: Import the ESML DataOps templates
 
 1)  Configure the inline python parameters in the file `21-train_in_2_gold_train_pipeline.py`
 
@@ -39,7 +39,7 @@ use_automl = True # SIMPLE MODE + AutoMLStep (if True)Manual ML Step (if False)
 
 ```
 
-# 3) Import & Configre the GHA/ADO ESML Azure Devops pipeline
+# 3) Setup DATAMESH triggers
 
 1) Import Pipeline from from template - [Template location ](../../../copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops)
 - Point the pipeline to your project and models branch, such as "project001_M11_dev_branch"
