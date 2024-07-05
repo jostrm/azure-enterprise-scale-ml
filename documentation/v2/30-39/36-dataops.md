@@ -1,4 +1,4 @@
-# !HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks
+# !HOWTO - Quickstart: DataOps with Azure Datafactory ESML templates
 
 # Prerequisites
 
