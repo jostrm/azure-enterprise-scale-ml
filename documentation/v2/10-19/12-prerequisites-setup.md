@@ -14,14 +14,15 @@
         - ESML-AIFactory-Project001
         - [How-to guide](https://learn.microsoft.com/en-us/azure/devops/repos/git/creatingrepo?view=azure-devops&tabs=visual-studio-2022) : Create GIT repos
 
-## Step 2) - Create Azure subscriptions & Enterprise Scale landing zones
+## Step 2) - Create Azure subscriptions (Enterprise Scale landing zone: Application landingzones)
 - **Purpose:** To have the AIFactory DEV, TEST, PROD environments
 - **Role needed:** Central IT / Cloud Team
 - **Mandatory:** DEV is mandatory. 1 Subscription
-- A) Create Subscriptions:
+- A) Create Subscriptions
     - Option A (Recommended to try out the AIFactory): Create 1 Azure subscription to act as the Dev environment. The AIFactory can simulate Test, Prod workflows (MLOps, LLMOps) with only a Dev
     - Option B (Recommended for productional use): For full AIFactory, create 3 Azure subscriptions (Dev, Stage, Prod)
     - [How-to guide](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/initial-subscriptions): Create Azure subscriptions
+    - [Read more](./14-networking-privateDNS.md) about AIFactory Enterprise Scale Landing Zones
 - B) Enable resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
     - [Tip: You can use the Powershell script to automate this](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
 
