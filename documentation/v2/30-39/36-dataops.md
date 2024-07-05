@@ -14,6 +14,7 @@
 
 1) Configure the lake_settings
 - See section "3 Getting started: Notebooks" in: [HOWTO - install AzureML SDK v1+v2 and ESML accelerator library](../v2/30-39/33-install-azureml-sdk-v1+v2.md)
+
 2) Run the 3 notebooks of your choice to genereate the Azure ML Pipelines: 
 - Example: If you want to work with Databricks and pyspark, for batch deployment: 1 + 2b + 3b
 - Example: If you want to use Azure ML compute and AutoML, for online deployment AND/OR batch deployment: 1 + 2a + 3b and/or 3c
