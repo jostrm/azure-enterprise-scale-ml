@@ -11,7 +11,7 @@
 - ![](./images/39-end-2-end-dataops-mlops.png)
 
 # 1) Import Datafactory templates & Run manually
-! TODO: TBA ! 
+! TODO: jostrm TBA ! 
 
 **Output:**
 - 3 Azure Data factory pipelines for: Training, Inference, Data refinement
@@ -19,7 +19,7 @@
 
 # 2) Setup DATAMESH triggers, in Datafactory (via EventGrid)
 
-! TODO: TBA ! 
+! TODO: jostrm TBA ! 
 
 
 
