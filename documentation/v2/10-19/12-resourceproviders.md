@@ -2,12 +2,13 @@
 
 If you have a blank Azure subscription, the resource providers for all services needs. 
 
-- Powershell script to `register if not exists` exists here: 
+- ESML AIFactory Automation script: Powershell script to `register mandatory resource provider if not exists` exists here: 
     - [azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
-- About resource providers: https://portal.azure.com/#todo/resource/subscriptions/todo-subscription-id/resourceproviders
+- [More info - Microsoft docs: resource providers](https://portal.azure.com/#todo/resource/subscriptions/todo-subscription-id/resourceproviders)
+- [More info - Microsoft docs: which service needs what provider](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-services-resource-providers)
 
 # INFO - What resource providers are we talking about:
-## NEW: AIFactory needs these:
+## NEW: AIFactory needs these (AIFactory Common + ESML project)
 
 - Microsoft.Security
 - microsoft.insights
@@ -35,7 +36,22 @@ If you have a blank Azure subscription, the resource providers for all services 
 - Microsoft.Batch
 - Microsoft.ManagedServices
 
-## To check: Are usually registered, already:
+### ESGenAI project specific: AI Search, Azure OpenAI/Speech, CosmosDB, Azure App Service, Azure API mgmt, Copilot Studio
+- Microsoft.Search
+- Microsoft.CognitiveServices
+- Microsoft.DocumentDB
+- Microsoft.AppConfiguration
+- Microsoft.DomainRegistration
+- Microsoft.CertificateRegistration
+- Microsoft.Web
+- Microsoft.ApiManagement
+- Microsoft.PowerPlatform
+
+### ESSpeech project: Video Indexer, Speech Service
+- Microsoft.Media
+- Microsoft.CognitiveServices
+
+## To check & verify: These are usually registered, already, but verify:
 
 - Microsoft.OperationsManagement
 - Microsoft.Management
@@ -59,3 +75,16 @@ If you have a blank Azure subscription, the resource providers for all services 
 - Microsoft.CloudShell
 - Microsoft.Commerce
 - Microsoft.Consumption
+
+## Not included in Powershell script - OPTIONAL & MANUAL: 
+For: Purview, BotService, PowerBI, PowerBIEmbedded, Azure ContainerApps, Azure SQL Database/MI/SynapseAnalytics, Azure Arc-enabled Kubernetes, LogicApps
+
+- Microsoft.BotService
+- Microsoft.Purview
+- Microsoft.PowerBI
+- Microsoft.PowerBIDedicated
+- Microsoft.App
+- Microsoft.Sql
+- Microsoft.Kubernetes
+- Microsoft.KubernetesConfiguration
+- Microsoft.Logic
