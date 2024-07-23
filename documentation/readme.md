@@ -31,6 +31,10 @@ It is also organized via the four components of the ESML AIFactory:
 
 ![](./v2/10-19/images/11-architecture-detailed-mlops.png)
 
+## ESML AIFactory: LLMOps Context
+
+![](./v2/10-19/images/11-architecture-detailed-llmops.png)
+
 # Full Documentation
 [LINK to full Documentation](./v2/10_index.md)
 
