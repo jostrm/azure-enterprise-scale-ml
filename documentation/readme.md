@@ -23,7 +23,7 @@ It is also organized via the four components of the ESML AIFactory:
 ## ESML AIFactory: The 4 main components
 ![](./v2/10-19/images/10-aifactory-4-components-2024-small.png)
 
-## ESML AIFactory: Enterprise Scale Landing Zones Context
+## ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
 
 ![](./v2/10-19/images/14-eslz-full-1.png)
 
