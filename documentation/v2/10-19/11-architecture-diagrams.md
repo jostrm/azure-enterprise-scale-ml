@@ -4,6 +4,10 @@ List of services in AIFActory common, AIFactory ESML project, and AIFactory GenA
 
 ![](./images/11-services-common-projects.png)
 
+# ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
+- ESLZ VWAN platform architecture + AIFactory application landingzones (Dev, Stage, Prod)
+![](./images/14-eslz-full-1.png)
+
 # High level diagrams - Architecture & Capabilities
 
 ## AI factory - 4 componentes & acceleration 
