@@ -65,6 +65,14 @@ $ResourceProviders = @(
 'Microsoft.Storage'
 'microsoft.support'
 'Microsoft.VirtualMachineImages'
+'Microsoft.Search'
+'Microsoft.CognitiveServices'
+'Microsoft.DocumentDB'
+'Microsoft.AppConfiguration'
+'Microsoft.DomainRegistration'
+'Microsoft.CertificateRegistration'
+'Microsoft.Web'
+'Microsoft.ApiManagement'
 )
 
 $sub = Select-AzSubscription $SubscriptionName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
