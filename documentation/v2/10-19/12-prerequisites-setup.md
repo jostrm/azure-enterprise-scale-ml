@@ -48,7 +48,7 @@ NB! If you only want to use the AIFActory for ESML projects, this is not needed.
 - **Purpose:** To be able to peer the AIFactory later. 
 - **Role needed:** Network team within Central IT / Cloud Team
 - **Mandatory:** No. We an setup an AIFactory standalone. But it cannot be peered later on. We need to use Bastion & VM to access it.
-- **Mandatory with /16 size:** No. A size /20 will also work, but not recommended for productional use.
+- **Mandatory with /16 size:** No. 16 is optimal, but a size /18 will also work (10 0000 IP adresses or more), but not recommended for productional use (not even for DEV environment)
 - **TODO**: Alloate at 1 or 3 vNet ranges, of size /16
 
 ## Step 5) Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
