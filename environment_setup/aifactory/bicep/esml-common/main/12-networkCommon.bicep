@@ -41,6 +41,8 @@ param commonRGNamePrefix string = ''
 param IPwhiteList string = ''
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jå
+param vnetResourceGroup_param string = ''
+param vnetNameFull_param string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
@@ -48,8 +50,15 @@ var common_subnet_cidr_v = replace(common_subnet_cidr,'XX',cidr_range)
 var common_pbi_subnet_cidr_v = replace(common_pbi_subnet_cidr,'XX',cidr_range)
 var common_bastion_subnet_cidr_v = replace(common_bastion_subnet_cidr,'XX',cidr_range)
 var common_subnet_scoring_cidr_v = replace(common_subnet_scoring_cidr,'XX',cidr_range)
-var vnetNameFull ='${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
 var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // esml-common-weu-dev-002 // esml-common-weu-dev-002 // DEPENDENCIES - should exist
+
+var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroupName
+var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
+
+resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
+  name: vnetResourceGroupName
+  scope:subscription(subscriptionIdDevTestProd)
+}
 
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
   name: commonResourceGroupName
@@ -58,7 +67,7 @@ resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01'
 
 module nsgCommon '../modules-common/nsgCommon.bicep' = {
   name: 'nsg-${common_subnet_name}'
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}'
     tags: tags
@@ -69,7 +78,7 @@ module nsgCommon '../modules-common/nsgCommon.bicep' = {
 
 module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
   name: 'nsg-${common_subnet_name}-scoring'
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}-scoring'
     tags: tags
@@ -79,7 +88,7 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = {
   name: 'nsg-${common_bastion_subnet_name}'
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
     tags: tags
@@ -89,7 +98,7 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = {
 }
 
 module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   name: 'nsg-${common_pbi_subnet_name}-depl'
   params: {
     name: 'nsg-${common_pbi_subnet_name}'
@@ -98,7 +107,7 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
   }
 }
 module vNetCommon '../modules-common/vNetCommon.bicep' = {
-  scope: esmlCommonResourceGroup
+  scope: vnetResourceGroup
   name: vnetNameFull
   params: {
     location: location

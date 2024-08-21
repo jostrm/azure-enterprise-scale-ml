@@ -58,6 +58,8 @@ param enableVmPubIp bool = false
 param common_subnet_name string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
+@description('(Required) true if Bastion Host should be created')
+param addBastionHost bool
 @description('Specifies project owner email and will be used for tagging and RBAC')
 param technicalContactEmail string
 @description('Specifies project owner objectId and will be used for tagging and RBAC')
@@ -75,25 +77,36 @@ param technicalAdminsEmail string = 'null'
 param IPwhiteList string = ''
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj 
+@description('Common resource group name. If not set, it will be created as "esml-common-weu-dev-001"')
+param commonResourceGroup_param string = ''
+param vnetResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param privDnsSubscription_param string = ''
+param privDnsResourceGroup_param string = ''
+
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
-var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
+var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
+var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroupName
+var privDnsResourceGroupName = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 // DEPENDENCIES - should exist
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
   name: commonResourceGroupName
   scope:subscription(subscriptionIdDevTestProd)
 }
+
 // Create a short, unique suffix, that will be unique to each AI Factorys common env (Dev,Test,Prod)
 var uniqueInAIFenv = substring(uniqueString(esmlCommonResourceGroup.id), 0, 5)
-var vnetNameFull ='${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
+var vnetNameFull =vnetNameFull_param != '' ? vnetNameFull_param : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
 var cmnName = 'cmn' // needs to be short. KV, ADF, LA, STORAGE needs to be globally unique
 var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}' //kv-cmn-prod-12345-004 (21/24)
 var kvNameCommonAdmin = 'kv-${cmnName}adm${env}-${uniqueInAIFenv}${commonResourceSuffix}' // kv-cmnadm-prod-12345-004 (24, 24max)
-var vnetId = '${subscription().id}/resourceGroups/${commonResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var defaultSubnet = common_subnet_name
 var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
-var privDnsResourceGroup = commonResourceGroupName
+
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
@@ -115,47 +128,47 @@ var privateAznbDnsZoneName = {
 
 var privateLinksDnsZones = {
   blob: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
     name:'privatelink.blob.${environment().suffixes.storage}'
   }
   file: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
     name:'privatelink.file.${environment().suffixes.storage}'
   }
   dfs: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
     name:'privatelink.dfs.${environment().suffixes.storage}'
   }
   queue: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
     name:'privatelink.queue.${environment().suffixes.storage}'
   }
   table: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
     name:'privatelink.table.${environment().suffixes.storage}'
   }
   registry: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // privatelink.${environment().suffixes.acrLoginServer}' // # E
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // privatelink.${environment().suffixes.acrLoginServer}' // # E
     name:'privatelink.azurecr.io'
   }
   vault: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
     name:'privatelink.vaultcore.azure.net'
   }
   amlworkspace: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/${privateDnsZoneName[toLower(environment().name)]}' //# E
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${privateDnsZoneName[toLower(environment().name)]}' //# E
     name: privateDnsZoneName[toLower(environment().name)]
   }
   notebooks: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/${privateAznbDnsZoneName[toLower(environment().name)]}' 
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${privateAznbDnsZoneName[toLower(environment().name)]}' 
     name:privateAznbDnsZoneName[toLower(environment().name)]
   }
   dataFactory: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net' // # E
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net' // # E
     name:'privatelink.datafactory.azure.net'
   }
   portal: {
-    id: '/subscriptions/${subscriptionIdDevTestProd}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com' 
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com' 
     name:'privatelink.adf.azure.com'
   }
 }
@@ -218,13 +231,13 @@ resource subnetCommonDefaultResource 'Microsoft.Network/virtualNetworks/subnets@
 }
 
 var bastion_subnet_name = 'AzureBastionSubnet'
-resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = {
+resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = if(addBastionHost == true) {
   name:'${vnetId}/${bastion_subnet_name}'
   scope: esmlCommonResourceGroup
 }
 
 var common_bastion_host_name = 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'
-module bastionHost '../modules-common/bastionHostCommon.bicep' = {
+module bastionHost '../modules-common/bastionHostCommon.bicep' = if(addBastionHost == true) { 
   scope: esmlCommonResourceGroup
   name: common_bastion_host_name
   params: {
@@ -528,7 +541,7 @@ module vmPublic '../../modules/virtualMachinePublic.bicep' = if(enableVmPubIp ==
   ]
 }
 module dnsZone1 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privateDnsZoneStorage'
   params: {
     typeArray: dataLake.outputs.dnsConfig
@@ -541,7 +554,7 @@ module dnsZone1 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
   ]
 }
 module dnsZone2 '../../modules/privateDnsZone.bicep' =  if(centralDnsZoneByPolicyInHub==false){
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privateDnsZoneKeyvault'
   params: {
     typeArray: kvCmn.outputs.dnsConfig
@@ -557,7 +570,7 @@ module dnsZone2 '../../modules/privateDnsZone.bicep' =  if(centralDnsZoneByPolic
 var dnsZone3DeplName = 'privateDnsZoneACR'
 var acrUniqueLinkId = uniqueString(dnsZone6DeplName)
 module dnsZone3 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone3DeplName
   params: {
     typeArray:[
@@ -574,7 +587,7 @@ module dnsZone3 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
 }
 
 module dnsZone4 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false && sweden_central_adf_missing== false) { 
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privateDnsZoneADF'
   params: {
     typeArray: adf.outputs.dnsConfig
@@ -586,7 +599,7 @@ module dnsZone4 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
 
 var dnsZone5DeplName = 'privateDnsZoneAML'
 module dnsZone5 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone5DeplName
   params: {
     typeArray:[
@@ -603,7 +616,7 @@ module dnsZone5 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
 
 var dnsZone6DeplName = 'privateDnsZoneNotebooksAML'
 module dnsZone6 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone6DeplName
   params: {
     typeArray:[
@@ -620,7 +633,7 @@ module dnsZone6 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
 
 
 module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privateDnsZoneCreationAndLinkDataLake'
   params: {
     dnsConfig: dataLake.outputs.dnsConfig
@@ -632,7 +645,7 @@ module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneBy
 }
 
 module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privateDnsZoneCreationAndLinkKeyVaultCmn'
   params: {
     dnsConfig: kvCmn.outputs.dnsConfig
@@ -645,7 +658,7 @@ module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZon
 }
 
 module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privateDnsZoneCreationAndLinkKeyVaultCmnAdmin'
   params: {
     dnsConfig: kvAdmin.outputs.dnsConfig
@@ -658,7 +671,7 @@ module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZ
 }
 
 module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && sweden_central_adf_missing== false){
-  scope:esmlCommonResourceGroup
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privateDnsZoneCreationAndLinkAzureDatafactory'
   params: {
     dnsConfig: adf.outputs.dnsConfig

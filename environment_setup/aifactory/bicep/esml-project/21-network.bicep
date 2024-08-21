@@ -16,7 +16,7 @@ param dbxPubSubnetCidr string
 @description('Specifies the name of the environment [dev,test,prod]. This name is reflected in resource group and sub-resources')
 param env string
 @description('Specifies the short location notation, such as "weu". This name is reflected in resource group and sub-resources')
-param locationSuffix string = 'weu'
+param locationSuffix string
 // virtual network related parameters
 // make sure that subnets used for private endpoints do NOT have PrivateEndpointNetworkPolicies set to "enabled"
 // https://docs.microsoft.com/sv-se/azure/private-link/disable-private-endpoint-network-policy
@@ -36,10 +36,11 @@ param commonResourceSuffix string
 param vnetResourceGroup string
 
 //Override paramenter
-param commonResourceGroup_param string = ''
+//param commonResourceGroup_param string = ''
+//param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
-param datalakeName_param string = ''
-param kvNameFromCOMMON_param string = ''
+//param datalakeName_param string = ''
+//param kvNameFromCOMMON_param string = ''
 
 var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 

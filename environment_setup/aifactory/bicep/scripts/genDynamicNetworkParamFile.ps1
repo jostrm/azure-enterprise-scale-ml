@@ -91,12 +91,12 @@ write-host "-DYNAMIC (vnetResourceGroup): Dynamic parameters as INPUT (from ADO 
 
 #$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # msft[esml-common]-swc-dev-001
 
-$vnetResourceGroup = if ( $commonResourceGroup_param -eq $null -or $commonResourceGroup_param -eq "" )
+$vnetResourceGroup = if ( $vnetResourceGroup_param -eq $null -or $vnetResourceGroup_param -eq "" )
 {
     "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
 }
 else {
-    $commonResourceGroup_param
+    $vnetResourceGroup_param
 }
 
 write-host "RESULT (vnetResourceGroup): $($vnetResourceGroup)"

@@ -11,6 +11,9 @@
         "hybridBenefit":{
             "value": true
         },
+        "addBastionHost":{
+            "value": true
+        },
         "lakeContainerName":{
 			"value": "lake3"
 		},
@@ -22,6 +25,12 @@
         },
         "centralDnsZoneByPolicyInHub": {
             "value": false
+        },
+        "privDnsSubscription_param": {
+            "value": ""
+        },
+        "privDnsResourceGroup_param": {
+            "value": ""
         },
         "tenantId": {
             "value": "todo_guid"

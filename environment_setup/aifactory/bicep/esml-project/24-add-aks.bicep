@@ -22,6 +22,7 @@ param vnetNameBase string = 'vnt-esmlcmn'
 
 //Override parameters
 param commonResourceGroup_param string = ''
+param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
@@ -32,7 +33,7 @@ var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj
 var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 
 var vnetNameFull = vnetNameFull_param != '' ? vnetNameFull_param : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
-var vnetId = '${subscription().id}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroup_param}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var uniqueDepl = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
 
 resource projectResourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {

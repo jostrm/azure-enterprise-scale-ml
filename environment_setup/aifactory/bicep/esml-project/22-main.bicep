@@ -103,9 +103,13 @@ var subscriptionIdDevTestProd = subscription().subscriptionId
 
 //Override RG, vnet, datalakename, kvNameFromCOMMON
 param commonResourceGroup_param string = ''
+param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
+param privDnsSubscription_param string = ''
+param privDnsResourceGroup_param string = ''
+
 
 // Override: AML: AKS cluster
 param aks_dev_sku_override string = ''
@@ -145,8 +149,9 @@ param commonRGNamePrefix string
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
 var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg' // esml-project001-weu-dev-002-rg
+var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroup
 var subscriptions_subscriptionId = subscription().id
-var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var defaultSubnet = common_subnet_name //'snet-esmlcmn-001'
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
 
@@ -184,40 +189,42 @@ var sweden_central_appInsight_classic_missing = (location == 'swedencentral')?tr
 
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
+var privDnsResourceGroup = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 var privateLinksDnsZones = {
   blob: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
   }
   file: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
   }
   dfs: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
   }
   queue: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
   }
   table: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
   }
   registry: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // ${environment().suffixes.acrLoginServer}'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // ${environment().suffixes.acrLoginServer}'
   }
   vault: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
   }
   amlworkspace: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.api.azureml.ms'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.api.azureml.ms'
   }
   notebooks: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.notebooks.azure.net' 
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.notebooks.azure.net' 
   }
   dataFactory: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net'
   }
   portal: {
-    id: '${subscriptions_subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
   }
 }
 
