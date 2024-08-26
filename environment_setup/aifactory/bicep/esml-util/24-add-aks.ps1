@@ -1,10 +1,10 @@
 # USAGE: .\aifactory\esml-util\24-add-aks.ps1 -spSecret 'your_secret' -spID 'your_id' -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id'
 param (
     # required parameters
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
-    [Parameter(Mandatory=$false, HelpMessage="Specifies the App id for service principal")][string]$spID,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$subscriptionID
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the sp")][string]$spSecret,
+    [Parameter(Mandatory=$false, HelpMessage="Specifies the App id")][string]$spID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the tenant")][string]$tenantID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the subscription id")][string]$subscriptionID
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {

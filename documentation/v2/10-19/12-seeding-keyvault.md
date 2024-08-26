@@ -3,6 +3,9 @@
 Purpose: We want to split the responsibility of who to create articfacts in Microsoft Entra ID, versus the AIFactory pipeline in Azure Devops / GHA - who reads information about service principals and sets permissions.
 - Example: An admininstrator can create 10 service principals, January 1st, that will be stored in a `seeding Keyvault`, and used whenever a project manager wants to order a new AIFactory project during the year, up to 10 projects.
 
+NB! **seeding keyvault = inputKeyvault** when speaking of variables and parameters in the AIFActory.
+- This, due to legacy reason (ESML AIFactory was established 2019), but will be synced in the future as seeding keyvault
+
 ## Step 1) Create the keyvault and enable BICEP to use is
 
 1) Create an Azure Keyvult, in the AIFactory DEV Azure subscription, in a resource group that ESML Core team administrators has access to.
@@ -22,7 +25,11 @@ The below is needed for ADO and BICEP able to use this keyvault:
  	- esml-project005-sp-oid
  	- esml-project005-sp-secret
  
-- 2) ESML ADMIN, configures the Azure Devope "esml-project" RELEASE pipeline, 4 VARIABLES need to be set. /Edit release/ Note that 2 valus is copied from external keuvaylt. Then run the RELEASE pipeline.
+- 2) Add tenant information
+	- tenant-id
+
+## Example Scenario - using this information when setting up new project in the AIFactory
+ESML ADMIN, configures the Azure Devops "esml-project" RELEASE pipeline, 4 VARIABLES need to be set. /Edit release/ Note that 2 valus is copied from external keuvaylt. Then run the RELEASE pipeline.
 
 	`project_number_000 = 005`
 
@@ -37,7 +44,7 @@ The below is needed for ADO and BICEP able to use this keyvault:
 	- ref003= AD user Object Id's for all project members, in a comma-separeted list: `asdf123,asd24,234f3`
 
 	#### Click "deploy"...wait 30min..DONE!
-## DONE!
+### DONE!
 
 ## Seeding keyvault - service principals & secrects explained
 Secret names is flexible. But if chosen the below names, no variable configuration is needed in the IaC pipeline in Azure Devops.
@@ -58,8 +65,9 @@ Service principals: Below the secret information about the service principals us
 | esml-project012-sp-id | `-`|
 | esml-project012-sp-oid | `-`|
 | esml-project012-sp-secret | `-`|
+| tenant-id | `RBAC`|
 
-![](./images/12-seeding-keyvault-secrets.png)
+![](./images/13-setup-aifactory-seeding-kv-sps-created.png)
 
 ## Service principals - purpose and permissions exaplained
 ### SP AIFactory specific (IaC purpose): 

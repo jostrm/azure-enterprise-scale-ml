@@ -13,7 +13,7 @@
         },
         "projecttags": {
             "value": {
-                "Application Name": "Enterprise Scale ML (ESML)",
+                "Application Name": "Enterprise AI Factory on Azure",
                 "BA ID": "NA",
                 "BCIO": "Robin",
                 "Business Area": "NA",
@@ -21,7 +21,7 @@
                 "Resource Managed By":"The Riddler",
                 "TechnicalContact": "batman@gothamcity.dc_",
                 "Project": "Batcave upgrade",     
-                "Description": "ESML AI Factory"
+                "Description": "Enterprise AIFactory"
             }
         }
     }

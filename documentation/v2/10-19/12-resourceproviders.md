@@ -7,6 +7,15 @@ If you have a blank Azure subscription, the resource providers for all services 
 - [More info - Microsoft docs: resource providers](https://portal.azure.com/#todo/resource/subscriptions/todo-subscription-id/resourceproviders)
 - [More info - Microsoft docs: which service needs what provider](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-services-resource-providers)
 
+# Prerequisites
+Prerequisites: You need to [install Azure Powershell](https://learn.microsoft.com/en-us/powershell/azure/install-azps-windows?view=azps-12.2.0&tabs=powershell&pivots=windows-psgallery) to run this script, [or you can run this in Azure Cloud Shell (Powershell)](https://learn.microsoft.com/en-us/azure/cloud-shell/get-started/classic?tabs=azurecli)
+
+# HowTo: login & Run
+
+Foreach subscription: 
+- Login, as in [this script](../../../../aifactory/esml-util/000-switch-sub2_dev.ps1)
+- Run this [this script](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
+
 # INFO - What resource providers are we talking about:
 ## NEW: AIFactory needs these (AIFactory Common + ESML project)
 
@@ -49,7 +58,7 @@ If you have a blank Azure subscription, the resource providers for all services 
 
 ### ESSpeech project: Video Indexer, Speech Service
 - Microsoft.Media
-- Microsoft.CognitiveServices
+- Microsoft.CognitiveServices (also in ESGenAI)
 
 ## To check & verify: These are usually registered, already, but verify:
 

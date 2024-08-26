@@ -43,6 +43,66 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
     - **Core team**: The code repository, where AIFactory (IaC) Automation and pipeline resides
     - **Project team**: The code repository, where AIFactory (MLops,LLMOps) Automation and pipeline resides
 
+## Private DNS zones  in the AIFactory, to support AIFactory project types: ESML, ESGenAI
+Private DNS zones, needed. 
+
+![](./images/13-setup-aifactory-hub-privateDnsZonesListAll.png)
+
+A) If you run the AIFactory in isolated mode (for DEMO purposes) which is default, they are created automatically via BICEP. 
+B) If you run the AIFactory in production mode, peered to your HUB, which is the recommended way, you need to ensure/create the Private DNS zones manually.
+
+## AIFactory vNets in its spokes: Dev, Test, Prod - address space
+
+The AIFactory have 3 vNets in its 3 spokes: Dev, Test, Prod, with a an address space of at least /18, but reccomended is /16.
+- /16 per vNet to support ~300 teams/use cases
+- /18 to support 70 teams/use cases
+
+### BackgroundWhy large vNets? 
+The AIFactory is designed to support more than 1 team, it default to support 20-300 teams or use cases.
+Working with AI and AI services, requires a lot of IP addresses, a traning cluster may concist of 4-16 nodes. The Azure Databricks services is recommended to have a minimum of 
+
+The Enterprise scale AIFactory has chosen address spaces based on recommended best practices, per service, such as Azure Databricks subnets /23, and Azure machine learning training and inferencing subnets etc.
+
+This adds up per AIFactory project (with a team of 3-10 people/use cases per team), to an address space for services needed to address to support DataOps, MLOps, LLMOps for 1 project teams's resources together.
+
+The network space needed per vNet, is hence at least /18 to support 70 teams/use cases, but we recommend /16 per vNet to support ~300 teams/use cases.
+
+#### Example workloads per team
+If having 8 team member in an AIFActory project, where each have member or use case have computes as below, it may add sum up to to 200 IP addresses: 
+- 5 AKS cluster 
+- 5 CPU cluster 
+- 5 GPU cluster
+- 5 Databricks spark cluster
+- + various private endpoints
+
+Hence having a /16 vNet give support for ~300 teams. 
+Hence having a /18 vNet give support for ~70 teams. 
+
+### cidr_range variables
+You only need to set the mid-part of the CIDR IP range definition to end up in address spaces.
+This, since there is a template for this, in this file [12-esml-cmn-parameters.json](../../../environment_setup/aifactory/parameters/12-esml-cmn-parameters.json) with he parameter **common_vnet_cidr**
+
+#### Example A) 
+- cidr_range (scope:dev): 10
+- cidr_range (scope:dev): 11
+- cidr_range (scope:dev): 12
+
+Will use the template, 10.XX.0.0/16, from the [baseline configurationfile](../../../environment_setup/aifactory/parameters/12-esml-cmn-parameters.json)
+That will end up in the three vNets with address spaces as below:  
+- adress space (scope:dev): 10.10.0.0/16
+- adress space (scope:test): 10.11.0.0/16
+- adress space (scope:prod): 10.12.0.0/16
+
+#### Example B)
+- cidr_range (scope:dev): 10
+- cidr_range (scope:dev): 11
+- cidr_range (scope:dev): 12
+
+Will use the template, 10.XX.0.0/16, from the [baseline configurationfile](../../../environment_setup/aifactory/parameters/12-esml-cmn-parameters.json)
+That will end up in the three vNets with address spaces as below:  
+- adress space (scope:dev): 10.10.0.0/16
+- adress space (scope:test): 10.11.0.0/16
+- adress space (scope:prod): 10.12.0.0/16
 
 ## How-to: view how the secure Azure Machine Learning workspaces are setup in the AIFactory automation
 
@@ -77,16 +137,57 @@ If you do not have central Privat DNS Zones, the DNS forwarding will not work un
 - The records needs to exists also in the HUB's private DNS zone and Custom DNS server - a manual task for each AIFactory project that is created.           
 - If the storage account with private endpoint, and users are using both public or private access, it will not work, since users are not in DNS zone.
 
-### SOLUTION - Private DNS zones: Custom DNS + Azure Policy
+### SOLUTION - Private DNS zones: Custom DNS + Azure Policy + Private DNS resolver
 If user are on-premises and tries to connect to a public Azure Machine Learning workspace or storage account, the on-premies DNS will ping the Custom DNS server that will call Azure to provide DNS, that in turn will know the public IP. This will work, if the below actions are taken. 
 
+Read more about [Private link and DNS integration at scale](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/private-link-and-dns-integration-at-scale)
+
 - Action 1: The custom DNS Server, needs to be in the central HUB
-- Action 2: A Policy can be assigned on MGMT group (or subscription) that for every type or private DNS zones (for PaaS) will create records, in the DNS Zone.				
-    - [How-to: Create Azure Policy that adds private link records to centralized private DNZ zones automatically](https://www.azadvertizer.net/azpolicyinitiativesadvertizer/Deploy-Private-DNS-Zones.html)
+- Action 2: 63 policys: Assign 4 _Azure policies_ separately and one _policy initiative_ (policy set) with 59 policys. These can be assigned on MGMT group (or subscription).
+    - Benefits: 
+        - Ensures private endpoints to Azure PaaS services are integrated with Azure Private DNS zones. 
+            - e.g. enables every type or private DNS zones (for PaaS) to automatically add A-records in the DNS Zone, whenever a private endpoint is created
+        - Denies the creation of a private DNS in the current scope (the application landingzones), to ensure only having zones in the Hub
+        - Cnfigures private DNS zone group to override the DNS resolution for PaaS services private endpoint. See https://aka.ms/pepdnszones for more.
+        - Audit private endpoints that are created in other subscriptions and/or tenants for Azure Machine Learning.
+    - 2a) Define the Azure policy's and the Azure Policy Initiative, by runnig the below two BICEP files under the _esml-util folder: 
+        - [28-policy.bicep](../../../../aifactory/esml-util/28-policy.bicep)
+        - [28-Initiatives.bicep](../../../../aifactory/esml-util/28-Initiatives.bicep)
+    - 2b) Assign the Azure policys and initiative to the subscriptions [How-to assign an Azure policy](https://learn.microsoft.com/en-us/azure/governance/policy/how-to/programmatically-create#create-and-assign-a-policy-definition)
+
+    - The below is the 4 separate policys, and the initiative_ with 58 policy's in its policy set that we need to defined and assing to the subscriptions: Dev, Test, Prod application landingzones of the AIFactory:
+
+        - ![](./images/13-setup-aifactory-policy-4-and-1-initiative.png)
+
+For more information about the policy's see [https://github.com/Azure/Enterprise-Scale](https://github.com/Azure/Enterprise-Scale/blob/main/docs/wiki/ALZ-Policies.md) where the (initiative_ exists in a larger file)[https://github.com/Azure/Enterprise-Scale/blob/main/eslzArm/managementGroupTemplates/policyDefinitions/initiatives.json]
+
 - Action 3: Create a central private endpoint for all, somewhere.This, since our Azure portals (such as Azure ML portal) are global, we need a private endpoint to that portal. 
     - If you have traditional Hub/Spoke topology, create it in the Hub. 				
     - If you have WWAN - you have a central vNet to the WWAN-hub, where Private DNS resolvers and DNS forward can live (for 1 or many if multi region) in WWAN hub.
     - [How-to: Private DNZ zones to forward - for Azure Machine Learning portal to work](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-custom-dns?tabs=azure-cli&view=azureml-api-2#example-custom-dns-server-hosted-on-premises)
+- Action 4: Private DNS Resolver
+    - Deploy a DNS Private Resolver in your Hub Virtual Network alongside your ExpressRoute Gateway. However, you **must also ensure that resolution of public FQDNs is permitted** and replies with a valid response via a DNS Forwarding Ruleset Rule to the targeted DNS server. As some Azure services rely upon rely upon the ability to resolve public DNS names to function. [Read more - Private resolver ruleset](https://learn.microsoft.com/en-us/azure/dns/private-resolver-endpoints-rulesets#rules)
+    - IMPORTANT: [Read about private link and public DNS forwarding](https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns)
+        - Read the `red boxes`. And tables for servies, such as Azure Machine Learning: 
+            - **Private DNS zone name:** privatelink.api.azureml.ms, privatelink.notebooks.azure.net
+            - **Public DNS zone forwarder:** api.azureml.ms, notebooks.azure.net, instances.azureml.ms, aznbcontent.net, inference.ml.azure.com
+
+### Peering of Spookes to Hub
+When setting up a peering from a spoke to a hub in an Azure Enterprise Scale environment, you should configure the following settings:
+
+1. **Allow Gateway Transit**: Enable this option in the hub's peering configuration to allow the spoke to use the hub's gateway for connectivity to other networks.
+2. **Use Remote Gateways**: Enable this option in the spoke's peering configuration to use the hub's gateway.
+3. **Allow Forwarded Traffic**: Enable this option in both the hub and spoke peering configurations to allow traffic to be forwarded between the networks³⁴.
+
+These settings ensure that traffic can flow smoothly between the spoke and hub, and through the hub to other networks if needed.
+
+More info:
+
+- (1) Create a transit VNet using VNet peering | Microsoft Azure Blog. https://azure.microsoft.com/en-us/blog/create-a-transit-vnet-using-vnet-peering/.
+- (2) Hub-spoke network topology with Azure Virtual WAN. https://learn.microsoft.com/en-us/azure/architecture/networking/architecture/hub-spoke-vwan-architecture.
+- (3) Patterns for inter-spoke networking - Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/networking/guide/spoke-to-spoke-networking.
+- (4) Hub-spoke network topology in Azure - Azure Architecture Center. https://learn.microsoft.com/en-us/azure/architecture/networking/architecture/hub-spoke.
+- (5) Create a hub and spoke topology in Azure - Portal. https://learn.microsoft.com/en-us/azure/virtual-network-manager/how-to-create-hub-and-spoke.
 
 ### How-to: Give user access from corp on-premises network - Custom DNS Server hosted onpremises
 This is needed to avoid Bastion and VM being the only way to access the secure AIFactory

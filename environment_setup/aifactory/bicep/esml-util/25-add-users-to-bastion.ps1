@@ -1,10 +1,10 @@
 # USAGE: .\aifactory\esml-util\25-add-user-to-bastion.ps1 -spSecret 'your_secret' -spID 'your_id' -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id' 
 param (
     # required parameters
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
+    [Parameter(Mandatory = $true, HelpMessage = "Specifies the info")][string]$spSecret,
     [Parameter(Mandatory=$false, HelpMessage="Specifies the App id for service principal")][string]$spID,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$subscriptionID
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the tenant")][string]$tenantID,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the subscription")][string]$subscriptionID
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {

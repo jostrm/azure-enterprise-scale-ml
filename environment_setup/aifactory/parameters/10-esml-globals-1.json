@@ -9,22 +9,22 @@
 			"value": "xxx-yyy-"
 		},
         "locationSuffix": {
-            "value": "weu"
+            "value": "sdc"
         },
         "location": {
-            "value": "westeurope"
+            "value": "swedencentral"
         },
         "tags": {
             "value": {
-                "Application Name": "Enterprise Scale ML (ESML)",
+                "Application Name": "Enterprise Scale AIFactory",
                 "BA ID": "NA",
-                "BCIO": "Robin",
+                "BCIO": "Spiderman",
                 "Business Area": "NA",
-                "Cost Center": "123456",
-                "Resource Managed By":"The Riddler",
-                "TechnicalContact": "batman@gothamcity.dc_",
-                "Project": "Batcave upgrade",     
-                "Description": "ESML AI Factory"
+                "Cost Center": "654321",
+                "Resource Managed By":"Stan Leee",
+                "TechnicalContact": "greengoblin@marvel.universe_",
+                "Project": "Marvel upgrade",     
+                "Description": "Enterprise Scale AI Factory"
             }
         }
     }

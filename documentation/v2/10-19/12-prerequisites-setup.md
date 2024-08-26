@@ -101,11 +101,22 @@ NB! If you only want to use the AIFActory for ESML projects, this is not needed.
 - **Mandatory:** Yes
 - **TODO**: [Azure Devops: Create service connection + Import IaC pipelines + Set service connection to pipeline steps](./12-prereq-ado-create-servicecon-import-ado-pipelines.md)
 
-# MORE INFO: Service principals & permissions exaplained: 
+## Step 8) Register Resource providers on Subscriptions
+
+[How-to - run script to enable resource providers ](./12-resourceproviders.md)
+
+## Step 9) If you want to have Private DNS zones centrally in HUB (recommended) = centralDnsZoneByPolicyInHub=true
+1) Create the Private DNS Zones in the HUB as specified: 
+    - [How-to - networking](./14-networking-privateDNS.md) 
+2) Apply the policy to add A-records for all PaaS services that creates a private endpoint to have an A-record added to the central Private DNS zones
+    - [How-to - networking](./14-networking-privateDNS.md)
+        - Action: A Policy can be assigned on MGMT group (or subscription) that for every type or private DNS zones (for PaaS) will create records, in the DNS Zone.				
+            - [Link: Create Azure Policy that adds private link records to centralized private DNZ zones automatically](https://www.azadvertizer.net/azpolicyinitiativesadvertizer/Deploy-Private-DNS-Zones.html)
+
+# MORE INFO: Service principals & permissions explained: 
 
 - [Read more](./12-permissions-users-ad-sps.md) here aobut the permisssions and service principals.
 - [Read more](./12-seeding-keyvault.md) abou the *Seeding Keyvault* in the AIFactory
-
 
 # MORE INFO: Network topology - Hub & Spoke & DNS Zones
 

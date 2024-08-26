@@ -2,7 +2,7 @@ param (
     [Parameter(Mandatory=$true)]
     [string]$SubscriptionName,
     [Parameter(Mandatory=$false)]
-    [bool]$Readonly = $true
+    [bool]$Readonly = $false
 )
 
 [string]$ScriptPath = $(if ([string]::IsNullOrEmpty($PSScriptRoot)) { $PSScriptRoot } else { split-path -parent $MyInvocation.MyCommand.Path })
@@ -73,6 +73,8 @@ $ResourceProviders = @(
 'Microsoft.CertificateRegistration'
 'Microsoft.Web'
 'Microsoft.ApiManagement'
+'Microsoft.PowerPlatform'
+'Microsoft.Media'
 )
 
 $sub = Select-AzSubscription $SubscriptionName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue

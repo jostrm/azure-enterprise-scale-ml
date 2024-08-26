@@ -171,6 +171,22 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com' 
     name:'privatelink.adf.azure.com'
   }
+  azureopenai: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
+    name:'privatelink.openai.azure.com'
+  }
+  azureaisearch: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
+    name:'privatelink.search.windows.net'
+  }
+  azurewebapps: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net'
+    name:'privatelink.azurewebsites.net'
+  }
+  cosmosdbnosql: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
+    name:'privatelink.documents.azure.com'
+  }
 }
 
 // Log analytics WORKSPACE (dev,test,prod - 3 in the AI Factory, one per landingzone/environment)
