@@ -201,8 +201,8 @@ E.g. if you want to have your Private DNS zones in your HUB, as recommended, e.g
 
 TODO: 
 - **Ensure you have all Private DNS zones**, pre-created in the HUB, manually (util-script are work in in TODO list)
-- **Ensure you have the Azure Policy and Azure Initiative assigned** [needed to add A-records automatically for all A-records to the Private DNS zones](https://www.azadvertizer.net/azpolicyinitiativesadvertizer/Deploy-Private-DNS-Zones.html) in HUB
-    -  - [How-to: Create Azure Policy that adds private link records to centralized private DNZ zones automatically](https://www.azadvertizer.net/azpolicyinitiativesadvertizer/Deploy-Private-DNS-Zones.html)
+- **Ensure you have created vNet Link to the Hub vNet, for all Private DNS Zones**
+- **Ensure you have the Azure Policy and Azure Initiative assigned** [How-To: Networking: peering-of-spookes-to-hub](./14-networking-privateDNS.md#infraaifactory-networking-private-dns-zones-hubspoke-etc-coreteam)
 - **Ensure you have peered the spoke vNets to the Hub** [How-To: Networking: peering-of-spookes-to-hub](./14-networking-privateDNS.md#peering-of-spookes-to-hub)
 - **Ensure you have all settings set in the parameter file** _10-esml-globals-4-13_21_22.json_
     - The parameters: privDnsSubscription_param, privDnsResourceGroup_param, centralDnsZoneByPolicyInHub

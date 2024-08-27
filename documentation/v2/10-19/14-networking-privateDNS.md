@@ -44,12 +44,43 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
     - **Project team**: The code repository, where AIFactory (MLops,LLMOps) Automation and pipeline resides
 
 ## Private DNS zones  in the AIFactory, to support AIFactory project types: ESML, ESGenAI
-Private DNS zones, needed. 
+Private DNS zones - Compute, Storage, WebApp, CosmosDB: 
 
-![](./images/13-setup-aifactory-hub-privateDnsZonesListAll.png)
+|Service |Private DNS Zone Name | Public DNS zone forwarders | Subresource | Description|
+|---|---|---|---|---|
+|Azure Datafactory |privatelink.adf.azure.com |adf.azure.com | dataFactory |-|
+|Azure Datafactory |privatelink.datafactory.azure.net |datafactory.azure.net| portal |-|
+|Azure Machine Learning |privatelink.api.azureml.ms <br> privatelink.notebooks.azure.net |api.azureml.ms<br>notebooks.azure.net<br>instances.azureml.ms<br>aznbcontent.net<br>inference.ml.azure.com | amlworkspace |-|
+|Azure Container registry|privatelink.azurecr.io<br> `{regionName}.data.privatelink.azurecr.io` |azurecr.io <br>{regionName}.data.azurecr.io |registry| Dependency: Azure Machine Learning, AI studio|
+|Azure Keyvault | privatelink.vaultcore.azure.net |vault.azure.net <br>vaultcore.azure.net|vault| Dependency: Azure Machine Learning |
+|Cognitive Services (Azure OpenAI, Speech, etc) |`privatelink.cognitiveservices.azure.com`<br>privatelink.openai.azure.com |cognitiveservices.azure.com<br>openai.azure.com| account |-|
+|Azure Webapps |privatelink.azurewebsites.net<br>scm.privatelink.azurewebsites.net|azurewebsites.net<br>scm.azurewebsites.net |sites |azureAppServicesPrivateDnsZoneId. Azure App Service hosts Azure Webapps, Azure Functions, Azure Logi Apps, Azure API mgmt. [More info](https://techcommunity.microsoft.com/t5/nonprofit-techies/understanding-azure-web-apps-and-azure-app-service/ba-p/3812572)|
+|Azure Storage |privatelink.blob.core.windows.net |blob.core.windows.net |blob, blob_secondary|-|
+|Azure Storage |privatelink.table.core.windows.net |table.core.windows.net |table, table_secondary|-|
+|Azure Storage |privatelink.queue.core.windows.net |queue.core.windows.net |queue, queue_secondary|-|
+|Azure Storage |privatelink.file.core.windows.net |file.core.windows.net|file|-|
+|Azure Storage |privatelink.dfs.core.windows.net | dfs.core.windows.net |dfs, dfs_secondary|-|
+|Cosmos DB | privatelink.documents.azure.com |documents.azure.com|Sql|-|
+|Cosmos DB | `privatelink.table.cosmos.azure.com` |table.cosmos.azure.com|Table|-|
+|Azure AI Search | privatelink.search.windows.net |search.windows.net|searchService|-|
+|Azure Databricks | `privatelink.azuredatabricks.net` |azuredatabricks.net|databricks_ui_api <br> browser_authentication|-|
+|Azure Databricks | `privatelink.databricks.azure.us` |databricks.azure.us|databricks_ui_api <br> browser_authentication|-|
 
-A) If you run the AIFactory in isolated mode (for DEMO purposes) which is default, they are created automatically via BICEP. 
-B) If you run the AIFactory in production mode, peered to your HUB, which is the recommended way, you need to ensure/create the Private DNS zones manually.
+Private DNS zones - Eventhandling & Monitoring: 
+
+|Service |Private DNS Zone Name | Public DNS zone forwarders | Subresource | Description|
+|---|---|---|---|---|
+|Azure Eventhubs | `privatelink.servicebus.windows.net` |servicebus.windows.net |namespace|-|
+|Azure Eventgrid | `privatelink.eventgrid.azure.net` |eventgrid.azure.net|topic,domain,topicSpace,partnernamespace |Dependency: Azure Datafactory|
+Synaps Analytics|
+|Azure Monitor | `privatelink.monitor.azure.com`<br>`privatelink.oms.opinsights.azure.com`<br>`privatelink.ods.opinsights.azure.com`<br>`privatelink.agentsvc.azure-automation.net`<br>privatelink.blob.core.windows.net |monitor.azure.com<br>oms.opinsights.azure.com<br>ods.opinsights.azure.com<br>agentsvc.azure-automation.net<br>blob.core.windows.net<br>services.visualstudio.com<br>applicationinsights.azure.com|azuremonitor|-|
+
+<!-- |Azure Batch | `{regionName}.privatelink.batch.azure.com` |{regionName}.batch.azure.com|batchAccount|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure Synaps Analytics|
+|Azure Batch | `{regionName}.service.privatelink.batch.azure.com` |{regionName}.service.batch.azure.com|nodeManagement|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure 
+--> 
+
+A) If you run the AIFactory in isolated mode (for DEMO purposes) which is default, they are created automatically via BICEP. <br>
+B) If you run the AIFactory in production mode, peered to your HUB, which is the recommended way, you need to ensure/create the Private DNS zones manually, e.g. no automation in ESML AIFactory yet).
 
 ## AIFactory vNets in its spokes: Dev, Test, Prod - address space
 
@@ -138,9 +169,12 @@ If you do not have central Privat DNS Zones, the DNS forwarding will not work un
 - If the storage account with private endpoint, and users are using both public or private access, it will not work, since users are not in DNS zone.
 
 ### SOLUTION - Private DNS zones: Custom DNS + Azure Policy + Private DNS resolver
-If user are on-premises and tries to connect to a public Azure Machine Learning workspace or storage account, the on-premies DNS will ping the Custom DNS server that will call Azure to provide DNS, that in turn will know the public IP. This will work, if the below actions are taken. 
+If user are on-premises and tries to connect to a public Azure Machine Learning workspace or storage account, the on-premies DNS will ping the Custom DNS server that will call Azure to provide DNS via the private DNS zone, that in turn will know the public IP. This will work, if the below actions are taken. 
 
-Read more about [Private link and DNS integration at scale](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/private-link-and-dns-integration-at-scale)
+Read more: 
+- [Private link and DNS integration at scale](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/private-link-and-dns-integration-at-scale)
+- [DNS-Integration-Scenarios](https://github.com/dmauser/PrivateLink/tree/master/DNS-Integration-Scenarios)
+- [Private Endpoint DNS - private to public](https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns)
 
 - Action 1: The custom DNS Server, needs to be in the central HUB
 - Action 2: 63 policys: Assign 4 _Azure policies_ separately and one _policy initiative_ (policy set) with 59 policys. These can be assigned on MGMT group (or subscription).
@@ -153,7 +187,11 @@ Read more about [Private link and DNS integration at scale](https://learn.micros
     - 2a) Define the Azure policy's and the Azure Policy Initiative, by runnig the below two BICEP files under the _esml-util folder: 
         - [28-policy.bicep](../../../../aifactory/esml-util/28-policy.bicep)
         - [28-Initiatives.bicep](../../../../aifactory/esml-util/28-Initiatives.bicep)
-    - 2b) Assign the Azure policys and initiative to the subscriptions [How-to assign an Azure policy](https://learn.microsoft.com/en-us/azure/governance/policy/how-to/programmatically-create#create-and-assign-a-policy-definition)
+    - 2b) Assign the Azure policys and initiative to the subscriptions [How-to assign an Azure policy](https://learn.microsoft.com/en-us/azure/governance/policy/how-to/programmatically-create#create-and-assign-a-policy-definition).
+        - Policy Initiative _Configure Azure PaaS services to use private DNS zones_
+            - Also set all parameters on the initative assignment, Private DNS Id's.
+            - Also set roles: _Network Contributor,Private DNS Zone Contributor,Contributor_ for the initiative MI, to have access to the HUB's Private DNS Zones
+        - ![](./images/13-setup-aifactory-policy-assignment-4-roles.png)
 
     - The below is the 4 separate policys, and the initiative_ with 58 policy's in its policy set that we need to defined and assing to the subscriptions: Dev, Test, Prod application landingzones of the AIFactory:
 
@@ -180,6 +218,8 @@ When setting up a peering from a spoke to a hub in an Azure Enterprise Scale env
 3. **Allow Forwarded Traffic**: Enable this option in both the hub and spoke peering configurations to allow traffic to be forwarded between the networks³⁴.
 
 These settings ensure that traffic can flow smoothly between the spoke and hub, and through the hub to other networks if needed.
+
+![](./images/13-setup-aifactory-peering-portal-config.png)
 
 More info:
 
