@@ -43,6 +43,9 @@ param IPwhiteList string = ''
 param centralDnsZoneByPolicyInHub bool = false // DONE: jå
 param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
+param commonResourceGroup_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
@@ -53,7 +56,7 @@ var common_subnet_scoring_cidr_v = replace(common_subnet_scoring_cidr,'XX',cidr_
 var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // esml-common-weu-dev-002 // esml-common-weu-dev-002 // DEPENDENCIES - should exist
 
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroupName
-var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
+var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001 @
 
 resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
   name: vnetResourceGroupName

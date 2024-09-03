@@ -1,0 +1,199 @@
+{
+  "properties": {
+    "lenses": [
+      {
+        "order": 0,
+        "parts": [
+          {
+            "position": {
+              "x": 0,
+              "y": 0,
+              "colSpan": 4,
+              "rowSpan": 2
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "## AIFactory: Central Functions ⟶\n- Seeding keyvault\n- External vNets (peered to Hub)\n",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          {
+            "position": {
+              "x": 0,
+              "y": 2,
+              "colSpan": 4,
+              "rowSpan": 2
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "\r\n## ESLZ: Hub ⟶\r\n- Bastion (in Hub)\r\n- Private DNS Zones (in Hub)",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          {
+            "position": {
+              "x": 0,
+              "y": 4,
+              "colSpan": 4,
+              "rowSpan": 5
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# AIFactory - Common ⟶\n`Team:` ESML core team & data ingestion team\n\n`Owner:` Head of AI and analytics\n\n`Responsibilities:` Onboard new ESML PRojects. Ingest data from data sources to datalake MASTER folder, for projects to subscribe to",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          {
+            "position": {
+              "x": 4,
+              "y": 4,
+              "colSpan": 6,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# AIFactory (DEV)  🡓",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          {
+            "position": {
+              "x": 10,
+              "y": 4,
+              "colSpan": 6,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# Cost (DEV)  🡓",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          {
+            "position": {
+              "x": 16,
+              "y": 4,
+              "colSpan": 6,
+              "rowSpan": 1
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# Metrics (DEV)  🡓",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          {
+            "position": {
+              "x": 22,
+              "y": 4,
+              "colSpan": 6,
+              "rowSpan": 9
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# HOWTO: Add a new ESML Project\n\nDOCS: https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/13-flow-diagram-1.md\n\n ## Seeding keyvault / External keyvault:\n - Purpose: For AAD ADMIN to add 1-300 project service principles. External keyvault: `kv-esml-common-ext`\n\n ## Add new PROJECT Process: 1-3 (ex:005)\n - 1) AAD ADMIN creates a new service principle in AAD, and saves in EXTERNAL keyvault `'kv-esml-common-ext'` the 3 values\n \t- esml-project005-sp-id\n \t- esml-project005-sp-oid\n \t- esml-project005-sp-secret\n \n - 2) ESML ADMIN, configures the Azure Devope \"esml-project\" RELEASE pipeline, 4 VARIABLES need to be set. /Edit release/ Note that 2 valus is copied from external keuvaylt. Then run the RELEASE pipeline.\n\n\t`project_number_000 = 005`\n\n\t`project_service_principal_AppID` = ref001\n\n\t`project_service_principal_OID` =  ref002\n\n\t`technical_admins_ad_object_id` = ref003\n\n\t- ref001= esml-project005-sp-id\n\t- ref002= esml-project005-sp-id\n\t- ref003= AD user Object Id's for all project members, in a comma-separeted list: `asdf123,asd24,234f3`\n\n\t#### Click \"deploy\"...wait 30min..DONE!\n",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          },
+          {
+            "position": {
+              "x": 0,
+              "y": 9,
+              "colSpan": 4,
+              "rowSpan": 19
+            },
+            "metadata": {
+              "inputs": [],
+              "type": "Extension/HubsExtension/PartType/MarkdownPart",
+              "settings": {
+                "content": {
+                  "content": "# AIFactory projects 🡓\r\n## PROJECT 001\r\n`Team:` Batman & Robin\r\n\r\n`Owner:` Donald Duck\r\n\r\n`Budget:` 10$/mon\r\n\r\n`Use case:` Predict fighting power\r\n\r\n`Datamesh:` Share back refined hero silver data to MASTER lake\r\n\r\n<br>\r\n\r\n## PROJECT 002\r\n`Team:` HR analytics\r\n\r\n`Owner:` Head of HR\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Predict employee churn\r\n\r\n`Datamesh:` Share back refined silver HR-data to MASTER lake\r\n\r\n<br><br><br><br>\r\n\r\n## PROJECT 003\r\n\r\n`Team:` External consultants\r\n\r\n`Owner:` BU factory analytics\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Detect harzards with computer vision in factory\r\n\r\n<br><br><br><br>\r\n\r\n## PROJECT 004\r\n\r\n`Team:` Dr Snuggles, Norpan, Grävlis\r\n\r\n`Owner:` Pippi Longstockings\r\n\r\n`Budget:` 1500$/mon\r\n\r\n`Use case:` Predict fighting power\r\n\r\n<br><br><br><br>",
+                  "title": "",
+                  "subtitle": "",
+                  "markdownSource": 1,
+                  "markdownUri": ""
+                }
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "model": {
+        "timeRange": {
+          "value": {
+            "relative": {
+              "duration": 24,
+              "timeUnit": 1
+            }
+          },
+          "type": "MsPortalFx.Composition.Configuration.ValueTypes.TimeRange"
+        }
+      }
+    }
+  },
+  "name": "ESML-AIFactory-Dev",
+  "type": "Microsoft.Portal/dashboards",
+  "location": "INSERT LOCATION",
+  "tags": {
+    "hidden-title": "ESML-AIFactory-Dev"
+  },
+  "apiVersion": "2022-12-01-preview"
+}

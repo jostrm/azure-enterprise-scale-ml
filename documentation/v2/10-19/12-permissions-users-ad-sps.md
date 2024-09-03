@@ -12,7 +12,13 @@ Each `ProjectTeam` has its own Service Principal, for unatteded Automation & Dat
 
 ### AFactory IaC Service Principal (1st)
     - Name: esml-common-bicep-sp
-    - Permissons: OWNER on Subscriptions created in step 2
+    - Permissons: 
+        - OWNER on Subscriptions created for the AIFactory landingzones: Dev, Test, Prod subscriptions. 
+        - If external vNet (BYO vNet): 
+            - CONTRIBUTOR the Resourcegroup where the external vNet resides for Dev, Test, Prod subscriptions/spokes
+                - Reason: To be able to create Network sercurity groups
+            - Network Contributor: to the vNet
+                Reason: To be able to create subnets, and to be able to assigne network security groups to the subnets.
     - Purpose: For the ESML AIFactory CoreTeam and its data ingestion team, for DataOps pipelines unattended
 ### Role: CoreTeam Service Principal (2nd)
     - Name: esml-common-sp

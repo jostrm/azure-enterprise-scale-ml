@@ -81,6 +81,8 @@ param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
 param commonResourceGroup_param string = ''
 param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
 

@@ -53,7 +53,7 @@ After import, it should look like this:
 
 - Click on the red marking at _Tasks_ where there are three task stages: esml-common-dev,esml-common-test,esml-common-prod, you need to configure all of them. 
 
-## 4) Congfigure the pipeline
+## 4) Configure the pipeline
 - Click on the red marking at _Tasks_ where there are three tasks stages: esml-common-dev,esml-common-test,esml-common-prod, you need to configure all of them, start with the task stage _esml-common-dev_
 - Click on Agent job, where it says _Some settings need attention_
 
@@ -91,7 +91,13 @@ You may create all 3 ARM connections at once, either based on same service princ
 - **ARM connection names**: _esml-aifactory-infra-dev_, _esml-aifactory-infra-test_, _esml-aifactory-infra-prod_
 - **Service principal info**
     - **Role**: OWNER (able to assign other idnetities priviledged roles)
-    - **Scope**: Subscription (DEV if Task is _esml-common-dev_, TEST subscription if _esml-common-test_)
+        - **Scope**: Subscription (DEV if Task is _esml-common-dev_, TEST subscription if _esml-common-test_)
+    - **If external vNet (BYO vNet):** 
+            - **CONTRIBUTOR** the Resourcegroup where the external vNet resides for Dev, Test, Prod subscriptions/spokes
+                - Reason: To be able to create Network sercurity groups
+            - **Network Contributor** to the vNet
+                Reason: To be able to create subnets, and to be able to assigne network security groups to the subnets.
+ [Read more about: Permissions for the service principle](./12-permissions-users-ad-sps.md)
 
 TODO: Support federated ARM connections https://learn.microsoft.com/en-us/azure/devops/pipelines/release/configure-workload-identity?view=azure-devops
 
@@ -156,7 +162,7 @@ NB! **seeding keyvault = inputKeyvault** when speaking of variables and paramete
 
 ## 7) Check in your code, and add artifact to point at your sources code in Azure Devops Release pipeline
 
-1) Chekin your code
+1) Check in your code
 2) Click EDIT button 
 
 ![](./images/13-setup-aifactory-ado-edit-create-release-btns.png)
@@ -228,6 +234,10 @@ If you don't know. Please go back to this step [12-resourceproviders.md](./12-re
 #### 3) Have checked in your code? 
 
 The parameters you edited, do they look as you configured them locally in Azure Devops also?
+
+#### 4) Is all permissions set for the Service Principle? 
+- The BICEP will have to create artifact under 1 or many subscriptions.
+- Note: If you have an external vNet (BYO vNet) in another subscription than its AIFactory environment subscription, it needs Contributor on ResourceGroup to create NSG's, and Network Contributor on the vNet to be able to assign the NSG's. [Read more about: Permissions for the service principle](./12-permissions-users-ad-sps.md)
 
 #### DONE! Ready to Run the pipeline
 Now you can go ahead and run the pipeline in Azure Devops. 
