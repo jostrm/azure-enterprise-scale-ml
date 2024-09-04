@@ -7,8 +7,8 @@
 - Option A) [Setup AIFactory - Infra Automation (AzureDevops+BICEP)](../10-19/13-setup-aifactory.md)
 - *Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../10-19/13-setup-aifactory-gha.md)
     - TODO: Soafara
-- *Option C)* [Setup AIFactory - Infra Automation (GithubActions+Terraform)](../10-19/13-setup-aifactory-gha.md)
-    - TODO: 
+- *Option C) [Setup AIFactory - Infra Automation (GithubActions+Terraform)](../10-19/13-setup-aifactory-gha.md)
+    - TODO: Joakim
 
 <!--
 2) [Provision AIFactory Common](../20-29/24-create-AIFactory-common.md)
