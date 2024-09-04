@@ -189,6 +189,42 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
     name:'privatelink.documents.azure.com'
   }
+  azurecogservice: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
+    name:'privatelink.cognitiveservices.azure.com'
+  }
+  azurewebappsscm: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/scm.privatelink.azurewebsites.net'
+    name:'scm.privatelink.azurewebsites.net'
+  }
+  azuredatabricks: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
+    name:'privatelink.azuredatabricks.net'
+  }
+  azureeventhubs: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
+    name:'privatelink.servicebus.windows.net'
+  }
+  azureeventgrid: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.eventgrid.azure.net'
+    name:'privatelink.eventgrid.azure.net'
+  }
+  azuremonitor: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.monitor.azure.com'
+    name:'privatelink.monitor.azure.com'
+  }
+  azuremonitoroms: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.oms.opinsights.azure.com'
+    name:'privatelink.oms.opinsights.azure.com'
+  }
+  azuremonitorods: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.ods.opinsights.azure.com'
+    name:'privatelink.ods.opinsights.azure.com'
+  }
+  azuremonitoragentsvc: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
+    name:'privatelink.agentsvc.azure-automation.net'
+  }
 }
 
 // Log analytics WORKSPACE (dev,test,prod - 3 in the AI Factory, one per landingzone/environment)

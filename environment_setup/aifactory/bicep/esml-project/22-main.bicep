@@ -226,6 +226,27 @@ var privateLinksDnsZones = {
   portal: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
   }
+  azuredatabricks: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
+  }
+  azureeventhubs: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
+  }
+  azureeventgrid: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.eventgrid.azure.net'
+  }
+  azuremonitor: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.monitor.azure.com'
+  }
+  azuremonitoroms: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.oms.opinsights.azure.com'
+  }
+  azuremonitorods: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.ods.opinsights.azure.com'
+  }
+  azuremonitoragentsvc: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
+  }
 }
 
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
