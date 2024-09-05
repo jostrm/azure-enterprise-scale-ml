@@ -162,6 +162,8 @@ param technicalAdminsObjectID string = 'null'
 param technicalAdminsEmail string = 'null'
 @description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
 param IPwhiteList string = ''
+@description('(Dummy) since esml-common needs this. But this parameter is in same .json override file, it needs to exist, otherwise BICEP validation error. ')
+param addBastionHost bool= false // Dummy: do not correspond to any parameters defined in the template: 'addBastionHost'
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
