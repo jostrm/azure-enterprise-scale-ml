@@ -23,12 +23,12 @@ The below shows Variables in Azure Devops, for the Common part of the AIFactory
 |**dev_test_prod** |**Do not change** |Yes|Meta data, for the pipeline to know current environment<br><br>&#9642; [Link - More info](../10-19/14-networking-privateDNS.md)|
 |**dev_test_prod_sub_id** |**Subscription ID of Dev, Stage, Prod** |Yes|Description<br><br>&#9642; [More info - Special variables section](#admin_input_keyvault_subscriptiondev_test_prod_sub_id---subscription-id-variables)|
 |**technical_admins_ad_object_id** |**Provide access to team** |No.| Comma separated string wihtout spaces, of ObjectIds for users to get access. Update for every new aifactory project team. <br>Example: a12345-1233r-c23g-2df3-asdfasdf32b,bg123214-123r-12g-sdf3-asdfasdf32b <br><br>&#9642; [Link - Permissions users and RBAC, ACL's](../10-19/12-permissions-users-ad-sps.md)|
-|**technical_admins_bastion_IP_whitelist** |**Whitelist IP address for Bastion access. Find template NSG rule to add other IP's**|No.| Your public IP address from your client that you want to whitelist to Bastion. If Windows client you can open a command prompt and run: _nslookup myip.opendns.com resolver1.opendns.com_ where the last non-authoritative answer of address would be your public IP address.You may also use your web browser and search for "my IP".<br>Example: 85.123.124.12<br><br>&#9642; [Link - Networking](../10-19/14-networking-privateDNS.md)|
+|**technical_admins_bastion_IP_whitelist** |**Whitelist IP address for Bastion access. Find template NSG rule to add other IP's**|No.| Only 1 IP is supported. Your public IP address from your client that you want to whitelist to Bastion. If Windows client you can open a command prompt and run: _nslookup myip.opendns.com resolver1.opendns.com_ where the last non-authoritative answer of address would be your public IP address.You may also use your web browser and search for "my IP".<br>Example: 85.123.124.12<br><br>&#9642; [Link - Networking](../10-19/14-networking-privateDNS.md)|
 |**technical_admins_email** |**Provide access to team**|No.|Comma separated string wihtout spaces, of Emails mapping for users in parameter _technical_admins_ad_object_id_. Update for every new aifactory project team. <br>Example: batman@gothamcity.com,robin@gothamcity.com <br><br>&#9642; [Link - Permissions users and RBAC, ACL's](../10-19/12-permissions-users-ad-sps.md)|
 
-## Special variables - further explained
+## Special variables further explained
 
-### **admin_input_keyvault_subscription**,**dev_test_prod_sub_id** - Subscription ID variables
+#### **admin_input_keyvault_subscription**,**dev_test_prod_sub_id** - Subscription ID variables
 
 Note: If you have your [seeding keyvault](../10-19/12-seeding-keyvault.md) in different subscriptions, you need to have your service principal that your ARM connection is based on, to be delegated with RBAC acccess READER to that Keyvault in the external subscription, and to be assiged Access policy Secrets READ. 
 
@@ -70,6 +70,21 @@ That will end up in the three vNets with address spaces as below:
 - address space (scope:prod): 10.12.0.0/16
 
 ## Variables:Project environments (Azure Devops/Github) that overrides baseline parameters, explained
+
+## Variables:Common environment (Azure Devops/Github) that overrides baseline parameters, explained
+
+|Variable|Purpose|1-time-setup only|Description|
+|---|---|---|---|
+|**admin_aifactorySuffixRG** |**AIFactory instance that this AIFactory project should connect to** |Yes| Check the common resource grup. If -002 if the AIFactory's common resource group ends with -002. <br><br>&#9642;Example: dc-batcave-esml-common-sdc-dev-002 |
+|**admin_aks_gpu_sku_dev_override** |**SKU override on AKS cluster attached to Azure ML workspace in DEV** |Yes|For DEV environment. Example: Standard_B4ms <br><br>&#9642; |
+|**admin_aks_gpu_sku_test_prod_override** |**SKU override on AKS cluster attached to Azure ML workspace** |Yes|For STAGE and PROD environments <br><br>&#9642; |
+|**admin_aks_nodes_dev_override** |**Number of nodes override on AKS cluster attached to Azure ML workspace in DEV** |Yes| integer. Default is 1 node <br><br>&#9642; |
+|**admin_aks_nodes_testProd_override** |**Number of nodes override on AKS cluster attached to Azure ML workspace** |Yes|For STAGE and PROD environments. Default is 3 nodes <br><br>&#9642; |
+|**admin_aks_version_override** |**kubernetesVersion on managed AKS cluster** |Yes<br>Default: `1.27.9` <br> Newer: `1.30.3`| kubernetesVersion on BICEP `Microsoft.ContainerService/managedClusters@2021-03-01` <br> Verify if supported by running command: `az aks get-versions --location westeurope --output table)` to verify that the version `1.27.9` is not too low/high version for your region.Login first: `az login --scope https://management.core.windows.net//.default` <br><br>&#9642; [Link - More info](https://learn.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli)|
+|**admin_commonResourceSuffix** |**The suffix of the resources in the common resource group** |Yes| Check the common resource grup. If the resources, such as the Aure Keyvault `kv-cmnadmdev-abcdf-001` ends with -001, it should be -001 here also<br><br>&#9642; |
+|**admin_ip_fw** |**Placeholder that is set automatically from pipeline code. Leave blank** |Yes|Leave blank. Do not need to be set. Will be overwritten<br><br>&#9642; |
+|**project_IP_whitelist** |**Set the default IP that will be whitelisted in the NSG for Bastion access** |Yes| Only 1 IP is supported. Your public IP address from your client that you want to whitelist to Bastion. If Windows client you can open a command prompt and run: _nslookup myip.opendns.com resolver1.opendns.com_ where the last non-authoritative answer of address would be your public IP address.You may also use your web browser and search for "my IP".<br>Example: 85.123.124.12<br><br>&#9642; [Link - Networking](../10-19/14-networking-privateDNS.md)|
+
 
 ## Parameters (.json) - Baseline parameters explained
 

@@ -46,34 +46,34 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
 ## Private DNS zones  in the AIFactory, to support AIFactory project types: ESML, ESGenAI
 Private DNS zones - Compute, Storage, WebApp, CosmosDB: 
 
-|Service |Private DNS Zone Name | Public DNS zone forwarders | Subresource | Description|
-|---|---|---|---|---|
-|Azure Datafactory |privatelink.adf.azure.com |adf.azure.com | dataFactory |-|
-|Azure Datafactory |privatelink.datafactory.azure.net |datafactory.azure.net| portal |-|
-|Azure Machine Learning |privatelink.api.azureml.ms <br> privatelink.notebooks.azure.net |api.azureml.ms<br>notebooks.azure.net<br>instances.azureml.ms<br>aznbcontent.net<br>inference.ml.azure.com | amlworkspace |-|
-|Azure Container registry|privatelink.azurecr.io<br> `{regionName}.data.privatelink.azurecr.io` |azurecr.io <br>{regionName}.data.azurecr.io |registry| Dependency: Azure Machine Learning, AI studio|
-|Azure Keyvault | privatelink.vaultcore.azure.net |vault.azure.net <br>vaultcore.azure.net|vault| Dependency: Azure Machine Learning |
-|Cognitive Services (Azure OpenAI, Speech, etc) |`privatelink.cognitiveservices.azure.com`<br>privatelink.openai.azure.com |cognitiveservices.azure.com<br>openai.azure.com| account |-|
-|Azure Webapps |privatelink.azurewebsites.net<br>scm.privatelink.azurewebsites.net|azurewebsites.net<br>scm.azurewebsites.net |sites |azureAppServicesPrivateDnsZoneId. Azure App Service hosts Azure Webapps, Azure Functions, Azure Logi Apps, Azure API mgmt. [More info](https://techcommunity.microsoft.com/t5/nonprofit-techies/understanding-azure-web-apps-and-azure-app-service/ba-p/3812572)|
-|Azure Storage |privatelink.blob.core.windows.net |blob.core.windows.net |blob, blob_secondary|-|
-|Azure Storage |privatelink.table.core.windows.net |table.core.windows.net |table, table_secondary|-|
-|Azure Storage |privatelink.queue.core.windows.net |queue.core.windows.net |queue, queue_secondary|-|
-|Azure Storage |privatelink.file.core.windows.net |file.core.windows.net|file|-|
-|Azure Storage |privatelink.dfs.core.windows.net | dfs.core.windows.net |dfs, dfs_secondary|-|
-|Cosmos DB | privatelink.documents.azure.com |documents.azure.com|Sql|-|
-|Cosmos DB | `privatelink.table.cosmos.azure.com` |table.cosmos.azure.com|Table|-|
-|Azure AI Search | privatelink.search.windows.net |search.windows.net|searchService|-|
-|Azure Databricks | `privatelink.azuredatabricks.net` |azuredatabricks.net|databricks_ui_api <br> browser_authentication|-|
-|Azure Databricks | `privatelink.databricks.azure.us` |databricks.azure.us|databricks_ui_api <br> browser_authentication|-|
+|Service | Project type |Private DNS Zone Name | Public DNS zone forwarders (to add in on-prem DNS) | Subresource | Description|
+|---|---|---|---|---|---|
+|Azure Datafactory |ESML|privatelink.adf.azure.com |adf.azure.com | dataFactory |-|
+|Azure Datafactory |ESML|privatelink.datafactory.azure.net |datafactory.azure.net| portal |-|
+|Azure Machine Learning |ESML, ESGenAI|privatelink.api.azureml.ms <br> privatelink.notebooks.azure.net |api.azureml.ms<br>notebooks.azure.net<br>instances.azureml.ms<br>aznbcontent.net<br>inference.ml.azure.com | amlworkspace |-|
+|Azure Container registry|ESML|privatelink.azurecr.io<br> `{regionName}.data.privatelink.azurecr.io` |azurecr.io <br>{regionName}.data.azurecr.io |registry| Dependency: Azure Machine Learning, AI studio|
+|Azure Keyvault |All|privatelink.vaultcore.azure.net |vault.azure.net <br>vaultcore.azure.net|vault| Dependency: Azure Machine Learning |
+|Azure Databricks |ESML| privatelink.azuredatabricks.net |azuredatabricks.net|databricks_ui_api <br> browser_authentication|-|
+|Azure Databricks |ESML| `privatelink.databricks.azure.us` |databricks.azure.us|databricks_ui_api <br> browser_authentication|-|
+|Cognitive Services (Azure OpenAI, Speech, etc) |ESML|privatelink.cognitiveservices.azure.com<br>privatelink.openai.azure.com |cognitiveservices.azure.com<br>openai.azure.com| account |-|
+|Azure Webapps |ESGenAI|privatelink.azurewebsites.net<br>scm.privatelink.azurewebsites.net|azurewebsites.net<br>scm.azurewebsites.net |sites |azureAppServicesPrivateDnsZoneId. Azure App Service hosts Azure Webapps, Azure Functions, Azure Logi Apps, Azure API mgmt. [More info](https://techcommunity.microsoft.com/t5/nonprofit-techies/understanding-azure-web-apps-and-azure-app-service/ba-p/3812572)|
+|Azure Storage |All|privatelink.blob.core.windows.net |blob.core.windows.net |blob, blob_secondary|-|
+|Azure Storage |All|privatelink.table.core.windows.net |table.core.windows.net |table, table_secondary|-|
+|Azure Storage |All|privatelink.queue.core.windows.net |queue.core.windows.net |queue, queue_secondary|-|
+|Azure Storage |All|privatelink.file.core.windows.net |file.core.windows.net|file|-|
+|Azure Storage |All|privatelink.dfs.core.windows.net | dfs.core.windows.net |dfs, dfs_secondary|-|
+|Cosmos DB |ESGenAI| privatelink.documents.azure.com |documents.azure.com|Sql|-|
+|Cosmos DB |ESGenAI| privatelink.table.cosmos.azure.com |table.cosmos.azure.com|Table|-|
+|Azure AI Search |ESGenAI| privatelink.search.windows.net |search.windows.net|searchService|-|
 
 Private DNS zones - Eventhandling & Monitoring: 
 
 |Service |Private DNS Zone Name | Public DNS zone forwarders | Subresource | Description|
 |---|---|---|---|---|
-|Azure Eventhubs | `privatelink.servicebus.windows.net` |servicebus.windows.net |namespace|-|
-|Azure Eventgrid | `privatelink.eventgrid.azure.net` |eventgrid.azure.net|topic,domain,topicSpace,partnernamespace |Dependency: Azure Datafactory|
+|Azure Eventhubs |ESML| privatelink.servicebus.windows.net |servicebus.windows.net |namespace|-|
+|Azure Eventgrid |ESML| privatelink.eventgrid.azure.net |eventgrid.azure.net|topic,domain,topicSpace,partnernamespace |Dependency: Azure Datafactory|
 Synaps Analytics|
-|Azure Monitor | `privatelink.monitor.azure.com`<br>`privatelink.oms.opinsights.azure.com`<br>`privatelink.ods.opinsights.azure.com`<br>`privatelink.agentsvc.azure-automation.net`<br>privatelink.blob.core.windows.net |monitor.azure.com<br>oms.opinsights.azure.com<br>ods.opinsights.azure.com<br>agentsvc.azure-automation.net<br>blob.core.windows.net<br>services.visualstudio.com<br>applicationinsights.azure.com|azuremonitor|-|
+|Azure Monitor |All| privatelink.monitor.azure.com<br>privatelink.oms.opinsights.azure.com<br>privatelink.ods.opinsights.azure.com<br>privatelink.agentsvc.azure-automation.net|monitor.azure.com<br>oms.opinsights.azure.com<br>ods.opinsights.azure.com<br>agentsvc.azure-automation.net<br>blob.core.windows.net<br>services.visualstudio.com<br>applicationinsights.azure.com|azuremonitor|-|
 
 <!-- |Azure Batch | `{regionName}.privatelink.batch.azure.com` |{regionName}.batch.azure.com|batchAccount|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure Synaps Analytics|
 |Azure Batch | `{regionName}.service.privatelink.batch.azure.com` |{regionName}.service.batch.azure.com|nodeManagement|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure 
@@ -184,9 +184,11 @@ Read more:
         - Denies the creation of a private DNS in the current scope (the application landingzones), to ensure only having zones in the Hub
         - Cnfigures private DNS zone group to override the DNS resolution for PaaS services private endpoint. See https://aka.ms/pepdnszones for more.
         - Audit private endpoints that are created in other subscriptions and/or tenants for Azure Machine Learning.
-    - 2a) Define the Azure policy's and the Azure Policy Initiative, by runnig the below two BICEP files under the _esml-util folder: 
-        - [28-policy.bicep](../../../../aifactory/esml-util/28-policy.bicep)
-        - [28-Initiatives.bicep](../../../../aifactory/esml-util/28-Initiatives.bicep)
+    - 2a) Define the Azure policy's and assigne the Azure Policy Initiative on the Sopkes subscriptions, e.g. AIFactory DEV, TEST, PROD. 
+        - Not to be assined on the Hub. But the Initative have a Managed Identity (see portal UI) that needs to have the RBAC roles on the HUB's private DNS Zones in the HUB.
+        - You can create them by runnig the below two BICEP files under the _esml-util folder, and assign them via the portal "Policy" UI
+            - Mandatory: [28-Initiatives.bicep](../../../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep)
+            - Optional: [28-policy.bicep](../../../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-util/28-policy.bicep)
     - 2b) Assign the Azure policys and initiative to the subscriptions [How-to assign an Azure policy](https://learn.microsoft.com/en-us/azure/governance/policy/how-to/programmatically-create#create-and-assign-a-policy-definition).
         - Policy Initiative _Configure Azure PaaS services to use private DNS zones_
             - Also set all parameters on the initative assignment, Private DNS Id's.

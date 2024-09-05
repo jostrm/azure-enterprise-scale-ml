@@ -115,7 +115,9 @@ TODO: Support federated ARM connections https://learn.microsoft.com/en-us/azure/
 
 ![](./images/13-setup-aifactory-ado-edit-variables.png)
 
-[More information about variables can bee seen here](./13-parameters-ado.md)
+[More information about variables can bee seen here](./13-parameters-ado.md) 
+
+To get "my ip": nslookup myip.opendns.com resolver1.opendns.com
 
 
 ## 6) Edit the Base parameters 
@@ -235,9 +237,27 @@ If you don't know. Please go back to this step [12-resourceproviders.md](./12-re
 
 The parameters you edited, do they look as you configured them locally in Azure Devops also?
 
-#### 4) Is all permissions set for the Service Principle? 
+#### 4) Is all permissions set for the service principle *esml-common-bicep-sp*? 
 - The BICEP will have to create artifact under 1 or many subscriptions.
 - Note: If you have an external vNet (BYO vNet) in another subscription than its AIFactory environment subscription, it needs Contributor on ResourceGroup to create NSG's, and Network Contributor on the vNet to be able to assign the NSG's. [Read more about: Permissions for the service principle](./12-permissions-users-ad-sps.md)
+
+#### 5) Verify Azure Devops, inline script arguemts. Especially for service principle *esml-common-bicep-sp*
+Check specifically the service principle name, of the secret name, in the seeding keyvault. If you have the default name, it should work. 
+If now, you need to edit in the Azure Devops Task setup, Script Arguments inline. See image
+
+![](./images/13-setup-aifactory-verify-ado-inline-script-parameters.png)
+
+#### 6) Verify that the service principle, *esml-common-bicep-sp*, have ACL access to seeding keuvault. 
+Even in the service principle *esml-common-bicep-sp* has OWNER on the Azure subscription, the Access Policy on secrets: GET,LIST,SET
+
+Otherwise you will encoutner an error message similas as below: 
+
+![](./images/13-setup-aifactory-verify-accesspolicys-sp.png)
+
+If so, you need to visit the seeding keyvault, Access policys, and give the service principle `Get, List, Set` , and rerun the pipeline release.
+
+![](./images/13-setup-aifactory-verify-sp-acess-policy-set.png)
+
 
 #### DONE! Ready to Run the pipeline
 Now you can go ahead and run the pipeline in Azure Devops. 
