@@ -188,10 +188,10 @@ Read more:
         - Not to be assined on the Hub. But the Initative have a Managed Identity (see portal UI) that needs to have the RBAC roles on the HUB's private DNS Zones in the HUB.
         - You can create them by runnig the below two BICEP files under the _esml-util folder, and assign them via the portal "Policy" UI
             - Mandatory:
-                - Online link [esml-util/28-Initiatives.bicep](../../../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-util/)
+                - Online link [esml-util/28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep)
                 - Local link (when you have added ESML as submodule, and copied the aifactory/esml-util folder locally): [28-Initiatives.bicep](../../../../aifactory/esml-util/28-Initiatives.bicep)
             - Optional: 
-                - Online link: [esml-util/28-policy.bicep](../../../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-util/)
+                - Online link: [esml-util/28-policy.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-policy.bicep)
                 - Local Link:  [28-policy.bicep](../../../../aifactory/esml-util/28-policy.bicep)
     - 2b) Assign the Azure policys and initiative to the subscriptions [How-to assign an Azure policy](https://learn.microsoft.com/en-us/azure/governance/policy/how-to/programmatically-create#create-and-assign-a-policy-definition).
         - Policy Initiative _Configure Azure PaaS services to use private DNS zones_
