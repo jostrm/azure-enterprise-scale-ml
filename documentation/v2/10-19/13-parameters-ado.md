@@ -71,8 +71,6 @@ That will end up in the three vNets with address spaces as below:
 
 ## Variables:Project environments (Azure Devops/Github) that overrides baseline parameters, explained
 
-## Variables:Common environment (Azure Devops/Github) that overrides baseline parameters, explained
-
 |Variable|Purpose|1-time-setup only|Description|
 |---|---|---|---|
 |**admin_aifactorySuffixRG** |**AIFactory instance that this AIFactory project should connect to** |Yes| Check the common resource grup. If -002 if the AIFactory's common resource group ends with -002. <br><br>&#9642;Example: dc-batcave-esml-common-sdc-dev-002 |
@@ -80,7 +78,7 @@ That will end up in the three vNets with address spaces as below:
 |**admin_aks_gpu_sku_test_prod_override** |**SKU override on AKS cluster attached to Azure ML workspace** |Yes|For STAGE and PROD environments <br><br>&#9642; |
 |**admin_aks_nodes_dev_override** |**Number of nodes override on AKS cluster attached to Azure ML workspace in DEV** |Yes| integer. Default is 1 node <br><br>&#9642; |
 |**admin_aks_nodes_testProd_override** |**Number of nodes override on AKS cluster attached to Azure ML workspace** |Yes|For STAGE and PROD environments. Default is 3 nodes <br><br>&#9642; |
-|**admin_aks_version_override** |**kubernetesVersion on managed AKS cluster** |Yes<br>Default: `1.27.9` <br> Newer: `1.30.3`| kubernetesVersion on BICEP `Microsoft.ContainerService/managedClusters@2021-03-01` <br> Verify if supported by running command: `az aks get-versions --location westeurope --output table)` to verify that the version `1.27.9` is not too low/high version for your region.Login first: `az login --scope https://management.core.windows.net//.default` <br><br>&#9642; [Link - More info](https://learn.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli)|
+|**admin_aks_version_override** |**kubernetesVersion on managed AKS cluster** |Yes<br>Default:20240905:`1.30.3` (`1.27.9`)| kubernetesVersion on BICEP `Microsoft.ContainerService/managedClusters@2021-03-01` <br> Verify if supported by running command: `az aks get-versions --location westeurope --output table)` to verify that the version `1.30.3` is not too low/high version for your region.Login first: `az login --scope https://management.core.windows.net//.default` <br><br>&#9642; [Link - More info](https://learn.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli)|
 |**admin_commonResourceSuffix** |**The suffix of the resources in the common resource group** |Yes| Check the common resource grup. If the resources, such as the Aure Keyvault `kv-cmnadmdev-abcdf-001` ends with -001, it should be -001 here also<br><br>&#9642; |
 |**admin_ip_fw** |**Placeholder that is set automatically from pipeline code. Leave blank** |Yes|Leave blank. Do not need to be set. Will be overwritten<br><br>&#9642; |
 |**project_IP_whitelist** |**Set the default IP that will be whitelisted in the NSG for Bastion access** |Yes| Only 1 IP is supported. Your public IP address from your client that you want to whitelist to Bastion. If Windows client you can open a command prompt and run: _nslookup myip.opendns.com resolver1.opendns.com_ where the last non-authoritative answer of address would be your public IP address.You may also use your web browser and search for "my IP".<br>Example: 85.123.124.12<br><br>&#9642; [Link - Networking](../10-19/14-networking-privateDNS.md)|
