@@ -50,30 +50,33 @@ Private DNS zones - Compute, Storage, WebApp, CosmosDB:
 |---|---|---|---|---|---|
 |Azure Datafactory |ESML|privatelink.adf.azure.com |adf.azure.com | dataFactory |-|
 |Azure Datafactory |ESML|privatelink.datafactory.azure.net |datafactory.azure.net| portal |-|
-|Azure Machine Learning |ESML, ESGenAI|privatelink.api.azureml.ms <br> privatelink.notebooks.azure.net |api.azureml.ms<br>notebooks.azure.net<br>instances.azureml.ms<br>aznbcontent.net<br>inference.ml.azure.com | amlworkspace |-|
-|Azure Container registry|ESML|privatelink.azurecr.io<br> `{regionName}.data.privatelink.azurecr.io` |azurecr.io <br>{regionName}.data.azurecr.io |registry| Dependency: Azure Machine Learning, AI studio|
-|Azure Keyvault |All|privatelink.vaultcore.azure.net |vault.azure.net <br>vaultcore.azure.net|vault| Dependency: Azure Machine Learning |
+|Azure Machine Learning |ESML,ESGenAI|privatelink.api.azureml.ms <br> privatelink.notebooks.azure.net |api.azureml.ms<br>notebooks.azure.net<br>instances.azureml.ms<br>aznbcontent.net<br>inference.ml.azure.com | amlworkspace |-|
+|Azure Container registry|ESML, ESGenAI|privatelink.azurecr.io<br> `{regionName}.data.privatelink.azurecr.io` |azurecr.io <br>{regionName}.data.azurecr.io |registry| Dependency: Azure Machine Learning, AI studio|
+|`Azure Kubernetes Service` |ESML, ESGenAI| privatelink.{regionName}.azmk8s.io <br> `{subzone}.privatelink.{regionName}.azmk8s.io` |{regionName}.azmk8s.io |management|-|
 |Azure Databricks |ESML| privatelink.azuredatabricks.net |azuredatabricks.net|databricks_ui_api <br> browser_authentication|-|
 |Azure Databricks |ESML| `privatelink.databricks.azure.us` |databricks.azure.us|databricks_ui_api <br> browser_authentication|-|
-|Cognitive Services (Azure OpenAI, Speech, etc) |ESML|privatelink.cognitiveservices.azure.com<br>privatelink.openai.azure.com |cognitiveservices.azure.com<br>openai.azure.com| account |-|
-|Azure Webapps |ESGenAI|privatelink.azurewebsites.net<br>scm.privatelink.azurewebsites.net|azurewebsites.net<br>scm.azurewebsites.net |sites |azureAppServicesPrivateDnsZoneId. Azure App Service hosts Azure Webapps, Azure Functions, Azure Logi Apps, Azure API mgmt. [More info](https://techcommunity.microsoft.com/t5/nonprofit-techies/understanding-azure-web-apps-and-azure-app-service/ba-p/3812572)|
+|Azure Keyvault |All|privatelink.vaultcore.azure.net |vault.azure.net <br>vaultcore.azure.net|vault| Dependency: Azure Machine Learning |
 |Azure Storage |All|privatelink.blob.core.windows.net |blob.core.windows.net |blob, blob_secondary|-|
 |Azure Storage |All|privatelink.table.core.windows.net |table.core.windows.net |table, table_secondary|-|
 |Azure Storage |All|privatelink.queue.core.windows.net |queue.core.windows.net |queue, queue_secondary|-|
 |Azure Storage |All|privatelink.file.core.windows.net |file.core.windows.net|file|-|
 |Azure Storage |All|privatelink.dfs.core.windows.net | dfs.core.windows.net |dfs, dfs_secondary|-|
+|Cognitive Services (Azure OpenAI, Speech, etc) |ESGenAI|privatelink.cognitiveservices.azure.com<br>privatelink.openai.azure.com |cognitiveservices.azure.com<br>openai.azure.com| account |-|
+|Azure Webapps |ESGenAI|privatelink.azurewebsites.net<br>scm.privatelink.azurewebsites.net|azurewebsites.net<br>scm.azurewebsites.net |sites |azureAppServicesPrivateDnsZoneId. Azure App Service hosts Azure Webapps, Azure Functions, Azure Logi Apps, Azure API mgmt. [More info](https://techcommunity.microsoft.com/t5/nonprofit-techies/understanding-azure-web-apps-and-azure-app-service/ba-p/3812572)|
 |Cosmos DB |ESGenAI| privatelink.documents.azure.com |documents.azure.com|Sql|-|
 |Cosmos DB |ESGenAI| privatelink.table.cosmos.azure.com |table.cosmos.azure.com|Table|-|
 |Azure AI Search |ESGenAI| privatelink.search.windows.net |search.windows.net|searchService|-|
 
 Private DNS zones - Eventhandling & Monitoring: 
 
-|Service |Private DNS Zone Name | Public DNS zone forwarders | Subresource | Description|
-|---|---|---|---|---|
+|Service | Project type |Private DNS Zone Name | Public DNS zone forwarders | Subresource | Description|
+|---|---|---|---|---|---|
 |Azure Eventhubs |ESML| privatelink.servicebus.windows.net |servicebus.windows.net |namespace|-|
 |Azure Eventgrid |ESML| privatelink.eventgrid.azure.net |eventgrid.azure.net|topic,domain,topicSpace,partnernamespace |Dependency: Azure Datafactory|
 Synaps Analytics|
 |Azure Monitor |All| privatelink.monitor.azure.com<br>privatelink.oms.opinsights.azure.com<br>privatelink.ods.opinsights.azure.com<br>privatelink.agentsvc.azure-automation.net|monitor.azure.com<br>oms.opinsights.azure.com<br>ods.opinsights.azure.com<br>agentsvc.azure-automation.net<br>blob.core.windows.net<br>services.visualstudio.com<br>applicationinsights.azure.com|azuremonitor|-|
+
+Source: [Microsoft Docs - Azure Private Endpoint private DNS zone values](https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns)
 
 <!-- |Azure Batch | `{regionName}.privatelink.batch.azure.com` |{regionName}.batch.azure.com|batchAccount|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure Synaps Analytics|
 |Azure Batch | `{regionName}.service.privatelink.batch.azure.com` |{regionName}.service.batch.azure.com|nodeManagement|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure 
