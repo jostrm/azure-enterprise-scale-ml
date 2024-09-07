@@ -162,8 +162,8 @@ param technicalAdminsObjectID string = 'null'
 param technicalAdminsEmail string = 'null'
 @description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
 param IPwhiteList string = ''
-@description('(Dummy) since esml-common needs this. But this parameter is in same .json override file, it needs to exist, otherwise BICEP validation error. ')
-param addBastionHost bool= false // Dummy: do not correspond to any parameters defined in the template: 'addBastionHost'
+@description('since esml-common needs this, and since we need to see if users in this file, should have RBAC acecss')
+param addBastionHost bool // Dummy: do not correspond to any parameters defined in the template: 'addBastionHost'
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
@@ -372,7 +372,6 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == 
     tags: tags2
     keyvaultName: kv1.outputs.keyvaultName
   }
-
   dependsOn: [
     kv1
     projectResourceGroup
@@ -513,7 +512,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   ]
 }
 
-var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var kvNameCommon = kvNameFromCOMMON_param != '' ? kvNameFromCOMMON_param : 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
   name: kvNameCommon
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
@@ -1011,7 +1010,7 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_ad
   ]
 }
 
-module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = {
+module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
   params: {

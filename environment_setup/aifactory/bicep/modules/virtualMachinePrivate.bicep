@@ -130,7 +130,8 @@ resource virtualMachine 'Microsoft.Compute/virtualMachines@2020-12-01' = {
 }
 
 resource extAADLogin 'Microsoft.Compute/virtualMachines/extensions@2020-12-01' = {
-  name: '${vmName}/AADLoginForWindows'
+  parent: virtualMachine
+  name: 'AADLoginForWindows'
   location:location
   properties:{
     publisher:'Microsoft.Azure.ActiveDirectory'
@@ -138,11 +139,7 @@ resource extAADLogin 'Microsoft.Compute/virtualMachines/extensions@2020-12-01' =
     type:'AADLoginForWindows'
     autoUpgradeMinorVersion:true
   }
-  dependsOn:[
-    virtualMachine //extDCforAADLogin
-  ]
 }
-
 
 resource automaticShutdown 'Microsoft.DevTestLab/schedules@2018-09-15' = {
   name: 'shutdown-computevm-${virtualMachine.name}'
@@ -150,7 +147,7 @@ resource automaticShutdown 'Microsoft.DevTestLab/schedules@2018-09-15' = {
   tags: tags
   properties: {
     dailyRecurrence: {
-      time: '2300'
+      time: '0330'
     }
     status: 'Enabled'
     targetResourceId: virtualMachine.id

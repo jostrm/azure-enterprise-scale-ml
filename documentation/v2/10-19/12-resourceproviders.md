@@ -17,6 +17,13 @@ Foreach subscription:
 - Run this [this script](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
 
 # INFO - What resource providers are we talking about:
+# IMPORTANT - AKS, Kubernetes and Private DNS Zones
+
+If not running the AIFactory standalone. E.g. if use have centrlazied private DNS Zones - **the private DNS zone is in a different subscription than the AKS cluster, you need to register the Azure provider `Microsoft.ContainerService` in both subscriptions**
+
+[Read more - AKS private clusters with Custom Private DNS zone](https://learn.microsoft.com/en-us/azure/aks/private-clusters?tabs=azure-portal)
+
+
 ## NEW: AIFactory needs these (AIFactory Common + ESML project)
 
 - Microsoft.Security

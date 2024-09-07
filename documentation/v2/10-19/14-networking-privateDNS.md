@@ -78,6 +78,8 @@ Synaps Analytics|
 
 Source: [Microsoft Docs - Azure Private Endpoint private DNS zone values](https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns)
 
+Note: Default behaviour of Microsoft Private DNS, they are registered in global. (you can change this, but need to register location for DNS in your subscription.
+
 <!-- |Azure Batch | `{regionName}.privatelink.batch.azure.com` |{regionName}.batch.azure.com|batchAccount|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure Synaps Analytics|
 |Azure Batch | `{regionName}.service.privatelink.batch.azure.com` |{regionName}.service.batch.azure.com|nodeManagement|Dependency: Azure Datafactory, Azure Machine Learning, Azure Media Service, Azure 
 --> 
@@ -193,10 +195,11 @@ Read more:
             - Mandatory:
                 - Online link [esml-util/28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep)
                 - Local link (when you have added ESML as submodule, and copied the aifactory/esml-util folder locally): [28-Initiatives.bicep](../../../../aifactory/esml-util/28-Initiatives.bicep)
-            - Optional: 
+            - Optional: *Deny the creation of private DNS*, etc
                 - Online link: [esml-util/28-policy.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-policy.bicep)
-                - Local Link:  [28-policy.bicep](../../../../aifactory/esml-util/28-policy.bicep)
-    - 2b) Assign the Azure policys and initiative to the subscriptions [How-to assign an Azure policy](https://learn.microsoft.com/en-us/azure/governance/policy/how-to/programmatically-create#create-and-assign-a-policy-definition).
+                - Local Link:  [28-policy.bicep](../../../../aifactory/esml-util/28-policy.bicep) 
+                - **Important! - Exemption is needed** As of now the AKS cluster creation uses SYSTEM Private DNS Zone, not CUSTOM, hence you cannot assign the policy without an exemption of policy "Deny the creation of private DNS". Since the system will try to create such PRivate DNS Zones. In the format of *<subzone>.privatelink.<region>.azmk8s.io* e.g a random GUID for <subzone>, for each cluster. [Read more - AKS private DNS zones](https://learn.microsoft.com/en-us/azure/aks/private-clusters?tabs=azure-portal)
+                    - Roadmap in ESML AIFactory, is to provision the AKS cluuster with CUSTOM_PRIVATE_DNS_ZONE_RESOURCE_ID. But Azure Machine Learning does not handle that well right now.programmatically-create#create-and-assign-a-policy-definition).
         - Policy Initiative _Configure Azure PaaS services to use private DNS zones_
             - Also set all parameters on the initative assignment, Private DNS Id's.
             - Also set roles: _Network Contributor,Private DNS Zone Contributor,Contributor_ for the initiative MI, to have access to the HUB's Private DNS Zones
