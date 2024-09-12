@@ -16,6 +16,9 @@
         },
         "kvNameFromCOMMON_param": {
             "value": ""
+        },
+        "enablePublicGenAIAccess": {
+            "value": false
         }
     }
 }

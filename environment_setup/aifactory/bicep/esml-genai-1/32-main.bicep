@@ -10,6 +10,17 @@ param serviceSettingDeployCosmosDB bool = false
 param serviceSettingDeployWebApp bool = false
 @description('Service setting:Deploy Azure Machine Learning')
 param serviceSettingDeployAzureML bool = false
+param semanticSearchTier string = 'free' //   'disabled' 'free' 'standard'
+param aiSearchSKUName string = 'basic' // 'basic' 'standard'
+
+@description('Default is false. May be needed if Azure OpenAI should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
+param enablePublicNetworkAccessForCognitive bool = false
+@description('Default is false. May be needed if Azure AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
+param enablePublicNetworkAccessForAISearch bool = false
+@description('Default is false. May be needed if Azure Storage used by AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
+param enablePublicNetworkAccessFoAIStorage bool = false
+@description('Default is false. If tru, it will flip all flags for GenAI RAG, such as Azure OpenAI, Azure AI Search, CosmosDB, WebApp, Azure Machine Learning')
+param enablePublicGenAIAccess bool = false
 
 // Azure Machine Learning
 param aks_dev_sku_override string = ''  // Override: AKS -  Azure Machine Learning
@@ -139,6 +150,7 @@ var vnetNameFull = vnetNameFull_param != '' ? vnetNameFull_param : '${vnetNameBa
 // ESML convention (that you may override)
 var projectName = 'prj${projectNumber}'
 var cmnName = 'cmn'
+var genaiName = 'genai'
 var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroup
@@ -153,7 +165,7 @@ var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: 
 var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
 
 // Other - uniquness, Keyvault name
-var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
+var deploymentProjSpecificUniqueSuffix = '${projectName}${genaiName}${locationSuffix}${env}${aifactorySuffixRG}'
 var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
@@ -226,7 +238,7 @@ var privateLinksDnsZones = {
 // Resource Groups
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)
-  name: 'prjResourceGroup${deploymentProjSpecificUniqueSuffix}'
+  name: 'prjRG${deploymentProjSpecificUniqueSuffix}'
   params: {
     rgName: targetResourceGroup
     location: location
@@ -271,7 +283,7 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
+  name: 'rbacRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
@@ -288,15 +300,170 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 
 // ------------------------------ END:RBAC ResourceGroups, Bastion,vNet, VMAdminLogin  ------------------------------//
 
+// ------------------------------ SERVICES - Azure OpenAI, Azure AI Search, Storage for Azure AI Search, Azure Content Safety ------------------------------//
+
+param csSKU string = 'S0'
+module contentSafety '../modules/contentSafety.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'ContentSafety4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    csSKU: csSKU
+    location: location
+    contentsafetyName: 'cs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+  }
+}
+// Azure OpenAI
+param gptDeploymentName string= 'gpt-4'
+var searchIndexName= 'idx-${projectName}${env}${uniqueInAIFenv}'
+param chatGptModelVersion string ='1106-Preview'
+param chatGptDeploymentCapacity int = 5
+param embeddingDeploymentName  string=  'text-embedding-ada-002'
+param embeddingModelName string =  'text-embedding-ada-002'
+param embeddingDeploymentCapacity int =5
+
+var defaultOpenAiDeployments = [
+  {
+    name: gptDeploymentName
+    model: {
+      format: 'OpenAI'
+      name: gptDeploymentName
+      version: chatGptModelVersion
+    }
+    sku: {
+      name: 'Standard'
+      capacity: chatGptDeploymentCapacity
+    }
+  }
+  {
+    name: embeddingDeploymentName
+    model: {
+      format: 'OpenAI'
+      name: embeddingModelName
+      version: '2'
+    }
+    sku: {
+      name: 'Standard'
+      capacity: embeddingDeploymentCapacity
+    }
+  }
+]
+
+module azureOpenAI '../modules/cognitiveServices.bicep' = if(enablePublicNetworkAccessForCognitive == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    cognitiveName: 'cog-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    tags: tags
+    location: location
+    sku: 'S0'
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    kind: 'TextAnalytics'
+    pendCogSerName: 'p-${projectName}-openai-${genaiName}'
+    deployments:defaultOpenAiDeployments
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privDnsZoneLinkAOAI${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: azureOpenAI.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+    azureOpenAI
+  ]
+}
+// Azure OpenAI - END
+
+// Azure AI Search
+
+module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    aiSearchName: 'aiSearch${deploymentProjSpecificUniqueSuffix}'
+    location: location
+    skuName: aiSearchSKUName
+    replicaCount: 1
+    partitionCount: 1
+    privateEndpointName: 'p-${projectName}-aisearch-${genaiName}'
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    tags: tags
+    semanticSearchTier: semanticSearchTier
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
+  }
+}
+
+module privateDnsaiSearchService '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'priDZoneSA${genaiName}${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: aiSearchService.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+    aiSearchService
+  ]
+}
+
+// Azure AI Search - END
+
+// Storage for Azure AI Search
+
+module sa4AIsearch '../modules/storageAccount.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'GenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+    skuName: 'Standard_LRS'
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}'
+    filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}'
+    queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
+    tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
+    tags: tags
+  }
+
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'priDZoneSA${genaiName}${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: sa4AIsearch.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+    sa4AIsearch
+  ]
+}
+
+// Storage for Azure AI Search - END
+
 // ------------------------------ SERVICES(Common) - Keyvault, VM, Loganalytics, AppInsights ------------------------------//
 
-// Related to Azure Machine Learning: Cintainer Registry, Storage Account, KeyVault, LogAnalytics, ApplicationInsights
+// Related to Azure Machine Learning: Cointainer Registry, Storage Account, KeyVault, LogAnalytics, ApplicationInsights
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
 module acr '../modules/containerRegistry.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AMLContainerReg4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    containerRegistryName: 'acr${projectName}${locationSuffix}${uniqueInAIFenv}${env}${prjResourceSuffixNoDash}'
+    containerRegistryName: 'acr${projectName}${genaiName}${locationSuffix}${uniqueInAIFenv}${env}${prjResourceSuffixNoDash}'
     skuName: 'Premium'
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -312,16 +479,16 @@ module acr '../modules/containerRegistry.bicep' = {
 
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
-    blobPrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
-    filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
-    queuePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
-    tablePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-table-to-vnt-mlcmn'
+    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
+    filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
+    queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
+    tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}ml'
     tags: tags
   }
 
@@ -332,7 +499,7 @@ module sacc '../modules/storageAccount.bicep' = {
 
 module kv1 '../modules/keyVault.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyvaultName: keyvaultName
     location: location
@@ -345,7 +512,6 @@ module kv1 '../modules/keyVault.bicep' = {
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
-      '${vnetId}/subnets/snt-${projectName}-dbxpub'
     ]
     accessPolicies: [] 
     ipRules: [
@@ -368,7 +534,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
 
 module applicationInsight '../modules/applicationInsights.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AppIns4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // max 255 chars
     tags: tags
@@ -383,7 +549,7 @@ module applicationInsight '../modules/applicationInsights.bicep' = {
 
 module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDeployProjectVM == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateVM4${deploymentProjSpecificUniqueSuffix}'
+  name: 'privVM4${deploymentProjSpecificUniqueSuffix}'
   params: {
     adminUsername: adminUsername
     adminPassword: adminPassword
@@ -418,7 +584,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 }
 
 module addSecret '../modules/kvSecretsPrj.bicep' = {
-  name: '${keyvaultName}addSecrect2ProjectKV${projectNumber}${locationSuffix}${env}'
+  name: '${keyvaultName}Secrect2Proj${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     spAppIDValue:externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) //projectServicePrincipleAppID_SeedingKeyvaultName 
@@ -455,7 +621,7 @@ var secretGet = {
 // PROJECT Keyvault where technicalContactId GET,LIST, SET
 module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${keyvaultName}APTechContact${projectNumber}${locationSuffix}${env}'
+  name: '${keyvaultName}AccessPol${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetListSet
     keyVaultResourceName: kv1.outputs.keyvaultName
@@ -478,7 +644,7 @@ resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 
 module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: '${kvNameCommon}GetList${projectNumber}${locationSuffix}${env}'
+  name: '${kvNameCommon}GetList${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommon
@@ -493,7 +659,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
 
 module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'spCmnKVPolicyGetList${projectNumber}${locationSuffix}${env}'
+  name: 'spGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGet
     keyVaultResourceName: commonKv.name
@@ -511,7 +677,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep'= {
 
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
+  name: 'priDZoneSA${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: sacc.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -522,7 +688,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
 }
 module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkKeyVault${projectNumber}${locationSuffix}${env}'
+  name: 'priDnZoneKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: kv1.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -533,7 +699,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
 }
 module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkACR${projectNumber}${locationSuffix}${env}'
+  name: 'priDnsZACR${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: acr.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -598,7 +764,7 @@ var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != 
 
 module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AzureMachineLearning4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AAMLGenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: amlName
     uniqueDepl: deploymentProjSpecificUniqueSuffix
@@ -622,7 +788,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
     tags: tags
     vnetId: vnetId
     subnetName: defaultSubnet
-    privateEndpointName: 'pend-${projectName}-aml-to-vnt-mlcmn'
+    privateEndpointName: 'pend-${projectName}-aml${genaiName}-to-vntcmn'
     amlPrivateDnsZoneID: privateLinksDnsZones['amlworkspace'].id
     notebookPrivateDnsZoneID:privateLinksDnsZones['notebooks'].id
     allowPublicAccessWhenBehindVnet:allowPublicAccessWhenBehindVnet
@@ -650,7 +816,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
 
 module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' ={
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDBX2AMLProjectSPSWC${projectNumber}${locationSuffix}${env}'
+  name: 'rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlName:amlName
     projectSP:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
