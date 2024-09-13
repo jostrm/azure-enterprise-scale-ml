@@ -81,7 +81,7 @@ NB! If you only want to use the AIFActory for ESML projects, this is not needed.
 ## Step 6) Delegate User Access: Onboard a Microsoft EntraID user, with access to the Azure Devops created in step 1, and with OWNER permission on the Subscriptions created in Step 2, 
 - **Purpose:** Efficiency. To be able to troubleshoot, manually login to Azure for `the AIFactory setup mentor`
 - **Role needed:** Microsoft EntraID administrator: Central IT / Cloud Team
-- **Mandatory:** No. But at least to be OWNER on the resource Groups that ESML AIFactory has created.
+- **Mandatory:** Yes. Very hard to debug, troubleshoot if no insights that permission is set correctly. Nedd to have read access in EntraID to see the servic principal and keyvault permissions. Someone needs to verify that the Azure Devops Service connection works, that service principal (SP) esml-common-bicep has Get, List, Set to seeding keyvault. That the SP is OWNER on the subscriptions.
 - **TODO**: 
     1) Create user in Microsoft EntraID
         - [How-to guide](https://learn.microsoft.com/en-us/entra/fundamentals/how-to-create-delete-users) : Create user
