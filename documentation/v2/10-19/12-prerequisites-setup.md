@@ -2,11 +2,11 @@
 
 ## Step 1) Create Azure Devops (or Github) projects
 - **Purpose:** Where the AIFactory acceleration code resides
-- **Role needed:** Central IT / Azure Devops aministrator
+- **Role needed:** Central IT. Microsoft EntraID administrator. Azure Devops administrator
 - **Mandatory:** Yes.
 - **What:** CODE repository: Create your Azure Devops project to store the AIFactory acceleration code (IaC, and templates)
 - **TODO**: 
-    1) Create a new Azure Devops project (or reuse an existing)
+    1) Create a new Azure Devops project (or reuse an existing). Create a Service Connection, based on a Service Principal with OWNER permisson on subscription, and GET,LIST, SET access policys on seeding keyvault. The Service Connection should have access to "all pipelines" in Azure Devops (at crestion step there is a checkbox for this)
         - [How-to guide](https://learn.microsoft.com/en-us/azure/devops/organizations/projects/create-project?view=azure-devops&tabs=browser): Create Azure Devops project
     2) Create 2 GIT repositories, in your Azure Devops
         - ESML-AIFactory-Common
