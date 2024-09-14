@@ -24,7 +24,7 @@ param location string = resourceGroup().location
 @description('')
 param eHRuleName string = 'rule'
 
-resource namespaceName_resource 'Microsoft.EventHub/namespaces@2021-11-01' = {
+resource namespaceNameEV 'Microsoft.EventHub/namespaces@2021-11-01' = {
   identity:{
     type:'SystemAssigned'
   }
@@ -41,16 +41,13 @@ resource namespaceName_resource 'Microsoft.EventHub/namespaces@2021-11-01' = {
   }
 }
 
-resource namespaceName_eventHubName 'Microsoft.EventHub/namespaces/eventhubs@2021-11-01' = {
-  parent: namespaceName_resource
+resource eventHub 'Microsoft.EventHub/namespaces/eventhubs@2021-11-01' = {
+  parent: namespaceNameEV
   name: eventHubName
   properties: {
     messageRetentionInDays: 7
     partitionCount: 1
   }
-  dependsOn: [
-    namespaceName_resource
-  ]
 }
 
 resource namespaceName_rule 'Microsoft.EventHub/namespaces/eventhubs/authorizationRules@2021-11-01' = {
@@ -62,18 +59,18 @@ resource namespaceName_rule 'Microsoft.EventHub/namespaces/eventhubs/authorizati
     ]
   }
   dependsOn: [
-    namespaceName_eventHubName
+    eventHub
   ]
 }
 
 var keysObj = listKeys(resourceId('Microsoft.EventHub/namespaces/eventhubs/authorizationRules', namespaceName, eventHubName, eHRuleName), '2021-01-01-preview')
 
 /*NS*/
-output eHNamespaceId string = namespaceName_resource.id
-output eHNnsName string = namespaceName_resource.name
-output principalId string = namespaceName_resource.identity.principalId
+output eHNamespaceId string = namespaceNameEV.id
+output eHNnsName string = namespaceNameEV.name
+output principalId string = namespaceNameEV.identity.principalId
 /*EH*/
-output eHubNameId string = namespaceName_eventHubName.id
+output eHubNameId string = eventHub.id
 
 /*NS Rules*/
 output eHAuthRulesId string = namespaceName_rule.id
@@ -83,7 +80,7 @@ output eHPConnString string = keysObj.primaryConnectionString
 output eHName string = eventHubName
 
 resource eventHubPend 'Microsoft.Network/privateEndpoints@2020-07-01' = {
-  name: eventHubName
+  name: privateEndpointName
   location: location
   tags: tags
   properties: {
@@ -95,7 +92,7 @@ resource eventHubPend 'Microsoft.Network/privateEndpoints@2020-07-01' = {
       {
         id: 'string'
         properties: {
-          privateLinkServiceId: namespaceName_resource.id
+          privateLinkServiceId: namespaceNameEV.id
           groupIds: [
             'namespace'
           ]
@@ -104,7 +101,7 @@ resource eventHubPend 'Microsoft.Network/privateEndpoints@2020-07-01' = {
             description: 'Private endpoint for Eventhub namespace'
           }
         }
-        name: 'pend-evenhubns'
+        name: 'string'
       }
     ]
   }
@@ -114,5 +111,6 @@ output dnsConfig array = [
   {
     name: eventHubPend.name
     type: 'namespace'
+    id: namespaceNameEV.id
   }
 ]
