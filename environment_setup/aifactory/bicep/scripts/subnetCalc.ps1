@@ -403,7 +403,9 @@ if ($(Get-AzContext).Subscription -ne "") {
     }
     else 
     {
-        if($projectType -eq "esml"){
+        Write-Host "projectTypeADO: '$projectTypeADO'"
+
+        if($projectTypeADO.Trim().ToLower() -eq "esml"){
             write-host "projectTypeADO=esml"
             $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '23'
@@ -411,7 +413,7 @@ if ($(Get-AzContext).Subscription -ne "") {
                 aksSubnetCidr     = '24'
             }
         }
-        elseif ($projectType -eq "esgenai-1"){
+        elseif ($projectTypeADO.Trim().ToLower() -eq "esgenai-1"){
             write-host "projectTypeADO=esgenai-1"
             $requiredSubnets = [PsObject]@{
                 genaiSubnetCidr  = '23'
@@ -419,7 +421,7 @@ if ($(Get-AzContext).Subscription -ne "") {
             }
         }
         else {
-            write-host "projectTypeADO=not supported value: $($projectType)"
+            write-host "projectTypeADO=not supported value: '$($projectTypeADO)'"
             $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '23'
                 dbxPrivSubnetCidr = '23'
@@ -542,16 +544,25 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     $template = ""
 
-    if($projectType -eq "esml"){
+    if($projectTypeADO.Trim().ToLower() -eq "esml"){
+        Write-host "Template for subnetParameters.json is projectType:esml"
         $template = $templateEsml
         write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
         write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"
         write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
     }
-    elseif ($projectType -eq "esgenai-1"){
+    elseif ($projectTypeADO.Trim().ToLower() -eq "esgenai-1"){
+        Write-host "Template for subnetParameters.json is projectType:esgenai-1"
         $template = $templateGenaI
         write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
         write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
+    }
+    else{
+        Write-host "Template for subnetParameters.json is projectType:unsupported value: '$projectType'"
+        $template = $templateEsml
+        write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
+        write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"
+        write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
     }
 
     $templateName = "subnetParameters.json"
