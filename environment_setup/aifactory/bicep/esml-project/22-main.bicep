@@ -835,7 +835,7 @@ module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDns
 
 module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroup)
-  name: 'privateDnsZoneAndLinkEvenhubs'
+  name: 'privateDnsZoneAndLinkEventhubs1'
   params: {
     dnsConfig: eventHubLogging.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -846,9 +846,9 @@ module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPo
   ]
 }
 
-module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false) && (databricksPrivate == true)){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroup)
-  name: 'privateDnsZoneAndLinkEvenhubs'
+  name: 'privateDnsZoneAndLinkDatabricks2'
   params: {
     dnsConfig: dbxPrivate.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
