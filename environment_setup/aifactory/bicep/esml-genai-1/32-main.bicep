@@ -592,11 +592,12 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   scope:commonResourceGroupRef
 }
 
-module applicationInsight '../modules/applicationInsights.bicep' = {
+module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AppIns4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // max 255 chars
+    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
     tags: tags
     location: location
   }
