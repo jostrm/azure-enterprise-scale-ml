@@ -21,6 +21,12 @@ param location string
 @description('Specifies the name of the SKU used for databricks')
 param skuName string
 
+@description('(Required) Specifies the subnet name that will be associated with the private endpoint')
+param subnetName string
+
+@description('(Required) Specifies the private endpoint name')
+param privateEndpointName string
+
 @description('Specifies the id of the management resource group for databricks')
 param managedResourceGroupId string
 
@@ -36,12 +42,22 @@ param vnetId string
 @description('Specifies the tags that should be deployed to databricks resources')
 param tags object
 
+@description('Indicates whether to retain or remove the AzureDatabricks outbound NSG rule - possible values are AllRules or NoAzureDatabricksRules.')
+@allowed([
+  'AllRules'
+  'NoAzureDatabricksRules'
+])
+param requiredNsgRules string = 'NoAzureDatabricksRules'
+
 // TODO
 @description('TODO')
 param amlWorkspaceId string
 var esmlProjectSecretscopeAKV = 'esml-prj-secretscope'  // Manage Principal All users
+var subnetRef = '${vnetId}/subnets/${subnetName}'
 
-resource databricksPrivate 'Microsoft.Databricks/workspaces@2021-04-01-preview' = {
+// TODO: https://github.com/Azure/azure-quickstart-templates/tree/master/quickstarts/microsoft.databricks/databricks-all-in-one-template-for-vnet-injection-privateendpoint
+
+resource databricksPrivate 'Microsoft.Databricks/workspaces@2024-05-01' = {
   name: name
   location: location
   tags: tags
@@ -51,7 +67,7 @@ resource databricksPrivate 'Microsoft.Databricks/workspaces@2021-04-01-preview' 
   
   properties: {
     publicNetworkAccess: 'Disabled' // value to disabled to access workspace only via private link.
-    requiredNsgRules: 'AllRules' // ['AllRules','NoAzureDatabricksRules' 'NoAzureServiceRules']  whether data plane (clusters) to control plane communication happen over private endpoint. 
+    requiredNsgRules: 'AllRules' // ['AllRules','NoAzureDatabricksRules' 'NoAzureServiceRules'] 'NoAzureServiceRules' value is for internal use only. whether data plane (clusters) to control plane communication happen over private endpoint. 
     managedResourceGroupId: managedResourceGroupId
     parameters: {
       amlWorkspaceId: {
@@ -81,7 +97,46 @@ resource databricksPrivate 'Microsoft.Databricks/workspaces@2021-04-01-preview' 
     }
   }
 }
+
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2021-08-01' = {
+  name: privateEndpointName
+  location: location
+  properties: {
+    subnet: {
+      subnet: {
+        id: subnetRef
+        name: subnetName
+      }
+    }
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointName
+        properties: {
+          privateLinkServiceId: databricksPrivate.id
+          groupIds: [
+            'databricks_ui_api'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Compliance with network design'
+          }
+        }
+        
+      }
+    ]
+  }
+}
+
 output databricksId string = databricksPrivate.id
 output databricks_workspace_id string = databricksPrivate.id
 output databricks_workspaceUrl string = databricksPrivate.properties.workspaceUrl
 output databricks_dbfs_storage_accountName string = databricksPrivate.properties.parameters.storageAccountName.value
+
+output dnsConfig array = [
+  {
+    name: privateEndpoint.name
+    type: 'databricks_ui_api'
+    id: databricksPrivate.id
+  }
+]
+

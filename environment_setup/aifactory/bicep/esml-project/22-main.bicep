@@ -535,7 +535,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
 
 
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  scope: resourceGroup(privDnsSubscription,privDnsResourceGroup)
   name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: sacc.outputs.dnsConfig
@@ -546,7 +546,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
   ]
 }
 module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  scope: resourceGroup(privDnsSubscription,privDnsResourceGroup)
   name: 'privateDnsZoneLinkKeyVault${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: kv1.outputs.dnsConfig
@@ -557,7 +557,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
   ]
 }
 module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  scope: resourceGroup(privDnsSubscription,privDnsResourceGroup)
   name: 'privateDnsZoneLinkACR${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: acr.outputs.dnsConfig
@@ -695,6 +695,10 @@ var databricksNameP = 'dbxp-${projectName}-${locationSuffix}-${env}${resourceSuf
 var databricksManagedRG = '${targetResourceGroup}${resourceSuffix}-dbxmgmt'
 var databricksManagedRGId = '${subscription().id}/resourceGroups/${databricksManagedRG}'
 
+//var managedResourceGroupName = 'databricks-rg-${workspaceName}-${uniqueString(workspaceName, resourceGroup().id)}'
+//var trimmedMRGName = substring(managedResourceGroupName, 0, min(length(managedResourceGroupName), 90))
+//var managedResourceGroupId = '${subscription().id}/resourceGroups/${trimmedMRGName}'
+
 resource amlResource 'Microsoft.MachineLearningServices/workspaces@2021-04-01' existing = {
   name: amlName
   scope:resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -733,6 +737,9 @@ module dbxPrivate '../modules/databricksPrivate.bicep' = if(databricksPrivate ==
     skuName: 'standard'
     tags: tags2
     vnetId: vnetId
+    privateEndpointName: 'pend-${databricksNameP}-to-vnt-mlcmn'
+    subnetName: dbxPubSubnetName
+    requiredNsgRules:'NoAzureDatabricksRules'
   }
   dependsOn: [
     projectResourceGroup
@@ -813,8 +820,8 @@ module dataLake '../modules/dataLake.bicep' = {
   ]
 }
 
-module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false) && (sweden_central_adf_missing==false)){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false)){
+  scope: resourceGroup(privDnsSubscription,privDnsResourceGroup)
   name: 'privateDnsZoneLinkADF${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: adf.outputs.dnsConfig
@@ -825,6 +832,33 @@ module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDns
     adf
   ]
 }
+
+module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroup)
+  name: 'privateDnsZoneAndLinkEvenhubs'
+  params: {
+    dnsConfig: eventHubLogging.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    privateDnsAzureDatafactory
+    eventHubLogging
+  ]
+}
+
+module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroup)
+  name: 'privateDnsZoneAndLinkEvenhubs'
+  params: {
+    dnsConfig: dbxPrivate.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    dbxPrivate
+  ]
+}
+
+
 
 // RBAC
 var secretGet = {
