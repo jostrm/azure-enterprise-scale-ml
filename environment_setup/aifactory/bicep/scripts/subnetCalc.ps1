@@ -391,27 +391,40 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     # This PSObject must be sorted by value in ascending order
 
-    $requiredSubnets = if ($null -eq $projectTypeADO -or $projectTypeADO -eq "" ) 
+    $requiredSubnets = $null
+    if ($null -eq $projectTypeADO -or $projectTypeADO -eq "" ) 
+    {
+        write-host "projectTypeADO is null or empty"
+        $requiredSubnets = [PsObject]@{
+            dbxPubSubnetCidr  = '23'
+            dbxPrivSubnetCidr = '23'
+            aksSubnetCidr     = '24'
+        }
+    }
+    else 
     {
         if($projectType -eq "esml"){
-            [PsObject]@{
+            write-host "projectTypeADO=esml"
+            $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '23'
                 dbxPrivSubnetCidr = '23'
                 aksSubnetCidr     = '24'
             }
         }
         elseif ($projectType -eq "esgenai-1"){
-            [PsObject]@{
+            write-host "projectTypeADO=esgenai-1"
+            $requiredSubnets = [PsObject]@{
                 genaiSubnetCidr  = '23'
                 aksSubnetCidr     = '24'
             }
         }
-    }
-    else {
-        $requiredSubnets = [PsObject]@{
-            dbxPubSubnetCidr  = '23'
-            dbxPrivSubnetCidr = '23'
-            aksSubnetCidr     = '24'
+        else {
+            write-host "projectTypeADO=not supported value: $($projectType)"
+            $requiredSubnets = [PsObject]@{
+                dbxPubSubnetCidr  = '23'
+                dbxPrivSubnetCidr = '23'
+                aksSubnetCidr     = '24'
+            }
         }
     }
 
@@ -456,6 +469,8 @@ if ($(Get-AzContext).Subscription -ne "") {
     $requiredSubnets.values | Select-Object -Unique | Sort-Object -Property Value | Foreach-Object {
         $possibleValuesForCidrNotations[$_] = Get-SubnetFitting -addressSpace $vnetObj.AddressSpace.AddressPrefixes[0] -cidrNotation $_
     }
+
+    write-host "DEBUG 4"
 
     $result = New-SubnetScheme -map $requiredSubnets -startIp $startIp -possibleValuesMap $possibleValuesForCidrNotations
     write-host "this is the result: "
