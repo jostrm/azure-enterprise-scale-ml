@@ -475,43 +475,44 @@ if ($(Get-AzContext).Subscription -ne "") {
     write-host "DEBUG 4"
 
     $result = New-SubnetScheme -map $requiredSubnets -startIp $startIp -possibleValuesMap $possibleValuesForCidrNotations
-    write-host "this is the result: "
-    write-host "Resource group for vNet    : $($vnetResourceGroup)"
-    write-host "vNet    : $($vnetName)"
-
+    write-host "this is the result:"
+    write-host "Resource group for vNet: $($vnetResourceGroup)"
+    write-host "vNet: $($vnetName)"
+    
+    # projectName has been declared by ConvertTo-Variables called earlier
     $templateEsml = @"
-    {
-        "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
-        "contentVersion": "1.0.0.0",
-        "parameters": {
-            "aksSubnetCidr": {
-                "value": "$($result["aksSubnetCidr"])"
-            },
-            "dbxPrivSubnetCidr": {
-                "value": "$($result["dbxPrivSubnetCidr"])"
-            },
-            "dbxPubSubnetCidr": {
-                "value": "$($result["dbxPubSubnetCidr"])"
-            },
-            "vnetNameBase": {
-                "value": "$vnetNameBase"
-            },
-            "location": {
-                "value": "$locationADO"
-            },
-            "locationSuffix": {
-                "value": "$locationSuffixADO"
-            },
-            "vnetResourceGroup": {
-                "value": "$vnetResourceGroup"
-            },
-            "commonResourceSuffix": {
-                "value": "$commonResourceSuffixADO"
-            }
+{
+    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "aksSubnetCidr": {
+            "value": "$($result["aksSubnetCidr"])"
+        },
+        "dbxPrivSubnetCidr": {
+            "value": "$($result["dbxPrivSubnetCidr"])"
+        },
+        "dbxPubSubnetCidr": {
+            "value": "$($result["dbxPubSubnetCidr"])"
+        },
+        "vnetNameBase": {
+            "value": "$vnetNameBase"
+        },
+        "location": {
+            "value": "$locationADO"
+        },
+        "locationSuffix": {
+            "value": "$locationSuffixADO"
+        },
+        "vnetResourceGroup": {
+            "value": "$vnetResourceGroup"
+        },
+        "commonResourceSuffix": {
+            "value": "$commonResourceSuffixADO"
         }
     }
-    "@
-
+}
+"@
+    
     $templateGenaI = @"
 {
     "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
@@ -542,7 +543,7 @@ if ($(Get-AzContext).Subscription -ne "") {
 }
 "@
 
-    $template = ""
+    $template = "not set"
 
     if($projectTypeADO.Trim().ToLower() -eq "esml"){
         Write-host "Template for subnetParameters.json is projectType:esml"

@@ -95,10 +95,10 @@ var genaiSubnetSettings =   {
   ]
 }
 
-module nsgGenAI '../modules/aksNsg.bicep' = {
+module nsgGenAI '../modules/nsgGenAI.bicep' = {
   name: 'nsgGenAI'
   params: {
-    name: 'aks-nsg-${projectName}-${locationSuffix}-${env}'
+    name: 'genai-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
     tags: {
       Description: 'AKS Nsg'
