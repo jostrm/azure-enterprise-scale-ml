@@ -562,7 +562,7 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp 
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit:hybridBenefit
-    vmSize: 'Standard_DS3_v2'
+    vmSize: 'standard_A2_v2' //'Standard_DS3_v2'
     location: location
     vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${commonResourceSuffix}'
     subnetName: defaultSubnet
