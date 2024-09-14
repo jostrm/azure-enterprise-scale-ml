@@ -2,11 +2,11 @@
 
 ## Step 1) Create Azure Devops (or Github) projects
 - **Purpose:** Where the AIFactory acceleration code resides
-- **Role needed:** Central IT / Azure Devops aministrator
+- **Role needed:** Central IT. Microsoft EntraID administrator. Azure Devops administrator
 - **Mandatory:** Yes.
-- **What:** CODE repository: Create your Azure Devops project to store the AIFactory acceleration code (IaC, and templates)
+- **What:** CODE repository: Create your Azure Devops project to store the AIFactory acceleration code (IaC, and templates) and Azure Devops Service Connections, based on Service principal "esml-common-bicep" (see step 3-7)
 - **TODO**: 
-    1) Create a new Azure Devops project (or reuse an existing)
+    1) Create a new Azure Devops project (or reuse an existing). GOAL & REASON: Admin to Create a Service Connection, based on a Service Principal (step 5) with OWNER permisson on subscription, and GET,LIST, SET access policys on seeding keyvault (step 3). The Service Connection should have access to "all pipelines" in Azure Devops (at crestion step there is a checkbox for this)
         - [How-to guide](https://learn.microsoft.com/en-us/azure/devops/organizations/projects/create-project?view=azure-devops&tabs=browser): Create Azure Devops project
     2) Create 2 GIT repositories, in your Azure Devops
         - ESML-AIFactory-Common
@@ -81,7 +81,7 @@ NB! If you only want to use the AIFActory for ESML projects, this is not needed.
 ## Step 6) Delegate User Access: Onboard a Microsoft EntraID user, with access to the Azure Devops created in step 1, and with OWNER permission on the Subscriptions created in Step 2, 
 - **Purpose:** Efficiency. To be able to troubleshoot, manually login to Azure for `the AIFactory setup mentor`
 - **Role needed:** Microsoft EntraID administrator: Central IT / Cloud Team
-- **Mandatory:** No. But at least to be OWNER on the resource Groups that ESML AIFactory has created.
+- **Mandatory:** Yes. Very hard to debug, troubleshoot if no insights that permission is set correctly. Nedd to have read access in EntraID to see the servic principal and keyvault permissions. Someone needs to verify that the Azure Devops Service connection works, that service principal (SP) esml-common-bicep has Get, List, Set to seeding keyvault. That the SP is OWNER on the subscriptions.
 - **TODO**: 
     1) Create user in Microsoft EntraID
         - [How-to guide](https://learn.microsoft.com/en-us/entra/fundamentals/how-to-create-delete-users) : Create user
