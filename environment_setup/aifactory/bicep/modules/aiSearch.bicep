@@ -12,24 +12,34 @@ param partitionCount int = 1
 param privateEndpointName string
 param semanticSearchTier string = 'free'
 param publicNetworkAccess bool = false
+param ipRules array = []
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
-resource aiSearch 'Microsoft.Search/aiSearchs@2021-04-01-preview' = {
+resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
   name: aiSearchName
   location: location
   tags: tags
   sku: {
     name: skuName
   }
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
+    authOptions: {
+      aadOrApiKey: {
+        aadAuthFailureMode:'http401WithBearerChallenge' // or 'http403'
+      }
+    }
     replicaCount: replicaCount
     partitionCount: partitionCount
     publicNetworkAccess: publicNetworkAccess? 'enabled': 'disabled'
     networkRuleSet: {
-      ipRules: []
-      defaultAction: publicNetworkAccess? 'Allow':'Deny'
-      virtualNetworkRules: json('[{"id": "${subnetRef}"}]')
+      bypass: 'AzurePortal' //'None' (GH copilot say also: 'AzureServices')
+      ipRules: ipRules
+      //defaultAction: publicNetworkAccess? 'Allow':'Deny'
+      //virtualNetworkRules: json('[{"id": "${subnetRef}"}]')
     }
     semanticSearch: semanticSearchTier
   }

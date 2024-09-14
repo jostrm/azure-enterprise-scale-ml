@@ -11,6 +11,7 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$aifactorySuffixRGADO,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory location suffix ")][string]$locationSuffixADO,
     [Parameter(Mandatory = $true, HelpMessage = "ESML projectNumber -makes a deployment unique per proj and env")][string]$projectNumber,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,genai-1]")][string]$projectTypeADO,
     
     # optional
     [Parameter(Mandatory = $false, HelpMessage="Use service principal")][switch]$useServicePrincipal=$false,
@@ -124,12 +125,12 @@ $genaiSubnetId=(Get-AzResourceGroupDeployment `
   -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
 
 Write-host "The following parameters are added to template"
-Write-host "dbxPubSubnetName : $dbxPubSubnetName"
+Write-host "dbxPubSubnetName: $dbxPubSubnetName"
 Write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
-Write-host "aksSubnetId      : $aksSubnetId"
-Write-host "genaiSubnetId      : $genaiSubnetId"
+Write-host "aksSubnetId: $aksSubnetId"
+Write-host "genaiSubnetId: $genaiSubnetId"
 
-$template = @"
+$templateEsml = @"
 {
     "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
     "contentVersion": "1.0.0.0",
@@ -142,6 +143,18 @@ $template = @"
         },
         "aksSubnetId": {
             "value": "$aksSubnetId"
+        }
+    }
+}
+"@
+
+$templateGenaI = @"
+{
+    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "aksSubnetId": {
+            "value": "$aksSubnetId"
         },
         "genaiSubnetId": {
             "value": "$genaiSubnetId"
@@ -150,5 +163,19 @@ $template = @"
 }
 "@
 
+$template = "not set"
+
+if($projectTypeADO.Trim().ToLower() -eq "esml"){
+    Write-host "Template for dynamicNetworkParams.json is projectType:esml"
+    $template = $templateEsml
+}
+elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+    Write-host "Template for dynamicNetworkParams.json is projectType:genai-1"
+    $template = $templateGenaI
+}
+else{
+    Write-host "Template for dynamicNetworkParams.json is projectType:unsupported value: '$projectTypeADO'"
+    $template = $templateEsml
+}
 $template | Out-File "$filePath/$templateName"
 Write-Verbose "Template written to $filePath/$templateName"

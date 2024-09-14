@@ -559,7 +559,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
     }
     else{
-        Write-host "Template for subnetParameters.json is projectType:unsupported value: '$projectType'"
+        Write-host "Template for subnetParameters.json is projectType:unsupported value: '$projectTypeADO'"
         $template = $templateEsml
         write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
         write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"

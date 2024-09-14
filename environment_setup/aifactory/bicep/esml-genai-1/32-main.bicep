@@ -34,13 +34,19 @@ param aml_cluster_dev_sku_override string = '' // Override: AML Compute Custer -
 param aml_cluster_test_prod_sku_override string = ''
 param aml_cluster_dev_nodes_override int = -1
 param aml_cluster_test_prod_nodes_override int = -1
-@description('Specifies the id of the AKS subnet that should be used by new AKS instance')
+// Networking - AML
+
+@description('Paramenter file dynamicNetworkParams.json contains this. Specifies the id of the AKS subnet that should be used by new AKS instance')
 param aksSubnetId string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
 param allowPublicAccessWhenBehindVnet bool = true
 // Azure Machine Learning - END
+
+// Networking: GenAI 
+@description('Paramenter file dynamicNetworkParams.json contains this. Written after dynamic IP calculation is done')
+param genaiSubnetId string
 
 // Seeding Keyvault & Bastion access
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
@@ -400,6 +406,11 @@ module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyIn
     tags: tags
     semanticSearchTier: semanticSearchTier
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
   }
 }
 
