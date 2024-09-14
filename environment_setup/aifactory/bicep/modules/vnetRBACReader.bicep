@@ -1,7 +1,6 @@
 @description('Specifies the name the datafactory resource')
 param vNetName string
 param common_bastion_subnet_name string
-param bastion_service_name string
 @secure()
 param project_service_principle string
 @description('Additional optional Object ID of more people to access Resource group')
@@ -73,21 +72,4 @@ resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020
     description:'Contributor to USER with OID  ${user_object_ids[i]} for Bastion NSG: ${common_bastion_subnet_name}'
   }
   scope:nsgBastion4project
-}]
-
-// Bastion "bastion-uks-dev-001" - READER
-
-resource resBastion4project 'Microsoft.Network/bastionHosts@2021-05-01' existing = {
-  name: bastion_service_name
-}
-
-resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-reader-${bastion_service_name}-${resourceGroup().id}')
-  properties: {
-    roleDefinitionId: readerRoleDefinition.id
-    principalId: user_object_ids[i]
-    principalType: 'User'
-    description:'Reader to USER with OID  ${user_object_ids[i]} for Bastion service: ${bastion_service_name}'
-  }
-  scope:resBastion4project
 }]

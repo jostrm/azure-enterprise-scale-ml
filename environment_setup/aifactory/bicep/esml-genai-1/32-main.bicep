@@ -294,18 +294,19 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacGenAIRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
-    bastion_service_name: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
-    aml
-    aiHub
+    azureOpenAI
     vmPrivate
+    sacc
+    kv1
+    aiHub
   ]
 }
 
@@ -429,6 +430,10 @@ module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyIn
       }
     ]
   }
+  dependsOn: [
+    projectResourceGroup
+    azureOpenAI
+  ]
 }
 
 module privateDnsaiSearchService '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
@@ -571,7 +576,6 @@ module applicationInsight '../modules/applicationInsights.bicep' = {
 
   dependsOn: [
     projectResourceGroup
-    
   ]
 }
 
@@ -594,7 +598,6 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDep
   dependsOn: [
     kv1
     projectResourceGroup
-    
   ]
 }
 
@@ -697,7 +700,8 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep'= {
   }
   dependsOn: [
     commonKv
-    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    kv1
+    aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
 
@@ -882,7 +886,7 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
     parentAIHubResourceId: aiHub.outputs.amlId
   }
   dependsOn: [
-    aiHub
+    aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
     azureOpenAI
   ]
 }
@@ -898,8 +902,11 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' ={
     additionalUserIds: technicalAdminsObjectID_array_safe
   }
   dependsOn: [
-    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    sacc
+    kv1
+    aiHub
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    //aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
 
@@ -907,17 +914,16 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' ={
 
 module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacReadUsersToCmnKeyvault${projectNumber}${locationSuffix}${env}'
+  name: 'rbacGenAIReadUsersToCmnKeyvault${projectNumber}${locationSuffix}${env}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: technicalAdminsObjectID_array_safe
+    bastion_service_name: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001
   }
   dependsOn: [
-    aml
-    aiHub
-    vmPrivate
+    azureOpenAI
+    sacc
+    kv1
     rbacReadUsersToCmnVnetBastion
   ]
 }
-
-
