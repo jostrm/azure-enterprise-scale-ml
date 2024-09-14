@@ -890,7 +890,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     tags: tags
     aifactorySuffix: aifactorySuffixRG
     amlPrivateDnsZoneID: privateLinksDnsZones['amlworkspace'].id
-    applicationInsights: applicationInsight.outputs.ainsId
+    applicationInsights: applicationInsightSWC.outputs.ainsId
     containerRegistry: acr.outputs.containerRegistryId
     env: env
     keyVault: kv1.outputs.keyvaultId
