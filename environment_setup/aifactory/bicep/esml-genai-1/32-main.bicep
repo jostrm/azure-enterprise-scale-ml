@@ -23,8 +23,10 @@ param enablePublicNetworkAccessForCognitive bool = false
 param enablePublicNetworkAccessForAISearch bool = false
 @description('Default is false. May be needed if Azure Storage used by AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessFoAIStorage bool = false
-@description('Default is false. If tru, it will flip all flags for GenAI RAG, such as Azure OpenAI, Azure AI Search, CosmosDB, WebApp, Azure Machine Learning')
+@description('Default is false. If true, it will flip all flags for GenAI RAG, such as Azure OpenAI, Azure AI Search, CosmosDB, WebApp, Azure Machine Learning')
 param enablePublicGenAIAccess bool = false
+@description('Default is true.')
+param allowPublicAccessWhenBehindVnet bool = true
 
 // Azure Machine Learning
 param aks_dev_sku_override string = ''  // Override: AKS -  Azure Machine Learning
@@ -45,7 +47,6 @@ param aksSubnetId string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
-param allowPublicAccessWhenBehindVnet bool = true
 // Azure Machine Learning - END
 
 // Networking: GenAI 

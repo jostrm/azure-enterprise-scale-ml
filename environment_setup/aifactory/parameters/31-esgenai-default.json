@@ -4,6 +4,9 @@
     "parameters": {
         "enablePublicGenAIAccess": {
             "value": false
+        },
+        "allowPublicAccessWhenBehindVnet": {
+            "value": true
         }
     }
 }

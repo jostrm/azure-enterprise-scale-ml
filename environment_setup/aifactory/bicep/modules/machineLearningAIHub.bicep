@@ -33,8 +33,9 @@ param amlPrivateDnsZoneID string
 @description('Resource name ID on DnsZone')
 param notebookPrivateDnsZoneID string
 @description('Azure ML allowPublicAccessWhenBehindVnet')
-param allowPublicAccessWhenBehindVnet bool = false
-param enablePublicGenAIAccess bool = false
+param allowPublicAccessWhenBehindVnet bool
+@description('AI Hub public access')
+param enablePublicGenAIAccess bool
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
 
