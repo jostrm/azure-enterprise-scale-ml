@@ -1011,7 +1011,7 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_ad
 }
 
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
   name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe

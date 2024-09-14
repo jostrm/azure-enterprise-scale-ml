@@ -65,18 +65,26 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
 resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = [for deployment in deployments: {
   parent: cognitive
   name: deployment.name
+  
   properties: {
     model: deployment.model
-    raiPolicyName: deployment.?raiPolicyName ?? null
+    raiPolicyName: deployment.?raiPolicyName ?? 'Microsoft.Default'
+    versionUpgradeOption: deployment.?versionUpgradeOption ??'OnceCurrentVersionExpired'
+    scaleSettings: {
+      capacity: deployment.scaleType.capacity
+      scaleType:deployment.scaleType.scaleType
+    }
   }
   sku: contains(deployment, 'sku') ? deployment.sku : {
     name: 'Standard'
-    capacity: 20
+    capacity: 10
   }
 }]
 
-output cognitiveName string = cognitive.name
+
 output cognitiveId string = cognitive.id
+output azureOpenAIEndpoint string = cognitive.properties.endpoint
+output cognitiveName string = cognitive.name
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name

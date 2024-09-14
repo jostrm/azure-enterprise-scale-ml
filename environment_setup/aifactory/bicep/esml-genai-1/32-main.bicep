@@ -4,12 +4,16 @@ targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are
 param serviceSettingDeployProjectVM bool = true
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
+@description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in hub mode')
+param serviceSettingDeployAIHub bool = true
+
+@description('Service setting:Deploy Azure Machine Learning')
+param serviceSettingDeployAzureML bool = false
 @description('Service setting:Deploy CosmosDB')
 param serviceSettingDeployCosmosDB bool = false
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
-@description('Service setting:Deploy Azure Machine Learning')
-param serviceSettingDeployAzureML bool = false
+
 param semanticSearchTier string = 'free' //   'disabled' 'free' 'standard'
 param aiSearchSKUName string = 'basic' // 'basic' 'standard'
 
@@ -321,11 +325,11 @@ module contentSafety '../modules/contentSafety.bicep' = {
 // Azure OpenAI
 param gptDeploymentName string= 'gpt-4'
 var searchIndexName= 'idx-${projectName}${env}${uniqueInAIFenv}'
-param chatGptModelVersion string ='1106-Preview'
+param chatGptModelVersion string = 'turbo-2024-04-09' // GPT-4 Turbo with Vision https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models#o1-preview-and-o1-mini-models-limited-access
 param chatGptDeploymentCapacity int = 5
-param embeddingDeploymentName  string=  'text-embedding-ada-002'
-param embeddingModelName string =  'text-embedding-ada-002'
-param embeddingDeploymentCapacity int =5
+param embeddingDeploymentName  string=  'text-embedding-3-large' // 'text-embedding-ada-002'
+param embeddingModelName string = 'text-embedding-3-large' // 'text-embedding-ada-002'
+param embeddingDeploymentCapacity int = 5
 
 var defaultOpenAiDeployments = [
   {
@@ -338,19 +342,31 @@ var defaultOpenAiDeployments = [
     sku: {
       name: 'Standard'
       capacity: chatGptDeploymentCapacity
+      tier: 'Standard'
     }
+    scaleSettings: {
+      scaleType: 'Standard'
+      capacity: chatGptDeploymentCapacity
+    }
+    raiPolicyName: 'Microsoft.Default'
   }
   {
     name: embeddingDeploymentName
     model: {
       format: 'OpenAI'
       name: embeddingModelName
-      version: '2'
+      //version: '2'
     }
     sku: {
       name: 'Standard'
       capacity: embeddingDeploymentCapacity
+      tier: 'Standard'
     }
+    scaleSettings: {
+      scaleType: 'Standard'
+      capacity: chatGptDeploymentCapacity
+    }
+    raiPolicyName: 'Microsoft.Default'
   }
 ]
 
@@ -822,6 +838,51 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
     privateDnsContainerRegistry
     privateDnsKeyVault
     privateDnsStorage
+  ]
+  
+}
+
+var aiHubName ='aihub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+
+module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: aiHubName
+  params: {
+    name: aiHubName
+    location: location
+    tags: tags
+    aifactorySuffix: aifactorySuffixRG
+    amlPrivateDnsZoneID: privateLinksDnsZones['amlworkspace'].id
+    applicationInsights: applicationInsight.outputs.ainsId
+    containerRegistry: acr.outputs.containerRegistryId
+    env: env
+    keyVault: kv1.outputs.keyvaultId
+    notebookPrivateDnsZoneID: privateLinksDnsZones['notebooks'].id
+    privateEndpointName:'pend-${projectName}-aihub${genaiName}-to-vntcmn'
+    projectName: projectName
+    skuName: 'basic'
+    skuTier: 'basic'
+    storageAccount: sacc.outputs.storageAccountId
+    subnetName: defaultSubnet
+    uniqueDepl: deploymentProjSpecificUniqueSuffix
+    vnetId: vnetId
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    enablePublicGenAIAccess:enablePublicGenAIAccess
+  }
+}
+
+module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true) {
+  name: 'aiHubConnection4${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params:{
+    aiHubName: aiHubName
+    targetOpenAIServiceEndpointId: azureOpenAI.outputs.azureOpenAIEndpoint
+    targetOpenAIServiceResourceId: azureOpenAI.outputs.cognitiveId
+    parentAIHubResourceId: aiHub.outputs.amlId
+  }
+  dependsOn: [
+    aiHub
+    azureOpenAI
   ]
 }
 
