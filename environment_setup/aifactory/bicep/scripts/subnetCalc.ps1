@@ -18,7 +18,7 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory suffix for COMMON resources [dev,test,prod]")][string]$commonResourceSuffixADO,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory data center region location westeurope, swedencentral ")][string]$locationADO,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory data center region location suffix weu, swc ")][string]$locationSuffixADO,
-    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,esgenai-1]")][string]$projectTypeADO,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,genai-1]")][string]$projectTypeADO,
 
     # optional parameters
     [Parameter(Mandatory = $false, HelpMessage = "Use service principal")][switch]$useServicePrincipal = $false,
@@ -413,8 +413,8 @@ if ($(Get-AzContext).Subscription -ne "") {
                 aksSubnetCidr     = '24'
             }
         }
-        elseif ($projectTypeADO.Trim().ToLower() -eq "esgenai-1"){
-            write-host "projectTypeADO=esgenai-1"
+        elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+            write-host "projectTypeADO=genai-1"
             $requiredSubnets = [PsObject]@{
                 genaiSubnetCidr  = '23'
                 aksSubnetCidr     = '24'
@@ -551,8 +551,8 @@ if ($(Get-AzContext).Subscription -ne "") {
         write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"
         write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
     }
-    elseif ($projectTypeADO.Trim().ToLower() -eq "esgenai-1"){
-        Write-host "Template for subnetParameters.json is projectType:esgenai-1"
+    elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+        Write-host "Template for subnetParameters.json is projectType:genai-1"
         $template = $templateGenaI
         write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
         write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
