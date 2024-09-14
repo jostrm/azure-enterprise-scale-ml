@@ -300,11 +300,11 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     bastion_service_name: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001
-    common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
     aml
+    aiHub
     vmPrivate
   ]
 }
@@ -904,4 +904,20 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' ={
 }
 
 // ------------------------------ END - SERVICES (Azure Machine Learning)  ------------------------------//
+
+module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacReadUsersToCmnKeyvault${projectNumber}${locationSuffix}${env}'
+  params: {
+    common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    user_object_ids: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    aml
+    aiHub
+    vmPrivate
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+
 
