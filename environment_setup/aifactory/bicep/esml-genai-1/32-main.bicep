@@ -186,7 +186,11 @@ var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroup
 var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
-var defaultSubnet = common_subnet_name
+
+// Gen genaiSubnetName from genaiSubnetId which is resourceID
+var segments = split(genaiSubnetId, '/')
+var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
+var defaultSubnet = genaiSubnetName //common_subnet_name
 
 // RBAC
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
