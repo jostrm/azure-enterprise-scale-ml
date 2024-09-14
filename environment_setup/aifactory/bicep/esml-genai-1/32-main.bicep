@@ -844,7 +844,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
     storageAccount: sacc.outputs.storageAccountId
     containerRegistry: acr.outputs.containerRegistryId
     keyVault: kv1.outputs.keyvaultId
-    applicationInsights: applicationInsight.outputs.ainsId
+    applicationInsights: applicationInsightSWC.outputs.ainsId
     aksSubnetId: aksSubnetId
     aksSubnetName:aksSubnetName
     aksDnsServiceIP:aksDnsServiceIP
