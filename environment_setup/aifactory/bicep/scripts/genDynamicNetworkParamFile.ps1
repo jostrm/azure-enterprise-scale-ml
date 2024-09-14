@@ -106,6 +106,7 @@ write-host "Deployment to lookup (earlier subnets): $($deploymentPrefix)SubnetDe
 
 # Get-AzResourceGroupDeployment : Resource group 'msftesml-common-swcdev-001' could not be found.
 # Deployment 'esml-p001-dev-swc-001SubnetDeplProj' could not be found.
+
 $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
   -ResourceGroupName "$vnetResourceGroup" `
   -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
@@ -118,10 +119,15 @@ $aksSubnetId=(Get-AzResourceGroupDeployment `
   -ResourceGroupName "$vnetResourceGroup" `
   -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
 
+$genaiSubnetId=(Get-AzResourceGroupDeployment `
+  -ResourceGroupName "$vnetResourceGroup" `
+  -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
+
 Write-host "The following parameters are added to template"
 Write-host "dbxPubSubnetName : $dbxPubSubnetName"
 Write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
 Write-host "aksSubnetId      : $aksSubnetId"
+Write-host "genaiSubnetId      : $genaiSubnetId"
 
 $template = @"
 {
@@ -136,26 +142,13 @@ $template = @"
         },
         "aksSubnetId": {
             "value": "$aksSubnetId"
+        },
+        "genaiSubnetId": {
+            "value": "$genaiSubnetId"
         }
     }
 }
 "@
-
-#    "projectOwnerEmail": {
-#      "value": "$projectOwnerEmail"
-#   },
-
-#   "projectOwnerId": {
-#    "value": "$projectOwnerId"
-#   }
-#   "adminUsername": {
-#    "value": "$adminUsername"
-#   },
-
-#   "tags": {
-#   "value": $($tags | ConvertTo-Json)
-#   }
-
 
 $template | Out-File "$filePath/$templateName"
 Write-Verbose "Template written to $filePath/$templateName"

@@ -16,8 +16,9 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project Azure resource suffix ")][string]$prjResourceSuffix,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory suffix for COMMON resource groups [dev,test,prod]")][string]$aifactorySuffixRGADO,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory suffix for COMMON resources [dev,test,prod]")][string]$commonResourceSuffixADO,
-    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory date center region location westeurope, swedencentral ")][string]$locationADO,
-    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory date center region location suffix weu, swc ")][string]$locationSuffixADO,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory data center region location westeurope, swedencentral ")][string]$locationADO,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory data center region location suffix weu, swc ")][string]$locationSuffixADO,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,esgenai-1]")][string]$projectTypeADO,
 
     # optional parameters
     [Parameter(Mandatory = $false, HelpMessage = "Use service principal")][switch]$useServicePrincipal = $false,
@@ -388,21 +389,41 @@ Connect-AzureContext @authSettings
 if ($(Get-AzContext).Subscription -ne "") {
     write-host "Successfully logged in as $($(Get-AzContext).Account) to $($(Get-AzContext).Subscription)"
 
-    # This PSObject must be sorted by value in ascending order  
-    $requiredSubnets = [PsObject]@{
-        dbxPubSubnetCidr  = '23'
-        dbxPrivSubnetCidr = '23'
-        aksSubnetCidr     = '24'
+    # This PSObject must be sorted by value in ascending order
+
+    $requiredSubnets = if ($null -eq $projectTypeADO -or $projectTypeADO -eq "" ) 
+    {
+        if($projectType -eq "esml"){
+            [PsObject]@{
+                dbxPubSubnetCidr  = '23'
+                dbxPrivSubnetCidr = '23'
+                aksSubnetCidr     = '24'
+            }
+        }
+        elseif ($projectType -eq "esgenai-1"){
+            [PsObject]@{
+                genaiSubnetCidr  = '23'
+                aksSubnetCidr     = '24'
+            }
+        }
+    }
+    else {
+        $requiredSubnets = [PsObject]@{
+            dbxPubSubnetCidr  = '23'
+            dbxPrivSubnetCidr = '23'
+            aksSubnetCidr     = '24'
+        }
     }
 
     write-host "VARIABLES:"
-    write-host "-STATIC (as incput to vnetName and vnetResourceGroup): Static from PARAMETERS.json: commonRGNamePrefix,vnetResourceGroupBase"
+    write-host "-STATIC (as input to vnetName and vnetResourceGroup): Static from PARAMETERS.json: commonRGNamePrefix,vnetResourceGroupBase"
     write-host "-DYNAMIC (as input to vnetName and vnetResourceGroup): Dynamic parameters as INPUT from ADO parameters: env,locationSuffixADO, commonResourceSuffixADO,aifactorySuffixRGADO"
 
     #$vnetName = "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO" # '${vnetNameBase}-$locationSuffix-${env}${commonResourceSuffix}'
     #$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # esml-common-weu-dev-001
     
-    $vnetName = if ( $vnetNameFull_param -eq $null -or $vnetNameFull_param -eq "" ) 
+
+    $vnetName = if ($null -eq $vnetNameFull_param -or $vnetNameFull_param -eq "" ) 
     {
         "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO"
     }
@@ -410,7 +431,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         $vnetNameFull_param
     }
 
-    $vnetResourceGroup = if ( $vnetResourceGroup_param -eq $null -or $vnetResourceGroup_param -eq "" )
+    $vnetResourceGroup = if ( $null -eq $vnetResourceGroup_param -or $vnetResourceGroup_param -eq "" )
     {
         "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
     }
@@ -418,80 +439,63 @@ if ($(Get-AzContext).Subscription -ne "") {
         $vnetResourceGroup_param
     }
 
+    write-host "Debug 00 vnetName: $($vnetName)"
+    write-host "Debug 00 vnetResourceGroup: $($vnetResourceGroup)"
+
     $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
 
-    #$lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObjSubnetsAddressPrefix | Sort-Object { $_.split("/")[0] -as [Version]} -Bottom 1).split("/") # JOSTRM fixed SORTING (int/version and no CIDR, instead of "string sort" and CIDR)
     $lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObj.Subnets | Sort-Object { $_.AddressPrefix.split("/")[0] -as [Version]} -Bottom 1)[0].AddressPrefix.split("/") # JOSTRM fixed sort (version and no CIDR, instead of "string sort" and CIDR)
     $startIp  = Find-NextIpAddress $(Get-Subnet $lastAllocatedNetwork -MaskBits $lastAllocatedCidr).BroadcastAddress.IPAddressToString
     
     write-host "Debug 01 lastAllocatedNetwork: $($lastAllocatedNetwork)"
     write-host "Debug 02 lastAllocatedCidr: $($lastAllocatedCidr)"
     write-host "Debug 03 startIp: $($startIp)"
-
     #write-host "DEBUG 4"
-    # $vnetGaps = Find-GapsInVnet -vnetObj $vnetObj -cidrs $requiredSubnets 
 
     $possibleValuesForCidrNotations = @{}
     $requiredSubnets.values | Select-Object -Unique | Sort-Object -Property Value | Foreach-Object {
         $possibleValuesForCidrNotations[$_] = Get-SubnetFitting -addressSpace $vnetObj.AddressSpace.AddressPrefixes[0] -cidrNotation $_
     }
 
-    # $generator = $requiredSubnets.PsObject.copy()
-    # $stateContextLastIterationCidr = @($generator.values)[0] # this is the first iteration's subnet mask
-    # $stateContextAllocationHistory = [collections.arraylist]@()
-    # $generator.keys | ForEach-Object {
-
-    #     $key         = $_
-    #     $currentCidr = $requiredSubnets[$_]
-    #     $selector    = 0
-
-    #     # if any gaps are identified for subnet mask
-    #     if ($vnetGaps.allocatableNetworks.$($currentCidr).Length -gt 0){ 
-    #         $subnetAddress = $vnetGaps.allocatableNetworks.$($currentCidr)[$selector]
-    #         try{ 
-    #             $subnetAddress = $vnetGaps.allocatableNetworks.$($currentCidr)[$selector]
-    #             # if the current iteration's address overlaps with the all the preceeding iterations and their addresses
-    #             # then we move on the the next one and mark this iteration as invalid by removing it from
-    #             # the allocatableNetworks pool
-    #             if ($currentCidr -gt $stateContextLastIterationCidr){ 
-
-    #                 $stateContextAllocationHistory | ForEach-Object {
-    #                     [collections.arraylist]$invalidAddresses = Get-SubnetFitting `
-    #                                                                 -addressSpace "$($_)/$stateContextLastIterationCidr" `
-    #                                                                 -cidrNotation $currentCidr
-    #                     $invalidAddresses | ForEach-Object {
-    #                         $vnetGaps.allocatableNetworks.$($currentCidr).Remove($_)
-    #                         $vnetGaps.allocatableNetworks.$($stateContextLastIterationCidr).Remove($_)
-    #                     }                            
-    #                 }
-    #             }
-    #             # set new subnetAddress to make sure it uses the latest state of allocatableNetworks
-    #             $subnetAddress                    = $vnetGaps.allocatableNetworks.$($currentCidr)[$selector]
-    #             # Update the state for next iteration
-    #             $stateContextLastIterationCidr    = $currentCidr
-    #             $requiredSubnets.$key             = "$subnetAddress/$currentCidr"
-    #             # Save the allocation history to the state
-    #             $stateContextAllocationHistory    = $stateContextAllocationHistory + "$subnetAddress/$currentCidr"
-    #             $vnetGaps.allocatableNetworks.$($currentCidr).RemoveAt($selector)
-    #         }
-    #         catch{ # when there are no gaps
-    #             $requiredSubnets.$key = "$currentCidr"
-    #         }
-    #     }
-    # }
-
     $result = New-SubnetScheme -map $requiredSubnets -startIp $startIp -possibleValuesMap $possibleValuesForCidrNotations
     write-host "this is the result: "
     write-host "Resource group for vNet    : $($vnetResourceGroup)"
     write-host "vNet    : $($vnetName)"
-    write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
-    write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"
-    write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
 
-    $templateName = "subnetParameters.json"
-    
-    # projectName has been declared by ConvertTo-Variables called earlier
-    $template = @"
+    $templateEsml = @"
+    {
+        "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+            "aksSubnetCidr": {
+                "value": "$($result["aksSubnetCidr"])"
+            },
+            "dbxPrivSubnetCidr": {
+                "value": "$($result["dbxPrivSubnetCidr"])"
+            },
+            "dbxPubSubnetCidr": {
+                "value": "$($result["dbxPubSubnetCidr"])"
+            },
+            "vnetNameBase": {
+                "value": "$vnetNameBase"
+            },
+            "location": {
+                "value": "$locationADO"
+            },
+            "locationSuffix": {
+                "value": "$locationSuffixADO"
+            },
+            "vnetResourceGroup": {
+                "value": "$vnetResourceGroup"
+            },
+            "commonResourceSuffix": {
+                "value": "$commonResourceSuffixADO"
+            }
+        }
+    }
+    "@
+
+    $templateGenaI = @"
 {
     "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
     "contentVersion": "1.0.0.0",
@@ -499,11 +503,8 @@ if ($(Get-AzContext).Subscription -ne "") {
         "aksSubnetCidr": {
             "value": "$($result["aksSubnetCidr"])"
         },
-        "dbxPrivSubnetCidr": {
-            "value": "$($result["dbxPrivSubnetCidr"])"
-        },
-        "dbxPubSubnetCidr": {
-            "value": "$($result["dbxPubSubnetCidr"])"
+        "genaiSubnetCidr": {
+            "value": "$($result["genaiSubnetCidr"])"
         },
         "vnetNameBase": {
             "value": "$vnetNameBase"
@@ -523,7 +524,25 @@ if ($(Get-AzContext).Subscription -ne "") {
     }
 }
 "@
+
+    $template = ""
+
+    if($projectType -eq "esml"){
+        $template = $templateEsml
+        write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
+        write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"
+        write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
+    }
+    elseif ($projectType -eq "esgenai-1"){
+        $template = $templateGenaI
+        write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
+        write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
+    }
+
+    $templateName = "subnetParameters.json"
     
+    # projectName has been declared by ConvertTo-Variables called earlier
+
     $template | Out-File "$filePath/$templateName"
     Write-host "Template written to $filePath/$templateName"
     Write-host "Parameter: aifactorySuffixRG is: $aifactorySuffixRGADO"

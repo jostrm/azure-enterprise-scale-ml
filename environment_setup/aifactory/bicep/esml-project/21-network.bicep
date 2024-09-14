@@ -1,4 +1,8 @@
 // ESML-COMMON Resource group is known, and where we add subnets, from ADO  --resource-group "$(cat subnetParameters.json | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"")" \
+
+//@description('Specifies cidr notation for genai subnet')
+//param genaiSubnetCidr string = ''
+
 @description('Specifies cidr notation for aks subnet')
 param aksSubnetCidr string
 
@@ -172,3 +176,4 @@ module aksSnt '../modules/subnetWithNsg.bicep' = {
 output dbxPubSubnetName string = 'snt-${dbxPubSnt.name}'
 output dbxPrivSubnetName string = 'snt-${dbxPrivSnt.name}'
 output aksSubnetId string = aksSnt.outputs.subnetId
+output genaiSubnetId string = ''
