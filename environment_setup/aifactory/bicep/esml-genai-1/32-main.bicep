@@ -136,8 +136,27 @@ param commonResourceSuffix string
 param resourceSuffix string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
+
+// Datalake
 @description('Datalake GEN 2 storage account prefix. Max 8 chars.Example: If prefix is "marvel", then "marvelesml001[random5]dev",marvelesml001[random5]test,marvelesml001[random5]prod')
 param commonLakeNamePrefixMax8chars string
+@description('Datalake GEN 2 storage account')
+param lakeContainerName string
+
+// Metadata
+@description('Specifies the tags2 that should be applied to newly created resources')
+param projecttags object
+@description('Specifies project owner email and will be used for tagging and RBAC')
+param projectOwnerEmail string
+@description('Specifies project owner objectId and will be used for tagging and RBAC')
+param projectOwnerId string
+@description('not set in genai-1')
+param databricksOID string = 'not set in genai-1'
+@description('not set in genai-1')
+param databricksPrivate bool = false
+@description('not set in genai-1')
+param AMLStudioUIPrivate bool = false
+
 var subscriptionIdDevTestProd = subscription().subscriptionId
 @description('ESML COMMON Resource Group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
 param commonRGNamePrefix string
@@ -311,6 +330,14 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 }
 
 // ------------------------------ END:RBAC ResourceGroups, Bastion,vNet, VMAdminLogin  ------------------------------//
+
+// ----DATALAKE
+var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
+resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
+  name: datalakeName
+  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+ 
+}
 
 // ------------------------------ SERVICES - Azure OpenAI, Azure AI Search, Storage for Azure AI Search, Azure Content Safety ------------------------------//
 
