@@ -243,7 +243,7 @@ var privateLinksDnsZones = {
   cognitiveservices: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
   }
-  aiSearch: {
+  searchService: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
   }
   azurewebappsscm: {

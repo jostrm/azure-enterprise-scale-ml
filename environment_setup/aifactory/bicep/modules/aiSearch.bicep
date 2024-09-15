@@ -6,6 +6,8 @@ param vnetId string
 param subnetName string
 param tags object
 param location string
+param enableSharedPrivateLink bool
+param sharedPrivateLinks array = []
 param skuName string = 'basic'
 param replicaCount int = 1
 param partitionCount int = 1
@@ -26,6 +28,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
   identity: {
     type: 'SystemAssigned'
   }
+  
   properties: {
     authOptions: {
       aadOrApiKey: {
@@ -43,6 +46,34 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
   }
 }
 
+@batchSize(1)
+resource sharedPrivateLink 'Microsoft.Search/searchServices/sharedPrivateLinks@2024-06-01-preview' = [for (sharedPend, i) in sharedPrivateLinks: if(enableSharedPrivateLink) {
+  name: 'aisearch-${aiSearchName}-shared-plink-${i}'
+  parent: aiSearch
+  properties: {
+    groupId: 'aiSearch'
+    sharedPrivateLinkResourceId: sharedPrivateLinks[i].id
+    privateLinkServiceConnectionState: {
+      status: 'Approved'
+      description: 'Compliance with network design'
+    }
+  }
+}]
+
+/*
+resource symbolicname 'Microsoft.Search/searchServices/sharedPrivateLinkResources@2024-03-01-preview' = {
+  name: 'string'
+  parent: resourceSymbolicName
+  properties: {
+    groupId: 'string'
+    privateLinkResourceId: 'string'
+    provisioningState: 'string'
+    requestMessage: 'string'
+    resourceRegion: 'string'
+    status: 'string'
+  }
+}
+*/
 resource pendAISearch 'Microsoft.Network/privateEndpoints@2022-01-01' = {
   name: privateEndpointName
   location: location
@@ -56,7 +87,7 @@ resource pendAISearch 'Microsoft.Network/privateEndpoints@2022-01-01' = {
         properties: {
           privateLinkServiceId: aiSearch.id
           groupIds: [
-            'aiSearch'
+            'searchService'
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
@@ -74,7 +105,7 @@ output aiSearchId string = aiSearch.id
 output dnsConfig array = [
   {
     name: pendAISearch.name
-    type: 'aiSearch'
+    type: 'searchService'
     id:aiSearch.id
   }
 ]

@@ -35,7 +35,8 @@ param serviceSettingDeployCosmosDB bool = false
 param serviceSettingDeployWebApp bool = false
 
 param semanticSearchTier string = 'free' //   'disabled' 'free' 'standard'
-param aiSearchSKUName string = 'basic' // 'basic' 'standard'
+param aiSearchSKUName string = 'basic' // 'basic' 'standard', 'standard2' if using sharedPrivateLinks
+param aiSearchEnableSharedPrivateLink bool = false
 
 @description('Default is false. May be needed if Azure OpenAI should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessForCognitive bool = false
@@ -277,7 +278,7 @@ var privateLinksDnsZones = {
   cognitiveservices: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
   }
-  aiSearch: {
+  searchService: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
   }
   azurewebappsscm: {
@@ -589,13 +590,48 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
 
 // Azure AI Search
 
+ //Deploys AI Search with private endpoints and shared private link connections
+ var sharedPrivateLinkResources = [
+  // First storage account with 'blob' groupId
+  {
+    groupId: 'blob'
+    status: 'Approved'
+    provisioningState: 'Succeeded'
+    requestMessage: 'created using the Bicep template'
+    privateLinkResourceId: sa4AIsearch.outputs.storageAccountId
+  }
+  // Second storage account with 'blob' groupId
+  {
+    groupId: 'blob'
+    status: 'Approved'
+    provisioningState: 'Succeeded'
+    requestMessage:  'created using the Bicep template'
+    privateLinkResourceId: sacc.outputs.storageAccountId
+  }
+  // First OpenAI resource with 'openai' groupId
+  {
+    groupId: 'openai_account'
+    status: 'Approved'
+    provisioningState: 'Succeeded'
+    requestMessage: 'created using the Bicep template'
+    privateLinkResourceId: csAzureOpenAI.outputs.cognitiveId
+  }
+  // Second OpenAI resource with 'openai' groupId
+  {
+    groupId: 'cognitiveservices_account'
+    status: 'Approved'
+    provisioningState: 'Succeeded'
+    requestMessage:  'created using the Bicep template'
+    privateLinkResourceId: csAIstudio.outputs.resourceId
+  }
+]
+
 module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyInHub==false){
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     aiSearchName: 'aiSearch${deploymentProjSpecificUniqueSuffix}'
     location: location
-    skuName: aiSearchSKUName
     replicaCount: 1
     partitionCount: 1
     privateEndpointName: 'p-${projectName}-aisearch-${genaiName}'
@@ -604,6 +640,9 @@ module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyIn
     tags: tags
     semanticSearchTier: semanticSearchTier
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
+    skuName: enablePublicGenAIAccess? aiSearchSKUName: 'standard2'
+    enableSharedPrivateLink:enablePublicGenAIAccess? false: true
+    sharedPrivateLinks:enablePublicGenAIAccess?[]:sharedPrivateLinkResources
     ipRules: [
       {
         value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
@@ -612,7 +651,6 @@ module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyIn
   }
   dependsOn: [
     projectResourceGroup
-    csAzureOpenAI
   ]
 }
 
@@ -650,7 +688,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
 
   dependsOn: [
     projectResourceGroup
-    aiSearchService
     csAzureOpenAI
   ]
 }
