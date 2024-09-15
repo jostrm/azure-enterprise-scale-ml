@@ -38,8 +38,6 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
     networkRuleSet: {
       bypass: 'AzurePortal' //'None' (GH copilot say also: 'AzureServices')
       ipRules: ipRules
-      //defaultAction: publicNetworkAccess? 'Allow':'Deny'
-      //virtualNetworkRules: json('[{"id": "${subnetRef}"}]')
     }
     semanticSearch: semanticSearchTier
   }
