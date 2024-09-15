@@ -135,8 +135,9 @@ output databricks_dbfs_storage_accountName string = databricksPrivate.properties
 output dnsConfig array = [
   {
     name: privateEndpoint.name
-    type: 'databricks_ui_api'
+    type: 'azuredatabricks'
     id: databricksPrivate.id
+    groupid:'databricks_ui_api'
   }
 ]
 

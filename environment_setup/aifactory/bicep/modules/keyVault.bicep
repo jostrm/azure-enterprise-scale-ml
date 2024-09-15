@@ -39,8 +39,9 @@ resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' = {
   tags: tags
   location: location
   properties: {
-    enabledForDeployment: false
-    enabledForTemplateDeployment: false
+    enabledForDeployment: true          // VMs can retrieve certificates
+    enabledForTemplateDeployment: true  // ARM can retrieve values
+    enableRbacAuthorization: false       // Using RBAC
     enabledForDiskEncryption: false
     enableSoftDelete: true
     softDeleteRetentionInDays:soft_delete_days

@@ -4,6 +4,7 @@ param targetOpenAIServiceEndpointId string
 @description('Resource ID of the AI Services resource')
 param targetOpenAIServiceResourceId string
 param parentAIHubResourceId string 
+param apiVersion string = '2024-08-01-preview'
 
 resource parentAMLWorkspaceAIHubObject 'Microsoft.MachineLearningServices/workspaces@2024-07-01-preview' existing = {
   name: parentAIHubResourceId
@@ -15,11 +16,12 @@ resource aiServicesConnection 'Microsoft.MachineLearningServices/workspaces/conn
   properties: {
     category: 'AIServices'
     target: targetOpenAIServiceEndpointId
-    authType: 'ApiKey'
     isSharedToAll: true
-    credentials: {
-      key: '${listKeys(targetOpenAIServiceResourceId, '2021-10-01').key1}'
-    }
+    authType: 'ApiKey'
+    //authType: 'AAD'
+    //credentials: {
+    //  key: '${listKeys(targetOpenAIServiceResourceId, apiVersion).key1}'
+    //}
     metadata: {
       ApiType: 'Azure'
       ResourceId: targetOpenAIServiceResourceId

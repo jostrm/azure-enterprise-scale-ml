@@ -128,6 +128,7 @@ var privateAznbDnsZoneName = {
     azurecloud: 'privatelink.notebooks.azure.net'
 }
 
+// 2024-09-15: 25 entries
 var privateLinksDnsZones = {
   blob: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
@@ -177,11 +178,11 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com' 
     name:'privatelink.adf.azure.com'
   }
-  azureopenai: {
+  openai: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
     name:'privatelink.openai.azure.com'
   }
-  azureaisearch: {
+  aiSearch: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
     name:'privatelink.search.windows.net'
   }
@@ -193,7 +194,7 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
     name:'privatelink.documents.azure.com'
   }
-  azurecogservice: {
+  cognitiveservices: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
     name:'privatelink.cognitiveservices.azure.com'
   }
@@ -205,7 +206,7 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
     name:'privatelink.azuredatabricks.net'
   }
-  azureeventhubs: {
+  namespace: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
     name:'privatelink.servicebus.windows.net'
   }
@@ -689,6 +690,73 @@ module dnsZone6 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
   }
 }
 
+/* DNS ZONES - GenAI START*/
+var dnsZone7DeplName = 'privateDnsZoneOpenAI'
+module dnsZone7 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+  name: dnsZone7DeplName
+  params: {
+    typeArray:[
+      {
+        type:'openai'
+        id:dnsZone7DeplName
+      }
+    ]
+    location: 'global'
+    privateLinksDnsZones: privateLinksDnsZones
+    virtualNetworkId:vnetId
+  }
+}
+var dnsZone8DeplName = 'privateDnsZoneAISearch'
+module dnsZone8 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+  name: dnsZone8DeplName
+  params: {
+    typeArray:[
+      {
+        type:'aiSearch'
+        id:dnsZone8DeplName
+      }
+    ]
+    location: 'global'
+    privateLinksDnsZones: privateLinksDnsZones
+    virtualNetworkId:vnetId
+  }
+}
+var dnsZone9DeplName = 'privateDnsZoneCognitiveServices'
+module dnsZone9 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+  name: dnsZone9DeplName
+  params: {
+    typeArray:[
+      {
+        type:'cognitiveservices'
+        id:dnsZone9DeplName
+      }
+    ]
+    location: 'global'
+    privateLinksDnsZones: privateLinksDnsZones
+    virtualNetworkId:vnetId
+  }
+}
+
+var dnsZone10DeplName = 'privateDnsZoneEventHubs'
+module dnsZone10 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+  name: dnsZone10DeplName
+  params: {
+    typeArray:[
+      {
+        type:'namespace'
+        id:dnsZone10DeplName
+      }
+    ]
+    location: 'global'
+    privateLinksDnsZones: privateLinksDnsZones
+    virtualNetworkId:vnetId
+  }
+}
+/*DNS ZONES - GenAI End*/
 
 module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)

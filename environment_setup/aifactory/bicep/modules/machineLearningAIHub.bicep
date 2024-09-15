@@ -38,9 +38,32 @@ param allowPublicAccessWhenBehindVnet bool
 param enablePublicGenAIAccess bool
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
+param aiSearchName string
+param acrName string
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
+
+resource aiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing = {
+  name: aiSearchName
+}
+resource acr 'Microsoft.ContainerRegistry/registries@2023-08-01-preview' existing = {
+  name: acrName
+}
+
+
+@description('Built-in Role: [AcrPull](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#acrpull)')
+resource containerRegistryPullRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+  scope: subscription()
+}
+
+@description('Built-in Role: [AcrPush](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#acrpush)')
+resource containerRegistryPushRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '8311e382-0749-4cb8-b61a-304f252e45ec'
+  scope: subscription()
+}
+
 
 resource amlAIHub 'Microsoft.MachineLearningServices/workspaces@2024-07-01-preview' = {
   name: name
@@ -60,14 +83,26 @@ resource amlAIHub 'Microsoft.MachineLearningServices/workspaces@2024-07-01-previ
     storageAccount: storageAccount
     containerRegistry: containerRegistry
     keyVault: keyVault
+    systemDatastoresAuthMode: 'identity'
     applicationInsights: applicationInsights
-    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
     hbiWorkspace:false
 
     // network settings
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet // Not in 2024-07-01 - Microsoft.MachineLearningServices/workspaces@2024-07-01-preview'
+    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       isolationMode: 'AllowInternetOutBound'
+      outboundRules: {
+        search: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: aiSearch.id
+            subresourceTarget: 'searchService'
+            sparkEnabled: false
+            sparkStatus: 'Inactive'
+          }
+        }
+      }
     }
     sharedPrivateLinkResources: []
   }
@@ -87,6 +122,29 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
 }
+
+@description('Assign AML Workspace\'s ID: AcrPush to workload\'s container registry.')
+resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acr.id, amlAIHub.name, containerRegistryPushRole.id,acrName)
+  properties: {
+    roleDefinitionId: containerRegistryPushRole.id
+    principalType: 'ServicePrincipal'
+    principalId: amlAIHub.identity.principalId
+  }
+}
+
+@description('Assign AML Workspace\'s Managed Online Endpoint: AcrPull to workload\'s container registry.')
+resource computeInstanceContainerRegistryPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acr.id, amlAIHub.name, containerRegistryPullRole.id,acrName)
+  properties: {
+    roleDefinitionId: containerRegistryPullRole.id
+    principalType: 'ServicePrincipal'
+    principalId: amlAIHub.identity.principalId
+  }
+}
+
 output amlId string = amlAIHub.id
 output amlName string = amlAIHub.name
 output principalId string = amlAIHub.identity.principalId

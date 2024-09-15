@@ -10,14 +10,23 @@ param sku string
 param vnetId string
 @description('Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
-param kind  string
-param deployments array = []
+@description('ResourceID of subnet for private endpoints')
+param subnetId string
+@description('Restore instead of Purge')
+param restore bool
+param openaiPrivateDnsZoneId string
+param cognitivePrivateDnsZoneId string
+param kind  string = 'AIServices'
 param publicNetworkAccess bool = false
 param pendCogSerName string
+param vnetRules array = []
+param ipRules array = []
+param disableLocalAuth bool = false
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
+var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
-  name: cognitiveName
+  name: nameCleaned
   location: location
   kind: kind
   tags: tags
@@ -25,13 +34,25 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
     name: sku
   }
   properties: {
-    customSubDomainName: toLower(cognitiveName)
-    publicNetworkAccess: publicNetworkAccess? 'enabled': 'disabled'
+    customSubDomainName: nameCleaned
+    publicNetworkAccess: publicNetworkAccess? 'Enabled': 'Disabled'
+    restore: restore
+    restrictOutboundNetworkAccess: publicNetworkAccess? false:true
+    disableLocalAuth: disableLocalAuth
+    apiProperties: {
+      statisticsEnabled: false
+    }
     networkAcls: {
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
-      virtualNetworkRules: json('[{"id": "${subnetRef}"}]')
-      ipRules: json('[]')
+      virtualNetworkRules: [for rule in vnetRules: {
+        id: rule
+        ignoreMissingVnetServiceEndpoint: true
+      }]
+      ipRules: ipRules
     }
+  }
+  identity: {
+    type: 'SystemAssigned'
   }
 }
 
@@ -40,9 +61,9 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   name: pendCogSerName
   properties: {
     subnet: {
-      id: subnetRef
+      id: subnetId
     }
-    customNetworkInterfaceName: 'pend-nic-${kind}'
+    customNetworkInterfaceName: 'pend-nic-${kind}-${nameCleaned}'
     privateLinkServiceConnections: [
       {
         name: pendCogSerName
@@ -61,34 +82,19 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   }
 }
 
-@batchSize(1)
-resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = [for deployment in deployments: {
-  parent: cognitive
-  name: deployment.name
-  
-  properties: {
-    model: deployment.model
-    raiPolicyName: deployment.?raiPolicyName ?? 'Microsoft.Default'
-    versionUpgradeOption: deployment.?versionUpgradeOption ??'OnceCurrentVersionExpired'
-    scaleSettings: {
-      capacity: deployment.scaleType.capacity
-      scaleType:deployment.scaleType.scaleType
-    }
-  }
-  sku: contains(deployment, 'sku') ? deployment.sku : {
-    name: 'Standard'
-    capacity: 10
-  }
-}]
-
-
-output cognitiveId string = cognitive.id
-output azureOpenAIEndpoint string = cognitive.properties.endpoint
-output cognitiveName string = cognitive.name
+output name string = cognitive.name
+output resourceId string = cognitive.id
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name
-    type: 'account'
+    type: 'openai'
     id:cognitive.id
+    groupid:'account'
+  }
+  {
+    name: pendCognitiveServices.name
+    type: 'cognitiveservices'
+    id:cognitive.id
+    groupid:'account'
   }
 ]

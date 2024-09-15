@@ -194,6 +194,11 @@ param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
 var privDnsResourceGroup = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
 
+// 2024-09-15: 25 entries
+/*  'AIServices'
+  'OpenAI'
+  'ContentSafety'
+*/
 var privateLinksDnsZones = {
   blob: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
@@ -232,10 +237,28 @@ var privateLinksDnsZones = {
   portal: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
   }
+  openai: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
+  }
+  cognitiveservices: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
+  }
+  aiSearch: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
+  }
+  azurewebappsscm: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/scm.privatelink.azurewebsites.net'
+  }
+  azurewebapps: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net'
+  }
+  cosmosdbnosql: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
+  }
   azuredatabricks: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
   }
-  azureeventhubs: {
+  namespace: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
   }
   azureeventgrid: {
@@ -375,7 +398,8 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == 
   dependsOn: [
     kv1
     projectResourceGroup
-    
+    aml
+    adf
   ]
 }
 
@@ -398,6 +422,8 @@ module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == tr
   dependsOn: [
     kv1
     projectResourceGroup
+    aml
+    adf
   ]
 }
 

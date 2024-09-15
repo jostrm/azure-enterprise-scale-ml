@@ -1,4 +1,24 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
+// Cognitive Service types & settings
+@allowed([
+  'AIServices'
+  'OpenAI'
+  'ContentSafety'
+])
+param kindAOpenAI string = 'OpenAI'
+param kindContentSafety string = 'ContentSafety'
+param kindAIServices string = 'AIServices'
+param apiVersionOpenAI string =  '2024-08-01-preview'
+param modelVersionGPT4 string = 'turbo-2024-04-09' // GPT-4 Turbo with Vision https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models#o1-preview-and-o1-mini-models-limited-access
+param modelVersionEmbedding string = 'text-embedding-3-large'
+param restore bool = false
+param csContentSafetySKU string = 'S0'
+@allowed([
+  'hub'
+  ''
+])
+param kindAIHub string = 'hub'
+// Cognitive Service types & settings, End
 
 @description('Service setting: Deploy VM for project')
 param serviceSettingDeployProjectVM bool = true
@@ -208,6 +228,11 @@ var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFe
 var privDnsResourceGroup = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
 
+// 2024-09-15: 25 entries, and special keyes
+/* 'AIServices' = cognitiveservices
+  'OpenAI' = openai
+  'ContentSafety' = cognitiveservices 
+*/
 var privateLinksDnsZones = {
   blob: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
@@ -246,10 +271,28 @@ var privateLinksDnsZones = {
   portal: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
   }
+  openai: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
+  }
+  cognitiveservices: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
+  }
+  aiSearch: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
+  }
+  azurewebappsscm: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/scm.privatelink.azurewebsites.net'
+  }
+  azurewebapps: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net'
+  }
+  cosmosdbnosql: {
+    id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
+  }
   azuredatabricks: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
   }
-  azureeventhubs: {
+  namespace: {
     id: '${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
   }
   azureeventgrid: {
@@ -325,7 +368,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
-    azureOpenAI
+    csAzureOpenAI
     vmPrivate
     sacc
     kv1
@@ -343,26 +386,108 @@ resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing 
  
 }
 
-// ------------------------------ SERVICES - Azure OpenAI, Azure AI Search, Storage for Azure AI Search, Azure Content Safety ------------------------------//
+// ------------------------------ SERVICES - AI Studio, Azure OpenAI, Azure AI Search, Storage for Azure AI Search, Azure Content Safety ------------------------------//
 
-param csSKU string = 'S0'
-module contentSafety '../modules/contentSafety.bicep' = {
+module csContentSafety '../modules/csContentSafety.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'ContentSafety4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    csSKU: csSKU
+    csSKU: csContentSafetySKU
     location: location
+    restore:restore
     contentsafetyName: 'cs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    kind: kindContentSafety
+    pendCogSerName: 'p-${projectName}-contentsafety-${genaiName}'
+    subnetName:defaultSubnet
+    vnetId: vnetId
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+    subnetId: genaiSubnetId
   }
+  dependsOn: [
+    projectResourceGroup
+    csAzureOpenAI
+    csAIstudio
+  ]
 }
+
+module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkContentSafety${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: csContentSafety.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+    csContentSafety
+  ]
+}
+
+// AI Studio, e.g. AIServices
+
+module csAIstudio '../modules/csAIStudio.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AIServices4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    location: location
+    sku: csContentSafetySKU
+    tags: tags
+    cognitiveName: 'ais-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    pendCogSerName: 'p-${projectName}-aiservices-${genaiName}'
+    restore: restore
+    subnetName: defaultSubnet
+    vnetId: vnetId
+    kind: kindAIServices
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+    disableLocalAuth: false
+    subnetId: genaiSubnetId
+    openaiPrivateDnsZoneId: privateLinksDnsZones.openai.id
+    cognitivePrivateDnsZoneId:privateLinksDnsZones.cognitiveservices.id
+  }
+  dependsOn: [
+    projectResourceGroup
+    csAzureOpenAI
+  ]
+}
+module privateDnsAIstudio '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkAIstudio${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: csAIstudio.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+    csAIstudio
+  ]
+}
+
 // Azure OpenAI
 param gptDeploymentName string= 'gpt-4'
 var searchIndexName= 'idx-${projectName}${env}${uniqueInAIFenv}'
-param chatGptModelVersion string = 'turbo-2024-04-09' // GPT-4 Turbo with Vision https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models#o1-preview-and-o1-mini-models-limited-access
-param chatGptDeploymentCapacity int = 5
-param embeddingDeploymentName  string=  'text-embedding-3-large' // 'text-embedding-ada-002'
-param embeddingModelName string = 'text-embedding-3-large' // 'text-embedding-ada-002'
-param embeddingDeploymentCapacity int = 5
+param chatGptModelVersion string = modelVersionGPT4 // GPT-4 Turbo with Vision https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models#o1-preview-and-o1-mini-models-limited-access
+param chatGptDeploymentCapacity int = 25
+param embeddingDeploymentName  string=  modelVersionEmbedding // 'text-embedding-ada-002'
+param embeddingModelName string = modelVersionEmbedding // 'text-embedding-ada-002'
+param embeddingDeploymentCapacity int = 25
 
 var defaultOpenAiDeployments = [
   {
@@ -403,21 +528,31 @@ var defaultOpenAiDeployments = [
   }
 ]
 
-module azureOpenAI '../modules/cognitiveServices.bicep' = if(enablePublicNetworkAccessForCognitive == true) {
+module csAzureOpenAI '../modules/csCognitiveServices.bicep' = if(enablePublicNetworkAccessForCognitive == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
     cognitiveName: 'cog-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     tags: tags
+    restore:restore
     location: location
-    sku: 'S0'
+    sku: csContentSafetySKU
     vnetId: vnetId
     subnetName: defaultSubnet
-    kind: 'TextAnalytics'
+    kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
     deployments:defaultOpenAiDeployments
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
-
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+    subnetId: genaiSubnetId
   }
   dependsOn: [
     projectResourceGroup
@@ -428,14 +563,28 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(centralDnsZoneBy
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privDnsZoneLinkAOAI${deploymentProjSpecificUniqueSuffix}'
   params: {
-    dnsConfig: azureOpenAI.outputs.dnsConfig
+    dnsConfig: csAzureOpenAI.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
     projectResourceGroup
-    azureOpenAI
+    csAzureOpenAI
   ]
 }
+
+module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'diagOpenAI${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: csAzureOpenAI.outputs.cognitiveName
+    logAnalyticsWorkspaceOpInsightResourceId: logAnalyticsWorkspaceOpInsight.id
+  }
+  dependsOn: [
+    projectResourceGroup
+    csAzureOpenAI
+  ]
+}
+
 // Azure OpenAI - END
 
 // Azure AI Search
@@ -463,7 +612,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyIn
   }
   dependsOn: [
     projectResourceGroup
-    azureOpenAI
+    csAzureOpenAI
   ]
 }
 
@@ -501,6 +650,8 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
 
   dependsOn: [
     projectResourceGroup
+    aiSearchService
+    csAzureOpenAI
   ]
 }
 
@@ -628,8 +779,9 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDep
   }
 
   dependsOn: [
-    kv1
     projectResourceGroup
+    csContentSafety
+    csAIstudio
   ]
 }
 
@@ -658,6 +810,8 @@ module addSecret '../modules/kvSecretsPrj.bicep' = {
   }
   dependsOn: [
     kv1
+    csAzureOpenAI
+    csAIstudio
   ]
 }
 
@@ -695,6 +849,8 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   dependsOn: [
     kv1
     addSecret
+    csAzureOpenAI
+    csAIstudio
   ]
 }
 
@@ -717,6 +873,8 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   }
   dependsOn: [
     commonKv
+    csAzureOpenAI
+    csAIstudio
   ]
 }
 
@@ -733,6 +891,8 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep'= {
   dependsOn: [
     commonKv
     kv1
+    csAzureOpenAI
+    csAIstudio
     aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
@@ -853,8 +1013,8 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
     vnetId: vnetId
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-aml${genaiName}-to-vntcmn'
-    amlPrivateDnsZoneID: privateLinksDnsZones['amlworkspace'].id
-    notebookPrivateDnsZoneID:privateLinksDnsZones['notebooks'].id
+    amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
+    notebookPrivateDnsZoneID:privateLinksDnsZones.notebooks.id
     allowPublicAccessWhenBehindVnet:allowPublicAccessWhenBehindVnet
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
@@ -889,12 +1049,12 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     location: location
     tags: tags
     aifactorySuffix: aifactorySuffixRG
-    amlPrivateDnsZoneID: privateLinksDnsZones['amlworkspace'].id
+    amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
     applicationInsights: applicationInsightSWC.outputs.ainsId
     containerRegistry: acr.outputs.containerRegistryId
     env: env
     keyVault: kv1.outputs.keyvaultId
-    notebookPrivateDnsZoneID: privateLinksDnsZones['notebooks'].id
+    notebookPrivateDnsZoneID: privateLinksDnsZones.notebooks.id
     privateEndpointName:'pend-${projectName}-aihub${genaiName}-to-vntcmn'
     projectName: projectName
     skuName: 'basic'
@@ -905,7 +1065,15 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     vnetId: vnetId
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess:enablePublicGenAIAccess
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    acrName: acr.outputs.containerRegistryName
   }
+  dependsOn: [
+    projectResourceGroup
+    privateDnsContainerRegistry
+    privateDnsKeyVault
+    privateDnsStorage
+  ]
 }
 
 module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true) {
@@ -913,13 +1081,14 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params:{
     aiHubName: aiHubName
-    targetOpenAIServiceEndpointId: azureOpenAI.outputs.azureOpenAIEndpoint
-    targetOpenAIServiceResourceId: azureOpenAI.outputs.cognitiveId
+    targetOpenAIServiceEndpointId: csAzureOpenAI.outputs.azureOpenAIEndpoint
+    targetOpenAIServiceResourceId: csAzureOpenAI.outputs.cognitiveId
     parentAIHubResourceId: aiHub.outputs.amlId
+    apiVersion: apiVersionOpenAI
   }
   dependsOn: [
     aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
-    azureOpenAI
+    csAzureOpenAI
   ]
 }
 
@@ -953,7 +1122,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
     bastion_service_name: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001
   }
   dependsOn: [
-    azureOpenAI
+    csAzureOpenAI
     sacc
     kv1
     rbacReadUsersToCmnVnetBastion

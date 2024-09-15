@@ -89,6 +89,7 @@ resource pendAcr 'Microsoft.Network/privateEndpoints@2020-07-01' = {
 }
 
 output containerRegistryId string = containerRegistry.id
+output containerRegistryName string = containerRegistry.name
 output dnsConfig array = [
   {
     name: pendAcr.name
