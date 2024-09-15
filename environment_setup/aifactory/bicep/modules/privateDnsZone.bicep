@@ -22,3 +22,4 @@ resource filePrivateDnsZoneVnetLinkLoop 'Microsoft.Network/privateDnsZones/virtu
     }
   }
 }]
+
