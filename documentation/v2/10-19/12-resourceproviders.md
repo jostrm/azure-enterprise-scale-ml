@@ -51,6 +51,7 @@ If not running the AIFactory standalone. E.g. if use have centrlazied private DN
 - Microsoft.DataLakeStore
 - Microsoft.Batch
 - Microsoft.ManagedServices
+- Microsoft.AlertsManagement
 
 ### ESGenAI project specific: AI Search, Azure OpenAI/Speech, CosmosDB, Azure App Service, Azure API mgmt, Copilot Studio
 - Microsoft.Search
