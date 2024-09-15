@@ -380,13 +380,6 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 // ------------------------------ END:RBAC ResourceGroups, Bastion,vNet, VMAdminLogin  ------------------------------//
 
 // ----DATALAKE
-var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
-resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
-  name: datalakeName
-  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
- 
-}
-
 // ------------------------------ SERVICES - AI Studio, Azure OpenAI, Azure AI Search, Storage for Azure AI Search, Azure Content Safety ------------------------------//
 
 module csContentSafety '../modules/csContentSafety.bicep' = {
@@ -415,8 +408,6 @@ module csContentSafety '../modules/csContentSafety.bicep' = {
   }
   dependsOn: [
     projectResourceGroup
-    csAzureOpenAI
-    csAIstudio
   ]
 }
 
@@ -429,7 +420,6 @@ module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZone
   }
   dependsOn: [
     projectResourceGroup
-    csContentSafety
   ]
 }
 
@@ -465,7 +455,6 @@ module csAIstudio '../modules/csAIStudio.bicep' = {
   }
   dependsOn: [
     projectResourceGroup
-    csAzureOpenAI
   ]
 }
 module privateDnsAIstudio '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
@@ -477,7 +466,6 @@ module privateDnsAIstudio '../modules/privateDns.bicep' = if(centralDnsZoneByPol
   }
   dependsOn: [
     projectResourceGroup
-    csAIstudio
   ]
 }
 
@@ -569,7 +557,6 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(centralDnsZoneBy
   }
   dependsOn: [
     projectResourceGroup
-    csAzureOpenAI
   ]
 }
 
@@ -582,7 +569,6 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
   }
   dependsOn: [
     projectResourceGroup
-    csAzureOpenAI
   ]
 }
 
@@ -663,7 +649,6 @@ module privateDnsaiSearchService '../modules/privateDns.bicep' = if(centralDnsZo
   }
   dependsOn: [
     projectResourceGroup
-    aiSearchService
   ]
 }
 
@@ -688,7 +673,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
 
   dependsOn: [
     projectResourceGroup
-    csAzureOpenAI
   ]
 }
 
@@ -701,7 +685,6 @@ module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(centralDnsZoneB
   }
   dependsOn: [
     projectResourceGroup
-    sa4AIsearch
   ]
 }
 
@@ -1069,9 +1052,6 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
 
   dependsOn: [
     projectResourceGroup
-    privateDnsContainerRegistry
-    privateDnsKeyVault
-    privateDnsStorage
   ]
   
 }
@@ -1107,9 +1087,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
   }
   dependsOn: [
     projectResourceGroup
-    privateDnsContainerRegistry
-    privateDnsKeyVault
-    privateDnsStorage
   ]
 }
 
@@ -1125,8 +1102,6 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   }
   dependsOn: [
     aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
-    csAIstudio
-    csAzureOpenAI
   ]
 }
 
