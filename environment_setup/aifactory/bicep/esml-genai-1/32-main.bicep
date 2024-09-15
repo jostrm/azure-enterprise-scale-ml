@@ -675,7 +675,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'GenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}ais${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -733,7 +733,7 @@ module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}ml${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -1141,7 +1141,6 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' ={
     additionalUserIds: technicalAdminsObjectID_array_safe
   }
   dependsOn: [
-    sacc
     kv1
     aiHub
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
@@ -1161,7 +1160,6 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
   }
   dependsOn: [
     csAzureOpenAI
-    sacc
     kv1
     rbacReadUsersToCmnVnetBastion
   ]
@@ -1175,7 +1173,7 @@ module rbacModule '../modules/aihubRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDeploy'
   params:{
-    storageAccountName: sacc.name
+    storageAccountName: sacc.outputs.storageAccountName
     aiSearchName: aiSearchService.outputs.aiSearchName
     resourceGroupId: targetResourceGroupId
     userObjectIds: technicalAdminsObjectID_array_safe

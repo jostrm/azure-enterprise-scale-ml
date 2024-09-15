@@ -135,6 +135,7 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in 
 }]
 
 output storageAccountId string = sacc.id
+output storageAccountName string = sacc.name
 output dnsConfig array = [
   {
     name: pendSacc[0].name
