@@ -49,6 +49,7 @@ var aksSubnetSettings =   {
   serviceEndpoints: [
     'Microsoft.KeyVault'
     'Microsoft.Storage'
+    'Microsoft.CognitiveServices'
   ]
 }
 module nsgAKS '../modules/aksNsg.bicep' = {
@@ -92,6 +93,7 @@ var genaiSubnetSettings =   {
   serviceEndpoints: [
     'Microsoft.KeyVault'
     'Microsoft.Storage'
+    'Microsoft.CognitiveServices'
   ]
 }
 
