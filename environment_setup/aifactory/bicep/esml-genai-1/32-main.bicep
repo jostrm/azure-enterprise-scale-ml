@@ -1081,13 +1081,14 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params:{
     aiHubName: aiHubName
-    targetOpenAIServiceEndpointId: csAzureOpenAI.outputs.azureOpenAIEndpoint
-    targetOpenAIServiceResourceId: csAzureOpenAI.outputs.cognitiveId
+    targetAIServicesEndpoint: csAIstudio.outputs.aiServicesEndpoint// csAzureOpenAI.outputs.azureOpenAIEndpoint
+    targetAIServiceResourceId: csAzureOpenAI.outputs.cognitiveId
     parentAIHubResourceId: aiHub.outputs.amlId
     apiVersion: apiVersionOpenAI
   }
   dependsOn: [
     aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    csAIstudio
     csAzureOpenAI
   ]
 }

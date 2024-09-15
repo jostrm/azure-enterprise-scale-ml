@@ -82,7 +82,12 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   }
 }
 
+output aiServicesId string = cognitive.id
+output aiServicesEndpoint string = cognitive.properties.endpoint
+output openAiId string = cognitive.id
+output aiServicesPrincipalId string = cognitive.identity.principalId
 output name string = cognitive.name
+
 output resourceId string = cognitive.id
 output dnsConfig array = [
   {
