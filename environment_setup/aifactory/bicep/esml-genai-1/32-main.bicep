@@ -1129,3 +1129,25 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
     rbacReadUsersToCmnVnetBastion
   ]
 }
+
+// ------------------- RBAC for AI Studio (AIServices) service pricipal, to services ---------------//
+
+var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
+
+module rbacModule '../modules/aihubRbac.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDeploy'
+  params:{
+    storageAccountName: sacc.name
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    resourceGroupId: targetResourceGroupId
+    userObjectIds: technicalAdminsObjectID_array_safe
+    aiServicesName:csAIstudio.outputs.name
+    aiServicesPrincipalId: csAIstudio.outputs.aiServicesPrincipalId
+  }
+  dependsOn: [
+    csAzureOpenAI
+    csAIstudio
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
