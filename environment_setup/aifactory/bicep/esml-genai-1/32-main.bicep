@@ -675,7 +675,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'GenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}ais${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -733,7 +733,7 @@ module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}ml${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
