@@ -875,7 +875,7 @@ module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPo
   ]
 }
 
-module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false) && (databricksPrivate == true)){
+module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && databricksPrivate == true){
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneAndLinkDatabricks2'
   params: {

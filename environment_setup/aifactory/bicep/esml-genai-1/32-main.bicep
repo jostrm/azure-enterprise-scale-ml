@@ -623,7 +623,8 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
   }
 ]
 
-var safeNameAISearch = toLower('aiSearch${uniqueInAIFenv}${deploymentProjSpecificUniqueSuffix}')
+var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${resourceSuffix}') ,'-','')
+
 module aiSearchService '../modules/aiSearch.bicep' = {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1065,7 +1066,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
 var aiHubName ='aihub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: aiHubName
   params: {
     name: aiHubName
