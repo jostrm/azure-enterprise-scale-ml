@@ -1108,7 +1108,7 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   params:{
     aiHubName: aiHubName
     targetAIServicesEndpoint: csAIstudio.outputs.aiServicesEndpoint// csAzureOpenAI.outputs.azureOpenAIEndpoint
-    targetAIServiceResourceId: csAzureOpenAI.outputs.cognitiveId
+    targetAIServiceResourceId: csAIstudio.outputs.resourceId
     parentAIHubResourceId: aiHub.outputs.amlId
     apiVersion: apiVersionOpenAI
   }
