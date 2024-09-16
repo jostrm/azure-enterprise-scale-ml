@@ -1095,6 +1095,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     aiSearchName: aiSearchService.outputs.aiSearchName
     acrName: acr.outputs.containerRegistryName
     privateLinksDnsZones: privateLinksDnsZones
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
   }
   dependsOn: [
     projectResourceGroup

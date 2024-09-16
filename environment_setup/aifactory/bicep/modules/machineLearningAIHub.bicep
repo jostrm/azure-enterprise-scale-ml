@@ -33,7 +33,7 @@ param allowPublicAccessWhenBehindVnet bool
 @description('AI Hub public access')
 param enablePublicGenAIAccess bool
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
-param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
+param centralDnsZoneByPolicyInHub bool
 param aiSearchName string
 param acrName string
 param privateLinksDnsZones object
