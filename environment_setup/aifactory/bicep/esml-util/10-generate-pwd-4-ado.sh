@@ -2,7 +2,7 @@
 #--parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
 
 # OPTION 2: *B03i*ivpM%E%!payASIiP=y
-#--parameters adminPassword2="$(cat /dev/urandom | tr -dc 'A-Za-z0-9_!@#$%^&*()\-+=' | head -c24 ; echo)" \
+#--parameters adminPassword="$(cat /dev/urandom | tr -dc 'A-Za-z0-9_!@#$%^&*()\-+=' | head -c24 ; echo)" \
 
 # OPTION 3: 1ZZck02NQTNhRDMYTDA0hz8MIxkZDmM2
 

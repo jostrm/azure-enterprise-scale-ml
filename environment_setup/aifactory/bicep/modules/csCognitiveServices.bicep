@@ -47,33 +47,6 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
   }
 }
 
-resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
-  location: location
-  name: pendCogSerName
-  tags: tags
-  properties: {
-    subnet: {
-      id: subnetId
-    }
-    customNetworkInterfaceName: 'pend-nic-${kind}-${cognitiveName}'
-    privateLinkServiceConnections: [
-      {
-        name: pendCogSerName
-        properties: {
-          privateLinkServiceId: cognitive.id
-          groupIds: [
-            'account'
-          ]
-          privateLinkServiceConnectionState: {
-            status: 'Approved'
-            description: 'Compliance with network design'
-          }
-        }
-      }
-    ]
-  }
-}
-
 resource gpt4turbo 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
   name: '${cognitiveName}/gpt-4'
   //parent: cognitive
@@ -90,6 +63,9 @@ resource gpt4turbo 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01'
     raiPolicyName: 'Microsoft.Default'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
+  dependsOn: [
+    cognitive
+  ]
 }
 
 resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
@@ -108,6 +84,9 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     raiPolicyName: 'Microsoft.Default'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
+  dependsOn: [
+    gpt4turbo
+  ]
 }
 
 /* DeploymentModelNotSupported - The model 'Format: OpenAI, Name: text-embedding-3-large, Version: ' of account deployment is not supported.*/
@@ -130,6 +109,9 @@ resource embedding3 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     raiPolicyName: 'Microsoft.Default'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
+  dependsOn: [
+    embedding2
+  ]
 }
 
 /*
@@ -157,6 +139,36 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
 }]
 
 */
+
+resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+  location: location
+  name: pendCogSerName
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnetId
+    }
+    customNetworkInterfaceName: 'pend-nic-${kind}-${cognitiveName}'
+    privateLinkServiceConnections: [
+      {
+        name: pendCogSerName
+        properties: {
+          privateLinkServiceId: cognitive.id
+          groupIds: [
+            'account'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Compliance with network design'
+          }
+        }
+      }
+    ]
+  }
+  dependsOn: [
+    embedding3
+  ]
+}
 
 output cognitiveId string = cognitive.id
 output azureOpenAIEndpoint string = cognitive.properties.endpoint
