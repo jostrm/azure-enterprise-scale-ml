@@ -5,6 +5,7 @@ param inputKeyvault string
 param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
 
+param vmSKU string = 'standard_A2_v2' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
 @description('Allow Azure ML Studio UI or not. Dataplane is always private, private endpoint - Azure backbone ')
 param AMLStudioUIPrivate bool = true
 @description('Databricks with PRIVATE endpoint or with SERVICE endpoint. Either way controlplane is on Azure backbone network ')
@@ -389,7 +390,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == 
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit: hybridBenefit
-    vmSize: 'standard_A4_v2' // 'Standard_DS3_v2'
+    vmSize: vmSKU // 'Standard_DS3_v2'
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet
@@ -412,7 +413,7 @@ module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == tr
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit: hybridBenefit
-    vmSize: 'Standard_DS3_v2'
+    vmSize: vmSKU
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet

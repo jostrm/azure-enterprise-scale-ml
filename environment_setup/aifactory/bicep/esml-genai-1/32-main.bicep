@@ -1,4 +1,6 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
+
+param vmSKU string = 'standard_D2as_v5' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
 // Cognitive Service types & settings
 @allowed([
   'AIServices'
@@ -793,7 +795,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDep
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit: hybridBenefit
-    vmSize: 'Standard_DS3_v2'
+    vmSize: vmSKU
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet
