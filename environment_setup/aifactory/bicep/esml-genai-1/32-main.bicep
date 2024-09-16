@@ -11,8 +11,26 @@ param kindAIServices string = 'AIServices'
 param apiVersionOpenAI string =  '2024-08-01-preview'
 param modelVersionGPT4 string = 'turbo-2024-04-09' // GPT-4 Turbo with Vision https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models#o1-preview-and-o1-mini-models-limited-access
 param modelVersionEmbedding string = 'text-embedding-3-large'
+param modelVersionEmbeddingVersion string = '1'
 param restore bool = false
-param csContentSafetySKU string = 'S0'
+
+// 'Basic' = S0
+@allowed([
+  'Free'
+  'S0'
+  'S1'
+  'S2'
+  'S3'
+])
+param aiSearchSKUSharedPrivate string = 'S2' // Needed for shared Private Endpoints  https://learn.microsoft.com/en-us/azure/search/search-limits-quotas-capacity#shared-private-link-resource-limits
+@allowed([
+  'Free'
+  'S0'
+  'S1'
+  'S2'
+  'S3'
+])
+param csContentSafetySKU string = 'S0' // 'Basic' = S0
 @allowed([
   'hub'
   ''
@@ -620,7 +638,7 @@ module aiSearchService '../modules/aiSearch.bicep' = {
     tags: tags
     semanticSearchTier: (location != 'swedencentral')? semanticSearchTier: 'disabled'
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
-    skuName: enablePublicGenAIAccess? aiSearchSKUName: 'standard2'
+    skuName: enablePublicGenAIAccess? aiSearchSKUName: aiSearchSKUSharedPrivate
     enableSharedPrivateLink:enablePublicGenAIAccess? false: true
     sharedPrivateLinks:enablePublicGenAIAccess?[]:sharedPrivateLinkResources
     ipRules: [
