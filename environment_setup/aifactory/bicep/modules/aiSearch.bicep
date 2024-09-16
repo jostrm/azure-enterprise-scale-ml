@@ -63,6 +63,10 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
   }
 }
 
+/*
+Error Not Found:  aisearch3pmpbprj001genaisdcdev-002/aisearch-aisearch3pmpbprj001genaisdcdev-002-shared-plink-0
+TODO: remove "-" and shorten name.
+
 @batchSize(1)
 resource sharedPrivateLink 'Microsoft.Search/searchServices/sharedPrivateLinks@2024-06-01-preview' = [for (sharedPend, i) in sharedPrivateLinks: if(enableSharedPrivateLink) {
   name: 'aisearch-${aiSearchName}-shared-plink-${i}'
@@ -76,6 +80,8 @@ resource sharedPrivateLink 'Microsoft.Search/searchServices/sharedPrivateLinks@2
     }
   }
 }]
+
+*/
 
 /*
 resource symbolicname 'Microsoft.Search/searchServices/sharedPrivateLinkResources@2024-03-01-preview' = {
