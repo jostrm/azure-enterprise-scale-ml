@@ -50,6 +50,7 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
 resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   location: location
   name: pendCogSerName
+  tags: tags
   properties: {
     subnet: {
       id: subnetId
@@ -73,6 +74,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   }
 }
 
+/*
 @batchSize(1)
 resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = [for deployment in deployments: {
   parent: cognitive
@@ -80,8 +82,10 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
   
   properties: {
     model: deployment.model
-    raiPolicyName: deployment.?raiPolicyName ?? 'Microsoft.Default'
-    versionUpgradeOption: deployment.?versionUpgradeOption ??'OnceCurrentVersionExpired'
+    //raiPolicyName: deployment.?raiPolicyName ?? 'Microsoft.Default'
+    raiPolicyName:'Microsoft.Default'
+    //versionUpgradeOption: deployment.?versionUpgradeOption ??'OnceCurrentVersionExpired'
+    versionUpgradeOption:'OnceCurrentVersionExpired'
     scaleSettings: {
       capacity: deployment.scaleType.capacity
       scaleType:deployment.scaleType.scaleType
@@ -89,11 +93,12 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
   }
   sku: {
     name: deployment.sku
-    capacity: deployment.capacity
-    tier: deployment.tier
+    //capacity: deployment.capacity
+    //tier: deployment.tier
   }
 }]
 
+*/
 
 output cognitiveId string = cognitive.id
 output azureOpenAIEndpoint string = cognitive.properties.endpoint

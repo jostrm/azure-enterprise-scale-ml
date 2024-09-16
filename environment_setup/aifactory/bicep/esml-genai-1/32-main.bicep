@@ -222,9 +222,6 @@ var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: techni
 
 // Other - uniquness, Keyvault name
 var deploymentProjSpecificUniqueSuffix = '${projectName}${genaiName}${locationSuffix}${env}${aifactorySuffixRG}'
-var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
-var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
-var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 
 // Networking - Private DNS
 var privDnsResourceGroup = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
@@ -314,6 +311,7 @@ var privateLinksDnsZones = {
   }
 }
 
+
 output privateLinksDnsZones object = privateLinksDnsZones
 
 // Resource Groups
@@ -331,6 +329,9 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2021-04-01' 
   name: commonResourceGroup
   scope:subscription(subscriptionIdDevTestProd)
 }
+var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
+var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 
 // ------------------------------ RBAC ResourceGroups, Bastion,vNet, VMAdminLogin  ------------------------------//
 
@@ -358,25 +359,6 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
   }
   dependsOn:[
     projectResourceGroup
-  ]
-}
-
-// RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
-module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacGenAIRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    user_object_ids: technicalAdminsObjectID_array_safe
-    vNetName: vnetNameFull
-    common_bastion_subnet_name: 'AzureBastionSubnet'
-    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
-  }
-  dependsOn: [
-    csAzureOpenAI
-    vmPrivate
-    sacc
-    kv1
-    aiHub
   ]
 }
 
@@ -472,6 +454,7 @@ module privateDnsAIstudio '../modules/privateDns.bicep' = if(centralDnsZoneByPol
   ]
 }
 
+
 // Azure OpenAI
 param gptDeploymentName string= 'gpt-4'
 var searchIndexName= 'idx-${projectName}${env}${uniqueInAIFenv}'
@@ -520,6 +503,7 @@ var defaultOpenAiDeployments = [
   }
 ]
 
+
 module csAzureOpenAI '../modules/csCognitiveServices.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
@@ -551,6 +535,7 @@ module csAzureOpenAI '../modules/csCognitiveServices.bicep' = {
   ]
 }
 
+
 module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privDnsZoneLinkAOAI${deploymentProjSpecificUniqueSuffix}'
@@ -561,6 +546,12 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(centralDnsZoneBy
   dependsOn: [
     projectResourceGroup
   ]
+}
+// LogAnalytics
+var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2020-08-01' existing = {
+  name: laName
+  scope:commonResourceGroupRef
 }
 
 module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
@@ -576,7 +567,6 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
 }
 
 // Azure OpenAI - END
-
 // Azure AI Search
 
  //Deploys AI Search with private endpoints and shared private link connections
@@ -615,11 +605,12 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
   }
 ]
 
+var safeNameAISearch = toLower('aiSearch${uniqueInAIFenv}${deploymentProjSpecificUniqueSuffix}')
 module aiSearchService '../modules/aiSearch.bicep' = {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
-    aiSearchName: 'aiSearch${deploymentProjSpecificUniqueSuffix}'
+    aiSearchName: safeNameAISearch
     location: location
     replicaCount: 1
     partitionCount: 1
@@ -763,12 +754,6 @@ module kv1 '../modules/keyVault.bicep' = {
   ]
 }
 
-// LogAnalytics
-var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2020-08-01' existing = {
-  name: laName
-  scope:commonResourceGroupRef
-}
 
 module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1162,5 +1147,24 @@ module rbacModule '../modules/aihubRbac.bicep' = {
     csAzureOpenAI
     csAIstudio
     rbacReadUsersToCmnVnetBastion
+  ]
+}
+
+// RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
+module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacGenAIRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    user_object_ids: technicalAdminsObjectID_array_safe
+    vNetName: vnetNameFull
+    common_bastion_subnet_name: 'AzureBastionSubnet'
+    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+    csAzureOpenAI
+    vmPrivate
+    sacc
+    kv1
+    aiHub
   ]
 }
