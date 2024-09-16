@@ -278,6 +278,8 @@ var privateLinksDnsZones = {
   }
 }
 
+output privateLinksDnsZones object = privateLinksDnsZones
+
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)
   name: 'prjResourceGroup${deploymentProjSpecificUniqueSuffix}'

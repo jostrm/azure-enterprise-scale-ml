@@ -24,11 +24,12 @@ param kindAIHub string = 'hub'
 param serviceSettingDeployProjectVM bool = true
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
+
 @description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in hub mode')
 param serviceSettingDeployAIHub bool = true
-
 @description('Service setting:Deploy Azure Machine Learning')
 param serviceSettingDeployAzureML bool = false
+
 @description('Service setting:Deploy CosmosDB')
 param serviceSettingDeployCosmosDB bool = false
 @description('Service setting:Deploy Azure WebApp')
@@ -39,7 +40,7 @@ param aiSearchSKUName string = 'basic' // 'basic' 'standard', 'standard2' if usi
 param aiSearchEnableSharedPrivateLink bool = false
 
 @description('Default is false. May be needed if Azure OpenAI should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
-param enablePublicNetworkAccessForCognitive bool = false
+param enablePublicNetworkAccessForCognitive bool = true
 @description('Default is false. May be needed if Azure AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessForAISearch bool = false
 @description('Default is false. May be needed if Azure Storage used by AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
@@ -313,6 +314,8 @@ var privateLinksDnsZones = {
   }
 }
 
+output privateLinksDnsZones object = privateLinksDnsZones
+
 // Resource Groups
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)
@@ -517,7 +520,7 @@ var defaultOpenAiDeployments = [
   }
 ]
 
-module csAzureOpenAI '../modules/csCognitiveServices.bicep' = if(enablePublicNetworkAccessForCognitive == true) {
+module csAzureOpenAI '../modules/csCognitiveServices.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -612,7 +615,7 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
   }
 ]
 
-module aiSearchService '../modules/aiSearch.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module aiSearchService '../modules/aiSearch.bicep' = {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
