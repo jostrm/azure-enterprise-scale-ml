@@ -14,8 +14,8 @@ param subnetName string
 param subnetId string
 @description('Restore instead of Purge')
 param restore bool
-param openaiPrivateDnsZoneId string
-param cognitivePrivateDnsZoneId string
+param privateLinksDnsZones object
+param centralDnsZoneByPolicyInHub bool = true
 param kind  string = 'AIServices'
 param publicNetworkAccess bool = false
 param pendCogSerName string
@@ -82,13 +82,27 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   }
 }
 
-output aiServicesId string = cognitive.id
-output aiServicesEndpoint string = cognitive.properties.endpoint
-output openAiId string = cognitive.id
-output aiServicesPrincipalId string = cognitive.identity.principalId
-output name string = cognitive.name
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+  name: '${pendCognitiveServices.name}/${pendCognitiveServices.name}DnsZone'
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateLinksDnsZones.openai.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.openai.id //openai
+        }
+      }
+      {
+        name: privateLinksDnsZones.cognitiveservices.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.cognitiveservices.id//cognitiveservices
+        }
+      }
+    ]
+  }
+}
 
-output resourceId string = cognitive.id
+/*
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name
@@ -103,3 +117,11 @@ output dnsConfig array = [
     groupid:'account'
   }
 ]
+*/
+
+output aiServicesId string = cognitive.id
+output aiServicesEndpoint string = cognitive.properties.endpoint
+output openAiId string = cognitive.id
+output aiServicesPrincipalId string = cognitive.identity.principalId
+output name string = cognitive.name
+output resourceId string = cognitive.id

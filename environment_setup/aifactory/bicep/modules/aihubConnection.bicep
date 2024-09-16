@@ -11,7 +11,7 @@ resource parentAMLWorkspaceAIHubObject 'Microsoft.MachineLearningServices/worksp
 }
 
 resource aiServicesConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-01-01-preview' = {
-  name: '${aiHubName}-connection-AIServices'
+  name: 'connectionAIServicesToHub'
   parent: parentAMLWorkspaceAIHubObject
   properties: {
     category: 'AIServices'

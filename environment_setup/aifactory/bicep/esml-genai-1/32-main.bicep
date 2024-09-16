@@ -39,7 +39,7 @@ param kindAIHub string = 'hub'
 // Cognitive Service types & settings, End
 
 @description('Service setting: Deploy VM for project')
-param serviceSettingDeployProjectVM bool = true
+param serviceSettingDeployProjectVM bool = false
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
 
@@ -290,9 +290,11 @@ var privateLinksDnsZones = {
   }
   openai: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
+    name: 'privatelink.openai.azure.com'
   }
   cognitiveservices: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
+    name: 'privatelink.cognitiveservices.azure.com'
   }
   searchService: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
@@ -453,13 +455,14 @@ module csAIstudio '../modules/csAIStudio.bicep' = {
     ]
     disableLocalAuth: false
     subnetId: genaiSubnetId
-    openaiPrivateDnsZoneId: privateLinksDnsZones.openai.id
-    cognitivePrivateDnsZoneId:privateLinksDnsZones.cognitiveservices.id
+    privateLinksDnsZones: privateLinksDnsZones
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
   }
   dependsOn: [
     projectResourceGroup
   ]
 }
+/* Is done within the module csAIstudio instead
 module privateDnsAIstudio '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkAIstudio${deploymentProjSpecificUniqueSuffix}'
@@ -471,7 +474,7 @@ module privateDnsAIstudio '../modules/privateDns.bicep' = if(centralDnsZoneByPol
     projectResourceGroup
   ]
 }
-
+*/
 
 // Azure OpenAI
 param gptDeploymentName string= 'gpt-4'
@@ -1112,7 +1115,7 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   ]
 }
 
-module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' ={
+module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(serviceSettingDeployAzureML == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {

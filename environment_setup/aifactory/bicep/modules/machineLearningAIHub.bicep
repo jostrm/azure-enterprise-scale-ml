@@ -43,6 +43,17 @@ param acrName string
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
+var privateDnsZoneName =  {
+  azureusgovernment: 'privatelink.api.ml.azure.us'
+  azurechinacloud: 'privatelink.api.ml.azure.cn'
+  azurecloud: 'privatelink.api.azureml.ms'
+}
+
+var privateAznbDnsZoneName = {
+    azureusgovernment: 'privatelink.notebooks.usgovcloudapi.net'
+    azurechinacloud: 'privatelink.notebooks.chinacloudapi.cn'
+    azurecloud: 'privatelink.notebooks.azure.net'
+}
 
 resource aiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing = {
   name: aiSearchName
@@ -109,7 +120,7 @@ resource amlAIHub 'Microsoft.MachineLearningServices/workspaces@2024-07-01-previ
 }
 
 module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
-  name: 'machineLearningNetworking${uniqueDepl}'
+  name: 'machineLearningWorkspaceGenAI${uniqueDepl}'
   scope: resourceGroup()
   params: {
     location: location
@@ -122,6 +133,27 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
 }
+
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+  name: '${machineLearningPrivateEndpoint.name}/${machineLearningPrivateEndpoint.name}DnsZone'
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateDnsZoneName[environment().name]
+        properties:{
+          privateDnsZoneId: amlPrivateDnsZoneID //amlPrivateDnsZone.id
+        }
+      }
+      {
+        name: privateAznbDnsZoneName[environment().name]
+        properties:{
+          privateDnsZoneId: notebookPrivateDnsZoneID//notebookPrivateDnsZone.id
+        }
+      }
+    ]
+  }
+}
+
 
 @description('Assign AML Workspace\'s ID: AcrPush to workload\'s container registry.')
 resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -145,13 +177,14 @@ resource computeInstanceContainerRegistryPullRoleAssignment 'Microsoft.Authoriza
   }
 }
 
-output amlId string = amlAIHub.id
-output amlName string = amlAIHub.name
-output principalId string = amlAIHub.identity.principalId
-
+/*
 output dnsConfig array = [
   {
     name: privateEndpointName //pendAml.name
     type: 'amlworkspace'
   }
 ]
+  */
+output amlId string = amlAIHub.id
+output amlName string = amlAIHub.name
+output principalId string = amlAIHub.identity.principalId
