@@ -12,7 +12,7 @@ param skuName string = 'basic'
 param replicaCount int = 1
 param partitionCount int = 1
 param privateEndpointName string
-param semanticSearchTier string = 'free'
+param semanticSearchTier string = 'disabled' //'disabled', 'standard'
 param publicNetworkAccess bool = false
 param ipRules array = []
 

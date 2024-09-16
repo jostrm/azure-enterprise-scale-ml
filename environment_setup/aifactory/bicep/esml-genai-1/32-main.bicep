@@ -618,7 +618,7 @@ module aiSearchService '../modules/aiSearch.bicep' = {
     vnetId: vnetId
     subnetName: defaultSubnet
     tags: tags
-    semanticSearchTier: semanticSearchTier
+    semanticSearchTier: (location != 'swedencentral')? semanticSearchTier: 'disabled'
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
     skuName: enablePublicGenAIAccess? aiSearchSKUName: 'standard2'
     enableSharedPrivateLink:enablePublicGenAIAccess? false: true
