@@ -563,7 +563,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
 
 
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(privDnsSubscription,targetResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: sacc.outputs.dnsConfig
@@ -574,7 +574,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
   ]
 }
 module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(privDnsSubscription,targetResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkKeyVault${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: kv1.outputs.dnsConfig
@@ -585,7 +585,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
   ]
 }
 module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(privDnsSubscription,targetResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkACR${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: acr.outputs.dnsConfig
@@ -849,7 +849,7 @@ module dataLake '../modules/dataLake.bicep' = {
 }
 
 module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false)){
-  scope: resourceGroup(privDnsSubscription,targetResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkADF${projectNumber}${locationSuffix}${env}'
   params: {
     dnsConfig: adf.outputs.dnsConfig
@@ -862,7 +862,7 @@ module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDns
 }
 
 module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope:resourceGroup(privDnsSubscription,targetResourceGroup)
+  scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneAndLinkEventhubs1'
   params: {
     dnsConfig: eventHubLogging.outputs.dnsConfig
@@ -875,7 +875,7 @@ module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPo
 }
 
 module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false) && (databricksPrivate == true)){
-  scope:resourceGroup(privDnsSubscription,targetResourceGroup)
+  scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneAndLinkDatabricks2'
   params: {
     dnsConfig: dbxPrivate.outputs.dnsConfig

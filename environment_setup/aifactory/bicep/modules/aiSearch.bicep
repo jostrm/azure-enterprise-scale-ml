@@ -11,9 +11,9 @@ param sharedPrivateLinks array = []
 @allowed([
   'Free'
   'Basic'
-  'standard2'
+  'standard2' // 0 out of 0 quota, is default, apply to get this.
 ])
-param skuName string = 'standard2'
+param skuName string = 'Basic'
 param replicaCount int = 1
 param partitionCount int = 1
 param privateEndpointName string
