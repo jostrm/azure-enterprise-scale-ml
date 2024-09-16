@@ -7,11 +7,11 @@ param parentAIHubResourceId string
 param apiVersion string = '2024-08-01-preview'
 
 resource parentAMLWorkspaceAIHubObject 'Microsoft.MachineLearningServices/workspaces@2024-07-01-preview' existing = {
-  name: parentAIHubResourceId
+  name: aiHubName // TODO - check if this is correct? NAME instead of ID? 
 }
 
 resource aiServicesConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-01-01-preview' = {
-  name: 'connectionAIServicesToHub'
+  name: 'connectionAIServicesToHub' // name: '${aiHubName}/${connectionAIServicesToHub}' and no parent
   parent: parentAMLWorkspaceAIHubObject
   properties: {
     category: 'AIServices'
