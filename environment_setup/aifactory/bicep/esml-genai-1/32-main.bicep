@@ -14,13 +14,13 @@ param modelVersionEmbedding string = 'text-embedding-3-large'
 param modelVersionEmbeddingVersion string = '1'
 param restore bool = false
 
-// 'Basic' = S0
 @allowed([
-  'Free'
-  'Basic'
+  'S0' // 'Free': Invalid SKU name
+  'S1' // 'Basic': Invalid SKU name
+  'standard'
   'standard2' // 0 out of 0 quota, is default, apply to get this.
 ])
-param aiSearchSKUSharedPrivate string = 'Basic' // Needed for shared Private Endpoints  https://learn.microsoft.com/en-us/azure/search/search-limits-quotas-capacity#shared-private-link-resource-limits
+param aiSearchSKUSharedPrivate string = 'standard' // Needed for shared Private Endpoints  https://learn.microsoft.com/en-us/azure/search/search-limits-quotas-capacity#shared-private-link-resource-limits
 @allowed([
   'Free'
   'S0'

@@ -163,7 +163,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev'){
   name: 'AMLAKSDev4${uniqueDepl}'
   params: {
     name: aksName // esml001-weu-prod
-    tags: tags
+    tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
     location: location
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table    // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns'
@@ -198,7 +198,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod'){
   name: 'AMLAKSTestProd4${uniqueDepl}'
   params: {
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
-    tags: tags
+    tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
     location: location
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table  1.22.6 and 1.23.3(preview) // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns' // 'aks-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'

@@ -9,15 +9,26 @@ param location string
 param enableSharedPrivateLink bool
 param sharedPrivateLinks array = []
 @allowed([
-  'Free'
-  'Basic'
+  'S0' // 'Free': Invalid SKU name
+  'S1' // 'Basic': Invalid SKU name
+  'standard'
   'standard2' // 0 out of 0 quota, is default, apply to get this.
 ])
-param skuName string = 'Basic'
+param skuName string = 'standard' 
+@allowed([
+  'default'
+  'highDensity'
+])
+param hostingMode string = 'default'
 param replicaCount int = 1
 param partitionCount int = 1
 param privateEndpointName string
-param semanticSearchTier string = 'disabled' //'disabled', 'standard'
+@allowed([
+  'disabled'
+  'free'
+  'standard'
+])
+param semanticSearchTier string = 'disabled'
 param publicNetworkAccess bool = false
 param ipRules array = []
 
@@ -41,6 +52,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
       }
     }
     replicaCount: replicaCount
+    hostingMode: hostingMode
     partitionCount: partitionCount
     publicNetworkAccess: publicNetworkAccess? 'enabled': 'disabled'
     networkRuleSet: {
