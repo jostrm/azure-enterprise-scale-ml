@@ -8,15 +8,12 @@ param tags object
 param location string
 param enableSharedPrivateLink bool
 param sharedPrivateLinks array = []
-// 'Basic' = S0
 @allowed([
   'Free'
-  'S0'
-  'S1'
-  'S2'
-  'S3'
+  'Basic'
+  'standard2'
 ])
-param skuName string = 'S0'
+param skuName string = 'standard2'
 param replicaCount int = 1
 param partitionCount int = 1
 param privateEndpointName string

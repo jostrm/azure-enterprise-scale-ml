@@ -1,3 +1,4 @@
+Connect-AzAccount -Tenant 'TODO_tenantID'
 
 $context = Get-AzSubscription -SubscriptionId 'TODO_subscriptionID'
 Set-AzContext $context

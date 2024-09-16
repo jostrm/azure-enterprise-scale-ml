@@ -1,5 +1,5 @@
 # USAGE: 
-.\201-az-cli-give-role.ps1 -spID '4885c3c2-702b-4b30-8cc3-dafc6acf3a4c' -target_spOID '00e70fc7-8f6d-46bc-a051-d6e004558d3b' -tenantID 'b7872ef0-9a00-4c18-8a4a-c7d25c778a9e' -subscription_id '451967ad-7751-478e-8c64-cd0e7afa64ed' -resource_group 'sweco-1-esml-common-sdc-dev-001' -storageAccountName 'sweco1mt4t7esml001dev'
+.\201-az-cli-give-role.ps1 -spID 'asdf' -target_spOID 'asdf' -tenantID 'asdf' -subscription_id 'adsf' -resource_group 'rg-name' -storageAccountName 'saname'
 
 # DESCRIPTION:# ow to give azure role Storage Blob Data Owner on a storage account with powershell (and/or Owner on Keyvault), logging in with a service principal, giving another service principal that role.
 param (

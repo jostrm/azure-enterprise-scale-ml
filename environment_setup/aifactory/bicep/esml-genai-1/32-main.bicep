@@ -17,12 +17,10 @@ param restore bool = false
 // 'Basic' = S0
 @allowed([
   'Free'
-  'S0'
-  'S1'
-  'S2'
-  'S3'
+  'Basic'
+  'standard2'
 ])
-param aiSearchSKUSharedPrivate string = 'S2' // Needed for shared Private Endpoints  https://learn.microsoft.com/en-us/azure/search/search-limits-quotas-capacity#shared-private-link-resource-limits
+param aiSearchSKUSharedPrivate string = 'standard2' // Needed for shared Private Endpoints  https://learn.microsoft.com/en-us/azure/search/search-limits-quotas-capacity#shared-private-link-resource-limits
 @allowed([
   'Free'
   'S0'
