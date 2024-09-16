@@ -52,7 +52,7 @@ resource sharedPrivateLink 'Microsoft.Search/searchServices/sharedPrivateLinks@2
   parent: aiSearch
   properties: {
     groupId: 'aiSearch'
-    sharedPrivateLinkResourceId: sharedPrivateLinks[i].id
+    sharedPrivateLinkResourceId: sharedPrivateLinks[i].privateLinkResourceId
     privateLinkServiceConnectionState: {
       status: 'Approved'
       description: 'Compliance with network design'
