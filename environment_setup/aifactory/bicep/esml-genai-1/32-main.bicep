@@ -278,9 +278,11 @@ var privateLinksDnsZones = {
   }
   amlworkspace: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.api.azureml.ms'
+    name: 'privatelink.api.azureml.ms'
   }
   notebooks: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.notebooks.azure.net' 
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.notebooks.azure.net'
+    name: 'privatelink.notebooks.azure.net'
   }
   dataFactory: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net'
@@ -1094,6 +1096,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     enablePublicGenAIAccess:enablePublicGenAIAccess
     aiSearchName: aiSearchService.outputs.aiSearchName
     acrName: acr.outputs.containerRegistryName
+    privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
     projectResourceGroup

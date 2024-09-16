@@ -1,8 +1,10 @@
 # Documentation - Executive summary
 
-**Governance related** - relevant for central IT, networking team (CoreTeam: 10-29)
+Quick Setup
+1) [Prerequisites - to setup AIFactory](./10-19/12-prerequisites-setup.md) - Estimated setup time: 1-2h
+2) [End-2-End SETUP tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to) - Estimated setup time: 4-8h
 
-[Prerequisites - to setup AIFactory](./10-19/12-prerequisites-setup.md)
+**Governance related** - relevant for central IT, networking team (CoreTeam: 10-29)
 
 * [11) Infra:AIFactory: Static documentation (CoreTeam)](#11-infraaifactory-static-documentation-coreteam)
 * [12) Infra:AIFactory: Roles & Permissions for users (CoreTeam)](#12-infraaifactory-roles--permissions-for-users-coreteam)
@@ -12,7 +14,8 @@
 * [21) Infra:AIFactory: How-to: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
 * [22) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
 * [23) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
-* [24) End-2-End setup tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to) - Estimated setup time: 4-8h
+
+
 
 **Consumer related** - relevant for developers, data scientists, data engineers (ProjectTeam: 30-39)
 

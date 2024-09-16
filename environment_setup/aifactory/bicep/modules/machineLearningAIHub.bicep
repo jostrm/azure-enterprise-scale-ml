@@ -28,10 +28,6 @@ param privateEndpointName string
 param vnetId string
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
-@description('Resource name ID on DnsZone')
-param amlPrivateDnsZoneID string
-@description('Resource name ID on DnsZone')
-param notebookPrivateDnsZoneID string
 @description('Azure ML allowPublicAccessWhenBehindVnet')
 param allowPublicAccessWhenBehindVnet bool
 @description('AI Hub public access')
@@ -40,6 +36,7 @@ param enablePublicGenAIAccess bool
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
 param aiSearchName string
 param acrName string
+param privateLinksDnsZones object
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
@@ -49,7 +46,7 @@ var privateDnsZoneName =  {
   azurecloud: 'privatelink.api.azureml.ms'
 }
 
-var privateAznbDnsZoneName = {
+var privateDnsZoneNameNotebooks = {
     azureusgovernment: 'privatelink.notebooks.usgovcloudapi.net'
     azurechinacloud: 'privatelink.notebooks.chinacloudapi.cn'
     azurecloud: 'privatelink.notebooks.azure.net'
@@ -119,18 +116,29 @@ resource amlAIHub 'Microsoft.MachineLearningServices/workspaces@2024-07-01-previ
   }
 }
 
-module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
-  name: 'machineLearningWorkspaceGenAI${uniqueDepl}'
-  scope: resourceGroup()
-  params: {
-    location: location
-    tags: tags
-    workspaceArmId: amlAIHub.id
-    subnetId: subnetRef
-    machineLearningPleName: privateEndpointName
-    amlPrivateDnsZoneID: amlPrivateDnsZoneID
-    notebookPrivateDnsZoneID: notebookPrivateDnsZoneID
-    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2020-11-01' = {
+  name: privateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointName
+        properties: {
+          groupIds: [
+            'amlworkspace'
+          ]
+          privateLinkServiceId: amlAIHub.id
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Private endpoint for Azure machine learning workspace'
+          }
+        }
+      }
+    ]
+    subnet: {
+      id: subnetRef
+    }
   }
 }
 
@@ -141,13 +149,13 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
       {
         name: privateDnsZoneName[environment().name]
         properties:{
-          privateDnsZoneId: amlPrivateDnsZoneID //amlPrivateDnsZone.id
+          privateDnsZoneId: privateLinksDnsZones.amlworkspace.id 
         }
       }
       {
-        name: privateAznbDnsZoneName[environment().name]
+        name: privateDnsZoneNameNotebooks[environment().name]
         properties:{
-          privateDnsZoneId: notebookPrivateDnsZoneID//notebookPrivateDnsZone.id
+          privateDnsZoneId: privateLinksDnsZones.notebooks.id 
         }
       }
     ]
