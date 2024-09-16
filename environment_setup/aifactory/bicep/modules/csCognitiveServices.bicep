@@ -74,6 +74,64 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   }
 }
 
+resource gpt4turbo 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+  name: '${cognitiveName}/gpt-4'
+  //parent: cognitive
+  sku: {
+    name: 'Standard'
+    capacity: 25
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-4'
+      version:'turbo-2024-04-09' // If your region doesn't support this version, please change it.
+    }
+    raiPolicyName: 'Microsoft.Default'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+}
+
+resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+  name: 'text-embedding-ada-002'
+  parent: cognitive
+  sku: {
+    name: 'Standard'
+    capacity: 25
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-ada-002'
+      version:'2'
+    }
+    raiPolicyName: 'Microsoft.Default'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+}
+
+/* DeploymentModelNotSupported - The model 'Format: OpenAI, Name: text-embedding-3-large, Version: ' of account deployment is not supported.*/
+
+resource embedding3 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+  name: 'text-embedding-3-large'
+  parent: cognitive
+  sku: {
+    name: 'Standard'
+    capacity: 25
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-3-large'
+      version:'1' 
+      //name: 'text-embedding-ada-002'
+      //version:'2'
+    }
+    raiPolicyName: 'Microsoft.Default'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+}
+
 /*
 @batchSize(1)
 resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = [for deployment in deployments: {

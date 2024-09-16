@@ -460,8 +460,8 @@ param gptDeploymentName string= 'gpt-4'
 var searchIndexName= 'idx-${projectName}${env}${uniqueInAIFenv}'
 param chatGptModelVersion string = modelVersionGPT4 // GPT-4 Turbo with Vision https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models#o1-preview-and-o1-mini-models-limited-access
 param chatGptDeploymentCapacity int = 25
-param embeddingDeploymentName  string=  modelVersionEmbedding // 'text-embedding-ada-002'
-param embeddingModelName string = modelVersionEmbedding // 'text-embedding-ada-002'
+param embeddingDeploymentName  string=  modelVersionEmbedding // 'text-embedding-ada-002', 'text-embedding-3-large'
+param embeddingModelName string = modelVersionEmbedding // 'text-embedding-ada-002', 'text-embedding-3-large'
 param embeddingDeploymentCapacity int = 25
 
 var defaultOpenAiDeployments = [
