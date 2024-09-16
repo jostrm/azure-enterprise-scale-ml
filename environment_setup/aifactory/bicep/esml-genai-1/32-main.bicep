@@ -636,7 +636,7 @@ module aiSearchService '../modules/aiSearch.bicep' = {
 
 module privateDnsaiSearchService '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'priDZoneSA${genaiName}${deploymentProjSpecificUniqueSuffix}'
+  name: 'priDZoneSA1${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: aiSearchService.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -672,7 +672,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
 
 module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'priDZoneSA${genaiName}${deploymentProjSpecificUniqueSuffix}'
+  name: 'priDZoneSA2${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: sa4AIsearch.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -909,7 +909,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep'= {
 
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'priDZoneSA${deploymentProjSpecificUniqueSuffix}'
+  name: 'priDZoneSA3${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: sacc.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
