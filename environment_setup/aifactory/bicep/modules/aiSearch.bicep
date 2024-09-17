@@ -7,7 +7,7 @@ param subnetName string
 param tags object
 param location string
 param enableSharedPrivateLink bool
-param sharedPrivateLinks array
+param sharedPrivateLinks array = []
 @allowed([
   'S0' // 'Free': Invalid SKU name
   'S1' // 'Basic': Invalid SKU name
@@ -34,7 +34,41 @@ param ipRules array = []
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
-resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
+resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enableSharedPrivateLink == true) {
+  name: aiSearchName
+  location: location
+  tags: tags
+  sku: {
+    name: 'standard2' // Neends to be standard2 or higher (You may not have quota for this. You need to apply if so)
+  }
+  identity: {
+    type: 'SystemAssigned'
+  }
+  
+  properties: {
+    authOptions: {
+      aadOrApiKey: {
+        aadAuthFailureMode:'http401WithBearerChallenge' // or 'http403'
+      }
+    }
+    replicaCount: replicaCount
+    hostingMode: hostingMode
+    partitionCount: partitionCount
+    publicNetworkAccess: publicNetworkAccess? 'enabled': 'disabled'
+    networkRuleSet: {
+      bypass: 'AzurePortal' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'
+      ipRules: ipRules
+    }
+    semanticSearch: semanticSearchTier
+  }
+  @batchSize(1)
+  resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2024-06-01-preview' =  [for (sharedPL, i) in sharedPrivateLinks: {
+        name: '${aiSearchName}-shared-pe-${i}' //  'search-shared-private-link-${i}'
+        properties: sharedPL
+    }]
+}
+
+resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enableSharedPrivateLink == false) {
   name: aiSearchName
   location: location
   tags: tags
@@ -61,11 +95,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
     }
     semanticSearch: semanticSearchTier
   }
-  @batchSize(1)
-  resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2024-06-01-preview' =  [for (sharedPL, i) in sharedPrivateLinks: if(enableSharedPrivateLink) {
-        name: '${aiSearchName}-shared-pe-${i}' //  'search-shared-private-link-${i}'
-        properties: sharedPL
-    }]
+
 }
 
 /*
