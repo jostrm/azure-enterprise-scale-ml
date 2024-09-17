@@ -72,6 +72,9 @@ resource containerRegistryPushRole 'Microsoft.Authorization/roleDefinitions@2022
   scope: subscription()
 }
 
+// NB! sharedPrivateLinkResources - The HUB, similar as Azure AISearch, can also have sharedPrivateLinkResources
+// TODO: Create another resrouce amlAIHubSharedPend, with an IF statement here
+// https://learn.microsoft.com/en-us/azure/templates/microsoft.machinelearningservices/2024-07-01-preview/workspaces?pivots=deployment-language-bicep
 
 resource amlAIHub 'Microsoft.MachineLearningServices/workspaces@2024-07-01-preview' = {
   name: name
@@ -112,7 +115,6 @@ resource amlAIHub 'Microsoft.MachineLearningServices/workspaces@2024-07-01-previ
         }
       }
     }
-    sharedPrivateLinkResources: []
   }
 }
 
