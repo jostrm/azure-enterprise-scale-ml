@@ -90,7 +90,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
     partitionCount: partitionCount
     publicNetworkAccess: publicNetworkAccess? 'enabled': 'disabled'
     networkRuleSet: {
-      bypass: 'AzurePortal' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'
+      bypass: 'AzureServices' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'
       ipRules: ipRules
     }
     semanticSearch: semanticSearchTier
