@@ -61,6 +61,11 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
     }
     semanticSearch: semanticSearchTier
   }
+  @batchSize(1)
+  resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2024-06-01-preview' =  [for (sharedPL, i) in sharedPrivateLinks: if(enableSharedPrivateLink) {
+        name: '${aiSearchName}-shared-pe-${i}' //  'search-shared-private-link-${i}'
+        properties: sharedPL
+    }]
 }
 
 /*
@@ -84,6 +89,7 @@ resource sharedPrivateLink 'Microsoft.Search/searchServices/sharedPrivateLinks@2
 */
 
 /*
+
 resource symbolicname 'Microsoft.Search/searchServices/sharedPrivateLinkResources@2024-03-01-preview' = {
   name: 'string'
   parent: resourceSymbolicName
