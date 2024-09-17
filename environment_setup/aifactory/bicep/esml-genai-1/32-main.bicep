@@ -646,7 +646,8 @@ module aiSearchService '../modules/aiSearch.bicep' = {
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
     skuName: enablePublicGenAIAccess? aiSearchSKUName: aiSearchSKUSharedPrivate
     enableSharedPrivateLink:enablePublicGenAIAccess? false: true
-    sharedPrivateLinks:enablePublicGenAIAccess?[]:sharedPrivateLinkResources
+    sharedPrivateLinks:sharedPrivateLinkResources
+    //sharedPrivateLinks:enablePublicGenAIAccess?[]:sharedPrivateLinkResources
     ipRules: [
       {
         value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
