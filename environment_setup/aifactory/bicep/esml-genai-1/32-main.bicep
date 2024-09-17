@@ -1176,7 +1176,7 @@ module rbacModule '../modules/aihubRbac.bicep' = {
 
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
   name: 'rbacGenAIRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
