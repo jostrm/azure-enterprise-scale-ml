@@ -23,7 +23,9 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Region location prefix in ESML settings: [weu,uks,swe,sdc]")][string]$locationSuffix,
     [Parameter(Mandatory = $false, HelpMessage = "Region location in ESML settings: [westeurope, swedencentral, uksouth]")][string]$location,
     [Parameter(Mandatory = $false, HelpMessage = "ESML Projectnumber, three digits: 001")][string]$projectNumber,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env,
+    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet Resource Group - BYOVnet")][string]$BYOvNetResourceGroup,
+    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet vNet Name")][string]$BYOvNetName
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {
@@ -76,16 +78,42 @@ Write-Host "userIds : ${userObjectIds}"
 Write-Host "kv : ${projectKeyvaultName}"
 Write-Host "bastion : ${bastion_service_name}"
 
-New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
--Name $deplName `
--ResourceGroupName $common_rg `
--project_resourcegroup_name $project_rg `
--dashboard_resourcegroup_name $dashboard_resourcegroup_name `
--project_service_principle_oid $projectSPObjectID `
--vnet_name $vnetNameFull `
--user_object_ids $userObjectIds `
--bastion_service_name $bastion_service_name `
--Verbose
+if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
+  Write-Host "Running BYOVnet logic..."
+  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnet.bicep" `
+  -Name $deplName `
+  -ResourceGroupName $BYOvNetResourceGroup `
+  -vnet_resourcegroup_name $BYOvNetResourceGroup `
+  -project_service_principle_oid $projectSPObjectID `
+  -vnet_name $BYOvNetName `
+  -user_object_ids $userObjectIds `
+  -Verbose
+
+  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
+  -Name $deplName `
+  -ResourceGroupName $common_rg `
+  -project_resourcegroup_name $project_rg `
+  -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
+  -user_object_ids $userObjectIds `
+  -bastion_service_name $bastion_service_name `
+  -storage_account_name_datalake $storageAccount `
+  -Verbose
+}
+else{
+  Write-Host "Running standard logic (not BYOVnet logic)..."
+  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
+  -Name $deplName `
+  -ResourceGroupName $common_rg `
+  -project_resourcegroup_name $project_rg `
+  -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
+  -project_service_principle_oid $projectSPObjectID `
+  -vnet_name $vnetNameFull `
+  -user_object_ids $userObjectIds `
+  -bastion_service_name $bastion_service_name `
+  -storage_account_name_datalake $storageAccount `
+  -Verbose
+
+}
 
 $inUserObjectIdsArray = $userObjectIds -split ','
 

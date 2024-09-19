@@ -117,7 +117,11 @@ TODO: Support federated ARM connections https://learn.microsoft.com/en-us/azure/
 
 [More information about variables can bee seen here](./13-parameters-ado.md) 
 
-To get "my ip": nslookup myip.opendns.com resolver1.opendns.com
+To get "my ip": 
+- Option A) Go to any storage account in Azure, and click networking. At the green marking in image, your public IP is seen 
+![](./images/13-setup-aifactory-find-your-ip-via-storage-account.png)
+
+- Option B) Open a terminal and run: `nslookup myip.opendns.com resolver1.opendns.com`
 
 
 ## 6) Edit the Base parameters 
