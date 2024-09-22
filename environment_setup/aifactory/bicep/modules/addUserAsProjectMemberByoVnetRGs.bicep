@@ -102,7 +102,7 @@ module projectVmAdminRGcontributorPermissions './rbacGeneric.bicep' = {
   ]
 }
 
-resource dashboard_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing {
+resource dashboard_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: dashboard_resourcegroup_name
   scope: subscription()
 }
