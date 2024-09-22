@@ -9,7 +9,7 @@
 // Separete powershell: AccessPolicy on Keyvault: 25-add-users-to-kv-get-list-access-policy.ps1
 
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
-param dashboard_resourcegroup_name string = ''
+param dashboard_resourcegroup_name string = 'dashboards'
 param storage_account_name_datalake string
 param bastion_service_name string
 param project_resourcegroup_name string
@@ -102,12 +102,12 @@ module projectVmAdminRGcontributorPermissions './rbacGeneric.bicep' = {
   ]
 }
 
-resource dashboard_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = if(dashboard_resourcegroup_name!= '') {
+resource dashboard_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing {
   name: dashboard_resourcegroup_name
   scope: subscription()
 }
 
-module dashboardRGcontributorPermissions './contributorRbacSimple.bicep' = if(dashboard_resourcegroup_name!= ''){
+module dashboardRGcontributorPermissions './contributorRbacSimple.bicep' = {
   scope: dashboard_resourcegroup
   name: 'dashboardRGcontributorPermissions3456'
   params: {
