@@ -173,7 +173,7 @@ resource roleAssignmentSearchIndexUserDataContributor 'Microsoft.Authorization/r
 }]
 
 resource roleAssignmentSearchContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, userObjectIds[i])
+  name: guid(existingAiSearch.id, contributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
