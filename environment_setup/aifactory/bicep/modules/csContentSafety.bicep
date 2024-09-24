@@ -44,7 +44,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   name: pendCogSerName
   properties: {
     subnet: {
-      id: subnetId
+      id: subnetRef
     }
     customNetworkInterfaceName: 'pend-nic-${kind}-${contentsafetyName}'
     privateLinkServiceConnections: [
