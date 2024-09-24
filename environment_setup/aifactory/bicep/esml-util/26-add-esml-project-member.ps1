@@ -1,6 +1,6 @@
 # USAGE: 
 # cd aifactory\esml-util
-# .\26-add-esml-project-member.ps1 -spSecret 'abc' -spID '96483bab-9e36-46f0-8bb7-6633c49e87a1' -tenantID '720b637a-655a-40cf-816a-f22f40755c2c' -subscriptionID '7ec8e6b8-bef0-4811-91a9-6bf389d80de2' -storageAccount 'ingkagaipgvr2esml001dev' -adlsgen2filesystem 'lake3' -userObjectIds 'x,y,z' -projectSPObjectID 'dba0c027-1f5a-4580-a22c-671e32462d9a' -commonSPObjectID '86d6895c-19a7-4b03-a753-ebf645e1a91d' -commonADgroupObjectID 'NULL' -projectADGroupObjectId 'NULL' -projectKeyvaultName 'kv-p002-uks-dev-pgvr201' -commonRGNamePrefix 'ingka-genai-' -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix 'uks' -projectNumber '002' -env 'dev'
+# .\26-add-esml-project-member.ps1 -spID -tenantID  -subscriptionID -storageAccount -adlsgen2filesystem -userObjectIds 'x,y,z' -projectSPObjectID -commonSPObjectID -commonADgroupObjectID 'NULL' -projectADGroupObjectId 'NULL' -projectKeyvaultName -commonRGNamePrefix -commonResourceSuffix '-001' -aifactorySuffixRG '-001' -locationSuffix -projectNumber -env 'dev'
 
 param (
     # required parameters
@@ -53,7 +53,8 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
 }
 
 # EDIT per your convention if it differs from ESML AIFactory defaults
-$deplName = '26-add-esml-project-member'
+$deplName1 = '26-add-esml-project-member-1'
+$deplName2 = '26-add-esml-project-member-2'
 $projectXXX = "project"+$projectNumber
 $common_rg = "${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}" # dc-heroes-esml-common-weu-dev-001
 $project_rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
@@ -79,9 +80,9 @@ Write-Host "kv : ${projectKeyvaultName}"
 Write-Host "bastion : ${bastion_service_name}"
 
 if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
-  Write-Host "Running BYOVnet logic..."
+  Write-Host "Running BYOVnet logic - addUserAsProjectMemberByoVnet"
   New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnet.bicep" `
-  -Name $deplName `
+  -Name $deplName1 `
   -ResourceGroupName $BYOvNetResourceGroup `
   -vnet_resourcegroup_name $BYOvNetResourceGroup `
   -project_service_principle_oid $projectSPObjectID `
@@ -89,8 +90,9 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -user_object_ids $userObjectIds `
   -Verbose
 
-  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
-  -Name $deplName `
+  Write-Host "Running BYOVnet logic - addUserAsProjectMemberByoVnetRGs"
+  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnetRGs.bicep" `
+  -Name $deplName2 `
   -ResourceGroupName $common_rg `
   -project_resourcegroup_name $project_rg `
   -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
@@ -102,7 +104,7 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
 else{
   Write-Host "Running standard logic (not BYOVnet logic)..."
   New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
-  -Name $deplName `
+  -Name $deplName1 `
   -ResourceGroupName $common_rg `
   -project_resourcegroup_name $project_rg `
   -dashboard_resourcegroup_name $dashboard_resourcegroup_name `

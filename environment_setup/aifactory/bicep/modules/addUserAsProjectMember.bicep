@@ -163,7 +163,7 @@ resource dashboard_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01'
   scope: subscription()
 }
 
-module dashboardRGcontributorPermissions './contributorRbacSimple.bicep' = if(dashboard_resourcegroup_name!= ''){
+module dashboardRGcontributorPermissions './contributorRbacSimple.bicep' = {
   scope: dashboard_resourcegroup
   name: 'dashboardRGcontributorPermissions3456'
   params: {
