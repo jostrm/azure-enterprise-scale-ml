@@ -93,6 +93,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
       bypass: 'AzureServices' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'
       ipRules: ipRules
     }
+    
     semanticSearch: semanticSearchTier
   }
 
@@ -159,6 +160,8 @@ resource pendAISearch 'Microsoft.Network/privateEndpoints@2022-01-01' = {
   
 }
 
+var hostName = 'https://${aiSearch.name}.search.windows.net'
+output aiSearchEndpoint string = hostName
 output aiSearchName string = aiSearch.name
 output aiSearchId string = aiSearch.id
 output dnsConfig array = [

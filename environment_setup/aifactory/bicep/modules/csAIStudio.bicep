@@ -46,7 +46,7 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
-        ignoreMissingVnetServiceEndpoint: true
+        ignoreMissingVnetServiceEndpoint: false
       }]
       ipRules: ipRules
     }

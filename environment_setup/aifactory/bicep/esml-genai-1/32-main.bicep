@@ -464,19 +464,6 @@ module csAIstudio '../modules/csAIStudio.bicep' = {
     projectResourceGroup
   ]
 }
-/* Is done within the module csAIstudio instead
-module privateDnsAIstudio '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsLinkAIstudio${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    dnsConfig: csAIstudio.outputs.dnsConfig
-    privateLinksDnsZones: privateLinksDnsZones
-  }
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
-*/
 
 // Azure OpenAI
 param gptDeploymentName string= 'gpt-4'
@@ -527,7 +514,7 @@ var defaultOpenAiDeployments = [
 ]
 
 
-module csAzureOpenAI '../modules/csCognitiveServices.bicep' = {
+module csAzureOpenAI '../modules/csOpenAI.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1117,6 +1104,23 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   ]
 }
 
+module aiHubConnectionSearch '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true) {
+  name: 'aiHubConnection4Search${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params:{
+    aiHubName: aiHubName
+    targetAIServicesEndpoint: aiSearchService.outputs.aiSearchEndpoint
+    targetAIServiceResourceId: aiSearchService.outputs.aiSearchId
+    parentAIHubResourceId: aiHub.outputs.amlId
+    apiVersion: apiVersionOpenAI
+    category: 'CognitiveSearch' // 'AIServices'
+  }
+  dependsOn: [
+    aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+  ]
+}
+
+
 module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(serviceSettingDeployAzureML == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
@@ -1158,9 +1162,10 @@ var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Res
 
 module rbacModule '../modules/aihubRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDeploy'
+  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
     aiSearchName: aiSearchService.outputs.aiSearchName
     resourceGroupId: targetResourceGroupId
     userObjectIds: technicalAdminsObjectID_array_safe

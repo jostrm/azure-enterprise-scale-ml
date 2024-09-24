@@ -5,14 +5,14 @@ param tags object
 @description('Specifies the location that will be used')
 param location string
 @description('Specifies the SKU, where default is standard')
-param sku string
+param sku string = 'S0'
 @description('Specifies the VNET id that will be associated with the private endpoint')
 param vnetId string
 @description('Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
 @description('ResourceID of subnet for private endpoints')
 param subnetId string
-param kind  string
+param kind  string = 'OpenAI'
 param deployments array = []
 param publicNetworkAccess bool = false
 param pendCogSerName string
@@ -23,6 +23,9 @@ param restore bool
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 
+// TODO: in ADO pipeline: https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#grant-access-to-trusted-azure-services-for-azure-openai
+//bypass:'AzureServices'
+//resource cognitive 'Microsoft.CognitiveServices/accounts@2023-10-01' = {
 resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
   name: cognitiveName
   location: location
@@ -37,6 +40,7 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     networkAcls: {
+      //bypass:'AzureServices'
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
@@ -103,8 +107,6 @@ resource embedding3 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
       format: 'OpenAI'
       name: 'text-embedding-3-large'
       version:'1' 
-      //name: 'text-embedding-ada-002'
-      //version:'2'
     }
     raiPolicyName: 'Microsoft.Default'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
@@ -113,6 +115,32 @@ resource embedding3 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     embedding2
   ]
 }
+
+/*
+@batchSize(1)
+resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = [for deployment in deployments: {
+  parent: cognitive
+  name: deployment.name
+  
+  properties: {
+    model: deployment.model
+    //raiPolicyName: deployment.?raiPolicyName ?? 'Microsoft.Default'
+    raiPolicyName:'Microsoft.Default'
+    //versionUpgradeOption: deployment.?versionUpgradeOption ??'OnceCurrentVersionExpired'
+    versionUpgradeOption:'OnceCurrentVersionExpired'
+    scaleSettings: {
+      capacity: deployment.scaleType.capacity
+      scaleType:deployment.scaleType.scaleType
+    }
+  }
+  sku: {
+    name: deployment.sku
+    //capacity: deployment.capacity
+    //tier: deployment.tier
+  }
+}]
+
+*/
 
 resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   location: location
@@ -150,7 +178,7 @@ output cognitiveName string = cognitive.name
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name
-    type: 'cognitiveservices'
+    type: 'openai'
     id:cognitive.id
     groupid:'account'
   }
