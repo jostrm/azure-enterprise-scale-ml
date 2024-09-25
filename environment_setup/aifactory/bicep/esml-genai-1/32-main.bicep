@@ -1227,9 +1227,6 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
-    aiSearchName: aiSearchService.outputs.aiSearchName
-    resourceGroupId: targetResourceGroupId
-    userObjectIds: technicalAdminsObjectID_array_safe
     aiServicesName:csAIstudio.outputs.name
     aiSearchMIObjectId: aiSearchService.outputs.principalId
     openAIName: csAzureOpenAI.outputs.cognitiveName
