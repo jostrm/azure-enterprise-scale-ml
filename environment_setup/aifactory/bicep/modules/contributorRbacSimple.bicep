@@ -4,7 +4,7 @@ resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018
   name: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 }
 
-@description('Additional optional Object ID of more people to access Resource group')
+@description('Object ID array of people to access Resource group')
 param user_object_ids array
 
 resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
@@ -15,4 +15,5 @@ resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-0
     principalType: 'User'
     description: 'Contributor to user to get Contributor on resource group: ${resourceGroup().name}'
   }
+  scope: resourceGroup()
 }]

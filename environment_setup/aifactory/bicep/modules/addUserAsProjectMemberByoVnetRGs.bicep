@@ -108,7 +108,7 @@ resource dashboard_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01'
 }
 
 module dashboardRGcontributorPermissions './contributorRbacSimple.bicep' = {
-  scope: dashboard_resourcegroup
+  scope: resourceGroup(dashboard_resourcegroup_name)
   name: 'dashboardRGcontributorPermissions3456'
   params: {
    user_object_ids: user_object_ids_array_Safe
