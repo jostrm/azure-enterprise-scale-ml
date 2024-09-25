@@ -56,6 +56,7 @@ param serviceSettingDeployWebApp bool = false
 param semanticSearchTier string = 'free' //   'disabled' 'free' 'standard'
 param aiSearchSKUName string = 'basic' // 'basic' 'standard', 'standard2' if using sharedPrivateLinks
 param aiSearchEnableSharedPrivateLink bool = false
+param aiSearchEnableSharedPrivateLink_DOCS string = 'https://learn.microsoft.com/en-us/azure/search/search-limits-quotas-capacity#shared-private-link-resource-limits'
 
 @description('Default is false. May be needed if Azure OpenAI should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessForCognitive bool = true

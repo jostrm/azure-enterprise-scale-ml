@@ -7,6 +7,12 @@
         },
         "allowPublicAccessWhenBehindVnet": {
             "value": true
+        },
+        "aiSearchEnableSharedPrivateLink":{ 
+            "value": false
+        },
+        "aiSearchEnableSharedPrivateLink_DOCS":{ 
+            "value": "SharedPrivateLinks for Azure AI Search requires SKU standard2 or higher, you many need to apply for that. Alternative: In Azure Portal, AISearch, click Allow Azure services checkbox and do not created SharedPrivateLinks"
         }
     }
 }
