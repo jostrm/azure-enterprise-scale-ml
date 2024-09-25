@@ -92,7 +92,7 @@ resource contentSafetyCongnitiveServicesUserRoleId 'Microsoft.Authorization/role
 
 // 002 -> AI Search
 resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, '${openAIServicePrincipal}+010')
+  name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -103,7 +103,7 @@ resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssign
 }
 
 resource roleAssignmentSearchIndexDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, '${openAIServicePrincipal}+011')
+  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -113,7 +113,7 @@ resource roleAssignmentSearchIndexDataContributor 'Microsoft.Authorization/roleA
   scope: existingAiSearch
 }
 resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchServiceContributorRoleId, '${openAIServicePrincipal}+012')
+  name: guid(existingAiSearch.id, searchServiceContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
