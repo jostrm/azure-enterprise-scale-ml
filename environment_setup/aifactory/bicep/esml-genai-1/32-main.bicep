@@ -1176,10 +1176,30 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
 }
 
 // ------------------- RBAC for AI Studio (AIServices) service pricipal, to services ---------------//
+// -- DOCS: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/use-your-data-securely#create-shared-private-link --//
 
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 
-module rbacModule '../modules/aihubRbac.bicep' = {
+module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    resourceGroupId: targetResourceGroupId
+    aiServicesName: csAzureOpenAI.outputs.cognitiveName
+    openAIServicePrincipal:csAzureOpenAI.outputs.principalId
+    contentSafetyName: csContentSafety.outputs.name
+  }
+  dependsOn: [
+    csAzureOpenAI
+    csAIstudio
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+
+module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
@@ -1189,7 +1209,8 @@ module rbacModule '../modules/aihubRbac.bicep' = {
     resourceGroupId: targetResourceGroupId
     userObjectIds: technicalAdminsObjectID_array_safe
     aiServicesName:csAIstudio.outputs.name
-    aiServicesPrincipalId: csAIstudio.outputs.aiServicesPrincipalId
+    openAIName: csAzureOpenAI.outputs.cognitiveName
+    contentSafetyName: csContentSafety.outputs.name
   }
   dependsOn: [
     csAzureOpenAI
@@ -1197,6 +1218,69 @@ module rbacModule '../modules/aihubRbac.bicep' = {
     rbacReadUsersToCmnVnetBastion
   ]
 }
+
+
+module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    resourceGroupId: targetResourceGroupId
+    userObjectIds: technicalAdminsObjectID_array_safe
+    aiServicesName:csAIstudio.outputs.name
+    aiSearchMIObjectId: aiSearchService.outputs.principalId
+    openAIName: csAzureOpenAI.outputs.cognitiveName
+  }
+  dependsOn: [
+    csAzureOpenAI
+    csAIstudio
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+
+module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    resourceGroupId: targetResourceGroupId
+    aiServicesName:csAIstudio.outputs.name
+    aiServicesPrincipalId:csAIstudio.outputs.aiServicesPrincipalId
+    openAIName:csAzureOpenAI.outputs.cognitiveName
+    contentSafetyName: csContentSafety.outputs.name
+  }
+  dependsOn: [
+    csAzureOpenAI
+    csAIstudio
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+
+
+/*
+module rbacModuleWebApp'../modules/aihubRbacAIWebApp.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    resourceGroupId: targetResourceGroupId
+    aiServicesName: csAzureOpenAI.outputs.cognitiveName
+    aiServicesPrincipalId:csAzureOpenAI.outputs.principalId
+  }
+  dependsOn: [
+    csAzureOpenAI
+    csAIstudio
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+  */
+
 
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {

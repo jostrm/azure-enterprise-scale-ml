@@ -164,6 +164,8 @@ var hostName = 'https://${aiSearch.name}.search.windows.net'
 output aiSearchEndpoint string = hostName
 output aiSearchName string = aiSearch.name
 output aiSearchId string = aiSearch.id
+output principalId string = aiSearch.identity.principalId
+
 output dnsConfig array = [
   {
     name: pendAISearch.name

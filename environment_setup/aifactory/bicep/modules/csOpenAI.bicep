@@ -175,6 +175,8 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
 output cognitiveId string = cognitive.id
 output azureOpenAIEndpoint string = cognitive.properties.endpoint
 output cognitiveName string = cognitive.name
+output principalId string = cognitive.identity.principalId // SystemAssigned
+
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name

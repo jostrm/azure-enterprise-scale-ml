@@ -67,6 +67,8 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
 
 output name string = contentSafetyAccount.name
 output resourceId string = contentSafetyAccount.id
+output principalId string = contentSafetyAccount.identity.principalId
+
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name
