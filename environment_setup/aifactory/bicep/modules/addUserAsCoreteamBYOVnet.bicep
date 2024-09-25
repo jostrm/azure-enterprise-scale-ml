@@ -10,7 +10,7 @@
 // *networkContributorRoleDefinition on vNET
 
 param vnet_name string
-param vnet_resourcegroup_name string // This deployment. It is either COOMMON RG, or external vNet RG
+param vnet_resourcegroup_name string // This deployment. It is either COMMON RG, or external vNet RG
 param common_bastion_subnet_name string = 'AzureBastionSubnet'
 param project_service_principle_oid string
 param user_object_ids string
@@ -22,6 +22,17 @@ var service_principle_array = project_service_principle_oid == ''? []: array(spl
 resource vnet_resourcegroup 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: vnet_resourcegroup_name
   scope: subscription()
+}
+
+module commonRGOwnerPermissions './ownerRbac.bicep' = {
+  scope: vnet_resourcegroup
+  name: 'commonRGOwnerPerm4coremteam123'
+  params: {
+   user_object_ids: user_object_ids_array_Safe
+  }
+  dependsOn:[
+    vnet_resourcegroup
+  ]
 }
 
 // networkContributor
@@ -42,7 +53,6 @@ resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018
 // subet - Microsoft.Network/virtualNetworks/subnets/join/action
 resource vNetNameResource 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
   name: vnet_name
-  //scope: subscription() //
 }
 
 resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{

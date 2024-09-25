@@ -18,7 +18,9 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Region location prefix in ESML settings: [weu,uks,swe,sdc]")][string]$locationSuffix,
     [Parameter(Mandatory = $false, HelpMessage = "Region location in ESML settings: [westeurope, swedencentral, uksouth]")][string]$location,
     [Parameter(Mandatory = $false, HelpMessage = "ESML Projectnumber, three digits: 001")][string]$projectNumber,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env,
+    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet Resource Group - BYOVnet")][string]$BYOvNetResourceGroup,
+    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet vNet Name")][string]$BYOvNetName
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {
@@ -44,7 +46,8 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
 }
 
 # EDIT per your convention if it differs from ESML AIFactory defaults
-$deplName = '26-add-esml-coreteam-member'
+$deplName1 = '26-add-esml-coreteam-member1'
+$deplName2 = '26-add-esml-coreteam-member2'
 $common_rg = "${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}" # dc-heroes-esml-common-weu-dev-001
 $project_rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
 
@@ -52,10 +55,6 @@ $projectKeyvaultName = "kv-p${projectNumber}-${locationSuffix}-${env}-${aifactor
 $commonKeyvaultName = "kv-cmn${env}-${aifactorySalt}-${commonKeyvaultNameSuffix}" # kv-cmndev-abcde-001
 $commonAdmKeyvaultName = "kv-cmnadm${env}-${aifactorySalt}-${commonKeyvaultNameSuffix}" # kv-cmnadmdev-abcde-001
 $dashboard_resourcegroup_name = 'dashboards'
-#$projectXXX = "project"+$projectNumber
-#$vnetNameBase = 'vnt-esmlcmn'
-#$vnetNameFull = "${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}"
-#$bastion_service_name = "bastion-${locationSuffix}-${env}${aifactorySuffixRG}"
 
 Write-Host "Common RG" $common_rg
 Write-Host "Project RG" $project_rg
@@ -66,18 +65,48 @@ Write-Host "UserIds : ${userObjectIds}"
 Write-Host "project kv : ${projectKeyvaultName}"
 Write-Host "common kv : ${commonKeyvaultName}"
 Write-Host "common adm kv : ${commonAdmKeyvaultName}"
+Write-Host "BYOvNetResourceGroup: ${BYOvNetResourceGroup}"
+Write-Host "BYOvNetName: ${BYOvNetName}"
 
 Write-Host "Kicking off the BICEP..."
 
-New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsCoreteam.bicep" `
--Name $deplName `
--ResourceGroupName $common_rg `
--common_resourcegroup_name $common_rg `
--project_resourcegroup_name $project_rg `
--dashboard_resourcegroup_name $dashboard_resourcegroup_name `
--user_object_ids $userObjectIds `
--storage_account_name_datalake $storageAccount `
--Verbose
+if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
+  Write-Host "Running BYOVnet logic, first step: addCoreaTeamAsMemberOfCommonRG"
+  Set-AzDefault -ResourceGroupName $common_rg
+
+  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsCoreteam.bicep" `
+  -Name $deplName1 `
+  -ResourceGroupName $common_rg `
+  -common_resourcegroup_name $common_rg `
+  -project_resourcegroup_name $project_rg `
+  -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
+  -user_object_ids $userObjectIds `
+  -storage_account_name_datalake $storageAccount `
+  -Verbose
+
+  Write-Host "Running BYOVnet logic, second and last step: addCoreTeamAsProjectMemberBYOVnet"
+  Set-AzDefault -ResourceGroupName $BYOvNetResourceGroup
+
+  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsCoreteamBYOVnet.bicep" `
+  -Name $deplName2 `
+  -ResourceGroupName $BYOvNetResourceGroup `
+  -user_object_ids $userObjectIds `
+  -vnet_resourcegroup_name $BYOvNetResourceGroup `
+  -vnet_name $BYOvNetName `
+  -Verbose
+
+}else {
+  Write-Host "Running standard logic (not BYOVnet logic)..."
+  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsCoreteam.bicep" `
+  -Name $deplName1 `
+  -ResourceGroupName $common_rg `
+  -common_resourcegroup_name $common_rg `
+  -project_resourcegroup_name $project_rg `
+  -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
+  -user_object_ids $userObjectIds `
+  -storage_account_name_datalake $storageAccount `
+  -Verbose
+}
 
 $inUserObjectIdsArray = $userObjectIds -split ','
 

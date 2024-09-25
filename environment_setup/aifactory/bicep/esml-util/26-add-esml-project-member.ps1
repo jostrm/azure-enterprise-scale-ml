@@ -68,29 +68,37 @@ $dashboard_resourcegroup_name = 'dashboards'
 
 # EDIT end
 Write-Host "Kicking off the BICEP..."
-#Set-AzDefault -ResourceGroupName $rg
 
 Write-Host "common_rg : ${common_rg}"
 Write-Host "project_rg : ${project_rg}"
 Write-Host "dashboard_rg : ${dashboard_resourcegroup_name}"
 Write-Host "projectSP_id : ${projectSPObjectID}"
 Write-Host "vnetName : ${vnetNameFull}"
-Write-Host "userIds : ${userObjectIds}"
+Write-Host "BYOvNetResourceGroup: ${BYOvNetResourceGroup}"
+Write-Host "BYOvNetName: ${BYOvNetName}"
+Write-Host "vnetName : ${vnetNameFull}"
 Write-Host "kv : ${projectKeyvaultName}"
 Write-Host "bastion : ${bastion_service_name}"
 
+for ($i=0; $i -lt $userObjectIds.Length; $i++) {
+  $userID = $userObjectIds[$i]
+  Write-Host "userIds [$i] : ${userID}"
+}
+
 if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   Write-Host "Running BYOVnet logic - addUserAsProjectMemberByoVnet"
+  Set-AzDefault -ResourceGroupName $BYOvNetResourceGroup
   New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnet.bicep" `
   -Name $deplName1 `
   -ResourceGroupName $BYOvNetResourceGroup `
-  -vnet_resourcegroup_name $BYOvNetResourceGroup `
   -project_service_principle_oid $projectSPObjectID `
+  -vnet_resourcegroup_name $BYOvNetResourceGroup `
   -vnet_name $BYOvNetName `
   -user_object_ids $userObjectIds `
   -Verbose
 
   Write-Host "Running BYOVnet logic - addUserAsProjectMemberByoVnetRGs"
+  Set-AzDefault -ResourceGroupName $common_rg
   New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnetRGs.bicep" `
   -Name $deplName2 `
   -ResourceGroupName $common_rg `
