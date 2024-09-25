@@ -1182,7 +1182,7 @@ var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Res
 
 module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacOpenAIDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1201,7 +1201,7 @@ module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = {
 
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacUsersDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1222,7 +1222,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
 
 module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacSearchDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1242,7 +1242,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
 
 module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacAIServicesDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
