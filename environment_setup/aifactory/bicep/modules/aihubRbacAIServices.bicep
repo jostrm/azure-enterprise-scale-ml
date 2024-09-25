@@ -39,7 +39,7 @@ resource existingAiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' e
   name: aiSearchName
 }
 
-resource existingOpenAI 'Microsoft.Search/searchServices@2021-04-01-preview' existing = {
+resource existingOpenAI 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
   name: openAIName
 }
 
