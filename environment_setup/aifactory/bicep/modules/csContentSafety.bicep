@@ -67,7 +67,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
 
 output name string = contentSafetyAccount.name
 output resourceId string = contentSafetyAccount.id
-output principalId string = contentSafetyAccount.identity.principalId
+//output principalId string = contentSafetyAccount.identity.principalId // Error, "The template output 'principalId' is not valid: The language expression property 'identity' doesn't exist,
 
 output dnsConfig array = [
   {
