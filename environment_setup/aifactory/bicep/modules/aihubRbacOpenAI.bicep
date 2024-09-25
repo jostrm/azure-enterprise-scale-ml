@@ -65,19 +65,20 @@ resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorizati
 
 //Q end
 
+// Error: cb0314f0-9e8e-5c50-8760-21beb80f5ac5
 resource contentSafetyReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingContentSafety.id, readerRole, openAIServicePrincipal)
+  name: guid(existingContentSafety.id, readerRole, '${openAIServicePrincipal}+016')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRole)
-    description: '018'
+    description: '016'
   }
   scope: existingContentSafety
 }
 
 resource contentSafetyCongnitiveServicesUserRoleId 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingContentSafety.id, congnitiveServicesUserRoleId, openAIServicePrincipal)
+  name: guid(existingContentSafety.id, congnitiveServicesUserRoleId, '${openAIServicePrincipal}+018')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -90,7 +91,7 @@ resource contentSafetyCongnitiveServicesUserRoleId 'Microsoft.Authorization/role
 
 // -> AI Search
 resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, openAIServicePrincipal)
+  name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, '${openAIServicePrincipal}+010')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -101,7 +102,7 @@ resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssign
 }
 
 resource roleAssignmentSearchIndexDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, openAIServicePrincipal)
+  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, '${openAIServicePrincipal}+011')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -111,7 +112,7 @@ resource roleAssignmentSearchIndexDataContributor 'Microsoft.Authorization/roleA
   scope: existingAiSearch
 }
 resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchServiceContributorRoleId, openAIServicePrincipal)
+  name: guid(existingAiSearch.id, searchServiceContributorRoleId, '${openAIServicePrincipal}+012')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -125,7 +126,7 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 // -> Storage START
 
 resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, openAIServicePrincipal)
+  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, '${openAIServicePrincipal}+013')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -135,7 +136,7 @@ resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleA
   scope: existingStorageAccount
 }
 resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, openAIServicePrincipal)
+  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, '${openAIServicePrincipal}+014')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -147,7 +148,7 @@ resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/role
 
 // FILE
 resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, openAIServicePrincipal)
+  name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, '${openAIServicePrincipal}+01b')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -157,7 +158,7 @@ resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authoriza
   scope: existingStorageAccount
 }
 resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageFileDataPrivilegedContributorRoleId, openAIServicePrincipal)
+  name: guid(existingStorageAccount2.id, storageFileDataPrivilegedContributorRoleId, '${openAIServicePrincipal}+019a')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -171,7 +172,7 @@ resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authoriz
 
 // -> PROJECT RG START
 resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, openAIServicePrincipal)
+  name: guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, '${openAIServicePrincipal}+015')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -182,7 +183,7 @@ resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/ro
 }
 
 resource roleAssignmentKeyVaultAdministrator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, keyVaultAdministrator, openAIServicePrincipal)
+  name: guid(resourceGroupId, keyVaultAdministrator, '${openAIServicePrincipal}+016')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -193,7 +194,7 @@ resource roleAssignmentKeyVaultAdministrator 'Microsoft.Authorization/roleAssign
 }
 
 resource roleAssignmentUserAccessAdministrator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, userAccessAdministratorRoleId, openAIServicePrincipal)
+  name: guid(resourceGroupId, userAccessAdministratorRoleId, '${openAIServicePrincipal}+017')
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
