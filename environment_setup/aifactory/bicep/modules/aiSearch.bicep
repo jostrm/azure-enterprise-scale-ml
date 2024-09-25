@@ -44,7 +44,6 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
   identity: {
     type: 'SystemAssigned'
   }
-  
   properties: {
     authOptions: {
       aadOrApiKey: {

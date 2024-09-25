@@ -1189,6 +1189,7 @@ module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = {
     aiSearchName: aiSearchService.outputs.aiSearchName
     resourceGroupId: targetResourceGroupId
     aiServicesName: csAzureOpenAI.outputs.cognitiveName
+    //openAIServicePrincipal:csAzureOpenAI.outputs.principalId
     openAIServicePrincipal:csAzureOpenAI.outputs.principalId
     contentSafetyName: csContentSafety.outputs.name
   }

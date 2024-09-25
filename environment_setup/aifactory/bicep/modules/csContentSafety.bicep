@@ -19,6 +19,9 @@ resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2022-03-01' 
   name: contentsafetyName
   location: location
   kind: kind
+  identity: {
+    type: 'SystemAssigned'
+  }
   sku: {
     name: csSKU
   }

@@ -27,6 +27,9 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
   name: cognitiveName
   location: location
   kind: kind
+  identity: {
+    type: 'SystemAssigned'
+  }
   tags: tags
   sku: {
     name: sku

@@ -26,11 +26,15 @@ var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 // TODO: in ADO pipeline: https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#grant-access-to-trusted-azure-services-for-azure-openai
 //bypass:'AzureServices'
 //resource cognitive 'Microsoft.CognitiveServices/accounts@2023-10-01' = {
-resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
+//resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
+resource cognitive 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
   name: cognitiveName
   location: location
   kind: kind
   tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
   sku: {
     name: sku
   }
@@ -175,7 +179,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
 output cognitiveId string = cognitive.id
 output azureOpenAIEndpoint string = cognitive.properties.endpoint
 output cognitiveName string = cognitive.name
-output principalId string = cognitive.identity.principalId // SystemAssigned
+output principalId string = cognitive.identity.principalId // SystemAssigned. Unable to evaluate template outputs: 'principalId'
 
 output dnsConfig array = [
   {
