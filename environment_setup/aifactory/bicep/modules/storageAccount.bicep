@@ -34,6 +34,8 @@ param subnetName string
 
 @description('Specifies the tags that should be applied to the storage acocunt resources')
 param tags object
+param vnetRules array = []
+param ipRules array = []
 
 var location = resourceGroup().location
 var subnetRef = '${vnetId}/subnets/${subnetName}'
@@ -56,7 +58,7 @@ var groupIds = [
   }
 ]
 
-resource sacc 'Microsoft.Storage/storageAccounts@2021-04-01' = {
+resource sacc 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: storageAccountName
   tags: tags
   location: location
@@ -101,6 +103,10 @@ resource sacc 'Microsoft.Storage/storageAccounts@2021-04-01' = {
     networkAcls: {
       bypass: 'AzureServices' // CHECK?
       defaultAction: 'Deny' // CHECK?
+      virtualNetworkRules: [for rule in vnetRules: {
+        id: rule
+      }]
+      ipRules: ipRules
     }
     supportsHttpsTrafficOnly: true
   }

@@ -52,7 +52,7 @@ resource vmAdminLoginRoleDefinition 'Microsoft.Authorization/roleDefinitions@201
 // subet - Microsoft.Network/virtualNetworks/subnets/join/action
 resource vNetNameResource 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
   name: vnet_name
-  //scope: subscription() //resourceGroup(subscription_id, common_rg_name)
+  //scope: subscription() //
 }
 
 resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{
