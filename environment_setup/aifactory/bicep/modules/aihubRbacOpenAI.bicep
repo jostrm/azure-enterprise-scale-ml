@@ -62,10 +62,11 @@ resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorizati
   scope: existingAiServicesResource
 }
 */
-
 //Q end
 
 // Error: cb0314f0-9e8e-5c50-8760-21beb80f5ac5
+
+/* 001
 resource contentSafetyReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingContentSafety.id, readerRole, '${openAIServicePrincipal}+016')
   properties: {
@@ -87,9 +88,9 @@ resource contentSafetyCongnitiveServicesUserRoleId 'Microsoft.Authorization/role
   }
   scope: existingContentSafety
 }
+*/
 
-
-// -> AI Search
+// 002 -> AI Search
 resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, '${openAIServicePrincipal}+010')
   properties: {
@@ -123,8 +124,11 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 }
 // AI Search - END
 
-// -> Storage START
 
+
+// 003 -> Storage START
+
+/*003
 resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, '${openAIServicePrincipal}+013')
   properties: {
@@ -170,7 +174,10 @@ resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authoriz
 
 // -> Storage END
 
-// -> PROJECT RG START
+*/
+
+// 004 -> PROJECT RG START
+/*004
 resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, '${openAIServicePrincipal}+015')
   properties: {
@@ -206,13 +213,15 @@ resource roleAssignmentUserAccessAdministrator 'Microsoft.Authorization/roleAssi
 
 // -> PROJECT RG END
 
+*/
+
 // --------------- AIServices MI END ---------------- //
 
 // Outputs
-output roleAssignmentSearchIndexDataReaderName string = roleAssignmentSearchIndexDataReader.name
-output roleAssignmentSearchIndexDataContributorName string = roleAssignmentSearchIndexDataContributor.name
-output roleAssignmentSearchServiceContributorName string = roleAssignmentSearchServiceContributor.name
-output roleAssignmentStorageBlobDataContributorName string = roleAssignmentStorageBlobDataContributor.name
+//output roleAssignmentSearchIndexDataReaderName string = roleAssignmentSearchIndexDataReader.name
+//output roleAssignmentSearchIndexDataContributorName string = roleAssignmentSearchIndexDataContributor.name
+//output roleAssignmentSearchServiceContributorName string = roleAssignmentSearchServiceContributor.name
+//output roleAssignmentStorageBlobDataContributorName string = roleAssignmentStorageBlobDataContributor.name
 
 
 // Outputs for GUIDs with resource names
