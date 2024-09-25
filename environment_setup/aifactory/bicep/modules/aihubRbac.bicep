@@ -41,7 +41,7 @@ resource existingAiServicesResource 'Microsoft.CognitiveServices/accounts@2024-0
 // --------------- SP for Azure AI services -START ---------------- //
 
 resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, aiServicesPrincipalId)
+  name: '010-${guid(existingAiSearch.id, searchIndexDataReaderRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     principalType: 'ServicePrincipal'
@@ -51,7 +51,7 @@ resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssign
 }
 
 resource roleAssignmentSearchIndexDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, aiServicesPrincipalId)
+  name: '011-${guid(existingAiSearch.id, searchIndexDataContributorRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
@@ -59,7 +59,7 @@ resource roleAssignmentSearchIndexDataContributor 'Microsoft.Authorization/roleA
   scope: existingAiSearch
 }
 resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchServiceContributorRoleId, aiServicesPrincipalId)
+  name: '012-${guid(existingAiSearch.id, searchServiceContributorRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
@@ -68,7 +68,7 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 }
 
 resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)
+  name: '013-${guid(existingStorageAccount.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
@@ -76,7 +76,7 @@ resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleA
   scope: existingStorageAccount
 }
 resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)
+  name: '014-${guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
@@ -89,7 +89,7 @@ resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/role
 var aiInferenceDeploymentOperatorRoleId = '3afb7f49-54cb-416e-8c09-6dc049efa503'
 
 resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, aiServicesPrincipalId)
+  name: '015-${guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', aiInferenceDeploymentOperatorRoleId)
@@ -97,10 +97,7 @@ resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/ro
   scope: resourceGroup()
 }
 
-
 /*
-
-
 resource roleAssignmentStorageBlobDataOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingStorageAccount.id, storageBlobDataOwnerRoleId, aiServicesPrincipalId)
   properties: {
@@ -110,19 +107,10 @@ resource roleAssignmentStorageBlobDataOwner 'Microsoft.Authorization/roleAssignm
   scope: existingStorageAccount
 }
 
-
-resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, aiServicesPrincipalId)
-  properties: {
-    principalId: aiServicesPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
-  }
-  scope: existingStorageAccount
-}
   */
 
 resource roleAssignmentKeyVaultAdministrator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, keyVaultAdministrator, aiServicesPrincipalId)
+  name: '016-${guid(resourceGroupId, keyVaultAdministrator, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultAdministrator)
@@ -134,7 +122,7 @@ resource roleAssignmentKeyVaultAdministrator 'Microsoft.Authorization/roleAssign
 var userAccessAdministratorRoleId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9'
 
 resource roleAssignmentUserAccessAdministrator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, userAccessAdministratorRoleId, aiServicesPrincipalId)
+  name: '017-${guid(resourceGroupId, userAccessAdministratorRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', userAccessAdministratorRoleId)
@@ -143,12 +131,8 @@ resource roleAssignmentUserAccessAdministrator 'Microsoft.Authorization/roleAssi
 }
 
 
-// --------------- SP END ---------------- //
-
-// --------------- AIServices MI START ---------------- //
-
 resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, aiServicesPrincipalId)
+  name: '018-${guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, aiServicesPrincipalId)}'
   properties: {
     principalId: aiServicesPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
@@ -156,24 +140,42 @@ resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorizati
   scope: existingAiServicesResource
 }
 
+resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: '019-${guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, aiServicesPrincipalId)}'
+  properties: {
+    principalId: aiServicesPrincipalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
+  }
+  scope: existingStorageAccount
+}
+resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: '019-${guid(existingStorageAccount2.id, storageFileDataPrivilegedContributorRoleId, aiServicesPrincipalId)}'
+  properties: {
+    principalId: aiServicesPrincipalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
+  }
+  scope: existingStorageAccount2
+}
+
+
 // --------------- AIServices MI END ---------------- //
 
 // --------------- USERS START ---------------- //
 
 // SEARCH
 resource roleAssignmentSearchIndexUserDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, userObjectIds[i])
+  name: '020-${guid(existingAiSearch.id, searchIndexDataContributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'SearchIndexUserDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingAiSearch.name}'
   }
   scope:existingAiSearch
 }]
 
 resource roleAssignmentSearchContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAiSearch.id, contributorRoleId, userObjectIds[i])
+  name: '021-${guid(existingAiSearch.id, contributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
@@ -186,33 +188,33 @@ resource roleAssignmentSearchContributor 'Microsoft.Authorization/roleAssignment
 
 // AI SERVICES
 resource userRoleAssignmentContributorAiSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAiServicesResource.id, searchServiceContributorRoleId, userObjectIds[i])
+  name: '022-${guid(existingAiServicesResource.id, searchServiceContributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name}'
   }
   scope:existingAiSearch
 }]
 
 resource roleAssignmentCognitiveServicesOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])
+  name: '023-${guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'OpenAIContributorRole to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to call data on data plane'
   }
   scope:existingAiServicesResource
 }]
 
 resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
+  name: '024-${guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'OpenAICognitiveServicesUSer to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to list API keys'
   }
   scope:existingAiServicesResource
@@ -220,63 +222,62 @@ resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/rol
 
 
 resource userRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAiServicesResource.id, contributorRoleId, userObjectIds[i])
+  name: '025-${guid(existingAiServicesResource.id, contributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name}'
   }
   scope:existingAiServicesResource
 }]
 
-// STORAGE
+// USERS to STORAGE
 
 resource userRoleAssignmentContributorStorage1 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount.id, contributorRoleId, userObjectIds[i])
+  name: '026-${guid(existingStorageAccount.id, contributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
 }]
 resource userRoleAssignmentContributorStorage2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount.id, contributorRoleId, userObjectIds[i])
+  name: '026-${guid(existingStorageAccount2.id, contributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
-    description:'CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
+    principalType: 'User'
+    description:'CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
 }]
 
 resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, userObjectIds[i])
+  name: '027-${guid(existingStorageAccount.id, storageBlobDataContributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
 }]
 resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, userObjectIds[i])
+  name: '027-${guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
-    description:'StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
+    principalType: 'User'
+    description:'StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
 }]
 
-
 resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])
+  name: '028-${guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
     principalId: userObjectIds[i]
@@ -286,25 +287,23 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Autho
   scope:existingStorageAccount
 }]
 resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])
+  name: '028-${guid(existingStorageAccount2.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
-    description:'FileDataPrivilegedContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
+    principalType: 'User'
+    description:'FileDataPrivilegedContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
 }]
 
-
-
 // RG
 resource userRoleAssignmentContributorStorageAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(resourceGroupId, contributorRoleId, userObjectIds[i])
+  name: '029-${guid(resourceGroupId, contributorRoleId, userObjectIds[i])}'
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
-    //principalType: 'User'
+    principalType: 'User'
     description:'CONTRIBUTOR on RG to USER with OID  ${userObjectIds[i]} for : ${resourceGroupId}'
   }
   scope:resourceGroup()
