@@ -128,7 +128,7 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 
 // 003 -> Storage START
 
-//003
+/* 003
 resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, '${openAIServicePrincipal}+013')
   properties: {
@@ -173,9 +173,10 @@ resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authoriz
 }
 
 // -> Storage END
+*/
 
 // 004 -> PROJECT RG START
-// 004
+/*004
 resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, '${openAIServicePrincipal}+015')
   properties: {
@@ -211,6 +212,7 @@ resource roleAssignmentUserAccessAdministrator 'Microsoft.Authorization/roleAssi
 
 // -> PROJECT RG END
 
+*/ 
 
 // --------------- AIServices MI END ---------------- //
 
