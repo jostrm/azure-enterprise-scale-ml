@@ -66,7 +66,7 @@ resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorizati
 
 // Error: cb0314f0-9e8e-5c50-8760-21beb80f5ac5
 
-/* 001
+// 001
 resource contentSafetyReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingContentSafety.id, readerRole, '${openAIServicePrincipal}+016')
   properties: {
@@ -88,9 +88,9 @@ resource contentSafetyCongnitiveServicesUserRoleId 'Microsoft.Authorization/role
   }
   scope: existingContentSafety
 }
-*/
 
-// 002 -> AI Search
+
+/* 002 -> AI Search
 resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, openAIServicePrincipal)
   properties: {
@@ -124,11 +124,11 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 }
 // AI Search - END
 
-
+*/
 
 // 003 -> Storage START
 
-/*003
+//003
 resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, '${openAIServicePrincipal}+013')
   properties: {
@@ -174,10 +174,8 @@ resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authoriz
 
 // -> Storage END
 
-*/
-
 // 004 -> PROJECT RG START
-/*004
+// 004
 resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, '${openAIServicePrincipal}+015')
   properties: {
@@ -213,7 +211,6 @@ resource roleAssignmentUserAccessAdministrator 'Microsoft.Authorization/roleAssi
 
 // -> PROJECT RG END
 
-*/
 
 // --------------- AIServices MI END ---------------- //
 
