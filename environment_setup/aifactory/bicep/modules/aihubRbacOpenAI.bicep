@@ -42,6 +42,14 @@ resource existingContentSafety 'Microsoft.CognitiveServices/accounts@2024-04-01-
   name: contentSafetyName
 }
 
+// STATUS
+// 001 (content safety) enbart: failed
+// 002 (AI Search) enbart: 
+// 003 (Storage) enbart: 
+// 004 (RG) enbart: 
+// STATUS END
+
+
 // --------------- SP for Azure AI services -START ---------------- //
 
 // Q: Is this needed? To have access from AIServices to OpenAIContributor? E.g. set permission on itself?
@@ -66,7 +74,7 @@ resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorizati
 
 // Error: cb0314f0-9e8e-5c50-8760-21beb80f5ac5
 
-// 001
+/* 001
 resource contentSafetyReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingContentSafety.id, readerRole, '${openAIServicePrincipal}+016')
   properties: {
@@ -89,8 +97,9 @@ resource contentSafetyCongnitiveServicesUserRoleId 'Microsoft.Authorization/role
   scope: existingContentSafety
 }
 
+*/
 
-/* 002 -> AI Search
+// 002 -> AI Search
 resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, openAIServicePrincipal)
   properties: {
@@ -124,7 +133,7 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 }
 // AI Search - END
 
-*/
+
 
 // 003 -> Storage START
 
