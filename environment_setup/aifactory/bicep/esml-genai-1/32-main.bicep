@@ -519,7 +519,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    cognitiveName: 'cogAOI-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    cognitiveName: 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     tags: tags
     restore:restore
     location: location

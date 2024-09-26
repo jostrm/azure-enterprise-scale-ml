@@ -46,7 +46,7 @@ resource existingContentSafety 'Microsoft.CognitiveServices/accounts@2024-04-01-
 // 001 (content safety) enbart: failed
 // *002 (AI Search) enbart: failed in ADO (green in deployment)
 // *003 (Storage) enbart: 
-// 004 (RG) enbart: 
+// *004 (RG) enbart: 
 // STATUS END
 
 
@@ -182,7 +182,7 @@ resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authoriz
 // -> Storage END
 
 // 004 -> PROJECT RG START
-/*004
+
 resource roleAssignmentAIInferenceDeploymentOperator 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroupId, aiInferenceDeploymentOperatorRoleId, '${openAIServicePrincipal}+015')
   properties: {
@@ -217,8 +217,6 @@ resource roleAssignmentUserAccessAdministrator 'Microsoft.Authorization/roleAssi
 }
 
 // -> PROJECT RG END
-
-*/ 
 
 // --------------- AIServices MI END ---------------- //
 
