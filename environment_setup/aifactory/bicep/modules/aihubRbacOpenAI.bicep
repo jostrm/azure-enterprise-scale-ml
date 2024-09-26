@@ -44,7 +44,7 @@ resource existingContentSafety 'Microsoft.CognitiveServices/accounts@2024-04-01-
 
 // STATUS
 // 001 (content safety) enbart: failed
-// 002 (AI Search) enbart: 
+// 002 (AI Search) enbart: failed in ADO (green in deployment)
 // 003 (Storage) enbart: 
 // 004 (RG) enbart: 
 // STATUS END
@@ -100,6 +100,7 @@ resource contentSafetyCongnitiveServicesUserRoleId 'Microsoft.Authorization/role
 */
 
 // 002 -> AI Search
+/*
 resource roleAssignmentSearchIndexDataReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiSearch.id, searchIndexDataReaderRoleId, openAIServicePrincipal)
   properties: {
@@ -133,7 +134,7 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 }
 // AI Search - END
 
-
+*/
 
 // 003 -> Storage START
 
