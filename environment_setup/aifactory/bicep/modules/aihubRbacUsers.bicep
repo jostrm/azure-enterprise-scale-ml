@@ -168,7 +168,7 @@ resource openAIRoleAssignmentContributorAiServices 'Microsoft.Authorization/role
 }]
 
 resource openAIRoleBasedAccessControlAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingOpenAI.id, contributorRoleId, userObjectIds[i])
+  name: guid(existingOpenAI.id, roleBasedAccessControlAdminForWebApp, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleBasedAccessControlAdminForWebApp)
     principalId: userObjectIds[i]
@@ -179,6 +179,7 @@ resource openAIRoleBasedAccessControlAdmin 'Microsoft.Authorization/roleAssignme
 }]
 
 // USERS to ContentSafety: Cognitive Services Users and Reader.
+
 resource contentSafetyServicesOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingContentSafety.id, congnitiveServicesUserRoleId, userObjectIds[i])
   properties: {
@@ -189,6 +190,7 @@ resource contentSafetyServicesOpenAICotributorUsers 'Microsoft.Authorization/rol
   }
   scope:existingContentSafety
 }]
+
 
 resource contentSafetyCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingContentSafety.id, readerRole, userObjectIds[i])

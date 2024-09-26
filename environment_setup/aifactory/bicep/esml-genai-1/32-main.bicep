@@ -514,12 +514,12 @@ var defaultOpenAiDeployments = [
   }
 ]
 
-
+// cog-prj003-sdc-dev-3pmpb-001
 module csAzureOpenAI '../modules/csOpenAI.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    cognitiveName: 'cog-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    cognitiveName: 'cogAOI-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     tags: tags
     restore:restore
     location: location
