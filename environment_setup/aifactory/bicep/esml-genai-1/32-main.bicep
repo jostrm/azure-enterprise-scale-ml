@@ -432,7 +432,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     location: location
     restore:restore
     name: 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    kind: kindContentSafety
+    kind: 'ComputerVision'
     pendCogSerName: 'p-${projectName}-vision-${genaiName}'
     subnetName:defaultSubnet
     vnetId: vnetId
