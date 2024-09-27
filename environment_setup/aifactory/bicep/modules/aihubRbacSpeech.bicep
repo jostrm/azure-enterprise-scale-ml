@@ -56,18 +56,9 @@ resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authoriza
   }
   scope: existingStorageAccount
 }
-resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageBlobDataOwnerRoleId, aiSpeechMIObjectId)
-  properties: {
-    principalId: aiSpeechMIObjectId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataOwnerRoleId)
-    description: '019a'
-  }
-  scope: existingStorageAccount2
-}
 
 // USERS to Speech
+
 
 resource speechServiceOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(speechService.id, congnitiveServicesUserRoleId, userObjectIds[i])
@@ -90,7 +81,6 @@ resource speechServiceReader 'Microsoft.Authorization/roleAssignments@2022-04-01
   }
   scope:speechService
 }]
-
 
 // Outputs
 output roleAssignmentStorageBlobDataContributorName string = roleAssignmentStorageBlobDataContributor.name
