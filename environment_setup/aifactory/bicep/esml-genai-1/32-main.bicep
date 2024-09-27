@@ -31,6 +31,10 @@ param aiSearchSKUSharedPrivate string = 'standard' // Needed for shared Private 
   'S3'
 ])
 param csContentSafetySKU string = 'S0' // 'Basic' = S0
+param csSpeechSKU string = 'S0'
+param csVisionSKU string = 'S0'
+param csDocIntelligenceSKU string = 'S0'
+
 @allowed([
   'hub'
   ''
@@ -38,6 +42,10 @@ param csContentSafetySKU string = 'S0' // 'Basic' = S0
 param kindAIHub string = 'hub'
 // Cognitive Service types & settings, End
 
+@description('Service setting: Deploy Azure AI Document Intelligence for project')
+param serviceSettingDeployAIDocIntelligence bool = true
+@description('Service setting: Deploy Azure Speech for project')
+param serviceSettingDeployAzureSpeech bool = true
 @description('Service setting: Deploy Azure AI Vision for project')
 param serviceSettingDeployAzureAIVision bool = true
 @description('Service setting: Deploy VM for project')
@@ -428,12 +436,67 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'Vision4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    csSKU: csContentSafetySKU
+    csSKU: csVisionSKU
     location: location
     restore:restore
     name: 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'ComputerVision'
     pendCogSerName: 'p-${projectName}-vision-${genaiName}'
+    subnetName:defaultSubnet
+    vnetId: vnetId
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AISpeech4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    csSKU: csSpeechSKU
+    location: location
+    restore:restore
+    name: 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    kind: 'SpeechServices'
+    pendCogSerName: 'p-${projectName}-speech-${genaiName}'
+    subnetName:defaultSubnet
+    vnetId: vnetId
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AIDocIntelligence4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    csSKU: csDocIntelligenceSKU
+    location: location
+    restore:restore
+    name: 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    kind: 'FormRecognizer'
+    pendCogSerName: 'p-${projectName}-docs-${genaiName}'
     subnetName:defaultSubnet
     vnetId: vnetId
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
@@ -1269,6 +1332,39 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
     sacc
   ]
 }
+module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSpeechMIObjectId: csSpeech.outputs.principalId
+    userObjectIds: technicalAdminsObjectID_array_safe
+    speechServiceName: csSpeech.outputs.name
+  }
+  dependsOn: [
+    csSpeech
+    sacc
+    sa4AIsearch
+  ]
+}
+module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    userObjectIds: technicalAdminsObjectID_array_safe
+    aiDocsIntelMIObjectId: csDocIntelligence.outputs.principalId
+    docsServiceName: csDocIntelligence.outputs.name
+  }
+  dependsOn: [
+    csDocIntelligence
+    sacc
+    sa4AIsearch
+  ]
+}
+
 
 module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
