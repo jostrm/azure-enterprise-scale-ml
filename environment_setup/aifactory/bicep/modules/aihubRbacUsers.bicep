@@ -52,7 +52,9 @@ resource existingContentSafety 'Microsoft.CognitiveServices/accounts@2024-04-01-
 
 // --------------- USERS START ---------------- //
 
-// USERES to AI SEARCH
+// 020:USERES to AI SEARCH
+/*
+//(guid-finder: Ok)
 resource roleAssignmentSearchIndexUserDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, userObjectIds[i])
   properties: {
@@ -63,7 +65,7 @@ resource roleAssignmentSearchIndexUserDataContributor 'Microsoft.Authorization/r
   }
   scope:existingAiSearch
 }]
-
+//(guid-finder: ok)
 resource roleAssignmentSearchContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiSearch.id, contributorRoleId, userObjectIds[i])
   properties: {
@@ -74,7 +76,7 @@ resource roleAssignmentSearchContributor 'Microsoft.Authorization/roleAssignment
   }
   scope:existingAiSearch
 }]
-
+//(guid-finder: ok)
 resource userRoleAssignmentContributorAiSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, userObjectIds[i])
   properties: {
@@ -86,7 +88,7 @@ resource userRoleAssignmentContributorAiSearch 'Microsoft.Authorization/roleAssi
   scope:existingAiSearch
 }]
 
-// USERS to AIServices
+// 021 - USERS to AIServices
 resource roleAssignmentCognitiveServicesOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])
   properties: {
@@ -97,7 +99,7 @@ resource roleAssignmentCognitiveServicesOpenAICotributorUsers 'Microsoft.Authori
   }
   scope:existingAiServicesResource
 }]
-
+//(guid-finder: ok)
 resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
   properties: {
@@ -109,7 +111,7 @@ resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/rol
   scope:existingAiServicesResource
 }]
 
-
+//(guid-finder: ok)
 resource userRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, contributorRoleId, userObjectIds[i])
   properties: {
@@ -121,7 +123,9 @@ resource userRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAs
   scope:existingAiServicesResource
 }]
 
-// USERS to OpenAI
+*/
+
+// 022:USERS to OpenAI
 
 resource openAICogUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingOpenAI.id, congnitiveServicesUserRoleId, userObjectIds[i])
@@ -133,7 +137,7 @@ resource openAICogUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
   }
   scope:existingOpenAI
 }]
-
+//(guid-finder: ok)
 resource openAIServicesOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingOpenAI.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])
   properties: {
@@ -144,7 +148,7 @@ resource openAIServicesOpenAICotributorUsers 'Microsoft.Authorization/roleAssign
   }
   scope:existingOpenAI
 }]
-
+//(guid-finder: ok)
 resource openAICognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingOpenAI.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
   properties: {
@@ -156,6 +160,7 @@ resource openAICognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignm
   scope:existingOpenAI
 }]
 
+//(guid-finder:ok)
 resource openAIRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingOpenAI.id, contributorRoleId, userObjectIds[i])
   properties: {
@@ -166,7 +171,7 @@ resource openAIRoleAssignmentContributorAiServices 'Microsoft.Authorization/role
   }
   scope:existingOpenAI
 }]
-
+//(guid-finder:ok)
 resource openAIRoleBasedAccessControlAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingOpenAI.id, roleBasedAccessControlAdminForWebApp, userObjectIds[i])
   properties: {
@@ -178,8 +183,9 @@ resource openAIRoleBasedAccessControlAdmin 'Microsoft.Authorization/roleAssignme
   scope:existingOpenAI
 }]
 
-// USERS to ContentSafety: Cognitive Services Users and Reader.
+// 023:USERS to ContentSafety: Cognitive Services Users and Reader.
 
+//(guid-finder: OK)
 resource contentSafetyServicesOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingContentSafety.id, congnitiveServicesUserRoleId, userObjectIds[i])
   properties: {
@@ -191,7 +197,7 @@ resource contentSafetyServicesOpenAICotributorUsers 'Microsoft.Authorization/rol
   scope:existingContentSafety
 }]
 
-
+//(guid-finder: OK)
 resource contentSafetyCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingContentSafety.id, readerRole, userObjectIds[i])
   properties: {
@@ -218,8 +224,9 @@ resource contentSafetyRoleAssignmentContributorAiServices 'Microsoft.Authorizati
 */
 
 
-// USERS to STORAGE
+// 024: USERS to STORAGE
 
+//(guid-finder: OK )
 resource userRoleAssignmentContributorStorage1 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount.id, contributorRoleId, userObjectIds[i])
   properties: {
@@ -230,6 +237,7 @@ resource userRoleAssignmentContributorStorage1 'Microsoft.Authorization/roleAssi
   }
   scope:existingStorageAccount
 }]
+//(guid-finder: OK )
 resource userRoleAssignmentContributorStorage2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount2.id, contributorRoleId, userObjectIds[i])
   properties: {
@@ -240,7 +248,7 @@ resource userRoleAssignmentContributorStorage2 'Microsoft.Authorization/roleAssi
   }
   scope:existingStorageAccount2
 }]
-
+//(guid-finder: ok)
 resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, userObjectIds[i])
   properties: {
@@ -251,6 +259,8 @@ resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignm
   }
   scope:existingStorageAccount
 }]
+
+//(guid-finder: ok)
 resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, userObjectIds[i])
   properties: {
@@ -262,6 +272,7 @@ resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssign
   scope:existingStorageAccount2
 }]
 
+//(guid-finder: OK)
 resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])
   properties: {
@@ -272,6 +283,8 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Autho
   }
   scope:existingStorageAccount
 }]
+
+//(guid-finder: OK)
 resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount2.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])
   properties: {
@@ -283,7 +296,7 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Auth
   scope:existingStorageAccount2
 }]
 
-// RG
+// (guid-finder:OK) RG
 resource userRoleAssignmentContributorStorageAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(resourceGroupId, contributorRoleId, userObjectIds[i])
   properties: {

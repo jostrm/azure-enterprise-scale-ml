@@ -52,9 +52,8 @@ resource existingContentSafety 'Microsoft.CognitiveServices/accounts@2024-04-01-
 
 // --------------- SP for Azure AI services -START ---------------- //
 
-// Q: Is this needed? To have access from AIServices to OpenAIContributor? E.g. set permission on itself?
+// Q: Is this needed? 
 
-/*
 resource existingAiServicesResource 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
   name: aiServicesName
 }
@@ -69,7 +68,7 @@ resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorizati
   }
   scope: existingAiServicesResource
 }
-*/
+
 //Q end
 
 // Error: cb0314f0-9e8e-5c50-8760-21beb80f5ac5
