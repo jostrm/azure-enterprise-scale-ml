@@ -38,6 +38,8 @@ param csContentSafetySKU string = 'S0' // 'Basic' = S0
 param kindAIHub string = 'hub'
 // Cognitive Service types & settings, End
 
+@description('Service setting: Deploy Azure AI Vision for project')
+param serviceSettingDeployAzureAIVision bool = true
 @description('Service setting: Deploy VM for project')
 param serviceSettingDeployProjectVM bool = false
 @description('Service setting:Deploy Azure AI Search')
@@ -416,6 +418,34 @@ module csContentSafety '../modules/csContentSafety.bicep' = {
       }
     ]
     subnetId: genaiSubnetId
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVision==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'Vision4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    csSKU: csContentSafetySKU
+    location: location
+    restore:restore
+    name: 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    kind: kindContentSafety
+    pendCogSerName: 'p-${projectName}-vision-${genaiName}'
+    subnetName:defaultSubnet
+    vnetId: vnetId
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
   }
   dependsOn: [
     projectResourceGroup
@@ -1215,6 +1245,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     aiServicesName:csAIstudio.outputs.name
     openAIName: csAzureOpenAI.outputs.cognitiveName
     contentSafetyName: csContentSafety.outputs.name
+    visonServiceName: csVision.outputs.name
   }
   dependsOn: [
     csAzureOpenAI
@@ -1223,6 +1254,22 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   ]
 }
 
+module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacVisionDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiVisionMIObjectId: csVision.outputs.principalId
+    userObjectIds: technicalAdminsObjectID_array_safe
+    visonServiceName: csVision.outputs.name
+  }
+  dependsOn: [
+    csVision
+    sa4AIsearch
+    sacc
+  ]
+}
 
 module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)

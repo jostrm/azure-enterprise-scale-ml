@@ -9,6 +9,7 @@ param userObjectIds array // Specific user's object ID's for "User to Service Ta
 param aiServicesName string // AIServices name, e.g. AIStudio name
 param openAIName string
 param contentSafetyName string
+param visonServiceName string
 
 // Role Definition IDs
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
@@ -48,7 +49,6 @@ resource existingOpenAI 'Microsoft.CognitiveServices/accounts@2024-04-01-preview
 resource existingContentSafety 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
   name: contentSafetyName
 }
-
 
 // --------------- USERS START ---------------- //
 
@@ -194,7 +194,7 @@ resource contentSafetyServicesOpenAICotributorUsers 'Microsoft.Authorization/rol
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', congnitiveServicesUserRoleId)
     principalId: userObjectIds[i]
     principalType: 'User'
-    description:'023: OpenAIContributorRole to USER with OID  ${userObjectIds[i]} for : ${existingContentSafety.name} to call data on data plane'
+    description:'023: cognitiveServicesUser to USER with OID  ${userObjectIds[i]} for : ${existingContentSafety.name} to call data on data plane'
   }
   scope:existingContentSafety
 }]
