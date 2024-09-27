@@ -1377,6 +1377,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
     openAIName: csAzureOpenAI.outputs.cognitiveName
   }
   dependsOn: [
+    aiSearchService
     csAzureOpenAI
     csAIstudio
     rbacReadUsersToCmnVnetBastion
