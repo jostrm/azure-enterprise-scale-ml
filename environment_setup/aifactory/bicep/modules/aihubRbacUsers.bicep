@@ -9,7 +9,6 @@ param userObjectIds array // Specific user's object ID's for "User to Service Ta
 param aiServicesName string // AIServices name, e.g. AIStudio name
 param openAIName string
 param contentSafetyName string
-param visonServiceName string
 
 // Role Definition IDs
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'

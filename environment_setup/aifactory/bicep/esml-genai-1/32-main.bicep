@@ -1245,7 +1245,6 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     aiServicesName:csAIstudio.outputs.name
     openAIName: csAzureOpenAI.outputs.cognitiveName
     contentSafetyName: csContentSafety.outputs.name
-    visonServiceName: csVision.outputs.name
   }
   dependsOn: [
     csAzureOpenAI
