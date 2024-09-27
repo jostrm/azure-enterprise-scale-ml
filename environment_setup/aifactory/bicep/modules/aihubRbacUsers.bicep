@@ -53,7 +53,7 @@ resource existingContentSafety 'Microsoft.CognitiveServices/accounts@2024-04-01-
 // --------------- USERS START ---------------- //
 
 // 020:USERES to AI SEARCH
-/*
+
 //(guid-finder: Ok)
 resource roleAssignmentSearchIndexUserDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, userObjectIds[i])
@@ -123,7 +123,6 @@ resource userRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAs
   scope:existingAiServicesResource
 }]
 
-*/
 
 // 022:USERS to OpenAI
 
@@ -185,6 +184,9 @@ resource openAIRoleBasedAccessControlAdmin 'Microsoft.Authorization/roleAssignme
 
 // 023:USERS to ContentSafety: Cognitive Services Users and Reader.
 
+// Showing 3 out of 7 error(s). Status Message: The role assignment already exists
+// This removed 4 errors. After this was removed, the other 3 errors were removed - Showing 3 out of 3 error(s). Status Message: The role assignment already exists.
+
 //(guid-finder: OK)
 resource contentSafetyServicesOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingContentSafety.id, congnitiveServicesUserRoleId, userObjectIds[i])
@@ -210,6 +212,9 @@ resource contentSafetyCognitiveServicesOpenAIUsers 'Microsoft.Authorization/role
 }]
 
 /*
+END - Showing 3 out of 7 error(s). Status Message: The role assignment already exists
+*/
+
 resource contentSafetyRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingContentSafety.id, contributorRoleId, userObjectIds[i])
   properties: {
@@ -221,10 +226,9 @@ resource contentSafetyRoleAssignmentContributorAiServices 'Microsoft.Authorizati
   scope:existingContentSafety
 }]
 
-*/
-
 
 // 024: USERS to STORAGE
+
 
 //(guid-finder: OK )
 resource userRoleAssignmentContributorStorage1 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
@@ -260,18 +264,6 @@ resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignm
   scope:existingStorageAccount
 }]
 
-//(guid-finder: ok)
-resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: userObjectIds[i]
-    principalType: 'User'
-    description:'027b: StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
-  }
-  scope:existingStorageAccount2
-}]
-
 //(guid-finder: OK)
 resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])
@@ -284,6 +276,26 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Autho
   scope:existingStorageAccount
 }]
 
+
+// From: Showing 3 out of 3 error(s). Status Message: The role assignment already exists. To: Showing 2 out of 2 error(s). Status Message: The role assignment already exists.
+//Removeing this gave - Showing 2 out of 2 error(s). Status Message: The role assignment already exists.
+
+//(guid-finder: ok)
+resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: userObjectIds[i]
+    principalType: 'User'
+    description:'027b: StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
+  }
+  scope:existingStorageAccount2
+}]
+
+
+// From: Showing 2 out of 2 error(s). Status Message: The role assignment already exists.
+// To: 0 errors
+
 //(guid-finder: OK)
 resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount2.id, storageFileDataPrivilegedContributorRoleId, userObjectIds[i])
@@ -295,6 +307,7 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Auth
   }
   scope:existingStorageAccount2
 }]
+
 
 // (guid-finder:OK) RG
 resource userRoleAssignmentContributorStorageAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
