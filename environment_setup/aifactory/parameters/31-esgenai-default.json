@@ -16,6 +16,12 @@
         },
         "serviceSettingDeployAzureAIVision": {
             "value": false
+        },
+        "serviceSettingDeployAzureSpeech":{ 
+            "value": false
+        },
+        "serviceSettingDeployAIDocIntelligence":{ 
+            "value": false
         }
     }
 }
