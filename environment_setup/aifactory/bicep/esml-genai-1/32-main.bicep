@@ -358,6 +358,7 @@ var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFe
 
 // ------------------------------ RBAC ResourceGroups, Bastion,vNet, VMAdminLogin  ------------------------------//
 
+/*
 module ownerPermissions '../modules/contributorRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'Owner4TechContact${deploymentProjSpecificUniqueSuffix}'
@@ -371,6 +372,8 @@ module ownerPermissions '../modules/contributorRbac.bicep' = {
     projectResourceGroup
   ]
 }
+*/
+
 module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'VMAdminLogin4${deploymentProjSpecificUniqueSuffix}'
