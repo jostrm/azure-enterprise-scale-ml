@@ -62,8 +62,6 @@ resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authoriza
 // USERS to Speech
 
 
-
-
 resource speechServiceOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(speechService.id, congnitiveServicesUserRoleId, userObjectIds[i])
   properties: {
@@ -75,6 +73,7 @@ resource speechServiceOpenAICotributorUsers 'Microsoft.Authorization/roleAssignm
   scope:speechService
 }]
 
+/*
 resource speechServiceReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(speechService.id, readerRole, userObjectIds[i])
   properties: {
@@ -85,5 +84,7 @@ resource speechServiceReader 'Microsoft.Authorization/roleAssignments@2022-04-01
   }
   scope:speechService
 }]
+
+*/
 
 
