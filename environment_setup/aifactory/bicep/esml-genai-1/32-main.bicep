@@ -1332,6 +1332,8 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
     sacc
   ]
 }
+
+/*
 module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
@@ -1348,6 +1350,8 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
     sa4AIsearch
   ]
 }
+*/
+
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
