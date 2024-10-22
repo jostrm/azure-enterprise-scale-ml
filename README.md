@@ -3,7 +3,7 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 - Plug and play accelerator for: DataOps, MLOps, LLMOps, enterprise scale environment.
 
 ## Main purpose: 
-1) `Marry mutliple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
+1) `Marry multiple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
     - All `PRIVATE` networking: Private endpoints for all services such as Azure Machine Learning, private AKS cluster, private Container registry, Storage, Azure data factory, Monitoring etc
         - Both for creating artifacts, training, and inference. To avoid data exfiltration, and have high network isolation
         - Docs: Securing Azure Machine Learning & its compute: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-secure-training-vnet?view=azureml-api-1&tabs=instance%2Crequired
