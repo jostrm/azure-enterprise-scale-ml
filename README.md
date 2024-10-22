@@ -24,8 +24,26 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 -	`Microsoft: AI Factory (CAF/MLOps)` documentation : Machine learning operations - Cloud Adoption Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations
     
+## ESML AIFactory: The 2 project types
+Tehnically, there are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
 
-# Documentation
+Personas is a tool the AIFactory uses to map *tools, processes and people*, to scale AI **organizationally** as well.  
+Personas is used to: 
+
+1) **Find resource gaps, define responsibility, or find redesign needs:** If you do not have people in your organization that fit a persona description needed to support a process step, you either need to redesign the architecture, change the process, or onboard new people with that persona. Personas is a good tool to define scope of **responsibility**
+2) **Education:** Mapping personas to specific **Azure services** in the architecture provides the benefits of offering **educational** sessions and online courses to upskill within.
+3) **Security & Access:** Personas mapped to **processes, architectures and services** can be used to define which services they need access to in a process.
+4) **Project planning & Interactions** Personas mapped to each other can be used see which personas that primarily interacts with each other, to be used to setup sync meetings and project planning.
+
+[Read more about *personas* ](./v2/20-29/25-personas.md)
+
+![](./documentation/v2/10-19/images/10-personas-2-architectures.png)
+
+## ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
+There are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
+![](./documentation/v2/10-19/images/14-eslz-full-1.png)
+
+# Full Documentation
 The [Documentation](./documentation/v2/10_index.md) is organized around ROLES via Doc series. 
 
 | Doc series | Role | Focus | Details|
@@ -75,13 +93,14 @@ It is also organized via the four components of the ESML AIFactory:
 |2022-08  |ESML infra (IaC)|Bicep now support yaml as well|-|
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
-# TEMPLATES for PIPELINES
-TRAINING & INFERENCE pipelines is 1 of 5 template types in ESML AIFactory that accelerates for the end-user. 
-- 0.1% percentage of the code to write, to go from R&D process, to productional Pipelines: 
+# BAKCKROUND - How the accelerator started 2019
+ESML stands for: Enterprise Scale ML. 
 
-![](./esml/images/23_esml_pipeline_overview_intro.png)
+This accelerator was born 2019 due to a need to accelerated DataOps and MLOps. 
 
-# THE Challenge
+The accelerateor was then called ESML, We now only call this acceleration ESML, or project type=ESML, in the Entperise Scale AIFActory
+
+## THE Challenge 2019
 Innovating with AI and Machine Learning, multiple voices expressed the need to have an `Enterprise Scale AI & Machine Learning Platform` with `end-2-end` turnkey `DataOps` and `MLOps`.
 Other requirements were to have an `enterprise datalake design`, able to `share refined data across the organization`, and `high security` and robustness: General available technology only, vNet support for pipelines & data with private endpoints. A secure platform, with a factory approach to build models. 
 
@@ -93,34 +112,27 @@ Also, the full solution should be able to be provisioned 100% via `infrastructur
 
 ![](./esml/images/esml-s02e01-challenge.png)
 
-# THE Strategy
+## THE Strategy 2019
 To meet the requirements & challenge, multiple best practices needed to be married and implemented, such as: `CAF/WAF, MLOps, Datalake design, AI Factory, Microsoft Intelligent Data Platform / Modern Data Architecture.`
 ![](./esml/images/esml-s02e01-the-solution.png)
 An open source initiative could help all at once, this open-source accelerator Enterprise Scale ML(ESML) -  `to get an AI Factory on Azure`
-# THE Solution - TEMPLATES & Accelerator
+
+## THE Solution 2019 - TEMPLATES & Accelerator
 `ESML` provides an `AI Factory` quicker (within 4-40 hours), with 1-250 ESMLProjects, an ESML Project is a set of Azure services glued together securely.
 -	`Challenge 1 solved:` Marry multiple, 4, best practices
 -	`Challenge 2 solved:` Dev, Test, Prod Azure environments/Azure subscriptions
 -	`Challenge 3 solved:` Turnkey: Datalake, DataOps,  INNER & OUTER LOOP MLOps
 `ESML marries multiple best practices` into one `solution accelerator`, with 100% infrastructure-as-code
 
-## ESML 4 main components:
-  ![](./esml/images/23_ESML_4_main_components.png)
+### IaC & MLOps TEMPLATES 2019: Templates for PIPELINES in project type ESML
 
-## ESML AI Factory - 4 step process: 
-![](./esml/images/esml-s02e01-4steps.png)
- # ESML AI Factory "Oneslider": Dev,Test,Prod environments - Enterprise Scale LandingZones
-- Easy to provision a new ESMLProject for Dev,Test,Prod with easy cost followup, since its own PROJECT resource groups for each `Project team` in the ESML `AI Factory`:
-- Horisontally 3 COMMON environment (Dev,Test, Prod) and vertically ESMLProject 1-250
-  ![](./esml/images/esml-s01e01-0.png)
+The below is how it looked like, when ESML automated both the infrastructire, and generating Azure machine learning pipelines, with 3 lines of code. 
 
-The Azure Devops/BICEP can optionally integrate with ITSM system as a "ticket" in ServiceNow/Remedy/JIRA Service Desk. The below info is needed for the ESML provisioning:
-![](./esml/images/esml-project-ticket.png)
-![](./esml/images/Bicep-1-click.png)
-## ESML Architecture - "Modern data analytics platform"
-Based on this reference architecture: https://docs.microsoft.com/en-us/azure/architecture/solution-ideas/articles/azure-databricks-modern-analytics-architecture
+TRAINING & INFERENCE pipeline templates types in ESML AIFactory that accelerates for the end-user. 
+- 0.1% percentage of the code to write, to go from R&D process, to productional Pipelines: 
 
-![](./esml/images/esml-arch-small.png)
+![](./esml/images/23_esml_pipeline_overview_intro.png)
+
 
 # Contributing to ESML AIFactory?
 This repository is a push-only mirror. Ping Joakim Åström for contributions / ideas. 

@@ -33,9 +33,9 @@ The **The AIFactory** has default personas, that are collected within the groups
 # Benefits of Personas
 Personas are typically added to user stories, features, and requirements. They offer many benefits when creating an AI solution.
 
-1) **Find resource gaps or redesign needs:** If you do not have people in your organization that fit a persona description needed to support a process step, you either need to redesign the architecture, change the process, or onboard new people with that persona.
-2) **Education:** Mapping personas to specific Azure services in the architecture provides the benefits of offering educational sessions and online courses to upskill within.
-3) **Security & Access:** Personas mapped to a process, architecture and services can be used to define which services they need access to in a process.
+1) **Find resource gaps, define responsibility, or find redesign needs:** If you do not have people in your organization that fit a persona description needed to support a **process step**, you either need to redesign the architecture, change the process, or onboard new people with that persona. Personas is a good tool to define scope of **responsibility**
+2) **Education:** Mapping personas to specific **Azure services** in the architecture provides the benefits of offering **educational** sessions and online courses to upskill within.
+3) **Security & Access:** Personas mapped to **processes, architectures and services** can be used to define which services they need access to in a process.
 4) **Project planning & Interactions** Personas mapped to each other can be used see which personas that primarily interacts with each other, to be used to setup sync meetings and project planning.
 
 > [!NOTE]
