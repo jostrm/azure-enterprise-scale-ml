@@ -150,8 +150,6 @@ After the setup, you can simply click on a pipeline to provision 1 or 250 AIFact
 
 ## 25) `Personas`: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)
 
-Tehnically, there are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
-
 Personas is a tool the AIFactory uses to map *tools, processes and people*, to scale AI **organizationally** as well.  
 Personas is used to: 
 
