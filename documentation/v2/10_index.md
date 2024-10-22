@@ -1,4 +1,4 @@
-# Documentation - Full documenation
+# Documentation - Full documentation
 
 Quick Setup
 1) [Prerequisites - to setup AIFactory](./10-19/12-prerequisites-setup.md) - Estimated setup time: 1-2h

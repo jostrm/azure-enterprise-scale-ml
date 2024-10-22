@@ -47,7 +47,7 @@ The 2 project types, lives inside of the AIFactory landingzones.
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
 
-# Full Documentation
+# Documentation: 
 The [Documentation](./documentation/readme.md) is organized around ROLES via Doc series. 
 
 | Doc series | Role | Focus | Details|
