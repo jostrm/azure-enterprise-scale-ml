@@ -18,8 +18,8 @@ It is also organized via the four components of the ESML AIFactory:
 | 3) Templates for: DataOps, MLOps, *LLMOps | Y | - | All | 20-29, 30-39 |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | - |ProjectTeam | 30-39 |
 
-# Documenation Executive Summary
-This page is only an executive summary. Go here for the The full [Documentation](./v2/10_index.md)
+# Documenation Executive Summary VS Full documentation
+The current page is only an *executive summary* of the documentation. Go here for the [Full Documentation](./v2/10_index.md)
 
 ## ESML AIFactory: The 4 components of acceleration
 ![](./v2/10-19/images/10-aifactory-4-components-2024-small.png)
