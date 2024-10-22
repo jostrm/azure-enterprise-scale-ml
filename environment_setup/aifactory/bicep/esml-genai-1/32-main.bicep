@@ -40,28 +40,42 @@ param csDocIntelligenceSKU string = 'S0'
   ''
 ])
 param kindAIHub string = 'hub'
-// Cognitive Service types & settings, End
 
+// ### FALSE as default - START ### 
+
+// Standalone: Speech, Vision, DocIntelligence
 @description('Service setting: Deploy Azure AI Document Intelligence for project')
-param serviceSettingDeployAIDocIntelligence bool = true
+param serviceSettingDeployAIDocIntelligence bool = false
 @description('Service setting: Deploy Azure Speech for project')
-param serviceSettingDeployAzureSpeech bool = true
+param serviceSettingDeployAzureSpeech bool = false
 @description('Service setting: Deploy Azure AI Vision for project')
-param serviceSettingDeployAzureAIVision bool = true
+param serviceSettingDeployAzureAIVision bool = false
+
+// User access workaround, if standalone
 @description('Service setting: Deploy VM for project')
 param serviceSettingDeployProjectVM bool = false
-@description('Service setting:Deploy Azure AI Search')
-param serviceSettingDeployAzureAISearch bool = true
-
-@description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in hub mode')
-param serviceSettingDeployAIHub bool = true
 @description('Service setting:Deploy Azure Machine Learning')
 param serviceSettingDeployAzureML bool = false
 
+// UI and History in RAG
 @description('Service setting:Deploy CosmosDB')
 param serviceSettingDeployCosmosDB bool = false
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
+
+// ### FALSE as default - END ### 
+
+// ### TRUE as default - START ### 
+@description('Service setting:Deploy Azure AI Search')
+param serviceSettingDeployAzureAISearch bool = true
+@description('Service setting: Deploy Azure OpenAI for project')
+param serviceSettingDeployAzureOpenAI bool = true
+@description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in hub mode')
+param serviceSettingDeployAIHub bool = true
+@description('Service setting: Deploy Content Safety for project')
+param serviceSettingDeployContentSafety bool = true
+
+// ### TRUE as default - END ###
 
 param semanticSearchTier string = 'free' //   'disabled' 'free' 'standard'
 param aiSearchSKUName string = 'basic' // 'basic' 'standard', 'standard2' if using sharedPrivateLinks
@@ -403,7 +417,7 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
 // ----DATALAKE
 // ------------------------------ SERVICES - AI Studio, Azure OpenAI, Azure AI Search, Storage for Azure AI Search, Azure Content Safety ------------------------------//
 
-module csContentSafety '../modules/csContentSafety.bicep' = {
+module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDeployContentSafety==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'ContentSafety4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -515,7 +529,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
   ]
 }
 
-module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployContentSafety == true){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkContentSafety${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -714,7 +728,7 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
 
 var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${resourceSuffix}') ,'-','')
 
-module aiSearchService '../modules/aiSearch.bicep' = {
+module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzureAISearch==true) {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
@@ -742,7 +756,7 @@ module aiSearchService '../modules/aiSearch.bicep' = {
   ]
 }
 
-module privateDnsaiSearchService '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsaiSearchService '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && serviceSettingDeployAzureAISearch==true){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'priDZoneSA1${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1219,7 +1233,7 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   ]
 }
 
-module aiHubConnectionSearch '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true) {
+module aiHubConnectionSearch '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true && serviceSettingDeployAzureAISearch==true) {
   name: 'aiHubConnection4Search${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params:{
@@ -1276,7 +1290,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
 
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 
-module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = {
+module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch==true && serviceSettingDeployContentSafety==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacOpenAIDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
@@ -1285,14 +1299,13 @@ module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = {
     aiSearchName: aiSearchService.outputs.aiSearchName
     resourceGroupId: targetResourceGroupId
     aiServicesName: csAzureOpenAI.outputs.cognitiveName
-    //openAIServicePrincipal:csAzureOpenAI.outputs.principalId
     openAIServicePrincipal:csAzureOpenAI.outputs.principalId
     contentSafetyName: csContentSafety.outputs.name
   }
   dependsOn: [
     csAzureOpenAI
-    csAIstudio
-    rbacReadUsersToCmnVnetBastion
+    csContentSafety
+    aiSearchService
   ]
 }
 
@@ -1310,9 +1323,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     contentSafetyName: csContentSafety.outputs.name
   }
   dependsOn: [
-    csAzureOpenAI
-    csAIstudio
-    rbacReadUsersToCmnVnetBastion
+    rbacModuleOpenAI
   ]
 }
 
@@ -1333,7 +1344,6 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
   ]
 }
 
-/*
 module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
@@ -1350,7 +1360,6 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
     sa4AIsearch
   ]
 }
-*/
 
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1370,7 +1379,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
 }
 
 
-module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
+module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacSearchDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
@@ -1384,11 +1393,10 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = {
     aiSearchService
     csAzureOpenAI
     csAIstudio
-    rbacReadUsersToCmnVnetBastion
   ]
 }
 
-module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = {
+module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacAIServicesDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
@@ -1402,9 +1410,9 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = {
     contentSafetyName: csContentSafety.outputs.name
   }
   dependsOn: [
+    aiSearchService
     csAzureOpenAI
     csAIstudio
-    rbacReadUsersToCmnVnetBastion
   ]
 }
 
@@ -1441,6 +1449,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
+    rbacModuleAIServices
     csAzureOpenAI
     vmPrivate
     sacc

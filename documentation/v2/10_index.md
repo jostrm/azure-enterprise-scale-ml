@@ -14,6 +14,8 @@ Quick Setup
 * [21) Infra:AIFactory: How-to: Onboarding of CoreTeam users and ProjectMembers via Pipelines (CoreTeam)](#21-infraaifactory--how-to-onboarding-of-coreteam-users-and-projectmembers-via-pipelines-coreteam)
 * [22) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
 * [23) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
+* [24) End-2-End setup tutorial: AIFactory (4-8 hours) - How-to](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to)
+* [25) Personas: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
 
 
 
@@ -145,6 +147,10 @@ Here is an [End-2-End setup tutorial](./20-29/24-end-2-end-setup.md), with an es
 - Estimated setup time 1 hour: Configure AIFactory Common DEV + the 1st ESMLProject (type: ESML)
 
 After the setup, you can simply click on a pipeline to provision 1 or 250 AIFactory project architectures, of type ESML or ESGenAI.
+
+## 25) `Personas`: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)
+
+
 
 # 30) Usage: Dashboard, Available Tools & Services, DataOps, MLOps, Access options to AIFactory (ProjectTeam)
 Here you can find HOWTO guides for a ESML ProjectTeam, including its DataOps, MLOps, supported use cases, accelerated use cases.
