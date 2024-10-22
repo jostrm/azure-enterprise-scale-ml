@@ -48,7 +48,7 @@ The 2 project types, lives inside of the AIFactory landingzones.
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
 
 # Full Documentation
-The [Documentation](./documentation/v2/10_index.md) is organized around ROLES via Doc series. 
+The [Documentation](./documentation/readme.md) is organized around ROLES via Doc series. 
 
 | Doc series | Role | Focus | Details|
 |------------|-----|--------|--------|
@@ -66,7 +66,7 @@ It is also organized via the four components of the ESML AIFactory:
 | 3) Templates for: DataOps, MLOps, *LLMOps | All | 20-29, 30-39 |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  |ProjectTeam | 30-39 |
 
-[LINK to Documentation](./documentation/v2/10_index.md)
+[LINK to Documentation](./documentation/readme.md)
 
 ## Best practices implemented & benefits
 - Based on best & proven practices for organizational scale, across projects. 
