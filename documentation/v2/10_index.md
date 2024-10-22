@@ -15,7 +15,7 @@ Quick Setup
 * [22) Datalake template: How-to: Setup Datalake & Onboard ProjectTeam permissions (CoreTeam)](#22-datalake-template--how-to-setup-datalake--onboard-projectteam-via-pipelines)
 * [23) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
 * [24) End-2-End setup tutorial: AIFactory (4-8 hours) - How-to](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to)
-* [25) Personas: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
+* [25) Personas: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)](#25-personas-connecting-people--agents-to-processes-dataops-mlops-genaiops--toolsarchitectures-and-services)
 
 
 
@@ -150,6 +150,17 @@ After the setup, you can simply click on a pipeline to provision 1 or 250 AIFact
 
 ## 25) `Personas`: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)
 
+Tehnically, there are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
+
+Personas is a tool the AIFactory uses to map *tools, processes and people*, to scale AI **organizationally** as well.  
+Personas is used to: 
+
+1) **Find resource gaps, define responsibility, or find redesign needs:** If you do not have people in your organization that fit a persona description needed to support a process step, you either need to redesign the architecture, change the process, or onboard new people with that persona. Personas is a good tool to define scope of **responsibility**
+2) **Education:** Mapping personas to specific **Azure services** in the architecture provides the benefits of offering **educational** sessions and online courses to upskill within.
+3) **Security & Access:** Personas mapped to **processes, architectures and services** can be used to define which services they need access to in a process.
+4) **Project planning & Interactions** Personas mapped to each other can be used see which personas that primarily interacts with each other, to be used to setup sync meetings and project planning.
+
+[Go here for PERSONAS docs, persona cards, personas tables ](./20-29/25-personas.md)
 
 
 # 30) Usage: Dashboard, Available Tools & Services, DataOps, MLOps, Access options to AIFactory (ProjectTeam)
