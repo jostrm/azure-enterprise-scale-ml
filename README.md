@@ -35,7 +35,7 @@ Personas is used to:
 3) **Security & Access:** Personas mapped to **processes, architectures and services** can be used to define which services they need access to in a process.
 4) **Project planning & Interactions** Personas mapped to each other can be used see which personas that primarily interacts with each other, to be used to setup sync meetings and project planning.
 
-[Read more about *personas* ](./v2/20-29/25-personas.md)
+[Read more about *personas* ](./documentation/v2/20-29/25-personas.md)
 
 ![](./documentation/v2/10-19/images/10-personas-2-architectures.png)
 
