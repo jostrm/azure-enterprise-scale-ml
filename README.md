@@ -97,7 +97,7 @@ It is also organized via the four components of the ESML AIFactory:
 |2022-08  |ESML infra (IaC)|Bicep now support yaml as well|-|
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
-# BAKCKROUND - How the accelerator started 2019
+# BACKGROUND - How the accelerator started 2019
 ESML stands for: Enterprise Scale ML. 
 
 This accelerator was born 2019 due to a need to accelerated DataOps and MLOps. 
