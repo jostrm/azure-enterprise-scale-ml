@@ -40,7 +40,11 @@ Personas is used to:
 ![](./documentation/v2/10-19/images/10-personas-2-architectures.png)
 
 ## ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
-There are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
+The 2 project types, lives inside of the AIFactory landingzones. 
+- There are 3 AIFactory AI landingzones: Dev, Stage, Production, where a project is represented.
+- The AIFactory has a default scalabillity to automate the creation of ~200-300 AIFactory projects, in each environment. 
+- One project is usually assigned to a team of 1-10 people with multiple use cases, but sometimes also to run an isolated use case.
+
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
 
 # Full Documentation
