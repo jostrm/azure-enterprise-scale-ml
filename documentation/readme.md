@@ -15,7 +15,7 @@ It is also organized via the four components of the ESML AIFactory:
 |-----------|------------|----------------|-------|----|
 | 1) Infra:AIFactory | Y | - | CoreTeam | 10-19 |
 | 2) Datalake template | Y | - | All | 20-29,30-39 |
-| 3) Templates for: DataOps, MLOps, *LLMOps | Y | - | All | 20-29, 30-39 |
+| 3) Templates for: DataOps, MLOps, *GenAIOps | Y | - | All | 20-29, 30-39 |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | - |ProjectTeam | 30-39 |
 
 # Documenation Executive Summary VS Full documentation
@@ -29,6 +29,7 @@ The current page is only an *executive summary* of the documentation. Go here fo
 
 ![](./v2/10-19/images/14-eslz-full-1.png)
 
+<!-- 
 ## ESML AIFactory: The 2 project types and the AIFactory Personas
 Technically, The AIFactory has automation to setup 2 project types, a set of services glued together with private networking & RBAC, a team gets access to (automation process takes 35min), with templates for DataOps, MLOps or GenAIOps.
 
@@ -43,11 +44,13 @@ Personas is a tool the AIFactory uses to map *tools, processes and people*, to s
 
 ![](./v2/10-19/images/10-personas-2-architectures.png)
 
+-->
+
 ## ESML AIFactory: MLOps Context
 
 ![](./v2/10-19/images/11-architecture-detailed-mlops.png)
 
-## ESML AIFactory: LLMOps Context
+## ESML AIFactory: GenAIOps Context
 
 ![](./v2/10-19/images/11-architecture-detailed-llmops.png)
 

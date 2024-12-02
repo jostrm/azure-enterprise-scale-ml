@@ -1,6 +1,6 @@
 # Project: azure-enterprise-scale-ml (ESML) AI Factory 
 The `Enterprise Scale AI Factory` is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
-- Plug and play accelerator for: DataOps, MLOps, LLMOps, enterprise scale environment.
+- Plug and play accelerator for: DataOps, MLOps, GenAIOps, enterprise scale environment.
 
 ## Main purpose: 
 1) `Marry multiple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
@@ -23,7 +23,8 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 
 -	`Microsoft: AI Factory (CAF/MLOps)` documentation : Machine learning operations - Cloud Adoption Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations
-    
+
+<!-- 
 ## ESML AIFactory: The 2 project types
 Tehnically, there are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
 
@@ -38,6 +39,8 @@ Personas is used to:
 [Read more about *personas* ](./documentation/v2/20-29/25-personas.md)
 
 ![](./documentation/v2/10-19/images/10-personas-2-architectures.png)
+
+-->
 
 ## ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
 The 2 project types, lives inside of the AIFactory landingzones. 
@@ -63,7 +66,7 @@ It is also organized via the four components of the ESML AIFactory:
 |-----------|--------|----|
 | 1) Infra:AIFactory | CoreTeam | 10-19 |
 | 2) Datalake template | All | 20-29,30-39 |
-| 3) Templates for: DataOps, MLOps, *LLMOps | All | 20-29, 30-39 |
+| 3) Templates for: DataOps, MLOps, *GenAIOps | All | 20-29, 30-39 |
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  |ProjectTeam | 30-39 |
 
 [LINK to Documentation](./documentation/readme.md)
