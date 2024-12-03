@@ -24,6 +24,9 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 -	`Microsoft: AI Factory (CAF/MLOps)` documentation : Machine learning operations - Cloud Adoption Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations
 
+-	`Microsoft: AI Factory (Well-architected framework)` documentation : WAF AI workload - Well-architected Framework | Microsoft Learn
+    - https://learn.microsoft.com/en-us/azure/well-architected/ai/personas
+    
 <!-- 
 ## ESML AIFactory: The 2 project types
 Tehnically, there are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
