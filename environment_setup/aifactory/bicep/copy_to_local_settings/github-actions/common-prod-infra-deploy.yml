@@ -1,0 +1,105 @@
+name: common-prod-infra-deploy.yml
+
+on:
+    #push:
+    workflow_dispatch:
+
+env:
+  admin_input_keyvault_subscription: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # seeding keyvault, subscription id
+  aifactorySuffixRG: "-001"
+  aiResourceSuffix: "-001"
+  cidr_range: "17"
+  admin_location: "westeurope"
+  admin_locationSuffix: "weu"
+  prod_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # SubscriptionID prod
+  technical_admins_ad_object_id: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  technical_admins_bastion_IP_whitelist: "192.x.x.x"
+  technical_admins_email: "adminemail@example.com"
+  admin_input_keyvault_rg: "aifactory-rg"
+  admin_input_keyvault_name: "seeding-kv-name"
+
+jobs:
+    prod-common-deploy:
+      name: Deploy to Prod
+      environment:
+        name: Prod
+      runs-on: ubuntu-latest
+      env:
+        dev_test_prod: "prod"
+      steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: GIT
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: 11-Common RG and RBAC
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment sub create \
+            --name "esml-cmn-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.aifactorySuffixRG }}-DeplRG" \
+            --subscription "${{ env.prod_sub_id }}" \
+            --location "${{ env.admin_location }}" \
+            --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\11-rgCommon.bicep" \
+            --parameters @"./aifactory/parameters/11-esml-globals-11_13.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
+            --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+            --parameters location="${{ env.admin_location }}" \
+            --parameters env="${{ env.dev_test_prod }}" \
+            --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
+            --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
+          azcliversion: latest
+      - name: 12-Common-Networking
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment sub create \
+            --name "esml-cmn${{ env.dev_test_prod }}-${{ env.aifactorySuffixRG }}-${{ env.aiResourceSuffix }}Subnets" \
+            --subscription "${{ env.prod_sub_id }}" \
+            --location "${{ env.admin_location }}" \
+            --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\12-networkCommon.bicep" \
+            --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-2-12_13_21_22.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-3-12_13.json" \
+            --parameters @"./aifactory/parameters/12-esml-cmn-parameters.json" \
+            --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+            --parameters location="${{ env.admin_location }}" \
+            --parameters env="${{ env.dev_test_prod }}" \
+            --parameters cidr_range="${{ env.cidr_range }}" \
+            --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
+            --parameters commonResourceSuffix="${{ env.aiResourceSuffix }}" \
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
+          azcliversion: latest
+      - name: '13-Deploy resources'
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment sub create \
+            --name "esml-cmn-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.aifactorySuffixRG }}-${{ env.aiResourceSuffix }}-DeplRes" \
+            --subscription "${{ env.prod_sub_id }}" \
+            --location "${{ env.admin_location }}" \
+            --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\13-rgLevel.bicep" \
+            --parameters adminPassword="$( date +%s | sha256sum | base64 | head -c 32 ; echo )" \
+            --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-2-12_13_21_22.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-3-12_13.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-4-13_21_22.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-5-13_23.json" \
+            --parameters @"./aifactory/parameters/11-esml-globals-11_13.json" \
+            --parameters @"./aifactory/parameters/13-esml-cmn-parameters.json" \
+            --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+            --parameters location="${{ env.admin_location }}" \
+            --parameters env="${{ env.dev_test_prod }}" \
+            --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
+            --parameters resourceSuffix="${{ env.aiResourceSuffix }}" \
+            --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
+            --parameters inputKeyvaultSubscription="${{ env.admin_input_keyvault_subscription }}" \
+            --parameters inputKeyvaultResourcegroup="${{ env.admin_input_keyvault_rg }}" \
+            --parameters inputKeyvault="${{ env.admin_input_keyvault_name }}"
+          azcliversion: latest
