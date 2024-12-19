@@ -24,6 +24,8 @@ param location string = resourceGroup().location
 @description('')
 param eHRuleName string = 'rule'
 
+param keyvaultName string
+
 resource namespaceNameEV 'Microsoft.EventHub/namespaces@2021-11-01' = {
   identity:{
     type:'SystemAssigned'
@@ -63,7 +65,25 @@ resource namespaceName_rule 'Microsoft.EventHub/namespaces/eventhubs/authorizati
   ]
 }
 
-var keysObj = listKeys(resourceId('Microsoft.EventHub/namespaces/eventhubs/authorizationRules', namespaceName, eventHubName, eHRuleName), '2021-01-01-preview')
+var keysObj = listKeys(resourceId('Microsoft.EventHub/namespaces/eventhubs/authorizationRules', namespaceName, eventHubName, eHRuleName), '2024-01-01')
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName
+  scope: resourceGroup()
+}
+
+@description('Key Vault Secret: Eventhubs ConnectionString')
+resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'aifactory-proj-eventhub-connectionstring'
+  properties: {
+    value:keysObj.primaryConnectionString
+    contentType: 'text/plain'
+    attributes: {
+      enabled: true
+    }
+  }
+}
 
 /*NS*/
 output eHNamespaceId string = namespaceNameEV.id
@@ -75,8 +95,6 @@ output eHubNameId string = eventHub.id
 /*NS Rules*/
 output eHAuthRulesId string = namespaceName_rule.id
 /*Other*/
-// output eHObjName object = keysObj
-output eHPConnString string = keysObj.primaryConnectionString
 output eHName string = eventHubName
 
 resource eventHubPend 'Microsoft.Network/privateEndpoints@2020-07-01' = {

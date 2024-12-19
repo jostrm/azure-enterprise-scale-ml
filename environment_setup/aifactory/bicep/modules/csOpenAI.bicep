@@ -6,28 +6,59 @@ param tags object
 param location string
 @description('Specifies the SKU, where default is standard')
 param sku string = 'S0'
-@description('Specifies the VNET id that will be associated with the private endpoint')
-param vnetId string
+//@description('Specifies the VNET id that will be associated with the private endpoint')
+//param vnetId string
+//@description('ResourceID of subnet for private endpoints')
+//param subnetId string
+@description('Specifies the VNET name that will be associated with the private endpoint')
+param vnetName string
 @description('Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
-@description('ResourceID of subnet for private endpoints')
-param subnetId string
-param kind  string = 'OpenAI'
-param deployments array = []
+param kind string = 'OpenAI'
 param publicNetworkAccess bool = false
 param pendCogSerName string
 param vnetRules array = []
 param ipRules array = []
 param restore bool
+param disableLocalAuth bool = true
+@allowed([
+  '1106-preview'
+  '0613'
+  'vision-preview'
+  'turbo-2024-04-0'
+])
+param modelGPT4Version string = '1106-preview' // If your region doesn't support this version, please change it.
+param laWorkspaceName string
+param keyvaultName string
+param vnetResourceGroupName string
+param aiSearchPrincipalId string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
+
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laWorkspaceName
+}
+
+//var subnetRef = '${vnetId}/subnets/${subnetName}'
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
+
+//var subnetRef = subnet.id
 
 // TODO: in ADO pipeline: https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#grant-access-to-trusted-azure-services-for-azure-openai
 //bypass:'AzureServices'
 //resource cognitive 'Microsoft.CognitiveServices/accounts@2023-10-01' = {
 //resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
-resource cognitive 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
+//resource cognitive 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
+//resource cognitive 'Microsoft.CognitiveServices/accounts@2024-06-01-preview' = {
+resource cognitiveOpenAI 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: cognitiveName
   location: location
   kind: kind
@@ -39,12 +70,14 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
     name: sku
   }
   properties: {
+    allowedFqdnList: []
     customSubDomainName: nameCleaned
     publicNetworkAccess: publicNetworkAccess? 'Enabled': 'Disabled'
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
+    disableLocalAuth: disableLocalAuth
     networkAcls: {
-      //bypass:'AzureServices'
+      bypass:'AzureServices'
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
@@ -55,9 +88,9 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
   }
 }
 
-resource gpt4turbo 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
-  name: '${cognitiveName}/gpt-4'
-  //parent: cognitive
+resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+  name: 'gpt-4'
+  parent: cognitiveOpenAI
   sku: {
     name: 'Standard'
     capacity: 25
@@ -66,19 +99,17 @@ resource gpt4turbo 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01'
     model: {
       format: 'OpenAI'
       name: 'gpt-4'
-      version:'turbo-2024-04-09' // If your region doesn't support this version, please change it.
+      version:modelGPT4Version 
     }
     raiPolicyName: 'Microsoft.Default'
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable' // 'NoAutoUpgrade'
   }
-  dependsOn: [
-    cognitive
-  ]
+
 }
 
 resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
   name: 'text-embedding-ada-002'
-  parent: cognitive
+  parent: cognitiveOpenAI
   sku: {
     name: 'Standard'
     capacity: 25
@@ -93,73 +124,43 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
   dependsOn: [
-    gpt4turbo
+    gpt4modelOpenAI
   ]
 }
 
-/* DeploymentModelNotSupported - The model 'Format: OpenAI, Name: text-embedding-3-large, Version: ' of account deployment is not supported.*/
-
-resource embedding3 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
-  name: 'text-embedding-3-large'
-  parent: cognitive
-  sku: {
-    name: 'Standard'
-    capacity: 25
-  }
+resource openAIDiagSettingsOpenAI 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: 'default'
+  scope: cognitiveOpenAI
   properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'text-embedding-3-large'
-      version:'1' 
-    }
-    raiPolicyName: 'Microsoft.Default'
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+    workspaceId: logAnalyticsWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs'
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+    logAnalyticsDestinationType: null
   }
-  dependsOn: [
-    embedding2
-  ]
 }
 
-/*
-@batchSize(1)
-resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = [for deployment in deployments: {
-  parent: cognitive
-  name: deployment.name
-  
-  properties: {
-    model: deployment.model
-    //raiPolicyName: deployment.?raiPolicyName ?? 'Microsoft.Default'
-    raiPolicyName:'Microsoft.Default'
-    //versionUpgradeOption: deployment.?versionUpgradeOption ??'OnceCurrentVersionExpired'
-    versionUpgradeOption:'OnceCurrentVersionExpired'
-    scaleSettings: {
-      capacity: deployment.scaleType.capacity
-      scaleType:deployment.scaleType.scaleType
-    }
-  }
-  sku: {
-    name: deployment.sku
-    //capacity: deployment.capacity
-    //tier: deployment.tier
-  }
-}]
-
-*/
-
-resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+resource pendCognitiveServicesOpenAI 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   location: location
   name: pendCogSerName
   tags: tags
   properties: {
     subnet: {
-      id: subnetRef
+      id: subnet.id
     }
     customNetworkInterfaceName: 'pend-nic-${kind}-${cognitiveName}'
     privateLinkServiceConnections: [
       {
         name: pendCogSerName
         properties: {
-          privateLinkServiceId: cognitive.id
+          privateLinkServiceId: cognitiveOpenAI.id
           groupIds: [
             'account'
           ]
@@ -172,20 +173,53 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
     ]
   }
   dependsOn: [
-    embedding3
+    embedding2
   ]
 }
 
-output cognitiveId string = cognitive.id
-output azureOpenAIEndpoint string = cognitive.properties.endpoint
-output cognitiveName string = cognitive.name
-output principalId string = cognitive.identity.principalId // SystemAssigned. Unable to evaluate template outputs: 'principalId'
+resource keyVaultOpenAI 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName
+  scope: resourceGroup()
+}
+
+@description('Key Vault: Azure OpenAI K in vault as S')
+resource kValueOpenAI 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVaultOpenAI
+  name: 'aifactory-proj-azureopenai-api-key'
+  properties: {
+    value:cognitiveOpenAI.listKeys().key1
+    contentType: 'text/plain'
+    attributes: {
+      enabled: true
+    }
+  }
+}
+
+// Search -> OpenAI
+var cognitiveServicesOpenAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
+resource openAIAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(cognitiveOpenAI.id, cognitiveServicesOpenAIContributorRoleId, aiSearchPrincipalId)  
+  properties: {
+    principalId: aiSearchPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
+    description: '018'
+  }
+  scope: cognitiveOpenAI
+}
+
+// Users -> OpenAI
+
+output cognitiveId string = cognitiveOpenAI.id
+output azureOpenAIEndpoint string = cognitiveOpenAI.properties.endpoint
+output cognitiveName string = cognitiveOpenAI.name
+output principalId string = cognitiveOpenAI.identity.principalId // SystemAssigned. Unable to evaluate template outputs: 'principalId'
 
 output dnsConfig array = [
   {
-    name: pendCognitiveServices.name
+    name: pendCognitiveServicesOpenAI.name
     type: 'openai'
-    id:cognitive.id
+    id:cognitiveOpenAI.id
     groupid:'account'
   }
 ]

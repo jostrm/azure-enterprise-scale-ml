@@ -241,6 +241,7 @@ module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep
     name: laName
     tags: tags
     location: location
+    keyvaultName: kvNameCommon
   }
 
   dependsOn: [

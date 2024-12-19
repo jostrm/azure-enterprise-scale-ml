@@ -13,6 +13,11 @@ param queuePrivateEndpointName string
 @description('Specifies the name of the table service private endpoint')
 param tablePrivateEndpointName string
 
+param corsRules array = []
+param containers array = []
+param files array = []
+param networkAcls object = {}
+
 @allowed([
   'Standard_LRS'
   'Standard_ZRS'
@@ -58,7 +63,7 @@ var groupIds = [
   }
 ]
 
-resource sacc 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   tags: tags
   location: location
@@ -73,6 +78,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     allowBlobPublicAccess: false
     isHnsEnabled: false
     isNfsV3Enabled: false
+    enableExtendedGroups: false
     encryption: {
       keySource: 'Microsoft.Storage'
       requireInfrastructureEncryption: false
@@ -99,10 +105,10 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-01-01' = {
       keyExpirationPeriodInDays: 7
     }
     largeFileSharesState: 'Disabled'
-    minimumTlsVersion: 'TLS1_2'  // CHECK?
+    minimumTlsVersion: 'TLS1_2'
     networkAcls: {
-      bypass: 'AzureServices' // CHECK?
-      defaultAction: 'Deny' // CHECK?
+      bypass: 'AzureServices' 
+      defaultAction: 'Deny' 
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
       }]
@@ -110,6 +116,37 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     }
     supportsHttpsTrafficOnly: true
   }
+  resource blobServices 'blobServices' = if (!empty(containers)) {
+    name: 'default'
+    properties: {
+      cors: {
+        corsRules: corsRules
+      }
+      deleteRetentionPolicy: {
+        enabled: true
+        days: 7
+      }
+    }
+    resource container 'containers' = [for container in containers: {
+      name: container.name
+      properties: {
+        publicAccess: contains(container, 'publicAccess') ? container.publicAccess : 'None'
+      }
+    }]
+  }
+  resource fileServices 'fileServices' = if (!empty(files)) {
+    name: 'default'
+    properties: {
+      cors: {
+        corsRules: corsRules
+      }
+      shareDeleteRetentionPolicy: {
+        enabled: true
+        days: 7
+      }
+    }
+  }
+  
 }
 
 resource pendSacc 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in groupIds: {

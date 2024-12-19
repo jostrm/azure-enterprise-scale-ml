@@ -13,10 +13,10 @@ var readerRole = 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Azure content safety
 var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 
 // Existing resources for scoping role assignments
-resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' existing = {
+resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
-resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2021-08-01' existing = {
+resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName2
 }
 resource visionService 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {

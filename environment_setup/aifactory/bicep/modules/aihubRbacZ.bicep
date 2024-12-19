@@ -19,7 +19,7 @@ var cognitiveServicesUserRoleID = 'a97b65f3-24c7-4388-baec-2e87135dc908' // Plac
 var keyVaultAdministrator = '00482a5a-887f-4fb3-b363-3b7fe8e74483'
 
 // Existing resources for scoping role assignments
-resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' existing = {
+resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
 

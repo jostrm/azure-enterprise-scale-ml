@@ -107,6 +107,7 @@ param aksNodes_testProd int
 param ciVmSku_dev string
 @description('TestProd default VM size for the default Compute Instance cluster:Standard_D4_v3. More: Standard_D14 (16 cores,112 ram)')
 param ciVmSku_testProd string
+param ipRules array = []
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false

@@ -712,6 +712,7 @@ module eventHubLogging '../modules/eventhub.bicep' = if(enableEventhubs) {
     tags: tags2
     vnetId: vnetId
     subnetName: defaultSubnet
+    keyvaultName: kv1.outputs.keyvaultName
   }
   dependsOn: [
     projectResourceGroup

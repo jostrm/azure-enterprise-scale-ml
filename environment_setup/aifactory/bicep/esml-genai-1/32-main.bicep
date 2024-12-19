@@ -34,12 +34,16 @@ param csContentSafetySKU string = 'S0' // 'Basic' = S0
 param csSpeechSKU string = 'S0'
 param csVisionSKU string = 'S0'
 param csDocIntelligenceSKU string = 'S0'
-
+param csAIservicesSKU string = 'S0'
+param csOpenAISKU string = 'S0'
 @allowed([
-  'hub'
-  ''
+  '1106-preview'
+  '0613'
+  'vision-preview'
+  'turbo-2024-04-0'
 ])
-param kindAIHub string = 'hub'
+param modelGPT4Version string = '1106-preview' // If your region doesn't support this version, please change it.
+
 
 // ### FALSE as default - START ### 
 
@@ -48,32 +52,34 @@ param kindAIHub string = 'hub'
 param serviceSettingDeployAIDocIntelligence bool = false
 @description('Service setting: Deploy Azure Speech for project')
 param serviceSettingDeployAzureSpeech bool = false
-@description('Service setting: Deploy Azure AI Vision for project')
-param serviceSettingDeployAzureAIVision bool = false
 
-// User access workaround, if standalone
+// User access: standalone/Bastion
 @description('Service setting: Deploy VM for project')
 param serviceSettingDeployProjectVM bool = false
-@description('Service setting:Deploy Azure Machine Learning')
-param serviceSettingDeployAzureML bool = false
+@description('Service setting:Deploy Azure Machine Learning - classic, not in hub mode')
+param serviceSettingDeployAzureMLClassic bool = false
 
 // UI and History in RAG
 @description('Service setting:Deploy CosmosDB')
 param serviceSettingDeployCosmosDB bool = false
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
-
+@description('Service setting: Deploy Content Safety for project')
+param serviceSettingDeployContentSafety bool = false
+@description('Service setting: Deploy Azure OpenAI for project')
+param serviceSettingDeployAzureOpenAI bool = false
 // ### FALSE as default - END ### 
 
 // ### TRUE as default - START ### 
+@description('Service setting: Deploy Azure AI Vision for project')
+param serviceSettingDeployAzureAIVision bool = true
+param serviceSettingOverrideRegionAzureAIVision string = 'northeurope'
+param serviceSettingOverrideRegionAzureAISearch string = 'northeurope'
+
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
-@description('Service setting: Deploy Azure OpenAI for project')
-param serviceSettingDeployAzureOpenAI bool = true
-@description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in hub mode')
+@description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in AI hub mode, with AIServices and 1 project')
 param serviceSettingDeployAIHub bool = true
-@description('Service setting: Deploy Content Safety for project')
-param serviceSettingDeployContentSafety bool = true
 
 // ### TRUE as default - END ###
 
@@ -372,7 +378,7 @@ module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   }
 }
 
-resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
   scope:subscription(subscriptionIdDevTestProd)
 }
@@ -381,22 +387,6 @@ var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 
 // ------------------------------ RBAC ResourceGroups, Bastion,vNet, VMAdminLogin  ------------------------------//
-
-/*
-module ownerPermissions '../modules/contributorRbac.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'Owner4TechContact${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    userId: technicalContactId
-    userEmail: technicalContactEmail
-    additionalUserEmails: technicalAdminsEmail_array_safe
-    additionalUserIds:technicalAdminsObjectID_array_safe
-  }
-  dependsOn:[
-    projectResourceGroup
-  ]
-}
-*/
 
 module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -424,99 +414,15 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
     csSKU: csContentSafetySKU
     location: location
     restore:restore
+    vnetResourceGroupName: vnetResourceGroupName
     contentsafetyName: 'cs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: kindContentSafety
     pendCogSerName: 'p-${projectName}-contentsafety-${genaiName}'
-    subnetName:defaultSubnet
-    vnetId: vnetId
+    subnetName:genaiSubnetName
+    vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
-    ]
-    ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
-      }
-    ]
-    subnetId: genaiSubnetId
-  }
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
-
-module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVision==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'Vision4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    csSKU: csVisionSKU
-    location: location
-    restore:restore
-    name: 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    kind: 'ComputerVision'
-    pendCogSerName: 'p-${projectName}-vision-${genaiName}'
-    subnetName:defaultSubnet
-    vnetId: vnetId
-    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
-    vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
-    ]
-    ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
-      }
-    ]
-  }
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
-
-module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AISpeech4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    csSKU: csSpeechSKU
-    location: location
-    restore:restore
-    name: 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    kind: 'SpeechServices'
-    pendCogSerName: 'p-${projectName}-speech-${genaiName}'
-    subnetName:defaultSubnet
-    vnetId: vnetId
-    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
-    vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
-    ]
-    ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
-      }
-    ]
-  }
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
-module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AIDocIntelligence4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    csSKU: csDocIntelligenceSKU
-    location: location
-    restore:restore
-    name: 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    kind: 'FormRecognizer'
-    pendCogSerName: 'p-${projectName}-docs-${genaiName}'
-    subnetName:defaultSubnet
-    vnetId: vnetId
-    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
-    vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
     ]
     ipRules: [
       {
@@ -541,20 +447,148 @@ module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZone
   ]
 }
 
-// AI Studio, e.g. AIServices
+module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVision==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'Vision4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    csSKU: csVisionSKU
+    location: (!empty(serviceSettingOverrideRegionAzureAIVision)) ? serviceSettingOverrideRegionAzureAIVision : location
+    restore:restore
+    keyvaultName: keyvaultName
+    vnetResourceGroupName: vnetResourceGroupName
+    name: 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    kind: 'ComputerVision'
+    pendCogSerName: 'p-${projectName}-vision-${genaiName}'
+    subnetName:defaultSubnet
+    vnetName: vnetNameFull
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
 
-module csAIstudio '../modules/csAIStudio.bicep' = {
+module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureAIVision == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsVision ${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: csVision.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AISpeech4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    csSKU: csSpeechSKU
+    location: location
+    restore:restore
+    keyvaultName: keyvaultName
+    vnetResourceGroupName: vnetResourceGroupName
+    name: 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    kind: 'SpeechServices'
+    pendCogSerName: 'p-${projectName}-speech-${genaiName}'
+    subnetName:defaultSubnet
+    vnetName: vnetNameFull
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureSpeech == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkSpeech${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: csSpeech.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+
+module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AIDocIntelligence4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    csSKU: csDocIntelligenceSKU
+    location: location
+    restore:restore
+    keyvaultName: keyvaultName
+    vnetResourceGroupName: vnetResourceGroupName
+    name: 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    kind: 'FormRecognizer'
+    pendCogSerName: 'p-${projectName}-docs-${genaiName}'
+    subnetName:defaultSubnet
+    vnetName: vnetNameFull
+    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAIDocIntelligence == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsDocInt${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: csDocIntelligence.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+
+// """"" Azure AI Services """"""
+module aiServices '../modules/csAIServices.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AIServices4${deploymentProjSpecificUniqueSuffix}'
   params: {
     location: location
-    sku: csContentSafetySKU
+    sku: csAIservicesSKU
     tags: tags
-    cognitiveName: 'ais-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    pendCogSerName: 'p-${projectName}-aiservices-${genaiName}'
+    vnetResourceGroupName: vnetResourceGroupName
+    cognitiveName: 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    pendCogSerName: 'p-${projectName}-aiahub-${genaiName}'
     restore: restore
     subnetName: defaultSubnet
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    keyvaultName: keyvaultName
+    modelGPT4Version:modelGPT4Version
     kind: kindAIServices
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
@@ -567,7 +601,6 @@ module csAIstudio '../modules/csAIStudio.bicep' = {
       }
     ]
     disableLocalAuth: false
-    subnetId: genaiSubnetId
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
   }
@@ -576,70 +609,27 @@ module csAIstudio '../modules/csAIStudio.bicep' = {
   ]
 }
 
-// Azure OpenAI
-param gptDeploymentName string= 'gpt-4'
-var searchIndexName= 'idx-${projectName}${env}${uniqueInAIFenv}'
-param chatGptModelVersion string = modelVersionGPT4 // GPT-4 Turbo with Vision https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models#o1-preview-and-o1-mini-models-limited-access
-param chatGptDeploymentCapacity int = 25
-param embeddingDeploymentName  string=  modelVersionEmbedding // 'text-embedding-ada-002', 'text-embedding-3-large'
-param embeddingModelName string = modelVersionEmbedding // 'text-embedding-ada-002', 'text-embedding-3-large'
-param embeddingDeploymentCapacity int = 25
-
-var defaultOpenAiDeployments = [
-  {
-    name: gptDeploymentName
-    model: {
-      format: 'OpenAI'
-      name: gptDeploymentName
-      version: chatGptModelVersion
-    }
-    sku: {
-      name: 'Standard'
-      capacity: chatGptDeploymentCapacity
-      tier: 'Standard'
-    }
-    scaleSettings: {
-      scaleType: 'Standard'
-      capacity: chatGptDeploymentCapacity
-    }
-    raiPolicyName: 'Microsoft.Default'
-  }
-  {
-    name: embeddingDeploymentName
-    model: {
-      format: 'OpenAI'
-      name: embeddingModelName
-      //version: '2'
-    }
-    sku: {
-      name: 'Standard'
-      capacity: embeddingDeploymentCapacity
-      tier: 'Standard'
-    }
-    scaleSettings: {
-      scaleType: 'Standard'
-      capacity: chatGptDeploymentCapacity
-    }
-    raiPolicyName: 'Microsoft.Default'
-  }
-]
-
 // cog-prj003-sdc-dev-3pmpb-001
-module csAzureOpenAI '../modules/csOpenAI.bicep' = {
+module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureOpenAI==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
     cognitiveName: 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     tags: tags
+    laWorkspaceName:laName
     restore:restore
-    location: location
-    sku: csContentSafetySKU
-    vnetId: vnetId
-    subnetName: defaultSubnet
+    location: (!empty(serviceSettingOverrideRegionAzureAISearch)) ? serviceSettingOverrideRegionAzureAISearch : location
+    vnetResourceGroupName: vnetResourceGroupName
+    sku: csOpenAISKU
+    vnetName: vnetNameFull
+    subnetName: genaiSubnetName
+    keyvaultName: keyvaultName
+    modelGPT4Version:modelGPT4Version
+    aiSearchPrincipalId: aiSearchService.outputs.principalId
     kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
-    deployments:defaultOpenAiDeployments
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    disableLocalAuth:true
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
@@ -649,7 +639,6 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = {
         value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
       }
     ]
-    subnetId: genaiSubnetId
   }
   dependsOn: [
     projectResourceGroup
@@ -657,7 +646,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = {
 }
 
 
-module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(serviceSettingDeployAzureOpenAI==true && centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privDnsZoneLinkAOAI${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -668,14 +657,8 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(centralDnsZoneBy
     projectResourceGroup
   ]
 }
-// LogAnalytics
-var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2020-08-01' existing = {
-  name: laName
-  scope:commonResourceGroupRef
-}
 
-module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
+module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = if(serviceSettingDeployAzureOpenAI==true && centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'diagOpenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -686,6 +669,14 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
     projectResourceGroup
   ]
 }
+
+// LogAnalytics
+var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laName
+  scope:commonResourceGroupRef
+}
+
 
 // Azure OpenAI - END
 // Azure AI Search
@@ -708,7 +699,7 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
     requestMessage:  'created using the Bicep template'
     privateLinkResourceId: sacc.outputs.storageAccountId
   }
-  // First OpenAI resource with 'openai' groupId
+  /* First OpenAI resource with 'openai' groupId
   {
     groupId: 'openai_account'
     status: 'Approved'
@@ -716,13 +707,14 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = {
     requestMessage: 'created using the Bicep template'
     privateLinkResourceId: csAzureOpenAI.outputs.cognitiveId
   }
+    */
   // Second OpenAI resource with 'openai' groupId
   {
     groupId: 'cognitiveservices_account'
     status: 'Approved'
     provisioningState: 'Succeeded'
     requestMessage:  'created using the Bicep template'
-    privateLinkResourceId: csAIstudio.outputs.resourceId
+    privateLinkResourceId: aiServices.outputs.resourceId
   }
 ]
 
@@ -756,7 +748,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
   ]
 }
 
-module privateDnsaiSearchService '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && serviceSettingDeployAzureAISearch==true){
+module privateDnsAiSearchService '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && serviceSettingDeployAzureAISearch==true){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'priDZoneSA1${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -785,13 +777,53 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
     tags: tags
+    networkAcls: networkAcls
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+    containers: [
+      {
+        name: 'default'
+      }
+    ]
+    files: [
+      {
+        name: 'default'
+      }
+    ]
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
-    ipRules: [
+    corsRules: [
       {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+        allowedOrigins: [
+          'https://mlworkspace.azure.ai'
+          'https://ml.azure.com'
+          'https://*.ml.azure.com'
+          'https://ai.azure.com'
+          'https://*.ai.azure.com'
+          'https://mlworkspacecanary.azure.ai'
+          'https://mlworkspace.azureml-test.net'
+        ]
+        allowedMethods: [
+          'GET'
+          'HEAD'
+          'POST'
+          'PUT'
+          'DELETE'
+          'OPTIONS'
+          'PATCH'
+        ]
+        maxAgeInSeconds: 1800
+        exposedHeaders: [
+          '*'
+        ]
+        allowedHeaders: [
+          '*'
+        ]
       }
     ]
   }
@@ -837,6 +869,11 @@ module acr '../modules/containerRegistry.bicep' = {
   ]
 }
 
+param networkAcls object = {
+  bypass: 'AzureServices'
+  defaultAction: 'Allow'
+}
+
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
@@ -850,6 +887,17 @@ module sacc '../modules/storageAccount.bicep' = {
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}ml'
     tags: tags
+    networkAcls: networkAcls
+    containers: [
+      {
+        name: 'default'
+      }
+    ]
+    files: [
+      {
+        name: 'default'
+      }
+    ]
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
@@ -857,6 +905,35 @@ module sacc '../modules/storageAccount.bicep' = {
     ipRules: [
       {
         value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      }
+    ]
+    corsRules: [
+      {
+        allowedOrigins: [
+          'https://mlworkspace.azure.ai'
+          'https://ml.azure.com'
+          'https://*.ml.azure.com'
+          'https://ai.azure.com'
+          'https://*.ai.azure.com'
+          'https://mlworkspacecanary.azure.ai'
+          'https://mlworkspace.azureml-test.net'
+        ]
+        allowedMethods: [
+          'GET'
+          'HEAD'
+          'POST'
+          'PUT'
+          'DELETE'
+          'OPTIONS'
+          'PATCH'
+        ]
+        maxAgeInSeconds: 1800
+        exposedHeaders: [
+          '*'
+        ]
+        allowedHeaders: [
+          '*'
+        ]
       }
     ]
   }
@@ -929,7 +1006,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDep
   dependsOn: [
     projectResourceGroup
     csContentSafety
-    csAIstudio
+    aiServices
   ]
 }
 
@@ -957,9 +1034,7 @@ module addSecret '../modules/kvSecretsPrj.bicep' = {
     keyvaultName: kv1.outputs.keyvaultName
   }
   dependsOn: [
-    kv1
-    csAzureOpenAI
-    csAIstudio
+    aiServices
   ]
 }
 
@@ -995,10 +1070,8 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
     additionalPrincipalIds:technicalAdminsObjectID_array_safe
   }
   dependsOn: [
-    kv1
     addSecret
-    csAzureOpenAI
-    csAIstudio
+    aiServices
   ]
 }
 
@@ -1021,8 +1094,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   }
   dependsOn: [
     commonKv
-    csAzureOpenAI
-    csAIstudio
+    aiServices
   ]
 }
 
@@ -1039,8 +1111,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep'= {
   dependsOn: [
     commonKv
     kv1
-    csAzureOpenAI
-    csAIstudio
+    aiServices
     aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
@@ -1134,7 +1205,7 @@ var aml_cluster_test_prod_sku_param = aml_cluster_test_prod_sku_override != '' ?
 var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
 var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 
-module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML == true)  {
+module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLClassic == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AAMLGenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1176,6 +1247,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
+    
   }
 
   dependsOn: [
@@ -1184,7 +1256,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureML ==
   
 }
 
-var aiHubName ='aihub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1197,34 +1269,46 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     applicationInsights: applicationInsightSWC.outputs.ainsId
     containerRegistry: acr.outputs.containerRegistryId
     env: env
-    keyVault: kv1.outputs.keyvaultId
+    keyVaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
-    projectName: projectName
+    aifactoryProjectName: projectName
     skuName: 'basic'
     skuTier: 'basic'
     storageAccount: sacc.outputs.storageAccountId
     subnetName: defaultSubnet
-    uniqueDepl: deploymentProjSpecificUniqueSuffix
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess:enablePublicGenAIAccess
     aiSearchName: aiSearchService.outputs.aiSearchName
     acrName: acr.outputs.containerRegistryName
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    kindAIHub:'Hub'
+    //openAiResourceName:csAzureOpenAI.outputs.cognitiveName
+    aiServicesName: aiServices.name
+    logWorkspaceName:logAnalyticsWorkspaceOpInsight.name
+    locationSuffix:locationSuffix
+    resourceSuffix:resourceSuffix
+    ipRules: [
+      {
+        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO/GH variables
+      }
+    ]
   }
   dependsOn: [
     projectResourceGroup
   ]
 }
 
-module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true) {
+/* Done interally
+module aiServicesConnection '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true) {
   name: 'aiHubConnection4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params:{
     aiHubName: aiHubName
-    targetAIServicesEndpoint: csAIstudio.outputs.aiServicesEndpoint// csAzureOpenAI.outputs.azureOpenAIEndpoint
-    targetAIServiceResourceId: csAIstudio.outputs.resourceId
+    targetAIServicesEndpoint: aiServices.outputs.aiServicesEndpoint// csAzureOpenAI.outputs.azureOpenAIEndpoint
+    targetAIServiceResourceId: aiServices.outputs.resourceId
     parentAIHubResourceId: aiHub.outputs.amlId
     apiVersion: apiVersionOpenAI
   }
@@ -1233,7 +1317,7 @@ module aiHubConnection '../modules/aihubConnection.bicep' = if(serviceSettingDep
   ]
 }
 
-module aiHubConnectionSearch '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true && serviceSettingDeployAzureAISearch==true) {
+module aiSearchConnection '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true && serviceSettingDeployAzureAISearch==true) {
   name: 'aiHubConnection4Search${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params:{
@@ -1248,9 +1332,9 @@ module aiHubConnectionSearch '../modules/aihubConnection.bicep' = if(serviceSett
     aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
+*/
 
-
-module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(serviceSettingDeployAzureML == true)  {
+module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(serviceSettingDeployAzureMLClassic == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1290,42 +1374,58 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
 
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 
-module rbacModuleOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch==true && serviceSettingDeployContentSafety==true) {
+module rbacForOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacOpenAIDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
     aiSearchName: aiSearchService.outputs.aiSearchName
-    resourceGroupId: targetResourceGroupId
-    aiServicesName: csAzureOpenAI.outputs.cognitiveName
     openAIServicePrincipal:csAzureOpenAI.outputs.principalId
-    contentSafetyName: csContentSafety.outputs.name
+    servicePrincipleObjecId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    openAIName:csAzureOpenAI.outputs.cognitiveName
+    userObjectIds:technicalAdminsObjectID_array_safe
   }
-  dependsOn: [
-    csAzureOpenAI
-    csContentSafety
-    aiSearchService
-  ]
+}
+module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceSettingDeployAzureAISearch==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacAIServicesDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    aiServicesPrincipalId:aiServices.outputs.aiServicesPrincipalId
+  }
+}
+
+module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacSearchDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiServicesName:aiServices.outputs.name
+    aiSearchMIObjectId: aiSearchService.outputs.principalId
+  }
 }
 
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacUsersDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacUsersAIHubDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
     aiSearchName: aiSearchService.outputs.aiSearchName
     resourceGroupId: targetResourceGroupId
     userObjectIds: technicalAdminsObjectID_array_safe
-    aiServicesName:csAIstudio.outputs.name
-    openAIName: csAzureOpenAI.outputs.cognitiveName
-    contentSafetyName: csContentSafety.outputs.name
+    aiServicesName:aiServices.outputs.name
+    aiHubName:aiHub.outputs.name
+    aiHubProjectName:aiHub.outputs.aiProjectName
+    servicePrincipleObjecId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
-  dependsOn: [
-    rbacModuleOpenAI
-  ]
 }
+
+// #### OPTIONAL ####
 
 module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1337,11 +1437,6 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
     userObjectIds: technicalAdminsObjectID_array_safe
     visonServiceName: csVision.outputs.name
   }
-  dependsOn: [
-    csVision
-    sa4AIsearch
-    sacc
-  ]
 }
 
 module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
@@ -1354,13 +1449,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
     userObjectIds: technicalAdminsObjectID_array_safe
     speechServiceName: csSpeech.outputs.name
   }
-  dependsOn: [
-    csSpeech
-    sacc
-    sa4AIsearch
-  ]
 }
-
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
@@ -1371,51 +1460,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
     aiDocsIntelMIObjectId: csDocIntelligence.outputs.principalId
     docsServiceName: csDocIntelligence.outputs.name
   }
-  dependsOn: [
-    csDocIntelligence
-    sacc
-    sa4AIsearch
-  ]
 }
-
-
-module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacSearchDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
-  params:{
-    storageAccountName: sacc.outputs.storageAccountName
-    storageAccountName2: sa4AIsearch.outputs.storageAccountName
-    aiServicesName:csAIstudio.outputs.name
-    aiSearchMIObjectId: aiSearchService.outputs.principalId
-    openAIName: csAzureOpenAI.outputs.cognitiveName
-  }
-  dependsOn: [
-    aiSearchService
-    csAzureOpenAI
-    csAIstudio
-  ]
-}
-
-module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacAIServicesDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
-  params:{
-    storageAccountName: sacc.outputs.storageAccountName
-    storageAccountName2: sa4AIsearch.outputs.storageAccountName
-    aiSearchName: aiSearchService.outputs.aiSearchName
-    resourceGroupId: targetResourceGroupId
-    aiServicesName:csAIstudio.outputs.name
-    aiServicesPrincipalId:csAIstudio.outputs.aiServicesPrincipalId
-    openAIName:csAzureOpenAI.outputs.cognitiveName
-    contentSafetyName: csContentSafety.outputs.name
-  }
-  dependsOn: [
-    aiSearchService
-    csAzureOpenAI
-    csAIstudio
-  ]
-}
-
 
 /*
 module rbacModuleWebApp'../modules/aihubRbacAIWebApp.bicep' = {
@@ -1450,7 +1495,6 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
   }
   dependsOn: [
     rbacModuleAIServices
-    csAzureOpenAI
     vmPrivate
     sacc
     kv1

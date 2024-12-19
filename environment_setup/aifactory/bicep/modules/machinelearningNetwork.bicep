@@ -18,6 +18,7 @@ param tags object
 param amlPrivateDnsZoneID string
 @description('Resource name ID on DnsZone')
 param notebookPrivateDnsZoneID string
+param ipRules array = []
 
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj

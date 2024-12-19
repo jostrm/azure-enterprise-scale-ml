@@ -7,23 +7,30 @@ param location string
 @description('Specifies the SKU, where default is standard')
 param sku string
 @description('Specifies the VNET id that will be associated with the private endpoint')
-param vnetId string
+param vnetName string
 @description('Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
-@description('ResourceID of subnet for private endpoints')
-param subnetId string
-param kind  string
-param deployments array = []
+param kind string
 param publicNetworkAccess bool = false
 param pendCogSerName string
 param vnetRules array = []
 param ipRules array = []
 param restore bool
+param vnetResourceGroupName string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 
-resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
+
+resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: cognitiveName
   location: location
   kind: kind
@@ -40,6 +47,7 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     networkAcls: {
+      bypass:'AzureServices'
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
@@ -50,9 +58,9 @@ resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
   }
 }
 
-resource gpt4turbo 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
-  name: '${cognitiveName}/gpt-4'
-  //parent: cognitive
+resource gpt4services 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+  name: 'gpt-4'
+  parent: aiServices
   sku: {
     name: 'Standard'
     capacity: 25
@@ -66,14 +74,11 @@ resource gpt4turbo 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01'
     raiPolicyName: 'Microsoft.Default'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
-  dependsOn: [
-    cognitive
-  ]
 }
 
-resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+resource embedding2services 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
   name: 'text-embedding-ada-002'
-  parent: cognitive
+  parent: aiServices
   sku: {
     name: 'Standard'
     capacity: 25
@@ -88,32 +93,7 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
   dependsOn: [
-    gpt4turbo
-  ]
-}
-
-/* DeploymentModelNotSupported - The model 'Format: OpenAI, Name: text-embedding-3-large, Version: ' of account deployment is not supported.*/
-
-resource embedding3 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
-  name: 'text-embedding-3-large'
-  parent: cognitive
-  sku: {
-    name: 'Standard'
-    capacity: 25
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'text-embedding-3-large'
-      version:'1' 
-      //name: 'text-embedding-ada-002'
-      //version:'2'
-    }
-    raiPolicyName: 'Microsoft.Default'
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
-  }
-  dependsOn: [
-    embedding2
+    gpt4services
   ]
 }
 
@@ -123,14 +103,14 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   tags: tags
   properties: {
     subnet: {
-      id: subnetRef
+      id: subnet.id
     }
     customNetworkInterfaceName: 'pend-nic-${kind}-${cognitiveName}'
     privateLinkServiceConnections: [
       {
         name: pendCogSerName
         properties: {
-          privateLinkServiceId: cognitive.id
+          privateLinkServiceId: aiServices.id
           groupIds: [
             'account'
           ]
@@ -143,20 +123,20 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
     ]
   }
   dependsOn: [
-    embedding3
+    embedding2services
   ]
 }
 
-output cognitiveId string = cognitive.id
-output azureOpenAIEndpoint string = cognitive.properties.endpoint
-output cognitiveName string = cognitive.name
+output cognitiveId string = aiServices.id
+output azureOpenAIEndpoint string = aiServices.properties.endpoint
+output cognitiveName string = aiServices.name
 //output principalId string = cognitive.identity.principalId // Is this used? 
 
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name
     type: 'cognitiveservices'
-    id:cognitive.id
+    id:aiServices.id
     groupid:'account'
   }
 ]

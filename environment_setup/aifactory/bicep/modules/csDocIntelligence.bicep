@@ -6,14 +6,25 @@ param publicNetworkAccess bool = true
 param vnetRules array = []
 param ipRules array = []
 param pendCogSerName string
-param vnetId string
+param vnetName string
 param subnetName string
 param restore bool
+param keyvaultName string
+param vnetResourceGroupName string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
 var nameCleaned = toLower(replace(name, '-', ''))
 
-resource csAccount 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
+
+resource csAccountDocInt 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: name
   location: location
   kind: kind
@@ -29,6 +40,7 @@ resource csAccount 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     networkAcls: {
+      bypass:'AzureServices'
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
@@ -45,14 +57,14 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   name: pendCogSerName
   properties: {
     subnet: {
-      id: subnetRef
+      id: subnet.id
     }
     customNetworkInterfaceName: 'pend-nic-${kind}-${nameCleaned}'
     privateLinkServiceConnections: [
       {
         name: pendCogSerName
         properties: {
-          privateLinkServiceId: csAccount.id
+          privateLinkServiceId: csAccountDocInt.id
           groupIds: [
             'account'
           ]
@@ -65,18 +77,48 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
     ]
   }
 }
+resource keyVaultDocInt 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName
+  scope: resourceGroup()
+}
 
-output name string = csAccount.name
-output resourceId string = csAccount.id
-output principalId string = csAccount.identity.principalId 
-output endpoint string = csAccount.properties.endpoint
-output host string = split(csAccount.properties.endpoint, '/')[2]
+@description('Key Vault: Azur AI Document Intelligence K in vault as S')
+resource kValueDocInt 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVaultDocInt
+  name: 'aifactory-proj-aidocintelligence-api-key'
+  properties: {
+    value:csAccountDocInt.listKeys().key1
+    contentType: 'text/plain'
+    attributes: {
+      enabled: true
+    }
+  }
+}
+@description('Key Vault: Azure AI Document Intelligence Endpoint in vault as S')
+resource kValueDocInt2 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVaultDocInt
+  name: 'aifactory-proj-aidocintelligence-api-endpoint'
+  properties: {
+    value:csAccountDocInt.properties.endpoint
+    contentType: 'text/plain'
+    attributes: {
+      enabled: true
+    }
+  }
+}
+
+
+output name string = csAccountDocInt.name
+output resourceId string = csAccountDocInt.id
+output principalId string = csAccountDocInt.identity.principalId 
+output endpoint string = csAccountDocInt.properties.endpoint
+output host string = split(csAccountDocInt.properties.endpoint, '/')[2]
 
 output dnsConfig array = [
   {
     name: pendCognitiveServices.name
     type: 'cognitiveservices'
-    id:csAccount.id
+    id:csAccountDocInt.id
     groupid:'account'
   }
 ]

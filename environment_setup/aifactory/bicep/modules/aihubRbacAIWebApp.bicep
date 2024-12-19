@@ -23,10 +23,10 @@ var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 
 // Existing resources for scoping role assignments
-resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' existing = {
+resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
-resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2021-08-01' existing = {
+resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName2
 }
 

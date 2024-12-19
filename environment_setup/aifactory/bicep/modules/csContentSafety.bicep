@@ -1,5 +1,6 @@
 @description('ResourceID of subnet for private endpoints')
-param subnetId string
+param subnetName string
+param vnetName string
 param csSKU string = 'S0'
 param location string
 param contentsafetyName string
@@ -8,14 +9,24 @@ param publicNetworkAccess bool = true
 param vnetRules array = []
 param ipRules array = []
 param pendCogSerName string
-param vnetId string
-param subnetName string
 param restore bool
+param vnetResourceGroupName string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
+//param vnetId string
+//param subnetName string
+//var subnetRef = '${vnetId}/subnets/${subnetName}'
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
 var nameCleaned = toLower(replace(contentsafetyName, '-', ''))
 
-resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
+resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: contentsafetyName
   location: location
   kind: kind
@@ -31,6 +42,7 @@ resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2022-03-01' 
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     networkAcls: {
+      bypass:'AzureServices'
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
@@ -47,7 +59,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   name: pendCogSerName
   properties: {
     subnet: {
-      id: subnetRef
+      id: subnet.id
     }
     customNetworkInterfaceName: 'pend-nic-${kind}-${contentsafetyName}'
     privateLinkServiceConnections: [

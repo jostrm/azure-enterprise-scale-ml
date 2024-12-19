@@ -15,8 +15,9 @@ The `Enterprise Scale AI Factory` is a plug and play solution that automates the
 5) `Enterprise scale & security & battle tested`: Used by customers and partners with MLOps since 2019 (see LINKS) to accelerate the development and delivery of AI solutions, with common tooling & marrying multiple best practices. Private networking (private endpoints), as default.
 
 ## Public links for more info
--	`AI factory - setup in 60h (Company: Epiroc)` - End-2-End pipelines for use case: How-to
-    - https://customers.microsoft.com/en-us/story/1653030140221000726-epiroc-manufacturing-azure-machine-learning
+-	`AI factory - (Company: Epiroc)` - Microsoft Customer Story-Epiroc advances manufacturing innovation with AI Factory creating data heaven
+    - [Microsoft Customer Story-Epiroc advances manufacturing innovation with AI Factory creating data heaven
+    ](https://customers.microsoft.com/en-us/story/1653030140221000726-epiroc-manufacturing-azure-machine-learning)
 
 -   `AI factory` - Technical BLOG
     - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
