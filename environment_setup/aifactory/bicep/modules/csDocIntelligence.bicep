@@ -40,7 +40,7 @@ resource csAccountDocInt 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     networkAcls: {
-      bypass:'AzureServices'
+      //bypass:'AzureServices'
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
