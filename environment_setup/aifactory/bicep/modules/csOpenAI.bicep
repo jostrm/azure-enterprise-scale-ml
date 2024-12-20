@@ -22,12 +22,12 @@ param ipRules array = []
 param restore bool
 param disableLocalAuth bool = true
 @allowed([
-  '1106-preview'
+  '1106-Preview'
   '0613'
   'vision-preview'
   'turbo-2024-04-0'
 ])
-param modelGPT4Version string = '1106-preview' // If your region doesn't support this version, please change it.
+param modelGPT4Version string = '1106-Preview' // If your region doesn't support this version, please change it.
 param laWorkspaceName string
 param keyvaultName string
 param vnetResourceGroupName string

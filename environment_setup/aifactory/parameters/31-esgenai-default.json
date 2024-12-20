@@ -22,6 +22,9 @@
         },
         "serviceSettingDeployAIDocIntelligence":{ 
             "value": false
+        },
+        "modelGPT4Version": {
+            "value": "1106-Preview"
         }
     }
 }
