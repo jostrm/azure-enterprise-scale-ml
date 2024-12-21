@@ -271,6 +271,42 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   }
 }
 
+//CPU Cluster
+resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
+  name: 'aif-dont-del-for-acr' // p001-m1-weu-prod (16/16...or 24)
+  parent: aiHub
+  location: location
+  tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    computeType: 'AmlCompute'
+    computeLocation: location
+    description: 'Dont touch. Dont delete. CPU cluster for building images for Container Registry'
+    disableLocalAuth: true
+    properties: {
+      vmPriority: 'Dedicated'
+      vmSize: 'Standard_DS3_v2'
+      enableNodePublicIp: false
+      isolatedNetwork: false
+      osType: 'Linux'
+      remoteLoginPortPublicAccess: 'Disabled'
+      scaleSettings: {
+        minNodeCount: 0
+        maxNodeCount: 3
+        nodeIdleTimeBeforeScaleDown: 'PT120S'
+      }
+      subnet: {
+        id: subnet.id
+      }
+    }
+  }
+  dependsOn:[
+    machineLearningPrivateEndpoint
+  ]
+}
+
 
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
 resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {

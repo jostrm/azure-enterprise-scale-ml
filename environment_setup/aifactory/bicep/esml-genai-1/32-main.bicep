@@ -1286,7 +1286,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     kindAIHub:'Hub'
     //openAiResourceName:csAzureOpenAI.outputs.cognitiveName
-    aiServicesName: aiServices.name
+    aiServicesName: aiServices.outputs.name
     logWorkspaceName:logAnalyticsWorkspaceOpInsight.name
     logWorkspaceResoureGroupName:commonResourceGroup
     locationSuffix:locationSuffix
