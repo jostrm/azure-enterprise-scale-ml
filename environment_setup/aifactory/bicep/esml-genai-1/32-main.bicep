@@ -1288,6 +1288,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     //openAiResourceName:csAzureOpenAI.outputs.cognitiveName
     aiServicesName: aiServices.name
     logWorkspaceName:logAnalyticsWorkspaceOpInsight.name
+    logWorkspaceResoureGroupName:commonResourceGroup
     locationSuffix:locationSuffix
     resourceSuffix:resourceSuffix
     ipRules: [

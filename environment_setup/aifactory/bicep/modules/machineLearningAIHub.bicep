@@ -45,6 +45,7 @@ param kindAIHub string = 'Hub'
 param ipRules array = []
 param aiServicesName string
 param logWorkspaceName string
+param logWorkspaceResoureGroupName string
 param locationSuffix string
 param resourceSuffix string
 
@@ -73,6 +74,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2023-05-01' existing =
 }
 resource logWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
   name: logWorkspaceName
+  scope:resourceGroup(logWorkspaceResoureGroupName)
 }
 resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
   name: keyVaultName
