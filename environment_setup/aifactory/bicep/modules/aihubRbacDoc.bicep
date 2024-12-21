@@ -8,8 +8,8 @@ param userObjectIds array // Specific user's object ID's for "User to Service Ta
 // Role Definition IDs: Cognitive Services OpenAI Contributor
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
-var congnitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908' // Azure content safety
-var readerRole = 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Azure content safety
+//var congnitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
+var cognitiveServicesContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442' 
 var storageBlobDataOwnerRoleId = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 
 // Existing resources for scoping role assignments
@@ -45,7 +45,7 @@ resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/role
   scope: existingStorageAccount2
 }
 
-// Search -> Storage-File
+// AI docs -> Storage-File
 
 resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingStorageAccount.id, storageFileDataPrivilegedContributorRoleId, aiDocsIntelMIObjectId)
@@ -58,40 +58,28 @@ resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authoriza
   scope: existingStorageAccount
 }
 resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageBlobDataOwnerRoleId, aiDocsIntelMIObjectId)
+  name: guid(existingStorageAccount2.id, storageFileDataPrivilegedContributorRoleId, aiDocsIntelMIObjectId)
   properties: {
     principalId: aiDocsIntelMIObjectId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataOwnerRoleId)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
     description: '019a'
   }
   scope: existingStorageAccount2
 }
 
-// USERS to Vision
+// USERS to Docs
 
 resource docsServiceOpenAICotributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(docsService.id, congnitiveServicesUserRoleId, userObjectIds[i])
+  name: guid(docsService.id, cognitiveServicesContributorRoleId, userObjectIds[i])
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', congnitiveServicesUserRoleId)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
     principalId: userObjectIds[i]
     principalType: 'User'
-    description:'023: CognitiveServicesUser to USER with OID  ${userObjectIds[i]} for : ${docsService.name} to call data on data plane'
+    description:'023: cognitiveServicesContributor role to USER with OID  ${userObjectIds[i]} for : ${docsService.name} to call data on data plane'
   }
   scope:docsService
 }]
-
-resource docsServiceReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(docsService.id, readerRole, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRole)
-    principalId: userObjectIds[i]
-    principalType: 'User'
-    description:'023: Reader to USER with OID  ${userObjectIds[i]} for : ${docsService.name} to call data on data plane'
-  }
-  scope:docsService
-}]
-
 
 // Outputs
 output roleAssignmentStorageBlobDataContributorName string = roleAssignmentStorageBlobDataContributor.name

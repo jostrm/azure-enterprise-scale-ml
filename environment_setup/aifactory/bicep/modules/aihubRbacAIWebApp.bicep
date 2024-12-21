@@ -254,27 +254,6 @@ resource userRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAs
 
 // USERS to STORAGE
 
-resource userRoleAssignmentContributorStorage1 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount.id, contributorRoleId, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
-    principalId: userObjectIds[i]
-    principalType: 'User'
-    description:'026a: CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
-  }
-  scope:existingStorageAccount
-}]
-resource userRoleAssignmentContributorStorage2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingStorageAccount2.id, contributorRoleId, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
-    principalId: userObjectIds[i]
-    principalType: 'User'
-    description:'026b: CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
-  }
-  scope:existingStorageAccount2
-}]
-
 resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, userObjectIds[i])
   properties: {
@@ -315,18 +294,6 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Auth
     description:'028b: FileDataPrivilegedContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
-}]
-
-// RG
-resource userRoleAssignmentContributorStorageAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(resourceGroupId, contributorRoleId, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
-    principalId: userObjectIds[i]
-    principalType: 'User'
-    description:'029: CONTRIBUTOR on RG to USER with OID  ${userObjectIds[i]} for : ${resourceGroupId}'
-  }
-  scope:resourceGroup()
 }]
 
 // --------------- USERS END ---------------- //
