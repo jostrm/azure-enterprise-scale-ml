@@ -165,11 +165,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     allowRoleAssignmentOnRG: true
     friendlyName: 'AI Foundry Hub for: ${aifactoryProjectName}-${env}-${aiFactoryNumber}'
     description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for ${aifactoryProjectName} in ESML-${env} environment in ${location}'
-    storageAccount: resourceId('Microsoft.Storage/storageAccounts', storageAccount)
-    containerRegistry:resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
+    storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
+    containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
     systemDatastoresAuthMode: 'identity'
-    applicationInsights: resourceId('Microsoft.Insights/components', applicationInsights)
+    applicationInsights: applicationInsights // resourceId('Microsoft.Insights/components', applicationInsights)
     hbiWorkspace:false
 
     // network settings
