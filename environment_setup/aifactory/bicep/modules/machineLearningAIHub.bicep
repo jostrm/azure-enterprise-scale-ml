@@ -272,6 +272,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
 }
 
 //CPU Cluster
+// ":"Current operation is not supported on Hub workspace
+/*
 resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
   name: 'aif-dont-del-for-acr' // p001-m1-weu-prod (16/16...or 24)
   parent: aiHub
@@ -306,7 +308,7 @@ resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/co
     machineLearningPrivateEndpoint
   ]
 }
-
+*/
 
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
 resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {

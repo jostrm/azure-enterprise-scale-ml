@@ -1302,38 +1302,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
   ]
 }
 
-/* Done interally
-module aiServicesConnection '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true) {
-  name: 'aiHubConnection4${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  params:{
-    aiHubName: aiHubName
-    targetAIServicesEndpoint: aiServices.outputs.aiServicesEndpoint// csAzureOpenAI.outputs.azureOpenAIEndpoint
-    targetAIServiceResourceId: aiServices.outputs.resourceId
-    parentAIHubResourceId: aiHub.outputs.amlId
-    apiVersion: apiVersionOpenAI
-  }
-  dependsOn: [
-    aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
-  ]
-}
-
-module aiSearchConnection '../modules/aihubConnection.bicep' = if(serviceSettingDeployAIHub == true && serviceSettingDeployAzureAISearch==true) {
-  name: 'aiHubConnection4Search${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  params:{
-    aiHubName: aiHubName
-    targetAIServicesEndpoint: aiSearchService.outputs.aiSearchEndpoint
-    targetAIServiceResourceId: aiSearchService.outputs.aiSearchId
-    parentAIHubResourceId: aiHub.outputs.amlId
-    apiVersion: apiVersionOpenAI
-    category: 'CognitiveSearch' // 'AIServices'
-  }
-  dependsOn: [
-    aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
-  ]
-}
-*/
 
 module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(serviceSettingDeployAzureMLClassic == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
