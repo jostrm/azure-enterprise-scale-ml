@@ -273,10 +273,9 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
 
 //CPU Cluster
 // ":"Current operation is not supported on Hub workspace
-/*
 resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
-  name: 'aif-dont-del-for-acr' // p001-m1-weu-prod (16/16...or 24)
-  parent: aiHub
+  name: 'buildcluster001' // p001-m1-weu-prod (16/16...or 24)
+  parent: aiProject
   location: location
   tags: tags
   identity: {
@@ -296,7 +295,7 @@ resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/co
       remoteLoginPortPublicAccess: 'Disabled'
       scaleSettings: {
         minNodeCount: 0
-        maxNodeCount: 3
+        maxNodeCount: 5
         nodeIdleTimeBeforeScaleDown: 'PT120S'
       }
       subnet: {
@@ -308,7 +307,6 @@ resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/co
     machineLearningPrivateEndpoint
   ]
 }
-*/
 
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
 resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
@@ -350,6 +348,10 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enableDataIsolation: true
     hubResourceId: aiHub.id
+    // configuration for workspaces with private link endpoint
+    imageBuildCompute: 'buildcluster001'
+    //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
+ 
   }
 
   resource endpoint 'onlineEndpoints' = {
