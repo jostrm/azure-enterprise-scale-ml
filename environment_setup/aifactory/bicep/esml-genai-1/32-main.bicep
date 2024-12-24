@@ -718,7 +718,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   }
 ]
 
-var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${resourceSuffix}') ,'-','')
+var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}') ,'-','')
 
 module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzureAISearch==true) {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
