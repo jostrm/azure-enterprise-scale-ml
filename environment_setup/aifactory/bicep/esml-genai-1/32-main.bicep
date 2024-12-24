@@ -1299,6 +1299,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
   }
   dependsOn: [
     projectResourceGroup
+    aiServices
   ]
 }
 

@@ -175,6 +175,7 @@ resource kValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
       enabled: true
     }
   }
+  
 }
 @description('Key Vault: Azure AI Services endpoint in vault as S')
 resource epValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {

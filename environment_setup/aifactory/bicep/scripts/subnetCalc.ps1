@@ -398,7 +398,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         $requiredSubnets = [PsObject]@{
             dbxPubSubnetCidr  = '23'
             dbxPrivSubnetCidr = '23'
-            aksSubnetCidr     = '24'
+            aksSubnetCidr     = '25'
         }
     }
     else 
@@ -410,14 +410,14 @@ if ($(Get-AzContext).Subscription -ne "") {
             $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '23'
                 dbxPrivSubnetCidr = '23'
-                aksSubnetCidr     = '24'
+                aksSubnetCidr     = '25'
             }
         }
         elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
             write-host "projectTypeADO=genai-1"
             $requiredSubnets = [PsObject]@{
-                genaiSubnetCidr  = '23'
-                aksSubnetCidr     = '24'
+                genaiSubnetCidr  = '25'
+                aksSubnetCidr     = '25'
             }
         }
         else {
@@ -425,7 +425,7 @@ if ($(Get-AzContext).Subscription -ne "") {
             $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '23'
                 dbxPrivSubnetCidr = '23'
-                aksSubnetCidr     = '24'
+                aksSubnetCidr     = '25'
             }
         }
     }
