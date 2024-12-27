@@ -52,7 +52,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   properties: {
     customSubDomainName: nameCleaned
     publicNetworkAccess:'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled'
-    restore: restore
+    //restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     disableLocalAuth: disableLocalAuth
     apiProperties: {

@@ -194,13 +194,15 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
             sparkEnabled: false
             sparkStatus: 'Inactive'
           }
-        }
+        } 
+        /* // Only \"PrivateEndpoint\" outbound rules can be specified when managed network isolation mode is \"AllowInternetOutbound\"
         wikipedia: {
           type: 'FQDN'
           destination: 'en.wikipedia.org'
           category: 'UserDefined'
           status: 'Active'
         }
+        */
         OpenAI: {
           type: 'PrivateEndpoint'
           destination: {
@@ -511,7 +513,32 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
   }
 }
-
+resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: privateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    customNetworkInterfaceName: 'pend-nic-aihub-${aiProject.name}'
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointName
+        properties: {
+          groupIds: [
+            'amlworkspace'
+          ]
+          privateLinkServiceId: aiProject.id
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Private endpoint for Azure AI Foundry AI Hub'
+          }
+        }
+      }
+    ]
+    subnet: {
+      id: subnet.id
+    }
+  }
+}
 resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
   name: '${pendAIHub.name}DnsZone'
   parent: pendAIHub
@@ -532,7 +559,26 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
     ]
   }
 }
-
+resource privateEndpointDnsProject 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+  name: '${pendAIHubProject.name}DnsZone'
+  parent: pendAIHubProject
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateDnsZoneName[environment().name]
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.amlworkspace.id 
+        }
+      }
+      {
+        name: privateDnsZoneNameNotebooks[environment().name]
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.notebooks.id 
+        }
+      }
+    ]
+  }
+}
 
 @description('Assign AML Workspace\'s ID: AcrPush to workload\'s container registry.')
 resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
