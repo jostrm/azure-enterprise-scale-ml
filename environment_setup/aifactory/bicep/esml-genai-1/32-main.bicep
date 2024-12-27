@@ -879,6 +879,25 @@ resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing 
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
+// Update simulation - since: "ACR sku cannot be retrieved because of internal error."
+module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acrCommonName
+    skuName: 'Premium'
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
+    tags: acrCommon.tags
+    location:acrCommon.location
+  }
+
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
 param networkAcls object = {
   bypass: 'AzureServices'
   defaultAction: 'Allow'
@@ -1231,7 +1250,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     skuTier: 'basic'
     env:env
     storageAccount: sacc.outputs.storageAccountId
-    containerRegistry:useCommonACR? acrCommon.id:acr.outputs.containerRegistryId
+    containerRegistry:useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
     keyVault: kv1.outputs.keyvaultId
     applicationInsights: applicationInsightSWC.outputs.ainsId
     aksSubnetId: aksSubnetId
@@ -1277,7 +1296,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     tags: tags
     aifactorySuffix: aifactorySuffixRG
     applicationInsights: applicationInsightSWC.outputs.ainsId
-    containerRegistry: useCommonACR? acrCommon.id:acr.outputs.containerRegistryId
+    containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
     env: env
     keyVaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
@@ -1291,7 +1310,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess:enablePublicGenAIAccess
     aiSearchName: aiSearchService.outputs.aiSearchName
-    acrName: useCommonACR? acrCommon.name:acr.outputs.containerRegistryName
+    acrName: useCommonACR? acrCommon2.name:acr.outputs.containerRegistryName
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     kindAIHub:'Hub'
