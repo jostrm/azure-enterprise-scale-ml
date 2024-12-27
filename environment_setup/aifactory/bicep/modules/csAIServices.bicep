@@ -51,7 +51,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: publicNetworkAccess? 'Enabled': 'Disabled'
+    publicNetworkAccess:'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled'
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     disableLocalAuth: disableLocalAuth
@@ -131,7 +131,8 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Compliance with network design'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
           }
         }
       }

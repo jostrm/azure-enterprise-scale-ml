@@ -165,21 +165,26 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   kind: kindAIHub
   properties: {
     allowRoleAssignmentOnRG: true
-    friendlyName: 'AI Foundry Hub for: ${aifactoryProjectName}-${env}-${aiFactoryNumber}'
+    friendlyName: '${name}-${env}-${aiFactoryNumber}'
     description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for ${aifactoryProjectName} in ESML-${env} environment in ${location}'
+
+     // dependent resources
     storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
     containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
-    systemDatastoresAuthMode: 'identity'
     applicationInsights: applicationInsights // resourceId('Microsoft.Insights/components', applicationInsights)
+
+    // configuration
+    systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
+    provisionNetworkNow: true
 
     // network settings
-    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
+    publicNetworkAccess: 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
@@ -212,8 +217,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
       defaultAction: enablePublicGenAIAccess? 'Allow':'Deny'
       ipRules: ipRules
     }
-    
-    provisionNetworkNow: true
+
   }
 
   resource aoaiConnection 'connections' = {
@@ -223,7 +227,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
       category: 'AzureOpenAI'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
+      peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -240,6 +245,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
+      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -343,7 +349,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
                             // to a resource group that only contains the project/hub.
   }
   properties: {
-    friendlyName: 'Default project for AI Factory project. Outbound access: Wikipedia (chat demo)'
+    friendlyName: aiHubProjectName
     description: 'Project to support the "Chat with Wikipedia" example prompt flow that is used as part of the Microsoft Learn Azure OpenAI baseline chat implementation. https://learn.microsoft.com/azure/architecture/ai-ml/architecture/baseline-openai-e2e-chat'
     v1LegacyMode: false
     publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
@@ -479,11 +485,12 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
 }
 
 
-resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2020-11-01' = {
+resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: privateEndpointName
   location: location
   tags: tags
   properties: {
+    customNetworkInterfaceName: 'pend-nic-aihub-${aiHub.name}'
     privateLinkServiceConnections: [
       {
         name: privateEndpointName
@@ -494,7 +501,7 @@ resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2020
           privateLinkServiceId: aiHub.id
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Private endpoint for Azure machine learning workspace'
+            description: 'Private endpoint for Azure AI Foundry AI Hub'
           }
         }
       }
@@ -506,8 +513,8 @@ resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2020
 }
 
 resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
-  name: '${machineLearningPrivateEndpoint.name}DnsZone'
-  parent: machineLearningPrivateEndpoint
+  name: '${pendAIHub.name}DnsZone'
+  parent: pendAIHub
   properties:{
     privateDnsZoneConfigs: [
       {

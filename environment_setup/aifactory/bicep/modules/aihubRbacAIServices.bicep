@@ -78,7 +78,7 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 // 002 -> Storage START
 
 resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, '${aiServicesPrincipalId}+013')
+  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)
   properties: {
     principalId: aiServicesPrincipalId
     principalType: 'ServicePrincipal'
@@ -88,7 +88,7 @@ resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleA
   scope: existingStorageAccount
 }
 resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, '${aiServicesPrincipalId}+014')
+  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)
   properties: {
     principalId: aiServicesPrincipalId
     principalType: 'ServicePrincipal'
@@ -100,7 +100,7 @@ resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/role
 
 // FILE
 resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId, '${aiServicesPrincipalId}+01b')
+  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId,aiServicesPrincipalId)
   properties: {
     principalId: aiServicesPrincipalId
     principalType: 'ServicePrincipal'
@@ -110,7 +110,7 @@ resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authoriza
   scope: existingStorageAccount
 }
 resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, '${aiServicesPrincipalId}+019a')
+  name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, aiServicesPrincipalId)
   properties: {
     principalId: aiServicesPrincipalId
     principalType: 'ServicePrincipal'

@@ -1357,9 +1357,10 @@ module rbacForOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeplo
     userObjectIds:technicalAdminsObjectID_array_safe
   }
 }
+// 6 assignments: OK
 module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceSettingDeployAzureAISearch==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacAIServicesDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacAIServices_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1368,20 +1369,24 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceS
   }
 }
 
-module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
+module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSettingDeployAzureAISearch==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacSearchDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacSearch_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
     aiServicesName:aiServices.outputs.name
     aiSearchMIObjectId: aiSearchService.outputs.principalId
   }
+  dependsOn: [
+    aiHub
+    rbacModuleAIServices
+  ]
 }
 
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacUsersAIHubDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacUsersAIHub_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1393,6 +1398,10 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     aiHubProjectName:aiHub.outputs.aiProjectName
     servicePrincipleObjecId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
+  dependsOn: [
+    aiHub
+    rbacModuleAISearch
+  ]
 }
 
 // #### OPTIONAL ####
