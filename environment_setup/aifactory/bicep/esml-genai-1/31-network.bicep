@@ -36,6 +36,7 @@ param vnetNameFull_param string = ''
 param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
+param useCommonACR string = ''
 
 var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
@@ -113,10 +114,10 @@ module genaiSnt '../modules/subnetWithNsg.bicep' = {
   params: {
     name: 'snt-${projectName}-genai'
     virtualNetworkName: vnetNameFull
-    addressPrefix: genaiSubnetSettings['cidr']
+    addressPrefix: genaiSubnetSettings.cidr
     location: location
-    serviceEndpoints: genaiSubnetSettings['serviceEndpoints']
-    delegations: genaiSubnetSettings['delegations']
+    serviceEndpoints: genaiSubnetSettings.serviceEndpoints
+    delegations: genaiSubnetSettings.delegations
     nsgId:nsgGenAI.outputs.nsgId
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }

@@ -1,7 +1,5 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
-@description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourge group, set this to true')
-param useCommonACR bool = false
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
 param inputKeyvault string
 param inputKeyvaultResourcegroup string
@@ -112,7 +110,8 @@ param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
-
+@description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourge group, set this to true')
+param useCommonACR bool = false
 
 // Override: AML: AKS cluster
 param aks_dev_sku_override string = ''

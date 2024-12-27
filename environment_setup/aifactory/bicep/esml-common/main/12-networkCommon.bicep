@@ -46,6 +46,7 @@ param vnetNameFull_param string = ''
 param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
+param useCommonACR string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)

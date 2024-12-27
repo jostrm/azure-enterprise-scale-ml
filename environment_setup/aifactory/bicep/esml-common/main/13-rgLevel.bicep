@@ -83,6 +83,7 @@ param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
+param useCommonACR string = ''
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
 
