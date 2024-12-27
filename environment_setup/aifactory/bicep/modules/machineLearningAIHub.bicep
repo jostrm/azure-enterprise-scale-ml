@@ -486,7 +486,7 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
   }
 }
 
-
+// privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
 resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: privateEndpointName
   location: location
@@ -513,15 +513,16 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
   }
 }
+var privateEndpointNameProject = 'pend-${aiProject.name}'
 resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: privateEndpointName
+  name: privateEndpointNameProject
   location: location
   tags: tags
   properties: {
     customNetworkInterfaceName: 'pend-nic-aihub-${aiProject.name}'
     privateLinkServiceConnections: [
       {
-        name: privateEndpointName
+        name: privateEndpointNameProject
         properties: {
           groupIds: [
             'amlworkspace'
