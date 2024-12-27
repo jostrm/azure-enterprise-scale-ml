@@ -872,10 +872,10 @@ module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
 }
 
 var acrCommonName = 'acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}'
-// acrcommon3pmpbsdc001dev
+var acrCommonNameSafe = replace(acrCommonName,'-','')
 
 resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR == true) {
-  name: acrCommonName
+  name: acrCommonNameSafe
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
@@ -884,7 +884,7 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    containerRegistryName: acrCommonName
+    containerRegistryName: acrCommonNameSafe
     skuName: 'Premium'
     vnetId: vnetId
     subnetName: defaultSubnet
