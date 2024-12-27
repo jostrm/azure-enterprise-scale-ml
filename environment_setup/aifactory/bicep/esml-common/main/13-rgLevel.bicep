@@ -232,6 +232,37 @@ var privateLinksDnsZones = {
   }
 }
 
+var acrCommonName = 'acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}'
+module acrCommon '../../modules/containerRegistry.bicep' ={
+  scope: esmlCommonResourceGroup
+  name: 'CommonACR4CommonRG${uniqueInAIFenv}'
+  params: {
+    containerRegistryName:acrCommonName
+    skuName: 'Premium'
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
+    tags: tags
+    location:location
+  }
+
+  dependsOn: [
+    esmlCommonResourceGroup
+  ]
+}
+module privateDnsContainerRegistry '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: esmlCommonResourceGroup
+  name: 'privDnsCommonACR${uniqueInAIFenv}'
+  params: {
+    dnsConfig: acrCommon.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    esmlCommonResourceGroup
+  ]
+}
+
+
 // Log analytics WORKSPACE (dev,test,prod - 3 in the AI Factory, one per landingzone/environment)
 var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep' = {

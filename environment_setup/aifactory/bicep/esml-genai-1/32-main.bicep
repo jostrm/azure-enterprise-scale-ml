@@ -1,5 +1,7 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+@description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourge group, set this to true')
+param useCommonACR bool = false
 param vmSKU string = 'standard_D2as_v5' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
 // Cognitive Service types & settings
 @allowed([
@@ -847,11 +849,11 @@ module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(centralDnsZoneB
 
 // Storage for Azure AI Search - END
 
-// ------------------------------ SERVICES(Common) - Keyvault, VM, Loganalytics, AppInsights ------------------------------//
+// ------------------------------ Azure ML dependency- Keyvault, VM, Azure container registry, Loganalytics, AppInsights ------------------------------//
 
 // Related to Azure Machine Learning: Cointainer Registry, Storage Account, KeyVault, LogAnalytics, ApplicationInsights
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
-module acr '../modules/containerRegistry.bicep' = {
+module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -867,6 +869,14 @@ module acr '../modules/containerRegistry.bicep' = {
   dependsOn: [
     projectResourceGroup
   ]
+}
+
+var acrCommonName = 'acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}'
+// acrcommon3pmpbsdc001dev
+
+resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR == true) {
+  name: acrCommonName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
 param networkAcls object = {
@@ -1140,7 +1150,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
     projectResourceGroup
   ]
 }
-module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && useCommonACR == false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'priDnsZACR${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1221,7 +1231,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     skuTier: 'basic'
     env:env
     storageAccount: sacc.outputs.storageAccountId
-    containerRegistry: acr.outputs.containerRegistryId
+    containerRegistry:useCommonACR? acrCommon.id:acr.outputs.containerRegistryId
     keyVault: kv1.outputs.keyvaultId
     applicationInsights: applicationInsightSWC.outputs.ainsId
     aksSubnetId: aksSubnetId
@@ -1267,7 +1277,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     tags: tags
     aifactorySuffix: aifactorySuffixRG
     applicationInsights: applicationInsightSWC.outputs.ainsId
-    containerRegistry: acr.outputs.containerRegistryId
+    containerRegistry: useCommonACR? acrCommon.id:acr.outputs.containerRegistryId
     env: env
     keyVaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
@@ -1281,7 +1291,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess:enablePublicGenAIAccess
     aiSearchName: aiSearchService.outputs.aiSearchName
-    acrName: acr.outputs.containerRegistryName
+    acrName: useCommonACR? acrCommon.name:acr.outputs.containerRegistryName
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     kindAIHub:'Hub'
@@ -1300,6 +1310,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
   dependsOn: [
     projectResourceGroup
     aiServices
+    aiSearchService
   ]
 }
 
