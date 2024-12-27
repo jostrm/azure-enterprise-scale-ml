@@ -126,7 +126,7 @@ resource searchServiceContributorSP 'Microsoft.Authorization/roleAssignments@202
 // --------------- AI SERVICES  ---------------- //
 
 @description('Users to Azure AI Services: Cognitive Services Contributor for users. All, except: Access quota, Make inference API call with Microsoft Entra ID')
-resource cognitiveServicesContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource cognitiveServicesContributorRoleU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
@@ -136,7 +136,7 @@ resource cognitiveServicesContributorRole 'Microsoft.Authorization/roleAssignmen
   }
   scope:existingAiServicesResource
 }]
-resource cognitiveServicesContributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource cognitiveServicesContributorRoleSPS 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, servicePrincipleObjecId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
@@ -146,8 +146,10 @@ resource cognitiveServicesContributorRoleSP 'Microsoft.Authorization/roleAssignm
   }
   scope:existingAiServicesResource
 }
+
+/*
 @description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
-resource cognitiveServicesUsagesReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource cognitiveServicesUsagesReaderU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
@@ -157,7 +159,7 @@ resource cognitiveServicesUsagesReader 'Microsoft.Authorization/roleAssignments@
   }
   scope:existingAiServicesResource
 }]
-resource cognitiveServicesUsagesReaderSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource cognitiveServicesUsagesReaderSPU 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, servicePrincipleObjecId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
@@ -167,9 +169,10 @@ resource cognitiveServicesUsagesReaderSP 'Microsoft.Authorization/roleAssignment
   }
   scope:existingAiServicesResource
 }
+*/
 
 @description('Users to Azure AI Services: Cognitive Services OpenAI Contributor for users. Full access including the ability to fine-tune, deploy and generate text')
-resource cognitiveServicesOpenAIContributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
