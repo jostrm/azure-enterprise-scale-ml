@@ -250,7 +250,7 @@ module acrCommon '../../modules/containerRegistry.bicep' ={
     esmlCommonResourceGroup
   ]
 }
-module privateDnsContainerRegistry '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: esmlCommonResourceGroup
   name: 'privDnsCommonACR${uniqueInAIFenv}'
   params: {

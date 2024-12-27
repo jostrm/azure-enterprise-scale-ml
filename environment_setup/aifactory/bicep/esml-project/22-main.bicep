@@ -1,5 +1,7 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+@description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourge group, set this to true')
+param useCommonACR bool = false
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
 param inputKeyvault string
 param inputKeyvaultResourcegroup string
@@ -431,7 +433,7 @@ module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == tr
 }
 
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
-module acr '../modules/containerRegistry.bicep' = {
+module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLContainerReg4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -447,6 +449,14 @@ module acr '../modules/containerRegistry.bicep' = {
   dependsOn: [
     projectResourceGroup
   ]
+}
+
+var acrCommonName = 'acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}'
+// acrcommon3pmpbsdc001dev
+
+resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR == true) {
+  name: acrCommonName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
 module sacc '../modules/storageAccount.bicep' = {
@@ -585,7 +595,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
     projectResourceGroup
   ]
 }
-module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && useCommonACR == false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkACR${projectNumber}${locationSuffix}${env}'
   params: {
@@ -665,7 +675,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     skuTier: 'basic'
     env:env
     storageAccount: sacc.outputs.storageAccountId
-    containerRegistry: acr.outputs.containerRegistryId
+    containerRegistry: useCommonACR? acrCommon.id: acr.outputs.containerRegistryId
     keyVault: kv1.outputs.keyvaultId
     applicationInsights: (sweden_central_appInsight_classic_missing == true)? applicationInsightSWC.outputs.ainsId: applicationInsight.outputs.ainsId 
     aksSubnetId: aksSubnetId
@@ -676,8 +686,8 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     vnetId: vnetId
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-aml-to-vnt-mlcmn'
-    amlPrivateDnsZoneID: privateLinksDnsZones['amlworkspace'].id
-    notebookPrivateDnsZoneID:privateLinksDnsZones['notebooks'].id
+    amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
+    notebookPrivateDnsZoneID:privateLinksDnsZones.notebooks.id
     allowPublicAccessWhenBehindVnet:(AMLStudioUIPrivate == true)? false:true
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
