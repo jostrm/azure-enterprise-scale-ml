@@ -2,7 +2,7 @@
 param name string
 param aifactorySuffix string
 @description('Specifies the computer pool name')
-param aifactoryProjectName string
+param aifactoryProjectNumber string
 @description('Specifies the location where the new machine learning studio resource should be deployed')
 param location string
 @description('ESML dev,test or prod. If DEV then AKS cluster is provisioned with 1 agent otherwise 3')
@@ -146,10 +146,10 @@ resource containerRegistryPushRole 'Microsoft.Authorization/roleDefinitions@2022
 var azureOpenAIConnectionName ='azureOpenAI'
 var azureAIServicesConnectionName ='azureAIServices'
 var azureAISearchConnectionName ='azureAISearch'
-var aiHubProjectName ='ai-project-${aifactoryProjectName}-${locationSuffix}-${env}${resourceSuffix}'
+var aiHubProjectName ='ai-project-${aifactoryProjectNumber}-01-${locationSuffix}-${env}${resourceSuffix}'
 var aiProjectDiagSettingName ='aiProjectDiagnosticSetting'
 var aiHubDiagSettingName ='aiHubDiagnosticSetting'
-var epDefaultName ='ep-${aifactoryProjectName}-${locationSuffix}-${env}${resourceSuffix}'
+var epDefaultName ='ep-${aifactoryProjectNumber}-01-${locationSuffix}-${env}${resourceSuffix}'
 
 resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
   name: name
@@ -166,7 +166,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   properties: {
     allowRoleAssignmentOnRG: true
     friendlyName: '${name}-${env}-${aiFactoryNumber}'
-    description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for ${aifactoryProjectName} in ESML-${env} environment in ${location}'
+    description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
 
      // dependent resources
     storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)

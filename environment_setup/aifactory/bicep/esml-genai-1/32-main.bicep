@@ -1271,7 +1271,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     env: env
     keyVaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
-    aifactoryProjectName: projectName
+    aifactoryProjectNumber: projectNumber
     skuName: 'basic'
     skuTier: 'basic'
     storageAccount: sacc.outputs.storageAccountId
