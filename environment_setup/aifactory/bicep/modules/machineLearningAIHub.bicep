@@ -513,6 +513,9 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
   }
 }
+
+// Error: PUT PE operation should be performed on the hub, not on the project workspace.
+/*
 var privateEndpointNameProject = 'pend-${aiProject.name}'
 resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: privateEndpointNameProject
@@ -540,9 +543,9 @@ resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     }
   }
 }
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
-  name: '${pendAIHub.name}DnsZone'
-  parent: pendAIHub
+  resource privateEndpointDnsProject 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+  name: '${pendAIHubProject.name}DnsZone'
+  parent: pendAIHubProject
   properties:{
     privateDnsZoneConfigs: [
       {
@@ -560,9 +563,12 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
     ]
   }
 }
-resource privateEndpointDnsProject 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
-  name: '${pendAIHubProject.name}DnsZone'
-  parent: pendAIHubProject
+  
+  */
+
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+  name: '${pendAIHub.name}DnsZone'
+  parent: pendAIHub
   properties:{
     privateDnsZoneConfigs: [
       {
