@@ -75,10 +75,13 @@ param serviceSettingDeployAzureOpenAI bool = false
 // ### TRUE as default - START ### 
 @description('Service setting: Deploy Azure AI Vision for project')
 param serviceSettingDeployAzureAIVision bool = true
-param serviceSettingOverrideRegionAzureAIVision string = 'northeurope'
-param serviceSettingOverrideRegionAzureAIVisionShort string = 'neu'
-param serviceSettingOverrideRegionAzureAISearch string = 'northeurope'
-param serviceSettingOverrideRegionAzureAISearchShort string = 'neu'
+
+// TODO: vnet in in other region, to create private endpoint, and then peer vNets
+//p-prj001-aisearch-genai was not found. Please make sure that the referenced resource exists, and that both resources are in the same region.","
+param serviceSettingOverrideRegionAzureAIVision string = ''
+param serviceSettingOverrideRegionAzureAIVisionShort string = ''
+param serviceSettingOverrideRegionAzureAISearch string = ''
+param serviceSettingOverrideRegionAzureAISearchShort string = ''
 
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
