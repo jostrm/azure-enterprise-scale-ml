@@ -1334,6 +1334,24 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
   ]
 }
 
+module rbacAcrCommonRG '../modules/acrRbac.bicep' = if(useCommonACR == true) {
+  scope:commonResourceGroupRef
+  name: 'rbacAcrCommon${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    acrName: acrCommon2.outputs.containerRegistryName
+    aiHubName: aiHub.outputs.name
+    aiHubRgName: targetResourceGroup
+  }
+}
+module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false) {
+  scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    acrName: acr.outputs.containerRegistryName
+    aiHubName: aiHub.outputs.name
+    aiHubRgName: targetResourceGroup
+  }
+}
 
 module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(serviceSettingDeployAzureMLClassic == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)

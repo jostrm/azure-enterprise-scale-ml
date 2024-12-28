@@ -67,10 +67,7 @@ var privateDnsZoneNameNotebooks = {
 resource aiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing = {
   name: aiSearchName
 }
-resource acr 'Microsoft.ContainerRegistry/registries@2023-08-01-preview' existing = {
-  name: acrName
-  scope: resourceGroup(acrResourceGroupName)
-}
+
 resource aiServices 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
   name: aiServicesName
 }
@@ -91,19 +88,6 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetName
   parent: vnet
 }
-/*Moved to other place - USER ACCESS
-@description('Built-in Role: [Storage Blob Data Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#storage-blob-data-contributor)')
-resource storageBlobDataContributorRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-  scope: subscription()
-}
-
-@description('Built-in Role: [Storage File Data Privileged Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#storage-file-data-privileged-contributor)')
-resource storageFileDataContributorRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: '69566ab7-960f-475b-8e7c-b3118f30c6bd'
-  scope: subscription()
-}
-*/
 
 var azureMachineLearningWorkspaceConnectionSecretsReaderRoleId = 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'  // SP, user, EP -> AI Hub, AI Project (RG)
 var azureMLMetricsWriter ='635dd51f-9968-44d3-b7fb-6d9a6bd613ae' // EP -> AI project
@@ -126,18 +110,6 @@ resource cognitiveServicesOpenAiUserRole 'Microsoft.Authorization/roleDefinition
 @description('Built-in Role: [Azure Machine Learning Workspace Connection Secrets Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles)')
 resource amlWorkspaceSecretsReaderRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
   name: 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'
-  scope: subscription()
-}
-
-@description('Built-in Role: [AcrPull](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#acrpull)')
-resource containerRegistryPullRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-  scope: subscription()
-}
-
-@description('Built-in Role: [AcrPush](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#acrpush)')
-resource containerRegistryPushRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: '8311e382-0749-4cb8-b61a-304f252e45ec'
   scope: subscription()
 }
 
@@ -586,28 +558,6 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
         }
       }
     ]
-  }
-}
-
-@description('Assign AML Workspace\'s ID: AcrPush to workload\'s container registry.')
-resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: acr
-  name: guid(acr.id, aiHub.name, containerRegistryPushRole.id,acrName)
-  properties: {
-    roleDefinitionId: containerRegistryPushRole.id
-    principalType: 'ServicePrincipal'
-    principalId: aiHub.identity.principalId
-  }
-}
-
-@description('Assign AML Workspace\'s Managed Online Endpoint: AcrPull to workload\'s container registry.')
-resource computeInstanceContainerRegistryPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: acr
-  name: guid(acr.id, aiHub.name, containerRegistryPullRole.id,acrName)
-  properties: {
-    roleDefinitionId: containerRegistryPullRole.id
-    principalType: 'ServicePrincipal'
-    principalId: aiHub.identity.principalId
   }
 }
 
