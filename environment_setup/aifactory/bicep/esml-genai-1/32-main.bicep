@@ -76,7 +76,9 @@ param serviceSettingDeployAzureOpenAI bool = false
 @description('Service setting: Deploy Azure AI Vision for project')
 param serviceSettingDeployAzureAIVision bool = true
 param serviceSettingOverrideRegionAzureAIVision string = 'northeurope'
+param serviceSettingOverrideRegionAzureAIVisionShort string = 'neu'
 param serviceSettingOverrideRegionAzureAISearch string = 'northeurope'
+param serviceSettingOverrideRegionAzureAISearchShort string = 'neu'
 
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
@@ -458,7 +460,8 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     restore:restore
     keyvaultName: keyvaultName
     vnetResourceGroupName: vnetResourceGroupName
-    name: 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    name: (!empty(serviceSettingOverrideRegionAzureAIVisionShort))? 'vision-${projectName}-${serviceSettingOverrideRegionAzureAIVisionShort}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    :'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'ComputerVision'
     pendCogSerName: 'p-${projectName}-vision-${genaiName}'
     subnetName:defaultSubnet
@@ -616,11 +619,11 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    cognitiveName: 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    cognitiveName:'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     tags: tags
     laWorkspaceName:laName
     restore:restore
-    location: (!empty(serviceSettingOverrideRegionAzureAISearch)) ? serviceSettingOverrideRegionAzureAISearch : location
+    location: location
     vnetResourceGroupName: vnetResourceGroupName
     sku: csOpenAISKU
     vnetName: vnetNameFull
@@ -726,8 +729,9 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
-    aiSearchName: safeNameAISearch
-    location: location
+    aiSearchName: (!empty(serviceSettingOverrideRegionAzureAISearchShort)) ? replace(toLower('aisearch${projectName}${serviceSettingOverrideRegionAzureAISearchShort}${env}${uniqueInAIFenv}${resourceSuffix}') ,'-','')
+    : replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}') ,'-','')
+    location: (!empty(serviceSettingOverrideRegionAzureAISearch)) ? serviceSettingOverrideRegionAzureAISearch : location
     replicaCount: 1
     partitionCount: 1
     privateEndpointName: 'p-${projectName}-aisearch-${genaiName}'

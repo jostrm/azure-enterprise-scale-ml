@@ -25,6 +25,18 @@
         },
         "modelGPT4Version": {
             "value": "1106-Preview"
+        },
+        "serviceSettingOverrideRegionAzureAISearch": {
+            "value": ""
+        },
+        "serviceSettingOverrideRegionAzureAISearchShort": {
+            "value": ""
+        },
+        "serviceSettingOverrideRegionAzureAIVision": {
+            "value": ""
+        },
+        "serviceSettingOverrideRegionAzureAIVisionShort": {
+            "value": ""
         }
     }
 }
