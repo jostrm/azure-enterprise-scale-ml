@@ -59,11 +59,12 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' =
   }
 }
 
-resource pendAcr 'Microsoft.Network/privateEndpoints@2020-07-01' = {
+resource pendAcr 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: privateEndpointName
   location: location
   tags: tags
   properties: {
+    customNetworkInterfaceName: '${privateEndpointName}-nic'
     subnet: {
       id: subnetRef
       name: subnetName

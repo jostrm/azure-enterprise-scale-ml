@@ -887,6 +887,7 @@ resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing 
 }
 
 // Update simulation - since: "ACR sku cannot be retrieved because of internal error."
+// pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
 module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
