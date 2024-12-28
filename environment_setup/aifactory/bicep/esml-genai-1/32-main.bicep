@@ -406,6 +406,7 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
   }
   dependsOn:[
     projectResourceGroup
+    rbacModuleUsers
   ]
 }
 
