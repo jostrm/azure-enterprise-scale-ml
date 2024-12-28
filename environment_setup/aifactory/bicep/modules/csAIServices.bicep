@@ -21,6 +21,7 @@ param vnetRules array = []
 param ipRules array = []
 param disableLocalAuth bool = false
 param vnetResourceGroupName string
+param acrNameDummy string = ''
 param keyvaultName string
 @allowed([
   '1106-Preview'

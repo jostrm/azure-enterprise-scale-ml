@@ -598,6 +598,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     keyvaultName: keyvaultName
     modelGPT4Version:modelGPT4Version
     kind: kindAIServices
+    acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
@@ -614,6 +615,9 @@ module aiServices '../modules/csAIServices.bicep' = {
   }
   dependsOn: [
     projectResourceGroup
+    sacc
+    //acr
+    //acrCommon2
   ]
 }
 
@@ -746,6 +750,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     skuName: enablePublicGenAIAccess? aiSearchSKUName: aiSearchSKUSharedPrivate
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
     sharedPrivateLinks:sharedPrivateLinkResources
+    acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: [
       {
         value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO

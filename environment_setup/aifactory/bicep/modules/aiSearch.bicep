@@ -7,6 +7,7 @@ param subnetName string
 param tags object
 param location string
 param enableSharedPrivateLink bool
+param acrNameDummy string = ''
 param sharedPrivateLinks array = []
 @allowed([
   'S0' // 'Free': Invalid SKU name
