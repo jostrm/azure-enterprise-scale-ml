@@ -592,7 +592,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     tags: tags
     vnetResourceGroupName: vnetResourceGroupName
     cognitiveName: 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}'
-    pendCogSerName: 'p-${projectName}-aiahub-${genaiName}'
+    pendCogSerName: 'p-${projectName}-aiservices-${genaiName}'
     restore: restore
     subnetName: defaultSubnet
     vnetName: vnetNameFull
@@ -603,7 +603,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      //'${vnetId}/subnets/snt-${projectName}-aks'
     ]
     ipRules: [
       {

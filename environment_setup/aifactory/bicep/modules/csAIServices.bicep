@@ -53,7 +53,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   properties: {
     customSubDomainName: nameCleaned
     publicNetworkAccess:'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled'
-    //restore: restore
+    restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     disableLocalAuth: disableLocalAuth
     apiProperties: {
@@ -121,7 +121,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
     subnet: {
       id: subnet.id
     }
-    customNetworkInterfaceName: 'pend-nic-${kind}-${nameCleaned}'
+    customNetworkInterfaceName: '${pendCogSerName}-nic'
     privateLinkServiceConnections: [
       {
         name: pendCogSerName
@@ -166,6 +166,7 @@ resource keyVaultOpenAI 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup()
 }
 
+/*
 @description('Key Vault: Azure AI Services K in vault as S')
 resource kValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVaultOpenAI
@@ -179,6 +180,8 @@ resource kValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   }
   
 }
+*/
+
 @description('Key Vault: Azure AI Services endpoint in vault as S')
 resource epValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVaultOpenAI
