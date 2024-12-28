@@ -125,6 +125,7 @@ resource searchServiceContributorSP 'Microsoft.Authorization/roleAssignments@202
 
 // --------------- AI SERVICES  ---------------- //
 
+/* 001
 @description('Users to Azure AI Services: Cognitive Services Contributor for users. All, except: Access quota, Make inference API call with Microsoft Entra ID')
 resource cognitiveServicesContributorRoleU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, userObjectIds[i])
@@ -146,6 +147,8 @@ resource cognitiveServicesContributorRoleSPS 'Microsoft.Authorization/roleAssign
   }
   scope:existingAiServicesResource
 }
+
+*/
 
 /*
 @description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
