@@ -218,6 +218,7 @@ resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAs
   }
   scope:existingAiServicesResource
 }
+// 003
 
 // --------------- STORAGE ---------------- //
 @description('Role Assignment for Azure Storage 1: StorageBlobDataContributor for users. Grants read/write/delete permissions to Blob storage resources')

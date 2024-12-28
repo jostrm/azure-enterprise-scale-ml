@@ -362,7 +362,6 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
 // Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added
 // manually specifically for the endpoint.
 
-/*
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -405,7 +404,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-*/
+
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
 resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
