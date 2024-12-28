@@ -47,6 +47,7 @@ param logWorkspaceName string
 param logWorkspaceResoureGroupName string
 param locationSuffix string
 param resourceSuffix string
+param applicationInsightsName string
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
@@ -62,6 +63,9 @@ var privateDnsZoneNameNotebooks = {
     azurecloud: 'privatelink.notebooks.azure.net'
 }
 
+resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: applicationInsightsName
+}
 resource aiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing = {
   name: aiSearchName
 }
@@ -144,7 +148,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
     containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
-    applicationInsights: applicationInsights // resourceId('Microsoft.Insights/components', applicationInsights)
+    applicationInsights: appInsights.id // resourceId('Microsoft.Insights/components', applicationInsights)
 
     // configuration
     systemDatastoresAuthMode: 'identity'

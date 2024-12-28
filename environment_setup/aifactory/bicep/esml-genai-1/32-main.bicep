@@ -1310,6 +1310,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     tags: tags
     aifactorySuffix: aifactorySuffixRG
     applicationInsights: applicationInsightSWC.outputs.ainsId
+    applicationInsightsName: applicationInsightSWC.name
     containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
     env: env
     keyVaultName: kv1.outputs.keyvaultName
