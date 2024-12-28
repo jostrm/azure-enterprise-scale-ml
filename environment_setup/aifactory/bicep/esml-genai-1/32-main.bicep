@@ -1430,6 +1430,7 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceS
   }
 }
 
+// 5 assignments: OK
 module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSettingDeployAzureAISearch==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacSearch_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
@@ -1457,7 +1458,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     aiServicesName:aiServices.outputs.name
     aiHubName:aiHub.outputs.name
     aiHubProjectName:aiHub.outputs.aiProjectName
-    servicePrincipleObjecId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
     aiHub

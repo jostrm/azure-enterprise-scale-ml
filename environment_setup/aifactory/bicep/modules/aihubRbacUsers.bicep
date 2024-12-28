@@ -7,7 +7,7 @@ param aiSearchName string // Resource ID for Azure AI Search
 param resourceGroupId string // Resource group ID where resources are located
 param userObjectIds array // Specific user's object ID's
 @secure()
-param servicePrincipleObjecId string // Service Principle Object ID
+param servicePrincipleObjectId string // Service Principle Object ID
 param aiServicesName string // AIServices name, e.g. AIStudio name
 param aiHubName string
 param aiHubProjectName string
@@ -90,12 +90,12 @@ resource searchIndexDataContributor 'Microsoft.Authorization/roleAssignments@202
   scope:existingAiSearch
 }]
 resource searchIndexDataContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'searchIndexDataContributorRoleId to project service principal OID: ${servicePrincipleObjecId} to ${existingAiSearch.name}'
+    description:'searchIndexDataContributorRoleId to project service principal OID: ${servicePrincipleObjectId} to ${existingAiSearch.name}'
   }
   scope:existingAiSearch
 }
@@ -113,12 +113,12 @@ resource searchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-
 }]
 
 resource searchServiceContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiSearch.id, searchServiceContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingAiSearch.id, searchServiceContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'searchServiceContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingAiSearch.name}'
+    description:'searchServiceContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAiSearch.name}'
   }
   scope:existingAiSearch
 }
@@ -137,12 +137,12 @@ resource cognitiveServicesContributorRoleU 'Microsoft.Authorization/roleAssignme
   scope:existingAiServicesResource
 }]
 resource cognitiveServicesContributorRoleSPS 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'cognitiveServicesContributor role to project service principal OID:${servicePrincipleObjecId} to ${existingAiServicesResource.name}'
+    description:'cognitiveServicesContributor role to project service principal OID:${servicePrincipleObjectId} to ${existingAiServicesResource.name}'
   }
   scope:existingAiServicesResource
 }
@@ -183,16 +183,17 @@ resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleA
   scope:existingAiServicesResource
 }]
 resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'cognitiveServicesOpenAIContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingAiServicesResource.name}'
+    description:'cognitiveServicesOpenAIContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAiServicesResource.name}'
   }
   scope:existingAiServicesResource
 }
 
+/*
 @description('Users to Azure AI Services: Cognitive Services OpenAI User:Read access to view files, models, deployments. The ability to create completion and embedding calls.')
 resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
@@ -205,15 +206,17 @@ resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/rol
   scope:existingAiServicesResource
 }]
 resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, servicePrincipleObjecId)
+  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'cognitiveServicesOpenAIUserRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingAiServicesResource.name}'
+    description:'cognitiveServicesOpenAIUserRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAiServicesResource.name}'
   }
   scope:existingAiServicesResource
 }
+*/
+
 // --------------- STORAGE ---------------- //
 @description('Role Assignment for Azure Storage 1: StorageBlobDataContributor for users. Grants read/write/delete permissions to Blob storage resources')
 resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
@@ -228,12 +231,12 @@ resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignm
 }]
 
 resource userStorageBlobDataContributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'storageBlobDataContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingStorageAccount.name}'
+    description:'storageBlobDataContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
 }
@@ -251,12 +254,12 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Autho
 }]
 
 resource roleAssignmentStorageUserFileDataPrivilegedContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'storageFileDataContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingStorageAccount.name}'
+    description:'storageFileDataContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
 }
@@ -273,12 +276,12 @@ resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssign
   scope:existingStorageAccount2
 }]
 resource userStorageBlobDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'storageBlobDataContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingStorageAccount2.name}'
+    description:'storageBlobDataContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
 }
@@ -296,12 +299,12 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Auth
 }]
 
 resource roleAssignmentStorageUserFileDataPrivilegedContributor2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, servicePrincipleObjecId)
+  name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'storageFileDataContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingStorageAccount2.name}'
+    description:'storageFileDataContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
 }
@@ -321,12 +324,12 @@ resource azureAIDeveloperRole 'Microsoft.Authorization/roleAssignments@2022-04-0
 }]
 
 resource azureAIDeveloperRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAIHub.id, azureAIDeveloperRoleId, servicePrincipleObjecId)
+  name: guid(existingAIHub.id, azureAIDeveloperRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'azureAIDeveloperRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingAIHub.name}'
+    description:'azureAIDeveloperRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAIHub.name}'
   }
   scope:existingAIHub
 }
@@ -345,12 +348,12 @@ resource azureAIAdministratorAssignment 'Microsoft.Authorization/roleAssignments
   scope:existingAIHubProject
 }]
 resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAIHubProject.id, azureAIAdministrator, servicePrincipleObjecId)
+  name: guid(existingAIHubProject.id, azureAIAdministrator, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'azureAIAdministrator to project service principal OID:${servicePrincipleObjecId} to ${existingAIHub.name}'
+    description:'azureAIAdministrator to project service principal OID:${servicePrincipleObjectId} to ${existingAIHub.name}'
   }
   scope:existingAIHubProject
 }
@@ -371,12 +374,12 @@ resource azureAIInferenceDeploymentOperatorRole 'Microsoft.Authorization/roleAss
 }]
 
 resource azureAIInferenceDeploymentOperatorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, azureAIInferenceDeploymentOperatorRoleId, servicePrincipleObjecId)
+  name: guid(resourceGroupId, azureAIInferenceDeploymentOperatorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIInferenceDeploymentOperatorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'azureAIInferenceDeploymentOperatorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingAIHub.name} on RG level'
+    description:'azureAIInferenceDeploymentOperatorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAIHub.name} on RG level'
   }
   scope:resourceGroup()
 }
@@ -395,12 +398,12 @@ resource azureMLDataScientistRole 'Microsoft.Authorization/roleAssignments@2022-
 }]
 
 resource azureMLDataScientistRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, azureMLDataScientistRoleId, servicePrincipleObjecId)
+  name: guid(resourceGroupId, azureMLDataScientistRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureMLDataScientistRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'azureMLDataScientistRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingAIHub.name} on RG level'
+    description:'azureMLDataScientistRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAIHub.name} on RG level'
   }
   scope:resourceGroup()
 }
@@ -418,12 +421,12 @@ resource amlWorkspaceConnectionSecretsReader 'Microsoft.Authorization/roleAssign
 }]
 
 resource amlWorkspaceConnectionSecretsReaderSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, azureMachineLearningWorkspaceConnectionSecretsReaderRoleId, servicePrincipleObjecId)
+  name: guid(resourceGroupId, azureMachineLearningWorkspaceConnectionSecretsReaderRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureMachineLearningWorkspaceConnectionSecretsReaderRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'azureMachineLearningWorkspaceConnectionSecretsReaderRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingAIHub.name} on RG level'
+    description:'azureMachineLearningWorkspaceConnectionSecretsReaderRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAIHub.name} on RG level'
   }
   scope:resourceGroup()
 }
@@ -442,12 +445,12 @@ resource contributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
 }]
 
 resource contributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, contributorRoleId, servicePrincipleObjecId)
+  name: guid(resourceGroupId, contributorRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'contributorRoleId to project service principal OID:${servicePrincipleObjecId} for ${resourceGroupId}'
+    description:'contributorRoleId to project service principal OID:${servicePrincipleObjectId} for ${resourceGroupId}'
   }
   scope:resourceGroup()
 }
@@ -465,12 +468,12 @@ resource roleBasedAccessControlAdminRGRole 'Microsoft.Authorization/roleAssignme
   scope:resourceGroup()
 }]
 resource roleBasedAccessControlAdminRGRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, roleBasedAccessControlAdministratorRG, servicePrincipleObjecId)
+  name: guid(resourceGroupId, roleBasedAccessControlAdministratorRG, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleBasedAccessControlAdministratorRG)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'roleBasedAccessControlAdministrator to project service principal OID:${servicePrincipleObjecId} for RG: ${resourceGroupId}'
+    description:'roleBasedAccessControlAdministrator to project service principal OID:${servicePrincipleObjectId} for RG: ${resourceGroupId}'
   }
   scope:resourceGroup()
 }
@@ -489,12 +492,12 @@ resource acrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i i
 }]
 
 resource acrPushSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, acrPushRoleId, servicePrincipleObjecId)
+  name: guid(resourceGroupId, acrPushRoleId, servicePrincipleObjectId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPushRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'acrPush role to project service principal OID:${servicePrincipleObjecId} for RG: ${resourceGroupId}'
+    description:'acrPush role to project service principal OID:${servicePrincipleObjectId} for RG: ${resourceGroupId}'
   }
   scope:resourceGroup()
 }
