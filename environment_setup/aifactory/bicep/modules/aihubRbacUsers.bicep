@@ -125,7 +125,7 @@ resource searchServiceContributorSP 'Microsoft.Authorization/roleAssignments@202
 
 // --------------- AI SERVICES  ---------------- //
 
-/* 001
+/* 001  - Error: Duplicate if these 2
 @description('Users to Azure AI Services: Cognitive Services Contributor for users. All, except: Access quota, Make inference API call with Microsoft Entra ID')
 resource cognitiveServicesContributorRoleU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, userObjectIds[i])
@@ -148,9 +148,9 @@ resource cognitiveServicesContributorRoleSPS 'Microsoft.Authorization/roleAssign
   scope:existingAiServicesResource
 }
 
-*/
+001  - Error: Duplicate if these 2 */
 
-
+// 002
 @description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
 resource cognitiveServicesUsagesReaderU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, userObjectIds[i])
@@ -172,6 +172,7 @@ resource cognitiveServicesUsagesReaderSPU 'Microsoft.Authorization/roleAssignmen
   }
   scope:existingAiServicesResource
 }
+// 002
 
 @description('Users to Azure AI Services: Cognitive Services OpenAI Contributor for users. Full access including the ability to fine-tune, deploy and generate text')
 resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
@@ -195,7 +196,7 @@ resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssig
   scope:existingAiServicesResource
 }
 
-/*
+// 003
 @description('Users to Azure AI Services: Cognitive Services OpenAI User:Read access to view files, models, deployments. The ability to create completion and embedding calls.')
 resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
@@ -217,7 +218,6 @@ resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAs
   }
   scope:existingAiServicesResource
 }
-*/
 
 // --------------- STORAGE ---------------- //
 @description('Role Assignment for Azure Storage 1: StorageBlobDataContributor for users. Grants read/write/delete permissions to Blob storage resources')
