@@ -69,7 +69,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing 
 }
 resource acr 'Microsoft.ContainerRegistry/registries@2023-08-01-preview' existing = {
   name: acrName
-  resourceGroup: acrResourceGroupName
+  scope: resourceGroup(acrResourceGroupName)
 }
 resource aiServices 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
   name: aiServicesName
