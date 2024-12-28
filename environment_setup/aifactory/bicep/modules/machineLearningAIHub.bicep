@@ -35,7 +35,6 @@ param enablePublicGenAIAccess bool
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool
 param aiSearchName string
-param acrName string
 param privateLinksDnsZones object
 @allowed([
   'Hub'
@@ -48,7 +47,6 @@ param logWorkspaceName string
 param logWorkspaceResoureGroupName string
 param locationSuffix string
 param resourceSuffix string
-param acrResourceGroupName string
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001

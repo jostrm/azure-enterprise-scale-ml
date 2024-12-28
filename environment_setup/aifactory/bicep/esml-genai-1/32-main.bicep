@@ -887,14 +887,14 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
     containerRegistryName: acrCommonNameSafe
     skuName: 'Premium'
     vnetId: vnetId
-    subnetName: defaultSubnet
+    subnetName: common_subnet_name // snet-esml-cmn-001
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: acrCommon.tags
     location:acrCommon.location
   }
 
   dependsOn: [
-    projectResourceGroup
+    acrCommon
   ]
 }
 
@@ -1297,7 +1297,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     aifactorySuffix: aifactorySuffixRG
     applicationInsights: applicationInsightSWC.outputs.ainsId
     containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
-    acrResourceGroupName: useCommonACR? commonResourceGroup:targetResourceGroup
     env: env
     keyVaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
@@ -1311,7 +1310,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess:enablePublicGenAIAccess
     aiSearchName: aiSearchService.outputs.aiSearchName
-    acrName: useCommonACR? acrCommon2.name:acr.outputs.containerRegistryName
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     kindAIHub:'Hub'
