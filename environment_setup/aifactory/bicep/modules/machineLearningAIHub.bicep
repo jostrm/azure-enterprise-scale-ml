@@ -255,45 +255,6 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   }
 }
 
-//CPU Cluster
-// ":"Current operation is not supported on Hub workspace
-/*
-resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
-  name: 'buildcluster001' // p001-m1-weu-prod (16/16...or 24)
-  parent: aiProject
-  location: location
-  tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    computeType: 'AmlCompute'
-    computeLocation: location
-    description: 'Dont touch. Dont delete. CPU cluster for building images for Container Registry'
-    disableLocalAuth: true
-    properties: {
-      vmPriority: 'Dedicated'
-      vmSize: 'Standard_DS3_v2'
-      enableNodePublicIp: false
-      isolatedNetwork: false
-      osType: 'Linux'
-      remoteLoginPortPublicAccess: 'Disabled'
-      scaleSettings: {
-        minNodeCount: 0
-        maxNodeCount: 5
-        nodeIdleTimeBeforeScaleDown: 'PT120S'
-      }
-      subnet: {
-        id: subnet.id
-      }
-    }
-  }
-  dependsOn:[
-    machineLearningPrivateEndpoint
-  ]
-}
-  */
-
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
 resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   name: aiHubDiagSettingName
@@ -334,8 +295,8 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enableDataIsolation: true
     hubResourceId: aiHub.id
-    // configuration for workspaces with private link endpoint
-    //imageBuildCompute: 'buildcluster001'
+    // configuration for workspaces with private link endpoint -> Error, not possible/allowed
+    //imageBuildCompute: 'buildcluster001' -> Error, not possible/allowed
     //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
  
   }
@@ -362,6 +323,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
 // Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added
 // manually specifically for the endpoint.
 
+// 004
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -372,6 +334,7 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
     principalId: aiProject::endpoint.identity.principalId
   }
 }
+//003
 @description('Assign the online endpoint the ability to read connections from AI Project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -383,6 +346,7 @@ resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
 }
 
+// 002
 @description('Assign the online endpoint the ability to write metrics. This is needed to enable monitoring and logging to the prompt flow from the managed endpoint.')
 resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -394,6 +358,7 @@ resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04
   }
 }
 
+/*001
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiServices
@@ -404,7 +369,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-
+*/
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
 resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
@@ -489,6 +454,33 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   }
 }
 
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+  name: '${pendAIHub.name}DnsZone'
+  parent: pendAIHub
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateDnsZoneName[environment().name]
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.amlworkspace.id 
+        }
+      }
+      {
+        name: privateDnsZoneNameNotebooks[environment().name]
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.notebooks.id 
+        }
+      }
+    ]
+  }
+}
+
+output id string = aiHub.id
+output name string = aiHub.name
+output principalId string = aiHub.identity.principalId
+output aiProjectName string = aiProject.name
+
+
 // Error: PUT PE operation should be performed on the hub, not on the project workspace.
 /*
 var privateEndpointNameProject = 'pend-${aiProject.name}'
@@ -538,31 +530,43 @@ resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {
     ]
   }
 }
-  
-  */
+*/
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
-  name: '${pendAIHub.name}DnsZone'
-  parent: pendAIHub
-  properties:{
-    privateDnsZoneConfigs: [
-      {
-        name: privateDnsZoneName[environment().name]
-        properties:{
-          privateDnsZoneId: privateLinksDnsZones.amlworkspace.id 
-        }
-      }
-      {
-        name: privateDnsZoneNameNotebooks[environment().name]
-        properties:{
-          privateDnsZoneId: privateLinksDnsZones.notebooks.id 
-        }
-      }
-    ]
+//CPU Cluster
+// ":"Current operation is not supported on Hub workspace
+/*
+resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
+  name: 'buildcluster001' // p001-m1-weu-prod (16/16...or 24)
+  parent: aiProject
+  location: location
+  tags: tags
+  identity: {
+    type: 'SystemAssigned'
   }
+  properties: {
+    computeType: 'AmlCompute'
+    computeLocation: location
+    description: 'Dont touch. Dont delete. CPU cluster for building images for Container Registry'
+    disableLocalAuth: true
+    properties: {
+      vmPriority: 'Dedicated'
+      vmSize: 'Standard_DS3_v2'
+      enableNodePublicIp: false
+      isolatedNetwork: false
+      osType: 'Linux'
+      remoteLoginPortPublicAccess: 'Disabled'
+      scaleSettings: {
+        minNodeCount: 0
+        maxNodeCount: 5
+        nodeIdleTimeBeforeScaleDown: 'PT120S'
+      }
+      subnet: {
+        id: subnet.id
+      }
+    }
+  }
+  dependsOn:[
+    machineLearningPrivateEndpoint
+  ]
 }
-
-output id string = aiHub.id
-output name string = aiHub.name
-output principalId string = aiHub.identity.principalId
-output aiProjectName string = aiProject.name
+  */
