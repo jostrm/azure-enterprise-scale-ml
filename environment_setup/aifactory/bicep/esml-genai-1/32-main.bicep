@@ -591,7 +591,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     sku: csAIservicesSKU
     tags: tags
     vnetResourceGroupName: vnetResourceGroupName
-    cognitiveName: 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    cognitiveName: 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}'
     pendCogSerName: 'p-${projectName}-aiahub-${genaiName}'
     restore: restore
     subnetName: defaultSubnet
