@@ -143,16 +143,17 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
 
      // dependent resources
+    applicationInsights: appInsights.id // resourceId('Microsoft.Insights/components', applicationInsights)
     storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
     containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
-    applicationInsights: appInsights.id // resourceId('Microsoft.Insights/components', applicationInsights)
 
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     provisionNetworkNow: true
-
+    enableDataIsolation: false // tomten
+    
     // network settings
     publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
