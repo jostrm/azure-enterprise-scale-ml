@@ -348,8 +348,8 @@ resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-0
 }
 */
 
-// 003 - works
-
+// 003 - works, Not.
+/*
 @description('Assign the online endpoint the ability to write metrics. This is needed to enable monitoring and logging to the prompt flow from the managed endpoint.')
 resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -360,9 +360,9 @@ resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-
+*/
 // 004 - checking, may not work.Nope dont work
-/*
+
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiServices
@@ -373,7 +373,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-*/
+
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
 resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
