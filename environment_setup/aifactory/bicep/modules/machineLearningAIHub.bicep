@@ -334,7 +334,8 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-//003
+//003*
+/*
 @description('Assign the online endpoint the ability to read connections from AI Project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -345,8 +346,10 @@ resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-0
     principalId: aiProject::endpoint.identity.principalId
   }
 }
+*/
 
-// 002
+// 002*
+/*
 @description('Assign the online endpoint the ability to write metrics. This is needed to enable monitoring and logging to the prompt flow from the managed endpoint.')
 resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -357,6 +360,7 @@ resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04
     principalId: aiProject::endpoint.identity.principalId
   }
 }
+*/
 
 /*001
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
