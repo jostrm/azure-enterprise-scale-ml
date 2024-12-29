@@ -1,0 +1,32 @@
+name: verify-aifactory-stage
+on: push
+jobs:
+  verify-infra:
+    name: Verifies provisioning in STAGE of an AI Factory common, and 2 project types ESML, ESGENAI
+    environment:
+      name: STAGE
+    runs-on: ubuntu-latest
+    steps:
+      - run: bicep --version
+  verify-dataops-template:
+    name: Verifies DATAOPS template in STAGE for DataOps, ingestion from sources to ESML datalake
+    environment:
+      name: STAGE
+    runs-on: ubuntu-latest
+    steps:
+      - run: python --version
+  verify-mlops-template:
+    name: Verifies MLOPS template in STAGE, for training, registering, deploying models, smoke-testing inference ep with monitoring
+    environment:
+      name: STAGE
+    runs-on: ubuntu-latest
+    steps:
+      - run: node --version
+      - run: npm --version
+  verify-genaiops-template:
+    name: Verifies GenAIOps template in STAGE, for RAG to Promptflow endpoint, smoke-testing inference with monitoring
+    environment:
+      name: STAGE
+    runs-on: ubuntu-latest
+    steps:
+      - run: python --version
