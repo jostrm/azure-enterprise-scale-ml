@@ -81,7 +81,7 @@ resource cognitiveOpenAI 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
-        ignoreMissingVnetServiceEndpoint: false
+        ignoreMissingVnetServiceEndpoint: true // tomten false to true
       }]
       ipRules: ipRules
     }

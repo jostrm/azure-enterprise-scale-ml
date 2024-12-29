@@ -53,7 +53,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' = {
       ipRules: ipRules
       virtualNetworkRules: [for rule in keyvaultNetworkPolicySubnets: {
         id: rule
-        ignoreMissingVnetServiceEndpoint: false
+        ignoreMissingVnetServiceEndpoint: true // tomten false to true
       }]
     }
     accessPolicies: accessPolicies

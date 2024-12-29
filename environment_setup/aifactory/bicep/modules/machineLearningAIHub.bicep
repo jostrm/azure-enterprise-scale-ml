@@ -156,7 +156,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     provisionNetworkNow: true
 
     // network settings
-    publicNetworkAccess: 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled'
+    publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'

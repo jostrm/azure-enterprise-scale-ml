@@ -52,19 +52,19 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess:'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled'
+    publicNetworkAccess:publicNetworkAccess? 'Enabled': 'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled' -> 'Disabled' 
     restore: restore
-    restrictOutboundNetworkAccess: publicNetworkAccess? false:true
+    restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true // tomten publicNetworkAccess? false:true -> false
     disableLocalAuth: disableLocalAuth
     apiProperties: {
       statisticsEnabled: false
     }
     networkAcls: {
       bypass:'AzureServices'
-      defaultAction: publicNetworkAccess? 'Allow':'Deny'
+      defaultAction: 'Allow' // publicNetworkAccess? 'Allow':'Deny' // tomten: -> Allow
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
-        ignoreMissingVnetServiceEndpoint: false
+        ignoreMissingVnetServiceEndpoint: true // tomten false to true
       }]
       ipRules: ipRules
     }
