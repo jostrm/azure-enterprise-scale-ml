@@ -152,8 +152,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     provisionNetworkNow: true
-    enableDataIsolation: false // tomten
-    
+    enableDataIsolation: enablePublicGenAIAccess?false:true // tomten
+
     // network settings
     publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
