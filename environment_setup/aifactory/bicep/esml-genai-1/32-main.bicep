@@ -90,8 +90,20 @@ param serviceSettingDeployAIHub bool = true
 
 // ### TRUE as default - END ###
 
+@allowed([
+  'disabled'
+  'free'
+  'standard'
+])
 param semanticSearchTier string = 'free' //   'disabled' 'free' 'standard'
-param aiSearchSKUName string = 'basic' // 'basic' 'standard', 'standard2' if using sharedPrivateLinks
+@allowed([
+  'basic'
+  'standard'
+  'standard2'
+  'S0'
+  'S1'
+])
+param aiSearchSKUName string = 'standard' // 'basic' gav error?  // 'basic' 'standard', 'standard2' if using sharedPrivateLinks ('S0,S1,standard,standard2')
 param aiSearchEnableSharedPrivateLink bool = false
 param aiSearchEnableSharedPrivateLink_DOCS string = 'https://learn.microsoft.com/en-us/azure/search/search-limits-quotas-capacity#shared-private-link-resource-limits'
 
