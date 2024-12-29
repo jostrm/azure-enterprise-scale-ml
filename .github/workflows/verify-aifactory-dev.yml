@@ -1,4 +1,4 @@
-name: verify-aifactory-Dev
+name: verify-aifactory-dev
 on: push
 jobs:
   verify-infra:
