@@ -323,7 +323,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
 // Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added
 // manually specifically for the endpoint.
 
-// 004 - works
+// 001 - works
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -334,7 +334,7 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-//003 - error
+//002 - error
 /*
 @description('Assign the online endpoint the ability to read connections from AI Project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -348,7 +348,7 @@ resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-0
 }
 */
 
-// 002 - worka
+// 003 - works
 
 @description('Assign the online endpoint the ability to write metrics. This is needed to enable monitoring and logging to the prompt flow from the managed endpoint.')
 resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -361,7 +361,7 @@ resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04
   }
 }
 
-// 001 - checking
+// 004 - checking
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiServices
