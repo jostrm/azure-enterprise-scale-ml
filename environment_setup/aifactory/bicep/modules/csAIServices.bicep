@@ -52,7 +52,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: 'Disabled' //AccountProvisioningStateInvalid if publicNetworkAccess? 'Enabled': 'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled' -> 'Disabled' 
+    publicNetworkAccess: publicNetworkAccess? 'Enabled': 'Disabled'  //private endpoint - AccountProvisioningStateInvalid.  in state Accepted  () publicNetworkAccess? 'Enabled': 'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled' -> 'Disabled' )
     restore: restore
     restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true // tomten publicNetworkAccess? false:true -> false
     disableLocalAuth: disableLocalAuth
@@ -114,6 +114,7 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
   ]
 }
 
+// aiservicesprj003sdcdev3pmpb002 in state Accepted (Code: AccountProvisioningStateInvalid)
 resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   location: location
   name: pendCogSerName
