@@ -7,10 +7,10 @@ param aifactoryProjectNumber string
 param location string
 @description('ESML dev,test or prod. If DEV then AKS cluster is provisioned with 1 agent otherwise 3')
 param env string
-@description('Specifies the skuname of the machine learning studio')
-param skuName string
-@description('Specifies the sku tier of the machine learning studio')
-param skuTier string
+//@description('Specifies the skuname of the machine learning studio')
+//param skuName string
+//@description('Specifies the sku tier of the machine learning studio')
+//param skuTier string
 @description('Specifies the storageaccount id used for the machine learning studio')
 param storageAccount string
 @description('Specifies the container registry id used for the machine learning studio')
@@ -132,10 +132,10 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     type: 'SystemAssigned'
   }
   tags: tags
-  sku: {
-    name: skuName
-    tier: skuTier
-  }
+  //sku: {
+  //  name: skuName
+  //  tier: skuTier
+ // }
   kind: kindAIHub
   properties: {
     allowRoleAssignmentOnRG: true
