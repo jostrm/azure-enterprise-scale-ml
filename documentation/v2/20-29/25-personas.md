@@ -77,7 +77,7 @@ Such as the architecture below, of a LAMBDA architecture for Modern analytics in
 >  The personas defined here may be seem as baseline personas, but the recommendation is to defined your own personas, using tools such as tables, persona template cards, graphs described in this section.
 >  It is important to that personas fit your [processes](#connection-to-processes-dataops-mlops-genaiops), organization, and users. A custom persona, defined with a [persona template card](#using-persona-template-cards) can support this.
 
-# How to define indetity-based RBAC to Personas
+# How to define Identity-based RBAC to Personas
 **Identity based RBAC** can be defined as links to another page, with a detailed table. All Azure services in a persona card can be linked and open a new markdown file with a table where security and role based access control is mapped to each service, in each environment (Dev, Stage, Production) of your architecture [See here for an example of such table from our MLOps accelerator](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/machine-learning-operations-v2#identity-rbac)
 
 ## Using a Table
