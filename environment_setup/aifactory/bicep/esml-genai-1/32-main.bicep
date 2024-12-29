@@ -97,11 +97,10 @@ param serviceSettingDeployAIHub bool = true
 ])
 param semanticSearchTier string = 'free' //   'disabled' 'free' 'standard'
 @allowed([
-  'basic'
+  'S0' // 'Free': Invalid SKU name
+  'S1' // 'Basic': Invalid SKU name
   'standard'
-  'standard2'
-  'S0'
-  'S1'
+  'standard2' // 0 out of 0 quota, is default, apply to get this.
 ])
 param aiSearchSKUName string = 'standard' // 'basic' gav error?  // 'basic' 'standard', 'standard2' if using sharedPrivateLinks ('S0,S1,standard,standard2')
 param aiSearchEnableSharedPrivateLink bool = false
@@ -762,7 +761,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     tags: tags
     semanticSearchTier: (location != 'swedencentral')? semanticSearchTier: 'disabled'
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
-    skuName: enablePublicGenAIAccess? aiSearchSKUName: aiSearchSKUSharedPrivate
+    skuName: aiSearchSKUName //enablePublicGenAIAccess? aiSearchSKUName: aiSearchSKUSharedPrivate
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
