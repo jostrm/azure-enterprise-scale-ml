@@ -686,7 +686,9 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = i
 // LogAnalytics
 var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 //resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
+//resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
+
+resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: laName
   scope:commonResourceGroupRef
 }
@@ -1021,6 +1023,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
   params: {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     logWorkspaceName: laName
+    logWorkspaceNameRG: commonResourceGroup
     //logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
     tags: tags
     location: location
@@ -1310,7 +1313,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     location: location
     tags: tags
     aifactorySuffix: aifactorySuffixRG
-    applicationInsights: applicationInsightSWC.outputs.ainsId
     applicationInsightsName: applicationInsightSWC.outputs.name
     containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
     env: env

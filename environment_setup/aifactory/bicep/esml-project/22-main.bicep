@@ -335,27 +335,13 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   scope:commonResourceGroupRef
 }
 
-module applicationInsight '../modules/applicationInsights.bicep'= if(sweden_central_appInsight_classic_missing== false){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // max 255 chars
-    tags: tags2
-    location: location
-  }
-
-  dependsOn: [
-    projectResourceGroup
-    
-  ]
-}
-
-module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(sweden_central_appInsight_classic_missing== true){
+module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     logWorkspaceName: laName
+    logWorkspaceNameRG: commonResourceGroup
     //logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
     tags: tags2
     location: location
@@ -677,7 +663,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     storageAccount: sacc.outputs.storageAccountId
     containerRegistry: useCommonACR? acrCommon.id: acr.outputs.containerRegistryId
     keyVault: kv1.outputs.keyvaultId
-    applicationInsights: (sweden_central_appInsight_classic_missing == true)? applicationInsightSWC.outputs.ainsId: applicationInsight.outputs.ainsId 
+    applicationInsights: applicationInsightSWC.outputs.ainsId
     aksSubnetId: aksSubnetId
     aksSubnetName:aksSubnetName
     aksDnsServiceIP:aksDnsServiceIP

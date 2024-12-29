@@ -17,8 +17,6 @@ param storageAccount string
 param containerRegistry string
 @description('Specifies the keyvault id used for the machine learning studio')
 param keyVaultName string
-@description('Specifies the application insights id used for the machine learning studio')
-param applicationInsights string
 @description('Specifies the tags that should be applied to machine learning studio resources')
 param tags object
 @description('(Required) Specifies the private endpoint name')
@@ -195,7 +193,6 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
       defaultAction: enablePublicGenAIAccess? 'Allow':'Deny'
       ipRules: ipRules
     }
-
   }
 
   resource aoaiConnection 'connections' = {

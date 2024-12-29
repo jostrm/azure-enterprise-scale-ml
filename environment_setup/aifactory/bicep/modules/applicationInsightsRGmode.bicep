@@ -8,8 +8,10 @@ param tags object
 param location string
 
 param logWorkspaceName string
+param logWorkspaceNameRG string
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
   name: logWorkspaceName
+  scope:resourceGroup(logWorkspaceNameRG)
 }
 
 resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
