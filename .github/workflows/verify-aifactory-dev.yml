@@ -1,24 +1,24 @@
-name: verify-aifactory-dev
+name: verify-aifactory-Dev
 on: push
 jobs:
   verify-infra:
     name: Verifies provisioning in DEV of an AI Factory common, and 2 project types ESML, ESGENAI
     environment:
-      name: Dev
+      name: DEV
     runs-on: ubuntu-latest
     steps:
       - run: bicep --version
   verify-dataops-template:
     name: Verifies DATAOPS template in DEV for DataOps, ingestion from sources to ESML datalake
     environment:
-      name: Dev
+      name: DEV
     runs-on: ubuntu-latest
     steps:
       - run: python --version
   verify-mlops-template:
     name: Verifies MLOPS template in DEV, for training, registering, deploying models, smoke-testing inference ep with monitoring
     environment:
-      name: Dev
+      name: DEV
     runs-on: ubuntu-latest
     steps:
       - run: node --version
@@ -26,7 +26,7 @@ jobs:
   verify-genaiops-template:
     name: Verifies GenAIOps template in DEV, for RAG to Promptflow endpoint, smoke-testing inference with monitoring
     environment:
-      name: Dev
+      name: DEV
     runs-on: ubuntu-latest
     steps:
       - run: python --version
