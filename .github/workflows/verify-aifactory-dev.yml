@@ -1,12 +1,36 @@
 name: verify-aifactory-dev
-on: push
+on: 
+  #push
+  workflow_dispatch:
+env:
+  admin_aiFactorySalt: "abcde" # AIFactory salt: abcde in any resource, such as kv-cmnadm-abcde-001
+  admin_aifactorySuffixRG: "-001" # Suffix on common resource group: -001
+  admin_commonResourceSuffix: "-001" # Suffix on common resource group: -001
+  admin_ip_fw: "192.x.x.x"  # IP Address of the admin, to whitelist from the firewall
+  admin_location: "westeurope"  # AIFactory location
+  admin_locationSuffix: "weu"  # Region location suffix in ESML settings: [weu,uks,swe,sdc]
+  admin_rg_name_prefix: "rg-prefix-"  # RG name prefix, excluding "esml"
+  admin_seeding_keyvault: "seeding-kv-name" # Seeding Keyvault name
+  admin_seeding_keyvault_rg: "seeding-kv-rg" # Seeding Keyvault resource group
+  admin_seeding_keyvault_subscription: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Seeding keyvault, subscription id
+  admin_storage_account_container_name: "lake3" # lakeContainerName in parameters/10-esml-globals
+  common_keyvault_suffix: '001' #common keyvaults suffix: 001 in kv-cmnadm-abcde-001 and kv-cmndev-abcde-001
+  project_keyvault_suffix: '01' # project keyvault suffix: 01 in kv-p003-uks-dev-abcde01
+  project_number_000: '001' #ESML Projectnumber, three digits: 001
+  user_emails_comma_separated_list: "" # Comma-separated, email(s) of new user(s) to grant admin permissions"
 jobs:
   verify-infra:
+    env: 
+      admin_storage_account: "adminstoracc123" # ESML AIFactory common datalake (storage account) name
+      dev_test_prod: "dev" # ESML AIFactory environment: [dev,test,prod]
+      dev_test_prod_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Subscription ID of the deployed resources for the environment
     name: Verifies provisioning in DEV of an AI Factory common, and 2 project types ESML, ESGENAI
     environment:
       name: DEV
     runs-on: ubuntu-latest
     steps:
+      - name: "Verify environment"
+        run: echo "Running on ${{ env.dev_test_prod }} environment"
       - run: bicep --version
   verify-dataops-template:
     name: Verifies DATAOPS template in DEV for DataOps, ingestion from sources to ESML datalake
@@ -14,19 +38,21 @@ jobs:
       name: DEV
     runs-on: ubuntu-latest
     steps:
-      - run: python --version
+      - name: "Verify Data factory templates"
+        run: python --version
   verify-mlops-template:
     name: Verifies MLOPS template in DEV, for training, registering, deploying models, smoke-testing inference ep with monitoring
     environment:
       name: DEV
     runs-on: ubuntu-latest
     steps:
-      - run: node --version
-      - run: npm --version
+      - name: "Verify Azure ML template pipelines"
+        run: node --version
   verify-genaiops-template:
     name: Verifies GenAIOps template in DEV, for RAG to Promptflow endpoint, smoke-testing inference with monitoring
     environment:
       name: DEV
     runs-on: ubuntu-latest
     steps:
-      - run: python --version
+      - name: "Verify Azure AI Foundyr, AI Search, with a RAG scenario, as promptflow"
+        run: python --version

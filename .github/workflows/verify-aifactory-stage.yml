@@ -1,5 +1,7 @@
 name: verify-aifactory-stage
-on: push
+on:
+  #push
+  workflow_dispatch:
 jobs:
   verify-infra:
     name: Verifies provisioning in STAGE of an AI Factory common, and 2 project types ESML, ESGENAI

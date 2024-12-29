@@ -1,5 +1,7 @@
 name: verify-aifactory-prod
-on: push
+on:
+  #push
+  workflow_dispatch:
 jobs:
   verify-infra:
     name: Verifies provisioning in PROD of an AI Factory common, and 2 project types ESML, ESGENAI
