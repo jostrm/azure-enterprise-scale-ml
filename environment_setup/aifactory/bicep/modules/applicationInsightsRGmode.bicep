@@ -31,3 +31,4 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
 }
 
 output ainsId string = applicationInsights.id
+output name string = applicationInsights.name
