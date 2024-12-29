@@ -92,16 +92,14 @@ It is also organized via the four components of the ESML AIFactory:
 
 |Date     |Category   | What   | Link   |
 |------------|-----------|--------|--------|
-|2024-03  |Automation | Add core team member| [26-add-esml-coreteam-member.ps1](./environment_setup/aifactory/bicep/esml-util/26-add-esml-coreteam-member.ps1)|
-|2024-03  |Automation | Add project member| [26-add-esml-project-member.ps1](./environment_setup/aifactory/bicep/esml-util/26-add-esml-project-member.ps1)|
-|2024-03  |Tutorial | Core-team tutorial  | [10-AIFactory-infra-subscription-resourceproviders.md](./documentation/10-AIFactory-infra-subscription-resourceproviders.md)|
-|2024-03  |Tutorial | End-user tutorial  | [01-jumphost-vm-bastion-access.md](./documentation/01-jumphost-vm-bastion-access.md)|
-|2024-03  |Tutorial | End-user tutorial  | [03-use_cases-where_to_start.md](./documentation/03-use_cases-where_to_start.md)|
-|2024-02  |Tutorial | End-user installation Compute Instance | [R01-install-azureml-sdk-v1+v2.m](./documentation/01-install-azureml-sdk-v1+v2.md) |
+|2024-10  |Best Practices| Well-Arhcitected framework| [WAF AI workload - AI Factory personas](./documentation/v2/20-29/25-personas.md)|
+|2024-03  |Automation | Add project member & core team memeber| [Workflow diagram](./documentation/v2/10-19/13-flow-diagram-1.md)|
+|2024-03  |Docs | New Docs v.2 | [Documentation](./documentation/v2/10_index.md)|
+|2024-02  |infra (IaC) | NEW! ESGenAI project type: Azure AI Foundry+AI Search | [15-aifactory-overview.md](./documentation/v2/10-19/15-aifactory-overview.md) |
 |2024-02  |Datalake - Onboarding |Auto-ACL on PROJECT folder in lakel|-|
 |2023-03  |Networking|No Public IP: Virtual private cloud - updated networking rules| https://learn.microsoft.com/en-us/azure/machine-learning/v1/how-to-secure-workspace-vnet?view=azureml-api-1&preserve-view=true&tabs=required%2Cpe%2Ccli|
 |2023-02  |ESML Pipeline templates|Azure Databricks: Training and Batch  pipeline templates. 100% same support as AML pipeline templates (inner/outer loop MLOps)|-|
-|2022-08  |ESML infra (IaC)|Bicep now support yaml as well|-|
+|2022-08  |infra (IaC)|Bicep now support yaml as well|-|
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
 # BACKGROUND - How the accelerator started 2019
