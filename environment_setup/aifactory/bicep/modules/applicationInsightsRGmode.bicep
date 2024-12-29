@@ -7,8 +7,10 @@ param tags object
 @description('Specifies the location where application insights should be deployed')
 param location string
 
-@description('Specifies the location where application insights should be deployed')
-param logAnalyticsWorkspaceID string
+param logWorkspaceName string
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
+  name: logWorkspaceName
+}
 
 resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: name
@@ -17,16 +19,16 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   kind: 'web'
   properties: {
     Application_Type: 'web'
-    WorkspaceResourceId:logAnalyticsWorkspaceID
-    DisableIpMasking: false
-    DisableLocalAuth: false
+    WorkspaceResourceId:logAnalyticsWorkspace.id
+    //DisableIpMasking: false  // tomten
+    //DisableLocalAuth: false  // tomten
     Flow_Type: 'Bluefield'
-    ForceCustomerStorageForProfiler: false
+    //ForceCustomerStorageForProfiler: false  // tomten
     //ImmediatePurgeDataOn30Days: true // Not available in Sweden Central. Error: ImmediatePurgeDataOn30Days cannot be set on current api-version
-    IngestionMode: 'LogAnalytics' // Cannot set ApplicationInsights as IngestionMode on consolidated applications
-    publicNetworkAccessForIngestion: 'Enabled'
-    publicNetworkAccessForQuery: 'Disabled'
-    Request_Source: 'rest'
+    //IngestionMode: 'LogAnalytics' // Cannot set ApplicationInsights as IngestionMode on consolidated applications // tomten
+    // publicNetworkAccessForIngestion: 'Enabled' // tomten
+    // publicNetworkAccessForQuery: 'Disabled' // tomtem
+    // Request_Source: 'rest' // tomten
   }
 }
 

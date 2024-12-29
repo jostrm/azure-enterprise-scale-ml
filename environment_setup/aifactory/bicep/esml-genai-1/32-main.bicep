@@ -685,11 +685,11 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = i
 
 // LogAnalytics
 var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+//resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
   name: laName
   scope:commonResourceGroupRef
 }
-
 
 // Azure OpenAI - END
 // Azure AI Search
@@ -1020,7 +1020,8 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-    logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
+    logWorkspaceName: laName
+    //logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
     tags: tags
     location: location
   }
@@ -1347,6 +1348,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
   ]
 }
 
+/* // RoleAssignmentUpdateNotPermitted
 module rbacAcrCommonRG '../modules/acrRbac.bicep' = if(useCommonACR == true) {
   scope:commonResourceGroupRef
   name: 'rbacAcrCommon${deploymentProjSpecificUniqueSuffix}'
@@ -1356,6 +1358,8 @@ module rbacAcrCommonRG '../modules/acrRbac.bicep' = if(useCommonACR == true) {
     aiHubRgName: targetResourceGroup
   }
 }
+
+*/
 module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false) {
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
