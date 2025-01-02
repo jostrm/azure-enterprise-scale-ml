@@ -1,6 +1,13 @@
-# Project: azure-enterprise-scale-ml (ESML) AI Factory 
-The `Enterprise Scale AI Factory` is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
+# Enterprise Scale AI Factory - submodule
+![Header](documentation/v2/10-19/images/header.png)
+
+Welcome to the official `Enterprise Scale AI Factory` you can use as a sumodule in your repo.
+This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
 - Plug and play accelerator for: DataOps, MLOps, GenAIOps, enterprise scale environment.
+
+> [!NOTE]
+> See the bootstrap Github repository template, that bootstrap's an AIFactory quickly. [Official AIFactory bootstrap repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage). This bootstrap repo becomes your repo - using the sumobule repo.
+>
 
 ## Main purpose: 
 1) `Marry multiple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.

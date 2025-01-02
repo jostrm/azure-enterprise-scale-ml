@@ -125,6 +125,27 @@ var aiProjectDiagSettingName ='aiProjectDiagnosticSetting'
 var aiHubDiagSettingName ='aiHubDiagnosticSetting'
 var epDefaultName ='ep-${aifactoryProjectNumber}-01-${locationSuffix}-${env}${resourceSuffix}'
 
+
+/*
+https://learn.microsoft.com/en-us/azure/machine-learning/how-to-configure-private-link?view=azureml-api-2&WT.mc_id=Portal-Microsoft_Azure_MLTeamAccounts&tabs=cli#enable-public-access-only-from-internet-ip-ranges-preview
+
+There are two possible properties that you can configure:
+
+1) allow_public_access_when_behind_vnet - used by the Python SDK v1
+public_network_access - used by the CLI and Python SDK v2 Each property overrides the other. For example, setting public_network_access will override any previous setting to allow_public_access_when_behind_vnet.
+Microsoft recommends using public_network_access to enable or disable public access to a workspace.
+
+2) Allown only IP ranges (max 200 rules)
+List IP network rules: az ml workspace network-rule list --resource-group "myresourcegroup" --workspace-name "myWS" --query ipRules
+Add a rule for a single IP address: az ml workspace network-rule add --resource-group "myresourcegroup" --workspace-name "myWS" --ip-address "16.17.18.19"
+Add a rule for an IP address range: az ml workspace network-rule add --resource-group "myresourcegroup" --workspace-name "myWS" --ip-address "16.17.18.0/24"
+Remove a rule for a single IP address: az ml workspace network-rule remove --resource-group "myresourcegroup" --workspace-name "myWS" --ip-address "16.17.18.19"
+Remove a rule for an IP address range: az ml workspace network-rule remove --resource-group "myresourcegroup" --workspace-name "myWS" --ip-address "16.17.18.0/24"
+
+az ml -h
+az extension update -n ml
+
+*/
 resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
   name: name
   location: location
