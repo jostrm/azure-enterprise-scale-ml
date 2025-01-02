@@ -3,12 +3,12 @@
 
 Welcome to the official `Enterprise Scale AI Factory` repository.
 This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
-- Plug and play accelerator for: DataOps, MLOps, GenAIOps, enterprise scale environment. 
+- Plug and play accelerator for: AI ready landingzones with templates for DataOps, MLOps, GenAIOps to get an enterprise scale environment.
 
-Usage: You can fork it or the most common alterantive - use it as a submodule in your own repo.
+Usage: You can fork it, or use it as a submodule in your own repo.
 
 > [!NOTE]
-> **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [Official AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage). This bootstrap repo becomes your repo - using the sumobule repo.
+> **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage). This bootstrap repo becomes your repo - using this as a sumobule repo.
 >
 
 ## Main purpose: 
