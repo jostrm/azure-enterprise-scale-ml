@@ -1,12 +1,14 @@
 # Enterprise Scale AI Factory - submodule
 ![Header](documentation/v2/10-19/images/header.png)
 
-Welcome to the official `Enterprise Scale AI Factory` you can use as a sumodule in your repo.
+Welcome to the official `Enterprise Scale AI Factory` repository.
 This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
-- Plug and play accelerator for: DataOps, MLOps, GenAIOps, enterprise scale environment.
+- Plug and play accelerator for: DataOps, MLOps, GenAIOps, enterprise scale environment. 
+
+Usage: You can fork it or the most common alterantive - use it as a submodule in your own repo.
 
 > [!NOTE]
-> See the bootstrap Github repository template, that bootstrap's an AIFactory quickly. [Official AIFactory bootstrap repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage). This bootstrap repo becomes your repo - using the sumobule repo.
+> **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [Official AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage). This bootstrap repo becomes your repo - using the sumobule repo.
 >
 
 ## Main purpose: 
