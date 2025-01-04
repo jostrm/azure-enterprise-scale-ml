@@ -1,5 +1,9 @@
 # Prerequisites - Before setting up an AIFactory
 
+> [!IMPORTANT]
+> See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
+> [Enterprise Scale AIFactory - Template repo, using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
+
 ## Step 1) Create Azure Devops (or Github) projects
 - **Purpose:** Where the AIFactory acceleration code resides
 - **Role needed:** Central IT. Microsoft EntraID administrator. Azure Devops administrator

@@ -1,7 +1,10 @@
 # Setup AIFactory - Infra Automation
-To configura the infra automation the first time takes ~4h. 
+To configura the infra automation the first time takes ~4h, which is great compared to 500-1500 hours.<br>
+And after this is done, you can setup as many AIFactory's you want, with configuration time 2-15min per AIFactory.
 
-After this is done, you can setup as many AIFactory's you want, with configuration time 2-15min per AIFactory.
+> [!IMPORTANT]
+> See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
+> [Enterprise Scale AIFactory - Template repo, using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
 
 ## 1) Azure Devops (or Github): Create an empty repo, _aifactory-infra-001_
 This _aifactory-infra-001_ will be your repo, where you have your configuration is overwriting the AIfactory config-template files.
