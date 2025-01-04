@@ -1,4 +1,4 @@
-name: project-dev-infra-deploy.yml
+name: project-esml-dev-infra-deploy.yml
 
 on:
     #push:
@@ -29,7 +29,7 @@ jobs:
   dev-project-deploy:
     name: Deploy to Dev
     environment:
-      name: Dev
+      name: dev
     runs-on: ubuntu-latest
     env:
       dev_test_prod: "dev"

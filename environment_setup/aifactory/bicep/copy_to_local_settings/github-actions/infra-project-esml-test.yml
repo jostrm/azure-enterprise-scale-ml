@@ -1,4 +1,4 @@
-name: project-prod-infra-deploy.yml
+name: project-esml-test-infra-deploy.yml
 
 on:
     #push:
@@ -17,7 +17,7 @@ env:
     admin_location: "westeurope"
     admin_locationSuffix: "weu"
     admin_prjResourceSuffix: "-001"
-    prod_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # SubscriptionID prod
+    test_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # SubscriptionID test
     project_IP_whitelist: "192.x.x.x"
     project_number_000: "001" # Project number (3 digits)
     technical_admins_ad_object_id: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
@@ -26,13 +26,13 @@ env:
     common-sp-secret-seeding-kv-name: "esml-common-bicep-sp-secret"
 
 jobs:
-  prod-project-deploy:
-    name: Deploy to Prod
+  test-project-deploy:
+    name: Deploy to Test
     environment:
-      name: Prod
+      name: stage
     runs-on: ubuntu-latest
     env:
-      dev_test_prod: "prod"
+      dev_test_prod: "test"
     steps:
     - name: Azure Login
       uses: azure/login@v2
@@ -56,14 +56,14 @@ jobs:
     - name: 10_Set ADO IP to keyvault FW whitelist
       uses: azure/cli@v2
       with:
-        inlineScript: az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.admin_ip_fw }}
+        inlineScript: az keyvault network-rule add --subscription ${{ env.admin_bicep_input_keyvault_subscription }} --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.admin_ip_fw }}
         azcliversion: latest
     - name: 10_download_keyvault_secrets
       uses: azure/cli@v2
       with:
         inlineScript: |
-          echo "common-sp-appid-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-appid-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
-          echo "common-sp-secret-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-secret-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
+          echo "common-sp-appid-value=$(az keyvault secret show --subscription ${{ env.admin_bicep_input_keyvault_subscription }}  --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-appid-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
+          echo "common-sp-secret-value=$(az keyvault secret show --subscription ${{ env.admin_bicep_input_keyvault_subscription }} --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-secret-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
         azcliversion: latest
     - name: Copy pipelineFunctions Module to Root
       uses: azure/powershell@v2
@@ -75,7 +75,7 @@ jobs:
       uses: azure/powershell@v2
       with:
         inlineScript: |
-          sudo pwsh -Command "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force ; ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc.ps1 -bicepPar1 './aifactory/parameters/10-esml-globals-1.json' -bicepPar2 './aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 './aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 './aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 './aifactory/parameters/10-esml-globals-override.json' -filePath './aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location }}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -useServicePrincipal"
+          sudo pwsh -Command "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force ; ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc.ps1 -bicepPar1 './aifactory/parameters/10-esml-globals-1.json' -bicepPar2 './aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 './aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 './aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 './aifactory/parameters/10-esml-globals-override.json' -filePath './aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.test_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location }}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -useServicePrincipal"
         azPSVersion: latest
     - name: 21_Deploy subnets and NSG
       uses: azure/cli@v2
@@ -83,7 +83,7 @@ jobs:
         inlineScript: |
           az deployment group create \
           --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}SubnetDeplProj" \
-          --subscription "${{ env.prod_sub_id }}" \
+          --subscription "${{ env.test_sub_id }}" \
           --resource-group "$( cat "./aifactory/parameters/subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"" )" \
           --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-project\21-network.bicep" \
           --parameters @"./aifactory/parameters/subnetParameters.json" \
@@ -95,7 +95,7 @@ jobs:
       uses: azure/powershell@v2
       with:
         inlineScript: |
-          sudo pwsh -Command "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force ; ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -useServicePrincipal -bicepPar1 './aifactory/parameters/10-esml-globals-1.json' -bicepPar2 './aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 './aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 './aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 './aifactory/parameters/10-esml-globals-override.json' -filePath './aifactory/parameters/' -env '${{ env.dev_test_prod }}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{ env.prod_sub_id }}' "
+          sudo pwsh -Command "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force ; ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -useServicePrincipal -bicepPar1 './aifactory/parameters/10-esml-globals-1.json' -bicepPar2 './aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 './aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 './aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 './aifactory/parameters/10-esml-globals-override.json' -filePath './aifactory/parameters/' -env '${{ env.dev_test_prod }}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{ env.test_sub_id }}' "
         azPSVersion: latest
     - name: 30_Sleep for 1 minute
       run: |
@@ -108,7 +108,7 @@ jobs:
         inlineScript: |
           az deployment sub create \
           --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}$PrjDepl" \
-          --subscription "${{ env.prod_sub_id }}" \
+          --subscription "${{ env.test_sub_id }}" \
           --location "${{ env.admin_location }}" \
           --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-project\22-main.bicep" \
           --parameters adminPassword="$( date +%s | sha256sum | base64 | head -c 32 ; echo )" \
@@ -141,6 +141,6 @@ jobs:
     - name: 10_Remove ADO IP from keyvault FW whitelist
       uses: azure/cli@v2
       with:
-        inlineScript: az keyvault network-rule remove --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.admin_ip_fw }}
+        inlineScript: az keyvault network-rule remove --subscription ${{ env.admin_bicep_input_keyvault_subscription }} --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.admin_ip_fw }}
         azcliversion: latest
       if: always()

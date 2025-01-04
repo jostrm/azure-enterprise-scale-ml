@@ -1,4 +1,4 @@
-name: esml-add-core-member-test.yml
+name: infra-add-core-member-dev.yml
 
 on:
     #push:
@@ -23,14 +23,14 @@ env:
     user_object_ids_comma_separated_list: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Comma-separated, ObjectIds of new user(s) to grant admin permissions
 
 jobs:
-    test-add-core-member:
-      name: Add core member to Test
+    add-core-member-dev:
+      name: Add core member to Dev
       environment:
-        name: stage
+        name: dev
       runs-on: ubuntu-latest
       env:
         admin_storage_account: "adminstoracc123" # ESML AIFactory common datalake (storage account) name
-        dev_test_prod: "test" # ESML AIFactory environment: [dev,test,prod]
+        dev_test_prod: "dev" # ESML AIFactory environment: [dev,test,prod]
         dev_test_prod_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Subscription ID of the deployed resources for the environment
       steps:
       - name: Azure Login

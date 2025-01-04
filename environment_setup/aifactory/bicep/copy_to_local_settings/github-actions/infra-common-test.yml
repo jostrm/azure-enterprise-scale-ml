@@ -1,4 +1,4 @@
-name: common-dev-infra-deploy.yml
+name: common-test-infra-deploy.yml
 
 on:
     #push:
@@ -11,7 +11,7 @@ env:
   cidr_range: "17"
   admin_location: "westeurope"
   admin_locationSuffix: "weu"
-  dev_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # SubscriptionID dev
+  test_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # SubscriptionID test
   technical_admins_ad_object_id: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
   technical_admins_bastion_IP_whitelist: "192.x.x.x"
   technical_admins_email: "adminemail@example.com"
@@ -19,13 +19,13 @@ env:
   admin_input_keyvault_name: "seeding-kv-name"
 
 jobs:
-    dev-common-deploy:
-      name: Deploy to Dev
+    test-common-deploy:
+      name: Deploy to Test
       environment:
-        name: Dev
+        name: stage
       runs-on: ubuntu-latest
       env:
-        dev_test_prod: "dev"
+        dev_test_prod: "test"
       steps:
       - name: Azure Login
         uses: azure/login@v2
@@ -41,7 +41,7 @@ jobs:
           inlineScript: |
             az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.aifactorySuffixRG }}-DeplRG" \
-            --subscription "${{ env.dev_sub_id }}" \
+            --subscription "${{ env.test_sub_id }}" \
             --location "${{ env.admin_location }}" \
             --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\11-rgCommon.bicep" \
             --parameters @"./aifactory/parameters/11-esml-globals-11_13.json" \
@@ -59,7 +59,7 @@ jobs:
           inlineScript: |
             az deployment sub create \
             --name "esml-cmn${{ env.dev_test_prod }}-${{ env.aifactorySuffixRG }}-${{ env.aiResourceSuffix }}Subnets" \
-            --subscription "${{ env.dev_sub_id }}" \
+            --subscription "${{ env.test_sub_id }}" \
             --location "${{ env.admin_location }}" \
             --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\12-networkCommon.bicep" \
             --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
@@ -80,7 +80,7 @@ jobs:
           inlineScript: |
             az deployment sub create \
             --name "esml-cmn-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.aifactorySuffixRG }}-${{ env.aiResourceSuffix }}-DeplRes" \
-            --subscription "${{ env.dev_sub_id }}" \
+            --subscription "${{ env.test_sub_id }}" \
             --location "${{ env.admin_location }}" \
             --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\13-rgLevel.bicep" \
             --parameters adminPassword="$( date +%s | sha256sum | base64 | head -c 32 ; echo )" \

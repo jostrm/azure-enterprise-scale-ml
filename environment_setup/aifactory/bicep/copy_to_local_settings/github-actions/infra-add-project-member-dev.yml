@@ -27,10 +27,10 @@ env:
 
 
 jobs:
-  dev-add-project-member:
+  add-project-member-dev:
     name: Add project member to Dev
     environment:
-      name: Dev
+      name: dev
     runs-on: ubuntu-latest
     env:
       admin_storage_account: "adminstoracc123" #Admin (Common) storage account
