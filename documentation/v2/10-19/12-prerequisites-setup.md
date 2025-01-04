@@ -24,19 +24,6 @@
     - [Read more](./14-networking-privateDNS.md) about AIFactory Enterprise Scale Landing Zones
 - B) Enable resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
     - [Tip: You can use the Powershell script to automate this](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
-- C) `ESGenAI and AzureOpenAI`: For each subscription you need to have an approved application via a registration form, that you sign off on that you will use Azure OpenAI responsibly
-    - **TODO:** 
-        - [Application form - direct link](https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=v4j5cvGGr0GRqy180BHbR7en2Ais5pxKtso_Pz4b1_xUNTZBNzRKNlVQSFhZMU9aV09EVzYxWFdORCQlQCN0PWcu)
-            -**NB!** To get this regiform approved can take ~2 weeks. Do this beforehand for all subscriptions.
-        - [Info about AzureOpenAI limited access](https://learn.microsoft.com/en-us/legal/cognitive-services/openai/limited-access)
-            - Azure OpenAI requires registration and is currently only available to approved enterprise customers and partners.
-    - **Planned scaling of AIFactory:** If you need to scale the AIFactory beyond the 3 subscriptions (Dev-001, Test-001, Prod-001) technical quota roof, also do this beforehand: 
-        - Example: If you want to have twice compute quota, create 6 subscriptions: Dev-001, Dev-002, Test-001, Test-002,Prod-001, Prod-002, and apply via form for all six.
-
-### Step C - More info) - ESGenAI project: Azure OpenAI apply for each Azure subscriptions (Responsible AI purpose)
-NB! If you only want to use the AIFActory for ESML projects, this is not needed. But if you want to use it for ESGenAI projects, meaning using Azure OpenAI for generative AI purpose, this is mandatory. Otherwise the Azure OpenAI services cannot be provisioned and used. 
-- For each subscription: Dev, Test, Prod, you need to apply via a form, that you will use Azure OpenAI responsibly, otherwise the Azure OpenAI services cannot be provisioned and used in that Subscripion. 
-- [Info about AzureOpenAI limited access](https://learn.microsoft.com/en-us/legal/cognitive-services/openai/limited-access)
 
 ## Step 3) Create an Azure keyvault for the admin of Microsoft Entra ID: The so called `seeding keyvault` (IaC purpose), and created Service principals
 - **Purpose:** For the admin (usually Central IT), who has access to Microsoft Entra ID to created service principals, to store information, to be consumed by AIFactory IaC pipeline.
@@ -47,9 +34,15 @@ NB! If you only want to use the AIFActory for ESML projects, this is not needed.
 ## Step 4) Networking: Allocate vNet ranges in your IP-plan: 3 vNets with /16 CIDR size (at least /20)
 - **Purpose:** To be able to peer the AIFactory later. 
 - **Role needed:** Network team within Central IT / Cloud Team
-- **Mandatory:** No. We an setup an AIFactory standalone. But it cannot be peered later on. We need to use Bastion & VM to access it.
+- **Mandatory:** No. We can setup an AIFactory standalone mode. There is still access modes you can use: 1) Bastion & VM  2) Azure VPN Gatway 3) IP-whitelisting (service endpoints). 
 - **Mandatory with /16 size:** No. 16 is optimal, but a size /18 will also work (10 0000 IP adresses or more), but not recommended for productional use (not even for DEV environment)
 - **TODO**: Alloate at 1 or 3 vNet ranges, of size /16
+
+> [!NOTE]
+> **AI Factory Standalone mode** has been used, when an organization cannot use private endpoints, or cannot peer anything to the HUB that has Private DNS Zones.
+> But, the recommendation is to peer it to the HUB, to have 4 access modes instead of 3, where the 4th is seamless and most cost effective.
+> [Read more about networking here](14-networking-privateDNS.md)
+
 
 ## Step 5) Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
 - **Purpose:** To be used to setup the AIFactory. The information of the service principals: ObjectID, ApplicationID, Secret needs to be stored in the seeding keyvault
@@ -101,11 +94,7 @@ NB! If you only want to use the AIFActory for ESML projects, this is not needed.
 - **Mandatory:** Yes
 - **TODO**: [Azure Devops: Create service connection + Import IaC pipelines + Set service connection to pipeline steps](./12-prereq-ado-create-servicecon-import-ado-pipelines.md)
 
-## Step 8) Register Resource providers on Subscriptions
-
-[How-to - run script to enable resource providers ](./12-resourceproviders.md)
-
-## Step 9) If you want to have Private DNS zones centrally in HUB (recommended) = centralDnsZoneByPolicyInHub=true
+## Step 8) If you want to have Private DNS zones centrally in HUB (recommended) = centralDnsZoneByPolicyInHub=true
 1) Create the Private DNS Zones in the HUB as specified: 
     - [How-to - networking](./14-networking-privateDNS.md) 
 2) Apply the policy to add A-records for all PaaS services that creates a private endpoint to have an A-record added to the central Private DNS zones

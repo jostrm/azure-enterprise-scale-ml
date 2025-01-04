@@ -13,7 +13,19 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
 - Option B (Recommended for productional use): Create a policy to create the private DNS zones in your HUB, and set the AIFactory config flag `centralDnsZoneByPolicyInHub` to `true`
     - The flag `centralDnsZoneByPolicyInHub` can be seen in [this AIFactory config file:e](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)
 
-## AIFactory Hub-Spoke - Light & Simplified view
+## AIFactory - 4 Access modes (Hub-connected VS Standalone)
+
+The AI Factory has 4 access modes. Only 1-3 is enables when the AI Factory is setup in standalone mode.
+Stanalone mode, meaning the AIFactory has its own "hub" with own private DNS zones, e.g. it is not peered to your central hub.
+
+1. **Azure VPN** (either to a Windows 11 DevBox or from client computer)
+2. **Bastion and private VM**with private IP-adress (client computer IP needs to be whitelisted for Bastion subnet)
+3. **Service endpoints & IP-address whitelisting** whitelist client IP's (service endpoints) to access UI such as AI Foundry UI, Azure Machine Learning UI
+4. **Peering** with central hub (client has direct line of sight if on corp network, and can use regular VPN from home)
+
+> [!NOTE]
+> **AI Factory Standalone mode** has been used, when an organization cannot use private endpoints, or cannot peer anything to the HUB that has Private DNS Zones.
+> But, the recommendation is to peer it to the HUB, to have 4 access modes instead of 3, where the 4th is seamless and most cost effective.
 
 ![](./images/14-eslz-networking-light.png)
 
