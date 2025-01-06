@@ -571,7 +571,9 @@ if ($(Get-AzContext).Subscription -ne "") {
     # projectName has been declared by ConvertTo-Variables called earlier
 
     $template | Out-File "$filePath/$templateName"
-    Write-host "Template written to $filePath/$templateName"
+    $fullPath = "$filePath/$templateName"
+    $resolvedPath = Resolve-Path $fullPath
+    Write-host "Template written to $resolvedPath"
     Write-host "Parameter: aifactorySuffixRG is: $aifactorySuffixRGADO"
     Write-host "Parameter: commonSuffixRGG is: $commonResourceSuffixADO"
 
