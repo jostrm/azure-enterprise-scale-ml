@@ -44,7 +44,7 @@ param vnetNameFull_param string = ''
 param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
-param useCommonACR string = ''
+param useCommonACR bool = false
 
 var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
