@@ -75,7 +75,7 @@ param notebookPrivateDnsZoneID string
 param kubernetesVersionAndOrchestrator string
 
 @description('Azure ML allowPublicAccessWhenBehindVnet')
-param allowPublicAccessWhenBehindVnet bool = false
+param allowPublicAccessWhenBehindVnet bool = true
 
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
@@ -112,33 +112,47 @@ param ipRules array = []
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
 
-resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
+//resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
+resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
   name: name
   location: location
   identity: {
     type: 'SystemAssigned'
   }
+  kind: 'MachineLearning'
   tags: tags
-  sku: {
-    name: skuName
-    tier: skuTier
-  }
+  //sku: {
+  //  name: skuName
+  //  tier: skuTier
+  //}
   properties: {
     friendlyName: '${projectName}-${env}-${aiFactoryNumber}'
-    description: 'Azure ML workspace for ${projectName} in ESML-${env} environment. In AI Factory(${aiFactoryNumber}), in ${location}'
+    description:  '${projectName}-${env}-${aiFactoryNumber}'
 
     storageAccount: storageAccount
     containerRegistry: containerRegistry
     keyVault: keyVault
     applicationInsights: applicationInsights
     
-    // configuration for workspaces with private link endpoint
-    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    publicNetworkAccess: 'Disabled'
+    managedNetwork: {
+      firewallSku:'Basic' // 'Standard'
+      isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+    }
 
-    // If sensitive data
-    hbiWorkspace:false
+    // configuration for workspaces with private link endpoint
+    allowRoleAssignmentOnRG: true
+    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
+    allowPublicAccessWhenBehindVnet: true //allowPublicAccessWhenBehindVnet tomten
+    publicNetworkAccess: 'Disabled'
+    systemDatastoresAuthMode: 'identity'
+    hbiWorkspace:false // tomten
+    v1LegacyMode:true // tomten
+    provisionNetworkNow: false // tomten
+    enableDataIsolation: false // tomten
+    networkAcls: {
+      defaultAction:'Deny'
+      ipRules: ipRules
+    }
   }
 }
 

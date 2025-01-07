@@ -282,10 +282,11 @@ var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, wh
 var defaultSubnet = genaiSubnetName //common_subnet_name
 
 // RBAC
-var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
+var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
+var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
-var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
+var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
 // Other - uniquness, Keyvault name
 var deploymentProjSpecificUniqueSuffix = '${projectName}${genaiName}${locationSuffix}${env}${aifactorySuffixRG}'
@@ -444,8 +445,8 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
       '${vnetId}/subnets/${defaultSubnet}'
     ]
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }
@@ -487,7 +488,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     ]
     ipRules: [
       {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+        value: ipWhitelist_array // 'your.public.ip.address' If using IP-whitelist from ADO
       }
     ]
   }
@@ -527,8 +528,8 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
       '${vnetId}/subnets/${defaultSubnet}'
     ]
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }
@@ -570,8 +571,8 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }
@@ -617,8 +618,8 @@ module aiServices '../modules/csAIServices.bicep' = {
       //'${vnetId}/subnets/snt-${projectName}-aks'
     ]
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
     disableLocalAuth: false
@@ -659,8 +660,8 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }
@@ -766,8 +767,8 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }
@@ -807,8 +808,8 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     tags: tags
     networkAcls: networkAcls
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
     containers: [
@@ -959,8 +960,8 @@ module sacc '../modules/storageAccount.bicep' = {
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
     corsRules: [
@@ -1017,8 +1018,8 @@ module kv1 '../modules/keyVault.bicep' = {
     ]
     accessPolicies: [] 
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }
@@ -1349,8 +1350,8 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     locationSuffix:locationSuffix
     resourceSuffix:resourceSuffix
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO/GH variables
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }

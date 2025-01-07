@@ -26,7 +26,6 @@ function Connect-AzureContext {
         # if verbose flag is enabled
         Write-Verbose "servicePrincipalId: $azureAplicationId"
         Write-Verbose "tenantId: $azureTenantId"
-        #Write-Verbose "servicePrincipalKey: $azurePassword"
         Write-Verbose "SubscriptionId: $SubscriptionId"
     } else {
         Write-host "Using current context active AzContext"

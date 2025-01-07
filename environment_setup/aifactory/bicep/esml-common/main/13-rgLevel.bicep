@@ -110,10 +110,11 @@ var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroupName}/provi
 var defaultSubnet = common_subnet_name
 var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
 
-var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
+var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
+var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
-var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
+var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 var sweden_central_adf_missing = false // (location == 'swedencentral')?true:false
 
 // Config regarding private DNS zones (Microsoft private DNS. If you have your ownd DNS server, see here: https://docs.microsoft.com/en-us/azure/machine-learning/how-to-custom-dns?tabs=azure-cli)
@@ -362,8 +363,8 @@ module kvCmn '../../modules/keyVault.bicep' = {
     ]
     accessPolicies: [] 
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }
@@ -500,8 +501,8 @@ module kvAdmin '../../modules/keyVault.bicep' = {
     ]
     accessPolicies: [] 
     ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
+      for ip in ipWhitelist_array: {
+        value: ip
       }
     ]
   }

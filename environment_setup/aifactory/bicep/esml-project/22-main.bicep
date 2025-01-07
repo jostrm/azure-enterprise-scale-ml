@@ -167,10 +167,11 @@ param IPwhiteList string = ''
 @description('since esml-common needs this, and since we need to see if users in this file, should have RBAC acecss')
 param addBastionHost bool // Dummy: do not correspond to any parameters defined in the template: 'addBastionHost'
 
-var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,' ',''),','))
+var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
+var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
-var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
+var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 var tags2 = projecttags
 
 var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
@@ -687,6 +688,11 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
+    ipRules: [
+      for ip in ipWhitelist_array: {
+        value: ip
+      }
+    ]
   }
 
   dependsOn: [
