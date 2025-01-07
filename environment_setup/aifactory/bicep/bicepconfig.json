@@ -7,7 +7,19 @@
                 "no-unused-params": {
                     "level": "off"
                 },
+                "no-unused-vars": {
+                    "level": "off"
+                },
                 "use-parent-property": {
+                    "level": "off"
+                },
+                "secure-secrets-in-params": {
+                    "level": "off"
+                },
+                "use-resource-id-functions": {
+                    "level": "off"
+                },
+                "no-unnecessary-dependson": {
                     "level": "off"
                 }
             }
