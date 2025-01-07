@@ -1203,6 +1203,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 
 // ------------------------------ SERVICES (Azure Machine Learning)  ------------------------------//
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var amlManagedName ='aml2-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
@@ -1296,7 +1297,8 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
-    
+    alsoManagedMLStudio:true
+    managedMLStudioName:amlManagedName
   }
 
   dependsOn: [

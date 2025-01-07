@@ -108,9 +108,55 @@ param ciVmSku_dev string
 @description('TestProd default VM size for the default Compute Instance cluster:Standard_D4_v3. More: Standard_D14 (16 cores,112 ram)')
 param ciVmSku_testProd string
 param ipRules array = []
+param alsoManagedMLStudio bool = false
+param managedMLStudioName string = ''
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
+
+var nameManaged = empty(managedMLStudioName)? '${name}-mn':managedMLStudioName
+
+resource mlStudioManaged 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(alsoManagedMLStudio) {
+  name: nameManaged
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  tags: tags
+  properties: {
+    allowRoleAssignmentOnRG: true
+    friendlyName: nameManaged
+    description: 'Azure ML Studio, managed networking'
+
+     // dependent resources
+    storageAccount: storageAccount
+    containerRegistry: containerRegistry
+    keyVault: keyVault
+    applicationInsights: applicationInsights
+
+    // configuration
+    systemDatastoresAuthMode: 'identity'
+    hbiWorkspace:false
+    provisionNetworkNow: true
+    enableDataIsolation: false // tomten
+    v1LegacyMode:false
+
+    // network settings
+    publicNetworkAccess: 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    managedNetwork: {
+      firewallSku:'Basic' // 'Standard'
+      isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+    }
+    networkAcls: {
+      defaultAction:'Deny'
+      ipRules: ipRules
+    }
+  }
+  dependsOn:[
+    machineLearningStudio
+  ]
+}
 
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
 resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
@@ -132,11 +178,6 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     containerRegistry: containerRegistry
     keyVault: keyVault
     applicationInsights: applicationInsights
-    
-    managedNetwork: {
-      firewallSku:'Basic' // 'Standard'
-      isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
-    }
 
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true
@@ -146,7 +187,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false // tomten
     v1LegacyMode:true // tomten
-    provisionNetworkNow: false // tomten
+    //provisionNetworkNow: false // tomten
     enableDataIsolation: false // tomten
     networkAcls: {
       defaultAction:'Deny'
