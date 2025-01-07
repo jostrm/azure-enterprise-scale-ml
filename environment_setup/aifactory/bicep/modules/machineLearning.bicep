@@ -110,13 +110,13 @@ param ciVmSku_testProd string
 param ipRules array = []
 param alsoManagedMLStudio bool = false
 param managedMLStudioName string = ''
-
+param privateEndpointName2 string = ''
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
 
 var nameManaged = empty(managedMLStudioName)? '${name}-mn':managedMLStudioName
 
-resource mlStudioManaged 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(alsoManagedMLStudio) {
+resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(alsoManagedMLStudio) {
   name: nameManaged
   location: location
   identity: {
@@ -156,6 +156,21 @@ resource mlStudioManaged 'Microsoft.MachineLearningServices/workspaces@2024-10-0
   dependsOn:[
     machineLearningStudio
   ]
+  
+}
+module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
+  name: 'machineLearningNetworking${uniqueDepl}'
+  scope: resourceGroup()
+  params: {
+    location: location
+    tags: tags
+    workspaceArmId: machineLearningStudioManaged.id
+    subnetId: subnetRef
+    machineLearningPleName: privateEndpointName2
+    amlPrivateDnsZoneID: amlPrivateDnsZoneID
+    notebookPrivateDnsZoneID: notebookPrivateDnsZoneID
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+  }
 }
 
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
@@ -378,12 +393,11 @@ resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/wo
   ]
 }
 
- /*jostrm-DEBUG */
-
 output amlId string = machineLearningStudio.id
 output amlName string = machineLearningStudio.name
 output principalId string = machineLearningStudio.identity.principalId
 
+// ###############  AML networking - custom networking ###############
 output dnsConfig array = [
   {
     name: privateEndpointName //pendAml.name

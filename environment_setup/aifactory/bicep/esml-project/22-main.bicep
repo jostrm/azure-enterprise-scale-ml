@@ -656,6 +656,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 }
 
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var amlManagedName ='aml2-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
@@ -753,6 +754,9 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
       action: 'Allow'
       value: ip
     }]
+    alsoManagedMLStudio:true
+    managedMLStudioName:amlManagedName
+    privateEndpointName2: 'pend-${projectName}-aml2-to-vnt-mlcmn'
   }
 
   dependsOn: [
