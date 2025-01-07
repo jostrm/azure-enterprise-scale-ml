@@ -444,11 +444,10 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
     ]
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -486,11 +485,10 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
     ]
-    ipRules: [
-      {
-        value: ipWhitelist_array // 'your.public.ip.address' If using IP-whitelist from ADO
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -527,11 +525,10 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
     ]
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -570,11 +567,10 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -617,11 +613,10 @@ module aiServices '../modules/csAIServices.bicep' = {
       '${vnetId}/subnets/${defaultSubnet}'
       //'${vnetId}/subnets/snt-${projectName}-aks'
     ]
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
     disableLocalAuth: false
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
@@ -659,11 +654,10 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -766,11 +760,10 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -807,11 +800,10 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
     tags: tags
     networkAcls: networkAcls
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
     containers: [
       {
         name: 'default'
@@ -959,11 +951,10 @@ module sacc '../modules/storageAccount.bicep' = {
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
     corsRules: [
       {
         allowedOrigins: [
@@ -1017,11 +1008,10 @@ module kv1 '../modules/keyVault.bicep' = {
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
     accessPolicies: [] 
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -1349,11 +1339,10 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     logWorkspaceResoureGroupName:commonResourceGroup
     locationSuffix:locationSuffix
     resourceSuffix:resourceSuffix
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup

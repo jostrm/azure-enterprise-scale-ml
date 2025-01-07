@@ -362,11 +362,10 @@ module kvCmn '../../modules/keyVault.bicep' = {
       '${vnetId}/subnets/${defaultSubnet}'
     ]
     accessPolicies: [] 
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     esmlCommonResourceGroup
@@ -500,11 +499,10 @@ module kvAdmin '../../modules/keyVault.bicep' = {
       '${vnetId}/subnets/${defaultSubnet}'
     ]
     accessPolicies: [] 
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     esmlCommonResourceGroup
@@ -583,6 +581,7 @@ module dataLake '../../modules/dataLake.bicep' = {
     tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
     tags: tags
     virtualNetworkRules:virtualNetworkRules2Add
+    ipWhitelist_array:ipWhitelist_array
   }
 
   dependsOn: [

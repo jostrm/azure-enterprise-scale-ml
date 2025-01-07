@@ -79,6 +79,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     isHnsEnabled: false
     isNfsV3Enabled: false
     enableExtendedGroups: false
+    supportsHttpsTrafficOnly: true
     encryption: {
       keySource: 'Microsoft.Storage'
       requireInfrastructureEncryption: false
@@ -114,7 +115,6 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
       }]
       ipRules: ipRules
     }
-    supportsHttpsTrafficOnly: true
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
     name: 'default'

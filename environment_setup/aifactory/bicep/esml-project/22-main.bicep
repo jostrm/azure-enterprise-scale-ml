@@ -63,7 +63,7 @@ param env string
   'Standard_RAGZRS'
 ])
 @description('Specifies the SKU of the storage account')
-param skuNameStorage string = 'Standard_ZRS'
+param skuNameStorage string = 'Standard_LRS' // 'Standard_ZRS'
 
 // RBAC START
 @description('Specifies project owner email and will be used for tagging and RBAC')
@@ -451,7 +451,7 @@ module sacc '../modules/storageAccount.bicep' = {
   name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
-    skuName: 'Standard_LRS'
+    skuName: skuNameStorage
     vnetId: vnetId
     subnetName: defaultSubnet
     blobPrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
@@ -459,8 +459,54 @@ module sacc '../modules/storageAccount.bicep' = {
     queuePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
     tablePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-table-to-vnt-mlcmn'
     tags: tags2
+    containers: [
+      {
+        name: 'default'
+      }
+    ]
+    files: [
+      {
+        name: 'default'
+      }
+    ]
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
+    corsRules: [
+      {
+        allowedOrigins: [
+          'https://mlworkspace.azure.ai'
+          'https://ml.azure.com'
+          'https://*.ml.azure.com'
+          'https://ai.azure.com'
+          'https://*.ai.azure.com'
+          'https://mlworkspacecanary.azure.ai'
+          'https://mlworkspace.azureml-test.net'
+        ]
+        allowedMethods: [
+          'GET'
+          'HEAD'
+          'POST'
+          'PUT'
+          'DELETE'
+          'OPTIONS'
+          'PATCH'
+        ]
+        maxAgeInSeconds: 1800
+        exposedHeaders: [
+          '*'
+        ]
+        allowedHeaders: [
+          '*'
+        ]
+      }
+    ]
   }
-
   dependsOn: [
     projectResourceGroup
   ]
@@ -484,11 +530,10 @@ module kv1 '../modules/keyVault.bicep' = {
       '${vnetId}/subnets/snt-${projectName}-dbxpub'
     ]
     accessPolicies: [] 
-    ipRules: [
-      {
-        value: IPwhiteList // 'your.public.ip.address' If using IP-whitelist from ADO
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
   dependsOn: [
     projectResourceGroup
@@ -688,11 +733,10 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
-    ipRules: [
-      for ip in ipWhitelist_array: {
-        value: ip
-      }
-    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
   }
 
   dependsOn: [
@@ -813,6 +857,7 @@ resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing 
  
 }
 var existingRules = esmlCommonLake.properties.networkAcls.virtualNetworkRules
+var existingIps = esmlCommonLake.properties.networkAcls.ipRules
 var keepSku = esmlCommonLake.sku.name
 var keepLocation = esmlCommonLake.location
 var keepTags = esmlCommonLake.tags
@@ -826,6 +871,7 @@ var virtualNetworkRules2Add = [
   }
 ]
 var mergeVirtualNetworkRulesMerged = union(existingRules, virtualNetworkRules2Add)
+var mergeIpRules = union(existingIps, ipWhitelist_array)
 
 param lakeContainerName string
 module dataLake '../modules/dataLake.bicep' = {
@@ -845,6 +891,7 @@ module dataLake '../modules/dataLake.bicep' = {
     tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
     tags: keepTags
     virtualNetworkRules: mergeVirtualNetworkRulesMerged
+    ipWhitelist_array: mergeIpRules
   }
   dependsOn: [
     commonResourceGroupRef

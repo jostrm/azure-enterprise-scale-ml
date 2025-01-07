@@ -61,8 +61,41 @@ param deleteRetentionPolicyEnabled bool = true
 
 @description('Enable blob encryption at rest')
 param encryptionEnabled bool = true
+param ipWhitelist_array array = []
+param containers array = []
+param files array = []
+param corsRules array = [
+  {
+    allowedOrigins: [
+      'https://mlworkspace.azure.ai'
+      'https://ml.azure.com'
+      'https://*.ml.azure.com'
+      'https://ai.azure.com'
+      'https://*.ai.azure.com'
+      'https://mlworkspacecanary.azure.ai'
+      'https://mlworkspace.azureml-test.net'
+    ]
+    allowedMethods: [
+      'GET'
+      'HEAD'
+      'POST'
+      'PUT'
+      'DELETE'
+      'OPTIONS'
+      'PATCH'
+    ]
+    maxAgeInSeconds: 1800
+    exposedHeaders: [
+      '*'
+    ]
+    allowedHeaders: [
+      '*'
+    ]
+  }
+]
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
+
 var groupIds = [
   {
     name: blobPrivateEndpointName
@@ -86,7 +119,8 @@ var groupIds = [
   }
 ]
 
-resource lake 'Microsoft.Storage/storageAccounts@2021-02-01'= {
+//resource lake 'Microsoft.Storage/storageAccounts@2021-02-01'= {
+resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName // esmldatalake002dev
   sku: {
     name: skuName
@@ -97,21 +131,29 @@ resource lake 'Microsoft.Storage/storageAccounts@2021-02-01'= {
   properties:{
     allowBlobPublicAccess: false
     accessTier: 'Hot'
-    //allowCrossTenantReplication: true  // Not supported if DATALAKE
-    allowSharedKeyAccess: true
     isHnsEnabled: true // DATALAKE
+    //allowCrossTenantReplication: true  // Not supported if DATALAKE
     // isNfsV3Enabled: false // Not supported if DATALAKE
+    allowSharedKeyAccess: true
     encryption: {
       keySource: 'Microsoft.Storage'
-      //requireInfrastructureEncryption: false
+      requireInfrastructureEncryption: false
       services: {
         blob: {
-          enabled: encryptionEnabled
+          enabled: true
           keyType: 'Account'
         }
         file: {
-          enabled: encryptionEnabled
+          enabled: true
           keyType: 'Account'
+        }
+        queue: {
+          enabled: true
+          keyType: 'Service'
+        }
+        table: {
+          enabled: true
+          keyType: 'Service'
         }
       }
     }
@@ -124,29 +166,41 @@ resource lake 'Microsoft.Storage/storageAccounts@2021-02-01'= {
     networkAcls:{
       bypass: 'AzureServices'
       defaultAction:'Deny'
-      ///ipRules:[
-       // {
-       //   value:'xxx.231.154.59/32'   // If using IP-whitelist from ADO
-       //   action:'Allow'
-       //}
-     /// ]
+      ipRules: [for ip in ipWhitelist_array: {
+        action: 'Allow'
+        value: ip
+      }]
      virtualNetworkRules:virtualNetworkRules
     }
-
   }
-}
-
-resource lake_container 'Microsoft.Storage/storageAccounts/blobServices/containers@2021-02-01' = { // = if (length(containerName) > 1)
-  name: '${lake.name}/default/${containerName}'
-}
-
-resource blobServiceSoftDel 'Microsoft.Storage/storageAccounts/blobServices@2021-04-01' = if(deleteRetentionPolicyEnabled==true) {
-  parent: lake
-  name: 'default'
-  properties: {
-    deleteRetentionPolicy: {
-      enabled: true
-      days: deleteRetentionPolicy
+  resource blobServices 'blobServices' = if (!empty(containers)) {
+    name: 'default'
+    properties: {
+      cors: {
+        corsRules: corsRules
+      }
+      deleteRetentionPolicy: {
+        enabled: true
+        days: deleteRetentionPolicy
+      }
+    }
+    resource container 'containers' = [for container in containers: {
+      name: container.name
+      properties: {
+        publicAccess: contains(container, 'publicAccess') ? container.publicAccess : 'None'
+      }
+    }]
+  }
+  resource fileServices 'fileServices' = if (!empty(files)) {
+    name: 'default'
+    properties: {
+      cors: {
+        corsRules: corsRules
+      }
+      shareDeleteRetentionPolicy: {
+        enabled: true
+        days: deleteRetentionPolicy
+      }
     }
   }
 }
