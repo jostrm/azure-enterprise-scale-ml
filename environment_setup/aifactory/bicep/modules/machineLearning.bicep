@@ -119,7 +119,6 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
   identity: {
     type: 'SystemAssigned'
   }
-  kind: 'MachineLearning'
   tags: tags
   //sku: {
   //  name: skuName
