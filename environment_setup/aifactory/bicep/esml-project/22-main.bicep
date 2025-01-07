@@ -388,7 +388,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == 
     keyvaultName: kv1.outputs.keyvaultName
   }
   dependsOn: [
-    kv1
+
     projectResourceGroup
     aml
     adf
@@ -412,7 +412,6 @@ module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == tr
   }
 
   dependsOn: [
-    kv1
     projectResourceGroup
     aml
     adf
@@ -556,7 +555,6 @@ module addSecret '../modules/kvSecretsPrj.bicep' = {
     keyvaultName: kv1.outputs.keyvaultName
   }
   dependsOn: [
-    kv1
   ]
 }
 
@@ -578,7 +576,6 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
     additionalPrincipalIds:technicalAdminsObjectID_array_safe
   }
   dependsOn: [
-    kv1
     addSecret
   ]
 }
@@ -796,7 +793,6 @@ module dbx '../modules/dataBricks.bicep'  = if(databricksPrivate == false) {
   }
   dependsOn: [
     projectResourceGroup
-    aml
   ]
 }
 
@@ -819,7 +815,6 @@ module dbxPrivate '../modules/databricksPrivate.bicep' = if(databricksPrivate ==
   }
   dependsOn: [
     projectResourceGroup
-    aml
   ]
 }
 
@@ -908,7 +903,6 @@ module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDns
   }
   dependsOn: [
     projectResourceGroup
-    adf
   ]
 }
 
@@ -919,10 +913,6 @@ module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPo
     dnsConfig: eventHubLogging.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
-  dependsOn: [
-    privateDnsAzureDatafactory
-    eventHubLogging
-  ]
 }
 
 module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && databricksPrivate == true){
@@ -932,9 +922,6 @@ module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZo
     dnsConfig: dbxPrivate.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
-  dependsOn: [
-    dbxPrivate
-  ]
 }
 
 
