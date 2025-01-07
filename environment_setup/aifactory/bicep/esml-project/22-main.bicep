@@ -302,6 +302,7 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2021-04-01' 
 var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
+var keyvaultName2 = 'kv-2${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 
 module ownerPermissions '../modules/contributorRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -530,6 +531,73 @@ module sacc '../modules/storageAccount.bicep' = {
   ]
 }
 
+module sacc2 '../modules/storageAccount.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AMLStorageAcc42${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: replace('sa2${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+    skuName: skuNameStorage
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    blobPrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
+    filePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
+    queuePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
+    tablePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-table-to-vnt-mlcmn'
+    tags: tags2
+    containers: [
+      {
+        name: 'default'
+      }
+    ]
+    files: [
+      {
+        name: 'default'
+      }
+    ]
+    vnetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+    ]
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
+    corsRules: [
+      {
+        allowedOrigins: [
+          'https://mlworkspace.azure.ai'
+          'https://ml.azure.com'
+          'https://*.ml.azure.com'
+          'https://ai.azure.com'
+          'https://*.ai.azure.com'
+          'https://mlworkspacecanary.azure.ai'
+          'https://mlworkspace.azureml-test.net'
+        ]
+        allowedMethods: [
+          'GET'
+          'HEAD'
+          'POST'
+          'PUT'
+          'DELETE'
+          'OPTIONS'
+          'PATCH'
+        ]
+        maxAgeInSeconds: 1800
+        exposedHeaders: [
+          '*'
+        ]
+        allowedHeaders: [
+          '*'
+        ]
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+
 module kv1 '../modules/keyVault.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
@@ -557,6 +625,34 @@ module kv1 '../modules/keyVault.bicep' = {
     projectResourceGroup
   ]
 }
+module kv2 '../modules/keyVault.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AMLKeyVault42${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyvaultName: keyvaultName2
+    location: location
+    tags: tags2
+    enablePurgeProtection:true
+    tenantIdentity: tenantId
+    vnetId: vnetId
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-${projectName}-kv2-to-vnt-mlcmn'
+    keyvaultNetworkPolicySubnets: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/snt-${projectName}-dbxpub'
+    ]
+    accessPolicies: [] 
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
 // Note: az keyvault update  --name msft-weu-dev-cmnai-kv --enabled-for-template-deployment true
 resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
   name: inputKeyvault
@@ -757,6 +853,8 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     alsoManagedMLStudio:true
     managedMLStudioName:amlManagedName
     privateEndpointName2: 'pend-${projectName}-aml2-to-vnt-mlcmn'
+    storageAccount2: sacc2.outputs.storageAccountId
+    keyVault2: kv2.outputs.keyvaultId
   }
 
   dependsOn: [

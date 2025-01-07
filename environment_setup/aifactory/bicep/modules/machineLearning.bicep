@@ -111,6 +111,9 @@ param ipRules array = []
 param alsoManagedMLStudio bool = false
 param managedMLStudioName string = ''
 param privateEndpointName2 string = ''
+param storageAccount2 string = ''
+param keyVault2 string = ''
+
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
 
@@ -129,9 +132,9 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     description: 'Azure ML Studio, managed networking'
 
      // dependent resources
-    storageAccount: storageAccount
+    storageAccount: storageAccount2
+    keyVault: keyVault2
     containerRegistry: containerRegistry
-    keyVault: keyVault
     applicationInsights: applicationInsights
 
     // configuration
@@ -159,7 +162,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
   
 }
 module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
-  name: 'machineLearningNetworking${uniqueDepl}'
+  name: 'machineLearningNetworking2${uniqueDepl}'
   scope: resourceGroup()
   params: {
     location: location
