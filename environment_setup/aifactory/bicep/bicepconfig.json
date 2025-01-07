@@ -1,0 +1,16 @@
+{
+    "analyzers": {
+        "core": {
+            "enabled": true,
+            "verbose": false,
+            "rules": {
+                "no-unused-params": {
+                    "level": "off"
+                },
+                "use-parent-property": {
+                    "level": "off"
+                }
+            }
+        }
+    }
+}
