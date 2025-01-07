@@ -85,6 +85,35 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
   }
 }
 
+resource eventHubPend 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+  location: location
+  name: privateEndpointName
+  properties: {
+    subnet: {
+      id: subnetRef
+      name: subnetName
+    }
+    customNetworkInterfaceName: '${privateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointName
+        properties: {
+          privateLinkServiceId: namespaceNameEV.id
+          groupIds: [
+            'namespace'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+
+
 /*NS*/
 output eHNamespaceId string = namespaceNameEV.id
 output eHNnsName string = namespaceNameEV.name
@@ -96,34 +125,6 @@ output eHubNameId string = eventHub.id
 output eHAuthRulesId string = namespaceName_rule.id
 /*Other*/
 output eHName string = eventHubName
-
-resource eventHubPend 'Microsoft.Network/privateEndpoints@2020-07-01' = {
-  name: privateEndpointName
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: subnetRef
-      name: subnetName
-    }
-    privateLinkServiceConnections: [
-      {
-        id: 'string'
-        properties: {
-          privateLinkServiceId: namespaceNameEV.id
-          groupIds: [
-            'namespace'
-          ]
-          privateLinkServiceConnectionState: {
-            status: 'Approved'
-            description: 'Private endpoint for Eventhub namespace'
-          }
-        }
-        name: 'string'
-      }
-    ]
-  }
-}
 
 output dnsConfig array = [
   {
