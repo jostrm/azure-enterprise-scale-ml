@@ -438,13 +438,32 @@ module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
 }
 
 var acrCommonName = 'acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}'
-// acrcommon3pmpbsdc001dev
+var acrCommonNameSafe = replace(acrCommonName,'-','')
 
 resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR == true) {
-  name: acrCommonName
+  name: acrCommonNameSafe
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
+// Update simulation - since: "ACR sku cannot be retrieved because of internal error."
+// pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
+module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acrCommonNameSafe
+    skuName: 'Premium'
+    vnetId: vnetId
+    subnetName: common_subnet_name // snet-esml-cmn-001
+    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
+    tags: acrCommon.tags
+    location:acrCommon.location
+  }
+
+  dependsOn: [
+    acrCommon
+  ]
+}
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
@@ -704,7 +723,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     skuTier: 'basic'
     env:env
     storageAccount: sacc.outputs.storageAccountId
-    containerRegistry: useCommonACR? acrCommon.id: acr.outputs.containerRegistryId
+    containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId: acr.outputs.containerRegistryId
     keyVault: kv1.outputs.keyvaultId
     applicationInsights: applicationInsightSWC.outputs.ainsId
     aksSubnetId: aksSubnetId
