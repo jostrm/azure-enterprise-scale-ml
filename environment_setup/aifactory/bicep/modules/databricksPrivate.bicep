@@ -103,10 +103,8 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2021-08-01' = {
   location: location
   properties: {
     subnet: {
-      subnet: {
-        id: subnetRef
-        name: subnetName
-      }
+      id: subnetRef
+      name: subnetName
     }
     privateLinkServiceConnections: [
       {

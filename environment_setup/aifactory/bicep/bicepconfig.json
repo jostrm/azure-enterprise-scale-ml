@@ -21,6 +21,9 @@
                 },
                 "no-unnecessary-dependson": {
                     "level": "off"
+                },
+                "use-safe-access": {
+                    "level": "off"
                 }
             }
         }

@@ -791,11 +791,6 @@ var databricksManagedRGId = '${subscription().id}/resourceGroups/${databricksMan
 //var trimmedMRGName = substring(managedResourceGroupName, 0, min(length(managedResourceGroupName), 90))
 //var managedResourceGroupId = '${subscription().id}/resourceGroups/${trimmedMRGName}'
 
-resource amlResource 'Microsoft.MachineLearningServices/workspaces@2021-04-01' existing = {
-  name: amlName
-  scope:resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-}
-
 module dbx '../modules/dataBricks.bicep'  = if(databricksPrivate == false) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'Dbx4${deploymentProjSpecificUniqueSuffix}'
