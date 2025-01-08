@@ -1,6 +1,5 @@
 @description('Specifies the name of the new machine learning studio resources')
 param name string
-
 param uniqueDepl string
 param uniqueSalt5char string
 param locationSuffix string
@@ -37,34 +36,14 @@ param aksSSLstatus string = ''
 
 @description('Specifies the skuname of the machine learning studio')
 param skuName string
-
 @description('Specifies the sku tier of the machine learning studio')
 param skuTier string
-
-@description('Specifies the storageaccount id used for the machine learning studio')
-param storageAccount string
-
-@description('Specifies the container registry id used for the machine learning studio')
-param containerRegistry string
-
-@description('Specifies the keyvault id used for the machine learning studio')
-param keyVault string
-
-@description('Specifies the application insights id used for the machine learning studio')
-param applicationInsights string
-
-//@description('Specifies the aks id used for the machine learning studio')
-//param aksClusterId string
-
 @description('Specifies the tags that should be applied to machine learning studio resources')
 param tags object
-
 @description('(Required) Specifies the private endpoint name')
 param privateEndpointName string
-
 @description('(Required) Specifies the virtual network id associated with private endpoint')
 param vnetId string
-
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
 @description('Resource name ID on DnsZone')
@@ -73,10 +52,8 @@ param amlPrivateDnsZoneID string
 param notebookPrivateDnsZoneID string
 @description('AKS Kubernetes version and AgentPool orchestrator version')
 param kubernetesVersionAndOrchestrator string
-
 @description('Azure ML allowPublicAccessWhenBehindVnet')
 param allowPublicAccessWhenBehindVnet bool = true
-
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
 
@@ -111,13 +88,44 @@ param ipRules array = []
 param alsoManagedMLStudio bool = false
 param managedMLStudioName string = ''
 param privateEndpointName2 string = ''
-param storageAccount2 string = ''
-param keyVault2 string = ''
+
+param saName string
+param saName2 string
+param kvName string
+param kvName2 string
+param acrResourceId string
+param acrName string
+param acrRGName string
+param appInsightsName string
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
 
 var nameManaged = empty(managedMLStudioName)? '${name}-mn':managedMLStudioName
+
+resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: saName
+}
+
+resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: saName
+}
+
+resource existingKeyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: kvName
+}
+resource existingKeyvault2 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: kvName2
+}
+resource existingAppInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+  name: appInsightsName
+}
+
+resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: acrName
+  scope: resourceGroup(acrRGName)
+}
+
 
 resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(alsoManagedMLStudio) {
   name: nameManaged
@@ -129,13 +137,13 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
   properties: {
     allowRoleAssignmentOnRG: true
     friendlyName: nameManaged
-    description: 'Azure ML Studio, managed networking'
+    description: 'Azure ML Studio, managed networking, not using legacy V1 mode'
 
      // dependent resources
-    storageAccount: storageAccount2
-    keyVault: keyVault2
-    containerRegistry: containerRegistry
-    applicationInsights: applicationInsights
+    storageAccount: existingStorageAccount2.id
+    keyVault: existingKeyvault2.id
+    containerRegistry: existingAcr.id
+    applicationInsights: existingAppInsights.id
 
     // configuration
     systemDatastoresAuthMode: 'identity'
@@ -192,10 +200,10 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     friendlyName: '${projectName}-${env}-${aiFactoryNumber}'
     description:  '${projectName}-${env}-${aiFactoryNumber}'
 
-    storageAccount: storageAccount
-    containerRegistry: containerRegistry
-    keyVault: keyVault
-    applicationInsights: applicationInsights
+    storageAccount: existingStorageAccount.id
+    containerRegistry: existingAcr.id
+    keyVault: existingKeyvault.id
+    applicationInsights: existingAppInsights.id
 
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true

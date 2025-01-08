@@ -509,13 +509,18 @@ module sacc '../modules/storageAccount.bicep' = {
   ]
 }
 
+
 var sacc2Name = replace('sa2${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+/*
 resource existingSacc2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: sacc2Name
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
 }
 
 module sacc2 '../modules/storageAccount.bicep' = if(existingSacc2.id == null && alsoManagedMLStudio == true) {
+*/
+
+module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLStorageAcc42${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -821,10 +826,6 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     skuName: 'basic'
     skuTier: 'basic'
     env:env
-    storageAccount: sacc.outputs.storageAccountId
-    containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId: acr.outputs.containerRegistryId
-    keyVault: kv1.outputs.keyvaultId
-    applicationInsights: applicationInsightSWC.outputs.ainsId
     aksSubnetId: aksSubnetId
     aksSubnetName:aksSubnetName
     aksDnsServiceIP:aksDnsServiceIP
@@ -855,8 +856,14 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     alsoManagedMLStudio:alsoManagedMLStudio
     managedMLStudioName:amlManagedName
     privateEndpointName2: alsoManagedMLStudio? 'pend-${projectName}-aml2-to-vnt-mlcmn': ''
-    storageAccount2: alsoManagedMLStudio? sacc2.outputs.storageAccountId: ''
-    keyVault2:alsoManagedMLStudio? kv2.outputs.keyvaultId: ''
+    saName:sacc.name
+    saName2:alsoManagedMLStudio? sacc2.name: ''
+    kvName:kv1.outputs.keyvaultName
+    kvName2:alsoManagedMLStudio? kv2.outputs.keyvaultName: ''
+    acrName: useCommonACR? acrCommon2.outputs.containerRegistryName: acr.outputs.containerRegistryName
+    acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
+    acrResourceId: useCommonACR? acrCommon2.outputs.containerRegistryId: acr.outputs.containerRegistryId
+    appInsightsName:applicationInsightSWC.outputs.name
   }
 
   dependsOn: [
@@ -864,6 +871,8 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     privateDnsContainerRegistry
     privateDnsKeyVault
     privateDnsStorage
+    sacc2
+    kv2
   ]
 }
 

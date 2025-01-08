@@ -26,7 +26,7 @@ var subnetRef = '${vnetId}/subnets/${subnetName}'
 var policyOn = 'enabled' // 'disabled'
 var containerRegistryNameCleaned = replace(containerRegistryName, '-', '')
 
-resource containerRegistry 'Microsoft.ContainerRegistry/registries@2021-09-01' = {
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: containerRegistryNameCleaned
   tags: tags
   location: location
