@@ -70,8 +70,8 @@ env:
     admin_private_azureMLStudioUI: true # Private Azure ML Studio UI
     admin_private_DatabricksUI: false # Private Databricks UI
 jobs:
-  job1-deploy-networking-project-genai:
-    name: ESGenAI Project Networking
+  job1-deploy-networking-project-esml:
+    name: Project Networking
     if: vars.RUN_JOB1_NETWORKING
     environment: ${{github.event.inputs.environment}}
     runs-on: ubuntu-latest
@@ -95,7 +95,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: true
-    - name: 10_Get ADO IP for agent
+    - name: 01_pwsh_get_IP_for_ADO_agent
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       run: |
         $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
@@ -106,13 +106,13 @@ jobs:
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       run: |
         echo "The value of runner_ip is: ${{ env.runner_ip }}"
-    - name: 10_Set ADO IP to keyvault FW whitelist
+    - name: 02_az_set_ADO_ip_to_sedding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
         inlineScript: az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.runner_ip }}
         azcliversion: latest
-    - name: 10_download_keyvault_secrets
+    - name: 03_download_seeding_keyvault
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
@@ -121,18 +121,18 @@ jobs:
           echo "common-sp-secret-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-secret-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
         azcliversion: latest
     - name: Set permissions 755 on WORKSPACE
-      if: env.ENABLE_NETWORKING_JOB  != 'false'
+      if: env.ENABLE_NETWORKING_JOB  != 'false' && env.ENABLE_DEBUG_STEP == 'true'
       run: chmod -R 755 ${{ github.workspace }}
     - name: Set permissions 757 on scripts
-      if: env.ENABLE_NETWORKING_JOB  != 'false'
+      if: env.ENABLE_NETWORKING_JOB  != 'false' && env.ENABLE_DEBUG_STEP == 'true'
       run: chmod -R 757 ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
-    - name: 20_A_Calculate subnet allocations_PS
+    - name: 04_pwsh_calculate_subnet_allocations
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
       run: |
         sudo pwsh -Command  ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc.ps1 -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -filePath '../../../../../aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.dev_test_prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location}}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectTypeADO '${{ env.admin_projectType }}' -useServicePrincipal
       shell: pwsh
-    - name: 21_Deploy subnets and NSG
+    - name: 05_az_bicep_deploy_subnets_and_NSGs
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with: 
@@ -149,28 +149,19 @@ jobs:
           --parameters env="${{ env.dev_test_prod }}" \
           --parameters projectNumber="${{ env.project_number_000 }}"
         azcliversion: latest
-    - name: 30_Sleep for 1 minute
-      if: env.ENABLE_STEP == 'true'
-      run: |
-        write-host "Waiting for subnets to fully register to subscription"
-        Start-Sleep 60
-      shell: pwsh
-    - name: Set output job1_ran=true or false
-      id: set_output
-      run: echo "::set-output name=job1_ran::true"
-    - name: 10_Remove ADO IP from keyvault FW whitelist
+    - name: 08_az_remove_ip_from_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
         inlineScript: az keyvault network-rule remove --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
         azcliversion: latest
       #if: always()
-  job2-deploy-services-project-genai:
-      name: ESGenAI services to RG
+  job2-deploy-services-project-esml:
+      name: BICEP - EMSL services to RG
       environment: ${{github.event.inputs.environment}}
       runs-on: ubuntu-latest
       if: always()
-      needs: job1-deploy-networking-project-genai
+      needs: job1-deploy-networking-project-esml
       defaults:
         run:
           shell: pwsh
@@ -185,7 +176,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: 10_Get ADO IP for agent
+      - name: 01_pwsh_get_IP_for_GH_runner
         run: |
           $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
           echo "runner_ip=$resp" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
@@ -194,24 +185,24 @@ jobs:
       - name: Use environment variable
         run: |
           echo "The value of runner_ip is $runner_ip"
-      - name: 10_Set ADO IP to keyvault FW whitelist
+      - name: 02_az_set_ADO_ip_to_sedding_keyvault_FW_whitelist
         uses: azure/cli@v2
         with:
           inlineScript: az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
           azcliversion: latest
-      - name: 10_download_keyvault_secrets
+      - name: 03_az_download_seeding_keyvault
         uses: azure/cli@v2
         with:
           inlineScript: |
             echo "common-sp-appid-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-appid-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
             echo "common-sp-secret-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-secret-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
           azcliversion: latest
-      - name: Generate dynamic network parameters
+      - name: 04_pwsh_fetch_network_parameters
         working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
         run: |
           sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{env.common-sp-appid-value}}' -spSecret '${{env.common-sp-secret-value}}' -useServicePrincipal -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -filePath '../../../../../aifactory/parameters/' -env '${{env.dev_test_prod}}' -locationSuffixADO '${{env.admin_locationSuffix}}' -aifactorySuffixRGADO '${{env.admin_aifactorySuffixRG}}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{env.dev_test_prod_sub_id}}' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectTypeADO '${{env.admin_projectType}}'"
         shell: pwsh
-      - name: 32_Deploy ESGenAI project
+      - name: 05_az_bicep_deploy_genai_project
         uses: azure/cli@v2
         with:
           #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/"
@@ -259,7 +250,7 @@ jobs:
             --parameters aml_ci_test_prod_sku_override="${{ env.admin_aml_computeInstance_testProd_sku_override }}" \
             --parameters IPwhiteList="${{ env.project_IP_whitelist }}"
           azcliversion: latest
-      - name: 10_Remove ADO IP from keyvault FW whitelist
+      - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
         uses: azure/cli@v2
         with:
           inlineScript: az keyvault network-rule remove --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
