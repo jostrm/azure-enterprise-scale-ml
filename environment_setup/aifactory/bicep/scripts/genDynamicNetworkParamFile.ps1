@@ -91,8 +91,7 @@ if ($null -ne $aifactorySuffixRGADO -and $aifactorySuffixRGADO -ne '') {
 }
 
 $templateName = "dynamicNetworkParams.json"
-$deploymentPrefix = "esml-p$projectNumber-$env-$locationSuffix$aifactorySuffix" # esml-p001-dev-westeurope002
-$deploymentPrefix = "esml-$commonRGNamePrefixp$projectNumber-$env-$locationSuffix$aifactorySuffix" # esml-marvel-1p001-dev-westeurope002
+$deploymentPrefix = "esml-p$projectNumber-$env-$locationSuffix$aifactorySuffix" # esml-p001-dev-sdc-002
 
 write-host "PARAMETERS: Static and Dynamic used::"
 write-host "-STATIC (vnetResourceGroup): Static parameters: [commonRGNamePrefix,vnetResourceGroupBase, locationSuffix] (from PARAMETERS.json)"
