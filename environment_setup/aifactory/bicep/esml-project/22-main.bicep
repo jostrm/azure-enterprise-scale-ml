@@ -443,11 +443,14 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
     acrCommon
   ]
 }
+
+var saName = replace('sa${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName: saName
     skuName: skuNameStorage
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -510,7 +513,7 @@ module sacc '../modules/storageAccount.bicep' = {
 }
 
 
-var sacc2Name = replace('sa2${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+var sacc2Name = replace('sa2p${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
 /*
 resource existingSacc2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: sacc2Name
@@ -522,7 +525,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(existingSacc2.id == null && 
 
 module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AMLStorageAcc42${deploymentProjSpecificUniqueSuffix}'
+  name: 'AMLStorage2${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: sacc2Name
     skuName: skuNameStorage

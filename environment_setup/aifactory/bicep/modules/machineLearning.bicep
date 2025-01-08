@@ -240,7 +240,7 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
 var aksName = 'esml${projectNumber}-${locationSuffix}-${env}' // esml001-weu-prod (20/16) VS esml001-weu-prod (16/16)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
-resource existingAksCluster 'Microsoft.ContainerService/managedClusters@2021-03-01' = {
+resource existingAksCluster 'Microsoft.ContainerService/managedClusters@2021-03-01' existing = {
   name: aksName
 }
 
