@@ -761,8 +761,8 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
   ]
 }
 
-var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-var amlManagedName ='aml2-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var amlName ='aml-${projectNumber}-${locationSuffix}-${env}${resourceSuffix}'
+var amlManagedName ='aml2${projectNumber}${locationSuffix}${env}${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
@@ -816,7 +816,7 @@ var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != 
 
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AzureMachineLearning4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AML1classic${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: amlName
     uniqueDepl: deploymentProjSpecificUniqueSuffix

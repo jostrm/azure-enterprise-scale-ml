@@ -170,7 +170,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
   
 }
 module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
-  name: 'machineLearningNetworking2${uniqueDepl}'
+  name: 'mlNetworking2${uniqueDepl}'
   scope: resourceGroup()
   params: {
     location: location
@@ -224,7 +224,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
 }
 
 module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
-  name: 'machineLearningNetworking${uniqueDepl}'
+  name: 'mlNetworking1${uniqueDepl}'
   scope: resourceGroup()
   params: {
     location: location
@@ -314,7 +314,8 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod' && ex
 
 //AKS attach compute PRIVATE cluster, without SSL
 resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(ownSSL == 'disabled') {
-  name: '${machineLearningStudio.name}/${aksName}'
+  name: aksName
+  parent: machineLearningStudio
   location: location
   properties: {
     computeType: 'AKS'
@@ -343,7 +344,8 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
 
 //CPU Cluster
 resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
-  name: '${machineLearningStudio.name}/p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
+  name: 'p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
+  parent: machineLearningStudio
   location: location
   tags: tags
   identity: {
@@ -378,7 +380,8 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
 
 //Compute instance
 resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(aml_create_ci==true) {
-  name: '${machineLearningStudio.name}/p${projectNumber}-m01-${uniqueSalt5char}-${env}-ci01' // p001-m01-12345-prod-ci01 (24/24)(The name needs to be unique within an Azure region)
+  name: 'p${projectNumber}-m01-${uniqueSalt5char}-${env}-ci01' // p001-m01-12345-prod-ci01 (24/24)(The name needs to be unique within an Azure region)
+  parent: machineLearningStudio
   location: location
   tags: tags
   identity: {
