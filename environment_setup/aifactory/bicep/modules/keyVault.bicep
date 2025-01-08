@@ -85,7 +85,8 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Compliance with network design'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
           }
         }
       }

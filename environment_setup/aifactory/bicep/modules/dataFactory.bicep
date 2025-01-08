@@ -63,7 +63,8 @@ resource pendAdf 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in g
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Azure factory ${obj.gid} private endpoints'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
           }
         }
         name: 'pend-adf-${obj.gid}'

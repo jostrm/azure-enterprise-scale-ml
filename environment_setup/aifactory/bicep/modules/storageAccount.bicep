@@ -160,7 +160,7 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in 
     }
     privateLinkServiceConnections: [
       {
-        id: 'string'
+        name: obj.name
         properties: {
           privateLinkServiceId: sacc.id
           groupIds: [
@@ -168,10 +168,10 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in 
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Compliance with network design'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
           }
         }
-        name: 'string'
       }
     ]
   }

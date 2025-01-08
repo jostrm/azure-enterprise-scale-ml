@@ -466,7 +466,8 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
           privateLinkServiceId: aiHub.id
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Private endpoint for Azure AI Foundry AI Hub'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
           }
         }
       }
@@ -523,7 +524,8 @@ resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {
           privateLinkServiceId: aiProject.id
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Private endpoint for Azure AI Foundry AI Hub'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
           }
         }
       }

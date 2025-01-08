@@ -50,7 +50,8 @@ resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2020
           privateLinkServiceId: workspaceArmId
           privateLinkServiceConnectionState: {
             status: 'Approved'
-            description: 'Private endpoint for Azure machine learning workspace'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
           }
         }
       }
