@@ -1040,8 +1040,6 @@ module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZo
   }
 }
 
-
-
 // RBAC
 var secretGet = {
   secrets: [ 

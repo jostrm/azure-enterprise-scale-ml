@@ -64,7 +64,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' = {
   }
 }
 
-resource pendKeyv 'Microsoft.Network/privateEndpoints@2020-07-01' = {
+resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   name: privateEndpointName
   location: location
   tags: tags
@@ -73,9 +73,10 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2020-07-01' = {
       id: subnetRef
       name: subnetName
     }
+    customNetworkInterfaceName: '${privateEndpointName}-nic'
     privateLinkServiceConnections: [
       {
-        id: 'string'
+        name: privateEndpointName
         properties: {
           privateLinkServiceId: keyVault.id
           groupIds: [
@@ -86,7 +87,6 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2020-07-01' = {
             description: 'Compliance with network design'
           }
         }
-        name: 'string'
       }
     ]
   }
