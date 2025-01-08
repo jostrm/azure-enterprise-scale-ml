@@ -34,7 +34,7 @@ param location string =  resourceGroup().location
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = if(enablePurgeProtection){
   name: keyvaultName
   tags: tags
   location: location
@@ -44,9 +44,38 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: false       // Using RBAC
     enabledForDiskEncryption: false
     enableSoftDelete: true
-    publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
     softDeleteRetentionInDays:soft_delete_days
     enablePurgeProtection: enablePurgeProtection
+    publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
+    tenantId: tenantIdentity
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Deny'
+      ipRules: ipRules
+      virtualNetworkRules: [for rule in keyvaultNetworkPolicySubnets: {
+        id: rule
+        ignoreMissingVnetServiceEndpoint: true // tomten false to true
+      }]
+    }
+    accessPolicies: accessPolicies
+    sku: {
+      name: 'standard'
+      family: 'A'
+    }
+  }
+}
+resource keyVault2 'Microsoft.KeyVault/vaults@2023-07-01' = if(!enablePurgeProtection){
+  name: keyvaultName
+  tags: tags
+  location: location
+  properties: {
+    enabledForDeployment: true          // VMs can retrieve certificates
+    enabledForTemplateDeployment: true  // ARM can retrieve values
+    enableRbacAuthorization: false       // Using RBAC
+    enabledForDiskEncryption: false
+    enableSoftDelete: false
+    enablePurgeProtection: false
+    publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
     tenantId: tenantIdentity
     networkAcls: {
       bypass: 'AzureServices'
@@ -79,7 +108,7 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
       {
         name: privateEndpointName
         properties: {
-          privateLinkServiceId: keyVault.id
+          privateLinkServiceId: (enablePurgeProtection==true)? keyVault.id: keyVault2.id
           groupIds: [
             'vault'
           ]
@@ -94,13 +123,13 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   }
 }
 
-output keyvaultId string = keyVault.id
-output keyvaultName string = keyVault.name
-output keyvaultUri string = keyVault.properties.vaultUri
+output keyvaultId string = (enablePurgeProtection==true)? keyVault.id: keyVault2.id
+output keyvaultName string = (enablePurgeProtection==true)? keyVault.name: keyVault2.name
+output keyvaultUri string =(enablePurgeProtection==true)? keyVault.properties.vaultUri: keyVault2.properties.vaultUri
 output dnsConfig array = [
   {
     name: pendKeyv.name
     type: 'vault'
-    id: keyVault.id
+    id: (enablePurgeProtection==true)? keyVault.id: keyVault2.id
   }
 ]

@@ -8,7 +8,7 @@ param serviceSettingDeployProjectVM bool = false
 param inputKeyvault string
 param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
-
+param keyvaultEnablePurgeProtection bool = true
 param vmSKU string = 'standard_A2_v2' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
 @description('Allow Azure ML Studio UI or not. Dataplane is always private, private endpoint - Azure backbone ')
 param AMLStudioUIPrivate bool = true
@@ -605,7 +605,7 @@ module kv1 '../modules/keyVault.bicep' = {
     keyvaultName: keyvaultName
     location: location
     tags: tags2
-    enablePurgeProtection:true
+    enablePurgeProtection:keyvaultEnablePurgeProtection
     tenantIdentity: tenantId
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -642,7 +642,7 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     keyvaultName: keyvaultName2
     location: location
     tags: tags2
-    enablePurgeProtection:true
+    enablePurgeProtection:keyvaultEnablePurgeProtection
     tenantIdentity: tenantId
     vnetId: vnetId
     subnetName: defaultSubnet
