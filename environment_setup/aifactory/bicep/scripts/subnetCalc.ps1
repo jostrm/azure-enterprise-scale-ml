@@ -21,6 +21,7 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,genai-1]")][string]$projectTypeADO,
 
     # optional parameters
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$commonRGNamePrefixVar,
     [Parameter(Mandatory = $false, HelpMessage = "Use service principal")][switch]$useServicePrincipal = $false,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the object id for service principal")][string]$spObjId,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
@@ -430,17 +431,26 @@ if ($(Get-AzContext).Subscription -ne "") {
         }
     }
 
+    if ($null -ne $commonRGNamePrefixVar -and $commonRGNamePrefixVar -ne '') {
+        $commonRGNamePrefix = $commonRGNamePrefixVar
+    }
+    if ($null -ne $locationSuffixADO -and $locationSuffixADO -ne '') {
+        $locationSuffix = $locationSuffixADO
+    }
+    if ($null -ne $aifactorySuffixRGADO -and $aifactorySuffixRGADO -ne '') {
+        $aifactorySuffix = $aifactorySuffixRGADO
+    }
+    if ($null -ne $commonResourceSuffixADO -and $commonResourceSuffixADO -ne '') {
+        $commonResourceSuffix = $commonResourceSuffixADO
+    }
+
     write-host "VARIABLES:"
     write-host "-STATIC (as input to vnetName and vnetResourceGroup): Static from PARAMETERS.json: commonRGNamePrefix,vnetResourceGroupBase"
-    write-host "-DYNAMIC (as input to vnetName and vnetResourceGroup): Dynamic parameters as INPUT from ADO parameters: env,locationSuffixADO, commonResourceSuffixADO,aifactorySuffixRGADO"
-
-    #$vnetName = "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO" # '${vnetNameBase}-$locationSuffix-${env}${commonResourceSuffix}'
-    #$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # esml-common-weu-dev-001
-    
+    write-host "-DYNAMIC (as input to vnetName and vnetResourceGroup): Dynamic parameters as INPUT from ADO parameters: env,locationSuffix, commonResourceSuffixADO,aifactorySuffixRGADO"
 
     $vnetName = if ($null -eq $vnetNameFull_param -or $vnetNameFull_param -eq "" ) 
     {
-        "$vnetNameBase-$locationSuffixADO-$env$commonResourceSuffixADO"
+        "$vnetNameBase-$locationSuffix$env$commonResourceSuffix"
     }
     else {
         $vnetNameFull_param
@@ -448,7 +458,7 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     $vnetResourceGroup = if ( $null -eq $vnetResourceGroup_param -or $vnetResourceGroup_param -eq "" )
     {
-        "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
+        "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix$env$aifactorySuffix"
     }
     else {
         $vnetResourceGroup_param
@@ -498,16 +508,16 @@ if ($(Get-AzContext).Subscription -ne "") {
             "value": "$vnetNameBase"
         },
         "location": {
-            "value": "$locationADO"
+            "value": "$location"
         },
         "locationSuffix": {
-            "value": "$locationSuffixADO"
+            "value": "$locationSuffix"
         },
         "vnetResourceGroup": {
             "value": "$vnetResourceGroup"
         },
         "commonResourceSuffix": {
-            "value": "$commonResourceSuffixADO"
+            "value": "$commonResourceSuffix"
         }
     }
 }
@@ -528,16 +538,16 @@ if ($(Get-AzContext).Subscription -ne "") {
             "value": "$vnetNameBase"
         },
         "location": {
-            "value": "$locationADO"
+            "value": "$location"
         },
         "locationSuffix": {
-            "value": "$locationSuffixADO"
+            "value": "$locationSuffix"
         },
         "vnetResourceGroup": {
             "value": "$vnetResourceGroup"
         },
         "commonResourceSuffix": {
-            "value": "$commonResourceSuffixADO"
+            "value": "$commonResourceSuffix"
         }
     }
 }
@@ -574,8 +584,8 @@ if ($(Get-AzContext).Subscription -ne "") {
     $fullPath = "$filePath/$templateName"
     $resolvedPath = Resolve-Path $fullPath
     Write-host "Template written to $resolvedPath"
-    Write-host "Parameter: aifactorySuffixRG is: $aifactorySuffixRGADO"
-    Write-host "Parameter: commonSuffixRGG is: $commonResourceSuffixADO"
+    Write-host "Parameter: aifactorySuffixRG is: $aifactorySuffix"
+    Write-host "Parameter: commonSuffixRGG is: $commonResourceSuffix"
 
 }else{
     write-host "Failed to login"

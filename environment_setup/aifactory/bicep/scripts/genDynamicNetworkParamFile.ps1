@@ -14,6 +14,7 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,genai-1]")][string]$projectTypeADO,
     
     # optional
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$commonRGNamePrefixVar,
     [Parameter(Mandatory = $false, HelpMessage="Use service principal")][switch]$useServicePrincipal=$false,
     [Parameter(Mandatory = $false, HelpMessage="Specifies the object id for service principal")][string]$spObjId,
     [Parameter(Mandatory = $false, HelpMessage="Specifies the secret for service principal")][string]$spSecret,
@@ -79,12 +80,19 @@ else
     Connect-AzureContext @authSettings
 }
 
-$templateName = "dynamicNetworkParams.json"
-#$deploymentPrefix = Get-Date -Format "yyyyMMddHH" # ADO --name "$(date +%Y%m%d%H)SubnetDeployment" \
+if ($null -ne $commonRGNamePrefixVar -and $commonRGNamePrefixVar -ne '') {
+    $commonRGNamePrefix = $commonRGNamePrefixVar
+}
+if ($null -ne $locationSuffixADO -and $locationSuffixADO -ne '') {
+    $locationSuffix = $locationSuffixADO
+}
+if ($null -ne $aifactorySuffixRGADO -and $aifactorySuffixRGADO -ne '') {
+    $aifactorySuffix = $aifactorySuffixRGADO
+}
 
-#"esml-p$(project_number_000)-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj" \
-#$deploymentPrefix = "esml-p$projectNumber-$env$locationSuffixADO$aifactorySuffixRG" # esml-p001-dev-westeurope002
-$deploymentPrefix = "esml-p$projectNumber-$env-$locationSuffixADO$aifactorySuffixRGADO" # esml-p001-dev-westeurope002
+$templateName = "dynamicNetworkParams.json"
+$deploymentPrefix = "esml-p$projectNumber-$env-$locationSuffix$aifactorySuffix" # esml-p001-dev-westeurope002
+$deploymentPrefix = "esml-$commonRGNamePrefixp$projectNumber-$env-$locationSuffix$aifactorySuffix" # esml-marvel-1p001-dev-westeurope002
 
 write-host "PARAMETERS: Static and Dynamic used::"
 write-host "-STATIC (vnetResourceGroup): Static parameters: [commonRGNamePrefix,vnetResourceGroupBase, locationSuffix] (from PARAMETERS.json)"
@@ -92,9 +100,9 @@ write-host "-DYNAMIC (vnetResourceGroup): Dynamic parameters as INPUT (from ADO 
 
 #$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # msft[esml-common]-swc-dev-001
 
-$vnetResourceGroup = if ( $vnetResourceGroup_param -eq $null -or $vnetResourceGroup_param -eq "" )
+$vnetResourceGroup = if ( $null -eq $vnetResourceGroup_param -or "" -eq $vnetResourceGroup_param )
 {
-    "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO"
+    "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix-$env$aifactorySuffix"
 }
 else {
     $vnetResourceGroup_param
