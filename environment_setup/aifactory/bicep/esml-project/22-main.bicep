@@ -166,6 +166,7 @@ param technicalAdminsEmail string = 'null'
 param IPwhiteList string = ''
 @description('since esml-common needs this, and since we need to see if users in this file, should have RBAC acecss')
 param addBastionHost bool // Dummy: do not correspond to any parameters defined in the template: 'addBastionHost'
+param alsoManagedMLStudio bool = true
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
 var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
@@ -531,11 +532,17 @@ module sacc '../modules/storageAccount.bicep' = {
   ]
 }
 
-module sacc2 '../modules/storageAccount.bicep' = {
+var sacc2Name = replace('sa2${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+resource existingSacc2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: sacc2Name
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+}
+
+module sacc2 '../modules/storageAccount.bicep' = if(existingSacc2.id == null && alsoManagedMLStudio == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLStorageAcc42${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa2${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName: sacc2Name
     skuName: skuNameStorage
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -597,8 +604,15 @@ module sacc2 '../modules/storageAccount.bicep' = {
   ]
 }
 
-
-module kv1 '../modules/keyVault.bicep' = {
+resource existingKv1 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+}
+resource existingKv2 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName2
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+}
+module kv1 '../modules/keyVault.bicep' = if(existingKv1.id == null) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -625,7 +639,7 @@ module kv1 '../modules/keyVault.bicep' = {
     projectResourceGroup
   ]
 }
-module kv2 '../modules/keyVault.bicep' = {
+module kv2 '../modules/keyVault.bicep' = if(existingKv2.id == null && alsoManagedMLStudio == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault42${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -850,11 +864,11 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
       action: 'Allow'
       value: ip
     }]
-    alsoManagedMLStudio:true
+    alsoManagedMLStudio:alsoManagedMLStudio
     managedMLStudioName:amlManagedName
-    privateEndpointName2: 'pend-${projectName}-aml2-to-vnt-mlcmn'
-    storageAccount2: sacc2.outputs.storageAccountId
-    keyVault2: kv2.outputs.keyvaultId
+    privateEndpointName2: alsoManagedMLStudio? 'pend-${projectName}-aml2-to-vnt-mlcmn': ''
+    storageAccount2: alsoManagedMLStudio? sacc2.outputs.storageAccountId: ''
+    keyVault2:alsoManagedMLStudio? kv2.outputs.keyvaultId: ''
   }
 
   dependsOn: [

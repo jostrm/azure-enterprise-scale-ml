@@ -34,7 +34,7 @@ param location string =  resourceGroup().location
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
-resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' = {
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: keyvaultName
   tags: tags
   location: location
@@ -44,6 +44,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' = {
     enableRbacAuthorization: false       // Using RBAC
     enabledForDiskEncryption: false
     enableSoftDelete: true
+    publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
     softDeleteRetentionInDays:soft_delete_days
     enablePurgeProtection: enablePurgeProtection
     tenantId: tenantIdentity
