@@ -107,14 +107,14 @@ resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' e
   name: saName
 }
 
-resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
-  name: saName
+resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = if(!empty(saName2)){
+  name: saName2
 }
 
 resource existingKeyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: kvName
 }
-resource existingKeyvault2 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource existingKeyvault2 'Microsoft.KeyVault/vaults@2023-07-01' existing = if(!empty(kvName2)){
   name: kvName2
 }
 resource existingAppInsights 'Microsoft.Insights/components@2020-02-02' existing = {

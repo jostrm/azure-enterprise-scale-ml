@@ -506,6 +506,7 @@ output aiProjectName string = aiProject.name
 
 
 // Error: PUT PE operation should be performed on the hub, not on the project workspace.
+//sa008sdc3pmpb001dev
 /*
 var privateEndpointNameProject = 'pend-${aiProject.name}'
 resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {

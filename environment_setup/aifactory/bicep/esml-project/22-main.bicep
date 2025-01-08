@@ -444,13 +444,13 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
   ]
 }
 
-var saName = replace('sa${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+var saccName = replace('sa${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}','-','')
 
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: saName
+    storageAccountName: saccName
     skuName: skuNameStorage
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -513,7 +513,7 @@ module sacc '../modules/storageAccount.bicep' = {
 }
 
 
-var sacc2Name = replace('sa2p${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
+var sacc2Name = replace('sa2p${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}','-','')
 /*
 resource existingSacc2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: sacc2Name
