@@ -1,5 +1,9 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+// User access: standalone/Bastion
+@description('Service setting: Deploy VM for project')
+param serviceSettingDeployProjectVM bool = false
+
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
 param inputKeyvault string
 param inputKeyvaultResourcegroup string
@@ -11,8 +15,6 @@ param AMLStudioUIPrivate bool = true
 @description('Databricks with PRIVATE endpoint or with SERVICE endpoint. Either way controlplane is on Azure backbone network ')
 param databricksPrivate bool = false
 @secure()
-//@minLength(8)
-//@maxLength(128)
 @description('The password that is saved to keyvault and used by local admin user on VM')
 param adminPassword string
 @description('The username of the local admin that is created on VM')
@@ -136,8 +138,6 @@ param enableAML bool = true
 
 @description('if Eventhubs, Streaming use cases to be enabled and provisioned by default, or added.')
 param enableEventhubs bool = true
-@description('Specifies wether or not the virtual machine should have a public IP address or not')
-param enableVmPubIp bool = false
 
 // ENABLE/DISABLE end
 
@@ -374,7 +374,7 @@ module adf '../modules/dataFactory.bicep' = if(sweden_central_adf_missing== fals
   ]
 }
 
-module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == false) {
+module vmPrivate '../modules/virtualMachinePrivate.bicep'  = if(serviceSettingDeployProjectVM == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateVM4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -391,29 +391,6 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == 
   }
   dependsOn: [
 
-    projectResourceGroup
-    aml
-    adf
-  ]
-}
-
-module vmPublic '../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'publicVM${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    adminUsername: adminUsername
-    adminPassword: adminPassword
-    hybridBenefit: hybridBenefit
-    vmSize: vmSKU
-    location: location
-    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-    subnetName: defaultSubnet
-    vnetId: vnetId
-    tags: tags2
-    keyvaultName: kv1.outputs.keyvaultName
-  }
-
-  dependsOn: [
     projectResourceGroup
     aml
     adf
@@ -604,15 +581,16 @@ module sacc2 '../modules/storageAccount.bicep' = if(existingSacc2.id == null && 
   ]
 }
 
+/*
+# TODO:it is only private endpoints I want to avoid, if they already exists.
 resource existingKv1 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
 }
-resource existingKv2 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: keyvaultName2
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-}
+
 module kv1 '../modules/keyVault.bicep' = if(existingKv1.id == null) {
+*/
+module kv1 '../modules/keyVault.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -639,7 +617,17 @@ module kv1 '../modules/keyVault.bicep' = if(existingKv1.id == null) {
     projectResourceGroup
   ]
 }
+
+/* error: deployment could not be found. 
+# TODO:it is only private endpoints I want to avoid, if they already exists.
+resource existingKv2 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName2
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+}
+
 module kv2 '../modules/keyVault.bicep' = if(existingKv2.id == null && alsoManagedMLStudio == true) {
+*/
+module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault42${deploymentProjSpecificUniqueSuffix}'
   params: {
