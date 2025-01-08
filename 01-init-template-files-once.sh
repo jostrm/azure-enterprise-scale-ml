@@ -102,7 +102,7 @@ echo -e "${YELLOW}02. COPY TEMPLATE files (Azure Devops pipeline, GHA workflow, 
 
 # Define the directory within the current directory
 current_dir=$(pwd)
-aif_dir="$current_dir/aifactory"
+aif_dir="$current_dir/aifactory-templates"
 
 # Create the temporary directory
 rm -rf "$aif_dir"
