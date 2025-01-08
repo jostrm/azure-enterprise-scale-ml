@@ -185,7 +185,8 @@ module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
 }
 
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
-resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+//resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
   name: name
   location: location
   identity: {
