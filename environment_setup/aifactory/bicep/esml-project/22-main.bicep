@@ -444,7 +444,7 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
   ]
 }
 
-var saccName = replace('sa${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}','-','')
+var saccName = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
 
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -513,7 +513,7 @@ module sacc '../modules/storageAccount.bicep' = {
 }
 
 
-var sacc2Name = replace('sa2p${projectNumber}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}','-','')
+var sacc2Name = replace('sa2${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
 /*
 resource existingSacc2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: sacc2Name
@@ -761,8 +761,8 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
   ]
 }
 
-var amlName ='aml-${projectNumber}-${locationSuffix}-${env}${resourceSuffix}'
-var amlManagedName ='aml2${projectNumber}${locationSuffix}${env}${resourceSuffix}'
+var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var amlManagedName ='aml2-${projectName}${locationSuffix}${env}${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
@@ -859,13 +859,12 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     alsoManagedMLStudio:alsoManagedMLStudio
     managedMLStudioName:amlManagedName
     privateEndpointName2: alsoManagedMLStudio? 'pend-${projectName}-aml2-to-vnt-mlcmn': ''
-    saName:sacc.name
-    saName2:alsoManagedMLStudio? sacc2.name: ''
+    saName:sacc.outputs.storageAccountName
+    saName2:alsoManagedMLStudio? sacc2.outputs.storageAccountName: ''
     kvName:kv1.outputs.keyvaultName
     kvName2:alsoManagedMLStudio? kv2.outputs.keyvaultName: ''
     acrName: useCommonACR? acrCommon2.outputs.containerRegistryName: acr.outputs.containerRegistryName
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
-    acrResourceId: useCommonACR? acrCommon2.outputs.containerRegistryId: acr.outputs.containerRegistryId
     appInsightsName:applicationInsightSWC.outputs.name
   }
 

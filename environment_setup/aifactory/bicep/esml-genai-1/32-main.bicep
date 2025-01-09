@@ -1256,7 +1256,7 @@ var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != 
 
 module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLClassic == true)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AAMLGenAI4${deploymentProjSpecificUniqueSuffix}'
+  name: 'MLClassic4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: amlName
     uniqueDepl: deploymentProjSpecificUniqueSuffix
@@ -1269,10 +1269,11 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     skuName: 'basic'
     skuTier: 'basic'
     env:env
-    storageAccount: sacc.outputs.storageAccountId
-    containerRegistry:useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
-    keyVault: kv1.outputs.keyvaultId
-    applicationInsights: applicationInsightSWC.outputs.ainsId
+    saName : sacc.outputs.storageAccountName
+    acrName:useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+    acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
+    kvName: kv1.outputs.keyvaultName
+    appInsightsName: applicationInsightSWC.outputs.name
     aksSubnetId: aksSubnetId
     aksSubnetName:aksSubnetName
     aksDnsServiceIP:aksDnsServiceIP
@@ -1296,6 +1297,11 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
+    ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
+      value: ip
+    }]
+
   }
 
   dependsOn: [

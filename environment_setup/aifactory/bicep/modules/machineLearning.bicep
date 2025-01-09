@@ -90,10 +90,9 @@ param managedMLStudioName string = ''
 param privateEndpointName2 string = ''
 
 param saName string
-param saName2 string
+param saName2 string = ''
 param kvName string
-param kvName2 string
-param acrResourceId string
+param kvName2 string = ''
 param acrName string
 param acrRGName string
 param appInsightsName string
