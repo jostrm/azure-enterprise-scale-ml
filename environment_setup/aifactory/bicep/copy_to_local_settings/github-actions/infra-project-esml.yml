@@ -71,8 +71,8 @@ env:
     admin_private_DatabricksUI: false # Private Databricks UI
 jobs:
   job1-deploy-networking-project-esml:
-    name: Project Networking
-    if: vars.RUN_JOB1_NETWORKING
+    name: ESML Networking
+    if: ${{ vars.RUN_JOB1_NETWORKING }} == 'true'
     environment: ${{github.event.inputs.environment}}
     runs-on: ubuntu-latest
     defaults:
@@ -160,7 +160,7 @@ jobs:
       name: BICEP - EMSL services to RG
       environment: ${{github.event.inputs.environment}}
       runs-on: ubuntu-latest
-      if: always()
+      if: success() || cancelled()
       needs: job1-deploy-networking-project-esml
       defaults:
         run:
@@ -182,9 +182,9 @@ jobs:
           echo "runner_ip=$resp" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           echo "Environment is (vars.AZURE_ENV_NAME): ${{env.dev_test_prod}}"
         shell: pwsh
-      - name: Use environment variable
+      - name: Echo runner_ip
         run: |
-          echo "The value of runner_ip is $runner_ip"
+          echo "The value of runner_ip is ${{ env.runner_ip }}"
       - name: 02_az_set_ADO_ip_to_sedding_keyvault_FW_whitelist
         uses: azure/cli@v2
         with:
@@ -202,7 +202,7 @@ jobs:
         run: |
           sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{env.common-sp-appid-value}}' -spSecret '${{env.common-sp-secret-value}}' -useServicePrincipal -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -filePath '../../../../../aifactory/parameters/' -env '${{env.dev_test_prod}}' -locationSuffixADO '${{env.admin_locationSuffix}}' -aifactorySuffixRGADO '${{env.admin_aifactorySuffixRG}}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{env.dev_test_prod_sub_id}}' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectTypeADO '${{env.admin_projectType}}'"
         shell: pwsh
-      - name: 05_az_bicep_deploy_genai_project
+      - name: 05_az_bicep_deploy_esml_project
         uses: azure/cli@v2
         with:
           #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/"
