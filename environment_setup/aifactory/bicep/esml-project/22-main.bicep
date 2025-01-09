@@ -775,7 +775,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 }
 
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-var amlManagedName ='aml2-${projectName}-${locationSuffix}-${env}-${resourceSuffix}'
+var amlManagedName ='aml2-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
