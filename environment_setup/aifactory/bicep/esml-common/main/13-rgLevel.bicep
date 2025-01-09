@@ -130,7 +130,7 @@ var privateAznbDnsZoneName = {
     azurecloud: 'privatelink.notebooks.azure.net'
 }
 
-// 2024-09-15: 25 entries
+/// 2024-09-15: 25 entries
 var privateLinksDnsZones = {
   blob: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
@@ -232,6 +232,123 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
     name:'privatelink.agentsvc.azure-automation.net'
   }
+}
+
+var privateLinksDnsZonesArray = [
+  {
+    name: privateLinksDnsZones.blob.name
+    id: privateLinksDnsZones.blob.id
+  }
+  {
+    name: privateLinksDnsZones.file.name
+    id: privateLinksDnsZones.file.id
+  }
+  {
+    name: privateLinksDnsZones.dfs.name
+    id: privateLinksDnsZones.dfs.id
+  }
+  {
+    name: privateLinksDnsZones.queue.name
+    id: privateLinksDnsZones.queue.id
+  }
+  {
+    name: privateLinksDnsZones.table.name
+    id: privateLinksDnsZones.table.id
+  }
+  {
+    name: privateLinksDnsZones.registry.name
+    id: privateLinksDnsZones.registry.id
+  }
+  {
+    name: privateLinksDnsZones.registryregion.name
+    id: privateLinksDnsZones.registryregion.id
+  }
+  {
+    name: privateLinksDnsZones.vault.name
+    id: privateLinksDnsZones.vault.id
+  }
+  {
+    name: privateLinksDnsZones.amlworkspace.name
+    id: privateLinksDnsZones.amlworkspace.id
+  }
+  {
+    name: privateLinksDnsZones.notebooks.name
+    id: privateLinksDnsZones.notebooks.id
+  }
+  {
+    name: privateLinksDnsZones.dataFactory.name
+    id: privateLinksDnsZones.dataFactory.id
+  }
+  {
+    name: privateLinksDnsZones.portal.name
+    id: privateLinksDnsZones.portal.id
+  }
+  {
+    name: privateLinksDnsZones.openai.name
+    id: privateLinksDnsZones.openai.id
+  }
+  {
+    name: privateLinksDnsZones.searchService.name
+    id: privateLinksDnsZones.searchService.id
+  }
+  {
+    name: privateLinksDnsZones.azurewebapps.name
+    id: privateLinksDnsZones.azurewebapps.id
+  }
+  {
+    name: privateLinksDnsZones.cosmosdbnosql.name
+    id: privateLinksDnsZones.cosmosdbnosql.id
+  }
+  {
+    name: privateLinksDnsZones.cognitiveservices.name
+    id: privateLinksDnsZones.cognitiveservices.id
+  }
+  {
+    name: privateLinksDnsZones.azurewebappsscm.name
+    id: privateLinksDnsZones.azurewebappsscm.id
+  }
+  {
+    name: privateLinksDnsZones.azuredatabricks.name
+    id: privateLinksDnsZones.azuredatabricks.id
+  }
+  {
+    name: privateLinksDnsZones.namespace.name
+    id: privateLinksDnsZones.namespace.id
+  }
+  {
+    name: privateLinksDnsZones.azureeventgrid.name
+    id: privateLinksDnsZones.azureeventgrid.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitor.name
+    id: privateLinksDnsZones.azuremonitor.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitoroms.name
+    id: privateLinksDnsZones.azuremonitoroms.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitorods.name
+    id: privateLinksDnsZones.azuremonitorods.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitoragentsvc.name
+    id: privateLinksDnsZones.azuremonitoragentsvc.id
+  }
+]
+
+module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+  name: 'createPrivateDnsZonesIfNotExistsCmn'
+  params: {
+    privateLinksDnsZones: privateLinksDnsZonesArray
+    privDnsSubscription: privDnsSubscription
+    privDnsResourceGroup: privDnsResourceGroupName
+    location: location
+  }
+  dependsOn: [
+    esmlCommonResourceGroup
+  ]
 }
 
 var acrCommonName = 'acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}'

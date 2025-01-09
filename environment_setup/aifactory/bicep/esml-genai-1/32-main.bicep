@@ -293,99 +293,242 @@ var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalA
 var deploymentProjSpecificUniqueSuffix = '${projectName}${genaiName}${locationSuffix}${env}${aifactorySuffixRG}'
 
 // Networking - Private DNS
-var privDnsResourceGroup = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsResourceGroupName = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 // 2024-09-15: 25 entries, and special keyes
-/* 'AIServices' = cognitiveservices
-  'OpenAI' = openai
-  'ContentSafety' = cognitiveservices 
-*/
+var privateDnsZoneName =  {
+  azureusgovernment: 'privatelink.api.ml.azure.us'
+  azurechinacloud: 'privatelink.api.ml.azure.cn'
+  azurecloud: 'privatelink.api.azureml.ms'
+}
+
+var privateAznbDnsZoneName = {
+    azureusgovernment: 'privatelink.notebooks.usgovcloudapi.net'
+    azurechinacloud: 'privatelink.notebooks.chinacloudapi.cn'
+    azurecloud: 'privatelink.notebooks.azure.net'
+}
+
+// 2024-09-15: 25 entries
 var privateLinksDnsZones = {
   blob: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
+    name:'privatelink.blob.${environment().suffixes.storage}'
   }
   file: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
+    name:'privatelink.file.${environment().suffixes.storage}'
   }
   dfs: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
+    name:'privatelink.dfs.${environment().suffixes.storage}'
   }
   queue: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
+    name:'privatelink.queue.${environment().suffixes.storage}'
   }
   table: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
+    name:'privatelink.table.${environment().suffixes.storage}'
   }
   registry: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // ${environment().suffixes.acrLoginServer}'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // privatelink.${environment().suffixes.acrLoginServer}' // # E
+    name:'privatelink.azurecr.io'
   }
   registryregion: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/${location}.data.privatelink.azurecr.io'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${location}.data.privatelink.azurecr.io' // privatelink.${environment().suffixes.acrLoginServer}' // # E
     name:'${location}.data.privatelink.azurecr.io'
   }
   vault: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
+    name:'privatelink.vaultcore.azure.net'
   }
   amlworkspace: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.api.azureml.ms'
-    name: 'privatelink.api.azureml.ms'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${privateDnsZoneName[toLower(environment().name)]}' //# E
+    name: privateDnsZoneName[toLower(environment().name)]
   }
   notebooks: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.notebooks.azure.net'
-    name: 'privatelink.notebooks.azure.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${privateAznbDnsZoneName[toLower(environment().name)]}' 
+    name:privateAznbDnsZoneName[toLower(environment().name)]
   }
   dataFactory: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net' // # E
+    name:'privatelink.datafactory.azure.net'
   }
   portal: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com' 
+    name:'privatelink.adf.azure.com'
   }
   openai: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
-    name: 'privatelink.openai.azure.com'
-  }
-  cognitiveservices: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
-    name: 'privatelink.cognitiveservices.azure.com'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
+    name:'privatelink.openai.azure.com'
   }
   searchService: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
-  }
-  azurewebappsscm: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/scm.privatelink.azurewebsites.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
+    name:'privatelink.search.windows.net'
   }
   azurewebapps: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net'
+    name:'privatelink.azurewebsites.net'
   }
   cosmosdbnosql: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
+    name:'privatelink.documents.azure.com'
+  }
+  cognitiveservices: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
+    name:'privatelink.cognitiveservices.azure.com'
+  }
+  azurewebappsscm: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/scm.privatelink.azurewebsites.net'
+    name:'scm.privatelink.azurewebsites.net'
   }
   azuredatabricks: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
+    name:'privatelink.azuredatabricks.net'
   }
   namespace: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
+    name:'privatelink.servicebus.windows.net'
   }
   azureeventgrid: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.eventgrid.azure.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.eventgrid.azure.net'
+    name:'privatelink.eventgrid.azure.net'
   }
   azuremonitor: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.monitor.azure.com'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.monitor.azure.com'
+    name:'privatelink.monitor.azure.com'
   }
   azuremonitoroms: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.oms.opinsights.azure.com'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.oms.opinsights.azure.com'
+    name:'privatelink.oms.opinsights.azure.com'
   }
   azuremonitorods: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.ods.opinsights.azure.com'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.ods.opinsights.azure.com'
+    name:'privatelink.ods.opinsights.azure.com'
   }
   azuremonitoragentsvc: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
+    name:'privatelink.agentsvc.azure-automation.net'
   }
 }
 
+var privateLinksDnsZonesArray = [
+  {
+    name: privateLinksDnsZones.blob.name
+    id: privateLinksDnsZones.blob.id
+  }
+  {
+    name: privateLinksDnsZones.file.name
+    id: privateLinksDnsZones.file.id
+  }
+  {
+    name: privateLinksDnsZones.dfs.name
+    id: privateLinksDnsZones.dfs.id
+  }
+  {
+    name: privateLinksDnsZones.queue.name
+    id: privateLinksDnsZones.queue.id
+  }
+  {
+    name: privateLinksDnsZones.table.name
+    id: privateLinksDnsZones.table.id
+  }
+  {
+    name: privateLinksDnsZones.registry.name
+    id: privateLinksDnsZones.registry.id
+  }
+  {
+    name: privateLinksDnsZones.registryregion.name
+    id: privateLinksDnsZones.registryregion.id
+  }
+  {
+    name: privateLinksDnsZones.vault.name
+    id: privateLinksDnsZones.vault.id
+  }
+  {
+    name: privateLinksDnsZones.amlworkspace.name
+    id: privateLinksDnsZones.amlworkspace.id
+  }
+  {
+    name: privateLinksDnsZones.notebooks.name
+    id: privateLinksDnsZones.notebooks.id
+  }
+  {
+    name: privateLinksDnsZones.dataFactory.name
+    id: privateLinksDnsZones.dataFactory.id
+  }
+  {
+    name: privateLinksDnsZones.portal.name
+    id: privateLinksDnsZones.portal.id
+  }
+  {
+    name: privateLinksDnsZones.openai.name
+    id: privateLinksDnsZones.openai.id
+  }
+  {
+    name: privateLinksDnsZones.searchService.name
+    id: privateLinksDnsZones.searchService.id
+  }
+  {
+    name: privateLinksDnsZones.azurewebapps.name
+    id: privateLinksDnsZones.azurewebapps.id
+  }
+  {
+    name: privateLinksDnsZones.cosmosdbnosql.name
+    id: privateLinksDnsZones.cosmosdbnosql.id
+  }
+  {
+    name: privateLinksDnsZones.cognitiveservices.name
+    id: privateLinksDnsZones.cognitiveservices.id
+  }
+  {
+    name: privateLinksDnsZones.azurewebappsscm.name
+    id: privateLinksDnsZones.azurewebappsscm.id
+  }
+  {
+    name: privateLinksDnsZones.azuredatabricks.name
+    id: privateLinksDnsZones.azuredatabricks.id
+  }
+  {
+    name: privateLinksDnsZones.namespace.name
+    id: privateLinksDnsZones.namespace.id
+  }
+  {
+    name: privateLinksDnsZones.azureeventgrid.name
+    id: privateLinksDnsZones.azureeventgrid.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitor.name
+    id: privateLinksDnsZones.azuremonitor.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitoroms.name
+    id: privateLinksDnsZones.azuremonitoroms.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitorods.name
+    id: privateLinksDnsZones.azuremonitorods.id
+  }
+  {
+    name: privateLinksDnsZones.azuremonitoragentsvc.name
+    id: privateLinksDnsZones.azuremonitoragentsvc.id
+  }
+]
 
 output privateLinksDnsZones object = privateLinksDnsZones
+
+module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,privDnsResourceGroupName)
+  name: 'createPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    privateLinksDnsZones: privateLinksDnsZonesArray
+    privDnsSubscription: privDnsSubscription
+    privDnsResourceGroup: privDnsResourceGroupName
+    location: location
+  }
+}
+
 
 // Resource Groups
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
