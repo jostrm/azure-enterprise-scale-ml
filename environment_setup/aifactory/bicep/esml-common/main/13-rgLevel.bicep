@@ -29,7 +29,7 @@ param enableLogAnalyticsQueries bool = true
   'Standard_RAGZRS'
 ])
 @description('Specifies the SKU of the storage account')
-param skuNameStorage string = 'Standard_ZRS'
+param skuNameStorage string = 'Standard_ZRS' // Cannot be changed after creation
 
 @allowed([
   'dev'

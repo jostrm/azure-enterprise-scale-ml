@@ -64,8 +64,21 @@ param env string
   'Standard_RAGRS'
   'Standard_RAGZRS'
 ])
-@description('Specifies the SKU of the storage account')
-param skuNameStorage string = 'Standard_LRS' // 'Standard_ZRS'
+@description('Specifies the SKU of the storage account, for Azure ML Studio')
+param skuNameStorage string = 'Standard_LRS' //  Cannot be changed after creation.
+
+@allowed([
+  'Standard_LRS'
+  'Standard_GRS'
+  'Standard_ZRS'
+  'Premium_LRS'
+  'Premium_ZRS'
+  'Standard_GZRS'
+  'Standard_RAGRS'
+  'Standard_RAGZRS'
+])
+@description('Specifies the SKU of the storage account, for AIFactory ESML Datalake')
+param skuNameStorageLake string = 'Standard_ZRS' // Must be the same as ESML Datalke in commmon RG. Cannot be changed after creation
 
 // RBAC START
 @description('Specifies project owner email and will be used for tagging and RBAC')
