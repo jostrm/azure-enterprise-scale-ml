@@ -14,7 +14,7 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,genai-1]")][string]$projectTypeADO,
     
     # optional
-    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$commonRGNamePrefixVar,
+    [Parameter(Mandatory = $false, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$commonRGNamePrefixVar,
     [Parameter(Mandatory = $false, HelpMessage="Use service principal")][switch]$useServicePrincipal=$false,
     [Parameter(Mandatory = $false, HelpMessage="Specifies the object id for service principal")][string]$spObjId,
     [Parameter(Mandatory = $false, HelpMessage="Specifies the secret for service principal")][string]$spSecret,
