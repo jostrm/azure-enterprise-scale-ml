@@ -137,7 +137,7 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     allowSharedKeyAccess: true
     encryption: {
       keySource: 'Microsoft.Storage'
-      requireInfrastructureEncryption: false
+      //requireInfrastructureEncryption: false  // The property 'requireInfrastructureEncryption' was specified in the input, but it cannot be updated as it is read-only
       services: {
         blob: {
           enabled: true
