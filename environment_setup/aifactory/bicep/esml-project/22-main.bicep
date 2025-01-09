@@ -8,7 +8,7 @@ param serviceSettingDeployProjectVM bool = false
 param inputKeyvault string
 param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
-param keyvaultEnablePurgeProtection bool = true
+param keyvaultEnablePurgeProtection bool = false
 param vmSKU string = 'standard_A2_v2' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
 @description('Allow Azure ML Studio UI or not. Dataplane is always private, private endpoint - Azure backbone ')
 param AMLStudioUIPrivate bool = true
@@ -762,7 +762,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 }
 
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-var amlManagedName ='aml2-${projectName}${locationSuffix}${env}${resourceSuffix}'
+var amlManagedName ='aml2-${projectName}-${locationSuffix}-${env}-${resourceSuffix}'
 var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]

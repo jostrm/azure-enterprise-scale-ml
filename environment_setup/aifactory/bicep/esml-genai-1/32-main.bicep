@@ -17,6 +17,7 @@ param modelVersionGPT4 string = 'turbo-2024-04-09' // GPT-4 Turbo with Vision ht
 param modelVersionEmbedding string = 'text-embedding-3-large'
 param modelVersionEmbeddingVersion string = '1'
 param restore bool = false
+param keyvaultEnablePurgeProtection bool = false
 
 @allowed([
   'S0' // 'Free': Invalid SKU name
@@ -998,7 +999,7 @@ module kv1 '../modules/keyVault.bicep' = {
     keyvaultName: keyvaultName
     location: location
     tags: tags
-    enablePurgeProtection:true
+    enablePurgeProtection:keyvaultEnablePurgeProtection
     tenantIdentity: tenantId
     vnetId: vnetId
     subnetName: defaultSubnet
