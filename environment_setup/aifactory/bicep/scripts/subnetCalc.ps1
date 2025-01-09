@@ -444,10 +444,6 @@ if ($(Get-AzContext).Subscription -ne "") {
         $commonResourceSuffix = $commonResourceSuffixADO
     }
 
-    write-host "VARIABLES:"
-    write-host "-STATIC (as input to vnetName and vnetResourceGroup): Static from PARAMETERS.json: commonRGNamePrefix,vnetResourceGroupBase"
-    write-host "-DYNAMIC (as input to vnetName and vnetResourceGroup): Dynamic parameters as INPUT from ADO parameters: env,locationSuffix, commonResourceSuffixADO,aifactorySuffixRGADO"
-
     $vnetName = if ($null -eq $vnetNameFull_param -or $vnetNameFull_param -eq "" ) 
     {
         "$vnetNameBase-$locationSuffix-$env$commonResourceSuffix" # 'esml-common-sdc-dev-002'
@@ -464,30 +460,27 @@ if ($(Get-AzContext).Subscription -ne "") {
         $vnetResourceGroup_param
     }
 
-    write-host "Debug 00 vnetName: $($vnetName)"
-    write-host "Debug 00 vnetResourceGroup: $($vnetResourceGroup)"
+    Write-Host "vnetName: $($vnetName)"
+    Write-Host "vnetResourceGroup: $($vnetResourceGroup)"
 
     $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
 
     $lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObj.Subnets | Sort-Object { $_.AddressPrefix.split("/")[0] -as [Version]} -Bottom 1)[0].AddressPrefix.split("/") # JOSTRM fixed sort (version and no CIDR, instead of "string sort" and CIDR)
     $startIp  = Find-NextIpAddress $(Get-Subnet $lastAllocatedNetwork -MaskBits $lastAllocatedCidr).BroadcastAddress.IPAddressToString
     
-    write-host "Debug 01 lastAllocatedNetwork: $($lastAllocatedNetwork)"
-    write-host "Debug 02 lastAllocatedCidr: $($lastAllocatedCidr)"
-    write-host "Debug 03 startIp: $($startIp)"
-    #write-host "DEBUG 4"
+    Write-Host "01 lastAllocatedNetwork: $($lastAllocatedNetwork)"
+    Write-Host "02 lastAllocatedCidr: $($lastAllocatedCidr)"
+    Write-Host "03 startIp: $($startIp)"
 
     $possibleValuesForCidrNotations = @{}
     $requiredSubnets.values | Select-Object -Unique | Sort-Object -Property Value | Foreach-Object {
         $possibleValuesForCidrNotations[$_] = Get-SubnetFitting -addressSpace $vnetObj.AddressSpace.AddressPrefixes[0] -cidrNotation $_
     }
 
-    write-host "DEBUG 4"
-
     $result = New-SubnetScheme -map $requiredSubnets -startIp $startIp -possibleValuesMap $possibleValuesForCidrNotations
-    write-host "this is the result:"
-    write-host "Resource group for vNet: $($vnetResourceGroup)"
-    write-host "vNet: $($vnetName)"
+    Write-Host "Result:"
+    Write-Host "Resource group for vNet: $($vnetResourceGroup)"
+    Write-Host "vNet: $($vnetName)"
     
     # projectName has been declared by ConvertTo-Variables called earlier
     $templateEsml = @"
