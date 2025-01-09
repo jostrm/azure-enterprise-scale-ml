@@ -450,7 +450,7 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     $vnetName = if ($null -eq $vnetNameFull_param -or $vnetNameFull_param -eq "" ) 
     {
-        "$vnetNameBase-$locationSuffix$env$commonResourceSuffix"
+        "$vnetNameBase-$locationSuffix-$env$commonResourceSuffix" # 'esml-common-sdc-dev-002'
     }
     else {
         $vnetNameFull_param
@@ -458,7 +458,7 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     $vnetResourceGroup = if ( $null -eq $vnetResourceGroup_param -or $vnetResourceGroup_param -eq "" )
     {
-        "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix$env$aifactorySuffix"
+        "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix-$env$aifactorySuffix" # 'acme-aif-esml-common-swedev-002'
     }
     else {
         $vnetResourceGroup_param
