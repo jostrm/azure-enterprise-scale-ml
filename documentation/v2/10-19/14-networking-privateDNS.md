@@ -21,7 +21,8 @@ Stanalone mode, meaning the AIFactory has its own "hub" with own private DNS zon
 1. **Azure VPN** (either to a Windows 11 DevBox/AVD or from client computer)
 2. **Bastion and bootrapped VM** VM with private IP-adress (client computer IP needs to be whitelisted for Bastion subnet). 
     - Alternatively: DevBox, VDI, Azure Virtual Devbox (AVD)
-3. **Service endpoints & IP-address whitelisting** whitelist client IP's (service endpoints) for end-users to access UI for some services, such as AI Foundry UI, Azure Machine Learning UI, Azure Keyvault, and Storage accounts. Peering it still recommended.
+3. **Service endpoints & IP-address whitelisting (WIP)** whitelist client IP's (service endpoints) for end-users to access UI for some services, such as AI Foundry UI, Azure Machine Learning UI, Azure Keyvault, and Storage accounts. Peering it still recommended. 
+    - NB! For Azure Machine Learning and Azure AI Foundry this is a new feature announced at Microsoft IGNITE Nov 2025, and WIP for the AI Factory.
 4. **Peering** with central hub (client has direct line of sight if on corp network, and can use regular VPN from home)
 
 > [!NOTE]
