@@ -44,4 +44,7 @@ cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-a
 mkdir -p "$aif_dir/azure_dashboards/"
 cp "$start_dir/environment_setup/aifactory/azure_dashboards" "$aif_dir/esml-infra/azure_dashboards/" -r
 
+## PARAMETERS
+cp "$start_dir/environment_setup/aifactory/parameters/" "$aif_dir/parameters/" -r
+
 echo -e "${GREEN}02. Success! ${NC}"
