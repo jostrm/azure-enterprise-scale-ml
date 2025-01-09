@@ -1017,7 +1017,7 @@ module dataLake '../modules/dataLake.bicep' = {
   params: {
     storageAccountName: datalakeName
     containerName: lakeContainerName
-    skuName: skuNameStorage
+    skuName: skuNameStorageLake
     location: keepLocation
     vnetId: vnetId
     subnetName: defaultSubnet
