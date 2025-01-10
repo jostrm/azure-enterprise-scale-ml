@@ -14,7 +14,7 @@ init_esml_util=true
 # 02. Copy template files to the new repository
 echo -e "${YELLOW}02. COPY TEMPLATE files (Azure Devops pipeline, GHA workflow, Bicep Variable file, environment file) to your repo ${NC}"
 
-# Define the directory within the current directory
+# Define the directory within the current directory.
 current_dir=$(pwd)
 aif_dir="$current_dir/aifactory-templates"
 
