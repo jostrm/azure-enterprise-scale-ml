@@ -159,7 +159,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
       isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
     }
     networkAcls: {
-      defaultAction:'Deny'
+      defaultAction:'Allow'
       ipRules: ipRules
     }
   }
@@ -209,14 +209,14 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     allowRoleAssignmentOnRG: true
     imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
     allowPublicAccessWhenBehindVnet: true //allowPublicAccessWhenBehindVnet tomten
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: 'Enabled'
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false // tomten
     v1LegacyMode:true // tomten
     //provisionNetworkNow: false // tomten
     enableDataIsolation: false // tomten
     networkAcls: {
-      defaultAction:'Deny'
+      defaultAction:'Allow'
       ipRules: ipRules
     }
   }
