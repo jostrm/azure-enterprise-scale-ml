@@ -626,7 +626,6 @@ module sacc '../modules/storageAccount.bicep' = {
     }]
     corsRules: [
       {
-      action: 'Allow'
         allowedOrigins: [
           'https://mlworkspace.azure.ai'
           'https://ml.azure.com'
@@ -636,6 +635,7 @@ module sacc '../modules/storageAccount.bicep' = {
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
           'https://42.swedencentral.instances.azureml.ms'
+          'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
         allowedMethods: [
@@ -706,7 +706,6 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
     }]
     corsRules: [
       {
-      action: 'Allow'
         allowedOrigins: [
           'https://mlworkspace.azure.ai'
           'https://ml.azure.com'
@@ -716,6 +715,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
           'https://42.swedencentral.instances.azureml.ms'
+          'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
         allowedMethods: [

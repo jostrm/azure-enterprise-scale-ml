@@ -967,7 +967,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     ]
     corsRules: [
       {
-      action: 'Allow'
         allowedOrigins: [
           'https://mlworkspace.azure.ai'
           'https://ml.azure.com'
@@ -977,6 +976,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
           'https://42.swedencentral.instances.azureml.ms'
+          'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
         allowedMethods: [
@@ -1103,10 +1103,9 @@ module sacc '../modules/storageAccount.bicep' = {
     ]
     ipRules: [for ip in ipWhitelist_array: {
       value: ip
-    }] // https://mlworkspace.azure.ai,https://ml.azure.com,https://*.ml.azure.com,https://ai.azure.com,https://*.ai.azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://*.azureml.ms,https://42.swedencentral.instances.azureml.ms
+    }] // https://mlworkspace.azure.ai,https://ml.azure.com,https://*.ml.azure.com,https://ai.azure.com,https://*.ai.azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://*.azureml.ms,https://42.swedencentral.instances.azureml.ms,https://*.instances.azureml.ms
     corsRules: [
       {
-      action: 'Allow'
         allowedOrigins: [
           'https://mlworkspace.azure.ai'
           'https://ml.azure.com'
@@ -1116,6 +1115,7 @@ module sacc '../modules/storageAccount.bicep' = {
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
           'https://42.swedencentral.instances.azureml.ms'
+          'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
         allowedMethods: [
