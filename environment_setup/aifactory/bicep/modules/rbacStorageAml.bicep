@@ -227,6 +227,7 @@ resource amlWorkspaceConnectionSecretsReaderSP 'Microsoft.Authorization/roleAssi
 }
 
 // --------------- RG:CONTRIBUTOR//
+/*
 @description('Role Assignment for ResoureGroup: CONTRIBUTOR for users.')
 resource contributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(resourceGroupId, contributorRoleId, userObjectIds[i])
@@ -249,6 +250,7 @@ resource contributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
   scope:resourceGroup()
 }
+*/
 
 // --------------- RG:User Access Admin//
 @description('Role Assignment for ResoureGroup: RoleBasedAccessControlAdministrator for users.')
@@ -297,4 +299,3 @@ resource acrPushSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope:resourceGroup()
 }
 // --------------- USERS END ---------------- //
-

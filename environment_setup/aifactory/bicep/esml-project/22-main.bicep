@@ -1450,7 +1450,7 @@ module rbacAml1 '../modules/rbacStorageAml.bicep' = {
 
 module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacUsersAIHub_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacUsersAML_AIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     resourceGroupId: targetResourceGroupId
@@ -1463,5 +1463,18 @@ module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
   ]
 }
 
+// RBAC on ACR Push/Pull for users in Common Resource group
 
-// TODO - RBAC on ACR Push/Pull for users in Common Resource group
+module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacUsersToCommonACR${projectNumber}${locationSuffix}${env}'
+  params: {
+    commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
+    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    userObjectIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    aml
+    acrCommon2
+  ]
+}
