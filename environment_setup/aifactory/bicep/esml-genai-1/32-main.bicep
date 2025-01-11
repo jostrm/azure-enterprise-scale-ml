@@ -17,7 +17,7 @@ param modelVersionGPT4 string = 'turbo-2024-04-09' // GPT-4 Turbo with Vision ht
 param modelVersionEmbedding string = 'text-embedding-3-large'
 param modelVersionEmbeddingVersion string = '1'
 param restore bool = false
-param keyvaultEnablePurgeProtection bool = false
+param keyvaultEnablePurgeProtection bool = true // The property "enablePurgeProtection" cannot be set to false.
 
 @allowed([
   'S0' // 'Free': Invalid SKU name
