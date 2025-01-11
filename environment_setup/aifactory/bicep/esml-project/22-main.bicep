@@ -891,6 +891,17 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
     projectResourceGroup
   ]
 }
+module privateDnsStorage2 '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
+  params: {
+    dnsConfig: sacc2.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
 module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsZoneLinkKeyVault${projectNumber}${locationSuffix}${env}'
@@ -1421,3 +1432,36 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
     rbacReadUsersToCmnVnetBastion
   ]
 }
+var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
+module rbacAml1 '../modules/rbacStorageAml.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacUsersAIHub_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    resourceGroupId: targetResourceGroupId
+    userObjectIds: technicalAdminsObjectID_array_safe
+    azureMLworkspaceName:aml.outputs.amlName
+    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+    aml
+  ]
+}
+
+module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacUsersAIHub_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sacc.outputs.storageAccountName
+    resourceGroupId: targetResourceGroupId
+    userObjectIds: technicalAdminsObjectID_array_safe
+    azureMLworkspaceName:amlManagedName
+    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+    aml
+  ]
+}
+
+
+// TODO - RBAC on ACR Push/Pull for users in Common Resource group
