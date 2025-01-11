@@ -185,7 +185,7 @@ module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
 
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
-resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(env == 'dev') {
   name: name
   location: location
   identity: {
@@ -220,6 +220,48 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
       ipRules: ipRules
     }
   }
+  dependsOn:[
+    aksDev
+  ]
+}
+resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'  = if(env == 'test' || env == 'prod') {
+  name: name
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  tags: tags
+  //sku: {
+  //  name: skuName
+  //  tier: skuTier
+  //}
+  properties: {
+    friendlyName: name
+    description:  '${projectName}-${env}-${aiFactoryNumber}'
+
+    storageAccount: existingStorageAccount.id
+    containerRegistry: existingAcr.id
+    keyVault: existingKeyvault.id
+    applicationInsights: existingAppInsights.id
+
+    // configuration for workspaces with private link endpoint
+    allowRoleAssignmentOnRG: true
+    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
+    allowPublicAccessWhenBehindVnet: true //allowPublicAccessWhenBehindVnet tomten
+    publicNetworkAccess: 'Enabled'
+    systemDatastoresAuthMode: 'identity'
+    hbiWorkspace:false // tomten
+    v1LegacyMode:true // tomten
+    //provisionNetworkNow: false // tomten
+    enableDataIsolation: false // tomten
+    networkAcls: {
+      defaultAction:'Allow'
+      ipRules: ipRules
+    }
+  }
+  dependsOn:[
+    aksTestProd
+  ]
 }
 
 module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
@@ -333,6 +375,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   }
   dependsOn:[
     machineLearningPrivateEndpoint
+    machineLearningStudio
   ]
 }
 
@@ -369,6 +412,7 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
   }
   dependsOn:[
     machineLearningPrivateEndpoint
+    machineLearningStudio
   ]
 }
 
