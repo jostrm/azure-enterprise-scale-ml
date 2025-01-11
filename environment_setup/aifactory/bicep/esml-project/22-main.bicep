@@ -626,6 +626,7 @@ module sacc '../modules/storageAccount.bicep' = {
     }]
     corsRules: [
       {
+      action: 'Allow'
         allowedOrigins: [
           'https://mlworkspace.azure.ai'
           'https://ml.azure.com'
@@ -634,6 +635,8 @@ module sacc '../modules/storageAccount.bicep' = {
           'https://*.ai.azure.com'
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
+          'https://42.swedencentral.instances.azureml.ms'
+          'https://*.azureml.ms'
         ]
         allowedMethods: [
           'GET'
@@ -703,6 +706,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
     }]
     corsRules: [
       {
+      action: 'Allow'
         allowedOrigins: [
           'https://mlworkspace.azure.ai'
           'https://ml.azure.com'
@@ -711,6 +715,8 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
           'https://*.ai.azure.com'
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
+          'https://42.swedencentral.instances.azureml.ms'
+          'https://*.azureml.ms'
         ]
         allowedMethods: [
           'GET'
@@ -738,7 +744,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
 
 /*
 # TODO:it is only private endpoints I want to avoid, if they already exists.
-resource existingKv1 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource existingKv1cors 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
 }

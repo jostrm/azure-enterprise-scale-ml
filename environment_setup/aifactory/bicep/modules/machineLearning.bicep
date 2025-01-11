@@ -197,7 +197,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
   //  tier: skuTier
   //}
   properties: {
-    friendlyName: '${projectName}-${env}-${aiFactoryNumber}'
+    friendlyName: name
     description:  '${projectName}-${env}-${aiFactoryNumber}'
 
     storageAccount: existingStorageAccount.id
