@@ -310,10 +310,6 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev') {
       }
     ]
   }
-
-  //dependsOn: [
-  //    machineLearningPrivateEndpoint
-  //  ]
 }
 
 module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
@@ -343,9 +339,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
       }
     ]
   }
-  dependsOn: [
-    machineLearningPrivateEndpoint
-  ]
+
 }
 
 //AKS attach compute PRIVATE cluster, without SSL
