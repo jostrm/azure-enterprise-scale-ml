@@ -209,6 +209,18 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
           }
           status: 'Active'
         }
+        /*
+        AmlWorkspace: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: aiHub.id
+            subresourceTarget: 'amlworkspace'
+            sparkEnabled: true
+            sparkStatus: 'Active'
+          }
+          status: 'Active'
+        }
+          */
       }
     }
     networkAcls: {

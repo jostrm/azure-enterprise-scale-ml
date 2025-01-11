@@ -658,7 +658,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
     csSKU: csSpeechSKU
     location: location
     restore:restore
-    keyvaultName: keyvaultName
+    keyvaultName: kv1.outputs.keyvaultName
     vnetResourceGroupName: vnetResourceGroupName
     name: 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'SpeechServices'
@@ -699,7 +699,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
     csSKU: csDocIntelligenceSKU
     location: location
     restore:restore
-    keyvaultName: keyvaultName
+    keyvaultName: kv1.outputs.keyvaultName
     vnetResourceGroupName: vnetResourceGroupName
     name: 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'FormRecognizer'
@@ -718,6 +718,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
   }
   dependsOn: [
     projectResourceGroup
+    kv1
   ]
 }
 
@@ -748,7 +749,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     restore: restore
     subnetName: defaultSubnet
     vnetName: vnetNameFull
-    keyvaultName: keyvaultName
+    keyvaultName: kv1.outputs.keyvaultName
     modelGPT4Version:modelGPT4Version
     kind: kindAIServices
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
@@ -768,6 +769,7 @@ module aiServices '../modules/csAIServices.bicep' = {
   dependsOn: [
     projectResourceGroup
     sacc
+    kv1
     //acr
     //acrCommon2
   ]
@@ -787,7 +789,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
     sku: csOpenAISKU
     vnetName: vnetNameFull
     subnetName: genaiSubnetName
-    keyvaultName: keyvaultName
+    keyvaultName: kv1.outputs.keyvaultName
     modelGPT4Version:modelGPT4Version
     aiSearchPrincipalId: aiSearchService.outputs.principalId
     kind: kindAOpenAI
@@ -805,6 +807,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
   }
   dependsOn: [
     projectResourceGroup
+    kv1
   ]
 }
 
