@@ -1475,6 +1475,9 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
     userObjectIds: technicalAdminsObjectID_array_safe
   }
   dependsOn: [
+    rbacKeyvaultCommon4Users
+    rbacAml1
+    rbacAml2
     aml
     acrCommon2
   ]
