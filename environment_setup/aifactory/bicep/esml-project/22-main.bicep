@@ -1020,6 +1020,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
       action: 'Allow'
       value: ip
     }]
+    ipWhitelist_array: ipWhitelist_array
     alsoManagedMLStudio:alsoManagedMLStudio
     managedMLStudioName:amlManagedName
     privateEndpointName2: alsoManagedMLStudio? 'pend-${projectName}-aml2-to-vnt-mlcmn': ''

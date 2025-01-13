@@ -96,6 +96,7 @@ param kvName2 string = ''
 param acrName string
 param acrRGName string
 param appInsightsName string
+param ipWhitelist_array array = []
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
@@ -158,6 +159,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
       firewallSku:'Basic' // 'Standard'
       isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
     }
+    ipAllowlist: ipWhitelist_array
     networkAcls: {
       defaultAction:'Allow'
       ipRules: ipRules
@@ -215,6 +217,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     v1LegacyMode:true // tomten
     //provisionNetworkNow: false // tomten
     enableDataIsolation: false // tomten
+    ipAllowlist: ipWhitelist_array
     networkAcls: {
       defaultAction:'Allow'
       ipRules: ipRules
