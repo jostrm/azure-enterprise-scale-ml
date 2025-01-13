@@ -10,6 +10,8 @@ param tags object
 @description('To lock INBOUND rule to only allow RDP anbd SSH ports from Azure Bastion  via private IP')
 param bastionIpRange string
 
+// TODO: outbound connection to ports 443, 445 for storage service tag
+
 resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: name
   location: location
@@ -187,6 +189,20 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           destinationAddressPrefix: 'Storage.${location}'
           access: 'Allow'
           priority: 160
+          direction: 'Outbound'
+        }
+      }
+       {// !!
+        name: 'AzureStorageAccount'
+        properties: {
+          description: 'AML'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '445'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'Storage.${location}'
+          access: 'Allow'
+          priority: 161
           direction: 'Outbound'
         }
       }

@@ -1160,7 +1160,7 @@ var virtualNetworkRules2Add = [
   }
 ]
 var mergeVirtualNetworkRulesMerged = union(existingRules, virtualNetworkRules2Add)
-var mergeIpRules = union(existingIps, ipWhitelist_array)
+//var mergeIpRules = union(existingIps, ipWhitelist_array)
 
 param lakeContainerName string
 module dataLake '../modules/dataLake.bicep' = {
@@ -1180,7 +1180,7 @@ module dataLake '../modules/dataLake.bicep' = {
     tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
     tags: keepTags
     virtualNetworkRules: mergeVirtualNetworkRulesMerged
-    ipWhitelist_array: mergeIpRules
+    ipWhitelist_array: ipWhitelist_array
   }
   dependsOn: [
     commonResourceGroupRef
@@ -1436,7 +1436,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 module rbacAml1 '../modules/rbacStorageAml.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacUsersAIHub_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacUsersAmlClassic_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     resourceGroupId: targetResourceGroupId
@@ -1461,6 +1461,22 @@ module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
   }
   dependsOn: [
     aml
+    rbacAml1
+  ]
+}
+
+module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacUsersAML_RGLevel_AIFactory${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    resourceGroupId: targetResourceGroupId
+    servicePrincipleObjectId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    userObjectIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    aml
+    rbacAml1
+    rbacAml2
   ]
 }
 
@@ -1478,6 +1494,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
     rbacKeyvaultCommon4Users
     rbacAml1
     rbacAml2
+    rbacAmlRGLevel
     aml
     acrCommon2
   ]
