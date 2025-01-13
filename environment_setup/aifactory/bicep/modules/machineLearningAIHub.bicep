@@ -46,6 +46,7 @@ param logWorkspaceResoureGroupName string
 param locationSuffix string
 param resourceSuffix string
 param applicationInsightsName string
+param ipWhitelist_array array = []
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
@@ -223,6 +224,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
           */
       }
     }
+    ipAllowlist:ipWhitelist_array
     networkAcls: {
       defaultAction: enablePublicGenAIAccess? 'Allow':'Deny'
       ipRules: ipRules

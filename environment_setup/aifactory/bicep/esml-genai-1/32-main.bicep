@@ -1500,6 +1500,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
       action: 'Allow'
       value: ip
     }]
+    ipWhitelist_array: ipWhitelist_array
   }
   dependsOn: [
     projectResourceGroup
@@ -1700,6 +1701,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
+    rbacModuleUsers
     rbacModuleAIServices
     vmPrivate
     sacc
@@ -1707,3 +1709,22 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     aiHub
   ]
 }
+
+// RBAC on ACR Push/Pull for users in Common Resource group
+
+module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacUsersToCommonACR${projectNumber}${locationSuffix}${env}'
+  params: {
+    commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
+    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    userObjectIds: technicalAdminsObjectID_array_safe
+  }
+  dependsOn: [
+    rbacReadUsersToCmnVnetBastion
+    rbacKeyvaultCommon4Users
+    aiHub
+    acrCommon2
+  ]
+}
+
