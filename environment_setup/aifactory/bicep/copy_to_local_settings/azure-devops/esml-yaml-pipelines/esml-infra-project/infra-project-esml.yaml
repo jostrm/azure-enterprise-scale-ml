@@ -1,0 +1,90 @@
+trigger:
+  branches:
+    include:
+      - release/project*
+
+variables:
+- template: ../variables/variables.yaml
+
+stages:
+- stage: Dev
+  displayName: Dev deployment of esml project
+  variables:
+    dev_test_prod: "dev"
+    dev_test_prod_sub_id: "$(dev_sub_id)"
+    admin_projectType: "esml"
+  jobs:
+    - deployment: ESML-Networking
+      displayName: Deploy networking for project with Bicep
+      pool:
+        vmImage: windows-latest
+      environment: Dev  
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-1-networking.yml
+    - deployment: ESML-Services to RG
+      displayName: Deploy Azure services for project with Bicep
+      pool:
+        vmImage: windows-latest
+      environment: Dev  
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-2-esml-services.yml
+- stage: Stage
+  displayName: Stage deployment of esml project
+  variables:
+    dev_test_prod: "test"
+    dev_test_prod_sub_id: "$(test_sub_id)"
+    admin_projectType: "esml"
+  jobs:
+    - deployment: ESML-Networking
+      displayName: Deploy networking for project with Bicep
+      pool:
+        vmImage: windows-latest
+      environment: Stage  
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-1-networking.yml
+    - deployment: ESML-Services to RG
+      displayName: Deploy Azure services for project with Bicep
+      pool:
+        vmImage: windows-latest
+      environment: Stage  
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-2-esml-services.yml
+- stage: Prod
+  displayName: Prod deployment of esml project
+  variables:
+    dev_test_prod: "prod"
+    dev_test_prod_sub_id: "$(prod_sub_id)"
+    admin_projectType: "esml"
+  jobs:
+    - deployment: ESML-Networking
+      displayName: Deploy networking for project with Bicep
+      pool:
+        vmImage: windows-latest
+      environment: Prod  
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-1-networking.yml
+    - deployment: ESML-Services to RG
+      displayName: Deploy Azure services for project with Bicep
+      pool:
+        vmImage: windows-latest
+      environment: Prod
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-2-esml-services.yml

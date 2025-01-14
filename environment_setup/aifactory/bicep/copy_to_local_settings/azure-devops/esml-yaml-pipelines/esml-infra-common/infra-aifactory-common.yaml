@@ -1,0 +1,62 @@
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+- template: ../variables/variables.yaml
+
+stages:
+- stage: Dev
+  displayName: Dev environment for AIFactory Common
+  variables:
+    dev_test_prod: "dev"
+    dev_test_prod_sub_id: $(dev_sub_id)
+  jobs:
+    - deployment: Deploy to DEV
+      displayName: AIFactory Common
+      pool:
+        vmImage: windows-latest
+      environment: Dev  
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-1-aif-cmn.yaml
+
+- stage: Stage
+  dependsOn: Dev
+  displayName: Stage environment for AIFactory Common
+  variables:
+    dev_test_prod: "test"
+    dev_test_prod_sub_id: $(test_sub_id)
+  jobs:
+    - deployment: Deploy to Stage
+      displayName: AIFactory Common
+      pool:
+        vmImage: windows-latest
+      environment: Stage
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-1-aif-cmn.yaml
+
+- stage: Prod
+  dependsOn: Stage
+  displayName: Prod environment for AIFactory Common
+  variables:
+    dev_test_prod: "prod"
+    dev_test_prod_sub_id: $(prod_sub_id)
+  jobs:
+    - deployment: Deploy to PROD
+      displayName: Deploy ESML common with Bicep to prod
+      pool:
+        vmImage: windows-latest
+      environment: Prod
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - template: ./jobs/job-1-aif-cmn.yaml
+  

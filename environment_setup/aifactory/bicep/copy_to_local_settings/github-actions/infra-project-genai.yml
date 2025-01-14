@@ -57,7 +57,7 @@ env:
     optional_serviceSettingDeployAzureCosmosDB: false # Deploy Azure CosmosDB
     # OPTIONAL - ESML specific
     admin_aks_gpu_sku_dev_override: "Standard_B4ms" # AKS GPU SKU for dev
-    admin_aks_gpu_sku_test_prod_override: Standard_DS13-2_v2 # AKS GPU SKU for test/prod
+    admin_aks_gpu_sku_test_prod_override: "Standard_DS13-2_v2" # AKS GPU SKU for test/prod
     admin_aks_nodes_dev_override: 1 # AKS nodes for dev
     admin_aks_nodes_testProd_override: 3 # AKS nodes for test/prod
     admin_aks_version_override: "1.30.3" # AKS version
@@ -259,6 +259,7 @@ jobs:
             --parameters aml_cluster_dev_sku_override="${{ env.admin_aml_cluster_sku_dev_override }}" \
             --parameters aml_cluster_test_prod_sku_override="${{ env.admin_aml_cluster_sku_testProd_override }}" \
             --parameters aml_cluster_dev_nodes_override="${{ env.admin_aml_cluster_maxNodes_dev_override }}" \
+            --parameters aml_cluster_test_prod_nodes_override="${{ env.admin_aml_cluster_maxNodes_testProd_override }}" \
             --parameters aml_ci_dev_sku_override="${{ env.admin_aml_computeInstance_dev_sku_override }}" \
             --parameters aml_ci_test_prod_sku_override="${{ env.admin_aml_computeInstance_testProd_sku_override }}" \
             --parameters enablePublicGenAIAccess="${{ env.admin_enablePublicGenAIAccess }}" \

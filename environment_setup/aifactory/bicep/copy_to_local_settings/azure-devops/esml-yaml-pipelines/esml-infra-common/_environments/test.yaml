@@ -44,6 +44,7 @@ steps:
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-2-12_13_21_22.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-3-12_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
      --parameters @"..\..\..\..\aifactory\parameters\12-esml-cmn-parameters.json" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
@@ -73,6 +74,7 @@ steps:
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-4-13_21_22.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-5-13_23.json" \
      --parameters @"..\..\..\..\aifactory\parameters\11-esml-globals-11_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
      --parameters @"..\..\..\..\aifactory\parameters\13-esml-cmn-parameters.json" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \

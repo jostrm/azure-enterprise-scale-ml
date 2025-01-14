@@ -1,0 +1,73 @@
+steps:
+
+- checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
+  submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
+  continueOnError: false # Continue running even on failure?.  (false,n,no,off,on,true,y,yes)
+  displayName: GIT # Human-readable name for the task. 
+  enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
+  name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
+
+- task: AzureCLI@2
+  displayName: '01_pwsh_get_IP_for_ADO_agent'
+  inputs:
+    azureSubscription: '$(esml-aifactory-infra-dev)'
+    scriptType: ps
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+     $resp = $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
+             Write-Host $resp
+             Write-Host "##vso[task.setvariable variable=admin_ip_fw]$resp"
+             $ipAddr = $resp
+             Write-Host ipAddr is: $admin_ip_fw
+
+- task: AzureCLI@2
+  displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
+  inputs:
+    azureSubscription: '$(esml-aifactory-infra-dev)'
+    scriptType: bash
+    scriptLocation: 'inlineScript'
+    inlineScript: 'az keyvault network-rule add --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
+
+- task: AzureKeyVault@2
+  displayName: '03_az_download_seeding_keyvault'
+  inputs:
+    azureSubscription: '$(esml-aifactory-infra-dev)'
+    KeyVaultName: '$(admin_bicep_kv_fw)'
+
+- task: AzurePowerShell@4
+  displayName: '04_pwsh_calculate_subnet_allocations'
+  inputs:
+    azureSubscription: '$(esml-aifactory-infra-dev)'
+    ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc.ps1'
+    ScriptArguments: '-bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -useServicePrincipal'
+    preferredAzurePowerShellVersion: latest
+    pwsh: true
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
+
+- task: AzureCLI@2
+  displayName: '05_az_bicep_deploy_subnets_and_NSGs'
+  inputs:
+    azureSubscription: '$(esml-aifactory-infra-dev)'
+    scriptType: bash
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+     echo "Deploying subnets and NSG to subscription: $(dev_test_prod_sub_id)"
+     az deployment group create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --resource-group "$(cat "..\..\..\..\aifactory\parameters\subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"")" \
+     --template-file "esml-project\21-network.bicep" \
+     --parameters @"..\..\..\..\aifactory\parameters\subnetParameters.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)"
+     
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+
+- task: AzureCLI@1
+  displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
+  inputs:
+    azureSubscription: '$(esml-aifactory-infra-dev)'
+    scriptLocation: 'inlineScript'
+    inlineScript: 'az keyvault network-rule remove --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
+  condition: always()

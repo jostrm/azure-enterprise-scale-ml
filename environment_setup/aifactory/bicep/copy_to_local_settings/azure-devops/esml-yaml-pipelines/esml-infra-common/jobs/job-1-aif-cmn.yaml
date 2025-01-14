@@ -8,9 +8,9 @@ steps:
   name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
 
 - task: AzureCLI@2
-  displayName: '11-Common RG and RBAC'
+  displayName: '01_az_bicep_common_rg'
   inputs:
-    azureSubscription: '$(azureSubscription_dev)'
+    azureSubscription: '$(esml-aifactory-infra-dev)'
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
@@ -30,9 +30,9 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
-  displayName: '12-Common-Networking'
+  displayName: '02_az_bicep_networking'
   inputs:
-    azureSubscription: '$(azureSubscription_dev)'
+    azureSubscription: '$(esml-aifactory-infra-dev)'
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
@@ -44,6 +44,7 @@ steps:
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-2-12_13_21_22.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-3-12_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
      --parameters @"..\..\..\..\aifactory\parameters\12-esml-cmn-parameters.json" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
@@ -55,9 +56,9 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
-  displayName: '13-Deploy resources '
+  displayName: '01_az_bicep_deploy_resources'
   inputs:
-    azureSubscription: '$(azureSubscription_dev)'
+    azureSubscription: '$(esml-aifactory-infra-dev)'
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
@@ -73,6 +74,7 @@ steps:
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-4-13_21_22.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-5-13_23.json" \
      --parameters @"..\..\..\..\aifactory\parameters\11-esml-globals-11_13.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
      --parameters @"..\..\..\..\aifactory\parameters\13-esml-cmn-parameters.json" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
