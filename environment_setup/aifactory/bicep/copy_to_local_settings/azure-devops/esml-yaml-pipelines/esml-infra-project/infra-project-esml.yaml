@@ -24,7 +24,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yml
+              - template: ./jobs/job-1-networking.yaml
     - deployment: ESML-Services to RG
       displayName: Deploy Azure services for project with Bicep
       pool:
@@ -34,7 +34,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-esml-services.yml
+              - template: ./jobs/job-2-esml-services.yaml
 - stage: Stage
   displayName: Stage deployment of esml project
   variables:
@@ -52,7 +52,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yml
+              - template: ./jobs/job-1-networking.yaml
     - deployment: ESML-Services to RG
       displayName: Deploy Azure services for project with Bicep
       pool:
@@ -62,7 +62,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-esml-services.yml
+              - template: ./jobs/job-2-esml-services.yaml
 - stage: Prod
   displayName: Prod deployment of esml project
   variables:
@@ -80,7 +80,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yml
+              - template: ./jobs/job-1-networking.yaml
     - deployment: ESML-Services to RG
       displayName: Deploy Azure services for project with Bicep
       pool:
@@ -90,4 +90,4 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-esml-services.yml
+              - template: ./jobs/job-2-esml-services.yaml

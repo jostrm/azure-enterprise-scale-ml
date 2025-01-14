@@ -24,7 +24,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yml
+              - template: ./jobs/job-1-networking.yaml
     - deployment: ESGenAI-Services to RG-Dev
       displayName: Deploy Azure services for project with Bicep to Dev
       pool:
@@ -34,7 +34,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-genai-services.yml
+              - template: ./jobs/job-2-genai-services.yaml
 - stage: Stage
   displayName: Deploying ESGenAI project
   variables:
@@ -52,7 +52,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yml
+              - template: ./jobs/job-1-networking.yaml
     - deployment: ESGenAI-Services to RG in Stage
       displayName: Deploy Azure services for project with Bicep to Stage.
       pool:
@@ -62,7 +62,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-genai-services.yml
+              - template: ./jobs/job-2-genai-services.yaml
 - stage: Prod
   displayName: Deploying esml project
   variables:
@@ -80,7 +80,7 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yml
+              - template: ./jobs/job-1-networking.yaml
     - deployment: ESGenAI-Services to RG
       displayName: Deploy Azure services for project with Bicep to Prod
       pool:
@@ -94,4 +94,4 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-genai-services.yml
+              - template: ./jobs/job-2-genai-services.yaml
