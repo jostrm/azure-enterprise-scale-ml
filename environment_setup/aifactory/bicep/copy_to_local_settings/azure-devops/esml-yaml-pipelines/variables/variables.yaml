@@ -14,9 +14,9 @@ variables:
   admin_hybridBenefit: "false"
   
   # ONCE: AI Factory - Environments: Dev, Stage, Prod (needed for project provisioning)
-  azureSubscription_dev: "" # Name of service connection dev
-  azureSubscription_test: "" # Name of service connection test
-  azureSubscription_prod: "" # Name of service connection prod
+  dev_service_connection: "" # Name of service connection for DEV Azure subscription
+  test_service_connection: "" # Name of service connection TEST Azure subscription
+  prod_service_connection: "" # Name of service connection PROD Azure subscription
   dev_sub_id: "" # SubscriptionID dev
   test_sub_id: "" # SubscriptionID test
   prod_sub_id: "" # SubscriptionID prod

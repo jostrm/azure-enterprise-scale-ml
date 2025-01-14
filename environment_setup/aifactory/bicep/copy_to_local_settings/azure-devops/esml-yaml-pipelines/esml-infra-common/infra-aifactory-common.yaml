@@ -12,6 +12,7 @@ stages:
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: $(dev_sub_id)
+    dev_test_prod_ado_service_connection: $(dev_service_connection)
   jobs:
     - deployment: Deploy to DEV
       displayName: AIFactory Common
@@ -30,6 +31,7 @@ stages:
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: $(test_sub_id)
+    dev_test_prod_ado_service_connection: $(test_service_connection)
   jobs:
     - deployment: Deploy to Stage
       displayName: AIFactory Common
@@ -48,6 +50,7 @@ stages:
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: $(prod_sub_id)
+    dev_test_prod_ado_service_connection: $(prod_service_connection)
   jobs:
     - deployment: Deploy to PROD
       displayName: Deploy ESML common with Bicep to prod
