@@ -1,20 +1,22 @@
-# Introduction 
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# BICEP to provision the AIFactory and new projects
+This repo is BICEP first. Meaning that Terraform has lower prio. 
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+You can use either **GITHUB** or **Azure Devops** automation pipelines (that uses BICEP under neath the hood)
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+You do **not need** to interact with either BICEP or Terraform, since the AIFactory provides automation pipelines.
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+We recommend to use the GITHUB option, that uses Github actions with workflows, and also is provided as a TEMPLATE Github repository.
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+## Workflow: AIFactory Common 
+Start with setting up a common AIFactory environment, example, the DEV environment
+- [infra-aifactory-common.yaml](./esml-infra-common/infra-aifactory-common.yaml)
+
+## Workflow: AIFactory projects
+Then you can import and run the pipelines to setup 1-M projects. There are 2 AIFactory project types supported as of now: 
+- [infra-project-genai.yaml](./infra-project-genai.yml)
+- [infra-project-esml.yaml](./infra-project-esml.yml)
+
+
+> [!TIP]
+>  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.
+>
