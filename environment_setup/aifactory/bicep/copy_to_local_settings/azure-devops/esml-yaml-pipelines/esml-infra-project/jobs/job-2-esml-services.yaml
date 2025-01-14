@@ -10,7 +10,7 @@ steps:
 - task: AzureCLI@2
   displayName: '01_pwsh_get_IP_for_ADO_agent'
   inputs:
-    azureSubscription: '$(esml-aifactory-infra-dev)'
+    azureSubscription: '$(dev_test_prod_ado_service_connection)'
     scriptType: ps
     scriptLocation: 'inlineScript'
     inlineScript: |
@@ -23,7 +23,7 @@ steps:
 - task: AzureCLI@2
   displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
   inputs:
-    azureSubscription: '$(esml-aifactory-infra-dev)'
+    azureSubscription: '$(dev_test_prod_ado_service_connection)'
     scriptType: bash
     scriptLocation: 'inlineScript'
     inlineScript: 'az keyvault network-rule add --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
@@ -31,13 +31,13 @@ steps:
 - task: AzureKeyVault@2
   displayName: '03_az_download_seeding_keyvault'
   inputs:
-    azureSubscription: '$(esml-aifactory-infra-dev)'
+    azureSubscription: '$(dev_test_prod_ado_service_connection)'
     KeyVaultName: '$(admin_bicep_kv_fw)'
 
 - task: AzureCLI@2
   displayName: '04_pwsh_fetch_network_parameters'
   inputs:
-    azureSubscription: '$(esml-aifactory-infra-dev)'
+    azureSubscription: '$(dev_test_prod_ado_service_connection)'
     scriptType: pscore
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
     arguments: '-spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -useServicePrincipal -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)"'
@@ -46,7 +46,7 @@ steps:
 - task: AzureCLI@2
   displayName: '05_az_bicep_deploy_genai_project'
   inputs:
-    azureSubscription: '$(esml-aifactory-infra-dev)'
+    azureSubscription: '$(dev_test_prod_ado_service_connection)'
     scriptType: bash
     scriptLocation: 'inlineScript'
     inlineScript: |
@@ -98,7 +98,7 @@ steps:
 - task: AzureCLI@1
   displayName: '06_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   inputs:
-    azureSubscription: '$(esml-aifactory-infra-dev)'
+    azureSubscription: '$(dev_test_prod_ado_service_connection)'
     scriptLocation: 'inlineScript'
     inlineScript: 'az keyvault network-rule remove --resource-group $(admin_bicep_kv_fw_rg) --name $(admin_bicep_kv_fw) --ip-address $(admin_ip_fw)'
   condition: always()
