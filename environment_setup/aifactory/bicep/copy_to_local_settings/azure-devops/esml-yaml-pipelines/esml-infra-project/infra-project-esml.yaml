@@ -8,14 +8,14 @@ variables:
 
 stages:
 - stage: Dev
-  displayName: Dev deployment of esml project
+  displayName: Dev
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: "$(dev_sub_id)"
     dev_test_prod_ado_service_connection: $(dev_service_connection)
     admin_projectType: "esml"
   jobs:
-    - deployment: ESML Networking
+    - deployment: ESML_Networking
       displayName: Deploy networking for project with Bicep
       pool:
         vmImage: windows-latest
@@ -25,7 +25,7 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-1-networking.yaml
-    - deployment: ESML Services to RG
+    - deployment: ESML_Services
       displayName: Deploy Azure services for project with Bicep
       pool:
         vmImage: windows-latest
@@ -34,16 +34,16 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-ESML services.yaml
+              - template: ./jobs/job-2-esml-services.yaml
 - stage: Stage
-  displayName: Stage deployment of esml project
+  displayName: Stage
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
     dev_test_prod_ado_service_connection: $(test_service_con_connection)
     admin_projectType: "esml"
   jobs:
-    - deployment: ESML Networking
+    - deployment: ESML_Networking
       displayName: Deploy networking for project with Bicep
       pool:
         vmImage: windows-latest
@@ -53,7 +53,7 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-1-networking.yaml
-    - deployment: ESML Services to RG
+    - deployment: ESML_Services
       displayName: Deploy Azure services for project with Bicep
       pool:
         vmImage: windows-latest
@@ -62,16 +62,16 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-ESML services.yaml
+              - template: ./jobs/job-2-esml-services.yaml
 - stage: Prod
-  displayName: Prod deployment of esml project
+  displayName: Prod
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
     dev_test_prod_ado_service_connection: $(prod_service_con_connection)
     admin_projectType: "esml"
   jobs:
-    - deployment: ESML Networking
+    - deployment: ESML_Networking
       displayName: Deploy networking for project with Bicep
       pool:
         vmImage: windows-latest
@@ -81,7 +81,7 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-1-networking.yaml
-    - deployment: ESML Services to RG
+    - deployment: ESML_Services
       displayName: Deploy Azure services for project with Bicep
       pool:
         vmImage: windows-latest
@@ -90,4 +90,4 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-2-ESML services.yaml
+              - template: ./jobs/job-2-esml-services.yaml

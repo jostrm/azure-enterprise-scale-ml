@@ -8,14 +8,14 @@ variables:
 
 stages:
 - stage: Dev
-  displayName: Deploying ESGenAI project
+  displayName: Dev
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: "$(dev_sub_id)"
     dev_test_prod_ado_service_connection: $(dev_service_connection)
     admin_projectType: "genai-1"
   jobs:
-    - deployment: ESGenAI Networking
+    - deployment: ESGenAI_Networking
       displayName: Deploy networking for project with Bicep to Dev
       pool:
         vmImage: windows-latest
@@ -25,7 +25,7 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-1-networking.yaml
-    - deployment: ESGenAI Services to RG-Dev
+    - deployment: ESGenAI_Services
       displayName: Deploy Azure services for project with Bicep to Dev
       pool:
         vmImage: windows-latest
@@ -36,14 +36,14 @@ stages:
             steps:
               - template: ./jobs/job-2-genai-services.yaml
 - stage: Stage
-  displayName: Deploying ESGenAI project
+  displayName: Stage
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
     dev_test_prod_ado_service_connection: $(test_service_connection)
     admin_projectType: "genai-1"
   jobs:
-    - deployment: ESGenAI Networking (Stage)
+    - deployment: ESGenAI_Networking
       displayName: Deploy networking for project with Bicep to Stage
       pool:
         vmImage: windows-latest
@@ -53,7 +53,7 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-1-networking.yaml
-    - deployment: ESGenAI Services to RG in Stage
+    - deployment: ESGenAI_Services
       displayName: Deploy Azure services for project with Bicep to Stage.
       pool:
         vmImage: windows-latest
@@ -64,14 +64,14 @@ stages:
             steps:
               - template: ./jobs/job-2-genai-services.yaml
 - stage: Prod
-  displayName: Deploying esml project
+  displayName: Prod
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
     dev_test_prod_ado_service_connection: $(prod_service_connection)
     admin_projectType: "genai-1"
   jobs:
-    - deployment: ESGenAI Networking PROD
+    - deployment: ESGenAI_Networking
       displayName: Deploy networking for project with Bicep to Prod
       pool:
         vmImage: windows-latest
@@ -81,7 +81,7 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-1-networking.yaml
-    - deployment: ESGenAI Services to RG
+    - deployment: ESGenAI_Services
       displayName: Deploy Azure services for project with Bicep to Prod
       pool:
         vmImage: windows-latest

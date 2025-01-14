@@ -8,14 +8,14 @@ variables:
 
 stages:
 - stage: Dev
-  displayName: Dev environment for AIFactory Common
+  displayName: AIFactory_Common_Dev
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: $(dev_sub_id)
     dev_test_prod_ado_service_connection: $(dev_service_connection)
   jobs:
-    - deployment: Deploy to DEV
-      displayName: AIFactory Common
+    - deployment: AIFactory_Common_Dev
+      displayName: AIFactory_Common_Dev
       pool:
         vmImage: windows-latest
       environment: Dev  
@@ -27,14 +27,14 @@ stages:
 
 - stage: Stage
   dependsOn: Dev
-  displayName: Stage environment for AIFactory Common
+  displayName: AIFactory_Common_Stage
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: $(test_sub_id)
     dev_test_prod_ado_service_connection: $(test_service_connection)
   jobs:
-    - deployment: Deploy to Stage
-      displayName: AIFactory Common
+    - deployment: AIFactory_Common_Stage
+      displayName: AIFactory_Common_Stage
       pool:
         vmImage: windows-latest
       environment: Stage
@@ -46,14 +46,14 @@ stages:
 
 - stage: Prod
   dependsOn: Stage
-  displayName: Prod environment for AIFactory Common
+  displayName: AIFactory_Common_Prod
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: $(prod_sub_id)
     dev_test_prod_ado_service_connection: $(prod_service_connection)
   jobs:
-    - deployment: Deploy to PROD
-      displayName: Deploy ESML common with Bicep to prod
+    - deployment: AIFactory_Common_Prod
+      displayName: AIFactory_Common_Prod
       pool:
         vmImage: windows-latest
       environment: Prod
