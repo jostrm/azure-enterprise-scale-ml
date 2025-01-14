@@ -47,6 +47,7 @@ env:
     useCommonACR: "${{ vars.USE_COMMON_ACR_FOR_PROJECTS }}" # Use common Azure Container Registry (save cost), insted of each project having its own.
 
     # OPTIONAL - GENAI specific
+    azure_machinelearning_sp_oid: "" # Azure Machine Learning service principle Object ID. In Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
     admin_enablePublicGenAIAccess: true # Enable public access to GenAI
     optional_serviceSettingDeployAIDocIntelligence: false # Deploy AI Doc Intelligence
     optional_serviceSettingDeployAzureAIVision: false # Deploy Azure AI Vision
@@ -57,7 +58,7 @@ env:
     optional_serviceSettingDeployAzureCosmosDB: false # Deploy Azure CosmosDB
     # OPTIONAL - ESML specific
     admin_aks_gpu_sku_dev_override: "Standard_B4ms" # AKS GPU SKU for dev
-    admin_aks_gpu_sku_test_prod_override: "Standard_DS13-2_v2" # AKS GPU SKU for test/prod
+    admin_aks_gpu_sku_test_prod_override: Standard_DS13-2_v2 # AKS GPU SKU for test/prod
     admin_aks_nodes_dev_override: 1 # AKS nodes for dev
     admin_aks_nodes_testProd_override: 3 # AKS nodes for test/prod
     admin_aks_version_override: "1.30.3" # AKS version
@@ -80,13 +81,28 @@ jobs:
         shell: pwsh
         #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/"
     steps:
-    - name: Print Skip NETWORKING variable
+    - name: Print info
       run: |
         echo "The value of vars.RUN_JOB1_NETWORKING  is: ${{ vars.RUN_JOB1_NETWORKING }}"
         echo "The value of env.ENABLE_NETWORKING_JOB  is: ${{ env.ENABLE_NETWORKING_JOB }}"
+        echo "The value of env.admin_enablePublicGenAIAccess is: ${{ env.admin_enablePublicGenAIAccess }}"
+        echo "The value of env.project_number_000  is: ${{ env.project_number_000 }}"
+        echo "The value of env.admin_aks_version_override  is: ${{ env.technical_admins_email }}"
+        echo "The value of env.admin_projectType  is: ${{ env.admin_projectType }}"
+        echo "The value of env.useCommonACR  is: ${{ env.useCommonACR }}"
+        echo "The value of env.admin_aks_version_override  is: ${{ env.admin_aks_version_override }}"
+    - name: Set TLS 1.2
+      run: |
+        pwsh -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12"
+    - name: Set as Powershell repo as trusted
+      run: |
+        pwsh -Command "Register-PSRepository -Default"
+    - name: Install PowershellGet manually
+      run: |
+        pwsh -Command "Install-Module -Name PowerShellGet -Force -AllowClobber"
     - name: Azure Login
-      if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/login@v2
+      if: env.ENABLE_NETWORKING_JOB  != 'false'
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         enable-AzPSSession: true
@@ -130,7 +146,7 @@ jobs:
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
       run: |
-        sudo pwsh -Command  ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc.ps1 -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -filePath '../../../../../aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.dev_test_prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location}}' -locationSuffixADO '${{ env.admin_location_SHORT }}' -projectTypeADO '${{ env.admin_projectType }}' -useServicePrincipal
+        sudo pwsh -Command  ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc.ps1 -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -filePath '../../../../../aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.dev_test_prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location}}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -projectTypeADO '${{ env.admin_projectType }}' -useServicePrincipal
       shell: pwsh
     - name: 04B_pwsh_calculate_subnet_allocations
       if: env.ENABLE_NETWORKING_JOB  != 'false' && env.ENABLE_DEBUG_STEP == 'true'
@@ -140,7 +156,7 @@ jobs:
         inlineScript: |
           sudo pwsh -Command "
             Set-Location -Path '${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts';
-            ./subnetCalc.ps1 -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -filePath '../../../../../aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.dev_test_prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location}}' -locationSuffixADO '${{ env.admin_location_SHORT }}' -projectTypeADO '${{ env.admin_projectType }}' -useServicePrincipal
+            ./subnetCalc.ps1 -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -filePath '../../../../../aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.dev_test_prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location}}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -projectTypeADO '${{ env.admin_projectType }}' -useServicePrincipal
           "
         azPSVersion: latest
         shell: pwsh
@@ -179,6 +195,15 @@ jobs:
           shell: pwsh
           #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/"
       steps:
+      - name: Print info
+        run: |
+          echo "The value of env.admin_enablePublicGenAIAccess is: ${{ env.admin_enablePublicGenAIAccess }}"
+          echo "The value of env.project_number_000  is: ${{ env.project_number_000 }}"
+          echo "The value of env.admin_aks_version_override  is: ${{ env.technical_admins_email }}"
+          echo "The value of env.admin_projectType  is: ${{ env.admin_projectType }}"
+          echo "The value of env.useCommonACR  is: ${{ env.useCommonACR }}"
+          echo "The value of env.ENABLE_NETWORKING_JOB  is: ${{ env.ENABLE_NETWORKING_JOB }}"
+          echo "The value of env.admin_aks_version_override  is: ${{ env.admin_aks_version_override }}"
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -259,13 +284,13 @@ jobs:
             --parameters aml_cluster_dev_sku_override="${{ env.admin_aml_cluster_sku_dev_override }}" \
             --parameters aml_cluster_test_prod_sku_override="${{ env.admin_aml_cluster_sku_testProd_override }}" \
             --parameters aml_cluster_dev_nodes_override="${{ env.admin_aml_cluster_maxNodes_dev_override }}" \
-            --parameters aml_cluster_test_prod_nodes_override="${{ env.admin_aml_cluster_maxNodes_testProd_override }}" \
             --parameters aml_ci_dev_sku_override="${{ env.admin_aml_computeInstance_dev_sku_override }}" \
             --parameters aml_ci_test_prod_sku_override="${{ env.admin_aml_computeInstance_testProd_sku_override }}" \
             --parameters enablePublicGenAIAccess="${{ env.admin_enablePublicGenAIAccess }}" \
             --parameters serviceSettingDeployAzureAIVision="${{ env.optional_serviceSettingDeployAzureAIVision }}" \
             --parameters serviceSettingDeployAzureSpeech="${{ env.optional_serviceSettingDeployAzureSpeech }}" \
             --parameters serviceSettingDeployAIDocIntelligence="${{ env.optional_serviceSettingDeployAIDocIntelligence }}" \
+            --parameters azureMachineLearningObjectId="${{ env.azure_machinelearning_sp_oid }}" \
             --parameters IPwhiteList="${{ env.project_IP_whitelist }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
