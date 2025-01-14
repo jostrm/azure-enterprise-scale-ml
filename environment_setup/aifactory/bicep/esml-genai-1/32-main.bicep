@@ -1612,6 +1612,14 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSetti
   ]
 }
 
+module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacAml2RG_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  dependsOn: [
+    aiHub
+  ]
+}
+
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacUsersAIHub_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
@@ -1631,6 +1639,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     rbacModuleAISearch
   ]
 }
+
 
 // #### OPTIONAL ####
 

@@ -33,9 +33,6 @@ var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' //
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, AIHub, AIProject, App Service/FunctionApp -> AI Search
 //var userAccessAdministratorRoleId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9' // AI services, AI Hub, AI Project <-> AI SEARCH
 
-// AI services
-var contributorRole = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Hub -is-> AI services
-
 // ###### 2024-12-19 TechExcel ###### END
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 
