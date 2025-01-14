@@ -108,6 +108,7 @@ steps:
      --parameters serviceSettingDeployAzureAIVision="$(optional_serviceSettingDeployAzureAIVision)" \
      --parameters serviceSettingDeployAzureSpeech="$(optional_serviceSettingDeployAzureSpeech)" \
      --parameters serviceSettingDeployAIDocIntelligence="$(optional_serviceSettingDeployAIDocIntelligence)" \
+     --parameters azureMachineLearningObjectId="$(azure_machinelearning_sp_oid)" \
      --parameters IPwhiteList="$(project_IP_whitelist)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
