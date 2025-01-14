@@ -12,7 +12,7 @@ resource acrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRole)
     principalId: aml_oId
     principalType: 'ServicePrincipal'
-    description:'Contrubutor on RG for AML SP on RG: ${resourceGroup().id}'
+    description:'Contributor on RG for AML SP on RG: ${resourceGroup().id}'
   }
   scope:resourceGroup()
 }

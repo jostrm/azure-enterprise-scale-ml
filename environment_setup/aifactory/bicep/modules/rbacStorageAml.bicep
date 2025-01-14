@@ -131,7 +131,7 @@ resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignmen
 // --------------- RG: AI Project//
 @description('RG:AI Project: AzureAIInferenceDeploymentOperator:Can perform all actions required to create a resource deployment within a resource group. ')
 resource azureAIInferenceDeploymentOperatorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(resourceGroupId, azureAIInferenceDeploymentOperatorRoleId, userObjectIds[i])
+  name: guid(existingAmlWorkspace.id, azureAIInferenceDeploymentOperatorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIInferenceDeploymentOperatorRoleId)
     principalId: userObjectIds[i]
@@ -166,6 +166,8 @@ resource azureMLDataScientistRole 'Microsoft.Authorization/roleAssignments@2022-
   scope:existingAmlWorkspace
 }]
 
+
+/*  Tenant ID, application ID, principal ID, and scope are not allowed to be updated
 resource azureMLDataScientistRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(resourceGroupId, azureMLDataScientistRoleId, servicePrincipleObjectId)
   properties: {
@@ -175,7 +177,7 @@ resource azureMLDataScientistRoleSP 'Microsoft.Authorization/roleAssignments@202
     description:'azureMLDataScientistRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAmlWorkspace.name} on RG level'
   }
   scope:resourceGroup()
-}
+} */
 
 @description('RG:AI Hub, AI Project: AzureMachineLearningWorkspaceConnectionSecretsReader: Can perform all actions within an AML workspace, except for creating or deleting compute resources and modifying the workspace itself.')
 resource amlWorkspaceConnectionSecretsReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{

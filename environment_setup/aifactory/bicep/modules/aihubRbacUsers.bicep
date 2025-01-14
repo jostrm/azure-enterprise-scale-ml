@@ -388,9 +388,11 @@ resource azureAIInferenceDeploymentOperatorRoleSP 'Microsoft.Authorization/roleA
 }
 
 // --------------- RG:AI Hub + Project --//
+
+// NB! Worked before - even if name: guid(existingAIHub.id, azureMLDataScientistRoleId, userObjectIds[i]) but it was or scope: resourceGroup()
 @description('RG:AI Hub, AI Project: Azure ML Data scientist: Can perform all actions within an AML workspace, except for creating or deleting compute resources and modifying the workspace itself.')
 resource azureMLDataScientistRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
-  name: guid(existingAIHub.id, azureMLDataScientistRoleId, userObjectIds[i])
+  name: guid(resourceGroupId, azureMLDataScientistRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureMLDataScientistRoleId)
     principalId: userObjectIds[i]

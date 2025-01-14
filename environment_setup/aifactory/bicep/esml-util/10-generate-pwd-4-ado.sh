@@ -1,3 +1,11 @@
+#!/bin/bash
+
+# ANSI color codes
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
 # OPTION 1: ZWVmZDAwZmFjY2ZmODNkNWZmNTg3ODQ3
 #--parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
 
@@ -5,8 +13,6 @@
 #--parameters adminPassword="$(cat /dev/urandom | tr -dc 'A-Za-z0-9_!@#$%^&*()\-+=' | head -c24 ; echo)" \
 
 # OPTION 3: 1ZZck02NQTNhRDMYTDA0hz8MIxkZDmM2
-
-#!/bin/bash
 
 # Generate parts of the password to ensure complexity
 upper=$(head /dev/urandom | tr -dc 'A-Z' | head -c 1)
