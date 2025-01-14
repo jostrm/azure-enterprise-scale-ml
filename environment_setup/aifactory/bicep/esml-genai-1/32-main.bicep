@@ -1,5 +1,6 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+param azureMachineLearningObjectId string =''
 @description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourcegroup, set this to true')
 param useCommonACR bool = false
 param vmSKU string = 'standard_D2as_v5' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
@@ -1612,9 +1613,12 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSetti
   ]
 }
 
-module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = {
+module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!empty(azureMachineLearningObjectId)) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacAml2RG_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    azureMachineLearningObjectId: azureMachineLearningObjectId
+  }
   dependsOn: [
     aiHub
   ]
