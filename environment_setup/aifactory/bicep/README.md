@@ -7,15 +7,14 @@ You do **not need** to interact with either BICEP or Terraform, since the AIFact
 
 We recommend to use the GITHUB option, that uses Github actions with workflows, and also is provided as a TEMPLATE Github repository.
 
-## Workflow: AIFactory Common 
+The Azure Devops option, provides automation pipelines (option of choosing classic release pipeline, or the new way - YAML build pipeline)
+
+## Alternative: Github Actions
 Start with setting up a common AIFactory environment, example, the DEV environment
-- [infra-aifactory-common.yaml](./esml-infra-common/infra-aifactory-common.yaml)
+- [Github Action - readme.md](./copy_to_local_settings/github-actions/readme.md)
 
-## Workflow: AIFactory projects
-Then you can import and run the pipelines to setup 1-M projects. There are 2 AIFactory project types supported as of now: 
-- [infra-project-genai.yaml](./infra-project-genai.yml)
-- [infra-project-esml.yaml](./infra-project-esml.yml)
-
+## Alternative: Azure Devops
+- [Azure Devops - readme.md](./copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
 
 > [!TIP]
 >  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.
