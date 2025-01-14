@@ -26,6 +26,7 @@ stages:
             steps:
               - template: ./jobs/job-1-networking.yaml
     - deployment: ESGenAI_Services
+      dependsOn: ESGenAI_Networking
       displayName: Deploy Azure services for project with Bicep to Dev
       pool:
         vmImage: windows-latest
@@ -54,6 +55,7 @@ stages:
             steps:
               - template: ./jobs/job-1-networking.yaml
     - deployment: ESGenAI_Services
+      dependsOn: ESGenAI_Networking
       displayName: Deploy Azure services for project with Bicep to Stage.
       pool:
         vmImage: windows-latest
@@ -82,6 +84,7 @@ stages:
             steps:
               - template: ./jobs/job-1-networking.yaml
     - deployment: ESGenAI_Services
+      dependsOn: ESGenAI_Networking
       displayName: Deploy Azure services for project with Bicep to Prod
       pool:
         vmImage: windows-latest

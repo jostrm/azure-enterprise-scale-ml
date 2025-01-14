@@ -5,5 +5,6 @@ To import pipeline templates you may choose either:
 - **YAML ADO BUILD pipeline** esml-yaml-pipelines, less frequent updated, and may break due to lack of _parameters_
     - Updated: 2024-03
 
-
-If you prefer Github, and are are searching for GITHUB workflows with Github actions, please visit the Github actions folder [here](../github-actions/readme.md)
+> [!TIP]
+>  Do you want to use Github instead of Azure Devops? Then you can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage).
+>

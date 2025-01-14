@@ -10,7 +10,7 @@ steps:
 - task: AzureCLI@2
   displayName: '01_az_bicep_common_rg'
   inputs:
-    azureSubscription: '$(dev_test_prod_ado_service_connection)'
+    azureSubscription: '${{ variables.dev_test_prod_ado_service_connection }}'
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
@@ -32,7 +32,7 @@ steps:
 - task: AzureCLI@2
   displayName: '02_az_bicep_networking'
   inputs:
-    azureSubscription: '$(dev_test_prod_ado_service_connection)'
+    azureSubscription: '${{ variables.dev_test_prod_ado_service_connection }}'
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
@@ -58,7 +58,7 @@ steps:
 - task: AzureCLI@2
   displayName: '01_az_bicep_deploy_resources'
   inputs:
-    azureSubscription: '$(dev_test_prod_ado_service_connection)'
+    azureSubscription: '${{ variables.dev_test_prod_ado_service_connection }}'
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
