@@ -1,4 +1,4 @@
-# USAGE: .\aifactory\esml-util\24-add-aks.ps1 -spSecret 'your_secret' -spID 'your_id' -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id'
+# USAGE: .\aifactory\esml-util\24-add-aks.ps1 -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id'
 param (
     # required parameters
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the sp")][string]$spSecret,

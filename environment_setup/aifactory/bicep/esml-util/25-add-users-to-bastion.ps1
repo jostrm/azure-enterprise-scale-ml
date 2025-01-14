@@ -1,4 +1,4 @@
-# USAGE: .\aifactory\esml-util\25-add-user-to-bastion.ps1 -spSecret 'your_secret' -spID 'your_id' -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id' 
+# USAGE: .\aifactory\esml-util\25-add-user-to-bastion.ps1 -tenantID 'your_tenant_id' -subscriptionID 'your_subscription_id' 
 param (
     # required parameters
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the info")][string]$spSecret,
