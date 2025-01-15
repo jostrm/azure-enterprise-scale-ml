@@ -55,9 +55,9 @@ See below for more resources and notebooks
 ###  A3) "Try-a-tonne / Hackathon": Responsible AI
 
 > [!TIP] 
-> Use these resources to create your own "Try-a-tonne" (Hackathon with known demo scenraios)
-> **Q1: Help be learn to create monitoring with Responsible AI metrics for my GenAI RAG-chat?**
-> **Q1: Help be learn to create monitoring with Responsible AI metrics for my Machine Learning model?**
+> Use these resources to create your own "Try-a-tonne" (Hackathon with known demo scenarios)
+> **Q1: Learn to create RAG solution, with monitoring with Responsible AI metrics for my GenAI RAG-chat?**
+> **Q1: Learn to train model via pipeline, and create monitoring with Responsible AI metrics for my Machine Learning model?**
 
 - [Azure AI - Responsible AI Hax](https://github.com/jostrm/azure-rai-hax)
 
