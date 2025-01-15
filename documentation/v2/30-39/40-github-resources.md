@@ -26,14 +26,19 @@ See below for more resources and notebooks
 - [START: Github](https://github.com/Azure/azureml-examples)
 - [TUTORIALS: Github](https://github.com/Azure/azureml-examples/tree/main/tutorials)
 
-**Some highlights:**
+**Some highlights:Online endpoints, Batch endpoint, Pipelines**
+
 - [Endpoint to serve GenAI model](https://github.com/Azure/azureml-examples/blob/main/sdk/python/endpoints/online/managed/online-endpoints-openapi.ipynb)
 - [Endpoint - debug locally in VS code](https://github.com/Azure/azureml-examples/blob/main/sdk/python/endpoints/online/managed/debug-online-endpoints-locally-in-visual-studio-code.ipynb)
 - [Endpoint - Kubernetes, Arc cluster](https://github.com/Azure/azureml-examples/blob/main/sdk/python/endpoints/online/kubernetes/kubernetes-online-endpoints-simple-deployment.ipynb)
+
 - [Batch endpoints](https://github.com/Azure/azureml-examples/tree/main/sdk/python/endpoints/batch)
+- [Batch endpoint - Tabular scenario](https://github.com/Azure/azureml-examples/blob/main/sdk/python/endpoints/batch/deploy-models/heart-classifier-mlflow/mlflow-for-batch-tabular.ipynb)
+
 - [Pipeline(python) - Titanic](https://github.com/Azure/azureml-examples/blob/main/sdk/python/jobs/pipelines/1b_pipeline_with_python_function_components/pipeline_with_python_function_components.ipynb)
 - [Pipeline (yaml)](https://github.com/Azure/azureml-examples/actions/workflows/sdk-jobs-pipelines-1a_pipeline_with_components_from_yaml-pipeline_with_components_from_yaml.yml)
-- [Batch processing in parallel](https://github.com/Azure/azureml-examples/blob/main/sdk/python/jobs/pipelines/1g_pipeline_with_parallel_nodes/pipeline_with_parallel_nodes.ipynb)
+
+- [Pipeline: Batch processing](https://github.com/Azure/azureml-examples/blob/main/sdk/python/jobs/pipelines/1g_pipeline_with_parallel_nodes/pipeline_with_parallel_nodes.ipynb)
 
 ###  A2)Responsible AI: Train model via Pipeline, and generate Responsible AI
 - TABULAR:
