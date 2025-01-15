@@ -8,7 +8,7 @@ Here is a collection of tutorials and Github resources for use cases you can ach
   
 See below for more resources and notebooks
 
-## ESML Project (Azure Machine Learning: TABULAR, TEXT, IMAGES)
+## A) ESML Project (Azure Machine Learning: TABULAR, TEXT, IMAGES)
 
 > [!TIP] 
 > Use these resources to answer the questions:
@@ -21,7 +21,7 @@ See below for more resources and notebooks
 >- **Q4: Productionalizing GenAI: Monitoring, Loadbalancing, API management, token rate limiting, cross-charging**
 >
 
-### Azure Machine Learning Tutorials
+### A1) Azure Machine Learning Tutorials
 
 - [START: Github](https://github.com/Azure/azureml-examples)
 - [TUTORIALS: Github](https://github.com/Azure/azureml-examples/tree/main/tutorials)
@@ -31,7 +31,7 @@ Some highlights
 - [Pipeline (yaml)](https://github.com/Azure/azureml-examples/actions/workflows/sdk-jobs-pipelines-1a_pipeline_with_components_from_yaml-pipeline_with_components_from_yaml.yml)
 - [Batch processing in parallel](https://github.com/Azure/azureml-examples/blob/main/sdk/python/jobs/pipelines/1g_pipeline_with_parallel_nodes/pipeline_with_parallel_nodes.ipynb)
 
-### Responsible AI: Train model via Pipeline, and generate Responsible AI
+###  A2)Responsible AI: Train model via Pipeline, and generate Responsible AI
 - TABULAR:
     - [Loan: Classification](https://github.com/Azure/azureml-examples/tree/main/sdk/python/responsible-ai/tabular/responsibleaidashboard-finance-loan-classification)
     - [Housing: Classification](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/tabular/responsibleaidashboard-housing-classification-model-debugging/responsibleaidashboard-housing-classification-model-debugging.ipynb)
@@ -43,7 +43,7 @@ Some highlights
     - [Fridge items": Classification, Object detection ](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/vision/responsibleaidashboard-image-classification-fridge.ipynb)
     - [object-detection-MSCOCO](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/vision/responsibleaidashboard-object-detection-MSCOCO.ipynb)
     
-### "Try-a-tonne / Hackathon": Responsible AI
+###  A3) "Try-a-tonne / Hackathon": Responsible AI
 
 > [!TIP] 
 > Use these resources to create your own "Try-a-tonne" (Hackathon with known demo scenraios)
@@ -53,13 +53,14 @@ Some highlights
 - [Azure AI - Responsible AI Hax](https://github.com/jostrm/azure-rai-hax)
 
 
-## ESGenaAI Project: RAG with Azure AI Foundry, Azure AI Search
+## B) ESGenaAI Project: RAG with Azure AI Foundry, Azure AI Search
 > [!TIP] 
 > Use these resources to answer the questions:
 >- **Q1: Productionalizing: Monitor endpoints for performance, Cost?**
 >- **Q2: Productionalizing GenAI: Monitoring, Auto-scaling, Loadbalancing, API management, token rate limiting, cross-charging**
 >
 
+## B1) Azure AI Foundry: RAG Chat with Azure AI Search and loadbalancing endpoints
 - [Advanced - code first RAG](https://learn.microsoft.com/en-us/azure/search/tutorial-rag-build-solution)
 - [API management - AI Gateway](https://learn.microsoft.com/en-us/azure/api-management/genai-gateway-capabilities)
 - [API management - AI Gateway: Github](https://github.com/Azure-Samples/AI-Gateway)
