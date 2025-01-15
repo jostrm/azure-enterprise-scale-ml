@@ -10,7 +10,7 @@ See below for more resources and notebooks
 
 ## ESML Project (Azure Machine Learning: TABULAR, TEXT, IMAGES)
 
-> [!TIP]
+> [!TIP] Use these resources to answer the questions:
 >- **Q1: WHEN to use WHAT compute in Azure Machine Learning? (Compute Instance, GPU cluster, AKS Cluster, Managed online endpoints)**
 >   - Coding (CI) VS Train (cluster in pipeline) VS Inference (auto-scaling managed endpoint)
 >   - R&D phase VS Prodcution phase
