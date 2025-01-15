@@ -12,7 +12,7 @@ See below for more resources and notebooks
 
 > [!TIP] 
 > Use these resources to answer the questions:
->- **Q1: WHEN to use WHAT compute in Azure Machine Learning? (Compute Instance, GPU cluster, AKS Cluster, Managed online endpoints)**
+>- **Q1: WHEN to use WHAT compute in Azure Machine Learning? (Compute Instance, GPU cluster, AKS Cluster, Managed online endpoints, Spark, Databricks)**
 >   - Coding (CI) VS Train (cluster in pipeline) VS Inference (auto-scaling managed endpoint)
 >   - R&D phase VS Prodcution phase
 >- **Q2: Notebook & Pipelines ? Train a model VS serve a model**
