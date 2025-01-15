@@ -47,8 +47,10 @@ Some highlights
 
 > [!TIP] 
 > Use these resources to create your own "Try-a-tonne" (Hackathon with known demo scenraios)
+> **Q1: Help be learn to create monitoring with Responsible AI metrics for my GenAI RAG-chat?**
+> **Q1: Help be learn to create monitoring with Responsible AI metrics for my Machine Learning model?**
 
-- [Create Jobs](https://github.com/Azure/azureml-examples/actions/workflows/sdk-jobs-pipelines-1a_pipeline_with_components_from_yaml-pipeline_with_components_from_yaml.yml)
+- [Azure AI - Responsible AI Hax](https://github.com/jostrm/azure-rai-hax)
 
 
 ## ESGenaAI Project: RAG with Azure AI Foundry, Azure AI Search
