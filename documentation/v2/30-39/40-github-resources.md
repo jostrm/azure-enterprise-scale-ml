@@ -10,7 +10,8 @@ See below for more resources and notebooks
 
 ## ESML Project (Azure Machine Learning: TABULAR, TEXT, IMAGES)
 
-> [!TIP] Use these resources to answer the questions:
+> [!TIP] 
+> Use these resources to answer the questions:
 >- **Q1: WHEN to use WHAT compute in Azure Machine Learning? (Compute Instance, GPU cluster, AKS Cluster, Managed online endpoints)**
 >   - Coding (CI) VS Train (cluster in pipeline) VS Inference (auto-scaling managed endpoint)
 >   - R&D phase VS Prodcution phase
@@ -43,10 +44,19 @@ Some highlights
     - [object-detection-MSCOCO](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/vision/responsibleaidashboard-object-detection-MSCOCO.ipynb)
     
 ### "Try-a-tonne / Hackathon": Responsible AI
+
+> [!TIP] 
+> Use these resources to create your own "Try-a-tonne" (Hackathon with known demo scenraios)
+
 - [Create Jobs](https://github.com/Azure/azureml-examples/actions/workflows/sdk-jobs-pipelines-1a_pipeline_with_components_from_yaml-pipeline_with_components_from_yaml.yml)
 
 
 ## ESGenaAI Project: RAG with Azure AI Foundry, Azure AI Search
+> [!TIP] 
+> Use these resources to answer the questions:
+>- **Q1: Productionalizing: Monitor endpoints for performance, Cost?**
+>- **Q2: Productionalizing GenAI: Monitoring, Auto-scaling, Loadbalancing, API management, token rate limiting, cross-charging**
+>
 
 - [Advanced - code first RAG](https://learn.microsoft.com/en-us/azure/search/tutorial-rag-build-solution)
 - [API management - AI Gateway](https://learn.microsoft.com/en-us/azure/api-management/genai-gateway-capabilities)
