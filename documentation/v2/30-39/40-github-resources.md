@@ -4,7 +4,7 @@
 Here is a collection of tutorials and Github resources for use cases you can achieve with AIFactory projects.
 
 > [!NOTE]
->Most tutorials are Python first, with Notebooks. These tutorials are good to get an understanding of
+>Most tutorials are Python first, with Jupyter Notebooks to create artifacts.
   
 See below for more resources and notebooks
 
