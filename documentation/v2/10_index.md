@@ -31,6 +31,7 @@ Quick Setup
 * [37) How-to guide: MLOps](#37-how-to-guide-mlops)
 * [38) How-to guide: LLMOps & RAG Chat Agent](#38-how-to-guide-llmops--rag-chat-agent)
 * [39) End-2-End config tutorial - ESML Project, ESGenAI Project](#39-end-2-end-setup-esml-project-esgenai-project) - Estimated config time: 1-2h
+* [40) Microsoft resources on Github](./30-39/40-github-resources.md)
 
 **FAQ - Trouble shooting** - relevant for all
 * [FAQ - Core team & AFactory infra](#40-faq)
