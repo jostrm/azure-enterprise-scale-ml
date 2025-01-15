@@ -293,3 +293,31 @@ Example questions:
 
 [FAQ - FAQ-43](../v2/40-49/41-FAQ-01.md)
 
+## 44) RESOURCES: TABULAR, TEXT, IMAGES, GenAI - Is there any Microsoft Github code examples I can try? 
+
+### ESML Project (Azure Machine Learning: TABULAR, TEXT, IMAGES)
+
+#### Tutorials
+
+- [Tutorials: Github](https://github.com/Azure/azureml-examples/tree/main/tutorials)
+- [Create Jobs/Pipelines](https://github.com/Azure/azureml-examples/actions/workflows/sdk-jobs-pipelines-1a_pipeline_with_components_from_yaml-pipeline_with_components_from_yaml.yml)
+
+#### Responsible AI: Train model via Pipeline, and generate Responsible AI
+- TABULAR:
+    - [Loan: Classification](https://github.com/Azure/azureml-examples/tree/main/sdk/python/responsible-ai/tabular/responsibleaidashboard-finance-loan-classification)
+    - [Housing: Classification](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/tabular/responsibleaidashboard-housing-classification-model-debugging/responsibleaidashboard-housing-classification-model-debugging.ipynb)
+
+    - [Healthcare - Covid : Classification](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/tabular/responsibleaidashboard-healthcare-covid-classification/responsibleaidashboard-healthcare-covid-classification.ipynb)
+- TEXT: 
+    - [Covid 19 Emergency event - Mulitlabel Text: Classification](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/text/responsibleaidashboard-multilabel-text-classification-covid-events.ipynb)
+- IMAGE: (NB! GPU's are needed for this scenario)
+    - [Fridge items": Classification, Object detection ](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/vision/responsibleaidashboard-image-classification-fridge.ipynb)
+    - [object-detection-MSCOCO](https://github.com/Azure/azureml-examples/blob/main/sdk/python/responsible-ai/vision/responsibleaidashboard-object-detection-MSCOCO.ipynb)
+    
+#### "Try-a-tonne / Hackathon": Responsible AI
+- [Create Jobs](https://github.com/Azure/azureml-examples/actions/workflows/sdk-jobs-pipelines-1a_pipeline_with_components_from_yaml-pipeline_with_components_from_yaml.yml)
+
+
+### ESGenaAI Project: RAG with Azure AI Foundry, Azure AI Search
+
+- [Advanced - code first RAG](https://learn.microsoft.com/en-us/azure/search/tutorial-rag-build-solution)    
