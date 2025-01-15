@@ -62,6 +62,7 @@ param deleteRetentionPolicyEnabled bool = true
 @description('Enable blob encryption at rest')
 param encryptionEnabled bool = true
 param ipWhitelist_array array = []
+param virtualNetworkRules_array array = []
 param containers array = []
 param files array = []
 param corsRules array = [
@@ -170,7 +171,12 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
         action: 'Allow'
         value: ip
       }]
-     virtualNetworkRules:virtualNetworkRules
+      virtualNetworkRules:[for snet_id in virtualNetworkRules_array:{
+          action: 'Allow'
+          id: snet_id
+          //state: 'string'
+        }]
+     //virtualNetworkRules:virtualNetworkRules
     }
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {

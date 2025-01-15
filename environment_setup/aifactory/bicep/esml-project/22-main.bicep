@@ -1159,8 +1159,14 @@ var virtualNetworkRules2Add = [
     state: 'succeeded'
   }
 ]
-var mergeVirtualNetworkRulesMerged = union(existingRules, virtualNetworkRules2Add)
-//var mergeIpRules = union(existingIps, ipWhitelist_array)
+var mergeVirtualNetworkRulesMerged = union(existingRules, virtualNetworkRules2Add) // union, avoid dups 
+
+// https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/bicep-functions-lambda
+var idsArrayExisting = map(existingRules, r => r.id) // var idsArrayExisting = [for rule in existingRules: rule.id]
+var newIdArray = [
+  dbxPublicSubnetResourceID
+]
+var virtualNetworkRules_array_noDups = union(idsArrayExisting,newIdArray)
 
 param lakeContainerName string
 module dataLake '../modules/dataLake.bicep' = {
@@ -1180,6 +1186,7 @@ module dataLake '../modules/dataLake.bicep' = {
     tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
     tags: keepTags
     virtualNetworkRules: mergeVirtualNetworkRulesMerged
+    virtualNetworkRules_array: virtualNetworkRules_array_noDups
     ipWhitelist_array: ipWhitelist_array
   }
   dependsOn: [
