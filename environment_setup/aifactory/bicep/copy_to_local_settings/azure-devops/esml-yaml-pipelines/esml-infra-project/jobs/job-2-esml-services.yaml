@@ -44,7 +44,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
 
 - task: AzureCLI@2
-  displayName: '05_az_bicep_deploy_genai_project'
+  displayName: '05_az_bicep_deploy_esml_project'
   inputs:
     azureSubscription: ${{ variables.dev_test_prod_ado_service_connection }}
     scriptType: bash
