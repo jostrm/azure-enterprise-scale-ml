@@ -1,5 +1,6 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+param privateDnsAndVnetLinkAllGlobalLocation bool=true
 // User access: standalone/Bastion
 @description('Service setting: Deploy VM for project')
 param serviceSettingDeployProjectVM bool = false
@@ -429,6 +430,7 @@ module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centr
     vNetName: vnetNameFull
     vNetResourceGroup: vnetResourceGroupName
     location: location
+    allGlobal:privateDnsAndVnetLinkAllGlobalLocation
   }
 }
 

@@ -2,7 +2,8 @@ param privDnsSubscription string
 param privDnsResourceGroup string
 param vNetName string
 param vNetResourceGroup string
-param location string 
+param location string
+param allGlobal bool = false
 var locationGlobal = 'global' // Using default Microsoft Private DNS, they are registered in global. (you can change this, but need to register, see ref01 )
 
 param privateLinksDnsZones array = [
@@ -115,7 +116,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for zone in privateLinksDnsZones: {
   name: zone.name
-  location: (zone.name != '${location}.data.privatelink.azurecr.io')? locationGlobal: location
+  location: (zone.name != '${location}.data.privatelink.azurecr.io' || allGlobal)? locationGlobal: location
   properties: {}
   // etag:''
   // tags:tags
@@ -126,7 +127,7 @@ resource filePrivateDnsZoneVnetLinkLoop 'Microsoft.Network/privateDnsZones/virtu
     privateDnsZones[i]
   ]
   name: '${privateDnsZones[i].name}/${uniqueString(privateDnsZones[i].id)}'
-  location: (privateDnsZones[i].name != '${location}.data.privatelink.azurecr.io')? locationGlobal: location
+  location: (privateDnsZones[i].name != '${location}.data.privatelink.azurecr.io' || allGlobal)? locationGlobal: location
   properties: {
     registrationEnabled: false // Is auto-registration of virtual machine records in the virtual network in the Private DNS zone enabled?
     resolutionPolicy: 'NxDomainRedirect' // The resolution policy for the private DNS zone. Possible values include: 'Default', 'NxDomainRedirect'
