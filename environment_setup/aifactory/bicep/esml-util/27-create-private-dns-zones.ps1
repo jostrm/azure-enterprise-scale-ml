@@ -6,6 +6,8 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
     [Parameter(Mandatory = $true, HelpMessage = "Subscription for Private DNS Zones ")][string]$subscriptionID,
     [Parameter(Mandatory = $true, HelpMessage = "ResourceGroup for Private DNS Zones. rg-esml-common or rg-aifactory-hub ")][string]$resourceGroupName,
+    [Parameter(Mandatory = $true, HelpMessage = "vNet name Usually same as Private DNS Zones")][string]$vnetName,
+    [Parameter(Mandatory = $true, HelpMessage = "vNet ResourceGroup for vNet.Usually same as Private DNS Zones")][string]$vnetNameResourceGroup,
     [Parameter(Mandatory = $true, HelpMessage = "location")][string]$location
 )
 
@@ -42,6 +44,8 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
   -location $location `
   -privDnsSubscription $subscriptionID `
   -privDnsResourceGroup $resourceGroupName `
+  -vNetName $vnetName `
+  -vNetResourceGroup $vnetNameResourceGroup `
   -Verbose
   
   Write-Host "BICEP success!"
