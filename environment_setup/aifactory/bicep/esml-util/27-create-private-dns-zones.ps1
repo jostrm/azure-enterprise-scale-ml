@@ -46,6 +46,7 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
   -privDnsResourceGroup $resourceGroupName `
   -vNetName $vnetName `
   -vNetResourceGroup $vnetNameResourceGroup `
+  -allGlobal $false `
   -Verbose
   
   Write-Host "BICEP success!"
