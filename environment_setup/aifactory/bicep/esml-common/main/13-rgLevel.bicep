@@ -1,6 +1,6 @@
 targetScope = 'subscription'  // Just to avoid sending a static RG. Instead: ESML dynamic via naming convention and parameters
 
-param privateDnsAndVnetLinkAllGlobalLocation bool=true
+param privateDnsAndVnetLinkAllGlobalLocation bool=false
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
 param inputKeyvault string
 param inputKeyvaultSubscription string

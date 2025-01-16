@@ -1,6 +1,6 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
-param privateDnsAndVnetLinkAllGlobalLocation bool=true
+param privateDnsAndVnetLinkAllGlobalLocation bool=false
 param azureMachineLearningObjectId string =''
 @description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourcegroup, set this to true')
 param useCommonACR bool = false

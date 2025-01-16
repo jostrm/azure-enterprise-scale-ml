@@ -1,6 +1,6 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
-param privateDnsAndVnetLinkAllGlobalLocation bool=true
+param privateDnsAndVnetLinkAllGlobalLocation bool=false
 // User access: standalone/Bastion
 @description('Service setting: Deploy VM for project')
 param serviceSettingDeployProjectVM bool = false
