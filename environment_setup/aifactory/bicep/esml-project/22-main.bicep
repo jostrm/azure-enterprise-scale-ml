@@ -427,6 +427,8 @@ module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centr
     privDnsSubscription: privDnsSubscription
     privDnsResourceGroup: privDnsResourceGroupName
     location: location
+    vNetName: vnetNameFull
+    vNetResourceGroup: vnetResourceGroupName
   }
 }
 
