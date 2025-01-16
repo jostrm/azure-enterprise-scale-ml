@@ -1,4 +1,4 @@
-# USAGE: .\aifactory\esml-util\27-create-private-dns-zones.ps1 -spID TODO -tenantID TODO -subscriptionID TODO8d1 -resourceGroupName TODO -location 'swedencentral'
+# USAGE: .\aifactory\esml-util\27-create-private-dns-zones.ps1 -spID TODO -tenantID TODO -subscriptionID TODO8d1 -resourceGroupName TODO -location 'swedencentral' -vnetName 'TODO' -vnetNameResourceGroup 'TODO'
 param (
     # required parameters
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
