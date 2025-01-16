@@ -346,6 +346,7 @@ module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bic
     privDnsResourceGroup: privDnsResourceGroupName
     vNetName: vnetNameFull
     vNetResourceGroup: vnetResourceGroupName
+    location: location
   }
   dependsOn: [
     esmlCommonResourceGroup
