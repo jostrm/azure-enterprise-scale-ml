@@ -113,10 +113,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   scope: resourceGroup(vNetResourceGroup)
 }
 
-
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for zone in privateLinksDnsZones: {
   name: zone.name
-  location: locationGlobal
+  location: (zone.name != '${location}.data.privatelink.azurecr.io')? locationGlobal: location
   properties: {}
   // etag:''
   // tags:tags
@@ -127,7 +126,7 @@ resource filePrivateDnsZoneVnetLinkLoop 'Microsoft.Network/privateDnsZones/virtu
     privateDnsZones[i]
   ]
   name: '${privateDnsZones[i].name}/${uniqueString(privateDnsZones[i].id)}'
-  location: locationGlobal
+  location: (privateDnsZones[i].name != '${location}.data.privatelink.azurecr.io')? locationGlobal: location
   properties: {
     registrationEnabled: false // Is auto-registration of virtual machine records in the virtual network in the Private DNS zone enabled?
     resolutionPolicy: 'NxDomainRedirect' // The resolution policy for the private DNS zone. Possible values include: 'Default', 'NxDomainRedirect'
