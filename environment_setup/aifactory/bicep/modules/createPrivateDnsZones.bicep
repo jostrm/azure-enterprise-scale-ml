@@ -1,8 +1,8 @@
 param privDnsSubscription string
 param privDnsResourceGroup string
-param location string
 param vNetName string
 param vNetResourceGroup string
+param location string ='global' // Using default Microsoft Private DNS, they are registered in global. (you can change this, but need to register, see ref01 )
 
 param privateLinksDnsZones array = [
   {
@@ -115,7 +115,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for zone in privateLinksDnsZones: {
   name: zone.name
-  location: 'global'
+  location: location
   properties: {}
   // etag:''
   // tags:tags

@@ -344,7 +344,6 @@ module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bic
     privateLinksDnsZones: privateLinksDnsZonesArray
     privDnsSubscription: privDnsSubscription
     privDnsResourceGroup: privDnsResourceGroupName
-    location: location
     vNetName: vnetNameFull
     vNetResourceGroup: vnetResourceGroupName
   }
