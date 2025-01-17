@@ -3,9 +3,8 @@ param (
     [Parameter(Mandatory=$true, HelpMessage="Specifies the App id for service principal")][string]$spID,
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the tenant id")][string]$tenantID,
     [Parameter(Mandatory = $true, HelpMessage = "Subscription id")][string]$subscriptionId,
-    
     [Parameter(Mandatory = $true, HelpMessage = "Project resource group")][string]$resourceGroupName,
-    [Parameter(Mandatory = $true, HelpMessage = "")][string]$userObjectId
+    [Parameter(Mandatory = $true, HelpMessage = "ObjectID")][string]$userObjectId
 )
 
 
