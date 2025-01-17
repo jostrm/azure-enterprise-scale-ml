@@ -161,7 +161,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     }
     ipAllowlist: ipWhitelist_array
     networkAcls: {
-      defaultAction:'Allow'
+      defaultAction:'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }
@@ -211,7 +211,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     allowRoleAssignmentOnRG: true
     imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
     allowPublicAccessWhenBehindVnet: true //allowPublicAccessWhenBehindVnet tomten
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false // tomten
     v1LegacyMode:true // tomten
@@ -219,7 +219,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     enableDataIsolation: false // tomten
     ipAllowlist: ipWhitelist_array
     networkAcls: {
-      defaultAction:'Allow'
+      defaultAction:'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }

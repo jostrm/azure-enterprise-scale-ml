@@ -226,7 +226,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     }
     ipAllowlist:ipWhitelist_array
     networkAcls: {
-      defaultAction: enablePublicGenAIAccess? 'Allow':'Deny'
+      defaultAction:'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }

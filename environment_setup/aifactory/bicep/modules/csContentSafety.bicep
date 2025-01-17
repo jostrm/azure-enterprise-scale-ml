@@ -43,7 +43,7 @@ resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' 
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     networkAcls: {
       bypass:'AzureServices'
-      defaultAction: publicNetworkAccess? 'Allow':'Deny'
+      defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
         ignoreMissingVnetServiceEndpoint: false

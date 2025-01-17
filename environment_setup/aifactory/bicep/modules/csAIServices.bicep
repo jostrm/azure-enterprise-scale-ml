@@ -61,7 +61,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     }
     networkAcls: {
       bypass:'AzureServices'
-      defaultAction: 'Allow' // publicNetworkAccess? 'Allow':'Deny' // tomten: -> Allow
+      defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
         ignoreMissingVnetServiceEndpoint: true // tomten false to true
