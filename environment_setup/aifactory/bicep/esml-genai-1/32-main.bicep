@@ -1,5 +1,11 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+// Optional override
+param bastionName string = ''
+param bastionResourceGroup string = ''
+param bastionSubscription string = ''
+param vnetNameFullBastion string = ''
+
 param privateDnsAndVnetLinkAllGlobalLocation bool=false
 param azureMachineLearningObjectId string =''
 @description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourcegroup, set this to true')
@@ -1556,13 +1562,28 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(service
 
 // ------------------------------ END - SERVICES (Azure Machine Learning)  ------------------------------//
 
-module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
+// Bastion in AIFactory COMMON RG, but with a custom name
+module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacGenAIReadUsersToCmnKeyvault${projectNumber}${locationSuffix}${env}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: technicalAdminsObjectID_array_safe
-    bastion_service_name: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001
+    bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
+  }
+  dependsOn: [
+    csAzureOpenAI
+    kv1
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+// Bastion Externally (Connectvivity subscription and RG)
+module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false) {
+  scope: resourceGroup(bastionSubscription,bastionResourceGroup)
+  name: 'rbacGenAIReadUsersTo_BastionExt${projectNumber}${locationSuffix}${env}'
+  params: {
+    user_object_ids: technicalAdminsObjectID_array_safe
+    bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
   }
   dependsOn: [
     csAzureOpenAI
@@ -1708,12 +1729,31 @@ module rbacModuleWebApp'../modules/aihubRbacAIWebApp.bicep' = {
 
 
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
-module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
+module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
   name: 'rbacGenAIRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
+    common_bastion_subnet_name: 'AzureBastionSubnet'
+    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+    rbacModuleUsers
+    rbacModuleAIServices
+    vmPrivate
+    sacc
+    kv1
+    aiHub
+  ]
+}
+// Bastion vNet Externally (Connectvivity subscription and RG || AI Factory Common RG)
+module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==false) {
+  scope: resourceGroup(bastionSubscription,bastionResourceGroup)
+  name: 'rbacReadUsersToCmnVnet_ExtBastion${projectNumber}${locationSuffix}${env}'
+  params: {
+    user_object_ids: technicalAdminsObjectID_array_safe
+    vNetName: vnetNameFullBastion
     common_bastion_subnet_name: 'AzureBastionSubnet'
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }

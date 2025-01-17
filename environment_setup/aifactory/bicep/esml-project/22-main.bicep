@@ -1,5 +1,11 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+// Optional override
+param bastionName string = ''
+param bastionResourceGroup string = ''
+param bastionSubscription string = ''
+param vnetNameFullBastion string = ''
+
 param privateDnsAndVnetLinkAllGlobalLocation bool=false
 // User access: standalone/Bastion
 @description('Service setting: Deploy VM for project')
@@ -1413,7 +1419,8 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_ad
   ]
 }
 
-module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true) {
+// Bastion in AIFacotry COMMON vNet/BYOVnet
+module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
   name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
   params: {
@@ -1429,13 +1436,31 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
   ]
 }
 
-module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
+// Bastion vNet Externally (Connectvivity subscription and RG || AI Factory Common RG)
+module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==false) {
+  scope: resourceGroup(bastionSubscription,bastionResourceGroup)
+  name: 'rbacReadUsersToCmnVnet_ExtBastion${projectNumber}${locationSuffix}${env}'
+  params: {
+    user_object_ids: technicalAdminsObjectID_array_safe
+    vNetName: vnetNameFullBastion
+    common_bastion_subnet_name: 'AzureBastionSubnet'
+    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+    aml
+    rbackSPfromDBX2AML
+    vmPrivate
+  ]
+}
+
+// Bastion in AIFactory COMMON RG, but with a custom name
+module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacReadUsersToCmnKeyvault${projectNumber}${locationSuffix}${env}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: technicalAdminsObjectID_array_safe
-    bastion_service_name: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001
+    bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
   }
   dependsOn: [
     aml
@@ -1444,6 +1469,22 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= {
     rbacReadUsersToCmnVnetBastion
   ]
 }
+// Bastion Externally (Connectvivity subscription and RG)
+module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false) {
+  scope: resourceGroup(bastionSubscription,bastionResourceGroup)
+  name: 'rbacGenAIReadUsersTo_BastionExt${projectNumber}${locationSuffix}${env}'
+  params: {
+    user_object_ids: technicalAdminsObjectID_array_safe
+    bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
+  }
+  dependsOn: [
+    aml
+    rbackSPfromDBX2AML
+    vmPrivate
+    rbacReadUsersToCmnVnetBastionExt
+  ]
+}
+
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 module rbacAml1 '../modules/rbacStorageAml.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
