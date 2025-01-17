@@ -44,7 +44,7 @@ resource csAccountDocInt 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       defaultAction: publicNetworkAccess? 'Allow':'Deny'
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
-        ignoreMissingVnetServiceEndpoint: false
+        ignoreMissingVnetServiceEndpoint: true
       }]
       ipRules: ipRules
     }
