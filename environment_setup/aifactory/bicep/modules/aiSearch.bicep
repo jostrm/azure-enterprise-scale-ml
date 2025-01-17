@@ -54,9 +54,9 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess: publicNetworkAccess? 'enabled': 'disabled'
+    publicNetworkAccess:'enabled' // publicNetworkAccess? 'enabled': 'disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
-      bypass: 'AzurePortal' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'
+      bypass: 'AzureServices' //'None', 'AzureServices', 'None'
       ipRules: ipRules
     }
     semanticSearch: semanticSearchTier
