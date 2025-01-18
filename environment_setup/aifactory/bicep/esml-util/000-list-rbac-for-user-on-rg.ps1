@@ -1,4 +1,3 @@
-# .\aifactory-templates\esml-util\000-list-rbac-for-user-on-rg.ps1 -spID "b7fd945b-4acd-454b-8db4-fa6752ea1c27" -tenantID "720b637a-655a-40cf-816a-f22f40755c2c" -subscriptionId "af154288-535b-47a4-b219-4b4509c4c8d1" -resourceGroupName "ingka-aif-esml-project004-swe-dev-002-rg" -userObjectId "262dfa84-bc95-4191-adcb-cb9398ca1741" -serviceName "aisearchprj003swedevh7amw001"
 param (
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
     [Parameter(Mandatory=$true, HelpMessage="Specifies the App id for service principal")][string]$spID,
