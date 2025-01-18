@@ -8,9 +8,29 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "COmmon ResourceGroup")][string]$resourceGroupNameCommon
 )
 
-
 if (-not [String]::IsNullOrEmpty($spSecret)) {
-    Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal"   
+    Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal"
+  
+    # Az login
+    az login --service-principal -u $spID -p $spSecret --tenant $tenantID
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "Logged in with service principal successfully!"
+    } else {
+        Write-Host "Failed to login with service principal."
+        exit 1
+    }
+    az account set --subscription $subscriptionID
+  
+    Write-Host "Now connected & logged in with SP successfully!"
+    $context = az account show --query "{Account: name, Subscription: id}" -o json | ConvertFrom-Json
+    if ($context.Subscription -ne "") {
+        Write-Host "Successfully logged in as $($context.Account) to $($context.Subscription)"
+    } else {
+        Write-Host "Failed to login to Azure with Service Principal. Exiting..."
+        exit 1
+    }
+  
+    # Powershell login
     $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
     $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
     Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
