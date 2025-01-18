@@ -54,7 +54,7 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess:'enabled' // publicNetworkAccess? 'enabled': 'disabled'  // Enabled, for ipRules to work.
+    publicNetworkAccess:'Enabled' // publicNetworkAccess? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
       bypass: 'AzureServices' //'None', 'AzureServices', 'None'
       ipRules: ipRules
@@ -68,6 +68,7 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
     }]
 }
 
+// To add Azure Portal. ipRules and add: nslookup on stamp2.ext.search.windows.net (Non-authorative answer)
 resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enableSharedPrivateLink == false) {
   name: aiSearchName
   location: location
@@ -88,7 +89,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess: publicNetworkAccess? 'enabled': 'disabled'
+    publicNetworkAccess:'Enabled' // publicNetworkAccess? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
       bypass: 'AzureServices' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'
       ipRules: ipRules

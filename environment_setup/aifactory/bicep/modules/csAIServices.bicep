@@ -52,7 +52,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: 'Enabled' // Cannot be changed later. publicNetworkAccess? 'Enabled': 'Disabled'  //private endpoint - AccountProvisioningStateInvalid.  in state Accepted  () publicNetworkAccess? 'Enabled': 'Disabled' // tomten publicNetworkAccess? 'Enabled': 'Disabled' -> 'Disabled' )
+    publicNetworkAccess: 'Enabled' // // If not Deny, then ipRules will be ignored (cannot be changed later either) publicNetworkAccess? 'Enabled': 'Disabled' 
     restore: restore
     restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true // tomten publicNetworkAccess? false:true -> false
     disableLocalAuth: disableLocalAuth

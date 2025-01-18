@@ -919,7 +919,6 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
       value: ip
     }]
   }
