@@ -52,8 +52,7 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
 
 # EDIT Variables
 $oids = @(
-    "a",
-    "b"
+
 )
 # Define the list of MI IDs
 $managedIdentities = @(

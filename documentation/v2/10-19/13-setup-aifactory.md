@@ -6,6 +6,34 @@ And after this is done, you can setup as many AIFactory's you want, with configu
 > See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
 > [Enterprise Scale AIFactory - Template repo, using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
 
+## Goal: Automation to use: Pipelines described
+The pipelines will automate the execution of BICEP/Terraform, Powershell, Azure CLI. The goal of this documentation page, is to configure and run at least the two pipelines: 
+
+- `infra-aifactory-common`
+- `infra-project-genai` and/or `infra-project-esml`
+
+You can see all avaialable pipelines below: <br>
+- `infra-aifactory-common`
+    - Creates Azure infrastructure, inclduing vNets & services, network rules, RBAC. Optionally adds core team member access (add-coreteam-member)
+- `infra-project-genai`
+    - Creates Azure infrastructure, inclduing subnets, network rules, RBAC, and add user access to a list of user ID (add-project-member-esml or add-project-member-genai)
+- `infra-project-esml`
+    - Creates Azure infrastructure, inclduing subnets, network rules, RBAC, and add user access to a list of user ID (add-project-member-esml or add-project-member-genai)
+- `add-coreteam-member`
+    - For all users, it will set the correct RBAC roles for the AI Factory Common part of Dev/Test/Prod
+- `add-project-member-esml`
+    - For all users, it will set the correct RBAC roles for Projectspecicif resource group, with optional IP-whitelisting for the services: `Azure Machine Learning, Keyvault, Storage`
+- `add-project-member-genai`
+    - For all users, it will set the correct RBAC roles for Projectspecicif resource group, with optional IP-whitelisting for the services: `Azure AI Hub, AI Services, AI Search, Keyvault, Storage`
+
+Below is how it will look like in the Pipelines/Release view in Azure Devops: 
+
+![](./images/13-setup-aifactory-ado-pipelines-overview.png)
+
+> [!NOTE]
+> Equivalent Github Action workflows also exists
+
+
 ## 1) Azure Devops (or Github): Create an empty repo, _aifactory-infra-001_
 This _aifactory-infra-001_ will be your repo, where you have your configuration is overwriting the AIfactory config-template files.
 
