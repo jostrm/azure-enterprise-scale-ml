@@ -56,12 +56,15 @@ Personas is used to:
 -->
 
 ## Feature Roadmap
-**BYOVCustomRoles: Bring your own custom RBAC roles, instead of Microsoft Build in roles. To connect with different `Personas` and `users` (project teams)
+
+**BYOVCustomRoles**: Bring your own custom RBAC roles, instead of Microsoft Build in roles. To connect with different `Personas` and `users` (project teams)
  - STATUS: Ongoing (2025-01)
-**BYOVnet: Bring your own vNet in a separate resource group, instead of having the AI Factory create it.
+**BYOVnet**: Bring your own vNet in a separate resource group, instead of having the AI Factory create it.
  - STATUS: Completed (2024-05)
-**Shared Container Registry: Optional flag, saving 30% run/idle cost per use case, by sharing container registry across Azure ML workspaces/Azure AI foundry
- - STATUS: Completed (2024-0)
+**Shared Container Registry**: Optional flag, saving 30% run/idle cost per use case, by sharing container registry across Azure ML workspaces/Azure AI foundry
+ - STATUS: Completed (2024-08)
+
+ See [Feature list for all features](./documentation/v2/10-19/11-architecture-diagrams.md)
 
 ## ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
 The 2 project types, lives inside of the AIFactory landingzones. 
