@@ -4,6 +4,31 @@
 > See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
 > [Enterprise Scale AIFactory - Template repo, using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
 
+## Summary of what is needed
+- **Github / Azure Devops**
+    - Steps: 1
+        - Github: Write access, to create Github Action workflows
+            - Github administrator
+        - Azure Devops: to create service connection and Build/Release pipelines
+            - Who: Azure Devops administrator
+- **Azure:** 
+    - Steps: 2,3,4
+    - Who: 
+        - Step 2 and 3: Azure Owner on at least 1 Azure subscription (if only setting up DEV environment)
+        - *Step 4: Networking team. That has the IP-plan, to see that vNet ranges are not conflicting. This is not needed if running the AI Factory standalone mode
+- **Entra ID**
+    - Steps: 5
+    - What: 
+        - **3 service principles** (ObjectID, AppId, Secret)
+        - **Object ID's** and **EMAIL-addressess**, for all end-users to be onboarded to the AI Factory project
+            - Format: Comma-separated list
+        - **IP-addresses** for all end-users to be onboarded to the AI Factory project
+            - Format: Comma-separated list
+        - **Object ID** for the global Azure Machine Learning application
+    - Who: Central IT with admininstrator access to EntraID
+
+# MANDATORY: 1-5
+
 ## Step 1) Create Azure Devops (or Github) projects
 - **Purpose:** Where the AIFactory acceleration code resides
 - **Role needed:** Central IT. Microsoft EntraID administrator. Azure Devops administrator
@@ -48,7 +73,7 @@
 > [Read more about networking here](14-networking-privateDNS.md)
 
 
-## Step 5) Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
+## Step 5) EntraID: Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
 - **Purpose:** To be used to setup the AIFactory. The information of the service principals: ObjectID, ApplicationID, Secret needs to be stored in the seeding keyvault
     - **SP1: `esml-common-bicep-sp`:** IaC purpose. This service principal will be used as a Service connection in Azure Devops. Used in a pipeline to create the AIFactory.
         - Store the info in the seeding keyvault.
@@ -75,10 +100,22 @@
 
 [Read more](./12-permissions-users-ad-sps.md) here aobut the permisssions and service principals
 
-## Step 6) Delegate User Access: Onboard a Microsoft EntraID user, with access to the Azure Devops created in step 1, and with OWNER permission on the Subscriptions created in Step 2, 
+
+- **Users: Loookup Object ID's**
+    - **Object ID's** and **EMAIL-addressess**, for all end-users to be onboarded to the AI Factory project
+        - Format: Comma-separated list
+    - **IP-addresses** for all end-users to be onboarded to the AI Factory project
+        - Format: Comma-separated list
+    - **Object ID** for the global Azure Machine Learning application. 
+    - See image: ![](./images/12-prerequisites-aml-sp-oid.png)
+
+
+# OPTIONAL 6-8
+
+## *Step 6) Delegate User Access: Onboard a Microsoft EntraID user, with access to the Azure Devops created in step 1, and with OWNER permission on the Subscriptions created in Step 2, 
 - **Purpose:** Efficiency. To be able to troubleshoot, manually login to Azure for `the AIFactory setup mentor`
 - **Role needed:** Microsoft EntraID administrator: Central IT / Cloud Team
-- **Mandatory:** Yes. Very hard to debug, troubleshoot if no insights that permission is set correctly. Nedd to have read access in EntraID to see the servic principal and keyvault permissions. Someone needs to verify that the Azure Devops Service connection works, that service principal (SP) esml-common-bicep has Get, List, Set to seeding keyvault. That the SP is OWNER on the subscriptions.
+- **Mandatory:** No, optional but recommended. Very hard to troubleshoot if no insights that permission is set correctly. Need to have read access in EntraID to see the servic principal and keyvault permissions. Someone needs to verify that the Azure Devops Service connection works, that service principal (SP) esml-common-bicep has Get, List, Set to seeding keyvault. That the SP is OWNER on the subscriptions.
 - **TODO**: 
     1) Create user in Microsoft EntraID
         - [How-to guide](https://learn.microsoft.com/en-us/entra/fundamentals/how-to-create-delete-users) : Create user
@@ -91,14 +128,16 @@
             - Note: To delegate a user access to the resource groups, you need to have [SETUP the AIFactory first](./13-setup-aifactory.md)
                 - Resource groups that will be created looks similar as this: `dc-heroes-esml-project001-weu-dev-001-rg`, `dc-heroes-esml-project001-weu-test-001-rg`, `dc-heroes-esml-project001-weu-prod-001-rg` 
 
-## Step 7) Delgate Service Principal Access in Azure Devops + Import IaC pipelines + Set service connection to pipeline steps
+## *Step 7) Delgate Service Principal Access in Azure Devops + Import IaC pipelines + Set service connection to pipeline steps
 - **Purpose:** Since only an Azure Devops admin have permission to create service connection and select that on a pipeline. 
     - E.g. the `AIFactory setup mentor` will not have permission with role: Stakeholder
 - **Role needed:**: Azure Devops admin
-- **Mandatory:** Yes
+- **Mandatory:** Not for Github. Only for Azure Devops.
 - **TODO**: [Azure Devops: Create service connection + Import IaC pipelines + Set service connection to pipeline steps](./12-prereq-ado-create-servicecon-import-ado-pipelines.md)
 
-## Step 8) If you want to have Private DNS zones centrally in HUB (recommended) = centralDnsZoneByPolicyInHub=true
+## *Step 8) If you want to have Private DNS zones centrally in HUB (recommended) = centralDnsZoneByPolicyInHub=true
+- **Mandatory:** No.
+- **Role needed:**: Central IT, that have access to the central Hub (Hub/Spoke or VWAN)
 1) Create the Private DNS Zones in the HUB as specified: 
     - [How-to - networking](./14-networking-privateDNS.md) 
 2) Apply the policy to add A-records for all PaaS services that creates a private endpoint to have an A-record added to the central Private DNS zones
