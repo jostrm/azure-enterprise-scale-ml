@@ -52,12 +52,6 @@ echo -e "${YELLOW}OBJECT ID NAME as KV SECRET${NC} in seeding keyvault will have
 echo -e "${YELLOW}SECRET NAME as KV SECRET${NC} in seeding keyvault will have the name: ${GREEN}"$SP_KV_SECRET"${NC}"
 echo -e "${GREEN}Note: If exists: ${NC}If Service principla already exists, then ObjectID will be updated in seeding keyvault.${NC}"
 
-# APPLICATIONS - To delete: Delete Application, and its service principal is also deleted.
-
-#SP_OID='' # Set RBAC on this. Enterprise Application Object ID
-#SP_APP_ID='' # Enterprise Application App_ID is same as APP_REG_ID
-#APP_REG_OID='' # Set IMAGE on this. App Registration Object ID
-
 # Prompt the user for confirmation
 read -p "Continue (Y/n)? " choice
 if [[ "$choice" == "n" || "$choice" == "N" ]]; then
@@ -105,7 +99,6 @@ if [ -z "$SP_EXISTS" ]; then
     #Print APP_ID
     echo -e "${GREEN}APP_ID: {$APP_ID} ${NC}"
     echo -e "${GREEN}OBJECT_ID: {$OBJECT_ID} ${NC}"
-    #echo -e "${GREEN}PASSWORD: {$PASSWORD} ${NC}"
 
     az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_APP_ID} --value $APP_ID
     az keyvault secret set --vault-name $KEY_VAULT_NAME --name ${SP_KV_OID} --value $OBJECT_ID
@@ -163,3 +156,8 @@ else
     echo -e "${RED}Failed to set logo URL${NC}"
     exit 1
 fi
+
+# APPLICATIONS - To delete: Delete Application, and its service principal is also deleted.
+#SP_OID='' # Set RBAC on this. Enterprise Application Object ID
+#SP_APP_ID='' # Enterprise Application App_ID is same as APP_REG_ID
+#APP_REG_OID='' # Set IMAGE on this. App Registration Object ID
