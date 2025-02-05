@@ -26,7 +26,6 @@ PROJECT_NUMBER_Y="" # A string number between 1-999. Example: "2"
 
 ##################### DO NOT CHANGE ANYTHING BELOW #####################
 # Template Names
-SP_NAME_TEMPLATE="esml-projectXXX-sp-id"
 SP_KV_ID_TEMPLATE="esml-projectXXX-sp-id"
 SP_KV_OID_TEMPLATE="esml-projectXXX-sp-oid"
 SP_KV_SECRET_TEMPLATE="esml-projectXXX-sp-secret"
