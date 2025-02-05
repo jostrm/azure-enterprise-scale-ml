@@ -87,8 +87,11 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
     name: 'nsg-${common_subnet_name}-scoring'
     tags: tags
     location:location
+    bastionIpRange: common_bastion_subnet_cidr_v
   }
 }
+
+var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = {
   name: 'nsg-${common_bastion_subnet_name}'
@@ -97,7 +100,7 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = {
     name: 'nsg-${common_bastion_subnet_name}'
     tags: tags
     location:location
-    IPwhiteList:IPwhiteList
+    IPwhiteList_Array:ipWhitelist_array
   }
 }
 

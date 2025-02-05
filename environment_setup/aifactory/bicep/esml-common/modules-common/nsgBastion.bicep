@@ -8,7 +8,7 @@ param location string
 param tags object
 
 @description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
-param IPwhiteList string = ''
+param IPwhiteList_Array string[] = []
 
 resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: name
@@ -31,9 +31,7 @@ resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           direction: 'Inbound'
           sourcePortRanges: []
           destinationPortRanges: []
-          sourceAddressPrefixes: [
-            IPwhiteList // If using IP-whitelist from ADO
-          ]
+          sourceAddressPrefixes: IPwhiteList_Array  // If using IP-whitelist from ADO
           destinationAddressPrefixes: []
         }
       }
