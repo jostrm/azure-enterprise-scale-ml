@@ -193,7 +193,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
        {// !!
-        name: 'AzureStorageAccount'
+        name: 'AzureStorageAccount2'
         properties: {
           description: 'AML'
           protocol: 'Tcp'

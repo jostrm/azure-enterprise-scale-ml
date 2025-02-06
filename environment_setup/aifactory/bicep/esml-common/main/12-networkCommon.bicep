@@ -70,7 +70,7 @@ resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01'
 }
 
 module nsgCommon '../modules-common/nsgCommon.bicep' = {
-  name: 'nsg-${common_subnet_name}depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
+  name: 'nsg-${common_subnet_name}-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}'

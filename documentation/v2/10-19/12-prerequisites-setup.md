@@ -27,6 +27,54 @@
         - **Object ID** for the global Azure Machine Learning application
     - Who: Central IT with admininstrator access to EntraID
 
+# Scripts
+
+1) Copy templates and scripts: Copies scripts to root
+
+    [../../../bootstrap/01-aif-copy-aifactory-templates.sh](../../../bootstrap/01-aif-copy-aifactory-templates.sh)
+
+    Run from your repo root location (e.g. dir/ls should list the `azure-enteprise-scale-ml` submodule folder)
+
+    ```bash
+    bash ./azure-enteprise-scale-ml/bootstrap/aifactory01-aif-copy-aifactory-templates.sh
+    ```
+
+    This will copy all template files to a folder at root called `aifactory`
+
+2) Ensure Azure providers are enabled (create if not exists)
+
+    [26-enable-resource-providers.ps1](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
+
+    How to run from root: 
+    ```bash
+    pwsh ./aifactory/esml-util/26-enable-resource-providers.ps1 -SubscriptionName 'TODO' -Readonly $false
+    ``` 
+
+3) Create one or many service principles, project specifics, that also adds the information in the Seeding Keyvault
+   
+    [29-create-sp-or-update-oid-for-project.sh](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
+    
+    Manually edit the variables at the top at the scrips. Then run from root: 
+    ```bash
+        ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
+    ```
+
+**Below scripts are relevant for centralized/peered AI Factory only. Not Standalone mode**
+
+4) Ensure Private DNS zones exists in "hub", if flag is set to true
+
+    [27-create-private-dns-zones.ps1](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
+
+    How to run from root: 
+
+    ```bash
+    pwsh ./aifactory/esml-util/27-create-private-dns-zones.ps1 -spID TODO -tenantID TODO -subscriptionID TODO8d1 -resourceGroupName TODO -location 'swedencentral'
+    ``` 
+
+5) Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
+
+    [./aifactory/esml-util/esml-util/28-Initiatives.bicep](./aifactory/esml-util/esml-util/28-Initiatives.bicep)
+
 # MANDATORY: 1-5
 
 ## Step 1) Create Azure Devops (or Github) projects
