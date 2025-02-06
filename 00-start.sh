@@ -31,19 +31,19 @@ if [[ "$orchestrator" == "a" ]]; then
 
     # Delete Github files in .github/workflows
     # YAML - Common -> aifactory-templates + .github/workflows
-    rm -f "$SCRIPT_DIR/.github/workflows/infra-common.yml"
+    rm -f "$SCRIPT_DIR/../.github/workflows/infra-common.yml"
 
     # YAML - infra-project-esml.yml -> aifactory-templates + .github/workflows
-    rm -f "$SCRIPT_DIR/.github/workflows/infra-project-esml.yml"
+    rm -f "$SCRIPT_DIR/../.github/workflows/infra-project-esml.yml"
 
     # YAML - infra-project-genai.yml -> aifactory-templates + .github/workflows
-    rm -f "$SCRIPT_DIR/.github/workflows/infra-project-genai.yml"
+    rm -f "$SCRIPT_DIR/../.github/workflows/infra-project-genai.yml"
 
     # YAML - infra-add-project-member.yml -> aifactory-templates + .github/workflows
-    rm -f "$SCRIPT_DIR/.github/workflows/infra-add-project-member.yml"
+    rm -f "$SCRIPT_DIR/../.github/workflows/infra-add-project-member.yml"
 
     # YAML - infra-add-core-member.yml -> aifactory-templates + .github/workflows
-    rm -f "$SCRIPT_DIR/.github/workflows/infra-add-core-member.yml"
+    rm -f "$SCRIPT_DIR/../.github/workflows/infra-add-core-member.yml"
 
     echo -e "${YELLOW}Copying new bootstrap files, to root of repository${NC}"
 
