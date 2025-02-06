@@ -55,15 +55,18 @@ if [[ "$orchestrator" == "a" ]]; then
     echo -e "${GREEN}Finished!${NC}"
     echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
 
-    echo -e "${YELLOW}Do you also want to remove the GITHUB folder (the workflows for AIFactory is removed) (Enter 'y' or 'n')${NC}"
-    read -p "Delete .github/workflows folder: " workflowsdelete
-    if [[ "$workflowsdelete" == "y" ]]; then
-        echo -e "${YELLOW}Deleting .github/workflows folder${NC}"
-        rm -rf "$SCRIPT_DIR/../.github/workflows"
-        rm -rf "$SCRIPT_DIR/../.github"
-        echo -e "${GREEN}Finished!${NC}"
-    else
-        echo -e "${GREEN}Did not delete the folder.${NC}"
+    # Check if the directory exists, if not, create it
+    if [ ! -d "$SCRIPT_DIR/../.github/workflows/" ]; then
+        echo -e "${YELLOW}Do you also want to remove the GITHUB folder (the workflows for AIFactory is removed) (Enter 'y' or 'n')${NC}"
+        read -p "Delete .github/workflows folder: " workflowsdelete
+        if [[ "$workflowsdelete" == "y" ]]; then
+            echo -e "${YELLOW}Deleting .github/workflows folder${NC}"
+            rm -rf "$SCRIPT_DIR/../.github/workflows"
+            rm -rf "$SCRIPT_DIR/../.github"
+            echo -e "${GREEN}Finished!${NC}"
+        else
+            echo -e "${GREEN}Did not delete the folder.${NC}"
+        fi    
     fi
 
 elif [[ "$orchestrator" == "g" ]]; then
