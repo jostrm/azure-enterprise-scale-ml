@@ -36,11 +36,13 @@ the filed you may edit.
 
 0) Add the submodule to your repo (to get the bootstrap files)
 
-    Run from your repo root location: 
+    Run from your repo root location:
 
     ```
     git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
     ```
+    
+    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
 
 1) Run `00-start.sh` that will copy bootstrap files, for either Github or Azure Devops
     You will be prompted if you want to use Azure Devops or Github. Then relevant bash bootstrap files will be copied to your root directory.
