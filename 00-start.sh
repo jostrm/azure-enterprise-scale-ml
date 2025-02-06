@@ -18,6 +18,7 @@ read -p "Orchestrator: " orchestrator
 
 if [[ "$orchestrator" == "a" ]]; then
     echo -e "${GREEN}You have chosen Azure DevOps.${NC}"
+    echo -e "${YELLOW}Cleaning potential old bootstrap files${NC}"
     
     # Delete potential Github BOOTSTRAP files,silent error if not exists
     rm -f "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
@@ -44,13 +45,19 @@ if [[ "$orchestrator" == "a" ]]; then
     # YAML - infra-add-core-member.yml -> aifactory-templates + .github/workflows
     rm -f "$SCRIPT_DIR/.github/workflows/infra-add-core-member.yml"
 
+    echo -e "${YELLOW}Copying new bootstrap files, to root of repository${NC}"
+
     # Copy AZURE DEVOPS template file and bootstrap files, to root of repository
     cp "$SCRIPT_DIR/bootstrap/01-aif-copy-aifactory-templates.sh" "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
     cp "$SCRIPT_DIR/bootstrap/02b-ADO-YAML-bootstrap-files.sh" "$SCRIPT_DIR/../02-ADO-YAML-bootstrap-files.sh"
     cp "$SCRIPT_DIR/bootstrap/03b-ADO-YAML-bootstrap-files-no-var-overwrite.sh" "$SCRIPT_DIR/../03-ADO-YAML-bootstrap-files-no-var-overwrite.sh"
 
+    echo -e "${GREEN}Finished!${NC}"
+    echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
+
 elif [[ "$orchestrator" == "g" ]]; then
     echo -e "${GREEN}You have chosen GitHub.${NC}"
+    echo -e "${YELLOW}Cleaning potential old bootstrap files${NC}"
     
     # Deleting potetoil Azure Devops files, silent error if not exists
     rm -f "$SCRIPT_DIR/../02-ADO-YAML-bootstrap-files.sh"
@@ -61,10 +68,15 @@ elif [[ "$orchestrator" == "g" ]]; then
     rm -f "$SCRIPT_DIR/../10-GH-create-or-update-github-variables.sh"
     rm -f "$SCRIPT_DIR/../.env.template"
 
+    echo -e "${YELLOW}Copying new bootstrap files, to root of repository${NC}"
+
     # Creating GitHub files,  to root of repository
     cp "$SCRIPT_DIR/bootstrap/01-aif-copy-aifactory-templates.sh" "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
     cp "$SCRIPT_DIR/bootstrap/02a-GH-bootstrap-files.sh" "$SCRIPT_DIR/../02-GH-bootstrap-files.sh"
     cp "$SCRIPT_DIR/bootstrap/03a-GH-bootstrap-files-no-env-overwrite.sh" "$SCRIPT_DIR/../03-GH-bootstrap-files-no-env-overwrite.sh"
+
+    echo -e "${GREEN}Finished!${NC}"
+    echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
 else
     echo -e "${RED}Invalid choice. Please run the script again and enter a valid option.${NC}"
     exit 1
