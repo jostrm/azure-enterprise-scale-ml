@@ -70,7 +70,7 @@ resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01'
 }
 
 module nsgCommon '../modules-common/nsgCommon.bicep' = {
-  name: 'nsg-${common_subnet_name}'
+  name: 'nsg-${common_subnet_name}depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}'
@@ -81,7 +81,7 @@ module nsgCommon '../modules-common/nsgCommon.bicep' = {
 }
 
 module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
-  name: 'nsg-${common_subnet_name}-scoring'
+  name: 'nsg-${common_subnet_name}-scoring-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}-scoring'
@@ -97,7 +97,7 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
 var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = {
-  name: 'nsg-${common_bastion_subnet_name}'
+  name: 'nsg-${common_bastion_subnet_name}-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
@@ -112,7 +112,7 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = {
 
 module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
   scope: vnetResourceGroup
-  name: 'nsg-${common_pbi_subnet_name}-depl'
+  name: 'nsg-${common_pbi_subnet_name}-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
   params: {
     name: 'nsg-${common_pbi_subnet_name}'
     tags: tags
@@ -124,7 +124,7 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
 }
 module vNetCommon '../modules-common/vNetCommon.bicep' = {
   scope: vnetResourceGroup
-  name: vnetNameFull
+  name: '${vnetNameFull}-depl'
   params: {
     location: location
     common_pbi_subnet_cidr: common_pbi_subnet_cidr_v
