@@ -29,6 +29,13 @@
 
 # Scripts
 
+0) Add the submodule to your repo
+
+    Run from your repo root location 
+
+    ```
+    git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
+    ```
 1) Copy templates and scripts: Copies scripts to root
 
     [../../../bootstrap/01-aif-copy-aifactory-templates.sh](../../../bootstrap/01-aif-copy-aifactory-templates.sh)
