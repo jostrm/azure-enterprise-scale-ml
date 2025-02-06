@@ -37,7 +37,7 @@ var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGr
 
 module rgCommon '../../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)
-  name: 'CommonRG${env}Depl${aifactorySuffixRG}'
+  name: 'CommonRG${env}-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
     rgName: commonResourceGroupName
     location: location
@@ -47,7 +47,7 @@ module rgCommon '../../modules/resourcegroupUnmanaged.bicep' = {
 
 module contributorPermissions '../../modules/contributorRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
-  name: 'ContributorPermissionsOnRGCmn'
+  name: 'ContributorPermissionsOnRGCmn-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
     userId: technicalContactId
     userEmail: technicalContactEmail
@@ -60,7 +60,7 @@ module contributorPermissions '../../modules/contributorRbac.bicep' = {
 }
 module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
-  name: 'VMAdminLoginPermissions'
+  name: 'VMAdminLoginPermissions-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
     userId: technicalContactId
     userEmail: technicalContactEmail

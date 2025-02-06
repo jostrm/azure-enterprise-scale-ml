@@ -59,6 +59,15 @@
         ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
     ```
 
+4) Get information to set variable values
+    - Project type: ESML
+        - `AKS version` supported in your region. 
+        - Example: `admin_aks_version_override: "1.30.3"` 
+        ```bash
+            az aks get-versions --location eastus --output table
+        ```
+    - Project type: GenaI
+        - 
 **Below scripts are relevant for centralized/peered AI Factory only. Not Standalone mode**
 
 4) Ensure Private DNS zones exists in "hub", if flag is set to true
