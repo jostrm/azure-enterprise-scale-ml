@@ -9,7 +9,10 @@
 
 ## Setup options: 
 - Option A) [Setup AIFactory - Infra Automation (AzureDevops+BICEP)](../10-19/13-setup-aifactory.md)
+    - [Azure Devops - YAML](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
+    - [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
 - Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../10-19/13-setup-aifactory-gha.md)
+    - [Github Actions](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
 - *Option C) [Setup AIFactory - Infra Automation (GithubActions+Terraform)](../10-19/13-setup-aifactory-gha.md)
     - TODO: Joakim
 

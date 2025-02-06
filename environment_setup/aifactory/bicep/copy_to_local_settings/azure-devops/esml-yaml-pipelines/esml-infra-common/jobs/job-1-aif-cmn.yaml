@@ -8,9 +8,18 @@ steps:
   name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
 
 - task: AzureCLI@2
+  displayName: '00_pwsh_print_info'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+      Write-Host "dev_test_prod is: $(dev_test_prod)"
+      Write-Host "parameters  serviceConnection is:  ${{ parameters.serviceConnection }}"
+- task: AzureCLI@2
   displayName: '01_az_bicep_common_rg'
   inputs:
-    azureSubscription: '${{ variables.dev_test_prod_ado_service_connection }}'
+    azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
@@ -32,7 +41,7 @@ steps:
 - task: AzureCLI@2
   displayName: '02_az_bicep_networking'
   inputs:
-    azureSubscription: '${{ variables.dev_test_prod_ado_service_connection }}'
+    azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
@@ -56,9 +65,9 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
-  displayName: '01_az_bicep_deploy_resources'
+  displayName: '03_az_bicep_deploy_resources'
   inputs:
-    azureSubscription: '${{ variables.dev_test_prod_ado_service_connection }}'
+    azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |

@@ -2,12 +2,29 @@
 To configura the infra automation the first time takes ~4h, which is great compared to 500-1500 hours.<br>
 And after this is done, you can setup as many AIFactory's you want, with configuration time 2-15min per AIFactory.
 
-> [!IMPORTANT]
+> [!NOTE]
 > See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
 > [Enterprise Scale AIFactory - Template repo, using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
 
 ## Goal: Automation to use: Pipelines described
 The pipelines will automate the execution of BICEP/Terraform, Powershell, Azure CLI. The goal of this documentation page, is to configure and run at least the two pipelines: 
+
+In the central submodule the pipeline templates exists here:
+- Option A) [Setup AIFactory - Infra Automation (AzureDevops+BICEP)](../10-19/13-setup-aifactory.md)
+    - [Azure Devops - YAML](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
+    - [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
+- Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../10-19/13-setup-aifactory-gha.md)
+    - [Github Actions](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
+
+**In your local repo**, after you have done STEP 3 and copied the files you will see the templates here. 
+
+- Azure Devops - Yaml [aifactory/esml-infra/azure-devops/bicep/yaml](../../../../aifactory/esml-infra/azure-devops/bicep/yaml/readme.md)
+- Azure Devops - Classic [aifactory/esml-infra/azure-devops/bicep/classic](../../../../aifactory/esml-infra/azure-devops/bicep/classic/readme.md)
+- Github Actions  [aifactory/esml-infra/github-actions/bicep/readme.md](../../../../aifactory/esml-infra/github-actions/bicep/readme.md)
+
+> [!IMPORTANT]
+> You need to use the local version as below, since you need to configure the Variable file. Either [Azure Devops variables](../../../../aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml) or Github Actions .env file
+>
 
 - `infra-aifactory-common`
 - `infra-project-genai` and/or `infra-project-esml`
@@ -60,8 +77,24 @@ This _aifactory-infra-001_ will be your repo, where you have your configuration 
 ![](./images/13-setup-aifactory-aifactory-folder-added.png)
 
 ## 4) Import pipelines/workflows to Azure Devops (or Github)
-For Azure Devops classic pipelines: 
-- Browse to the folder [aifactory/esml-infra/azure-devops/bicep/classic](../../../../aifactory/esml-infra/azure-devops/bicep/classic) where you should have 5 or more .json files, to import into Azure Devops. 
+
+In the central submodule the pipeline templates exists here: 
+
+- Option A) [Setup AIFactory - Infra Automation (AzureDevops+BICEP)](../10-19/13-setup-aifactory.md)
+    - [Azure Devops - YAML](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
+    - [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
+- Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../10-19/13-setup-aifactory-gha.md)
+    - [Github Actions](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
+
+**In your local repo**, after you have done STEP 3 and copied the files you will see the templates here. 
+
+- Azure Devops - Yaml [aifactory/esml-infra/azure-devops/bicep/yaml](../../../../aifactory/esml-infra/azure-devops/bicep/yaml/readme.md)
+- Azure Devops - Classic [aifactory/esml-infra/azure-devops/bicep/classic](../../../../aifactory/esml-infra/azure-devops/bicep/classic/readme.md)
+- Github Actions  [aifactory/esml-infra/github-actions/bicep/readme.md](../../../../aifactory/esml-infra/github-actions/bicep/readme.md)
+
+> [!IMPORTANT]
+> You need to use the local version as below, since you need to configure the Variable file. Either [Azure Devops variables](../../../../aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml) or Github Actions .env file
+>
 
 Import all, but start to imort two of them and execute them in the following order: 
 1) esml-infra-common-bicep.json

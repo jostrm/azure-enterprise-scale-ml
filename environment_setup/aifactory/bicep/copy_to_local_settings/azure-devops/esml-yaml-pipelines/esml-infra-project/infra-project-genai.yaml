@@ -36,6 +36,8 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.dev_service_connection }}
 - stage: Stage
   displayName: Stage
   variables:
@@ -65,12 +67,13 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.test_service_connection }}
 - stage: Prod
   displayName: Prod
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
-    dev_test_prod_ado_service_connection: $(prod_service_connection)
     admin_projectType: "genai-1"
   jobs:
     - deployment: ESGenAI_Networking
@@ -98,3 +101,5 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.prod_service_connection }}

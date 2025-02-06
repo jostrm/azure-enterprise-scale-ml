@@ -5,6 +5,14 @@ trigger:
 
 variables:
 - template: ../variables/variables.yaml
+- name: runNetworkingVar
+  value: true
+
+parameters:
+- name: runNetworking
+  displayName: 'Run Networking'
+  type: boolean
+  default: true
 
 stages:
 - stage: Dev
@@ -12,14 +20,15 @@ stages:
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: "$(dev_sub_id)"
-    dev_test_prod_ado_service_connection: $(dev_service_connection)
+    dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
       displayName: Deploy networking for project with Bicep
-      pool:
+      pool: 
         vmImage: windows-latest
-      environment: Dev  
+      environment: Dev
+      condition: eq(variables['runNetworkingVar'], 'true')
       strategy:
         runOnce:
           deploy:
@@ -27,7 +36,13 @@ stages:
               - template: ./jobs/job-1-networking.yaml
     - deployment: ESML_Services
       dependsOn: ESML_Networking
+      condition: always()
       displayName: Deploy Azure services for project with Bicep
+      variables:
+        dev_test_prod: "dev"
+        dev_test_prod_sub_id: "$(dev_sub_id)"
+        dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
+        admin_projectType: "esml"
       pool:
         vmImage: windows-latest
       environment: Dev  
@@ -36,12 +51,14 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-2-esml-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.dev_service_connection }}
 - stage: Stage
   displayName: Stage
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
-    dev_test_prod_ado_service_connection: $(test_service_con_connection)
+    dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
@@ -65,12 +82,14 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-2-esml-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.test_service_connection }}
 - stage: Prod
   displayName: Prod
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
-    dev_test_prod_ado_service_connection: $(prod_service_con_connection)
+    dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
@@ -94,3 +113,5 @@ stages:
           deploy:
             steps:
               - template: ./jobs/job-2-esml-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.prod_service_connection }}
