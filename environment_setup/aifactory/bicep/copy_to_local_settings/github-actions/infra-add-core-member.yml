@@ -1,0 +1,105 @@
+name: infra-add-core-member
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Github Environment to get variables and secrets from [dev,stage,prod]'
+        required: true
+        default: 'dev'
+env:
+    admin_aiFactorySalt: "abcde" # AIFactory salt: abcde in any resource, such as kv-cmnadm-abcde-001
+    admin_aifactorySuffixRG: "-001" # Suffix on common resource group: -001
+    admin_commonResourceSuffix: "-001" # Suffix on common resource group: -001
+    admin_ip_fw: "192.x.x.x"  # IP Address of the admin, to whitelist from the firewall
+    admin_location: "westeurope"  # AIFactory location
+    admin_locationSuffix: "weu"  # Region location suffix in ESML settings: [weu,uks,swe,sdc]
+    admin_rg_name_prefix: "rg-prefix-"  # RG name prefix, excluding "esml"
+    admin_seeding_keyvault: "seeding-kv-name" # Seeding Keyvault name
+    admin_seeding_keyvault_rg: "seeding-kv-rg" # Seeding Keyvault resource group
+    admin_seeding_keyvault_subscription: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Seeding keyvault, subscription id
+    admin_storage_account_container_name: "lake3" # lakeContainerName in parameters/10-esml-globals
+    common_keyvault_suffix: '001' #common keyvaults suffix: 001 in kv-cmnadm-abcde-001 and kv-cmndev-abcde-001
+    project_keyvault_suffix: '01' # project keyvault suffix: 01 in kv-p003-uks-dev-abcde01
+    project_number_000: '001' #ESML Projectnumber, three digits: 001
+    user_emails_comma_separated_list: "user1@example.com, user2@example.com" # Comma-separated, email(s) of new user(s) to grant admin permissions
+    user_object_ids_comma_separated_list: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Comma-separated, ObjectIds of new user(s) to grant admin permissions
+
+jobs:
+    add-core-member-dev:
+      name: Add core team member
+      environment: ${{github.event.inputs.environment}}
+      runs-on: ubuntu-latest
+      env:
+        admin_storage_account: "adminstoracc123" # ESML AIFactory common datalake (storage account) name
+        dev_test_prod: "dev" # ESML AIFactory environment: [dev,test,prod]
+        dev_test_prod_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Subscription ID of the deployed resources for the environment
+      steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: GIT
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: 10_Get ADO IP for agent
+        uses: azure/powershell@v2
+        with:
+          inlineScript: |
+            $resp = $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
+                    Write-Host $resp
+                    Write-Host "##vso[task.setvariable variable=admin_ip_fw]$resp"
+                    $ipAddr = $resp
+                    Write-Host ipAddr is: ${{ env.admin_ip_fw }}
+          azPSVersion: latest
+      - name: 10_Set ADO IP to keyvault FW whitelist
+        uses: azure/cli@v2
+        with:
+          inlineScript: az keyvault network-rule add --subscription ${{ env.admin_seeding_keyvault_subscription }} --resource-group ${{ env.admin_seeding_keyvault_rg }} --name ${{ env.admin_seeding_keyvault }} --ip-address ${{ env.admin_ip_fw }}
+          azcliversion: latest
+      - name: 11_Set ADO IP to storage FW whitelist
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            commonRGNamePrefix=${{ env.admin_rg_name_prefix }}
+            locationSuffix=${{ env.admin_locationSuffix }}
+            env=${{ env.dev_test_prod }}
+            aifactorySuffixRG=${{ env.admin_aifactorySuffixRG }}
+            common_rg=${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}
+            storage_account=${{ env.admin_storage_account }}
+            az storage account network-rule add --subscription ${{ env.dev_test_prod_sub_id }} --resource-group $common_rg --account-name $storage_account --ip-address ${{ env.admin_ip_fw }}
+      - name: 10_download_keyvault_secrets
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            echo "esml-common-bicep-sp-id=$(az keyvault secret show --subscription ${{ env.admin_seeding_keyvault_subscription }} --vault-name ${{ env.admin_seeding_keyvault }} --name 'esml-common-bicep-sp-id' --query 'value' --output tsv)" >> $GITHUB_ENV
+            echo "esml-common-bicep-sp-secret=$(az keyvault secret show --subscription ${{ env.admin_seeding_keyvault_subscription }} --vault-name ${{ env.admin_seeding_keyvault }} --name 'esml-common-bicep-sp-secret' --query 'value' --output tsv)" >> $GITHUB_ENV
+            echo "tenant-id=$(az keyvault secret show --subscription ${{ env.admin_seeding_keyvault_subscription }} --vault-name ${{ env.admin_seeding_keyvault }} --name 'tenant-id' --query 'value' --output tsv)" >> $GITHUB_ENV
+          azcliversion: latest
+      - name: '21_Add_project_member_ps_3_pwsh'
+        uses: azure/powershell@v2
+        with:
+          inlineScript:  |
+            sudo pwsh -Command "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force ; { Install-Module -Name Az -AllowClobber -Scope CurrentUser -Force
+            Install-Module Az.Storage -Repository PSGallery -Scope CurrentUser -Force
+            ${{ github.workspace }}/aifactory/esml-util/26-add-esml-coreteam-member.ps1 -spSecret \"${{ env.esml-common-bicep-sp-secret }}\" -spID \"${{ env.esml-common-bicep-sp-id }}\" -tenantID \"${{ env.tenant-id }}\" -subscriptionID \"${{ env.dev_test_prod_sub_id }}\" -storageAccount \"${{ env.admin_storage_account }}\" -adlsgen2filesystem \"${{ env.admin_storage_account_container_name }}\" -userObjectIds \"${{ env.user_object_ids_comma_separated_list }}\" -projectKeyvaultNameSuffix \"${{ env.project_keyvault_suffix }}\" -commonKeyvaultNameSuffix \"${{ env.common_keyvault_suffix }}\" -aifactorySalt \"${{ env.admin_aiFactorySalt }}\" -commonRGNamePrefix \"${{ env.admin_rg_name_prefix }}\" -commonResourceSuffix \"${{ env.admin_commonResourceSuffix }}\" -aifactorySuffixRG \"${{ env.admin_aifactorySuffixRG }}\" -locationSuffix \"${{ env.admin_locationSuffix }}\" -projectNumber \"${{ env.project_number_000 }}\" -env \"${{ env.dev_test_prod }}\" -location \"${{ env.admin_location }}\"} "
+          azPSVersion: latest
+      - name: 10_Remove ADO IP from keyvault FW whitelist
+        uses: azure/cli@v2
+        with:
+          inlineScript: az keyvault network-rule remove --subscription ${{ env.admin_seeding_keyvault_subscription }}  --resource-group ${{ env.admin_seeding_keyvault_rg }} --name ${{ env.admin_seeding_keyvault }} --ip-address ${{ env.admin_ip_fw }}
+          azcliversion: latest
+        if: always()
+      - name: 11_Remove ADO IP from storage FW whitelist
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            commonRGNamePrefix=${{ env.admin_rg_name_prefix }}
+            locationSuffix=${{ env.admin_locationSuffix }}
+            env=${{ env.dev_test_prod }}
+            aifactorySuffixRG=${{ env.admin_aifactorySuffixRG }}
+            common_rg=${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}
+            storage_account=${{ env.admin_storage_account }}
+            az storage account network-rule remove --subscription ${{ env.dev_test_prod_sub_id }}  --resource-group $common_rg --account-name $storage_account --ip-address ${{ env.admin_ip_fw }}
+        if: always()

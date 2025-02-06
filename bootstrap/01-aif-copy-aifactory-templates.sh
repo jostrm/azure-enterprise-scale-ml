@@ -58,17 +58,17 @@ fi
 
 ## TEMPLATES: infra orchestration (pipelines) - ADO (Bicep)
 mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/classic/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/" "$aif_dir/esml-infra/azure-devops/bicep/classic/" -r
+cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/classic/"
 
 mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/yaml/"
 cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/" "$aif_dir/esml-infra/azure-devops/bicep/yaml/" -r
 
 ## TEMPLATES: infra orchestration (pipelines) - GHA(Bicep, Terraform)
 mkdir -p "$aif_dir/esml-infra/github-actions/bicep/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/" "$aif_dir/esml-infra/github-actions/bicep/" -r
+cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/bicep/"
 
 mkdir -p "$aif_dir/esml-infra/github-actions/terraform/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/" "$aif_dir/esml-infra/github-actions/terraform/" -r
+cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/terraform/"
 
 ## Azure Dashboards
 mkdir -p "$aif_dir/esml-infra/azure_dashboards/"

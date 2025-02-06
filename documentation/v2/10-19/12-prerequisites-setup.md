@@ -29,57 +29,93 @@
 
 # Scripts
 
-0) Add the submodule to your repo
+>[!NOTE]
+> Note: `Local-repo-link` only works, after you have finished step 1. `Docs-link` will work relative from this Github documentation, useful to browser the file, wherof `Local-repo-link` is 
+the filed you may edit.
+> 
+
+0) Add the submodule to your repo (to get the bootstrap files)
 
     Run from your repo root location: 
 
     ```
     git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
     ```
-1) Copy templates and scripts: Copies scripts to root
 
-    [../../../bootstrap/01-aif-copy-aifactory-templates.sh](../../../bootstrap/01-aif-copy-aifactory-templates.sh)
-
-    Run from your repo root location (e.g. dir/ls should list the `azure-enteprise-scale-ml` submodule folder)
+1) Run `00-start.sh` that will copy bootstrap files, for either Github or Azure Devops
+    You will be prompted if you want to use Azure Devops or Github. Then relevant bash bootstrap files will be copied to your root directory.
+    
+    If you first select Azuure Devops and want to change your mind, just run this again, and it will clean up all Azure Devops files, and create bootstrap files for Github.
 
     ```bash
-    bash ./azure-enteprise-scale-ml/bootstrap/aifactory01-aif-copy-aifactory-templates.sh
+    bash ./azure-enterprise-scale-ml/00-start.sh
+    ```
+    
+2) Copy templates and scripts: Copies scripts to root
+
+    [Docs-link: 01-aif-copy-aifactory-templates.sh](../../../bootstrap/01-aif-copy-aifactory-templates.sh)
+
+    Run from your repo root location (e.g. dir/ls should list the `azure-enterprise-scale-ml` submodule folder)
+
+    ```bash
+    bash ./01-aif-copy-aifactory-templates.sh
     ```
 
-    This will copy all template files to a folder at root called `aifactory`
+>[!NOTE]
+> This will copy all template files to a folder at root called `aifactory-templates`. You need to rename that folder to `aifactory`, then you can edit parameters and variables. After this `Local-repo-link` and the code examples will work.
+>  
 
-2) Ensure Azure providers are enabled (create if not exists)
+3) `HOWTO: Refresh IaC pipelines`, without updating/overwriting the Variable files? 
+    Purpose: To refresh the IaC pipelines (get new features, added AI Facotry project types etc). 
+    
+    If you have chosen Azure Devops in step 1, you will see the following files, at your root. It is safe to run the ones starting with `03` without overwriting your configuration. 
+         
+    ```bash
+    bash ./02-ADO-YAML-bootstrap-files.sh
+    bash ./03-ADO-YAML-bootstrap-files-no-var-overwrite.sh
+    ```
 
-    [26-enable-resource-providers.ps1](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
+    If you have chosen Github in step 1, you will see the following files, at your root:
+    ```bash
+    bash ./02-GH-bootstrap-files.sh
+    bash ./03-GH-bootstrap-files-no-env-overwrite.sh
+    ```
+>[!IMPORTANT]
+>The files starting with `02`, you run only one time or if you want a clean slate including variables you may have configured will be overwritten. The files starting with `03 will NOT` overwrite your configured variables but will refresh your .github/workflows or Azure Devops YAML pipelines.
+>
+   
+    Note that if a pipeline (to support a new feature) needs a NEW variable, you need to look at the variable template file in the `aifactory-template` folder (Do step 2 to refresh that folder), and compare which variable to add under your `aifactory` folder.
+
+4) `VERIFY, BEFORE running any pipelines:` Ensure Azure providers are enabled (create if not exists)
+
+    [Docs-link: 26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1) | [Local-repo-link](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
 
     How to run from root: 
     ```bash
     pwsh ./aifactory/esml-util/26-enable-resource-providers.ps1 -SubscriptionName 'TODO' -Readonly $false
-    ``` 
 
-3) Create one or many service principles, project specifics, that also adds the information in the Seeding Keyvault
+
+5) `Optional:Nice-to-have script`: Creates one or many service principles and adds the information in the Seeding Keyvault.
    
-    [29-create-sp-or-update-oid-for-project.sh](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
+    [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | [Local-repo-link](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
     
-    Manually edit the variables at the top at the scrips. Then run from root: 
+    Manually edit the variables (`Local-repo-link`) at the top at the script, then run from root:
     ```bash
-        ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
+        bash ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
     ```
 
-4) Get information to set variable values
+6) `Optional:Nice-to-have script` GET AKS version, in your region, to set variable values
     - Project type: ESML
-        - `AKS version` supported in your region. 
-        - Example: `admin_aks_version_override: "1.30.3"` 
+        - **Variable: AKS version** supported in your region
+            - **Example:** `admin_aks_version_override: "1.30.3"` 
         ```bash
             az aks get-versions --location eastus --output table
-        ```
-    - Project type: GenaI
-        - 
+        ```    ``` 
 **Below scripts are relevant for centralized/peered AI Factory only. Not Standalone mode**
 
-4) Ensure Private DNS zones exists in "hub", if flag is set to true
+5) `VERIFY, BEFORE running any pipelines:`Ensure Private DNS zones exists in "hub", if flag is set to true
 
-    [27-create-private-dns-zones.ps1](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
+    [Docs-link: 27-create-private-dns-zones.ps1](../../../environment_setup/aifactory/bicep/esml-util/esml-util/27-create-private-dns-zones.ps1) | [Local-repo-link](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
 
     How to run from root: 
 
@@ -87,9 +123,9 @@
     pwsh ./aifactory/esml-util/27-create-private-dns-zones.ps1 -spID TODO -tenantID TODO -subscriptionID TODO8d1 -resourceGroupName TODO -location 'swedencentral'
     ``` 
 
-5) Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
+6) `BEFORE running any pipelines:`Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
 
-    [./aifactory/esml-util/esml-util/28-Initiatives.bicep](./aifactory/esml-util/esml-util/28-Initiatives.bicep)
+    [Docs-link: 28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep) | [Local-repo-link](./aifactory/esml-util/esml-util/28-Initiatives.bicep)
 
 # MANDATORY: 1-5
 

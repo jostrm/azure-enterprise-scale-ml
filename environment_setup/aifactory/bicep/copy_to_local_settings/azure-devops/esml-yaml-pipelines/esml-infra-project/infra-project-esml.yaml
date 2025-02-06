@@ -20,7 +20,6 @@ stages:
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: "$(dev_sub_id)"
-    dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
@@ -33,7 +32,9 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yaml
+              - template: ./jobs/job-1-esml-networking.yaml
+                parameters:
+                  serviceConnection: ${{ variables.dev_service_connection }}
     - deployment: ESML_Services
       dependsOn: ESML_Networking
       condition: always()
@@ -41,7 +42,6 @@ stages:
       variables:
         dev_test_prod: "dev"
         dev_test_prod_sub_id: "$(dev_sub_id)"
-        dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
         admin_projectType: "esml"
       pool:
         vmImage: windows-latest
@@ -58,7 +58,6 @@ stages:
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
-    dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
@@ -70,7 +69,9 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yaml
+              - template: ./jobs/job-1-esml-networking.yaml
+                parameters:
+                  serviceConnection: ${{ variables.test_service_connection }}
     - deployment: ESML_Services
       dependsOn: ESML_Networking
       displayName: Deploy Azure services for project with Bicep
@@ -89,7 +90,6 @@ stages:
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
-    dev_test_prod_ado_service_connection: "esml-aifactory-infra-dev"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
@@ -101,7 +101,9 @@ stages:
         runOnce:
           deploy:
             steps:
-              - template: ./jobs/job-1-networking.yaml
+              - template: ./jobs/job-1-esml-networking.yaml
+                parameters:
+                  serviceConnection: ${{ variables.prod_service_connection }}
     - deployment: ESML_Services
       dependsOn: ESML_Networking
       displayName: Deploy Azure services for project with Bicep

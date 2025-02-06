@@ -20,8 +20,8 @@ env:
     admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}" #seeding keyvault, resource group
     admin_aifactorySuffixRG: "${{ vars.AIFACTORY_SUFFIX }}"  # Max 6 characters. <company>-<aifactoryname> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
     admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"  # <company>-<aifactoryname> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
-    common-sp-appid-seeding-kv-name: "esml-common-bicep-sp-id"
-    common-sp-secret-seeding-kv-name: "esml-common-bicep-sp-secret"
+    common-sp-appid-seeding-kv-name: "${{ vars.COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID}}" # "esml-common-bicep-sp-id"
+    common-sp-secret-seeding-kv-name: "${{ vars.COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET}}" # "esml-common-bicep-sp-secret"
     admin_hybridBenefit: false # Enable Hybrid Benefits if provisioning VM access via Bastion
     admin_commonResourceSuffix: "-001"
     admin_prjResourceSuffix: "-001"
@@ -57,11 +57,10 @@ env:
     optional_serviceSettingDeployAzureCosmosDB: false # Deploy Azure CosmosDB
     # OPTIONAL - ESML specific
     admin_aks_gpu_sku_dev_override: "Standard_B4ms" # AKS GPU SKU for dev
-    admin_aks_gpu_sku_test_prod_override: "Standard_DS13-2_v2" # AKS GPU SKU for test/prod
+    admin_aks_gpu_sku_test_prod_override: Standard_DS13-2_v2 # AKS GPU SKU for test/prod
     admin_aks_nodes_dev_override: 1 # AKS nodes for dev
     admin_aks_nodes_testProd_override: 3 # AKS nodes for test/prod
     admin_aks_version_override: "1.30.3" # AKS version
-    
     admin_aml_cluster_maxNodes_dev_override: 3 # AML cluster max nodes for dev
     admin_aml_cluster_maxNodes_testProd_override: 5 # AML cluster max nodes for test/prod
     admin_aml_cluster_sku_dev_override: "Standard_DS3_v2" # AML cluster SKU for dev
@@ -76,17 +75,34 @@ jobs:
     if: ${{ vars.RUN_JOB1_NETWORKING }} == 'true'
     environment: ${{github.event.inputs.environment}}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: pwsh
+    #defaults:
+      #run:
+        #shell: pwsh
         #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/"
     steps:
     - name: Print Skip NETWORKING variable
       run: |
         echo "The value of vars.RUN_JOB1_NETWORKING  is: ${{ vars.RUN_JOB1_NETWORKING }}"
         echo "The value of env.ENABLE_NETWORKING_JOB  is: ${{ env.ENABLE_NETWORKING_JOB }}"
+    - name: Print info
+      run: |
+        echo "The value of env.admin_private_azureMLStudioUI is: ${{ env.admin_private_azureMLStudioUI }}"
+        echo "The value of env.project_number_000  is: ${{ env.project_number_000 }}"
+        echo "The value of env.admin_aks_version_override  is: ${{ env.technical_admins_email }}"
+        echo "The value of env.admin_projectType  is: ${{ env.admin_projectType }}"
+        echo "The value of env.useCommonACR  is: ${{ env.useCommonACR }}"
+        echo "The value of env.ENABLE_NETWORKING_JOB  is: ${{ env.ENABLE_NETWORKING_JOB }}"
+        echo "The value of env.admin_aks_version_override  is: ${{ env.admin_aks_version_override }}"
+    - name: Set TLS 1.2
+      run: |
+        pwsh -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12"
+    - name: Set as Powershell repo as trusted
+      run: |
+        pwsh -Command "Register-PSRepository -Default"
+    - name: Install PowershellGet manually
+      run: |
+        pwsh -Command "Install-Module -Name PowerShellGet -Force -AllowClobber"
     - name: Azure Login
-      if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/login@v2
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -107,7 +123,7 @@ jobs:
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       run: |
         echo "The value of runner_ip is: ${{ env.runner_ip }}"
-    - name: 02_az_set_ADO_ip_to_sedding_keyvault_FW_whitelist
+    - name: 02_az_set_ADO_ip_to_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
@@ -168,6 +184,15 @@ jobs:
           shell: pwsh
           #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/"
       steps:
+      - name: Print info
+        run: |
+          echo "The value of env.admin_private_azureMLStudioUI is: ${{ env.admin_private_azureMLStudioUI }}"
+          echo "The value of env.project_number_000  is: ${{ env.project_number_000 }}"
+          echo "The value of env.admin_aks_version_override  is: ${{ env.technical_admins_email }}"
+          echo "The value of env.admin_projectType  is: ${{ env.admin_projectType }}"
+          echo "The value of env.useCommonACR  is: ${{ env.useCommonACR }}"
+          echo "The value of env.ENABLE_NETWORKING_JOB  is: ${{ env.ENABLE_NETWORKING_JOB }}"
+          echo "The value of env.admin_aks_version_override  is: ${{ env.admin_aks_version_override }}"
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -186,7 +211,7 @@ jobs:
       - name: Echo runner_ip
         run: |
           echo "The value of runner_ip is ${{ env.runner_ip }}"
-      - name: 02_az_set_ADO_ip_to_sedding_keyvault_FW_whitelist
+      - name: 02_az_set_ADO_ip_to_seeding_keyvault_FW_whitelist
         uses: azure/cli@v2
         with:
           inlineScript: az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
@@ -199,11 +224,14 @@ jobs:
             echo "common-sp-secret-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-secret-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
           azcliversion: latest
       - name: 04_pwsh_fetch_network_parameters
+        id: fetch_network_parameters
         working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
         run: |
           sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{env.common-sp-appid-value}}' -spSecret '${{env.common-sp-secret-value}}' -useServicePrincipal -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -filePath '../../../../../aifactory/parameters/' -env '${{env.dev_test_prod}}' -locationSuffixADO '${{env.admin_locationSuffix}}' -aifactorySuffixRGADO '${{env.admin_aifactorySuffixRG}}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{env.dev_test_prod_sub_id}}' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectTypeADO '${{env.admin_projectType}}'"
+        continue-on-error: false
         shell: pwsh
       - name: 05_az_bicep_deploy_esml_project
+        if: steps.fetch_network_parameters.outcome == 'success'
         uses: azure/cli@v2
         with:
           #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/"
@@ -247,7 +275,6 @@ jobs:
             --parameters aml_cluster_dev_sku_override="${{ env.admin_aml_cluster_sku_dev_override }}" \
             --parameters aml_cluster_test_prod_sku_override="${{ env.admin_aml_cluster_sku_testProd_override }}" \
             --parameters aml_cluster_dev_nodes_override="${{ env.admin_aml_cluster_maxNodes_dev_override }}" \
-            --parameters aml_cluster_test_prod_nodes_override="${{ env.admin_aml_cluster_maxNodes_testProd_override }}" \
             --parameters aml_ci_dev_sku_override="${{ env.admin_aml_computeInstance_dev_sku_override }}" \
             --parameters aml_ci_test_prod_sku_override="${{ env.admin_aml_computeInstance_testProd_sku_override }}" \
             --parameters IPwhiteList="${{ env.project_IP_whitelist }}"

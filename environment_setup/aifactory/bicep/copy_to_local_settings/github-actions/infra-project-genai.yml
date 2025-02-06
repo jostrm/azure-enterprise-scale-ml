@@ -20,8 +20,8 @@ env:
     admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}" #seeding keyvault, resource group
     admin_aifactorySuffixRG: "${{ vars.AIFACTORY_SUFFIX }}"  #"-002"
     admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"  # <company>-<aifactoryname> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
-    common-sp-appid-seeding-kv-name: "esml-common-bicep-sp-id"
-    common-sp-secret-seeding-kv-name: "esml-common-bicep-sp-secret"
+    common-sp-appid-seeding-kv-name: "${{ vars.COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID}}" # "esml-common-bicep-sp-id"
+    common-sp-secret-seeding-kv-name: "${{ vars.COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET}}" # "esml-common-bicep-sp-secret"
     admin_hybridBenefit: false # Enable Hybrid Benefits if provisioning VM access via Bastion
     admin_commonResourceSuffix: "-001"
     admin_prjResourceSuffix: "-001"
@@ -47,7 +47,7 @@ env:
     useCommonACR: "${{ vars.USE_COMMON_ACR_FOR_PROJECTS }}" # Use common Azure Container Registry (save cost), insted of each project having its own.
 
     # OPTIONAL - GENAI specific
-    azure_machinelearning_sp_oid: "" # Azure Machine Learning service principle Object ID. In Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
+    azure_machinelearning_sp_oid: "b6b19655-d941-419f-abe6-8378b92cb8d2" # Azure Machine Learning service principle Object ID. In Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
     admin_enablePublicGenAIAccess: true # Enable public access to GenAI
     optional_serviceSettingDeployAIDocIntelligence: false # Deploy AI Doc Intelligence
     optional_serviceSettingDeployAzureAIVision: false # Deploy Azure AI Vision
@@ -159,7 +159,6 @@ jobs:
             ./subnetCalc.ps1 -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -filePath '../../../../../aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.dev_test_prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location}}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -projectTypeADO '${{ env.admin_projectType }}' -useServicePrincipal
           "
         azPSVersion: latest
-        shell: pwsh
     - name: 05_bicep_deploy_subnets_and_NSGs
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2

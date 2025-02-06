@@ -1,0 +1,109 @@
+name: infra-common
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Github Environment to get variables and secrets from [dev,stage,prod]'
+        required: true
+        default: 'dev'
+env:
+   # ADMIN specific START (only configure once)
+  admin_location: "${{ vars.AIFACTORY_LOCATION }}" # AIFactory location
+  admin_locationSuffix: "${{ vars.AIFACTORY_LOCATION_SHORT }}" # Region location suffix in ESML settings: [weu,uks,swe,sdc]
+  dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}" # "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  dev_test_prod: "${{ vars.AZURE_ENV_NAME }}" # ESML AIFactory environment: [dev,test,prod]
+  admin_input_keyvault_name: "${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}" # seeding keyvault, subscription id
+  admin_input_keyvault_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}" #seeding keyvault, resource group
+  aifactorySuffixRG: "${{ vars.AIFACTORY_SUFFIX }}"  # Max 6 characters. <company>-<aifactoryname> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
+  admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"  # <company>-<aifactoryname> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
+  cidr_range: "${{ vars.AIFACTORY_CIDR_XX }}" # XX = "17" 
+  aiResourceSuffix: "-001" # Suffix on resources within the resource group: -001, -002
+
+  # CORE TEAM MEMBERS specific
+  technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}" # "192.x.x.x"
+  technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"  # comma separated list with no spaces: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx,1234f-af-234-adfssdf,12312-aef23431"
+  technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"  # comma separated list
+
+jobs:
+    dev-common-deploy:
+      name: Deploy Common
+      environment: ${{github.event.inputs.environment}}
+      runs-on: ubuntu-latest
+      steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: GIT
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: 11-Common RG and RBAC
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment sub create \
+            --name "esml-cmn-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.aifactorySuffixRG }}-DeplRG" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}" \
+            --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\11-rgCommon.bicep" \
+            --parameters @"./aifactory/parameters/11-esml-globals-11_13.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
+            --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+            --parameters location="${{ env.admin_location }}" \
+            --parameters env="${{ env.dev_test_prod }}" \
+            --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
+            --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
+          azcliversion: latest
+      - name: 12-Common-Networking
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment sub create \
+            --name "esml-cmn${{ env.dev_test_prod }}-${{ env.aifactorySuffixRG }}-${{ env.aiResourceSuffix }}Subnets" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}" \
+            --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\12-networkCommon.bicep" \
+            --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-2-12_13_21_22.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-3-12_13.json" \
+            --parameters @"./aifactory/parameters/12-esml-cmn-parameters.json" \
+            --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+            --parameters location="${{ env.admin_location }}" \
+            --parameters env="${{ env.dev_test_prod }}" \
+            --parameters cidr_range="${{ env.cidr_range }}" \
+            --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
+            --parameters commonResourceSuffix="${{ env.aiResourceSuffix }}" \
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
+          azcliversion: latest
+      - name: '13-Deploy resources'
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment sub create \
+            --name "esml-cmn-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.aifactorySuffixRG }}-${{ env.aiResourceSuffix }}-DeplRes" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}" \
+            --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-common\main\13-rgLevel.bicep" \
+            --parameters adminPassword="$( date +%s | sha256sum | base64 | head -c 32 ; echo )" \
+            --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-2-12_13_21_22.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-3-12_13.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-4-13_21_22.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-5-13_23.json" \
+            --parameters @"./aifactory/parameters/11-esml-globals-11_13.json" \
+            --parameters @"./aifactory/parameters/13-esml-cmn-parameters.json" \
+            --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+            --parameters location="${{ env.admin_location }}" \
+            --parameters env="${{ env.dev_test_prod }}" \
+            --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
+            --parameters resourceSuffix="${{ env.aiResourceSuffix }}" \
+            --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
+            --parameters inputKeyvaultSubscription="${{ env.admin_input_keyvault_subscription }}" \
+            --parameters inputKeyvaultResourcegroup="${{ env.admin_input_keyvault_rg }}" \
+            --parameters inputKeyvault="${{ env.admin_input_keyvault_name }}"
+          azcliversion: latest
