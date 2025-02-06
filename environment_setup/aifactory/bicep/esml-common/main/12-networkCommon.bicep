@@ -124,7 +124,7 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
 }
 module vNetCommon '../modules-common/vNetCommon.bicep' = {
   scope: vnetResourceGroup
-  name: '${vnetNameFull}-depl'
+  name: '${vnetNameFull}depl${commonRGNamePrefix}${locationSuffix}${env}'
   params: {
     location: location
     common_pbi_subnet_cidr: common_pbi_subnet_cidr_v
