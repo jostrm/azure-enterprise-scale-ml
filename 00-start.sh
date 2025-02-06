@@ -56,7 +56,7 @@ if [[ "$orchestrator" == "a" ]]; then
     echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
 
     # Check if the directory exists, if not, create it
-    if [ ! -d "$SCRIPT_DIR/../.github/workflows/" ]; then
+    if [ -d "$SCRIPT_DIR/../.github/workflows/" ]; then
         echo -e "${YELLOW}Do you also want to remove the GITHUB folder (the workflows for AIFactory is removed) (Enter 'y' or 'n')${NC}"
         read -p "Delete .github/workflows folder: " workflowsdelete
         if [[ "$workflowsdelete" == "y" ]]; then
