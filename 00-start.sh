@@ -60,6 +60,7 @@ if [[ "$orchestrator" == "a" ]]; then
     if [[ "$workflowsdelete" == "y" ]]; then
         echo -e "${YELLOW}Deleting .github/workflows folder${NC}"
         rm -rf "$SCRIPT_DIR/../.github/workflows"
+        rm -rf "$SCRIPT_DIR/../.github"
         echo -e "${GREEN}Finished!${NC}"
     else
         echo -e "${GREEN}Did not delete the folder.${NC}"
