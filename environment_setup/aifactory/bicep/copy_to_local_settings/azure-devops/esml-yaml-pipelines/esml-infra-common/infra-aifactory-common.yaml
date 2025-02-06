@@ -25,6 +25,7 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
+                  cidr_range: ${{ variables.dev_cidr_range }}
 - stage: Stage
   dependsOn: Dev
   displayName: AIFactory_CMN_Stage
@@ -44,6 +45,7 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
+                  cidr_range: ${{ variables.test_cidr_range }}
 - stage: Prod
   dependsOn: Stage
   displayName: AIFactory_CMN_Prod
@@ -63,4 +65,5 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
+                  cidr_range: ${{ variables.prod_cidr_range }}
   

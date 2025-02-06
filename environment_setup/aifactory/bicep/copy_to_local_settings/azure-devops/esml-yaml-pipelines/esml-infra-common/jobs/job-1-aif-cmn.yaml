@@ -24,7 +24,7 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az deployment sub create \
-     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(aifactorySuffixRG)-DeplRG" \
+     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_aifactorySuffixRG)-DeplRG" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-common\main\11-rgCommon.bicep" \
@@ -33,7 +33,7 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
      --parameters env="$(dev_test_prod)" \
-     --parameters aifactorySuffixRG="$(aifactorySuffixRG)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
@@ -46,7 +46,7 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az deployment sub create \
-     --name "esml-cmn$(dev_test_prod)-$(aifactorySuffixRG)-$(aiResourceSuffix)Subnets" \
+     --name "esml-cmn$(dev_test_prod)-$(admin_aifactorySuffixRG)-$(admin_commonResourceSuffix)Subnets" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-common\main\12-networkCommon.bicep" \
@@ -58,10 +58,10 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
      --parameters env="$(dev_test_prod)" \
-     --parameters cidr_range="$(cidr_range)" \
-     --parameters aifactorySuffixRG="$(aifactorySuffixRG)" \
-     --parameters commonResourceSuffix="$(aiResourceSuffix)" \
-     --parameters IPwhiteList="$(technical_admins_bastion_IP_whitelist)"
+     --parameters cidr_range="${{ parameters.cidr_range }}" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters IPwhiteList="$(project_IP_whitelist)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
@@ -72,7 +72,7 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az deployment sub create \
-     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(aifactorySuffixRG)-$(aiResourceSuffix)-DeplRes" \
+     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_aifactorySuffixRG)-$(admin_commonResourceSuffix)-DeplRes" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-common\main\13-rgLevel.bicep" \
@@ -88,12 +88,12 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
      --parameters env="$(dev_test_prod)" \
-     --parameters aifactorySuffixRG="$(aifactorySuffixRG)" \
-     --parameters resourceSuffix="$(aiResourceSuffix)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters resourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)" \
-     --parameters IPwhiteList="$(technical_admins_bastion_IP_whitelist)" \
-     --parameters inputKeyvaultSubscription="$(admin_input_keyvault_subscription)" \
-     --parameters inputKeyvaultResourcegroup="$(admin_input_keyvault_rg)" \
-     --parameters inputKeyvault="$(admin_input_keyvault_name)"
+     --parameters IPwhiteList="$(project_IP_whitelist)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
