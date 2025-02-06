@@ -24,7 +24,7 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az deployment sub create \
-     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_aifactorySuffixRG)-DeplRG" \
+     --name "esml-cmn-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)$(admin_location)-DeplRG" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-common\main\11-rgCommon.bicep" \
@@ -46,7 +46,7 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az deployment sub create \
-     --name "esml-cmn$(dev_test_prod)-$(admin_aifactorySuffixRG)-$(admin_commonResourceSuffix)Subnets" \
+     --name "esml-cmn$(dev_test_prod)$(admin_aifactorySuffixRG)$(admin_commonResourceSuffix)$(admin_location)-Subnets" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-common\main\12-networkCommon.bicep" \
@@ -72,7 +72,7 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az deployment sub create \
-     --name "esml-cmn-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_aifactorySuffixRG)-$(admin_commonResourceSuffix)-DeplRes" \
+     --name "esml-cmn-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)$(admin_commonResourceSuffix)$(admin_location)-DeplRes" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-common\main\13-rgLevel.bicep" \

@@ -31,7 +31,7 @@
 
 0) Add the submodule to your repo
 
-    Run from your repo root location 
+    Run from your repo root location: 
 
     ```
     git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
