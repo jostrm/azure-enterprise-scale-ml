@@ -58,7 +58,7 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
      --parameters env="$(dev_test_prod)" \
-     --parameters cidr_range="${{ parameters.cidr_range }}" \
+     --parameters cidr_range="$(cidr_range)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters IPwhiteList="$(project_IP_whitelist)"

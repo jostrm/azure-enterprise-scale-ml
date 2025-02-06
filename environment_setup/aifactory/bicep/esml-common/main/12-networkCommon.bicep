@@ -89,6 +89,9 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
     location:location
     bastionIpRange: common_bastion_subnet_cidr_v
   }
+  dependsOn:[
+    nsgCommon
+  ]
 }
 
 var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
@@ -102,6 +105,9 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = {
     location:location
     IPwhiteList_Array:ipWhitelist_array
   }
+  dependsOn:[
+    nsgCommonScoring
+  ]
 }
 
 module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
@@ -112,6 +118,9 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
     tags: tags
     location:location
   }
+  dependsOn:[
+    nsgBastion
+  ]
 }
 module vNetCommon '../modules-common/vNetCommon.bicep' = {
   scope: vnetResourceGroup

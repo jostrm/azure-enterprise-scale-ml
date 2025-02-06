@@ -8,10 +8,11 @@ variables:
 
 stages:
 - stage: Dev
-  displayName: AIFactory_Common_Dev
+  displayName: AIFactory_CMN_Dev
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: $(dev_sub_id)
+    cidr_range: $(dev_cidr_range)
   jobs:
     - deployment: AIFactory_CMN_Dev
       displayName: AIFactory_CMN_Dev
@@ -25,13 +26,13 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
-                  cidr_range: ${{ variables.dev_cidr_range }}
 - stage: Stage
   dependsOn: Dev
   displayName: AIFactory_CMN_Stage
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: $(test_sub_id)
+    cidr_range: $(test_cidr_range)
   jobs:
     - deployment: AIFactory_CMN_Stage
       displayName: AIFactory_CMN_Stage
@@ -45,13 +46,13 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
-                  cidr_range: ${{ variables.test_cidr_range }}
 - stage: Prod
   dependsOn: Stage
   displayName: AIFactory_CMN_Prod
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: $(prod_sub_id)
+    cidr_range: $(prod_cidr_range)
   jobs:
     - deployment: AIFactory_CMN_Prod
       displayName: AIFactory_CMN_Prod
@@ -65,5 +66,4 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
-                  cidr_range: ${{ variables.prod_cidr_range }}
   
