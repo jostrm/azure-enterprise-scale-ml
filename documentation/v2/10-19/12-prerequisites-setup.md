@@ -47,7 +47,7 @@ the filed you may edit.
 1) Run `00-start.sh` that will copy bootstrap files, for either Github or Azure Devops
     You will be prompted if you want to use Azure Devops or Github. Then relevant bash bootstrap files will be copied to your root directory.
     
-    If you first select Azuure Devops and want to change your mind, just run this again, and it will clean up all Azure Devops files, and create bootstrap files for Github.
+    If you first select Azuzre Devops and want to change your mind, just run this again, and it will clean up all Azure Devops files, and create bootstrap files for Github.
 
     [Docs-link: 00-start.sh](../../../00-start.sh)
 
@@ -132,6 +132,11 @@ the filed you may edit.
     [Docs-link: 28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep) | [Local-repo-link](./aifactory/esml-util/esml-util/28-Initiatives.bicep)
 
 # MANDATORY: 1-5
+
+>[!NOTE]
+> If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ SETUP STARTING PAGE](../20-29/24-end-2-end-setup.md)
+>
+
 
 ## Step 1) Create Azure Devops (or Github) projects
 - **Purpose:** Where the AIFactory acceleration code resides
