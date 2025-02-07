@@ -8,8 +8,20 @@
 [Prerequisites](../10-19/12-prerequisites-setup.md)
 
 ## Config: Standalone VS Hub-connected centralized private DNS zones
+
+### When to choose What? 
+Recommended approach is to combine `BYOvNet` with `Hub-Connected & Centralized private DNZ zones`. This enables all 4 access modes: `Peering, VPN, Bastion, Whitelistlisting user IP's`, and separates the networking from the AI Factory common area, to your centralized Hub (Hub/Spoke).
+- **Scenarios**: Production scenario.
+
+But if you want simplicty or want to setup an AI Factory in an isolated bubble - not involving your Hub, choose `Standalone` mode. 
+- Standalone mode is still secured with private networking, and you can reach the UI portals (Azure AI Foundry, Azure Machine Learning) via either: `VPN, Bastion, Whitelistlisting user IP's`
+- **Scenarios**: 
+    1) Testing out the AI Factory accelerator
+    2) Setup an AIFactory for a temporary workshop, that needs to have high security.
+    3) If it is not possible to connect it to your HUB, for various reasons.
+
 ### Standalone
-For `Standalone mode` using the *AI Factory common resource group* for both `vNet and Private DNS zones` set the values as below: `true, subscriptionId and resourcegroupNam` where your centralized Private DNS zones resides. This is usually your Hub subscriptiom and platform-connectivity resource group.
+For `Standalone mode` using the *AI Factory common resource group* for both `Virtual Network, Network Security Groups, Private DNS zones` set the values as below: `true, subscriptionId and resourcegroupNam` where your centralized Private DNS zones resides. This is usually your Hub subscriptiom and platform-connectivity resource group.
 
 ```json
         "centralDnsZoneByPolicyInHub": {
@@ -24,7 +36,8 @@ For `Standalone mode` using the *AI Factory common resource group* for both `vNe
 ```
 
 ### Hub-Connected & Centralized private DNZ zones
-For `Hub-connected mode` for Private DNS zones set the values as below: `true, subscriptionId and resourcegroupName` where your centralized Private DNS zones resides. This is usually your Hub subscription and platform-connectivity resource group.
+For `Hub-connected mode` using your own *Hub resource group* for both `Private DNS zones` 
+Set values as below, e.g. where your centralized Private DNS zones resides. This is usually your Hub subscription and platform-connectivity resource group.
 
 [Docs-link: 10-esml-globals-4-13_21_22.json](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)  | [Local-repo-link](../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json)
 
@@ -42,7 +55,7 @@ For `Hub-connected mode` for Private DNS zones set the values as below: `true, s
 ```
 
 ## Config: BYOvNet
-For `Bring your own vNet`, e.g. NOT using the *AI Factory common resource group* for `vNet` location, set the parameters as below- 
+For `Bring your own vNet`, e.g. NOT using the *AI Factory common resource group* for `Virtual Network, Network Security Groups` location, set the parameters as below. 
 
 [Docs-link: 10-esml-globals-override.json](../../../environment_setup/aifactory/parameters/10-esml-globals-override.json)  | [Local-repo-link](../../../../aifactory/parameters/10-esml-globals-override.json)
 
