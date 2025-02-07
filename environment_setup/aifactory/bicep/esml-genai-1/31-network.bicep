@@ -40,6 +40,9 @@ param useCommonACR bool = false
 
 var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
+var vNetSalt = substring(uniqueString(resourceGroup().id), 0, 5)
+var deploymentProjSpecificUniqueSuffix = '${projectName}${vNetSalt}${locationSuffix}-${env}${commonResourceSuffix}'
+
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false 
 
@@ -54,7 +57,7 @@ var aksSubnetSettings =   {
   ]
 }
 module nsgAKS '../modules/aksNsg.bicep' = {
-  name: 'aksNsgAKS'
+  name: 'aksNsgAKS-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'aks-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -65,7 +68,7 @@ module nsgAKS '../modules/aksNsg.bicep' = {
 }
 
 module aksSnt '../modules/subnetWithNsg.bicep' = {
-  name: '${projectName}-aks'
+  name: 'aks-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-aks'
     virtualNetworkName: vnetNameFull
@@ -99,7 +102,7 @@ var genaiSubnetSettings =   {
 }
 
 module nsgGenAI '../modules/nsgGenAI.bicep' = {
-  name: 'nsgGenAI'
+  name: 'nsgGenAI-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'genai-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -110,7 +113,7 @@ module nsgGenAI '../modules/nsgGenAI.bicep' = {
 }
 
 module genaiSnt '../modules/subnetWithNsg.bicep' = {
-  name: '${projectName}-genai'
+  name: 'genai-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-genai'
     virtualNetworkName: vnetNameFull

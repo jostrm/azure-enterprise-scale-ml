@@ -19,6 +19,13 @@ param adminUsername string
 @description('Log analytics can only add search queries in BICEP once, otherwise will give error 2nd time, entry key already exists')
 param enableLogAnalyticsQueries bool = true
 
+param vmSKUSelectedArrayIndex int = 0
+param vmSKU array = [
+  'Standard_E2s_v3'
+  'Standard_D4s_v3'
+  'standard_D2as_v5'
+]
+
 @allowed([
   'Standard_LRS'
   'Standard_GRS'
@@ -54,7 +61,7 @@ param vnetNameBase string
 @description('Deployment location')
 param location string
 @description('Specifies wether or not the virtual machine should have a public IP address or not')
-param enableVmPubIp bool = false
+param enableAdminVM bool = false
 @description('Common default subnet')
 param common_subnet_name string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
@@ -340,7 +347,7 @@ var privateLinksDnsZonesArray = [
 
 module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'createPrivateDnsZonesIfNotExistsCmn'
+  name: 'PrivDnsZonesIfNotExistsCmn-${uniqueInAIFenv}'
   params: {
     privateLinksDnsZones: privateLinksDnsZonesArray
     privDnsSubscription: privDnsSubscription
@@ -418,7 +425,7 @@ module wsQueries '../../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyti
 var adfName = 'adf-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}' // globally unique: adf-cmn-weu-prod-1234-004 (25/63)
 module adf '../../modules/dataFactory.bicep' = if(sweden_central_adf_missing== false) {
   scope: esmlCommonResourceGroup
-  name: 'DataFactoryCmn'
+  name: 'DataFactoryCmn${uniqueInAIFenv}'
   params: {
     name: adfName
     location: location
@@ -453,7 +460,7 @@ resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' ex
 var common_bastion_host_name = 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'
 module bastionHost '../modules-common/bastionHostCommon.bicep' = if(addBastionHost == true) { 
   scope: esmlCommonResourceGroup
-  name: common_bastion_host_name
+  name: 'common_bastion-depl${uniqueInAIFenv}'
   params: {
     name: common_bastion_host_name
     location:location
@@ -470,7 +477,7 @@ var kvNameCommonNoDash = replace(kvNameCommon,'-','')
 
 module kvCmn '../../modules/keyVault.bicep' = {
   scope: esmlCommonResourceGroup
-  name: '${kvNameCommonNoDash}Deploy'
+  name: '${kvNameCommonNoDash}-depl-${uniqueInAIFenv}'
   params: {
     keyvaultName: kvNameCommon
     location: location
@@ -516,7 +523,7 @@ var secretAll = {
 // AzureDatabricks - if set, and if this EnterpriseApplication already exists (can be that a project needs to be provisoned first..)
 module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
   scope: esmlCommonResourceGroup
-  name: 'spDatabricksAccessPolicyGet'
+  name: 'spDBXAPGet${uniqueInAIFenv}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommon
@@ -535,7 +542,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 }
 module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = {
   scope: esmlCommonResourceGroup
-  name: 'spCmnAccessPolicyGet'
+  name: 'spCmnAPGet${uniqueInAIFenv}'
   params: {
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvNameCommon
@@ -550,7 +557,7 @@ module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = {
 }
 module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(sweden_central_adf_missing== false) {
   scope: esmlCommonResourceGroup
-  name: 'adfAccessPolicyGet'
+  name: 'adfAPGet${uniqueInAIFenv}'
   params: {
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvNameCommon
@@ -567,7 +574,7 @@ module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(sweden_c
 }
 module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = {
   scope: esmlCommonResourceGroup
-  name: 'kvCmnAccessPolicyTechnicalContactAll'
+  name: 'kvCmnAPTechContact${uniqueInAIFenv}'
   params: {
     keyVaultPermissions: secretAll
     keyVaultResourceName: kvNameCommon
@@ -584,7 +591,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bi
 }
 
 module addSecret '../modules-common/kvSecretsCmn.bicep' = {
-  name: '${kvNameCommonNoDash}addSecrect2CommonKV'
+  name: '${kvNameCommonNoDash}sec${uniqueInAIFenv}'
   scope: esmlCommonResourceGroup
   params: {
     esmlCommonSpIDSecret: externalKv.getSecret(inputCommonSPIDKey)
@@ -604,10 +611,9 @@ module addSecret '../modules-common/kvSecretsCmn.bicep' = {
 
 
 var kvAdminNoDash = replace(kvNameCommonAdmin,'-','')
-var kvAdminNameDeployment = 'KeyVaultAdmin${kvAdminNoDash}'
 module kvAdmin '../../modules/keyVault.bicep' = {
   scope: esmlCommonResourceGroup
-  name: kvAdminNameDeployment
+  name: '${kvAdminNoDash}${uniqueInAIFenv}'
   params: {
     keyvaultName: kvNameCommonAdmin
     location: location
@@ -632,7 +638,7 @@ module kvAdmin '../../modules/keyVault.bicep' = {
 }
 module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = {
   scope: esmlCommonResourceGroup
-  name: '${kvAdminNoDash}APolicyTechnicalContactAll' 
+  name: '${kvAdminNoDash}AP${uniqueInAIFenv}' 
   params: {
     keyVaultPermissions: secretAll
     keyVaultResourceName: kvNameCommonAdmin
@@ -646,7 +652,7 @@ module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.
 }
 module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = {
   scope: esmlCommonResourceGroup
-  name: '${kvAdminNoDash}APolicyCommonSPDepl'
+  name: '${kvAdminNoDash}AP2${uniqueInAIFenv}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommonAdmin
@@ -662,7 +668,7 @@ module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = {
 
 module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(sweden_central_adf_missing== false) {
   scope: esmlCommonResourceGroup
-  name: '${kvAdminNoDash}AccessPolicyGetADFDepl'
+  name: '${kvAdminNoDash}APadf${uniqueInAIFenv}'
   params: {
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvNameCommonAdmin
@@ -687,7 +693,7 @@ var virtualNetworkRules2Add = [
 ]
 module dataLake '../../modules/dataLake.bicep' = {
   scope: esmlCommonResourceGroup
-  name: 'StorageAccount${datalakeName}'
+  name: '${datalakeName}${uniqueInAIFenv}'
   params: {
     storageAccountName: datalakeName
     containerName: lakeContainerName
@@ -710,14 +716,14 @@ module dataLake '../../modules/dataLake.bicep' = {
   ]
 }
 
-module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp == false) {
+module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM == true) {
   scope: esmlCommonResourceGroup
-  name: 'privateVirtualMachine'
+  name: 'privateVirtualMachine${uniqueInAIFenv}'
   params: {
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit:hybridBenefit
-    vmSize: 'Standard_A4_v2' //'Standard_DS3_v2'
+    vmSize: vmSKU[0] //["Standard_E2s_v3","Standard_D4s_v3"]
     location: location
     vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${commonResourceSuffix}'
     subnetName: defaultSubnet
@@ -732,30 +738,9 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableVmPubIp 
   ]
 }
 
-module vmPublic '../../modules/virtualMachinePublic.bicep' = if(enableVmPubIp == true) {
-  scope: esmlCommonResourceGroup
-  name: 'publicVirtualMachine'
-  params: {
-    adminUsername: adminUsername
-    adminPassword: adminPassword
-    hybridBenefit:hybridBenefit
-    vmSize: 'Standard_A4_v2' // 'Standard_DS3_v2'
-    location: location
-    vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${commonResourceSuffix}'
-    subnetName: defaultSubnet
-    vnetId: vnetId
-    tags: tags
-    keyvaultName: kvAdmin.outputs.keyvaultName
-  }
-
-  dependsOn: [
-    kvAdmin
-    esmlCommonResourceGroup
-  ]
-}
 module dnsZone1 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneStorage'
+  name: 'privateDnsZoneStorage${uniqueInAIFenv}'
   params: {
     typeArray: dataLake.outputs.dnsConfig
     location: 'global'// Using default Microsoft Private DNS, they are registered in global. (you can change this, but need to register location for DNS in your subscription )
@@ -768,7 +753,7 @@ module dnsZone1 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
 }
 module dnsZone2 '../../modules/privateDnsZone.bicep' =  if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneKeyvault'
+  name: 'privateDnsZoneKeyvault${uniqueInAIFenv}'
   params: {
     typeArray: kvCmn.outputs.dnsConfig
     location: 'global'
@@ -780,7 +765,7 @@ module dnsZone2 '../../modules/privateDnsZone.bicep' =  if(centralDnsZoneByPolic
   ]
 }
 
-var dnsZone3DeplName = 'privateDnsZoneACR'
+var dnsZone3DeplName = 'privateDnsZoneACR${uniqueInAIFenv}'
 var acrUniqueLinkId = uniqueString(dnsZone6DeplName)
 module dnsZone3 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
@@ -801,7 +786,7 @@ module dnsZone3 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
 
 module dnsZone4 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false && sweden_central_adf_missing== false) { 
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneADF'
+  name: 'privateDnsZoneADF${uniqueInAIFenv}'
   params: {
     typeArray: adf.outputs.dnsConfig
     location: 'global'
@@ -810,7 +795,7 @@ module dnsZone4 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
   }
 }
 
-var dnsZone5DeplName = 'privateDnsZoneAML'
+var dnsZone5DeplName = 'privateDnsZoneAML${uniqueInAIFenv}'
 module dnsZone5 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone5DeplName
@@ -827,7 +812,7 @@ module dnsZone5 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
   }
 }
 
-var dnsZone6DeplName = 'privateDnsZoneNotebooksAML'
+var dnsZone6DeplName = 'privateDnsZoneNotebooksAML${uniqueInAIFenv}'
 module dnsZone6 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone6DeplName
@@ -845,7 +830,7 @@ module dnsZone6 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
 }
 
 /* DNS ZONES - GenAI START*/
-var dnsZone7DeplName = 'privateDnsZoneOpenAI'
+var dnsZone7DeplName = 'privateDnsZoneOpenAI${uniqueInAIFenv}'
 module dnsZone7 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone7DeplName
@@ -861,7 +846,7 @@ module dnsZone7 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
     virtualNetworkId:vnetId
   }
 }
-var dnsZone8DeplName = 'privateDnsZoneAISearch'
+var dnsZone8DeplName = 'privateDnsZoneAISearch${uniqueInAIFenv}'
 module dnsZone8 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone8DeplName
@@ -877,7 +862,7 @@ module dnsZone8 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
     virtualNetworkId:vnetId
   }
 }
-var dnsZone9DeplName = 'privateDnsZoneCognitiveServices'
+var dnsZone9DeplName = 'privateDnsZoneCognitiveServices${uniqueInAIFenv}'
 module dnsZone9 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone9DeplName
@@ -894,7 +879,7 @@ module dnsZone9 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
   }
 }
 
-var dnsZone10DeplName = 'privateDnsZoneEventHubs'
+var dnsZone10DeplName = 'privateDnsZoneEventHubs${uniqueInAIFenv}'
 module dnsZone10 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: dnsZone10DeplName
@@ -914,7 +899,7 @@ module dnsZone10 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolic
 
 module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneCreationAndLinkDataLake'
+  name: 'privDnsZoneAndLinkLake${uniqueInAIFenv}'
   params: {
     dnsConfig: dataLake.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -926,7 +911,7 @@ module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneBy
 
 module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneCreationAndLinkKeyVaultCmn'
+  name: 'privDnsZoneAndLinkKeyVaultCmn${uniqueInAIFenv}'
   params: {
     dnsConfig: kvCmn.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -939,7 +924,7 @@ module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZon
 
 module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneCreationAndLinkKeyVaultCmnAdmin'
+  name: 'privDnsZoneKVCmnAdmin${uniqueInAIFenv}'
   params: {
     dnsConfig: kvAdmin.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -952,7 +937,7 @@ module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZ
 
 module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && sweden_central_adf_missing== false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneCreationAndLinkAzureDatafactory'
+  name: 'privDnsZoneADFCmn${uniqueInAIFenv}'
   params: {
     dnsConfig: adf.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones

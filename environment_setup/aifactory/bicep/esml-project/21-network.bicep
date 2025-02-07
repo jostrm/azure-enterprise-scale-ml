@@ -51,6 +51,9 @@ var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetName
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
 
+var vNetSalt = substring(uniqueString(resourceGroup().id), 0, 5)
+var deploymentProjSpecificUniqueSuffix = '${projectName}${vNetSalt}${locationSuffix}-${env}${commonResourceSuffix}'
+
 // Subnet settings
 var dataBricksPrivateSubnetSettings = {
   cidr: dbxPrivSubnetCidr
@@ -87,7 +90,7 @@ var aksSubnetSettings =   {
 }
 
 module nsg '../modules/databricksNsg.bicep' = {
-  name: 'dbxNsg'
+  name: 'dbxNsg-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'dbx-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -98,7 +101,7 @@ module nsg '../modules/databricksNsg.bicep' = {
 }
 
 module nsgAKS '../modules/aksNsg.bicep' = {
-  name: 'aksNsgAKS'
+  name: 'aksNsgAKS-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'aks-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -109,7 +112,7 @@ module nsgAKS '../modules/aksNsg.bicep' = {
 }
 
 module dbxPubSnt '../modules/subnetWithNsg.bicep' = {
-  name: '${projectName}-dbxpub'
+  name: 'dbxpub-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-dbxpub'
     virtualNetworkName: vnetNameFull
@@ -127,7 +130,7 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = {
 }
 
 module dbxPrivSnt '../modules/subnetWithNsg.bicep' = {
-  name: '${projectName}-dbxpriv'
+  name: 'dbxpriv-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-dbxpriv'
     virtualNetworkName: vnetNameFull
@@ -149,7 +152,7 @@ module dbxPrivSnt '../modules/subnetWithNsg.bicep' = {
 }
 
 module aksSnt '../modules/subnetWithNsg.bicep' = {
-  name: '${projectName}-aks'
+  name: 'aks-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-aks'
     virtualNetworkName: vnetNameFull

@@ -16,7 +16,13 @@ param inputKeyvault string
 param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
 param keyvaultEnablePurgeProtection bool = true
-param vmSKU string = 'standard_A2_v2' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
+param vmSKUSelectedArrayIndex int = 2
+param vmSKU array = [
+  'Standard_E2s_v3'
+  'Standard_D4s_v3'
+  'standard_D2as_v5'
+]
+
 @description('Allow Azure ML Studio UI or not. Dataplane is always private, private endpoint - Azure backbone ')
 param AMLStudioUIPrivate bool = true
 @description('Databricks with PRIVATE endpoint or with SERVICE endpoint. Either way controlplane is on Azure backbone network ')
@@ -195,7 +201,17 @@ var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || tech
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 var tags2 = projecttags
 
-var deploymentProjSpecificUniqueSuffix = '${projectName}${locationSuffix}${env}${aifactorySuffixRG}'
+// Salt: Project/env specific
+resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
+  name: targetResourceGroup
+  scope:subscription(subscriptionIdDevTestProd)
+}
+var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
+var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
+
+// Salt: AIFactory instance/env specific
+var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+
 var sweden_central_adf_missing =  false // (location == 'swedencentral')?true:false
 var sweden_central_appInsight_classic_missing = (location == 'swedencentral')?true:false
 
@@ -456,8 +472,6 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2021-04-01' 
   scope:subscription(subscriptionIdDevTestProd)
 }
 
-
-var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 var keyvaultName2 = 'kv-2${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
@@ -538,7 +552,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep'  = if(serviceSettingDe
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit: hybridBenefit
-    vmSize: vmSKU // 'Standard_DS3_v2'
+    vmSize: vmSKU[vmSKUSelectedArrayIndex]
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet
@@ -855,7 +869,7 @@ var secretGetListSet = {
 }
 module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${keyvaultName}APTechContact${projectNumber}${locationSuffix}${env}'
+  name: '${keyvaultName}APTechContact${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetListSet
     keyVaultResourceName: kv1.outputs.keyvaultName
@@ -876,7 +890,7 @@ resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 
 module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: '${kvNameCommon}GetList${projectNumber}${locationSuffix}${env}'
+  name: '${kvNameCommon}GetList${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommon
@@ -892,7 +906,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
 
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
+  name: 'privDnsZoneLStorage${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: sacc.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -903,7 +917,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
 }
 module privateDnsStorage2 '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkStorage${projectNumber}${locationSuffix}${env}'
+  name: 'privDnsZoneLStorage${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: sacc2.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -914,7 +928,7 @@ module privateDnsStorage2 '../modules/privateDns.bicep' = if(centralDnsZoneByPol
 }
 module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkKeyVault${projectNumber}${locationSuffix}${env}'
+  name: 'privDnsZoneLKeyVault${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: kv1.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -925,7 +939,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
 }
 module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && useCommonACR == false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkACR${projectNumber}${locationSuffix}${env}'
+  name: 'privDnsZoneLACR${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: acr.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -1126,7 +1140,7 @@ var mangedIdentityName = 'esml${projectName}${env}DbxMI'
 
 module dbxMIPriv '../modules/databricksManagedIdentityRBAC.bicep' = if(databricksPrivate == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'dbxMIOwnerPriv${projectNumber}${locationSuffix}${env}'
+  name: 'dbxMIOwnerPriv${deploymentProjSpecificUniqueSuffix}'
   params: {
     location: location
     managedIdentityName: mangedIdentityName
@@ -1138,7 +1152,7 @@ module dbxMIPriv '../modules/databricksManagedIdentityRBAC.bicep' = if(databrick
 }
 module dbxMI '../modules/databricksManagedIdentityRBAC.bicep' = if(databricksPrivate == false) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'dbxMIOwner${projectNumber}${locationSuffix}${env}'
+  name: 'dbxMIOwner${deploymentProjSpecificUniqueSuffix}'
   params: {
     location: location
     managedIdentityName: mangedIdentityName
@@ -1181,7 +1195,7 @@ var virtualNetworkRules_array_noDups = union(idsArrayExisting,newIdArray)
 param lakeContainerName string
 module dataLake '../modules/dataLake.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'saUpdateVnetLake${projectNumber}${locationSuffix}${env}'
+  name: 'saUpdateVnetLake${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: datalakeName
     containerName: lakeContainerName
@@ -1207,7 +1221,7 @@ module dataLake '../modules/dataLake.bicep' = {
 
 module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDnsZoneByPolicyInHub==false)){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneLinkADF${projectNumber}${locationSuffix}${env}'
+  name: 'privateDnsZoneLinkADF${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: adf.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -1219,7 +1233,7 @@ module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDns
 
 module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneAndLinkEventhubs1'
+  name: 'privDnsZoneAndLinkEV1${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: eventHubLogging.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -1228,7 +1242,7 @@ module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPo
 
 module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && databricksPrivate == true){
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsZoneAndLinkDatabricks2'
+  name: 'privDnsZoneLDBX2${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: dbxPrivate.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -1251,7 +1265,7 @@ var secretGetList = {
 // AzureDatabricks - if set, and if this EnterpriseApplication already exists (can be that a project needs to be provisoned first..)
 module spProjectSPAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'spProjectSPAccessGet${projectNumber}${locationSuffix}${env}' //'${keyvaultName}/add'
+  name: 'spPRJSP${deploymentProjSpecificUniqueSuffix}' //'${keyvaultName}/add'
   params: {
     keyVaultPermissions: secretGet
     keyVaultResourceName: kv1.outputs.keyvaultName
@@ -1267,7 +1281,7 @@ module spProjectSPAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if(dat
 
 module adfAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if((databricksOID != null) && (sweden_central_adf_missing==false)) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'adfAccessPolicyGet${projectNumber}${locationSuffix}${env}'
+  name: 'adfAP1Get${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGet
     keyVaultResourceName: kv1.outputs.keyvaultName
@@ -1285,7 +1299,7 @@ module adfAccessPolicyGet '../modules/kvCmnAccessPolicys.bicep' = if((databricks
 
 module spDatabricksAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'spDBXAccessPolicyGetList${projectNumber}${locationSuffix}${env}'
+  name: 'spDBXAPGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kv1.outputs.keyvaultName
@@ -1310,7 +1324,7 @@ resource kvFromCommon 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 
 module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'spCmnKVPolicyGetList${projectNumber}${locationSuffix}${env}'
+  name: 'spCmnKVGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvFromCommon.name
@@ -1326,7 +1340,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(
 
 module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = if(sweden_central_adf_missing== false){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacLake4Project${projectNumber}${locationSuffix}${env}'
+  name: 'rbacLake4Prj${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlPrincipalId: aml.outputs.principalId
     userPrincipalId: technicalContactId
@@ -1343,7 +1357,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = if(sweden_centr
 
 module rbackDatabricks '../modules/databricksRBAC.bicep' = if(databricksPrivate == false) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDBX4Project${projectNumber}${locationSuffix}${env}'
+  name: 'rbacDBX4Prj${deploymentProjSpecificUniqueSuffix}'
   params: {
     databricksName: databricksName
     userPrincipalId: technicalContactId
@@ -1357,7 +1371,7 @@ module rbackDatabricks '../modules/databricksRBAC.bicep' = if(databricksPrivate 
 }
 module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPrivate == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDBXP4Project${projectNumber}${locationSuffix}${env}'
+  name: 'rbacDBXP4Prj${deploymentProjSpecificUniqueSuffix}'
   params: {
     databricksName: databricksNameP
     userPrincipalId: technicalContactId
@@ -1375,7 +1389,7 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
 // Note: SP OID: it must be the OBJECT ID of a service principal, not the OBJECT ID of an Application, different thing, and I have to agree it is very confusing.
 module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing== false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDBX2AazureMLwithProjectSP${projectNumber}${locationSuffix}${env}'
+  name: 'rbacDBX2AMLPrjSP${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlName:amlName
     projectSP:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
@@ -1391,7 +1405,7 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_cen
 }
 module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing==true){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDBX2AMLProjectSPSWC${projectNumber}${locationSuffix}${env}'
+  name: 'rbacDBX2AMLPrjSWC${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlName:amlName
     projectSP:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
@@ -1407,7 +1421,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(sweden_
 
 module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_adf_missing== false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacADFFromAMLorProjSP${projectNumber}${locationSuffix}${env}'
+  name: 'rbacADFAMProjSP${deploymentProjSpecificUniqueSuffix}'
   params: {
     datafactoryName:adfName
     userPrincipalId:technicalContactId
@@ -1422,7 +1436,7 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_ad
 // Bastion in AIFacotry COMMON vNet/BYOVnet
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
-  name: 'rbacReadUsersToCmnVnetBastion${projectNumber}${locationSuffix}${env}'
+  name: 'rbacUsersToCmnVnetBastion${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
@@ -1439,7 +1453,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 // Bastion vNet Externally (Connectvivity subscription and RG || AI Factory Common RG)
 module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==false) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
-  name: 'rbacReadUsersToCmnVnet_ExtBastion${projectNumber}${locationSuffix}${env}'
+  name: 'rbacUsersToCmnVnetExtBast2${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFullBastion
@@ -1456,7 +1470,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
 // Bastion in AIFactory COMMON RG, but with a custom name
 module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacReadUsersToCmnKeyvault${projectNumber}${locationSuffix}${env}'
+  name: 'rbacUsersToCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: technicalAdminsObjectID_array_safe
@@ -1472,7 +1486,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
 // Bastion Externally (Connectvivity subscription and RG)
 module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
-  name: 'rbacGenAIReadUsersTo_BastionExt${projectNumber}${locationSuffix}${env}'
+  name: 'rbacGenAIReadBastion${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
@@ -1488,7 +1502,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 module rbacAml1 '../modules/rbacStorageAml.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacUsersAmlClassic_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacUsersAmlClassic${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     resourceGroupId: targetResourceGroupId
@@ -1519,7 +1533,7 @@ module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
 
 module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacUsersAML_RGLevel_AIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacUsersAMLRG${deploymentProjSpecificUniqueSuffix}'
   params: {
     resourceGroupId: targetResourceGroupId
     servicePrincipleObjectId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
@@ -1536,7 +1550,7 @@ module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
 
 module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacUsersToCommonACR${projectNumber}${locationSuffix}${env}'
+  name: 'rbacUsersToCmnACR${deploymentProjSpecificUniqueSuffix}'
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)

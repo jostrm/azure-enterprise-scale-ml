@@ -10,7 +10,14 @@ param privateDnsAndVnetLinkAllGlobalLocation bool=false
 param azureMachineLearningObjectId string =''
 @description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourcegroup, set this to true')
 param useCommonACR bool = false
-param vmSKU string = 'standard_D2as_v5' // Kanske[standard_D2as_v5] - Ej ('Standard_DS3_v2')
+
+param vmSKUSelectedArrayIndex int = 2
+param vmSKU array = [
+  'Standard_E2s_v3'
+  'Standard_D4s_v3'
+  'standard_D2as_v5'
+]
+
 // Cognitive Service types & settings
 @allowed([
   'AIServices'
@@ -297,8 +304,16 @@ var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
-// Other - uniquness, Keyvault name
-var deploymentProjSpecificUniqueSuffix = '${projectName}${genaiName}${locationSuffix}${env}${aifactorySuffixRG}'
+// Salt: Project/env specific
+resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
+  name: targetResourceGroup
+  scope:subscription(subscriptionIdDevTestProd)
+}
+var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
+var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
+
+// Salt: AIFactory instance/env specific
+var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 
 // Networking - Private DNS
 var privDnsResourceGroupName = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
@@ -556,7 +571,7 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
   name: commonResourceGroup
   scope:subscription(subscriptionIdDevTestProd)
 }
-var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 
@@ -652,7 +667,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
 
 module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureAIVision == true){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privateDnsVision ${deploymentProjSpecificUniqueSuffix}'
+  name: 'privateDnsVision${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: csVision.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -825,7 +840,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
 
 module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(serviceSettingDeployAzureOpenAI==true && centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privDnsZoneLinkAOAI${deploymentProjSpecificUniqueSuffix}'
+  name: 'privDnsZoneLAOAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: csAzureOpenAI.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -945,7 +960,7 @@ module privateDnsAiSearchService '../modules/privateDns.bicep' = if(centralDnsZo
 
 module sa4AIsearch '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'GenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
+  name: 'GenAISAAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
@@ -1205,7 +1220,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDep
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit: hybridBenefit
-    vmSize: vmSKU
+    vmSize: vmSKU[vmSKUSelectedArrayIndex]
     location: location
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet
@@ -1235,7 +1250,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 }
 
 module addSecret '../modules/kvSecretsPrj.bicep' = {
-  name: '${keyvaultName}Secrect2Proj${deploymentProjSpecificUniqueSuffix}'
+  name: '${keyvaultName}S2P${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     spAppIDValue:externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) //projectServicePrincipleAppID_SeedingKeyvaultName 
@@ -1272,7 +1287,7 @@ var secretGet = {
 // PROJECT Keyvault where technicalContactId GET,LIST, SET
 module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${keyvaultName}AccessPol${deploymentProjSpecificUniqueSuffix}'
+  name: '${keyvaultName}AP${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetListSet
     keyVaultResourceName: kv1.outputs.keyvaultName
@@ -1295,7 +1310,7 @@ resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 
 module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: '${kvNameCommon}GetList${deploymentProjSpecificUniqueSuffix}'
+  name: '${kvNameCommon}GL${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommon
@@ -1476,7 +1491,7 @@ var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: aiHubName
+  name: 'aiHubName${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
     location: location
@@ -1519,18 +1534,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
   ]
 }
 
-/* // RoleAssignmentUpdateNotPermitted
-module rbacAcrCommonRG '../modules/acrRbac.bicep' = if(useCommonACR == true) {
-  scope:commonResourceGroupRef
-  name: 'rbacAcrCommon${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    acrName: acrCommon2.outputs.containerRegistryName
-    aiHubName: aiHub.outputs.name
-    aiHubRgName: targetResourceGroup
-  }
-}
-
-*/
 module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false) {
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
@@ -1564,7 +1567,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(service
 // Bastion in AIFactory COMMON RG, but with a custom name
 module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacGenAIReadUsersToCmnKeyvault${projectNumber}${locationSuffix}${env}'
+  name: 'rbac1GenAIReadUsersCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: technicalAdminsObjectID_array_safe
@@ -1579,7 +1582,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
 // Bastion Externally (Connectvivity subscription and RG)
 module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
-  name: 'rbacGenAIReadUsersTo_BastionExt${projectNumber}${locationSuffix}${env}'
+  name: 'rbac2GenAIUsersBastionExt${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
@@ -1598,7 +1601,7 @@ var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Res
 
 module rbacForOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacOpenAIDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1612,7 +1615,7 @@ module rbacForOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeplo
 // 6 assignments: OK
 module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceSettingDeployAzureAISearch==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacAIServices_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac4AIServices${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1624,7 +1627,7 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(serviceS
 // 5 assignments: OK
 module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSettingDeployAzureAISearch==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacSearch_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac5Search${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1639,7 +1642,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(serviceSetti
 
 module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!empty(azureMachineLearningObjectId)) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacAml2RG_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}'
   params:{
     azureMachineLearningObjectId: azureMachineLearningObjectId
   }
@@ -1650,7 +1653,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!empty(azureMac
 
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacUsersAIHub_DeployAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac7UsersAIHub${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1673,7 +1676,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
 
 module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacVisionDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac8Vision${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1685,7 +1688,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
 
 module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac9Speech${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1696,7 +1699,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
 }
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacSpeechDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac10Docs${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1709,7 +1712,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
 /*
 module rbacModuleWebApp'../modules/aihubRbacAIWebApp.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDeployESMLAIFactory${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac11WebApp${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
@@ -1730,7 +1733,7 @@ module rbacModuleWebApp'../modules/aihubRbacAIWebApp.bicep' = {
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
-  name: 'rbacGenAIRUsersToCmnVnetBas${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac12GenAIRUsersVnet${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
@@ -1749,7 +1752,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 // Bastion vNet Externally (Connectvivity subscription and RG || AI Factory Common RG)
 module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==false) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
-  name: 'rbacReadUsersToCmnVnet_ExtBastion${projectNumber}${locationSuffix}${env}'
+  name: 'rbac13UsersVnet${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFullBastion
@@ -1770,7 +1773,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
 
 module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacUsersToCommonACR${projectNumber}${locationSuffix}${env}'
+  name: 'rbac14UsersToCmnACR${deploymentProjSpecificUniqueSuffix}'
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
