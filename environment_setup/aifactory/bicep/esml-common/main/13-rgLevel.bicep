@@ -99,8 +99,8 @@ param privDnsResourceGroup_param string = ''
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroupName
-var privDnsResourceGroupName = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
+var privDnsResourceGroupName = privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 // DEPENDENCIES - should exist
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
