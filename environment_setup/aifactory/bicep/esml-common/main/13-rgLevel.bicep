@@ -868,7 +868,7 @@ module dnsZone8 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicy
   params: {
     typeArray:[
       {
-        type:'aiSearch'
+        type:'searchService'
         id:dnsZone8DeplName
       }
     ]
