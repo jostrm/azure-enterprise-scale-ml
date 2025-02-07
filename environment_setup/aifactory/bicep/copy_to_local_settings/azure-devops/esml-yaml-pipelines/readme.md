@@ -1,7 +1,12 @@
 # Azure Devops orchestration (.yaml): Bicep
-Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline in Azure Devops
+Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline in Azure Devops.
 
-The build pipelines you will import, is the yaml files below.
+>[!NOTE]
+> If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ setup starting page](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md)
+>
+
+The build pipelines you will import is the yaml files below.
+
 
 ## Pipeline: AIFactory Common 
 Start with setting up a common AIFactory environment, example, the DEV environment

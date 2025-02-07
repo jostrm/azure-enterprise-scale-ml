@@ -1,5 +1,9 @@
 # Azure Devops orchestration (classic): Bicep
 
+>[!NOTE]
+> If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ setup starting page](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md)
+>
+
 1) Import the json files as REALEASE pipelines in Azure Devops classic
 2) Edit the Variables in the Azure Devops UI, the Variables tab.
 3) Run first the [infra-aifactory-common.json](./infra-aifactory-common.json), to setup at least DEV common AIFactory environment
