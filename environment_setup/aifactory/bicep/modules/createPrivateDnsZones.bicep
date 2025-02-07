@@ -3,7 +3,7 @@ param privDnsResourceGroup string
 param vNetName string
 param vNetResourceGroup string
 param location string
-param allGlobal bool = false
+param allGlobal bool = true
 var locationGlobal = 'global' // Using default Microsoft Private DNS, they are registered in global. (you can change this, but need to register, see ref01 )
 
 param privateLinksDnsZones array = [
