@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: 11-Common RG and RBAC
+      - name: 1_az_bicep_common_rg
         uses: azure/cli@v2
         with:
           inlineScript: |
@@ -57,7 +57,7 @@ jobs:
             --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
             --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
           azcliversion: latest
-      - name: 12-Common-Networking
+      - name: 02_az_bicep_private_networking
         uses: azure/cli@v2
         with:
           inlineScript: |
@@ -69,6 +69,7 @@ jobs:
             --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
             --parameters @"./aifactory/parameters/10-esml-globals-2-12_13_21_22.json" \
             --parameters @"./aifactory/parameters/10-esml-globals-3-12_13.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-override.json" \
             --parameters @"./aifactory/parameters/12-esml-cmn-parameters.json" \
             --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
             --parameters location="${{ env.admin_location }}" \
@@ -78,7 +79,7 @@ jobs:
             --parameters commonResourceSuffix="${{ env.aiResourceSuffix }}" \
             --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
           azcliversion: latest
-      - name: '13-Deploy resources'
+      - name: 03_az_bicep_deploy_resources
         uses: azure/cli@v2
         with:
           inlineScript: |
@@ -94,6 +95,7 @@ jobs:
             --parameters @"./aifactory/parameters/10-esml-globals-4-13_21_22.json" \
             --parameters @"./aifactory/parameters/10-esml-globals-5-13_23.json" \
             --parameters @"./aifactory/parameters/11-esml-globals-11_13.json" \
+            --parameters @"./aifactory/parameters/10-esml-globals-override.json" \
             --parameters @"./aifactory/parameters/13-esml-cmn-parameters.json" \
             --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
             --parameters location="${{ env.admin_location }}" \

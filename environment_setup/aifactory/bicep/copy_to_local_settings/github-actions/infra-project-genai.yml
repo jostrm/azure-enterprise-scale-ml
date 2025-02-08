@@ -72,7 +72,7 @@ env:
     admin_private_DatabricksUI: false # Private Databricks UI
 jobs:
   job1-deploy-networking-project-genai:
-    name: ESGenAI Networking
+    name: ESGenAI_Networking
     environment: ${{github.event.inputs.environment}}
     runs-on: ubuntu-latest
     if: vars.RUN_JOB1_NETWORKING != 'false'
@@ -128,7 +128,7 @@ jobs:
       with:
         inlineScript: az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.runner_ip }}
         azcliversion: latest
-    - name: 03_download_seeding_keyvault
+    - name: 03_az_download_seeding_keyvault
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
@@ -142,7 +142,7 @@ jobs:
     - name: Set permissions 757 on scripts
       if: env.ENABLE_NETWORKING_JOB  != 'false' && env.ENABLE_DEBUG_STEP == 'true'
       run: chmod -R 757 ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
-    - name: 04A_pwsh_calculate_subnet_allocations
+    - name: 04_pwsh_calculate_subnet_allocations
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
       run: |
@@ -159,7 +159,7 @@ jobs:
             ./subnetCalc.ps1 -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -filePath '../../../../../aifactory/parameters/' -spObjId '${{ env.common-sp-appid-value }}' -spSecret '${{ env.common-sp-secret-value }}' -env '${{ env.dev_test_prod }}' -subscriptionId '${{ env.dev_test_prod_sub_id }}' -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' -locationADO '${{ env.admin_location}}' -locationSuffixADO '${{ env.admin_locationSuffix }}' -projectTypeADO '${{ env.admin_projectType }}' -useServicePrincipal
           "
         azPSVersion: latest
-    - name: 05_bicep_deploy_subnets_and_NSGs
+    - name: 05_az_bicep_deploy_subnets_and_NSGs
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with: 
@@ -172,11 +172,14 @@ jobs:
           --resource-group "$( cat "./aifactory/parameters/subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"" )" \
           --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-genai-1\31-network.bicep" \
           --parameters @"./aifactory/parameters/subnetParameters.json" \
+          --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
           --parameters @"./aifactory/parameters/10-esml-globals-override.json" \
           --parameters env="${{ env.dev_test_prod }}" \
           --parameters projectNumber="${{ env.project_number_000 }}"
+          --parameters location="$(admin_location)" \
+          --parameters locationSuffix="$(admin_locationSuffix)"
         azcliversion: latest
-    - name: 08_az_remove_ip_from_seeding_keyvault_FW_whitelist
+    - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
@@ -184,7 +187,7 @@ jobs:
         azcliversion: latest
       #if: always()
   job2-deploy-services-project-genai:
-      name: BICEP - ESGenAI services to RG
+      name: ESGenAI_Services
       environment: ${{github.event.inputs.environment}}
       runs-on: ubuntu-latest
       needs: job1-deploy-networking-project-genai

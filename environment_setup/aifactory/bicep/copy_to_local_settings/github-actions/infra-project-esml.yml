@@ -71,7 +71,7 @@ env:
     admin_private_DatabricksUI: false # Private Databricks UI
 jobs:
   job1-deploy-networking-project-esml:
-    name: ESML Networking
+    name: ESML_Networking
     if: ${{ vars.RUN_JOB1_NETWORKING }} == 'true'
     environment: ${{github.event.inputs.environment}}
     runs-on: ubuntu-latest
@@ -162,11 +162,14 @@ jobs:
           --resource-group "$( cat "./aifactory/parameters/subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"" )" \
           --template-file "azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-project\21-network.bicep" \
           --parameters @"./aifactory/parameters/subnetParameters.json" \
+          --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
           --parameters @"./aifactory/parameters/10-esml-globals-override.json" \
           --parameters env="${{ env.dev_test_prod }}" \
           --parameters projectNumber="${{ env.project_number_000 }}"
+          --parameters location="$(admin_location)" \
+          --parameters locationSuffix="$(admin_locationSuffix)"
         azcliversion: latest
-    - name: 08_az_remove_ip_from_seeding_keyvault_FW_whitelist
+    - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
@@ -174,7 +177,7 @@ jobs:
         azcliversion: latest
       #if: always()
   job2-deploy-services-project-esml:
-      name: BICEP - EMSL services to RG
+      name: ESML_Services
       environment: ${{github.event.inputs.environment}}
       runs-on: ubuntu-latest
       if: success() || cancelled()
