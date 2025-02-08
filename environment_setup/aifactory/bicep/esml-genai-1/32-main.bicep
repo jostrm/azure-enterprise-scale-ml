@@ -1583,12 +1583,13 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(service
 // ------------------------------ END - SERVICES (Azure Machine Learning)  ------------------------------//
 
 // Bastion in AIFactory COMMON RG, but with a custom name
-module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true){
+//TODO-jostrm-2025-split-bastion&commonKv, at = if(addBastionHost==true && empty(bastionSubscription)==true) {
+module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true && addBastionHost==true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbac1GenAIReadUsersCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: technicalAdminsObjectID_array_safe   
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
   }
   dependsOn: [
