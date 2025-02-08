@@ -119,7 +119,7 @@ the filed you may edit.
 
 5) `VERIFY, BEFORE running any pipelines:`Ensure Private DNS zones exists in "hub", if flag is set to true
 
-    [Docs-link: 27-create-private-dns-zones.ps1](../../../environment_setup/aifactory/bicep/esml-util/esml-util/27-create-private-dns-zones.ps1) | [Local-repo-link](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
+    [Docs-link: 27-create-private-dns-zones.ps1](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1) | [Local-repo-link](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
 
     How to run from root: 
 
