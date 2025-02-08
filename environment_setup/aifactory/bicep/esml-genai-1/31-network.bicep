@@ -56,10 +56,11 @@ var aksSubnetSettings =   {
     'Microsoft.CognitiveServices'
   ]
 }
+
 module nsgAKS '../modules/aksNsg.bicep' = {
   name: 'aksNsgAKS-${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'aks-nsg-${projectName}-${locationSuffix}-${env}'
+    name: 'aks-nsg-${projectName}-${locationSuffix}-${env}' // AKS-NSG-PRJ001-EUS2-DEV in 'aks-nsg-prj001-eus2-dev'
     location: location
     tags: {
       Description: 'AKS Nsg'
@@ -72,17 +73,13 @@ module aksSnt '../modules/subnetWithNsg.bicep' = {
   params: {
     name: 'snt-${projectName}-aks'
     virtualNetworkName: vnetNameFull
-    addressPrefix: aksSubnetSettings['cidr']
+    addressPrefix: aksSubnetSettings.cidr
     location: location
-    serviceEndpoints: aksSubnetSettings['serviceEndpoints']
-    delegations: aksSubnetSettings['delegations']
+    serviceEndpoints: aksSubnetSettings.serviceEndpoints
+    delegations: aksSubnetSettings.delegations
     nsgId:nsgAKS.outputs.nsgId
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
-
-  // Make sure that no overlapping processes are created
-  // On some cases AzureRm will return an error if paralell
-  // subnet creation processes are started
   dependsOn: [
     nsgAKS
   ]
@@ -124,7 +121,6 @@ module genaiSnt '../modules/subnetWithNsg.bicep' = {
     nsgId:nsgGenAI.outputs.nsgId
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
-
   dependsOn: [
     aksSnt
     nsgGenAI

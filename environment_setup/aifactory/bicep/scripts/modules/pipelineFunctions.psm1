@@ -1,6 +1,16 @@
-#   - This module serves a bunch of shared methods that other scripts can use
-#     and was intended to reduce DRY code in other scripts. Script is specifically designed 
-#     to be a part of the ESML project template automation scripts.
+
+# If AI Factory Project-Networking fails 04_pwsh_calculate_subnet_allocations (subnetCalc.ps1). Try below: 
+
+# Solution 1) Many times version needs to be synced
+# Solution 2)  -AllowClobber in this file was latest solution, after Install-Module. When '4.248.1' This works on other pipeline, but 4.251.1 was used. (Then AllowClobber worked)
+# Solution 3) Change version in the pipeline YAML file. Both 'OtherVersion' and 'preferredAzurePowerShellVersion' needs to be set.
+#   azurePowerShellVersion: 'LatestVersion' # 'LatestVersion' | 'OtherVersion' 
+#  preferredAzurePowerShellVersion: # ['4.251.1',' 5.251.1'] is downloaded, see TASK 'Initialize job'. 
+
+# Solution 5) Not tested. Since the buildagent could not download'4.248.1', maybe the below will work. 
+# [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+# Register-PSRepository -Default -Verbose
+# Set-PSRepository -Name "PSGallery" -InstallationPolicy Trusted
 
 #Import-Module Az
 

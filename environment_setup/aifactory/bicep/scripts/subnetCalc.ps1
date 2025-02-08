@@ -579,6 +579,7 @@ if ($(Get-AzContext).Subscription -ne "") {
     Write-host "Template written to $resolvedPath"
     Write-host "Parameter: aifactorySuffixRG is: $aifactorySuffix"
     Write-host "Parameter: commonSuffixRGG is: $commonResourceSuffix"
+    Write-host "Parameter: vnetResourceGroup is: $vnetResourceGroup"
 
 }else{
     write-host "Failed to login"
