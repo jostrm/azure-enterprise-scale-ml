@@ -45,10 +45,12 @@ param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param useCommonACR bool = false
-param tags object
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
-
+// To get TAGS from file: 10-esml-globals-1.json
+param tags object
+param aifactorySuffixRG string = '' // dummy
+param commonRGNamePrefix string = '' // dummy
 
 var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 var vNetSalt = substring(uniqueString(resourceGroup().id), 0, 5)
