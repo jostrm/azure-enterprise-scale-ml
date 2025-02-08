@@ -45,12 +45,12 @@ param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param useCommonACR bool = false
-
-var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
-
+param tags object
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
 
+
+var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 var vNetSalt = substring(uniqueString(resourceGroup().id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${vNetSalt}${locationSuffix}-${env}${commonResourceSuffix}'
 
@@ -94,9 +94,7 @@ module nsg '../modules/databricksNsg.bicep' = {
   params: {
     name: 'dbx-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
-    tags: {
-      Description: 'databricks Nsg'
-    }
+    tags:tags
   }
 }
 
@@ -105,9 +103,7 @@ module nsgAKS '../modules/aksNsg.bicep' = {
   params: {
     name: 'aks-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
-    tags: {
-      Description: 'AKS Nsg'
-    }
+    tags:tags
   }
 }
 

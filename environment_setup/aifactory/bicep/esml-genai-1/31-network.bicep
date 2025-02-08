@@ -37,6 +37,7 @@ param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param useCommonACR bool = false
+param tags object
 
 var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
@@ -62,9 +63,7 @@ module nsgAKS '../modules/aksNsg.bicep' = {
   params: {
     name: 'aks-nsg-${projectName}-${locationSuffix}-${env}' // AKS-NSG-PRJ001-EUS2-DEV in 'aks-nsg-prj001-eus2-dev'
     location: location
-    tags: {
-      Description: 'AKS Nsg'
-    }
+    tags:tags
   }
 }
 
@@ -103,9 +102,7 @@ module nsgGenAI '../modules/nsgGenAI.bicep' = {
   params: {
     name: 'genai-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
-    tags: {
-      Description: 'AKS Nsg'
-    }
+    tags:tags
   }
 }
 
