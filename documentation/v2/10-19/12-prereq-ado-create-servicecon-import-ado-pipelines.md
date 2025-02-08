@@ -10,8 +10,10 @@
     - 2) 2A (yaml) and 2B (classic)
         - Option 2A - Azure Devops (yaml)
             - Configure [base parameters](../../../../aifactory/parameters/) This link will not work if you have not done the [Prerequisites](./12-prerequisites-setup.md)
-                - All files, such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
+                - All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
             - Configure [variables](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml)
+            - Pipeline - Import Pipeline by selecting a Template, Run the pipeline. 
+                - Note that you need to Permit the pipeline to run, the first time (which requires Administrator permission in Azure Devops)
             - Templates:
                 - [esml-infra-common.yaml](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-common/infra-aifactory-common.yaml)
                 - [esml-infra-project-esml.yaml](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/infra-project-esml.yaml)

@@ -1,13 +1,26 @@
 # Azure Devops orchestration (classic): Bicep
 
+## Note: 1-3 is needed only if you did not run the SCRIPTS as mentioned in [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
+
+>[!IMPORTANT]
+> If this link works: [base parameters](../../../../aifactory/parameters/) you should not do thes steps 1-3 (you already have copied templates files locally)
+>
+
+1) Run the start script [00-start.sh](../../../../../00-start.sh),  this will create some bootstrap-scripts at your repo root.
+2) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for GHA workflows, and parameters.
+3) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
+    - Note: Is is under the `aifactory` folder, you will configure your [base parameters](../../../../aifactory/parameters/) and other variables.
+
+## Steps:4-7:
+
 >[!NOTE]
 > If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ setup starting page](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md)
 >
 
-1) Import the json files as REALEASE pipelines in Azure Devops classic
-2) Edit the Variables in the Azure Devops UI, the Variables tab.
-3) Run first the [infra-aifactory-common.json](./infra-aifactory-common.json), to setup at least DEV common AIFactory environment
-3) Run a project pipeline 
+4) Import the json files as REALEASE pipelines in Azure Devops classic
+5) Edit the Variables in the Azure Devops UI, the Variables tab.
+6) Run first the [infra-aifactory-common.json](./infra-aifactory-common.json), to setup at least DEV common AIFactory environment
+7) Run a project pipeline 
     - ESML project: [infra-project-esml.json](./infra-project-esml.json)
     - GenAI project: [infra-project-genai.json](./infra-project-genai.json)
 
