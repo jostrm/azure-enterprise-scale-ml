@@ -541,6 +541,8 @@ var privateLinksDnsZonesArray = [
 
 output privateLinksDnsZones object = privateLinksDnsZones
 
+/*Is already created in esml-common/main/13-rgLevel.bicep  */
+/*
 module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(subscriptionIdDevTestProd,privDnsResourceGroupName)
   name: 'createPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
@@ -554,7 +556,13 @@ module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centr
     allGlobal:privateDnsAndVnetLinkAllGlobalLocation
   }
 }
+*/
 
+// Verify that at least 1 Private DNS zones exists in privDnsResourceGroupName and privDnsSubscription  before continuing
+resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = {
+  name: 'privatelink.cognitiveservices.azure.com'
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+}
 
 // Resource Groups
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
