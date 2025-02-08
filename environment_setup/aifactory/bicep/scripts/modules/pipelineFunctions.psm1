@@ -66,17 +66,17 @@ function Import-Dependencies {
          }
         "genDynamicNetworkParamFile.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force
+            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force -AllowClobber
             Import-Module Az.Resources
             Import-Module Az.Accounts
             Import-Module Az.Network
          }
         "subnetCalc.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force
-            Install-Module Subnet -MinimumVersion $subnetVersion -Scope AllUsers -Force
+            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Subnet -MinimumVersion $subnetVersion -Scope AllUsers -Force -AllowClobber
             Import-Module Az.Resources
             Import-Module Az.Accounts
             Import-Module Az.Network
