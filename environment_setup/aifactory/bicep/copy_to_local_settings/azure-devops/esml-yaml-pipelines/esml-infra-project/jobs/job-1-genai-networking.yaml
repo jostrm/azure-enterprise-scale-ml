@@ -1,6 +1,4 @@
-
 steps:
-
 - checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
   submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
   continueOnError: false # Continue running even on failure?.  (false,n,no,off,on,true,y,yes)
@@ -20,6 +18,7 @@ steps:
       Write-Host "dev_test_prod is: $(dev_test_prod)"
       Write-Host "service_connection is: ${{ parameters.serviceConnection }}"
       Write-Host "dev_service_connection is: $(dev_service_connection)"
+      Write-Output "PowerShell Version: $($PSVersionTable.PSVersion)"
 - task: AzureCLI@2
   displayName: '01_pwsh_get_IP_for_ADO_agent'
   inputs:
@@ -46,15 +45,6 @@ steps:
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     KeyVaultName: '$(admin_bicep_kv_fw)'
-- task: AzurePowerShell@5
-  displayName: 'pwsh_print_version'
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    ScriptType: 'InlineScript'
-    Inline: |
-      Write-Output "PowerShell Version: $($PSVersionTable.PSVersion)"
-    pwsh: true
-    azurePowerShellVersion: 'LatestVersion'
 - task: AzurePowerShell@4
   displayName: '04_pwsh_calculate_subnet_allocations'
   inputs:
@@ -72,18 +62,23 @@ steps:
     scriptType: bash
     scriptLocation: 'inlineScript'
     inlineScript: |
+    
+     # value='${{ convertToJson(parameters.aifactory_tags) }}'
+     # echo '##vso[task.setvariable parameters.aifactory_tags.value]'$value
+
      echo "Deploying subnets and NSG to subscription: $(dev_test_prod_sub_id)"
      az deployment group create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj" \
      --subscription "$(dev_test_prod_sub_id)" \
-     --location "$(admin_location)" \
      --resource-group "$(cat "..\..\..\..\aifactory\parameters\subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"")" \
      --template-file "esml-genai-1\31-network.bicep" \
      --parameters @"..\..\..\..\aifactory\parameters\subnetParameters.json" \
+     --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-1.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
-     --parameters location="$(admin_location)"
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)"
      
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

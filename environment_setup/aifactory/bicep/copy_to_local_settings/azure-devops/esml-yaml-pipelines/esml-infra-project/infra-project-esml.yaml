@@ -10,24 +10,24 @@ variables:
 
 parameters:
 - name: runNetworking
-  displayName: 'Run Networking'
+  displayName: 'Enable Networking'
   type: boolean
   default: true
 
 stages:
-- stage: Dev
-  displayName: Dev
+- stage: Dev_ESML_Project
+  displayName: Dev ESML Project
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: "$(dev_sub_id)"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
-      displayName: Deploy networking for project with Bicep
+      condition: eq(variables['runNetworkingVar'], 'true')
+      displayName: Deploy Private Network
       pool: 
         vmImage: windows-latest
-      environment: Dev
-      condition: eq(variables['runNetworkingVar'], 'true')
+      environment: Dev      
       strategy:
         runOnce:
           deploy:
@@ -36,9 +36,9 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
     - deployment: ESML_Services
+      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'))
       dependsOn: ESML_Networking
-      condition: always()
-      displayName: Deploy Azure services for project with Bicep
+      displayName: Deploy ESML services,Personas,RBAC,ACL,CAF & WAF Policys
       variables:
         dev_test_prod: "dev"
         dev_test_prod_sub_id: "$(dev_sub_id)"
@@ -53,15 +53,16 @@ stages:
               - template: ./jobs/job-2-esml-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
-- stage: Stage
-  displayName: Stage
+- stage: Stage_ESML_Project
+  displayName: Stage ESML Project
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
-      displayName: Deploy networking for project with Bicep
+      condition: eq(variables['runNetworkingVar'], 'true')
+      displayName: Deploy Private Network
       pool:
         vmImage: windows-latest
       environment: Stage  
@@ -73,8 +74,9 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
     - deployment: ESML_Services
+      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'))
       dependsOn: ESML_Networking
-      displayName: Deploy Azure services for project with Bicep
+      displayName: DDeploy ESML services,Personas,RBAC,ACL,CAF & WAF Policys
       pool:
         vmImage: windows-latest
       environment: Stage  
@@ -85,15 +87,16 @@ stages:
               - template: ./jobs/job-2-esml-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
-- stage: Prod
-  displayName: Prod
+- stage: Prod_ESML_Project
+  displayName: Prod ESML Project
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
     admin_projectType: "esml"
   jobs:
     - deployment: ESML_Networking
-      displayName: Deploy networking for project with Bicep
+      condition: eq(variables['runNetworkingVar'], 'true')
+      displayName: Deploy Private Network
       pool:
         vmImage: windows-latest
       environment: Prod  
@@ -105,8 +108,9 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
     - deployment: ESML_Services
+      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'))
       dependsOn: ESML_Networking
-      displayName: Deploy Azure services for project with Bicep
+      displayName: DDeploy ESML services,Personas,RBAC,ACL,CAF & WAF Policys
       pool:
         vmImage: windows-latest
       environment: Prod
