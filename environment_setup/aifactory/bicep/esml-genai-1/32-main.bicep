@@ -632,6 +632,7 @@ module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZone
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -673,6 +674,7 @@ module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -713,6 +715,7 @@ module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -756,6 +759,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -846,6 +850,7 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(serviceSettingDe
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -950,6 +955,7 @@ module privateDnsAiSearchService '../modules/privateDns.bicep' = if(centralDnsZo
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -1037,6 +1043,7 @@ module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(centralDnsZoneB
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -1352,6 +1359,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -1363,6 +1371,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -1374,6 +1383,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }

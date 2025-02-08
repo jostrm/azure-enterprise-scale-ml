@@ -345,6 +345,7 @@ var privateLinksDnsZonesArray = [
   }
 ]
 
+
 module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'PrivDnsZonesIfNotExistsCmn-${uniqueInAIFenv}'
@@ -388,6 +389,7 @@ module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(c
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZonesIfNotExists
     esmlCommonResourceGroup
   ]
 }
@@ -738,165 +740,6 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM 
   ]
 }
 
-module dnsZone1 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false){
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneStorage${uniqueInAIFenv}'
-  params: {
-    typeArray: dataLake.outputs.dnsConfig
-    location: 'global'// Using default Microsoft Private DNS, they are registered in global. (you can change this, but need to register location for DNS in your subscription )
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-  dependsOn: [
-    dataLake
-  ]
-}
-module dnsZone2 '../../modules/privateDnsZone.bicep' =  if(centralDnsZoneByPolicyInHub==false){
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneKeyvault${uniqueInAIFenv}'
-  params: {
-    typeArray: kvCmn.outputs.dnsConfig
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-  dependsOn: [
-    kvCmn
-  ]
-}
-
-var dnsZone3DeplName = 'privateDnsZoneACR${uniqueInAIFenv}'
-var acrUniqueLinkId = uniqueString(dnsZone6DeplName)
-module dnsZone3 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: dnsZone3DeplName
-  params: {
-    typeArray:[
-      {
-        type: 'registry'
-        id:acrUniqueLinkId
-      }
-    ]
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-
-}
-
-module dnsZone4 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false && sweden_central_adf_missing== false) { 
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'privateDnsZoneADF${uniqueInAIFenv}'
-  params: {
-    typeArray: adf.outputs.dnsConfig
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-}
-
-var dnsZone5DeplName = 'privateDnsZoneAML${uniqueInAIFenv}'
-module dnsZone5 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: dnsZone5DeplName
-  params: {
-    typeArray:[
-      {
-        type:'amlworkspace'
-        id: dnsZone5DeplName
-      }
-    ]
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-}
-
-var dnsZone6DeplName = 'privateDnsZoneNotebooksAML${uniqueInAIFenv}'
-module dnsZone6 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: dnsZone6DeplName
-  params: {
-    typeArray:[
-      {
-        type:'notebooks'
-        id:dnsZone6DeplName
-      }
-    ]
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-}
-
-/* DNS ZONES - GenAI START*/
-var dnsZone7DeplName = 'privateDnsZoneOpenAI${uniqueInAIFenv}'
-module dnsZone7 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: dnsZone7DeplName
-  params: {
-    typeArray:[
-      {
-        type:'openai'
-        id:dnsZone7DeplName
-      }
-    ]
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-}
-var dnsZone8DeplName = 'privateDnsZoneAISearch${uniqueInAIFenv}'
-module dnsZone8 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: dnsZone8DeplName
-  params: {
-    typeArray:[
-      {
-        type:'searchService'
-        id:dnsZone8DeplName
-      }
-    ]
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-}
-var dnsZone9DeplName = 'privateDnsZoneCognitiveServices${uniqueInAIFenv}'
-module dnsZone9 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: dnsZone9DeplName
-  params: {
-    typeArray:[
-      {
-        type:'cognitiveservices'
-        id:dnsZone9DeplName
-      }
-    ]
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-}
-
-var dnsZone10DeplName = 'privateDnsZoneEventHubs${uniqueInAIFenv}'
-module dnsZone10 '../../modules/privateDnsZone.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: dnsZone10DeplName
-  params: {
-    typeArray:[
-      {
-        type:'namespace'
-        id:dnsZone10DeplName
-      }
-    ]
-    location: 'global'
-    privateLinksDnsZones: privateLinksDnsZones
-    virtualNetworkId:vnetId
-  }
-}
-/*DNS ZONES - GenAI End*/
-
 module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privDnsZoneAndLinkLake${uniqueInAIFenv}'
@@ -905,7 +748,7 @@ module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneBy
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
-    dnsZone1
+    createPrivateDnsZonesIfNotExists
   ]
 }
 
@@ -917,7 +760,7 @@ module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZon
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
-    dnsZone2
+    createPrivateDnsZonesIfNotExists
     kvCmn
   ]
 }
@@ -930,7 +773,7 @@ module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZ
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
-    dnsZone2
+    createPrivateDnsZonesIfNotExists
     kvAdmin
   ]
 }
@@ -943,7 +786,7 @@ module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralD
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
-    dnsZone4
+    createPrivateDnsZonesIfNotExists
     adf
   ]
 }

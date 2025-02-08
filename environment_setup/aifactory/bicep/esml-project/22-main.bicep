@@ -912,6 +912,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -923,6 +924,7 @@ module privateDnsStorage2 '../modules/privateDns.bicep' = if(centralDnsZoneByPol
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -934,6 +936,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(centralDnsZoneByPol
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -945,6 +948,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -1227,6 +1231,7 @@ module privateDnsAzureDatafactory '../modules/privateDns.bicep' = if((centralDns
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
+    createPrivateDnsZones
     projectResourceGroup
   ]
 }
@@ -1238,6 +1243,10 @@ module privateDnsEventhubs '../modules/privateDns.bicep' = if(centralDnsZoneByPo
     dnsConfig: eventHubLogging.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
 }
 
 module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && databricksPrivate == true){
@@ -1247,6 +1256,10 @@ module privateDnsAzureDatabricks '../modules/privateDns.bicep' = if(centralDnsZo
     dnsConfig: dbxPrivate.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
 }
 
 // RBAC
