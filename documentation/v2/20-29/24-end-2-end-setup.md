@@ -7,7 +7,23 @@
 ## Prerequisites
 [Prerequisites](../10-19/12-prerequisites-setup.md)
 
-## Config: Standalone VS Hub-connected centralized private DNS zones
+## Setup options: 
+- Option A) [Setup AIFactory - Infra Automation (AzureDevops+BICEP)](../10-19/13-setup-aifactory.md)
+    - [Azure Devops - YAML](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
+    - [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
+- Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../10-19/13-setup-aifactory-gha.md)
+    - [Github Actions](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
+- *Option C) [Setup AIFactory - Infra Automation (GithubActions+Terraform)](../10-19/13-setup-aifactory-gha.md)
+    - TODO: Joakim
+
+## Result: 
+This is what you will get:
+
+[AIFactory overview](../10-19/15-aifactory-overview.md)
+
+[AIFactory architecture diagrams](../10-19/11-architecture-diagrams.md) 
+
+## Advanced Configuration: Standalone VS Hub-connected centralized private DNS zones
 
 ### When to choose What? 
 Recommended approach is to combine `BYOvNet` with `Hub-Connected & Centralized private DNZ zones`. This enables all 4 access modes: `Peering, VPN, Bastion, Whitelistlisting user IP's`, and separates the networking from the AI Factory common area, to your centralized Hub (Hub/Spoke).
@@ -67,25 +83,3 @@ For `Bring your own vNet`, e.g. NOT using the *AI Factory common resource group*
             "value": "vnet-name-inside-of-resourcegroup"
         },
 ```
-
-## Setup options: 
-- Option A) [Setup AIFactory - Infra Automation (AzureDevops+BICEP)](../10-19/13-setup-aifactory.md)
-    - [Azure Devops - YAML](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
-    - [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
-- Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../10-19/13-setup-aifactory-gha.md)
-    - [Github Actions](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
-- *Option C) [Setup AIFactory - Infra Automation (GithubActions+Terraform)](../10-19/13-setup-aifactory-gha.md)
-    - TODO: Joakim
-
-<!--
-2) [Provision AIFactory Common](../20-29/24-create-AIFactory-common.md)
-3) ! TODO: jostrm TBA !  [WIP - Provision 1st AIFactory Project](../20-29/24-create-AIFactory-project.md)
-    - ! TODO: jostrm TBA !  [WIP - Configure 1st AIFactory Project](../20-29/24-create-AIFactory-project.md)
-
--->
-## Result: 
-This is what you will get:
-
-[AIFactory overview](../10-19/15-aifactory-overview.md)
-
-[AIFactory architecture diagrams](../10-19/11-architecture-diagrams.md) 
