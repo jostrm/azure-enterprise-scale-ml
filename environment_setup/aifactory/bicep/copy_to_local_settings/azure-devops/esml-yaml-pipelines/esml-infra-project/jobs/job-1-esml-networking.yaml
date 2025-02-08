@@ -68,12 +68,14 @@ steps:
      az deployment group create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj" \
      --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
      --resource-group "$(cat "..\..\..\..\aifactory\parameters\subnetParameters.json" | grep vnetResourceGroup -A1 | tail -n1 | cut -d: -f2 | tr -d " \"")" \
      --template-file "esml-project\21-network.bicep" \
      --parameters @"..\..\..\..\aifactory\parameters\subnetParameters.json" \
      --parameters @"..\..\..\..\aifactory\parameters\10-esml-globals-override.json" \
      --parameters env="$(dev_test_prod)" \
-     --parameters projectNumber="$(project_number_000)"
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters location="$(admin_location)"
      
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

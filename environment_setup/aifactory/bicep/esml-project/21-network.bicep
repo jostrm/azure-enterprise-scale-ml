@@ -33,7 +33,7 @@ param projectNumber string
 var projectName = 'prj${projectNumber}'
 
 @description('Deployment location')
-param location string = resourceGroup().location // from ESML-COMMON RG
+param location string
 param commonResourceSuffix string
 
 @description('Meta. Needed from ADO. To be grep from ADO in the az deployement call')
