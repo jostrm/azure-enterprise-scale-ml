@@ -80,6 +80,7 @@ for env in "${environments[@]}"; do
     create_or_update_variable $env "AIFACTORY_SUFFIX" "$AIFACTORY_SUFFIX"
     create_or_update_variable $env "AIFACTORY_PREFIX" "$AIFACTORY_PREFIX"
     create_or_update_variable $env "TENANT_AZUREML_OID" "$TENANT_AZUREML_OID"
+    create_or_update_variable $env "LAKE_PREFIX" "$LAKE_PREFIX"
 
     # Cost optimization
     create_or_update_variable $env "USE_COMMON_ACR_FOR_PROJECTS" "$USE_COMMON_ACR_FOR_PROJECTS"
