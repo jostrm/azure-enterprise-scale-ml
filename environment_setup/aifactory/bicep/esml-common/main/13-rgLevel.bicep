@@ -408,6 +408,7 @@ module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep
   }
 
   dependsOn: [
+    kvCmn
     esmlCommonResourceGroup
   ]
 }
