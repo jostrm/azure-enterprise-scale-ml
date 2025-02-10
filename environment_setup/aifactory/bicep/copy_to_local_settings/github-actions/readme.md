@@ -17,11 +17,38 @@ The file structure should now look something like below:
 
 ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-byorepo.png)
 
-## Continue with steps:5-8:
+## Continue with steps:5-9:
 
-5) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
-6) Edit the [.env] variables at your root. (These will override some of the base parameters)
-7) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
+5) Authenticate to  Azure and Github
+You need to login via `Azure CLI` and `Github CLI`, but recommendation is to also test login via `Powershell`. 
+- NB! Recommendation is to use a service principal when logging in. Not your user id.
+- The Service Principal should have OWNER permission to all 3 subscriptions (Dev, Test, Prod), such as the `esml-common-bicep-sp` service principle.
+- Test the login for all 3 subscriptions using `az cli` and `powershell` as below: 
+
+   a) Log in to `Azure CLI with a service principal`, to a specific tenant
+
+   ```sh
+    # Define the variables
+    clientId="your-client-id"
+    clientSecret="your-client-secret"
+    tenantId="your-tenant-id"
+    subscriptionId="your-subscription-id"
+    
+    az login --service-principal -u $clientId -p $clientSecret --tenant $tenantId
+    az account set --subscription $subscriptionId
+   ```
+
+   b) Log in to `GitHub CLI:`
+
+   ```sh
+    gh auth login
+   ```
+
+
+
+6) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
+7) Edit the [.env] variables at your root. (These will override some of the base parameters)
+8) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
     - Select `y`in the prompt `Do you want to use overwrite AZURE_CREDENTIALS with dummy value?` the first time you run the script.
     - Then, set the AZURE_CREDENTIALS manually using Github web portal for each Environment. The format should be: 
         ```json
@@ -32,7 +59,7 @@ The file structure should now look something like below:
             "tenantId": "<TenantId>"
         }
         ```
-8) Run the Github action workflows, start with `infra-aifactory-common.yaml` then you can run `infra-project-genai.yaml` or `infra-project-esml.yaml`
+9) Run the Github action workflows, start with `infra-aifactory-common.yaml` then you can run `infra-project-genai.yaml` or `infra-project-esml.yaml`
 
 ## Workflow: AIFactory Common 
 Start with setting up a common AIFactory environment, example, the DEV environment
