@@ -74,4 +74,7 @@ cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-a
 mkdir -p "$aif_dir/esml-infra/azure_dashboards/"
 cp "$start_dir/environment_setup/aifactory/azure_dashboards" "$aif_dir/esml-infra/azure_dashboards/" -r
 
+# Git Ignore
+cp "$start_dir/bootstrap/.gitignore.template" "$start_dir/../.gitignore"
+
 echo -e "${GREEN}02. Success! ${NC}"
