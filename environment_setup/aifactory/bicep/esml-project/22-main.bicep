@@ -1495,6 +1495,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: technicalAdminsObjectID_array_safe
+    addBastion: addBastionHost
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
   }
   dependsOn: [
@@ -1505,7 +1506,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
   ]
 }
 // Bastion Externally (Connectvivity subscription and RG)
-module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false) {
+module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false && addBastionHost==true) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbacGenAIReadBastion${deploymentProjSpecificUniqueSuffix}'
   params: {
