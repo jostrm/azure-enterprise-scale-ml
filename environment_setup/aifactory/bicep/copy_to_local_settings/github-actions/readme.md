@@ -13,7 +13,7 @@
 4) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
     - Note: If you want to refresh the pipeline templates, but not overwrite the .env file, you may run `03-GH-bootstrap-files-no-env-overwrite.sh`
 
-The file structure should now look something like below: 
+OUTPUT: The file structure should now look something like below: 
 
 ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-byorepo.png)
 
@@ -59,6 +59,10 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
             "tenantId": "<TenantId>"
         }
         ```
+
+    - OUTPUT: The environment in Github should now look something like below (~21 variables in each environment: Dev,Stage, Prod)
+    - ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-env-vars.png)
+
 9) Run the Github action workflows, start with `infra-aifactory-common.yaml` then you can run `infra-project-genai.yaml` or `infra-project-esml.yaml`
 
 ## Workflow: AIFactory Common 
