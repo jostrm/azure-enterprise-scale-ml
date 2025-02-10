@@ -23,9 +23,9 @@ variables:
   dev_sub_id: "" # SubscriptionID dev
   test_sub_id: "" # SubscriptionID test
   prod_sub_id: "" # SubscriptionID prod
-  dev_cidr_range: "11"
-  test_cidr_range: "12"
-  prod_cidr_range: "13"
+  dev_cidr_range: "11" # DEV_CIDR_RANGE will replace XX in the template: 10.XX.0.0/16
+  test_cidr_range: "12" # will replace XX in the template: 10.XX.0.0/16
+  prod_cidr_range: "13" # will replace XX in the template: 10.XX.0.0/16
 
   # FOR EACH PROJECT: AI Factory - Projects (ESML, ESGenAI, ESAgentic): Change for each new project
   admin_projectType: "esml" # What project type to deploy? [esml,genai-1,genai-2]
