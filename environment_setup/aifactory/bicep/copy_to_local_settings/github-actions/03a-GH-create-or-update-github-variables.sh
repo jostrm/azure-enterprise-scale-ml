@@ -61,6 +61,15 @@ gh_version=$(gh --version | grep -oP '\d+\.\d+\.\d+' | head -n 1)
 # Define environments
 environments=("dev" "stage" "prod")
 
+gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/dev
+create_or_update_variable "dev" "AZURE_ENV_NAME" "dev"
+
+gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/stage
+create_or_update_variable "stage" "AZURE_ENV_NAME" "test"
+
+gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/prod
+create_or_update_variable "prod" "AZURE_ENV_NAME" "prod"
+
 # AI Factory globals: variables and secrets
 for env in "${environments[@]}"; do
     echo -e "${YELLOW}Setting variables and secrets for environment: $env${NC}"
@@ -70,6 +79,7 @@ for env in "${environments[@]}"; do
     create_or_update_variable $env "AIFACTORY_LOCATION_SHORT" "$AIFACTORY_LOCATION_SHORT"
     create_or_update_variable $env "AIFACTORY_SUFFIX" "$AIFACTORY_SUFFIX"
     create_or_update_variable $env "AIFACTORY_PREFIX" "$AIFACTORY_PREFIX"
+    create_or_update_variable $env "TENANT_AZUREML_OID" "$TENANT_AZUREML_OID"
 
     # Cost optimization
     create_or_update_variable $env "USE_COMMON_ACR_FOR_PROJECTS" "$USE_COMMON_ACR_FOR_PROJECTS"
@@ -101,10 +111,9 @@ for env in "${environments[@]}"; do
 done
 
 # DEV variables
-gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/dev
-create_or_update_variable "dev" "AZURE_ENV_NAME" "dev"
 create_or_update_variable "dev" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
 create_or_update_variable "dev" "AZURE_SUBSCRIPTION_ID" "$DEV_SUBSCRIPTION_ID"
+create_or_update_variable "dev" "AIFACTORY_CIDR_XX" "$DEV_CIDR_RANGE"
 create_or_update_variable "dev" "GH_CLI_VERSION" "$gh_version"
 
 # DEV: Secrets
@@ -112,20 +121,18 @@ create_or_update_variable "dev" "GH_CLI_VERSION" "$gh_version"
 #create_or_update_secret "dev" "AZURE_CREDENTIALS" "replace_with_dev_sp_credencials"
 
 # STAGE variables
-gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/stage
-create_or_update_variable "stage" "AZURE_ENV_NAME" "test"
 create_or_update_variable "stage" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
-create_or_update_variable "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID" 
+create_or_update_variable "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
+create_or_update_variable "stage" "AIFACTORY_CIDR_XX" "$STAGE_CIDR_RANGE"
 
 # STAGE: Secrets
 #create_or_update_secret "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
 #create_or_update_secret "stage" "AZURE_CREDENTIALS" "replace_with_stage_sp_credencials"
 
 # PROD variables
-gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/prod
-create_or_update_variable "prod" "AZURE_ENV_NAME" "prod"
 create_or_update_variable "prod" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
 create_or_update_variable "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"
+create_or_update_variable "prod" "AIFACTORY_CIDR_XX" "$PROD_CIDR_RANGE"
 
 # PROD: Secrets
 #create_or_update_secret "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"

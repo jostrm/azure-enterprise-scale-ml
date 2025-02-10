@@ -47,7 +47,7 @@ env:
     useCommonACR: "${{ vars.USE_COMMON_ACR_FOR_PROJECTS }}" # Use common Azure Container Registry (save cost), insted of each project having its own.
 
     # OPTIONAL - GENAI specific
-    azure_machinelearning_sp_oid: "b6b19655-d941-419f-abe6-8378b92cb8d2" # Azure Machine Learning service principle Object ID. In Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
+    azure_machinelearning_sp_oid: "${{ vars.TENANT_AZUREML_OID }}" # Azure Machine Learning service principle Object ID. In Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
     admin_enablePublicGenAIAccess: true # Enable public access to GenAI
     optional_serviceSettingDeployAIDocIntelligence: false # Deploy AI Doc Intelligence
     optional_serviceSettingDeployAzureAIVision: false # Deploy Azure AI Vision
