@@ -56,5 +56,6 @@ resource snt 'Microsoft.Network/virtualNetworks/subnets@2020-06-01' = {
 
 
 output subnetId string =  snt.id
+output name string = snt.name
 
 
