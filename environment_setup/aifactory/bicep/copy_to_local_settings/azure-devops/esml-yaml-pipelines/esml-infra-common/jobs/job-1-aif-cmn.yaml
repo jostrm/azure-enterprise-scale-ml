@@ -33,6 +33,7 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
      --parameters env="$(dev_test_prod)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)"
@@ -57,6 +58,7 @@ steps:
      --parameters @"..\..\..\..\aifactory\parameters\12-esml-cmn-parameters.json" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters env="$(dev_test_prod)" \
      --parameters cidr_range="$(cidr_range)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
@@ -87,6 +89,7 @@ steps:
      --parameters @"..\..\..\..\aifactory\parameters\13-esml-cmn-parameters.json" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters env="$(dev_test_prod)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters resourceSuffix="$(admin_commonResourceSuffix)" \

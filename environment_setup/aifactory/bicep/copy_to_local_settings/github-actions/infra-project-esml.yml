@@ -166,8 +166,8 @@ jobs:
           --parameters @"./aifactory/parameters/10-esml-globals-override.json" \
           --parameters env="${{ env.dev_test_prod }}" \
           --parameters projectNumber="${{ env.project_number_000 }}"
-          --parameters location="$(admin_location)" \
-          --parameters locationSuffix="$(admin_locationSuffix)"
+          --parameters location="${{ env.admin_location}}" \
+          --parameters locationSuffix="${{ env.admin_locationSuffix }}"
         azcliversion: latest
     - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
