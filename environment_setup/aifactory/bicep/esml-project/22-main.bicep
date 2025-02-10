@@ -914,7 +914,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
 
 module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privDnsZoneLStorage${deploymentProjSpecificUniqueSuffix}'
+  name: 'privDnsZoneLStorageSacc${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: sacc.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -926,7 +926,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(centralDnsZoneByPoli
 }
 module privateDnsStorage2 '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'privDnsZoneLStorage${deploymentProjSpecificUniqueSuffix}'
+  name: 'privDnsZoneLStorageSacc2${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: sacc2.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
