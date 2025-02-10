@@ -15,6 +15,10 @@ Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline
 >[!TIP]
 > If you want to update the pipeline templates? Witout overwriting previous configuration. Then run the bash file created at your root called: `03-ADO-YAML-bootstrap-files-no-var-overwrite.sh`. This will ensure updated pipeline templates, and will not overwrite base parameters, or variables
 
+The file structure should now look something like below. The underlined folder is the AI Factory `submodule`.
+
+![](../../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-ADO-byorepo.png)
+
 ## Steps 4-7
 
 >[!NOTE]

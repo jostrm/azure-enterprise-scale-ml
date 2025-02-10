@@ -11,12 +11,27 @@
 3) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
     - Note: Is is under the `aifactory` folder, you will configure your [base parameters](../../../../aifactory/parameters/) and other variables.
 4) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
+    - Note: If you want to refresh the pipeline templates, but not overwrite the .env file, you may run `03-GH-bootstrap-files-no-env-overwrite.sh`
+
+The file structure should now look something like below: 
+
+![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-byorepo.png)
 
 ## Continue with steps:5-8:
 
 5) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
 6) Edit the [.env] variables at your root. (These will override some of the base parameters)
-7) Run the file created at your root called: `03-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
+7) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
+    - In the prompt
+    - Set the AZURE_CREDENTIALS manually using Github web portal for each Ennvironment. The format should be: 
+        ```json
+        {
+            "clientId": "<AppId of service princple that is OWNER, such as esml-commonn-bicep-sp>",
+            "clientSecret": "Secret of of service princple that is OWNER, such as esml-commonn-bicep-sp",
+            "subscriptionId": "<subscriptionID>",
+            "tenantId": "<TenantId>"
+        }
+        ```
 8) Run the Github action workflows
 
 ## Workflow: AIFactory Common 
