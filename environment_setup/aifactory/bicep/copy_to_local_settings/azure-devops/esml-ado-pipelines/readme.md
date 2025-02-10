@@ -17,7 +17,7 @@
 > If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ setup starting page](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md)
 >
 
-4) Import the json files as REALEASE pipelines in Azure Devops classic
+4) Import the json files as RELEASE pipelines in Azure Devops classic
 5) Edit the Variables in the Azure Devops UI, the Variables tab.
 6) Run first the [infra-aifactory-common.json](./infra-aifactory-common.json), to setup at least DEV common AIFactory environment
 7) Run a project pipeline 
@@ -35,3 +35,7 @@ If you want to onboard more people as AIFActory core team, to have access to the
 > [!TIP]
 >  Do you want to use Github instead of Azure Devops? Then you can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage).
 >
+
+## Very detailed instructions - screenshots
+
+[Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
