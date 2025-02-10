@@ -11,6 +11,8 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage). This bootstrap repo becomes your repo - using this as a sumobule repo.
 >
 
+[How-to SETUP](./documentation/v2/20-29/24-end-2-end-setup.md)
+
 ## Main purpose: 
 1) `Marry multiple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
     - All `PRIVATE` networking: Private endpoints for all services such as Azure Machine Learning, private AKS cluster, private Container registry, Storage, Azure data factory, Monitoring etc

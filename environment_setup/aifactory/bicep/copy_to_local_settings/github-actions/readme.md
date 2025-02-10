@@ -22,8 +22,8 @@ The file structure should now look something like below:
 5) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
 6) Edit the [.env] variables at your root. (These will override some of the base parameters)
 7) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
-    - In the prompt
-    - Set the AZURE_CREDENTIALS manually using Github web portal for each Ennvironment. The format should be: 
+    - Select `y`in the prompt `Do you want to use overwrite AZURE_CREDENTIALS with dummy value?` the first time you run the script.
+    - Then, set the AZURE_CREDENTIALS manually using Github web portal for each Environment. The format should be: 
         ```json
         {
             "clientId": "<AppId of service princple that is OWNER, such as esml-commonn-bicep-sp>",
