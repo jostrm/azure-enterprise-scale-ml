@@ -38,4 +38,4 @@ If you want to onboard more people as AIFActory core team, to have access to the
 
 ## Very detailed instructions - screenshots
 
-[Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
+[Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../../../../../../documentation/v2/10-19/13-setup-aifactory.md)
