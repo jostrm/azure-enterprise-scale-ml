@@ -32,7 +32,7 @@ The file structure should now look something like below:
             "tenantId": "<TenantId>"
         }
         ```
-8) Run the Github action workflows
+8) Run the Github action workflows, start with `infra-aifactory-common.yaml` then you can run `infra-project-genai.yaml` or `infra-project-esml.yaml`
 
 ## Workflow: AIFactory Common 
 Start with setting up a common AIFactory environment, example, the DEV environment
