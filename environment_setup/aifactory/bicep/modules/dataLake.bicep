@@ -63,7 +63,7 @@ param deleteRetentionPolicyEnabled bool = true
 param encryptionEnabled bool = true
 param ipWhitelist_array array = []
 param virtualNetworkRules_array array = []
-param containers array = []
+param containers array = ['lake3']
 param files array = []
 param corsRules array = [
   {
@@ -191,9 +191,9 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
       }
     }
     resource container 'containers' = [for container in containers: {
-      name: container.name
+      name: container
       properties: {
-        publicAccess: contains(container, 'publicAccess') ? container.publicAccess : 'None'
+        publicAccess: 'None'
       }
     }]
   }
