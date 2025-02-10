@@ -61,7 +61,7 @@ mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/classic/"
 cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/classic/"
 
 mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/yaml/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/" "$aif_dir/esml-infra/azure-devops/bicep/yaml/" -r
+cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/yaml/" -r
 
 ## TEMPLATES: infra orchestration (pipelines) - GHA(Bicep, Terraform)
 mkdir -p "$aif_dir/esml-infra/github-actions/bicep/"
