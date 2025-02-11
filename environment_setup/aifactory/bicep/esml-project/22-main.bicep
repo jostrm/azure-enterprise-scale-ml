@@ -139,7 +139,7 @@ param kvNameFromCOMMON_param string = ''
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
 @description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourcegroup, set this to true')
-param useCommonACR bool = false
+param useCommonACR bool = true
 
 // Override: AML: AKS cluster
 param aks_dev_sku_override string = ''

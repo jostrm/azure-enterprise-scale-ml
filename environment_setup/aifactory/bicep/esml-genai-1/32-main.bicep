@@ -9,7 +9,7 @@ param vnetNameFullBastion string = ''
 param privateDnsAndVnetLinkAllGlobalLocation bool=false
 param azureMachineLearningObjectId string =''
 @description('If you want to use a common Azure Container Registry, in the AI Factory COMMON resourcegroup, set this to true')
-param useCommonACR bool = false
+param useCommonACR bool = true
 
 param vmSKUSelectedArrayIndex int = 2
 param vmSKU array = [
