@@ -123,13 +123,16 @@ jobs:
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
-        inlineScript: az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.runner_ip }}
+        inlineScript: |
+          az account set --subscription ${{ env.admin_bicep_input_keyvault_subscription }}
+          az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.runner_ip }}
         azcliversion: latest
     - name: 03_download_seeding_keyvault
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
         inlineScript: |
+          az account set --subscription ${{ env.admin_bicep_input_keyvault_subscription }}
           echo "common-sp-appid-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-appid-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
           echo "common-sp-secret-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-secret-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
         azcliversion: latest
@@ -151,6 +154,7 @@ jobs:
       with: 
         inlineScript: |
           echo "Deploying subnets and NSG to subscription: ${{ env.dev_test_prod_sub_id }}"
+          az account set --subscription ${{ env.dev_test_prod_sub_id }}
           az deployment group create \
           --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}SubnetDeplProj" \
           --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -169,7 +173,9 @@ jobs:
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
-        inlineScript: az keyvault network-rule remove --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
+        inlineScript: |
+          az account set --subscription ${{ env.admin_bicep_input_keyvault_subscription }}
+          az keyvault network-rule remove --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
         azcliversion: latest
       #if: always()
   job2-deploy-services-project-esml:

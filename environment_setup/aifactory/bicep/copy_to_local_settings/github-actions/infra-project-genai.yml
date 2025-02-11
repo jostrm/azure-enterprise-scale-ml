@@ -126,7 +126,7 @@ jobs:
       if: env.ENABLE_NETWORKING_JOB  != 'false'
       uses: azure/cli@v2
       with:
-        inlineScript: | 
+        inlineScript: |
           az account set --subscription ${{ env.admin_bicep_input_keyvault_subscription }}
           az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address ${{ env.runner_ip }}
         azcliversion: latest
@@ -169,6 +169,7 @@ jobs:
         #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/"
         inlineScript: |
           echo "Deploying subnets and NSG to subscription: ${{ env.dev_test_prod_sub_id }}"
+          az account set --subscription ${{ env.dev_test_prod_sub_id }}
           az deployment group create \
           --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}SubnetDeplProj" \
           --subscription "${{ env.dev_test_prod_sub_id }}" \
