@@ -84,6 +84,7 @@ There is 25 mandatory, to support ESML and GENAI-1 project types in the AIFactor
 22|Azure Eventhubs |ESML| privatelink.servicebus.windows.net |servicebus.windows.net |namespace|-|
 23|Azure Eventgrid |ESML| privatelink.eventgrid.azure.net |eventgrid.azure.net|topic,domain,topicSpace,partnernamespace |Dependency: Azure Datafactory|
 24,25,26,27|Azure Monitor |All| privatelink.monitor.azure.com<br>privatelink.oms.opinsights.azure.com<br>privatelink.ods.opinsights.azure.com<br>privatelink.agentsvc.azure-automation.net|monitor.azure.com<br>oms.opinsights.azure.com<br>ods.opinsights.azure.com<br>agentsvc.azure-automation.net<br>blob.core.windows.net<br>services.visualstudio.com<br>applicationinsights.azure.com|azuremonitor|-|
+28|Azure AI Services |ESGenAI| privatelink.services.ai.azure.com |services.ai.azure.com|account|NEW! `2025-02-11` (in UK South)|
 
 
 Source: [Microsoft Docs - Azure Private Endpoint private DNS zone values](https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns)
