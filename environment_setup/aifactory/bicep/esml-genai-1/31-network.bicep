@@ -36,7 +36,7 @@ param vnetNameFull_param string = ''
 param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
-param useCommonACR bool = false
+param useCommonACR bool = true
 // To get TAGS from file: 10-esml-globals-1.json
 param tags object
 param aifactorySuffixRG string = '' // dummy

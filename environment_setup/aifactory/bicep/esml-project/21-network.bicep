@@ -44,7 +44,7 @@ param vnetNameFull_param string = ''
 param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
-param useCommonACR bool = false
+param useCommonACR bool = true
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
 // To get TAGS from file: 10-esml-globals-1.json
