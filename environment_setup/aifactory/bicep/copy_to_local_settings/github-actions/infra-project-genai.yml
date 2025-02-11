@@ -72,7 +72,7 @@ env:
     admin_private_DatabricksUI: false # Private Databricks UI
 jobs:
   job1-deploy-networking-project-genai:
-    name: ESGenAI_Networking
+    name: ESGenAI_Private_Networking
     environment: ${{github.event.inputs.environment}}
     runs-on: ubuntu-latest
     if: vars.RUN_JOB1_NETWORKING != 'false'
@@ -175,7 +175,7 @@ jobs:
           --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
           --parameters @"./aifactory/parameters/10-esml-globals-override.json" \
           --parameters env="${{ env.dev_test_prod }}" \
-          --parameters projectNumber="${{ env.project_number_000 }}"
+          --parameters projectNumber="${{ env.project_number_000 }}" \
           --parameters location="${{ env.admin_location}}" \
           --parameters locationSuffix="${{ env.admin_locationSuffix }}"
         azcliversion: latest
@@ -235,12 +235,65 @@ jobs:
           inlineScript: |
             echo "common-sp-appid-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-appid-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
             echo "common-sp-secret-value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.common-sp-secret-seeding-kv-name }} --query 'value' --output tsv)" >> $GITHUB_ENV
+            echo "project_sp_oid_value=$(az keyvault secret show --vault-name ${{ env.admin_bicep_kv_fw }} --name ${{ env.project_service_principal_OID_seeding_kv_name }} --query 'value' --output tsv)" >> $GITHUB_ENV
           azcliversion: latest
       - name: Generate dynamic network parameters
         working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
         run: |
           sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{env.common-sp-appid-value}}' -spSecret '${{env.common-sp-secret-value}}' -useServicePrincipal -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -filePath '../../../../../aifactory/parameters/' -env '${{env.dev_test_prod}}' -locationSuffixADO '${{env.admin_locationSuffix}}' -aifactorySuffixRGADO '${{env.admin_aifactorySuffixRG}}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{env.dev_test_prod_sub_id}}' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -projectTypeADO '${{env.admin_projectType}}'"
         shell: pwsh
+      - name: 05a_pwsh_remove_previous_run_rbac_in_prj_and_cmn_rg
+        if: false
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          pwsh -Command '$technical_admins_ad_object_id = "${{ env.technical_admins_ad_object_id }}"
+            $project_spoid = "${{ env.project_sp_oid_value }}"
+            $oids = $technical_admins_ad_object_id -split "\s*,\s*"
+      
+            # Define the list of MI IDs
+            $managedIdentities = @(
+                "", # AML 1 OID MI
+                "" # AML 2 OID MI
+            )
+      
+            ####### END - EDIT VARIABLES####
+      
+            # Scopes
+            $scopeCommon = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupNameCommon"
+            $rolesCommmonRG = @(
+                "8311e382-0749-4cb8-b61a-304f252e45ec" # "AcrPush"
+            )
+      
+            $scopeProjectResourceGroup = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName"
+            $rolesProjectRG = @(
+                "b24988ac-6180-42a0-ab88-20f7382dd24c", # "Contributor"
+                "8311e382-0749-4cb8-b61a-304f252e45ec", # "AcrPush"
+                "3afb7f49-54cb-416e-8c09-6dc049efa503", # "Azure AI Inference Deployment Operator"
+                "ea01e6af-a1c1-4350-9563-ad00f8c72ec5",# "Azure Machine Learning Workspace Connection Secrets Reader"
+                "f6c7c914-8db3-469d-8ca1-694a8f32e121", #"AzureML Data Scientist"
+                "f58310d9-a9f6-439a-9e8d-f62e7b41a168", #"Role Based Access Control Administrator"
+                "1c0163c0-47e6-4577-8991-ea5c82e286e4" #"Virtual Machine Administrator Login"
+            )
+      
+            Write-Host "Deleting roles on resource group $scopeProjectResourceGroup"
+            Write-Host ""
+      
+            # PROJECT RG - USERS
+            foreach ($oid in $oids) {
+                foreach ($role in $rolesProjectRG) {
+                    az role assignment delete --assignee $oid --role $role --scope $scopeProjectResourceGroup
+                }
+            }
+      
+            Write-Host "Deleting roles on resource group $resourceGroupNameCommon"
+            Write-Host ""
+            # COMMON - USERS
+            foreach ($oid in $oids) {
+                foreach ($role in $rolesCommmonRG) {
+                    az role assignment delete --assignee $oid --role $role --scope $scopeCommon
+                }
+            }'
       - name: 05_az_bicep_deploy_genai_project
         uses: azure/cli@v2
         with:
