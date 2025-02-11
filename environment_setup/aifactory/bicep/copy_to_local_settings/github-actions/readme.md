@@ -6,6 +6,16 @@
 
 ## Note: 1-4 is needed only if you did not run the SCRIPTS as mentioned in [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
+0) Add the submodule to your repo (to get the bootstrap files)
+
+    Run from your repo root location:
+
+    ```
+    git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
+    ```
+
+    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
+    
 1) Run the start script [00-start.sh](../../../../../00-start.sh),  this will create some bootstrap-scripts at your repo root.
 2) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for GHA workflows, and parameters.
 3) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
