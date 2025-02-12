@@ -8,7 +8,7 @@ This `Enterprise Scale AI Factory` repo is a plug and play solution that automat
 Usage: You can fork it, or use it as a submodule in your own repo.
 
 > [!NOTE]
-> **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage). This bootstrap repo becomes your repo - using this as a sumobule repo.
+> **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a sumobule repo.
 >
 
 [How-to SETUP](./documentation/v2/20-29/24-end-2-end-setup.md)
