@@ -29,7 +29,7 @@ param keyvaultName string
   'vision-preview'
   'turbo-2024-04-0'
 ])
-param modelGPT4Version string = '1106-Preview' // If your region doesn't support this version, please change it.
+param modelGPT4Version string // If your region doesn't support this version, please change it.
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
@@ -74,7 +74,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
 }
 
-resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (!empty(modelGPT4Version)) {
   name: 'gpt-4'
   parent: aiServices
   sku: {
@@ -110,7 +110,7 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
   dependsOn: [
-    gpt4modelOpenAI
+    aiServices
   ]
 }
 
