@@ -1509,7 +1509,7 @@ var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'aiHubName${deploymentProjSpecificUniqueSuffix}'
+  name: '${aiHubName}${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
     location: location
