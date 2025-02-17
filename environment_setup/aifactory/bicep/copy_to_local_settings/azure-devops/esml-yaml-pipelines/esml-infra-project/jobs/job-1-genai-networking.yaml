@@ -44,7 +44,7 @@ steps:
 - task: AzureKeyVault@2  
   displayName: '03_az_download_seeding_keyvault'
   inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
+    azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     KeyVaultName: '$(admin_bicep_kv_fw)'
 - task: AzurePowerShell@4
   displayName: '04_pwsh_calculate_subnet_allocations'

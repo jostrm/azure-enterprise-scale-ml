@@ -27,6 +27,10 @@ variables:
   test_cidr_range: "12" # will replace XX in the template: 10.XX.0.0/16
   prod_cidr_range: "13" # will replace XX in the template: 10.XX.0.0/16
 
+  dev_seeding_kv_service_connection: "" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
+  test_seeding_kv_service_connection: "" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
+  prod_seeding_kv_service_connection: "" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
+
   # FOR EACH PROJECT: AI Factory - Projects (ESML, ESGenAI, ESAgentic): Change for each new project
   admin_projectType: "esml" # What project type to deploy? [esml,genai-1,genai-2]
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
