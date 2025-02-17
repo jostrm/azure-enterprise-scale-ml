@@ -101,6 +101,10 @@ the filed you may edit.
 
 5) `Optional:Nice-to-have script`: Creates one or many service principles and adds the information in the Seeding Keyvault.
    
+    Best practice is to have `1 seeding keyvault per environment` (Dev, Stage, Production, e.g. per subscription. Benefits: 
+        - The secret names in keuvayults, can stay the same across the environments (you don't need to reconfigure Variables)
+        - The same service environment-specific `Azure Devops service connection` can be used for seeding keyvault as for the actual resources, wihtout needing to assign the `esml-common-bicep-sp` service principle access to further subscriptions, e.g. in the case the seding keyvault resides in another subscription.
+
     [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | [Local-repo-link](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
     
     Manually edit the variables (`Local-repo-link`) at the top at the script, then run from root:
