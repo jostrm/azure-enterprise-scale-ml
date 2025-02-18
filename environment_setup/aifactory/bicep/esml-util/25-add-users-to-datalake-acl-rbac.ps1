@@ -4,7 +4,8 @@ param (
     # required parameters
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
     [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
+    [Parameter(Mandatory = $true, HelpMessage = "Tenant ID")][string]$tenantID,
+    [Parameter(Mandatory = $true, HelpMessage = "Subscription ID")][string]$subcriptionID,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
     [Parameter(Mandatory=$true, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
     [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
@@ -15,21 +16,6 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Common AD group OID common. Set to TODO to ignore")][string]$commonADgroupObjectID = 'TODO',
     [Parameter(Mandatory = $false, HelpMessage = "Project AD group OID common. Set to TODO to ignore")][string]$projectADGroupObjectId = 'TODO'
 )
-
-# USAGE: .\aifactory\esml-util\200-datalake-acl-rbac.ps1 -spSecret "abc"
-
-#### Trouble shoot ####
-#$adlsgen2filesystem ="lake3"
-#$storageAccount ="TODO"
-#$spID ="TODO SP AppID - with Storage Blob Data Owner role" # Storage Blob Data Owner role. (esml-common-sp)
-#$tenantID ="TODO"
-#$projectXXX = "project001"
-#$projectSPObjectID = "TODO ObjectID"
-#$userObjectIds = @("TODO ObjectID","TODO ObjectID","TODO ObjectID") # users + project001-sp-oid
-#$commonSPObjectID = "TODO ObjectID" # esml-common-sp
-#$commonADgroupObjectID = "TODO" # AD group: esml-common-coreteam 
-#$projectADGroupObjectId = "TODO" # AD group: esml-project002
-#### Trouble shoot END ####
 
 $userObjectIds += $projectSPObjectID
 $ctx = $null
@@ -47,6 +33,8 @@ if (-not [String]::IsNullOrEmpty($spSecret)) {
     if ($(Get-AzContext).Subscription -ne "") {
       write-host "Successfully logged in as $($(Get-AzContext).Account) to $($(Get-AzContext).Subscription)"
       #$ctx = New-AzStorageContext -StorageAccountName $storageAccount -UseConnectedAccount
+      write-host "Set-AzContext to subscription: ${subcriptionID}"
+      Set-AzContext -Subscription $(Get-AzContext).Subscription
     }
     else {
       Write-Host "Failed to login to Azure with Service Principal. Exiting..."

@@ -18,8 +18,11 @@ fi
 
 ################ EDIT THIS #################
 env="dev"
-aiFactorySalt="$LAKE_PREFIX" # Set this in your .env file:  Your unique salt for AIFactory, look at a resource such as keyvault, to find the 5 characters.
+aiFactorySalt="$AIFACTORY_SALT" # Set this in your .env file:  Your unique salt for AIFactory, look at a resource such as keyvault, to find the 5 characters.
 ############################ DO NOT EDIT BELOW
+
+# Prompt for SAS token
+read -p "Enter SAS token (leave empty to use EntraID auth. NB! Storage Blob Data Owner is needed. Sets ACL): " sas_token
 
 # DIRECTORIES
 current_dir=$(pwd)
@@ -34,9 +37,8 @@ trap "rm -rf $UNZIP_DIR" EXIT
 
 # Variables
 commonLakeNamePrefixMax8chars="$LAKE_PREFIX"
-commonResourceSuffix="$AIFACTORY_SUFFIX"
-commonResourceSuffix="${commonResourceSuffix//-/}" # Replace '-' with '' in commonResourceSuffix
-STORAGE_ACCOUNT_NAME="${commonLakeNamePrefixMax8chars}${aiFactorySalt}esml${commonResourceSuffix}${env}" # Construct datalakeName
+resourceSuffix="001"
+STORAGE_ACCOUNT_NAME="${commonLakeNamePrefixMax8chars}${aiFactorySalt}esml${resourceSuffix}${env}" # Construct datalakeName
 
 echo -e "${GREEN}Datalake Name: $STORAGE_ACCOUNT_NAME ${NC}"
 
@@ -44,13 +46,39 @@ echo -e "${GREEN}Datalake Name: $STORAGE_ACCOUNT_NAME ${NC}"
 ZIP_FILE="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/lake/esml_lake.zip"
 CONTAINER_NAME="lake3"
 
-echo -e "${GREEN}UNZIP_DIR: $UNZIP_DIR ${NC}"
-
 # Unzip the folder
 unzip "$ZIP_FILE" -d "$UNZIP_DIR"
 
-# Upload the folder structure and content to Azure Storage
-az storage blob upload-batch -d "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT_NAME" -s "$UNZIP_DIR" --auth-mode login
-# az storage blob upload-batch -d "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT_NAME" -s "$UNZIP_DIR" --sas-token "<TODO>"
+echo -e "${GREEN}Datalake Name: $STORAGE_ACCOUNT_NAME ${NC}"
 
-echo -e "${GREEN}Upload complete! ${NC}"
+# Check if SAS token is provided
+if [ -z "$sas_token" ]; then
+  echo -e "${YELLOW}No SAS token provided. Using EntraID auth.${NC}"
+
+  # Login to Azure and set the subscription
+  az login
+  if [ $? -eq 0 ]; then
+    az account set --subscription "$DEV_SUBSCRIPTION_ID"
+    if [ $? -eq 0 ]; then
+      echo -e "${GREEN}UNZIP_DIR: $UNZIP_DIR ${NC}"
+
+      # Upload the folder structure and content to Azure Storage
+      az storage blob upload-batch -d "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT_NAME" -s "$UNZIP_DIR" --auth-mode login
+
+      echo -e "${GREEN}Upload complete! ${NC}"
+    else
+      echo -e "${RED}Failed to set the subscription. ${NC}"
+      exit 1
+    fi
+  else
+    echo -e "${RED}Azure login failed. ${NC}"
+    exit 1
+  fi
+else
+  echo -e "${GREEN}Using SAS token for authentication. ${NC}"
+
+  # Upload the folder structure and content to Azure Storage using SAS token
+  az storage blob upload-batch -d "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT_NAME" -s "$UNZIP_DIR" --sas-token "$sas_token"
+
+  echo -e "${GREEN}Upload complete! ${NC}"
+fi
