@@ -1,11 +1,11 @@
-# USAGE: .\aifactory\esml-util\25-add-users-to-datalake-acl-rbac.ps1 -spSecret "abc" -spID "abc" -tenantID "abc" -storageAccount "abcd" -adlsgen2filesystem "lake3" -projectXXX "project001" -userObjectIds a,b,c -projectSPObjectID "a" -commonSPObjectID "abc" -commonADgroupObjectID "TODO" -projectADGroupObjectId "TODO"
+# USAGE: .\aifactory\esml-util\25-add-users-to-datalake-acl-rbac.ps1 -spSecret "abc" -spID "abc" -tenantID "abc" -subscriptionID "abc" -storageAccount "abcd" -adlsgen2filesystem "lake3" -projectXXX "project001" -userObjectIds a,b,c -projectSPObjectID "a" -commonSPObjectID "abc" -commonADgroupObjectID "TODO" -projectADGroupObjectId "TODO"
 
 param (
     # required parameters
     [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
     [Parameter(Mandatory=$true, HelpMessage="Specifies the object id for service principal, with Storage Blob Data Owner role")][string]$spID,
     [Parameter(Mandatory = $true, HelpMessage = "Tenant ID")][string]$tenantID,
-    [Parameter(Mandatory = $true, HelpMessage = "Subscription ID")][string]$subcriptionID,
+    [Parameter(Mandatory = $true, HelpMessage = "Subscription ID")][string]$subscriptionID,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
     [Parameter(Mandatory=$true, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
     [Parameter(Mandatory = $true, HelpMessage = "ESMLProject number: project001")][string]$projectXXX,
