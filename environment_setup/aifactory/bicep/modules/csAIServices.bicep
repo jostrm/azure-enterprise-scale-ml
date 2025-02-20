@@ -52,9 +52,9 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: 'Enabled' // // If not Deny, then ipRules will be ignored (cannot be changed later either) publicNetworkAccess? 'Enabled': 'Disabled' 
+    publicNetworkAccess: 'Disabled' // // If not Deny/Disabled, then ipRules will be ignored (cannot be changed later either) publicNetworkAccess? 'Enabled': 'Disabled' 
     restore: restore
-    restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true // tomten publicNetworkAccess? false:true -> false
+    restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true
     disableLocalAuth: disableLocalAuth
     apiProperties: {
       statisticsEnabled: false
@@ -64,7 +64,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
-        ignoreMissingVnetServiceEndpoint: true // tomten false to true
+        ignoreMissingVnetServiceEndpoint: true
       }]
       ipRules: ipRules
     }
@@ -167,21 +167,6 @@ resource keyVaultOpenAI 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup()
 }
 
-/*
-@description('Key Vault: Azure AI Services K in vault as S')
-resource kValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVaultOpenAI
-  name: 'aifactory-proj-aiservices-api-key'
-  properties: {
-    value: aiServices.listKeys().key1
-    contentType: 'text/plain'
-    attributes: {
-      enabled: true
-    }
-  }
-  
-}
-*/
 
 @description('Key Vault: Azure AI Services endpoint in vault as S')
 resource epValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
@@ -215,6 +200,3 @@ output openAIEndpoint string = aiServices.properties.endpoints['OpenAI Language 
 output aiServicesPrincipalId string = aiServices.identity.principalId
 output name string = aiServices.name
 output resourceId string = aiServices.id
-
-//output aiServicesId string = aiServices.id
-//output openAiId string = aiServices.id
