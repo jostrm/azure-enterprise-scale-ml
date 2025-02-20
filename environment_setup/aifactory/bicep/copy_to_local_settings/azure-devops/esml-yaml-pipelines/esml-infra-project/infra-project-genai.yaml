@@ -5,7 +5,7 @@ trigger:
 variables:
 - template: ../variables/variables.yaml
 - name: runNetworkingVar
-  value: false
+  value: true
 
 stages:
 - stage: Dev_GenAI_Project
