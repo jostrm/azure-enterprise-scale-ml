@@ -90,7 +90,7 @@ stages:
               - template: ./jobs/job-2-esml-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
-                  serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
 - stage: Prod_ESML_Project
   displayName: Prod ESML Project
   variables:
@@ -111,7 +111,7 @@ stages:
               - template: ./jobs/job-1-esml-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
-                  serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
     - deployment: ESML_Services
       condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'))
       dependsOn: ESML_Networking
@@ -126,4 +126,4 @@ stages:
               - template: ./jobs/job-2-esml-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
-                  serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
