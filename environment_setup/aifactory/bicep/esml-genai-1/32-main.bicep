@@ -950,6 +950,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow' // Only IP addresses to AISearch are allowed, according to docs? 
       value: ip
     }]
   }
@@ -1145,6 +1146,7 @@ module sacc '../modules/storageAccount.bicep' = {
       '${vnetId}/subnets/snt-${projectName}-aks'
     ]
     ipRules: [for ip in ipWhitelist_array: {
+      action: 'Allow'
       value: ip
     }] // https://mlworkspace.azure.ai,https://ml.azure.com,https://*.ml.azure.com,https://ai.azure.com,https://*.ai.azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://*.azureml.ms,https://42.swedencentral.instances.azureml.ms,https://*.instances.azureml.ms
     corsRules: [

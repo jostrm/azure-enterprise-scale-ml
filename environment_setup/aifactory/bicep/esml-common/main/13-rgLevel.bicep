@@ -698,10 +698,10 @@ module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(s
 }
 
 var virtualNetworkRules2Add = [
-{
-  id: '${vnetId}/subnets/${defaultSubnet}'
-  action: 'Allow'
-  state: 'succeeded'
+  {
+    id: '${vnetId}/subnets/${defaultSubnet}'
+    action: 'Allow'
+    state: 'succeeded'
   }
 ]
 module dataLake '../../modules/dataLake.bicep' = {

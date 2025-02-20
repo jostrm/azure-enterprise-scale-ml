@@ -111,6 +111,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
       bypass: 'AzureServices' 
       defaultAction: 'Deny' 
       virtualNetworkRules: [for rule in vnetRules: {
+        action: 'Allow'
         id: rule
       }]
       ipRules: ipRules

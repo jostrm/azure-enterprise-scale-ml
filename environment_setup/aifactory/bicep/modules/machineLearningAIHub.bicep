@@ -7,10 +7,6 @@ param aifactoryProjectNumber string
 param location string
 @description('ESML dev,test or prod. If DEV then AKS cluster is provisioned with 1 agent otherwise 3')
 param env string
-//@description('Specifies the skuname of the machine learning studio')
-//param skuName string
-//@description('Specifies the sku tier of the machine learning studio')
-//param skuTier string
 @description('Specifies the storageaccount id used for the machine learning studio')
 param storageAccount string
 @description('Specifies the container registry id used for the machine learning studio')
@@ -48,7 +44,6 @@ param resourceSuffix string
 param applicationInsightsName string
 param ipWhitelist_array array = []
 
-//var subnetRef = '${vnetId}/subnets/${subnetName}'
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var privateDnsZoneName =  {
   azureusgovernment: 'privatelink.api.ml.azure.us'
@@ -154,10 +149,6 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     type: 'SystemAssigned'
   }
   tags: tags
-  //sku: {
-  //  name: skuName
-  //  tier: skuTier
- // }
   kind: kindAIHub
   properties: {
     allowRoleAssignmentOnRG: true
@@ -165,7 +156,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
 
      // dependent resources
-    applicationInsights: appInsights.id // resourceId('Microsoft.Insights/components', applicationInsights)
+    applicationInsights: appInsights.id 
     storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
     containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
@@ -177,11 +168,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     enableDataIsolation: enablePublicGenAIAccess?false:true // tomten
 
     // network settings
-    publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
+    publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' 
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      isolationMode: 'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
@@ -210,23 +201,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
           }
           status: 'Active'
         }
-        /*
-        AmlWorkspace: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiHub.id
-            subresourceTarget: 'amlworkspace'
-            sparkEnabled: true
-            sparkStatus: 'Active'
-          }
-          status: 'Active'
-        }
-          */
       }
     }
     ipAllowlist:ipWhitelist_array
     networkAcls: {
-      defaultAction:'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
+      defaultAction:'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }
@@ -322,7 +301,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
   }
   properties: {
     friendlyName: aiHubProjectName
-    description: 'Project to support the "Chat with Wikipedia" example prompt flow that is used as part of the Microsoft Learn Azure OpenAI baseline chat implementation. https://learn.microsoft.com/azure/architecture/ai-ml/architecture/baseline-openai-e2e-chat'
+    description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
     publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
@@ -331,7 +310,6 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     // configuration for workspaces with private link endpoint -> Error, not possible/allowed
     //imageBuildCompute: 'buildcluster001' -> Error, not possible/allowed
     //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
- 
   }
 
   resource endpoint 'onlineEndpoints' = {
@@ -353,10 +331,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
   }
 }
 
-// Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added
-// manually specifically for the endpoint.
-
-// 001 - works
+// Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added manually
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: aiProject
@@ -367,34 +342,6 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-//002 - error
-/*
-@description('Assign the online endpoint the ability to read connections from AI Project. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: aiProject
-  name: guid(aiProject.id, aiProject::endpoint.id, amlConnectionReaderRole.id)
-  properties: {
-    roleDefinitionId: amlConnectionReaderRole.id
-    principalType: 'ServicePrincipal'
-    principalId: aiProject::endpoint.identity.principalId
-  }
-}
-*/
-
-// 003 - works, Not.
-/*
-@description('Assign the online endpoint the ability to write metrics. This is needed to enable monitoring and logging to the prompt flow from the managed endpoint.')
-resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: aiProject
-  name: guid(aiProject.id, aiProject::endpoint.id, amlMetricsWriterRole.id)
-  properties: {
-    roleDefinitionId: amlMetricsWriterRole.id
-    principalType: 'ServicePrincipal'
-    principalId: aiProject::endpoint.identity.principalId
-  }
-}
-*/
-// 004 - checking, may not work.Nope dont work
 
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -406,7 +353,6 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
     principalId: aiProject::endpoint.identity.principalId
   }
 }
-
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
 resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
@@ -519,94 +465,28 @@ output principalId string = aiHub.identity.principalId
 output aiProjectName string = aiProject.name
 
 
-// Error: PUT PE operation should be performed on the hub, not on the project workspace.
-//sa008sdc3pmpb001dev
 /*
-var privateEndpointNameProject = 'pend-${aiProject.name}'
-resource pendAIHubProject 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: privateEndpointNameProject
-  location: location
-  tags: tags
+@description('Assign the online endpoint the ability to read connections from AI Project. This is needed to execute the prompt flow from the managed endpoint.')
+resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: aiProject
+  name: guid(aiProject.id, aiProject::endpoint.id, amlConnectionReaderRole.id)
   properties: {
-    customNetworkInterfaceName: 'pend-nic-aihub-${aiProject.name}'
-    privateLinkServiceConnections: [
-      {
-        name: privateEndpointNameProject
-        properties: {
-          groupIds: [
-            'amlworkspace'
-          ]
-          privateLinkServiceId: aiProject.id
-          privateLinkServiceConnectionState: {
-            status: 'Approved'
-            description: 'Auto-Approved'
-            actionsRequired: 'None'
-          }
-        }
-      }
-    ]
-    subnet: {
-      id: subnet.id
-    }
-  }
-}
-  resource privateEndpointDnsProject 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
-  name: '${pendAIHubProject.name}DnsZone'
-  parent: pendAIHubProject
-  properties:{
-    privateDnsZoneConfigs: [
-      {
-        name: privateDnsZoneName[environment().name]
-        properties:{
-          privateDnsZoneId: privateLinksDnsZones.amlworkspace.id 
-        }
-      }
-      {
-        name: privateDnsZoneNameNotebooks[environment().name]
-        properties:{
-          privateDnsZoneId: privateLinksDnsZones.notebooks.id 
-        }
-      }
-    ]
+    roleDefinitionId: amlConnectionReaderRole.id
+    principalType: 'ServicePrincipal'
+    principalId: aiProject::endpoint.identity.principalId
   }
 }
 */
 
-//CPU Cluster
-// ":"Current operation is not supported on Hub workspace
 /*
-resource acrBuildComputeCluster 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
-  name: 'buildcluster001' // p001-m1-weu-prod (16/16...or 24)
-  parent: aiProject
-  location: location
-  tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
+@description('Assign the online endpoint the ability to write metrics. This is needed to enable monitoring and logging to the prompt flow from the managed endpoint.')
+resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: aiProject
+  name: guid(aiProject.id, aiProject::endpoint.id, amlMetricsWriterRole.id)
   properties: {
-    computeType: 'AmlCompute'
-    computeLocation: location
-    description: 'Dont touch. Dont delete. CPU cluster for building images for Container Registry'
-    disableLocalAuth: true
-    properties: {
-      vmPriority: 'Dedicated'
-      vmSize: 'Standard_DS3_v2'
-      enableNodePublicIp: false
-      isolatedNetwork: false
-      osType: 'Linux'
-      remoteLoginPortPublicAccess: 'Disabled'
-      scaleSettings: {
-        minNodeCount: 0
-        maxNodeCount: 5
-        nodeIdleTimeBeforeScaleDown: 'PT120S'
-      }
-      subnet: {
-        id: subnet.id
-      }
-    }
+    roleDefinitionId: amlMetricsWriterRole.id
+    principalType: 'ServicePrincipal'
+    principalId: aiProject::endpoint.identity.principalId
   }
-  dependsOn:[
-    machineLearningPrivateEndpoint
-  ]
 }
-  */
+*/

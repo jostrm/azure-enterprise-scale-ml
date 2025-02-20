@@ -54,9 +54,9 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess:'Enabled' // publicNetworkAccess? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
+    publicNetworkAccess:publicNetworkAccess? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
-      bypass: 'AzureServices' //'None', 'AzureServices', 'None'
+      bypass: 'AzurePortal' //'None', 'AzureServices', 'None', 'AzurePortal'
       ipRules: ipRules
     }
     semanticSearch: semanticSearchTier
@@ -89,10 +89,10 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess:'Enabled' // publicNetworkAccess? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
+    publicNetworkAccess:publicNetworkAccess? 'Enabled': 'Disabled'
     networkRuleSet: {
-      bypass: 'AzureServices' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'
-      ipRules: ipRules
+      bypass: 'AzurePortal' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'. AIServices did not work
+      ipRules: ipRules // only IP addresses. Not also "action: 'Allow'"
     }
     
     semanticSearch: semanticSearchTier
@@ -100,41 +100,6 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
 
 }
 
-/*
-Error Not Found:  aisearch3pmpbprj001genaisdcdev-002/aisearch-aisearch3pmpbprj001genaisdcdev-002-shared-plink-0
-TODO: remove "-" and shorten name.
-
-@batchSize(1)
-resource sharedPrivateLink 'Microsoft.Search/searchServices/sharedPrivateLinks@2024-06-01-preview' = [for (sharedPend, i) in sharedPrivateLinks: if(enableSharedPrivateLink) {
-  name: 'aisearch-${aiSearchName}-shared-plink-${i}'
-  parent: aiSearch
-  properties: {
-    groupId: 'aiSearch'
-    sharedPrivateLinkResourceId: sharedPrivateLinks[i].privateLinkResourceId
-    privateLinkServiceConnectionState: {
-      status: 'Approved'
-      description: 'Compliance with network design'
-    }
-  }
-}]
-
-*/
-
-/*
-
-resource symbolicname 'Microsoft.Search/searchServices/sharedPrivateLinkResources@2024-03-01-preview' = {
-  name: 'string'
-  parent: resourceSymbolicName
-  properties: {
-    groupId: 'string'
-    privateLinkResourceId: 'string'
-    provisioningState: 'string'
-    requestMessage: 'string'
-    resourceRegion: 'string'
-    status: 'string'
-  }
-}
-*/
 resource pendAISearch 'Microsoft.Network/privateEndpoints@2022-01-01' = {
   name: privateEndpointName
   location: location

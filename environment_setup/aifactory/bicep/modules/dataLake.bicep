@@ -138,7 +138,6 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     allowSharedKeyAccess: true
     encryption: {
       keySource: 'Microsoft.Storage'
-      //requireInfrastructureEncryption: false  // The property 'requireInfrastructureEncryption' was specified in the input, but it cannot be updated as it is read-only
       services: {
         blob: {
           enabled: true
@@ -174,9 +173,7 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
       virtualNetworkRules:[for snet_id in virtualNetworkRules_array:{
           action: 'Allow'
           id: snet_id
-          //state: 'string'
         }]
-     //virtualNetworkRules:virtualNetworkRules
     }
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
