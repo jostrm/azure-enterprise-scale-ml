@@ -128,7 +128,7 @@ param aiSearchEnableSharedPrivateLink_DOCS string = 'https://learn.microsoft.com
 @description('Default is false. May be needed if Azure OpenAI should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessForCognitive bool = true
 @description('Default is false. May be needed if Azure AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
-param enablePublicNetworkAccessForAISearch bool = false
+param enablePublicNetworkAccessForAISearch bool = true
 @description('Default is false. May be needed if Azure Storage used by AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessFoAIStorage bool = false
 @description('Default is false. If true, it will flip all flags for GenAI RAG, such as Azure OpenAI, Azure AI Search, CosmosDB, WebApp, Azure Machine Learning')

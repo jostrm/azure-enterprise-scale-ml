@@ -6,7 +6,7 @@
             "value": false
         },
         "allowPublicAccessWhenBehindVnet": {
-            "value": true
+            "value": false
         },
         "aiSearchEnableSharedPrivateLink":{ 
             "value": false
