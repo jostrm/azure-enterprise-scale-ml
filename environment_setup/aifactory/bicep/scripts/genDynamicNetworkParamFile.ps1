@@ -115,27 +115,33 @@ write-host "Deployment to lookup (earlier subnets): $($deploymentPrefix)SubnetDe
 # Get-AzResourceGroupDeployment : Resource group 'msftesml-common-swcdev-001' could not be found.
 # Deployment 'esml-p001-dev-swc-001SubnetDeplProj' could not be found.
 
-$dbxPubSubnetName=(Get-AzResourceGroupDeployment `
-  -ResourceGroupName "$vnetResourceGroup" `
-  -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
-
-$dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
-  -ResourceGroupName "$vnetResourceGroup" `
-  -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
+Write-host "The following parameters are added to template"
 
 $aksSubnetId=(Get-AzResourceGroupDeployment `
   -ResourceGroupName "$vnetResourceGroup" `
   -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
 
-$genaiSubnetId=(Get-AzResourceGroupDeployment `
-  -ResourceGroupName "$vnetResourceGroup" `
-  -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
+if($projectTypeADO.Trim().ToLower() -eq "esml"){
+    $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$vnetResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
 
-Write-host "The following parameters are added to template"
-Write-host "dbxPubSubnetName: $dbxPubSubnetName"
-Write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
-Write-host "aksSubnetId: $aksSubnetId"
-Write-host "genaiSubnetId: $genaiSubnetId"
+    $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$vnetResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
+    
+    Write-host "dbxPubSubnetName: $dbxPubSubnetName"
+    Write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
+    Write-host "aksSubnetId: $aksSubnetId"
+}
+
+if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+    $genaiSubnetId=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$vnetResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
+    Write-host "genaiSubnetId: $genaiSubnetId"
+    Write-host "aksSubnetId: $aksSubnetId"
+}
 
 $templateEsml = @"
 {
