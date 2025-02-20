@@ -1510,7 +1510,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
   
 }
 
-var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}$${resourceSuffix}'
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1526,8 +1526,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     keyVaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
     aifactoryProjectNumber: projectNumber
-    //skuName: 'basic'
-    //skuTier: 'basic'
     storageAccount: sacc.outputs.storageAccountId
     subnetName: defaultSubnet
     vnetName: vnetNameFull
@@ -1538,7 +1536,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     kindAIHub:'Hub'
-    //openAiResourceName:csAzureOpenAI.outputs.cognitiveName
     aiServicesName: aiServices.outputs.name
     logWorkspaceName:logAnalyticsWorkspaceOpInsight.name
     logWorkspaceResoureGroupName:commonResourceGroup
