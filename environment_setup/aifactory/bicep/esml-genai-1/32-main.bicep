@@ -559,7 +559,7 @@ module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centr
 */
 
 // Verify that at least 1 Private DNS zones exists in privDnsResourceGroupName and privDnsSubscription  before continuing
-resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = {
+resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = if (centralDnsZoneByPolicyInHub==false){
   name: 'privatelink.cognitiveservices.azure.com'
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
 }
