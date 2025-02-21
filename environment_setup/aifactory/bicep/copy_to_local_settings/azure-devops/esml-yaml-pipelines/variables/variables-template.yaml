@@ -2,7 +2,6 @@ variables:
   # CHANGE ONCE: AI Factory - Globals
   admin_location: "swedencentral"
   admin_locationSuffix: "sdc"
-  admin_semanticSearchTier: "disabled" # "free", "standard", "disabled" (For Sweden Central and regions not supporting SemanticSearch for AI Search, this needs to be "disabled")
   admin_aifactoryPrefixRG: "acme-ai-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   admin_aifactorySuffixRG: "-001" #<-XXX> If you have mutliple AIFactory's in same regions: Examples: ["-001", "-002", "-003"]
   admin_bicep_input_keyvault_subscription: "" # seeding keuvyalt, subscription id
@@ -38,6 +37,8 @@ variables:
   project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure
   technical_admins_ad_object_id: ""
   technical_admins_email: "joakim, batman" # Email adresses, names, or some sort id ID, in a commas separated list, mapping to above ObjectID list
+  
+  # technical_admins_ad_groups: ""
 
   # COST optimization, impacts every project
   useCommonACR: true # Use common Azure Container Registry (save cost), insted of each project having its own.
