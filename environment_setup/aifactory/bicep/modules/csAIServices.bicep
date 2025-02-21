@@ -77,6 +77,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
 }
 
+/*
 resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (!empty(modelGPT4Version)) {
   name: 'gpt-4'
   parent: aiServices
@@ -93,8 +94,12 @@ resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-
     raiPolicyName: 'Microsoft.Default'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable' // 'NoAutoUpgrade'
   }
-
+  dependsOn: [
+    aiServices
+  ]
 }
+
+*/
 
 resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
   name: 'text-embedding-ada-002'
