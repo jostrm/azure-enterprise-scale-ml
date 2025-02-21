@@ -1511,7 +1511,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
 }
 
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}-${resourceSuffix}'
-var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}$${resourceSuffix}'
+var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
