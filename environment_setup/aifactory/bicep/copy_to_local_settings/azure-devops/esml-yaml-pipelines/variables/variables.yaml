@@ -50,9 +50,9 @@ variables:
   ad_coreteam_members: "<todo_object_id>,<todo_object_id>" #[GH-Secret] ObjectID for AD groups in a commas separated list, without space
 
   # PERSONAS
-  ad_project_esml_personas: "esml_team_lead,esml_team_member_datascientist,esml_team_member_front_end,esml_team_process_ops" # Mapped to AD_PROJECT_MEMBERS & PROJECT_TYPE=esml
-  ad_project_genai_personas: "genai_team_lead,genai_team_member_aifoundry,genai_team_member_agentic,genai_team_member_dataops,genai_team_member_frontend,esml_team_process_ops" # Mapped to AD_PROJECT_MEMBERS & PROJECT_TYPE=genai-1
-  ad_core_team_personas: "coreteam_it_admin,coreteam_dataops,coreteam_team_process_ops" # Mapped to AD_CORETEAM_MEMBERS
+  project_esml_personas: "esml_team_lead,esml_team_member_datascientist,esml_team_member_front_end,esml_team_process_ops" # Mapped to AD_PROJECT_MEMBERS & PROJECT_TYPE=esml
+  project_genai_personas: "genai_team_lead,genai_team_member_aifoundry,genai_team_member_agentic,genai_team_member_dataops,genai_team_member_frontend,esml_team_process_ops" # Mapped to AD_PROJECT_MEMBERS & PROJECT_TYPE=genai-1
+  core_team_personas: "coreteam_it_admin,coreteam_dataops,coreteam_team_process_ops" # Mapped to AD_CORETEAM_MEMBERS
 
   # OPTIONAL - GENAI specific
   admin_enablePublicGenAIAccess: true # Enable public access to GenAI UI, such as Azure AI Foundry/Studio and Azure Machine Learing Studio. It sill uses private link to access the services.
