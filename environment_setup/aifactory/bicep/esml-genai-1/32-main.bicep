@@ -1510,7 +1510,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
   
 }
 
-var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}-${resourceSuffix}'
+var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
@@ -1542,6 +1542,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     logWorkspaceResoureGroupName:commonResourceGroup
     locationSuffix:locationSuffix
     resourceSuffix:resourceSuffix
+    aifactorySalt: uniqueInAIFenv
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
       value: ip

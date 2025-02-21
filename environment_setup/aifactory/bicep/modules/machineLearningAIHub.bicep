@@ -29,6 +29,7 @@ param enablePublicGenAIAccess bool
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool
 param aiSearchName string
+param aifactorySalt string
 param privateLinksDnsZones object
 @allowed([
   'Hub'
@@ -116,10 +117,10 @@ resource amlWorkspaceSecretsReaderRole 'Microsoft.Authorization/roleDefinitions@
 var azureOpenAIConnectionName ='azureOpenAI'
 var azureAIServicesConnectionName ='azureAIServices'
 var azureAISearchConnectionName ='azureAISearch'
-var aiHubProjectName ='ai-project-${aifactoryProjectNumber}-01-${locationSuffix}-${env}${resourceSuffix}'
+var aiHubProjectName ='ai-prj-${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 var aiProjectDiagSettingName ='aiProjectDiagnosticSetting'
 var aiHubDiagSettingName ='aiHubDiagnosticSetting'
-var epDefaultName ='ep-${aifactoryProjectNumber}-01-${locationSuffix}-${env}${resourceSuffix}'
+var epDefaultName ='ep-${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 
 
 /*
