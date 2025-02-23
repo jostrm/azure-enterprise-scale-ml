@@ -165,17 +165,38 @@ Note: Below roles are **not set** explicitly for AI Foundry Hub in AI factory - 
 
 ### Service: `Azure AI Search`: GenAI
 
-Persona group|Personas|AI Search |Purpose|Environment
+Persona group|Personas|Roles|Purpose|Environment
 |---|---|---|---|---|
-|Project Team|`p011_genai_team_lead`,`p012_genai_team_member_aifoundry`, |`Search Index Data Contributor`,`Search Service Contributor`| Management: Search service and its indexes, including creating and configuring indexes, indexers, and other objects. Data operations: load data into indexes, run indexing jobs, and modify index content.| Dev
-|Project Team|`p102_esml_team_process_ops`|`Azure AI Developer`|`Azure AI Developer`| Management: Search service and its indexes, including creating and configuring indexes, indexers, and other objects. Data operations: load data into indexes, run indexing jobs, and modify index content |Stage, Production|
+|Project Team|`p011_genai_team_lead`,`p012_genai_team_member_aifoundry`, |`Search Index Data Contributor`,`Search Service Contributor`| Management: Search service and its indexes, including creating and configuring indexes, indexers, and other objects. Data operations: load data into indexes, run indexing jobs, and modify index content.| Dev| 
+|Project Team|`p102_esml_team_process_ops` |`Search Index Data Contributor`,`Search Service Contributor`| Management: Search service and its indexes, including creating and configuring indexes, indexers, and other objects. Data operations: load data into indexes, run indexing jobs, and modify index content.| Stage, Production |
 
 ### Service: `Azure AI Services`: GenAI
 
-Persona group|Personas|AI Search |Purpose|Environment
+Persona group|Personas|Roles|Purpose|Environment
 |---|---|---|---|---|
-|Project Team|`p011_genai_team_lead`,`p012_genai_team_member_aifoundry`, |`Cognitive Services OpenAI Contributor`,`Cognitive Services OpenAI User`,`Cognitive Services Usages Reader`| Creating and fine-tuning models, uploading datasets, and viewing and querying data. Monitor quota usage and resource consumption, helping you manage and optimize your Azure OpenAI resources effectively.| Dev
-|Project Team|`p102_esml_team_process_ops`|`Azure AI Developer`|`Azure AI Developer`|Creating and fine-tuning models, uploading datasets, and viewing and querying data. Monitor quota usage and resource consumption, helping you manage and optimize your Azure OpenAI resources effectively.|Stage, Production|
+|Project Team|`p011_genai_team_lead`,`p012_genai_team_member_aifoundry`, |`Cognitive Services OpenAI Contributor`,`Cognitive Services OpenAI User`,`Cognitive Services Usages Reader`| Creating and fine-tuning models, uploading datasets, and viewing and querying data. Monitor quota usage and resource consumption, helping you manage and optimize your Azure OpenAI resources effectively.| Dev|
+|Project Team|`p102_esml_team_process_ops` |`Cognitive Services OpenAI Contributor`,`Cognitive Services OpenAI User`,`Cognitive Services Usages Reader`| Creating and fine-tuning models, uploading datasets, and viewing and querying data. Monitor quota usage and resource consumption, helping you manage and optimize your Azure OpenAI resources effectively.| Stage, Production|
+
+### Service: `Azure Blob Storage 1 - AI Foundry`: GenAI
+
+Persona group|Personas|Roles|Purpose|Environment
+|---|---|---|---|---|
+|Project Team|`p011_genai_team_lead`,`p012_genai_team_member_aifoundry` |`Storage Blob Data Contributor`| Required for AI foundry meta data, and for AI Foundry RAG scenario | Dev |
+|Project Team|`p102_esml_team_process_ops` |`Storage Blob Data Contributor`| Required for reading and writing data to the blob storage, for AI Foundry RAG scenario |  Stage, Production|
+
+### Service: `Azure Blob Storage 2 - User Data & Fintuning`: GenAI
+
+Persona group|Personas|Roles|Purpose|Environment
+|---|---|---|---|---|
+|Project Team|`p011_genai_team_lead`,`p012_genai_team_member_aifoundry` |`Storage Blob Data Owner`| Required for AI Foundry in finetuning scenario. Also for reading and writing user data to the blob storage, separated from AI Foundry meta data. | Dev |
+|Project Team|`p102_esml_team_process_ops` |`Storage Blob Data Contributor`| Required for AI Foundry in finetuning scenario. Also for reading and writing user data to the blob storage, separated from AI Foundry meta data. |  Stage, Production|
+
+### Service: `Azure Keyvault`: GenAI
+
+Persona group|Personas|Access policys |Purpose|Environment
+|---|---|---|---|---|
+|Project Team|`p011_genai_team_lead`,`p012_genai_team_member_aifoundry` |`GET, LIST, SET, DELETE` | Access to project keyvault with info on endpoints, project specific artifacts| Dev |
+|Project Team|`p102_esml_team_process_ops` |`GET, LIST, SET`| Access to project keyvault with info on endpoints, project specific artifacts |  Stage, Production|
 
 
 # Project Team: ProjectType ESML (`001-010`)
