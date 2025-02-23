@@ -2,6 +2,8 @@
 # Introduction to Personas in AI
 This article describes personas and the benefits of involving personas in an architecture build. It covers examples of how you can define personas, the benfits of personas, and how to use them. It addresses how personas align with processes, organizations, and useful artifacts you may use to define your own personas, such as persona template cards, persona tables or persona graphs.
 
+[Go here ](./24-configure-AIfactory-project.md) for the AI Factory persona specification.
+
 **Tools, processes, and people**. Personas can be a tool to map these entities.
 
 You can use personas to map skilling needs to the *process* and *tools* used in the solution. Tools being Azure services and the architecture used in the solution. You can use personas to define scope of responsibility in the process to set a persona in context, and to enforce the principle of least privilege. 
@@ -65,11 +67,15 @@ Connecting personas to each stage in processes such as DataOps, MLOps, or GenAIO
 
 ![GenAIOps process](./images/25-personas-to-processes.png)
 
-## Connecting Personas to an Architectural Design
+## Connecting Personas to an Architectural Design (across multiple services)
 To connect a persona to an architectural design, you can create a graphical image that shows how Azure services are connected. This image can illustrate the flow of data and the interactions between different services. For example, you can show how data flows from Azure Data Factory to Azure Machine Learning, and how Azure DevOps is used to automate the deployment process. This visual representation can help stakeholders understand the architecture and the roles of different personas within it.
 
-Such as the architecture below, of a LAMBDA architecture for Modern analytics in Azure: 
-![Modern analytics in Azure](./images/25-personas-to-architectures.png)
+Such as the the two AI Factory project types and architectures below, of a LAMBDA architecture for Modern AI analytics in Azure, and GenAI RAG chat / agentic architecture.
+![AI Factory - two project types in Azure](./images/25-two-architectures-v2.png)
+
+## Connecting Personas to a service (single service)
+
+![AI Factory - Azure AI Foundry](./images/25-personas-one-servcice-aif.png)
 
 # How to define Personas
 
@@ -187,3 +193,7 @@ You can also use markdown as below, to define the persona template cards
 
 To get the details of learning material and certifications, [Microsoft Learn](https://learn.microsoft.com/en-us/training/). 
 When creating the security access controls per service, you can visit [Microsoft Well architected Framework](https://learn.microsoft.com/en-us/azure/well-architected/) for best practices, such as the  [Azure Well-Architected Framework perspective on Azure Machine Learning](https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-machine-learning), in combination of aligning with your organisations policy's.
+
+# Enterprise Scale AI Factory - Default Personas (security & access)
+
+[Link ](./24-configure-AIfactory-project.md) for the AI Factory persona specification 

@@ -1,20 +1,29 @@
-# Infra:AIFactory: Static documentation (CoreTeam)
+# AI factory - 4 componentes & acceleration
+![](./images/10-aifactory-4-components-2024-small.png)
 
-List of services in AIFActory common, AIFactory ESML project, and AIFactory GenAI project
+# Enterprise Scale AIFactory: ESLZ Context (VWan option)
+- ESLZ VWAN platform architecture + AIFactory application AI landing zones (Dev, Stage, Prod)
+![](./images/14-eslz-full-1.png)
+
+# Infra:AIFactory: Static documentation (CoreTeam)
+List of services in AIFActory common, AIFactory ESML project, and AIFactory GenAI project:
 
 ![](./images/11-services-common-projects.png)
 
-# ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
-- ESLZ VWAN platform architecture + AIFactory application landingzones (Dev, Stage, Prod)
-![](./images/14-eslz-full-1.png)
+# High level diagrams - DataOps, MLOps, GenAIOps
+![](./images/10-mlops-genaiops.png)
 
 # High level diagrams - Architecture & Capabilities
 
-## AI factory - 4 componentes & acceleration 
-![](./images/10-aifactory-4-components-2024-small.png)
+## AI factory - 2 project types (ESML, GenAI)
+![](./images/10-two-architectures-v2.png)
+
 
 ## AI factory - ESML project: Overview (ESML)
 ![](./images/11-services-highlevel-esml.png)
+
+### ESML project type: two flavours: Fabric ON/OFF
+![](./images/11-services-highlevel-esml_fabric.png)
 
 # High level diagram - Services integration (ESML)
 
@@ -27,7 +36,7 @@ List of services in AIFActory common, AIFactory ESML project, and AIFactory GenA
 ## AI factory - ESGenAI project: Overview (ESGenAI)
 ![](./images/11-services-highlevel-esgenai.png)
 
-## Low level diagram - LLMOps (ESGenAI)
+## Low level diagram - GenAI (ESGenAI)
 
 ![](./images/11-architecture-detailed-llmops.png)
 

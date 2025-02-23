@@ -11,18 +11,23 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a sumobule repo.
 >
 
-[How-to SETUP](./documentation/v2/20-29/24-end-2-end-setup.md)
+[How-to SETUP](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
+[Documentation](./documentation/readme.md) is organized around ROLES via Doc series. 
 
-## Main purpose: 
-1) `Marry multiple best practices & accelerators:` It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
+## This accelerator: Main purpose: 
+1) `Marry multiple best practices & accelerators:` **Secure Enterprise Scale AI Landing Zones + Secure GenAIOps template**  ( since using a GenAIOps/LLMOps template based on unsecure infrastructure (no private endpoints/vNet) will not be compatible with secure infra )
+    - It reuses multiple existing Microsoft accelerators/landingzone architecture and best practices such as CAF & WAF, and provides an end-2-end experience including Dev,Test, Prod environments.
     - All `PRIVATE` networking: Private endpoints for all services such as Azure Machine Learning, private AKS cluster, private Container registry, Storage, Azure data factory, Monitoring etc
         - Both for creating artifacts, training, and inference. To avoid data exfiltration, and have high network isolation
         - Docs: Securing Azure Machine Learning & its compute: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-secure-training-vnet?view=azureml-api-1&tabs=instance%2Crequired
 2) `Plug-and-play`: Dynamicallly create infra-resources per team, including networking dynamically, and RBAC dynamically
-    - Example of dynamicall: Subnet/IP calculator, ACL permission on the datalake for a project team, services "glued together"
+    - **IaC**: Multiple services `glued together` networkingwise and RBAC wise, in 2 secure baseline architectures (extendable/customizable) to cover all AI - both `Discriminative AI & Generative AI` including `DataOps`.
+    - **Networking**: Dynamic Subnet/IP calculator, from vNet to Subnets, also with option to `BYOvNet`.
+    - **Datalake design + Datamesh**: ACL permission on the datalake for a project team
+    - **Role based access control**: The use of PERSONAS for access control, skilling. Read more: [https://learn.microsoft.com/en-us/azure/well-architected/ai/personas](https://aka.ms/wafai)
 4) `Template way of working & Project way of working:` The AI Factory is `project based` (cost control, privacy, scalability per project) and provides <b>multiple templates</b> besides infrastructure template: `DataLake template, DataOps templates, MLOps templates`, with selectable project types.
-    - Sub-purpose: `Same MLOps` - weather data scientists chooses to work from Azure Databricks or Azure Machine Learning` - same MLOps template is used.
-    - Sub-purpose: `Common way of working, common toolbox, a flexible one`: A toolbox with a LAMBDA architecture with tools such as: Azure Datafactory, Azure Databricks, Azure Machine Learning, Eventhubs, AKS
+    - `Same GenAIOps/MLOps` - if data scientists chooses to work from Azure Databricks, Microsoft Fabric or Azure Machine Learning - same template can be leveraged [Read more](#iac--mlops-templates-2019-templates-for-pipelines-in-project-type-esml)
+    - `Common way of working, common toolbox, a flexible one`: A toolbox with a LAMBDA architecture with tools such as: Azure Datafactory, Azure Databricks, Azure Machine Learning, Eventhubs, AKS
 5) `Enterprise scale & security & battle tested`: Used by customers and partners with MLOps since 2019 (see LINKS) to accelerate the development and delivery of AI solutions, with common tooling & marrying multiple best practices. Private networking (private endpoints), as default.
 
 ## Public links for more info
@@ -39,28 +44,10 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 -	`Microsoft: AI Factory (Well-architected framework)` documentation : WAF AI workload - Well-architected Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/well-architected/ai/personas
     
-<!-- 
-## ESML AIFactory: The 2 project types
-Tehnically, there are two IaC automated project types in the AIFactory: ESML, GenAI. Here they are seen connected to PERSONAS.
-
-Personas is a tool the AIFactory uses to map *tools, processes and people*, to scale AI **organizationally** as well.  
-Personas is used to: 
-
-1) **Find resource gaps, define responsibility, or find redesign needs:** If you do not have people in your organization that fit a persona description needed to support a process step, you either need to redesign the architecture, change the process, or onboard new people with that persona. Personas is a good tool to define scope of **responsibility**
-2) **Education:** Mapping personas to specific **Azure services** in the architecture provides the benefits of offering **educational** sessions and online courses to upskill within.
-3) **Security & Access:** Personas mapped to **processes, architectures and services** can be used to define which services they need access to in a process.
-4) **Project planning & Interactions** Personas mapped to each other can be used see which personas that primarily interacts with each other, to be used to setup sync meetings and project planning.
-
-[Read more about *personas* ](./documentation/v2/20-29/25-personas.md)
-
-![](./documentation/v2/10-19/images/10-personas-2-architectures.png)
-
--->
-
 ## Feature Roadmap
 
-- **BYOVCustomRoles**: Bring your own custom RBAC roles, instead of Microsoft Build in roles. To connect with different `Personas` and `users` (project teams)
-    - STATUS: Ongoing (2025-01)
+- **AdvancdePersonas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
+    - STATUS: Ongoing (2025-02)
 - **BYOVnet**: Bring your own vNet in a separate resource group, instead of having the AI Factory create it.
     - STATUS: Completed (2024-05)
 - **Shared Container Registry**: Optional flag, saving 30% run/idle cost per use case, by sharing container registry across Azure ML workspaces/Azure AI foundry
@@ -68,13 +55,25 @@ Personas is used to:
 
  See [Feature list for all features](./documentation/v2/10-19/11-architecture-diagrams.md)
 
-## ESML AIFactory: Enterprise Scale Landing Zones Context (VWan option)
-The 2 project types, lives inside of the AIFactory landingzones. 
+## AI Factory: Enterprise Scale Landing Zones Context (VWan option)
+Currently there are 2 project types, template architectures (ESML, GenAI) that lives inside of the AIFactory landingzones. 
 - There are 3 AIFactory AI landingzones: Dev, Stage, Production, where a project is represented.
 - The AIFactory has a default scalabillity to automate the creation of ~200-300 AIFactory projects, in each environment. 
 - One project is usually assigned to a team of 1-10 people with multiple use cases, but sometimes also to run an isolated use case.
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
+
+## AI Factory project types: ESML, GenAI-1
+These are the two 2 project types, template architectures (ESML, GenAI) that are automated (IaC) to be setup as AI Factory projects for a use case, team, or business unit.
+-**ESML**: Enterprise Scale Machine Learning
+-**GenAI**: Enteprise Scale GenAI
+
+![AI Factory project types](./documentation/v2/10-19/images/10-personas-2-architectures.png)
+
+## ESML with FABRIC flavour
+You can optionally setup the ESML project type with Microsoft Fabric, as below:
+
+![ESML flavour](./documentation/v2/10-19/images/11-services-highlevel-esml_fabric.png)
 
 # Documentation: 
 The [Documentation](./documentation/readme.md) is organized around ROLES via Doc series. 
@@ -114,14 +113,15 @@ It is also organized via the four components of the ESML AIFactory:
 
 |Date     |Category   | What   | Link   |
 |------------|-----------|--------|--------|
-|2024-10  |Best Practices| Well-Arhcitected framework| [WAF AI workload - AI Factory personas](./documentation/v2/20-29/25-personas.md)|
+|2025-03  |infra (IaC)|ADO YAML also supported for project type GenAI. Now GHA or ADO supports both ESML, GenAI-1 |[IaC orchestration](../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/)|
+|2024-10  |Best Practices| Well-Arhitected framework for AI| [WAF AI workload - AI Factory personas](./documentation/v2/20-29/25-personas.md)|
 |2024-03  |Automation | Add project member & core team memeber| [Workflow diagram](./documentation/v2/10-19/13-flow-diagram-1.md)|
 |2024-03  |Docs | New Docs v.2 | [Documentation](./documentation/v2/10_index.md)|
-|2024-02  |infra (IaC) | NEW! ESGenAI project type: Azure AI Foundry+AI Search | [15-aifactory-overview.md](./documentation/v2/10-19/15-aifactory-overview.md) |
+|2024-02  |infra (IaC) | NEW! ESGenAI project type: Azure AI Foundry+AI Search (RAG/Agentic) | [15-aifactory-overview.md](./documentation/v2/10-19/15-aifactory-overview.md) |
 |2024-02  |Datalake - Onboarding |Auto-ACL on PROJECT folder in lakel|-|
 |2023-03  |Networking|No Public IP: Virtual private cloud - updated networking rules| https://learn.microsoft.com/en-us/azure/machine-learning/v1/how-to-secure-workspace-vnet?view=azureml-api-1&preserve-view=true&tabs=required%2Cpe%2Ccli|
-|2023-02  |ESML Pipeline templates|Azure Databricks: Training and Batch  pipeline templates. 100% same support as AML pipeline templates (inner/outer loop MLOps)|-|
-|2022-08  |infra (IaC)|Bicep now support yaml as well|-|
+|2021-02  |ESML Pipeline templates|Azure Databricks: Training and Batch pipeline templates. 100% same support as AML pipeline templates (inner/outer loop MLOps)|-|
+|2022-08  |infra (IaC)|ADO now support yaml for ESML|-|
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
 # BACKGROUND - How the accelerator started 2019
@@ -156,8 +156,9 @@ An open source initiative could help all at once, this open-source accelerator E
 `ESML marries multiple best practices` into one `solution accelerator`, with 100% infrastructure-as-code
 
 ### IaC & MLOps TEMPLATES 2019: Templates for PIPELINES in project type ESML
+Same MLOps template can be used, since Azure Machine Learning pipelines supports DatabricksSteps, SynapseSparkStep/Fabric.
 
-The below is how it looked like, when ESML automated both the infrastructire, and generating Azure machine learning pipelines, with 3 lines of code. 
+The below is how it looked like, when ESML automated both the infrastructure, and generating Azure machine learning pipelines, with 3 lines of code. 
 
 TRAINING & INFERENCE pipeline templates types in ESML AIFactory that accelerates for the end-user. 
 - 0.1% percentage of the code to write, to go from R&D process, to productional Pipelines: 
@@ -170,6 +171,8 @@ This repository is a push-only mirror. Ping Joakim Åström for contributions / 
 
 Since "mirror-only" design, Pull requests are not possible, except for ESML admins. See LICENCE file (open source, MIT license) 
 Speaking of open source, contributors: <br>
-- Credit to `Kim Berg` and `Ben Kooijman` for contributing! (kudos to the ESML IP calculator and Bicep additions for esml-project type)
+- Credit to `Sven Sowa` for contributing to the Powershells script to add all `private DNS zones to HUB` (essential automation when not running in standalone mode)
+- Credit to `Sofara Zoentsoa` for contributing to the Github Actions translation from ADO pipeline for ESML-project type
+- Credit to `Kim Berg` and `Ben Kooijman` for contributing! (kudos to the ESML IP calculator and Bicep additions for ESML-project type)
 - Credit to `Christofer Högvall` for contributing! (kudos to the Powershell script, to enable Resource providers, if not exits)
     - `azure-enterprise-scale-ml\environment_setup\aifactory\bicep\esml-util\26-enable-resource-providers.ps1`

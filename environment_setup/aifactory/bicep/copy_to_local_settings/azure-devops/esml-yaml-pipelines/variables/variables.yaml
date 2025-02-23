@@ -35,24 +35,26 @@ variables:
   # FOR EACH PROJECT: AI Factory - Projects (ESML, ESGenAI, ESAgentic): Change for each new project
   admin_projectType: "esml" # What project type to deploy? [esml,genai-1,genai-2]
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
-  project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure
+  project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. 124.56.78.0/24 is an example of a range
   technical_admins_ad_object_id: ""
   technical_admins_email: "joakim, batman" # Email adresses, names, or some sort id ID, in a commas separated list, mapping to above ObjectID list
 
   # COST optimization, impacts every project
   useCommonACR: true # Use common Azure Container Registry (save cost), insted of each project having its own.
 
-  # OPTIONAL - ADVANCED Roles & Personas
+  # OPTIONAL - GROUPS mapped to PERSONAS (one-to-one, e.g. if 2 groups then 2 personas)
   use_ad_groups: "false" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
-  # AD Groups & Personas
-  ad_project_members: "<todo_object_id>,<todo_object_id>" #[GH-Secret] ObjectID for AD groups in a commas separated list, without space
-  ad_coreteam_members: "<todo_object_id>,<todo_object_id>" #[GH-Secret] ObjectID for AD groups in a commas separated list, without space
+  # ENTRA ID SECURITY GROUPS - Object ID's (Create a new set of AD groups per project team. 001,002, etc)
+  # Tip of naming: Build a prefix based on [AIFactory prefix, suffix, locationSuffix and project number]) and add a persona unique suffix "p001" that easily maps to the AI Factory persona prefixes.
+  groups_project_members_esml: "<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>" #[GH-Secret] 3 groups of users. All except p001 group can be empty groups. ObjectID for Entra ID security groups in a commas separated list, without space
+  groups_project_members_genai_1: "<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>" #[GH-Secret] 5 groups. All except p011 can be empty groups. ObjectID for Entra ID security groups in a commas separated list, without space
+  groups_coreteam_members: "<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>" #[GH-Secret] 3 groups. ll except p080 group can be empty groups. Group ObjectID ObjectID for Entra ID security  in a commas separated list, without space
 
-  # PERSONAS
-  project_esml_personas: "esml_team_lead,esml_team_member_datascientist,esml_team_member_front_end,esml_team_process_ops" # Mapped to AD_PROJECT_MEMBERS & PROJECT_TYPE=esml
-  project_genai_personas: "genai_team_lead,genai_team_member_aifoundry,genai_team_member_agentic,genai_team_member_dataops,genai_team_member_frontend,esml_team_process_ops" # Mapped to AD_PROJECT_MEMBERS & PROJECT_TYPE=genai-1
-  core_team_personas: "coreteam_it_admin,coreteam_dataops,coreteam_team_process_ops" # Mapped to AD_CORETEAM_MEMBERS
+  # PERSONAS (001-010 are reserved for ESML, 011-020 for GenAI-1, 021-030 for GenAI-2, 080-090 for CoreTeam. 100-110 for Service Principals)
+  personas_project_esml: "p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops" # 4 Personas where first 3 contains users. The 4th is of type Service Principal. 3 are mapped to groups_project_members_esml & PROJECT_TYPE=esml
+  personas_project_genai_1: "p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops" # 6 Personas where 5 contain users. The 6th is an SP. mapped to groups_project_members_genai_1 & PROJECT_TYPE=genai-1
+  personas_core_team: "p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops" # 4 Personas, whereof first 3 contains useres. The 4th is a service principal. These personas are mapped to group_coreteam_members
 
   # OPTIONAL - GENAI specific
   admin_enablePublicGenAIAccess: true # Enable public access to GenAI UI, such as Azure AI Foundry/Studio and Azure Machine Learing Studio. It sill uses private link to access the services.
