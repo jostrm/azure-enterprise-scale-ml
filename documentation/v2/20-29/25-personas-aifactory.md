@@ -21,6 +21,7 @@ Such as the the two AI Factory project types and architectures below, of a LAMBD
 
 ![AI Factory - Azure AI Foundry](./images/25-personas-one-servcice-aif.png)
 
+You may compare the above, with the below more elevated option: <br>
 [Microsoft Learn - AI Foundry: RBAC and persona within AI Foundry](https://learn.microsoft.com/en-us/azure/ai-studio/concepts/rbac-ai-studio)
 
 # Feature Access: Personas VS Azure Policy VS Networking restrictions
