@@ -12,7 +12,7 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 >
 
 [How-to SETUP](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
-[Documentation](./documentation/readme.md) is organized around ROLES via Doc series. 
+[Documentation](./documentation/readme.md)
 
 ## This accelerator: Main purpose: 
 1) `Marry multiple best practices & accelerators:` **Secure Enterprise Scale AI Landing Zones + Secure GenAIOps template**  ( since using a GenAIOps/LLMOps template based on unsecure infrastructure (no private endpoints/vNet) will not be compatible with secure infra )

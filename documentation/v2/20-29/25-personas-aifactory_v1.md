@@ -7,17 +7,17 @@ The Enterprise Scale AI Factory are using personas both to connect personas to:
 - **Environments**: Dev, Stage, Production - to limit access in Stage and Production for people.
 - **Architecture**: Across multiple Azure services, for access control & education purposes.
 
-## Personas: Processes (DataOps, MLOps, GenAIOps) & Environments
+#### Personas: Processes (DataOps, MLOps, GenAIOps) & Environments
 
 ![GenAIOps process](./images/25-personas-to-processes.png)
 
-## Personas: Across multiple services
+## Personas: Architecture: Personas (across multiple services)
 To connect a persona to an architectural design, you can create a graphical image that shows how Azure services are connected. This image can illustrate the flow of data and the interactions between different services. For example, you can show how data flows from Azure Data Factory to Azure Machine Learning, and how Azure DevOps is used to automate the deployment process. This visual representation can help stakeholders understand the architecture and the roles of different personas within it.
 
 Such as the the two AI Factory project types and architectures below, of a LAMBDA architecture for Modern AI analytics in Azure, and GenAI RAG chat / agentic architecture.
 ![AI Factory - two project types in Azure](./images/25-two-architectures-v2.png)
 
-## Personas: Single service
+## Personas: Single service: Personas (single service)
 
 ![AI Factory - Azure AI Foundry](./images/25-personas-one-servcice-aif.png)
 
@@ -96,17 +96,18 @@ Persona group| Persona|Services|Purpose|Scenarios|Link to education|Environment
 
 Personas `011-020` are reserved within the main persona `project team` and the project type `GenAI-1`. The personas, will get permission via BICEP on both service-level, across serices, and at resource group level.
 
-## Resource group - COMMON Services:
+## Resource group - COMMON:
 
-Built-in Azure roles (most personas) for `Project team` members, on the common service level, in the common resource group:
-- **Azure Container Registry: Reader**: *access to the common Azure container registry*
-- **Azure Container Registry: AcrPush**: *access the common Azure container registry*
-- **Azure Datalake Gen2 - project folder: ACL**: *acccess the project specific folder* [Read more about ACL (Read,Write, Execute)](../10-19/12-permissions-users-ad-sps.md)
+Built-in Azure roles (most personas) in a `Project team` members has on resource group level:
+- **Contributor**
+- **AcrPush**
+- (**Virtual Machine Administrator Login**): *Sign on on VM via Bastion* (If Bastion access is set to be included)
 
 ## Resource group - PROJECT SPECIFIC:
-Built-in Azure roles (most personas) for `Project team` members, on the resource group level:
-- **Reader**: *access to the Azure AI foundry hub and project.
+Built-in Azure roles (most personas) in a `Project team` members have on resource group level:
+- **Contributor**
 - **AcrPush**: *push container images to an Azure Container Registry*
+- (**Virtual Machine Administrator Login**): *Sign on on VM via Bastion* (If Bastion access is set to be included)
 
 Some *persona specific* built-in roles, will also be assigned on resource group level.  Example of persona `p011_genai_team_lead`:
 - **Azure AI Inference Deployment Operator**: *Grants permission to create resource deployments for AI inference.*
@@ -133,11 +134,11 @@ Persona group| Persona|Services|Purpose|Scenarios|Link to education|Environment
 Depending on persona an Azure AI Foundry Hub can be assigned the built-in roles: `Azure AI Administrator`, `Azure AI Developer`, and an Azure AI Foundry project can be assigned the built-in roles: `Azure AI Administrator`, `Azure Machine Learning Workspace Connection Secrets Reader`, `AzureML Metrics Writer (preview)`
 
 > [!NOTE]
-> In the AI Factory, we are not using the elevated `Owner` or `Contributor` role on the AI Hub (even if possible), this since the AI Factory IaC already auotomates that part. From [MS Learn - about Owner](https://learn.microsoft.com/en-us/azure/ai-studio/concepts/rbac-ai-studio#default-roles-for-the-hub) Owner: *Full access to the hub, including the ability to manage and create new hubs and assign permissions. This role is automatically assigned to the hub creator*. 
->- In the AI Factory no user can create new Hubs. Only core team, using using the IaC Automation that ensures networking & RBAC to be assigned accordingly, and that integration to other serivces (AI Search, WebApp, Storage, CosmosDB) works.
+> In the AI Factory, we are not using the elevated `Owner` or `Contributor` role on the AI Hub (even if possible), this since the AI Factory IaC already covers that part. Owner: *Full access to the hub, including the ability to manage and create new hubs and assign permissions. This role is automatically assigned to the hub creator*. [MS Learn](https://learn.microsoft.com/en-us/azure/ai-studio/concepts/rbac-ai-studio#default-roles-for-the-hub) 
+>In the AI Factory no user can create new Hubs. Only core team, using using the IaC Automation that ensures networking & RBAC to be assigned accordingly, and that integration to other serivces (AI Search, WebApp, Storage, CosmosDB) works.
 
 Explanation `AzureML Data Scientist` (`Azure AI Developer`)
-- For now, the AI Factory setup of *AI Foundry Hub* and *AI project* only needs the `AzureML Data Scientist` built-in role to function - but the parenthesis states that since the product group have updated to use the more elevated role `Azure AI Developer`, the AI Factory will also update to that role, in near future.
+- For now, the AI Factory setup of AI Foundry and AI prokect works with only the `AzureML Data Scientist` built-in role, but the parenthesis states that since the product group have updated to use the more elevated role `Azure AI Developer`, the AI Factory will also update to that role, in near future.
     - Elevated difference: *The Azure AI Developer role is more elevated because it encompasses a wider range of actions, including the ability to create projects and manage compute resources, which are not included in the AzureML Data Scientist role*
 
 Persona group|Persona|AI Hub roles |AI Project roles|Purpose|Environment

@@ -2,7 +2,7 @@
 # Introduction to Personas in AI
 This article describes personas and the benefits of involving personas in an architecture build. It covers examples of how you can define personas, the benfits of personas, and how to use them. It addresses how personas align with processes, organizations, and useful artifacts you may use to define your own personas, such as persona template cards, persona tables or persona graphs.
 
-[Go here ](./24-configure-AIfactory-project.md) for the AI Factory persona specification.
+[Go here ](./25-personas-aifactory.md) for the AI Factory persona specification.
 
 **Tools, processes, and people**. Personas can be a tool to map these entities.
 
@@ -196,4 +196,4 @@ When creating the security access controls per service, you can visit [Microsoft
 
 # Enterprise Scale AI Factory - Default Personas (security & access)
 
-[Link ](./24-configure-AIfactory-project.md) for the AI Factory persona specification 
+[Go here ](./25-personas-aifactory.md) for the AI Factory persona specification.<br>
