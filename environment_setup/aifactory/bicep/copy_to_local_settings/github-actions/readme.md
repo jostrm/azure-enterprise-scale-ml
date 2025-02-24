@@ -22,6 +22,9 @@
    bash ./azure-enterprise-scale-ml/00-start.sh
     ```
 2) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for GHA workflows, and parameters.
+    ```
+   bash ./01-aif-copy-aifactory-templates.sh
+    ```
 3) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
     - Note: Is is under the `aifactory` folder, you will configure your [base parameters](../../../../aifactory/parameters/) and other variables.
 4) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
