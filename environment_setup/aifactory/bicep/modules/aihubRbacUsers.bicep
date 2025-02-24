@@ -72,7 +72,7 @@ resource existingAIHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-
   name: aiHubName
 }
 resource existingAIHubProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
-  name: aiHubName
+  name: aiHubProjectName
 }
 
 
