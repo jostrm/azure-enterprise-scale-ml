@@ -346,7 +346,7 @@ resource azureAIAdministratorAssignment 'Microsoft.Authorization/roleAssignments
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
     principalId: userObjectIds[i]
     principalType: 'User'
-    description:'044 azureAIAdministrator role to USER with OID  ${userObjectIds[i]} for : ${existingAIHub.name}'
+    description:'044 azureAIAdministrator role to USER with OID  ${userObjectIds[i]} for : ${existingAIHubProject.name}'
   }
   scope:existingAIHubProject
 }]
@@ -356,7 +356,30 @@ resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignmen
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
     principalId: servicePrincipleObjectId
     principalType: 'ServicePrincipal'
-    description:'azureAIAdministrator to project service principal OID:${servicePrincipleObjectId} to ${existingAIHub.name}'
+    description:'azureAIAdministrator to project service principal OID:${servicePrincipleObjectId} to ${existingAIHubProject.name}'
+  }
+  scope:existingAIHubProject
+}
+
+// Azure AI Developer
+@description('AI Project: Azure AI Developer:')
+resource aiDevOnAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(existingAIHubProject.id, azureAIDeveloperRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
+    principalId: userObjectIds[i]
+    principalType: 'User'
+    description:'azureAIDeveloperRoleId role to USER with OID  ${userObjectIds[i]} for : ${existingAIHubProject.name}'
+  }
+  scope:existingAIHubProject
+}]
+resource aiDevOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(existingAIHubProject.id, azureAIDeveloperRoleId, servicePrincipleObjectId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
+    principalId: servicePrincipleObjectId
+    principalType: 'ServicePrincipal'
+    description:'azureAIDeveloperRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAIHubProject.name}'
   }
   scope:existingAIHubProject
 }
