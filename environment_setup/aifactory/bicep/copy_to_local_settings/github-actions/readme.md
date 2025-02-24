@@ -29,6 +29,9 @@
     - Note: Is is under the `aifactory` folder, you will configure your [base parameters](../../../../aifactory/parameters/) and other variables.
 4) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
     - Note: If you want to refresh the pipeline templates, but not overwrite the .env file, you may run `03-GH-bootstrap-files-no-env-overwrite.sh`
+     ```
+   bash ./02-GH-bootstrap-files.sh
+    ```
 
 OUTPUT: The file structure should now look something like below: 
 
