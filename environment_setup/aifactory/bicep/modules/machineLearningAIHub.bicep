@@ -463,6 +463,7 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
 output id string = aiHub.id
 output name string = aiHub.name
 output principalId string = aiHub.identity.principalId
+output projectPrincipalId string = aiProject.identity.principalId
 output aiProjectName string = aiProject.name
 
 

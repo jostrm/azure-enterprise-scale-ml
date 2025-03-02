@@ -30,7 +30,7 @@ var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // S
 
 // Azure ML (AI Hub, AIProject)
 var azureMLDataScientistRoleId = 'f6c7c914-8db3-469d-8ca1-694a8f32e121' // SP, user -> AI Hub, AI Project (RG)
-var azureAIDeveloperRoleId = '64702f94-c441-49e6-a78b-ef80e0188fee'  // SP, user -> AI Hub
+var azureAIDeveloperRoleId = '64702f94-c441-49e6-a78b-ef80e0188fee'  // SP, user -> AI Hub, AI Project -> AIServices
 var azureAIInferenceDeploymentOperatorRoleId = '3afb7f49-54cb-416e-8c09-6dc049efa503'  // User -> AI project
 var azureAIAdministrator = 'b78c5d69-af96-48a3-bf8d-a8b4d589de94' // AI Project (to all underlying resources)
 
@@ -149,6 +149,19 @@ resource cognitiveServicesContributorRoleSPS 'Microsoft.Authorization/roleAssign
 }
 
 001  - Error: Duplicate if these 2 */
+
+// Needed for Agents in AI Hub's AIproject
+resource aiDeveloperOnAIServicesFromAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(existingAiServicesResource.id, azureAIDeveloperRoleId, existingAIHubProject.id)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
+    principalId: existingAIHubProject.identity.principalId
+    principalType: 'ServicePrincipal'
+    description:'Azure AI Developer On AIServices From AIProject MI OID of: ${existingAIHubProject.name} to ${existingAiServicesResource.name}'
+  }
+  scope:existingAiServicesResource
+}
+// Needed for Agents in AI Hud project, END
 
 // 002
 @description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
