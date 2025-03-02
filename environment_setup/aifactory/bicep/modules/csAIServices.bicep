@@ -55,7 +55,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: 'Disabled' // // If not Deny/Disabled, then ipRules will be ignored (cannot be changed later either) publicNetworkAccess? 'Enabled': 'Disabled' 
+    publicNetworkAccess: 'Enabled' //03-02: Change to Enabled // If not Deny/Disabled, then ipRules will be ignored (cannot be changed later either) publicNetworkAccess? 'Enabled': 'Disabled' 
     restore: restore
     restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true
     disableLocalAuth: disableLocalAuth
