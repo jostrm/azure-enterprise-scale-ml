@@ -1691,6 +1691,8 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   dependsOn: [
     aiHub
     rbacModuleAISearch
+    aiServices
+    aiHub
   ]
 }
 

@@ -87,3 +87,29 @@ For `Bring your own vNet`, e.g. NOT using the *AI Factory common resource group*
             "value": "vnet-name-inside-of-resourcegroup"
         },
 ```
+
+## Config: WebApp (post deplpoyment of WebApp)
+
+### Authentication (Webapp)
+- **Identity provider:** Microsoft EntraID
+- **Client secret setting**:  
+    - Service principal: Project specific, see project keyvault `esml-project-sp-003` 
+- **Issuer URL**: https://sts.windows.net/`your_tenantId`/v2.0
+    - See project keyvault for tenant id.
+- **Tenant requirement**
+    - Allow requestes only from the issuer tenant
+
+### Authentication (In EntraID) - API permissions
+- The service principle,Authentication page for,  `esml-project-sp-003, Needs to have API permissions, delegated, in Microsoft Graph:
+    - **User.Read**
+        - Sign in an read user profile
+    - **offline_access**
+        - Maintain data you have given it access to (such as login token, if offline)
+
+### Authentication (In EntraID) - Redirect URL
+Redirect url is on the same page, where checkbox is, and should be: 
+ 
+https://`webapp-prj003-your-web-app-name-001`.azurewebsites.net/.auth/login/aad/callback
+
+### Networking (WebApp)
+- You can choose to run the WebApp within the subnet: `snet-esml-cmn-001-scoring` 
