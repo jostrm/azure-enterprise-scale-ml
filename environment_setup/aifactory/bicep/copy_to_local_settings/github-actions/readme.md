@@ -4,7 +4,7 @@
 > If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ setup starting page](../../../../../documentation/v2/20-29/24-end-2-end-setup.md)
 >
 
-## Note: 1-4 is needed only if you did not run the SCRIPTS as mentioned in [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
+## Note: see [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
 0) Add the submodule to your repo (to get the bootstrap files)
 

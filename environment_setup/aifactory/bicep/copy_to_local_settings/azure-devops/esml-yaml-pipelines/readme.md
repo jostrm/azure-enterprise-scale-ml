@@ -1,7 +1,7 @@
 # Azure Devops orchestration (.yaml): Bicep
 Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline in Azure Devops.
 
-## Steps 1-3: These are ONLY needed if you did not run the SCRIPTS as mentioned in [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
+## See [prerequisites](../../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
 [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 

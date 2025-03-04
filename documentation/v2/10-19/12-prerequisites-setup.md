@@ -4,21 +4,23 @@
 > See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
 > [Enterprise Scale AIFactory - Template repo, using the AI Factory as submodule](https://github.com/azure/enterprise-scale-aifactory)
 
-## Summary of what is needed
+## Summary of what is needed (Steps 1-6 covers the details)
 - **Github / Azure Devops**
-    - Steps: 1
+    - **Steps: 1**
+    - **Who**
         - Github: Write access, to create Github Action workflows
             - Github administrator
         - Azure Devops: to create service connection and Build/Release pipelines
             - Who: Azure Devops administrator
 - **Azure:** 
-    - Steps: 2,3,4
-    - Who: 
-        - Step 2 and 3: Azure Owner on at least 1 Azure subscription (if only setting up DEV environment)
+    - **Steps: 2,3,4**
+    - **Who:** 
+        - Step 2 and 3: A persona with Azure Owner on at least 1 Azure subscription (if only setting up DEV environment)
         - *Step 4: Networking team. That has the IP-plan, to see that vNet ranges are not conflicting. This is not needed if running the AI Factory standalone mode
 - **Entra ID**
-    - Steps: 5
-    - What: 
+    - **Steps: 5**
+    - Who: Central IT with admininstrator access to EntraID
+    - **What:** 
         - **3 service principles** (ObjectID, AppId, Secret)
             - **Why**: MI is not supported from all Azure Services. Project-specific service principle is needed to:
                 - Projects: Enable Authentication on WebApp (only possible via SP), see [config-webapp-post-deplpoyment-of-webapp](../20-29/24-end-2-end-setup.md#config-webapp-post-deplpoyment-of-webapp)
@@ -31,117 +33,12 @@
         - **IP-addresses** for all end-users to be onboarded to the AI Factory project
             - Format: Comma-separated list
         - **Object ID** for the global Azure Machine Learning application
-    - Who: Central IT with admininstrator access to EntraID
+- **Verify E2E** 
+    - Step 6) Verify before running any pipelines, that all configuration and artifacts exists, such as Azure Resource providers.
 
-# Scripts
+After all pre-requisites are verified - [go to the SETUP page and choose your preffered orchestrator: Azure Devops - YAML or Github Actions](../20-29/24-end-2-end-setup.md)
 
->[!NOTE]
-> Note: `Local-repo-link` only works, after you have finished step 1. `Docs-link` will work relative from this Github documentation, useful to browser the file, wherof `Local-repo-link` is 
-the filed you may edit.
-> 
-
-0) Add the submodule to your repo (to get the bootstrap files)
-
-    Run from your repo root location:
-
-    ```
-    git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
-    ```
-
-    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
-
-1) Run `00-start.sh` that will copy bootstrap files, for either Github or Azure Devops
-    You will be prompted if you want to use Azure Devops or Github. Then relevant bash bootstrap files will be copied to your root directory.
-    
-    If you first select Azuzre Devops and want to change your mind, just run this again, and it will clean up all Azure Devops files, and create bootstrap files for Github.
-
-    [Docs-link: 00-start.sh](../../../00-start.sh)
-
-    ```bash
-    bash ./azure-enterprise-scale-ml/00-start.sh
-    ```
-    
-2) Copy templates and scripts: Copies scripts to root
-
-    [Docs-link: 01-aif-copy-aifactory-templates.sh](../../../bootstrap/01-aif-copy-aifactory-templates.sh)
-
-    Run from your repo root location (e.g. dir/ls should list the `azure-enterprise-scale-ml` submodule folder)
-
-    ```bash
-    bash ./01-aif-copy-aifactory-templates.sh
-    ```
-
->[!NOTE]
-> This will copy all template files to a folder at root called `aifactory-templates`. You need to rename that folder to `aifactory`, then you can edit parameters and variables. After this `Local-repo-link` and the code examples will work.
->  
-
-3) `HOWTO: Refresh IaC pipelines`, without updating/overwriting the Variable files? 
-    Purpose: To refresh the IaC pipelines (get new features, added AI Facotry project types etc). 
-    
-    If you have chosen Azure Devops in step 1, you will see the following files, at your root. It is safe to run the ones starting with `03` without overwriting your configuration. 
-         
-    ```bash
-    bash ./02-ADO-YAML-bootstrap-files.sh
-    bash ./03-ADO-YAML-bootstrap-files-no-var-overwrite.sh
-    ```
-
-    If you have chosen Github in step 1, you will see the following files, at your root:
-    ```bash
-    bash ./02-GH-bootstrap-files.sh
-    bash ./03-GH-bootstrap-files-no-env-overwrite.sh
-    ```
->[!IMPORTANT]
->The files starting with `02`, you run only one time or if you want a clean slate including variables you may have configured will be overwritten. The files starting with `03 will NOT` overwrite your configured variables but will refresh your .github/workflows or Azure Devops YAML pipelines.
->
-   
-    Note that if a pipeline (to support a new feature) needs a NEW variable, you need to look at the variable template file in the `aifactory-template` folder (Do step 2 to refresh that folder), and compare which variable to add under your `aifactory` folder.
-
-4) `VERIFY, BEFORE running any pipelines:` Ensure Azure providers are enabled (create if not exists)
-
-    [Docs-link: 26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1) | [Local-repo-link](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
-
-    How to run from root: 
-    ```bash
-    pwsh ./aifactory/esml-util/26-enable-resource-providers.ps1 -SubscriptionName 'TODO' -Readonly $false
-
-
-5) `Optional:Nice-to-have script`: Creates one or many service principles and adds the information in the Seeding Keyvault.
-   
-    Best practice is to have `1 seeding keyvault per environment` (Dev, Stage, Production, e.g. per subscription. Benefits: 
-        - The secret names in keuvayults, can stay the same across the environments (you don't need to reconfigure Variables)
-        - The same service environment-specific `Azure Devops service connection` can be used for seeding keyvault as for the actual resources, wihtout needing to assign the `esml-common-bicep-sp` service principle access to further subscriptions, e.g. in the case the seding keyvault resides in another subscription.
-
-    [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | [Local-repo-link](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
-    
-    Manually edit the variables (`Local-repo-link`) at the top at the script, then run from root:
-    ```bash
-        bash ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
-    ```
-
-6) `Optional:Nice-to-have script` GET AKS version, in your region, to set variable values
-    - Project type: ESML
-        - **Variable: AKS version** supported in your region
-            - **Example:** `admin_aks_version_override: "1.30.3"` 
-        ```bash
-            az aks get-versions --location eastus --output table
-        ```    ``` 
-**Below scripts are relevant for centralized/peered AI Factory only. Not Standalone mode**
-
-5) `VERIFY, BEFORE running any pipelines:`Ensure Private DNS zones exists in "hub", if flag is set to true
-
-    [Docs-link: 27-create-private-dns-zones.ps1](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1) | [Local-repo-link](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
-
-    How to run from root: 
-
-    ```bash
-    pwsh ./aifactory/esml-util/27-create-private-dns-zones.ps1 -spID TODO -tenantID TODO -subscriptionID TODO8d1 -resourceGroupName TODO -location 'swedencentral'
-    ``` 
-
-6) `BEFORE running any pipelines:`Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
-
-    [Docs-link: 28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep) | [Local-repo-link](./aifactory/esml-util/esml-util/28-Initiatives.bicep)
-
-# MANDATORY: 1-5
+# MANDATORY: 1-6
 
 >[!NOTE]
 > If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ SETUP STARTING PAGE](../20-29/24-end-2-end-setup.md)
@@ -226,12 +123,30 @@ the filed you may edit.
     - **IP-addresses** for all end-users to be onboarded to the AI Factory project
         - Format: Comma-separated list
     - **Object ID** for the global Azure Machine Learning application. 
+        - 1) Go to: Enterprise applications
+        - 2) Filter on Microsoft applications
+        - 3) Search "Azure Machine Learning"
+        - 4) Copy the ObjectID that the green arrow points at
     - See image: ![](./images/12-prerequisites-aml-sp-oid.png)
 
 
-# OPTIONAL 6-8
+## Step 6: Verify: Resource Providers, Private DNS zones (if not standalone)
+VERIFY, BEFORE running any pipelines. See [Scripts to run to verify/create if not exists](#scripts)
+- Ensure Azure `Resource providers` are enabled (create if not exists)
+    - [Script: E](#scripts)
+- Ensure `Private DNS zones` exists in "hub", if flag is set to true
+    - Note: Not needed for `Standalone AI Factory`
+    - [Script: H](#scripts)
+- Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
+    - Note: Not needed for `Standalone AI Factory`
+    - [Script: I](#scripts)
 
-## *Step 6) Delegate User Access: Onboard a Microsoft EntraID user, with access to the Azure Devops created in step 1, and with OWNER permission on the Subscriptions created in Step 2, 
+After all pre-requisites are verified - [go to the SETUP page and choose your preffered orchestrator: Azure Devops - YAML or Github Actions](../20-29/24-end-2-end-setup.md)
+
+
+# OPTIONAL 7-9
+
+## *Step 7) Delegate User Access: Onboard a Microsoft EntraID user, with access to the Azure Devops created in step 1, and with OWNER permission on the Subscriptions created in Step 2, 
 - **Purpose:** Efficiency. To be able to troubleshoot, manually login to Azure for `the AIFactory setup mentor`
 - **Role needed:** Microsoft EntraID administrator: Central IT / Cloud Team
 - **Mandatory:** No, optional but recommended. Very hard to troubleshoot if no insights that permission is set correctly. Need to have read access in EntraID to see the servic principal and keyvault permissions. Someone needs to verify that the Azure Devops Service connection works, that service principal (SP) esml-common-bicep has Get, List, Set to seeding keyvault. That the SP is OWNER on the subscriptions.
@@ -247,14 +162,14 @@ the filed you may edit.
             - Note: To delegate a user access to the resource groups, you need to have [SETUP the AIFactory first](./13-setup-aifactory.md)
                 - Resource groups that will be created looks similar as this: `dc-heroes-esml-project001-weu-dev-001-rg`, `dc-heroes-esml-project001-weu-test-001-rg`, `dc-heroes-esml-project001-weu-prod-001-rg` 
 
-## *Step 7) Delgate Service Principal Access in Azure Devops + Import IaC pipelines + Set service connection to pipeline steps
+## *Step 8) Delgate Service Principal Access in Azure Devops + Import IaC pipelines + Set service connection to pipeline steps
 - **Purpose:** Since only an Azure Devops admin have permission to create service connection and select that on a pipeline. 
     - E.g. the `AIFactory setup mentor` will not have permission with role: Stakeholder
 - **Role needed:**: Azure Devops admin
 - **Mandatory:** Not for Github. Only for Azure Devops.
 - **TODO**: [Azure Devops: Create service connection + Import IaC pipelines + Set service connection to pipeline steps](./12-prereq-ado-create-servicecon-import-ado-pipelines.md)
 
-## *Step 8) If you want to have Private DNS zones centrally in HUB (recommended) = centralDnsZoneByPolicyInHub=true
+## *Step 9) If you want to have Private DNS zones centrally in HUB (recommended) = centralDnsZoneByPolicyInHub=true
 - **Mandatory:** No.
 - **Role needed:**: Central IT, that have access to the central Hub (Hub/Spoke or VWAN)
 1) Create the Private DNS Zones in the HUB as specified: 
@@ -293,6 +208,116 @@ git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
 git submodule update --init --recursive
 git submodule foreach 'git checkout main || git checkout -b main origin/main'
 ```
+
+# MORE INFO - SCRIPTS & Quickstart
+# Scripts
+
+>[!NOTE]
+> Note: `Local-repo-link` only works, after you have finished step 1. `Docs-link` will work relative from this Github documentation, useful to browser the file, wherof `Local-repo-link` is 
+the filed you may edit.
+> 
+
+A) Add the submodule to your repo (to get the bootstrap files)
+
+    Run from your repo root location:
+
+    ```
+    git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
+    ```
+
+    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
+
+B) Run `00-start.sh` that will copy bootstrap files, for either Github or Azure Devops
+    You will be prompted if you want to use Azure Devops or Github. Then relevant bash bootstrap files will be copied to your root directory.
+    
+    If you first select Azuzre Devops and want to change your mind, just run this again, and it will clean up all Azure Devops files, and create bootstrap files for Github.
+
+    [Docs-link: 00-start.sh](../../../00-start.sh)
+
+    ```bash
+    bash ./azure-enterprise-scale-ml/00-start.sh
+    ```
+    
+C) Copy templates and scripts: Copies scripts to root
+
+    [Docs-link: 01-aif-copy-aifactory-templates.sh](../../../bootstrap/01-aif-copy-aifactory-templates.sh)
+
+    Run from your repo root location (e.g. dir/ls should list the `azure-enterprise-scale-ml` submodule folder)
+
+    ```bash
+    bash ./01-aif-copy-aifactory-templates.sh
+    ```
+
+>[!NOTE]
+> This will copy all template files to a folder at root called `aifactory-templates`. You need to rename that folder to `aifactory`, then you can edit parameters and variables. After this `Local-repo-link` and the code examples will work.
+>  
+
+D) `HOWTO: Refresh IaC pipelines`, without updating/overwriting the Variable files? 
+    Purpose: To refresh the IaC pipelines (get new features, added AI Facotry project types etc). 
+    
+    If you have chosen Azure Devops in step 1, you will see the following files, at your root. It is safe to run the ones starting with `03` without overwriting your configuration. 
+         
+    ```bash
+    bash ./02-ADO-YAML-bootstrap-files.sh
+    bash ./03-ADO-YAML-bootstrap-files-no-var-overwrite.sh
+    ```
+
+    If you have chosen Github in step 1, you will see the following files, at your root:
+    ```bash
+    bash ./02-GH-bootstrap-files.sh
+    bash ./03-GH-bootstrap-files-no-env-overwrite.sh
+    ```
+>[!IMPORTANT]
+>The files starting with `02`, you run only one time or if you want a clean slate including variables you may have configured will be overwritten. The files starting with `03 will NOT` overwrite your configured variables but will refresh your .github/workflows or Azure Devops YAML pipelines.
+>
+   
+    Note that if a pipeline (to support a new feature) needs a NEW variable, you need to look at the variable template file in the `aifactory-template` folder (Do step 2 to refresh that folder), and compare which variable to add under your `aifactory` folder.
+
+E) `VERIFY, BEFORE running any pipelines:` Ensure Azure resource providers are enabled (create if not exists)
+
+    [Docs-link: 26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1) | [Local-repo-link](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
+
+    How to run from root: 
+    ```bash
+    pwsh ./aifactory/esml-util/26-enable-resource-providers.ps1 -SubscriptionName 'TODO' -Readonly $false
+
+
+F) `Optional:Nice-to-have script`: Creates one or many service principles and adds the information in the Seeding Keyvault.
+   
+    Best practice is to have `1 seeding keyvault per environment` (Dev, Stage, Production, e.g. per subscription. Benefits: 
+        - The secret names in keuvayults, can stay the same across the environments (you don't need to reconfigure Variables)
+        - The same service environment-specific `Azure Devops service connection` can be used for seeding keyvault as for the actual resources, wihtout needing to assign the `esml-common-bicep-sp` service principle access to further subscriptions, e.g. in the case the seding keyvault resides in another subscription.
+
+    [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | [Local-repo-link](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
+    
+    Manually edit the variables (`Local-repo-link`) at the top at the script, then run from root:
+    ```bash
+        bash ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
+    ```
+
+G) `Optional:Nice-to-have script` GET AKS version, in your region, to set variable values
+    - Project type: ESML
+        - **Variable: AKS version** supported in your region
+            - **Example:** `admin_aks_version_override: "1.30.3"` 
+        ```bash
+            az aks get-versions --location eastus --output table
+        ```    ``` 
+**Below scripts are relevant for centralized/peered AI Factory only. Not Standalone mode**
+
+H) `VERIFY, BEFORE running any pipelines:`Ensure Private DNS zones exists in "hub", if flag is set to true
+
+    [Docs-link: 27-create-private-dns-zones.ps1](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1) | [Local-repo-link](./aifactory/esml-util/esml-util/27-create-private-dns-zones.ps1)
+
+    How to run from root: 
+
+    ```bash
+    pwsh ./aifactory/esml-util/27-create-private-dns-zones.ps1 -spID TODO -tenantID TODO -subscriptionID TODO8d1 -resourceGroupName TODO -location 'swedencentral'
+    ``` 
+
+I) `BEFORE running any pipelines:`Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
+
+    [Docs-link: 28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep) | [Local-repo-link](./aifactory/esml-util/esml-util/28-Initiatives.bicep)
+
 
 
 
