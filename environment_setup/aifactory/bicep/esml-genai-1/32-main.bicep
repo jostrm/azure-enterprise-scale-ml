@@ -54,7 +54,7 @@ param csVisionSKU string = 'S0'
 param csDocIntelligenceSKU string = 'S0'
 param csAIservicesSKU string = 'S0'
 param csOpenAISKU string = 'S0'
-
+param keyvaultSoftDeleteDays int=90
 /*
 @allowed([
   '1106-Preview'
@@ -1196,6 +1196,7 @@ module kv1 '../modules/keyVault.bicep' = {
     location: location
     tags: tags
     enablePurgeProtection:keyvaultEnablePurgeProtection
+    soft_delete_days: keyvaultSoftDeleteDays
     tenantIdentity: tenantId
     vnetId: vnetId
     subnetName: defaultSubnet

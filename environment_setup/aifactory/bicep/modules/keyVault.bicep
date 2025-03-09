@@ -44,7 +44,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = if(enablePurgeProtect
     enableRbacAuthorization: false       // Using RBAC
     enabledForDiskEncryption: false
     enableSoftDelete: true
-    // softDeleteRetentionInDays:soft_delete_days // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
+    softDeleteRetentionInDays:soft_delete_days // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
     enablePurgeProtection: enablePurgeProtection
     publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
     tenantId: tenantIdentity
