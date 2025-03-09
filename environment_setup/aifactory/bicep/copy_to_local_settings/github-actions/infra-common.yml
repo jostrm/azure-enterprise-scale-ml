@@ -20,6 +20,7 @@ env:
   admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"  # <company>-<aifactoryname> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   cidr_range: "${{ vars.AIFACTORY_CIDR_XX }}" # XX = "17" 
   aiResourceSuffix: "-001" # Suffix on resources within the resource group: -001, -002
+  admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
 
   # CORE TEAM MEMBERS specific
   technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}" # "192.x.x.x"
@@ -111,5 +112,6 @@ jobs:
             --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
             --parameters inputKeyvaultSubscription="${{ env.admin_input_keyvault_subscription }}" \
             --parameters inputKeyvaultResourcegroup="${{ env.admin_input_keyvault_rg }}" \
+            --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
             --parameters inputKeyvault="${{ env.admin_input_keyvault_name }}"
           azcliversion: latest

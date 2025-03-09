@@ -104,6 +104,7 @@ steps:
      --parameters aml_cluster_test_prod_nodes_override="$(admin_aml_cluster_maxNodes_testProd_override)" \
      --parameters aml_ci_dev_sku_override="$(admin_aml_computeInstance_dev_sku_override)" \
      --parameters aml_ci_test_prod_sku_override="$(admin_aml_computeInstance_testProd_sku_override)" \
+     --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters IPwhiteList="$(project_IP_whitelist)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

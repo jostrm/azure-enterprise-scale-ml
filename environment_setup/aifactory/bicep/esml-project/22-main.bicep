@@ -92,7 +92,7 @@ param skuNameStorage string = 'Standard_LRS' //  Cannot be changed after creatio
 ])
 @description('Specifies the SKU of the storage account, for AIFactory ESML Datalake')
 param skuNameStorageLake string = 'Standard_ZRS' // Must be the same as ESML Datalke in commmon RG. Cannot be changed after creation
-
+param keyvaultSoftDeleteDays int=90
 // RBAC START
 @description('Specifies project owner email and will be used for tagging and RBAC')
 param projectOwnerEmail string
@@ -791,6 +791,7 @@ module kv1 '../modules/keyVault.bicep' = {
     location: location
     tags: tags2
     enablePurgeProtection:keyvaultEnablePurgeProtection
+    soft_delete_days:keyvaultSoftDeleteDays
     tenantIdentity: tenantId
     vnetId: vnetId
     subnetName: defaultSubnet
@@ -828,6 +829,7 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     location: location
     tags: tags2
     enablePurgeProtection:keyvaultEnablePurgeProtection
+    soft_delete_days:keyvaultSoftDeleteDays
     tenantIdentity: tenantId
     vnetId: vnetId
     subnetName: defaultSubnet

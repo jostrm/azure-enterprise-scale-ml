@@ -96,6 +96,7 @@ steps:
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
+     --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)"

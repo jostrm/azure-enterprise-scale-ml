@@ -25,6 +25,7 @@ env:
     admin_hybridBenefit: false # Enable Hybrid Benefits if provisioning VM access via Bastion
     admin_commonResourceSuffix: "-001"
     admin_prjResourceSuffix: "-001"
+    admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
 
     # ADMIN specific START (only configure once)
     admin_ip_fw: "192.x.x.x" # Do not touch. leave as-is. This is just a placeholder a script will populate later.
@@ -341,6 +342,7 @@ jobs:
             --parameters aml_ci_dev_sku_override="${{ env.admin_aml_computeInstance_dev_sku_override }}" \
             --parameters aml_ci_test_prod_sku_override="${{ env.admin_aml_computeInstance_testProd_sku_override }}" \
             --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+            --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
             --parameters useCommonACR="${{ env.useCommonACR }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist

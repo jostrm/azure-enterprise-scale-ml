@@ -94,7 +94,8 @@ param kvNameFromCOMMON_param string = ''
 param useCommonACR bool = true
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
-
+param enablePurgeProtection bool = true
+param keyvaultSoftDeleteDays int = 90
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
@@ -496,6 +497,8 @@ module kvCmn '../../modules/keyVault.bicep' = {
     location: location
     tags: tags
     tenantIdentity: tenantId
+    enablePurgeProtection:enablePurgeProtection
+    soft_delete_days:keyvaultSoftDeleteDays
     vnetId: vnetId
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${kvNameCommon}-to-vnt-esmlcmn'
@@ -622,7 +625,6 @@ module addSecret '../modules-common/kvSecretsCmn.bicep' = {
   ]
 }
 
-
 var kvAdminNoDash = replace(kvNameCommonAdmin,'-','')
 module kvAdmin '../../modules/keyVault.bicep' = {
   scope: esmlCommonResourceGroup
@@ -634,6 +636,8 @@ module kvAdmin '../../modules/keyVault.bicep' = {
     tenantIdentity: tenantId
     vnetId: vnetId
     subnetName: defaultSubnet
+    enablePurgeProtection:enablePurgeProtection
+    soft_delete_days:keyvaultSoftDeleteDays
     privateEndpointName: 'pend-${kvNameCommonAdmin}-to-vnt-esmlcmn'
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'

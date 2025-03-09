@@ -13,6 +13,7 @@ variables:
   project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
   admin_hybridBenefit: "false"
+  admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
 
   # optional
   azure_machinelearning_sp_oid: "" # Azure Machine Learning service principle Object ID. Find it in Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
