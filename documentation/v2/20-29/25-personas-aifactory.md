@@ -215,3 +215,7 @@ Persona group| Persona|Services|Purpose|Scenarios|Link to education|Environment
 ## Within services: ESML
 
 ### Service: `Azure Machine Learning`: ESML (Persona: `p002_esml_team_member_datascientist`)
+
+## How-to Create EntraID groups, Connect to Personas, Add info to seeding keyvault
+
+[Ask your AI Factory core team to read this](../10-19/16-ad-groups-personas.md)

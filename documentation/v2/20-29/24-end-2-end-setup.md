@@ -88,6 +88,12 @@ For `Bring your own vNet`, e.g. NOT using the *AI Factory common resource group*
         },
 ```
 
+## Config: EntraID groups to Personas
+
+How-to Create EntraID groups, Connect to Personas, Add info to seeding keyvault: 
+
+[Ask your AI Factory core team to read this](../10-19/16-ad-groups-personas.md)
+
 ## Config: WebApp (post deplpoyment of WebApp)
 
 ### Authentication (Webapp)
