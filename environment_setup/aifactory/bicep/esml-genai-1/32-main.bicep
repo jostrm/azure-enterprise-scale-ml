@@ -65,6 +65,11 @@ param csOpenAISKU string = 'S0'
 */
 param modelGPT4Version string = '1106-Preview' // If your region doesn't support this version, please change it.
 
+// ---- EntraID Groups
+param useGroups bool = false
+param groupsProjectMembersESML string = ''
+param groupsProjectMembersGenai1 string = ''
+param groupsCoreteamMembers string = ''
 
 // ### FALSE as default - START ### 
 
@@ -300,12 +305,26 @@ var segments = split(genaiSubnetId, '/')
 var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
 var defaultSubnet = genaiSubnetName //common_subnet_name
 
-// RBAC
+// RBAC - USER ObjectID's
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
 var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
+
+// RBAC - PERSONAS Group ObjectID's
+var groupsProjectMembersESMLArray = useGroups? array(split(replace(groupsProjectMembersESML,'\\s+', ''),',')): []
+var groupsProjectMembersGenai1Array = useGroups? array(split(replace(groupsProjectMembersGenai1,'\\s+', ''),',')): []
+var groupsCoreteamMembersArray = useGroups? array(split(replace(groupsCoreteamMembers,'\\s+', ''),',')): []
+
+// ---- PERSONAS
+// 4 Personas where first 3 contains users. The 4th is of type Service Principal. 3 are mapped to groups_project_members_esml & PROJECT_TYPE=esml
+var personas_project_esml = array('p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops')
+// 6 Personas where 5 contain users. The 6th is an SP. mapped to groups_project_members_genai_1 & PROJECT_TYPE=genai-1'
+var personas_project_genai_1 = array('p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops')
+// 4 Personas, whereof first 3 contains useres. The 4th is a service principal. These personas are mapped to group_coreteam_members
+var personas_core_team = array('p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops')
+// ---- PERSONAS end
 
 // Salt: Project/env specific
 resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
@@ -1555,6 +1574,18 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     aiSearchService
   ]
 }
+
+// RBAC - PERSONAS Group ObjectID's
+//var groupsProjectMembersESMLArray = useGroups? array(split(replace(groupsProjectMembersESML,'\\s+', ''),',')): []
+//var groupsProjectMembersGenai1Array = useGroups? array(split(replace(groupsProjectMembersGenai1,'\\s+', ''),',')): []
+//var groupsCoreteamMembersArray = useGroups? array(split(replace(groupsCoreteamMembers,'\\s+', ''),',')): []
+
+// ---- PERSONAS
+// 4 Personas where first 3 contains users. The 4th is of type Service Principal.
+//var personas_project_esml = array('p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops')
+// 6 Personas where 5 contain users. The 6th is an SP. 
+//var personas_project_genai_1 = array('p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops')
+//var personas_core_team = array('p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops') // 4 Personas, whereof first 3 contains useres. The 4th is a service principal.
 
 module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false) {
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
