@@ -56,7 +56,7 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
     partitionCount: partitionCount
     publicNetworkAccess:publicNetworkAccess? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
-      bypass: 'AzurePortal' //'None', 'AzureServices', 'None', 'AzurePortal'
+      bypass: 'AzureServices' //'None', 'AzureServices', 'None', 'AzurePortal'
       ipRules: ipRules
     }
     semanticSearch: semanticSearchTier
