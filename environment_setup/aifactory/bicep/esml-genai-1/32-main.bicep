@@ -1716,6 +1716,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
     aiVisionMIObjectId: csVision.outputs.principalId
     userObjectIds: technicalAdminsObjectID_array_safe
     visonServiceName: csVision.outputs.name
+    useAdGroups:useAdGroups
   }
 }
 
@@ -1728,6 +1729,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
     aiSpeechMIObjectId: csSpeech.outputs.principalId
     userObjectIds: technicalAdminsObjectID_array_safe
     speechServiceName: csSpeech.outputs.name
+    useAdGroups:useAdGroups
   }
 }
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
@@ -1739,6 +1741,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
     userObjectIds: technicalAdminsObjectID_array_safe
     aiDocsIntelMIObjectId: csDocIntelligence.outputs.principalId
     docsServiceName: csDocIntelligence.outputs.name
+    useAdGroups:useAdGroups
   }
 }
 

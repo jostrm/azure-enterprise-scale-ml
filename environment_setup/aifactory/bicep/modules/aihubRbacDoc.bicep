@@ -4,6 +4,7 @@ param storageAccountName string // Name of Azure Storage Account
 param storageAccountName2 string // Name of Azure Storage Account
 param docsServiceName string
 param userObjectIds array // Specific user's object ID's for "User to Service Table"
+param useAdGroups bool = false // Use AD groups for role assignments
 
 // Role Definition IDs: Cognitive Services OpenAI Contributor
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -75,7 +76,7 @@ resource docsServiceOpenAICotributorUsers 'Microsoft.Authorization/roleAssignmen
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'023: cognitiveServicesContributor role to USER with OID  ${userObjectIds[i]} for : ${docsService.name} to call data on data plane'
   }
   scope:docsService
