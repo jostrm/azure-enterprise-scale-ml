@@ -2,6 +2,7 @@ param commonRGId string
 param userObjectIds array
 @secure()
 param servicePrincipleObjectId string
+param useAdGroups bool = false // Use AD groups for role assignments
 
 // Container Registry (EP, WebApp, Azure Function)
 var acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec' // SP, user -> RG
@@ -14,7 +15,7 @@ resource acrPushCmn 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for 
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPushRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'030: acrPush role on RG to USER with OID  ${userObjectIds[i]} for RG: ${commonRGId}'
   }
   scope:resourceGroup()

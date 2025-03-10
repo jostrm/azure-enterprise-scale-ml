@@ -1772,6 +1772,8 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    useAdGroups:useAdGroups
+
   }
   dependsOn: [
     rbacModuleUsers
@@ -1791,6 +1793,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
     vNetName: vnetNameFullBastion
     common_bastion_subnet_name: 'AzureBastionSubnet'
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     rbacModuleUsers
@@ -1811,6 +1814,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     userObjectIds: technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     rbacReadUsersToCmnVnetBastion

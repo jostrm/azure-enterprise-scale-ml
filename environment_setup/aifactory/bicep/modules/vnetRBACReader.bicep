@@ -5,6 +5,7 @@ param common_bastion_subnet_name string
 param project_service_principle string
 @description('Additional optional Object ID of more people to access Resource group')
 param user_object_ids array
+param useAdGroups bool = false // Use AD groups for role assignments
 
 var service_principle_array = project_service_principle == ''? []: array(split(project_service_principle,','))
 
@@ -34,7 +35,7 @@ resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@202
   properties: {
     roleDefinitionId: networkContributorRoleDefinition.id
     principalId: user_object_ids[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Network Contributor to USER with OID  ${user_object_ids[i]} for vNet: ${vNetName}'
   }
   scope:vNetNameResource
@@ -68,7 +69,7 @@ resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: user_object_ids[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Contributor to USER with OID  ${user_object_ids[i]} for Bastion NSG: ${common_bastion_subnet_name}'
   }
   scope:nsgBastion4project
