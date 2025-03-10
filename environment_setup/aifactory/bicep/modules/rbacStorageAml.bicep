@@ -7,6 +7,7 @@ param userObjectIds array // Specific user's object ID's
 @secure()
 param servicePrincipleObjectId string // Service Principle Object ID
 param azureMLworkspaceName string
+param useAdGroups bool = false
 
 // Azure ML (AI Hub, AIProject)
 var azureMLDataScientistRoleId = 'f6c7c914-8db3-469d-8ca1-694a8f32e121' // SP, user -> AI Hub, AI Project (RG)
@@ -37,7 +38,7 @@ resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignm
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'027a: StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
@@ -60,7 +61,7 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Autho
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'028a: FileDataPrivilegedContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
@@ -85,7 +86,7 @@ resource azureAIDeveloperRole 'Microsoft.Authorization/roleAssignments@2022-04-0
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'043 AzureAIDeveloper role to USER with OID  ${userObjectIds[i]} for : ${existingAmlWorkspace.name}'
   }
   scope:existingAmlWorkspace
@@ -110,7 +111,7 @@ resource azureAIAdministratorAssignment 'Microsoft.Authorization/roleAssignments
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'044 azureAIAdministrator role to USER with OID  ${userObjectIds[i]} for : ${existingAmlWorkspace.name}'
   }
   scope:existingAmlWorkspace
@@ -135,7 +136,7 @@ resource azureAIInferenceDeploymentOperatorRole 'Microsoft.Authorization/roleAss
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIInferenceDeploymentOperatorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'044 AzureAIInferenceDeploymentOperator role to USER with OID  ${userObjectIds[i]} for ${existingAmlWorkspace.name} on RG level'
   }
   scope:existingAmlWorkspace
@@ -160,7 +161,7 @@ resource azureMLDataScientistRole 'Microsoft.Authorization/roleAssignments@2022-
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureMLDataScientistRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'041 AzureMLDataScientist role to USER with OID  ${userObjectIds[i]} for : ${existingAmlWorkspace.name} on RG level'
   }
   scope:existingAmlWorkspace
@@ -185,7 +186,7 @@ resource amlWorkspaceConnectionSecretsReader 'Microsoft.Authorization/roleAssign
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureMachineLearningWorkspaceConnectionSecretsReaderRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'042 AzureMachineLearningWorkspaceConnectionSecretsReader role to USER with OID  ${userObjectIds[i]} for : ${existingAmlWorkspace.name} on RG level'
   }
   scope:existingAmlWorkspace

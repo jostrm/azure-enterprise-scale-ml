@@ -22,6 +22,7 @@ param storage_account_name_datalake string = ''
 param project_resourcegroup_name string = ''
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
 param dashboard_resourcegroup_name string = ''
+param useAdGroups bool = false
 
 var user_object_ids_array = array(split(replace(user_object_ids,' ',''),','))
 var user_object_ids_array_Safe = user_object_ids == ''? []: user_object_ids_array
@@ -49,6 +50,7 @@ module projectRGOwnerPermissions './ownerRbac.bicep' = if(project_resourcegroup_
   name: 'projectRGOwnerPerm4coremteamXY'
   params: {
    user_object_ids: user_object_ids_array_Safe
+   useAdGroups:useAdGroups
   }
   dependsOn:[
     project_resourcegroup
@@ -65,6 +67,7 @@ module commonRGOwnerPermissions './ownerRbac.bicep' = if(common_resourcegroup_na
   name: 'commonRGOwnerPermissions4coreteamXY'
   params: {
    user_object_ids: user_object_ids_array_Safe
+   useAdGroups:useAdGroups
   }
   dependsOn:[
     common_resourcegroup
@@ -81,6 +84,7 @@ module dashboardRGcontributorPermissions './ownerRbac.bicep' = if(dashboard_reso
   name: 'dashboardRGcontributorPermissions4CoreXY'
   params: {
    user_object_ids: user_object_ids_array_Safe
+   useAdGroups:useAdGroups
   }
   dependsOn:[
     dashboard_resourcegroup
@@ -96,7 +100,7 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
   properties: {
     roleDefinitionId: storageBlobDataOwner.id
     principalId: user_object_ids_array_Safe[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Storage Blob Data Owner to USER with OID  ${user_object_ids_array_Safe[i]} for storage account datalake: ${storage_account_name_datalake}'
   }
   scope:resCommonDatalakeStorage

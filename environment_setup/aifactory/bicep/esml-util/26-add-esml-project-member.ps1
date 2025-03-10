@@ -25,7 +25,8 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "ESML Projectnumber, three digits: 001")][string]$projectNumber,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env,
     [Parameter(Mandatory = $false, HelpMessage = "BYOvNet Resource Group - BYOVnet")][string]$BYOvNetResourceGroup,
-    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet vNet Name")][string]$BYOvNetName
+    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet vNet Name")][string]$BYOvNetName,
+    [Parameter(Mandatory = $false, HelpMessage = "useADGroups instead of User ObjectID")][bool]$useADGroups
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {
@@ -79,6 +80,7 @@ Write-Host "BYOvNetName: ${BYOvNetName}"
 Write-Host "vnetName : ${vnetNameFull}"
 Write-Host "kv : ${projectKeyvaultName}"
 Write-Host "bastion : ${bastion_service_name}"
+Write-Host "useADGroups: ${useADGroups}"
 
 for ($i=0; $i -lt $userObjectIds.Length; $i++) {
   $userID = $userObjectIds[$i]
@@ -95,6 +97,7 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -vnet_resourcegroup_name $BYOvNetResourceGroup `
   -vnet_name $BYOvNetName `
   -user_object_ids $userObjectIds `
+  -useADGroups $useADGroups `
   -Verbose
 
   Write-Host "Running BYOVnet logic - addUserAsProjectMemberByoVnetRGs"
@@ -107,6 +110,7 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -user_object_ids $userObjectIds `
   -bastion_service_name $bastion_service_name `
   -storage_account_name_datalake $storageAccount `
+  -useADGroups $useADGroups `
   -Verbose
 }
 else{
@@ -121,6 +125,7 @@ else{
   -user_object_ids $userObjectIds `
   -bastion_service_name $bastion_service_name `
   -storage_account_name_datalake $storageAccount `
+  -useADGroups $useADGroups `
   -Verbose
 
 }

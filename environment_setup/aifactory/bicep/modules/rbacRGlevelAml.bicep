@@ -8,6 +8,7 @@ param servicePrincipleObjectId string
 
 @description('The resource group ID.')
 param resourceGroupId string
+param useAdGroups bool = false
 
 // ############## RG level ##############
 
@@ -24,7 +25,7 @@ resource roleBasedAccessControlAdminRGRole 'Microsoft.Authorization/roleAssignme
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleBasedAccessControlAdministratorRG)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'030: RoleBasedAccessControlAdministrator on RG to USER with OID  ${userObjectIds[i]} for : ${resourceGroupId}'
   }
   scope:resourceGroup()
@@ -47,7 +48,7 @@ resource acrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i i
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPushRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'030: acrPush role on RG to USER with OID  ${userObjectIds[i]} for RG: ${resourceGroupId}'
   }
   scope:resourceGroup()
@@ -74,7 +75,7 @@ resource contributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'029: CONTRIBUTOR on RG to USER with OID  ${userObjectIds[i]} for ${resourceGroupId}'
   }
   scope:resourceGroup()

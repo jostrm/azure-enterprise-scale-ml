@@ -14,6 +14,7 @@ param vnet_resourcegroup_name string // This deployment. It is either COOMMON RG
 param common_bastion_subnet_name string = 'AzureBastionSubnet'
 param project_service_principle_oid string
 param user_object_ids string
+param useAdGroups bool = false
 
 var user_object_ids_array = array(split(replace(user_object_ids,' ',''),','))
 var user_object_ids_array_Safe = user_object_ids == ''? []: user_object_ids_array
@@ -50,7 +51,7 @@ resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@202
   properties: {
     roleDefinitionId: networkContributorRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Network Contributor to USER with OID  ${user_object_ids_array_Safe[i]} for vNet: ${vnet_name}'
   }
   scope:vNetNameResource
@@ -78,7 +79,7 @@ resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Contributor to USER with OID  ${user_object_ids_array_Safe[i]} for Bastion NSG: ${common_bastion_subnet_name}'
   }
   scope:nsgBastion4project

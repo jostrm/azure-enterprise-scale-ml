@@ -34,7 +34,7 @@ resource bastionCmn 'Microsoft.Network/bastionHosts@2021-05-01' = {
     disableCopyPaste: false
     dnsName: 'string'
     enableFileCopy: true
-    enableShareableLink: true
+    enableShareableLink: false
     enableTunneling: true
     enableIpConnect: false // true?
     ipConfigurations: [

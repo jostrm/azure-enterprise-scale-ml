@@ -1,5 +1,7 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+param useAdGroups bool = false
+
 // Optional override
 param bastionName string = ''
 param bastionResourceGroup string = ''
@@ -492,6 +494,7 @@ module ownerPermissions '../modules/contributorRbac.bicep' = {
     userEmail: technicalContactEmail
     additionalUserEmails: technicalAdminsEmail_array_safe
     additionalUserIds:technicalAdminsObjectID_array_safe
+    useAdGroups: useAdGroups
   }
   dependsOn:[
     projectResourceGroup
@@ -505,6 +508,7 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
     userEmail: technicalContactEmail
     additionalUserEmails: technicalAdminsEmail_array_safe
     additionalUserIds:technicalAdminsObjectID_array_safe
+    useAdGroups: useAdGroups
   }
   dependsOn:[
     projectResourceGroup
@@ -524,7 +528,6 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     logWorkspaceName: laName
     logWorkspaceNameRG: commonResourceGroup
-    //logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
     tags: tags2
     location: location
   }
@@ -1369,6 +1372,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = if(sweden_centr
     userPrincipalId: technicalContactId
     adfPrincipalId: adf.outputs.principalId
     datalakeName: datalakeName
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     dataLake
@@ -1385,6 +1389,7 @@ module rbackDatabricks '../modules/databricksRBAC.bicep' = if(databricksPrivate 
     databricksName: databricksName
     userPrincipalId: technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     dbx
@@ -1399,6 +1404,7 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
     databricksName: databricksNameP
     userPrincipalId: technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     dbxPrivate
@@ -1419,6 +1425,7 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_cen
     adfSP:adf.outputs.principalId
     projectADuser:technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     adf
@@ -1435,6 +1442,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(sweden_
     adfSP:'null' // this duplicate will be ignored
     projectADuser:technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
@@ -1449,6 +1457,7 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_ad
     datafactoryName:adfName
     userPrincipalId:technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     adf
@@ -1465,6 +1474,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml
@@ -1482,6 +1492,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
     vNetName: vnetNameFullBastion
     common_bastion_subnet_name: 'AzureBastionSubnet'
     project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml
@@ -1499,6 +1510,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
     user_object_ids: technicalAdminsObjectID_array_safe
     addBastion: addBastionHost
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml
@@ -1514,6 +1526,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml
@@ -1533,6 +1546,7 @@ module rbacAml1 '../modules/rbacStorageAml.bicep' = {
     userObjectIds: technicalAdminsObjectID_array_safe
     azureMLworkspaceName:aml.outputs.amlName
     servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml
@@ -1548,6 +1562,7 @@ module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
     userObjectIds: technicalAdminsObjectID_array_safe
     azureMLworkspaceName:amlManagedName
     servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml
@@ -1562,6 +1577,7 @@ module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
     resourceGroupId: targetResourceGroupId
     servicePrincipleObjectId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     userObjectIds: technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aml
@@ -1579,6 +1595,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     userObjectIds: technicalAdminsObjectID_array_safe
+    useAdGroups: useAdGroups
   }
   dependsOn: [
     rbacKeyvaultCommon4Users

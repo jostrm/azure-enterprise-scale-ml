@@ -3,6 +3,7 @@ param userPrincipalId string
 
 @description('Specifies the name the databricks resource')
 param databricksName string
+param useAdGroups bool = false
 
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
@@ -24,7 +25,7 @@ resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-pre
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: all_principals[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Contributor to USER with OID  ${all_principals[i]} for Databricks: ${databricksName}'
   }
   scope:databricks4Project

@@ -20,7 +20,8 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "ESML Projectnumber, three digits: 001")][string]$projectNumber,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env,
     [Parameter(Mandatory = $false, HelpMessage = "BYOvNet Resource Group - BYOVnet")][string]$BYOvNetResourceGroup,
-    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet vNet Name")][string]$BYOvNetName
+    [Parameter(Mandatory = $false, HelpMessage = "BYOvNet vNet Name")][string]$BYOvNetName,
+    [Parameter(Mandatory = $false, HelpMessage = "useADGroups instead of User ObjectID")][bool]$useADGroups
 )
 
 if (-not [String]::IsNullOrEmpty($spSecret)) {
@@ -67,6 +68,7 @@ Write-Host "common kv : ${commonKeyvaultName}"
 Write-Host "common adm kv : ${commonAdmKeyvaultName}"
 Write-Host "BYOvNetResourceGroup: ${BYOvNetResourceGroup}"
 Write-Host "BYOvNetName: ${BYOvNetName}"
+Write-Host "useADGroups: ${useADGroups}"
 
 Write-Host "Kicking off the BICEP..."
 
@@ -82,6 +84,7 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
   -user_object_ids $userObjectIds `
   -storage_account_name_datalake $storageAccount `
+  -useADGroups $useADGroups `
   -Verbose
 
   Write-Host "Running BYOVnet logic, second and last step: addCoreTeamAsProjectMemberBYOVnet"
@@ -93,6 +96,7 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -user_object_ids $userObjectIds `
   -vnet_resourcegroup_name $BYOvNetResourceGroup `
   -vnet_name $BYOvNetName `
+  -useADGroups $useADGroups `
   -Verbose
 
 }else {
@@ -105,6 +109,7 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -dashboard_resourcegroup_name $dashboard_resourcegroup_name `
   -user_object_ids $userObjectIds `
   -storage_account_name_datalake $storageAccount `
+  -useADGroups $useADGroups `
   -Verbose
 }
 

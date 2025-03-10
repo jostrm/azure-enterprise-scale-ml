@@ -35,6 +35,7 @@ param modelVersionEmbedding string = 'text-embedding-3-large'
 param modelVersionEmbeddingVersion string = '1'
 param restore bool = false
 param keyvaultEnablePurgeProtection bool = true // The property "enablePurgeProtection" cannot be set to false.
+param disableLocalAuth bool = true
 
 @allowed([
   'S0' // 'Free': Invalid SKU name
@@ -805,7 +806,7 @@ module aiServices '../modules/csAIServices.bicep' = {
       action: 'Allow'
       value: ip
     }]
-    disableLocalAuth: false
+    disableLocalAuth: disableLocalAuth
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
   }
@@ -838,7 +839,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
     kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
-    disableLocalAuth:true
+    disableLocalAuth:disableLocalAuth
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/snt-${projectName}-aks'
@@ -1602,7 +1603,6 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    csAzureOpenAI
     kv1
     rbacReadUsersToCmnVnetBastion
   ]
@@ -1617,7 +1617,6 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    csAzureOpenAI
     kv1
     rbacReadUsersToCmnVnetBastion
   ]
@@ -1628,7 +1627,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
 
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 
-module rbacForOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
+module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
   params:{

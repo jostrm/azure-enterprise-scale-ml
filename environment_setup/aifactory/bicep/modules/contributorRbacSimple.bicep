@@ -1,3 +1,5 @@
+param useAdGroups bool = false
+
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
@@ -12,7 +14,7 @@ resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-0
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: user_object_ids[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description: 'Contributor to user to get Contributor on resource group: ${resourceGroup().name}'
   }
   scope: resourceGroup()

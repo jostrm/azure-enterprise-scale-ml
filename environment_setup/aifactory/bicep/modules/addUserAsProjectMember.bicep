@@ -17,6 +17,7 @@ param project_resourcegroup_name string
 param project_service_principle_oid string
 param user_object_ids string
 param storage_account_name_datalake string = ''
+param useAdGroups bool = false
 
 var user_object_ids_array = array(split(replace(user_object_ids,' ',''),','))
 var user_object_ids_array_Safe = user_object_ids == ''? []: user_object_ids_array
@@ -64,7 +65,7 @@ resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@202
   properties: {
     roleDefinitionId: networkContributorRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Network Contributor to USER with OID  ${user_object_ids_array_Safe[i]} for vNet: ${vnet_name}'
   }
   scope:vNetNameResource
@@ -92,7 +93,7 @@ resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Contributor to USER with OID  ${user_object_ids_array_Safe[i]} for Bastion NSG: ${common_bastion_subnet_name}'
   }
   scope:nsgBastion4project
@@ -109,7 +110,7 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
   properties: {
     roleDefinitionId: readerRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Reader to USER with OID  ${user_object_ids_array_Safe[i]} for Bastion service: ${bastion_service_name}'
   }
   scope:resBastion4project
@@ -123,7 +124,7 @@ resource readerDatalakeStorage 'Microsoft.Authorization/roleAssignments@2020-04-
   properties: {
     roleDefinitionId: readerRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Reader to USER with OID  ${user_object_ids_array_Safe[i]} for DATALAKE storage: ${storage_account_name_datalake}'
   }
   scope:common_datalake
@@ -140,6 +141,7 @@ module projectRGcontributorPermissions './contributorRbacSimple.bicep' = {
   name: 'projectRGcontributorPermissions123'
   params: {
    user_object_ids: user_object_ids_array_Safe
+   useAdGroups:useAdGroups
   }
   dependsOn:[
     project_resourcegroup
@@ -152,6 +154,7 @@ module projectVmAdminRGcontributorPermissions './rbacGeneric.bicep' = {
   params: {
    user_object_ids: user_object_ids_array_Safe
    role_definition_id: vmAdminLoginRoleDefinition.id
+   useAdGroups:useAdGroups
   }
   dependsOn:[
     project_resourcegroup
@@ -168,6 +171,7 @@ module dashboardRGcontributorPermissions './contributorRbacSimple.bicep' = {
   name: 'dashboardRGcontributorPermissions3456'
   params: {
    user_object_ids: user_object_ids_array_Safe
+   useAdGroups:useAdGroups
   }
   dependsOn:[
     dashboard_resourcegroup

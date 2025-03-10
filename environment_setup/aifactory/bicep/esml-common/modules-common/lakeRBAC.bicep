@@ -1,6 +1,7 @@
 param amlPrincipalId string
 param userPrincipalId string
 param adfPrincipalId string
+param useAdGroups bool = false
 
 var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 var storageBlobDataContributor = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -26,7 +27,7 @@ resource readerUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview'
   properties: {
     roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${readerRoleDefinitionId}'
     principalId: userPrincipalId
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description: 'READER to USER ${userPrincipalId} for AD-user to get access to datalake: ${datalakeName}'
   }
   scope:datalakeFromCommon
