@@ -599,6 +599,7 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
     userEmail: technicalContactEmail
     additionalUserEmails: technicalAdminsEmail_array_safe
     additionalUserIds:technicalAdminsObjectID_array_safe
+    useAdGroups:useAdGroups
   }
   dependsOn:[
     projectResourceGroup

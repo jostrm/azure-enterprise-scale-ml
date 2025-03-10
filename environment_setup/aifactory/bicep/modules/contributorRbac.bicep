@@ -17,17 +17,28 @@ param additionalUserIds array
 param additionalUserEmails array
 
 var main_principal_2_array = array(userId)
-var all_principals = union(main_principal_2_array,additionalUserIds)
+//var all_principals = union(main_principal_2_array,additionalUserIds)
 
 var main_email_2_array = array(userEmail)
 var all_emails = union(main_email_2_array,additionalUserEmails)
 
-resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(all_principals)):{
-  name: guid('${all_principals[i]}-contributor-${resourceGroup().id}')
+resource contributorRole2userOrGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):{
+  name: guid('${additionalUserIds[i]}-contributor-${resourceGroup().id}')
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
-    principalId: all_principals[i]
+    principalId: additionalUserIds[i]
     principalType:useAdGroups? 'Group':'User'
-    description: 'Contributor to user ${all_emails[i]} to get Contributor on resource group: ${resourceGroup().name}'
+    description: 'Contributor to user ${additionalUserEmails[i]} to get Contributor on resource group: ${resourceGroup().name}'
   }
 }]
+
+resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(main_principal_2_array)): if(useAdGroups==false){
+  name: guid('${main_principal_2_array[i]}-contributor-${resourceGroup().id}')
+  properties: {
+    roleDefinitionId: contributorRoleDefinition.id
+    principalId: main_principal_2_array[i]
+    principalType:'User'
+    description: 'Contributor to user ${main_email_2_array[i]} to get Contributor on resource group: ${resourceGroup().name}'
+  }
+}]
+

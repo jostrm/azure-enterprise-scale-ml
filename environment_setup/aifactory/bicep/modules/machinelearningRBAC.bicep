@@ -21,7 +21,7 @@ resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018
 @description('Additional optional Object ID of more people to access Resource group')
 param additionalUserIds array
 var main_principal_2_array = array(projectADuser)
-var all_users = union(main_principal_2_array,additionalUserIds)
+//var all_users = union(main_principal_2_array,additionalUserIds)
 
 
 resource amlNameResource 'Microsoft.MachineLearningServices/workspaces@2021-04-01' existing = {
@@ -52,13 +52,28 @@ resource contributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-prev
   ]
 }
 
-resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(all_users)):{
-  name: guid('${all_users[i]}-${amlName}-${resourceGroup().id}')
+resource contributorUserOrGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):{
+  name: guid('${additionalUserIds[i]}-${amlName}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
-    principalId: all_users[i]
+    principalId: additionalUserIds[i]
     principalType:useAdGroups? 'Group':'User'
-    description:'Contributor to USER with OID  ${all_users[i]} for Azure ML ${amlName}'
+    description:'Contributor to USER or GROUP with OID  ${additionalUserIds[i]} for Azure ML ${amlName}'
+  }
+  scope:amlNameResource
+  dependsOn: [
+    contributorSP
+    contributorADF
+  ]
+}]
+
+resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(main_principal_2_array)): if(useAdGroups==false){
+  name: guid('${main_principal_2_array[i]}-${amlName}-${resourceGroup().id}')
+  properties: {
+    roleDefinitionId: contributorRoleDefinition.id
+    principalId: main_principal_2_array[i]
+    principalType:'User'
+    description:'Contributor to USER with OID  ${main_principal_2_array[i]} for Azure ML ${amlName}'
   }
   scope:amlNameResource
   dependsOn: [
