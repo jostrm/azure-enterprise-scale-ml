@@ -36,6 +36,7 @@ steps:
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

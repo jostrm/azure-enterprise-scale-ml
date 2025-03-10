@@ -96,6 +96,7 @@ param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
 param enablePurgeProtection bool = true
 param keyvaultSoftDeleteDays int = 90
+//param useAdGroups bool = false
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002

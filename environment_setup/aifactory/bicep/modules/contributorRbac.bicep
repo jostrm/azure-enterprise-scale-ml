@@ -3,6 +3,7 @@ param userId string
 
 @description('Specifies the email address of the person that ordered the resources')
 param userEmail string
+param useAdGroups bool = false
 
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
@@ -26,7 +27,7 @@ resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-0
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: all_principals[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description: 'Contributor to user ${all_emails[i]} to get Contributor on resource group: ${resourceGroup().name}'
   }
 }]

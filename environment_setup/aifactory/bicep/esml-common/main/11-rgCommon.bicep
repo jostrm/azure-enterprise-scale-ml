@@ -26,6 +26,7 @@ param technicalAdminsObjectID string = 'null'
 @description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')
 param technicalAdminsEmail string = 'null'
 param commonResourceGroup_param string = ''
+param useAdGroups bool = false
 
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
@@ -53,6 +54,7 @@ module contributorPermissions '../../modules/contributorRbac.bicep' = {
     userEmail: technicalContactEmail
     additionalUserIds: technicalAdminsObjectID_array_safe
     additionalUserEmails: technicalAdminsEmail_array_safe
+    useAdGroups: useAdGroups
   }
   dependsOn:[
     rgCommon
@@ -66,6 +68,7 @@ module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = {
     userEmail: technicalContactEmail
     additionalUserIds: technicalAdminsObjectID_array_safe
     additionalUserEmails: technicalAdminsEmail_array_safe
+    useAdGroups: useAdGroups
   }
   dependsOn:[
     rgCommon

@@ -15,6 +15,7 @@ resource VMAdminRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-
   scope: subscription()
   name: '1c0163c0-47e6-4577-8991-ea5c82e286e4'
 }
+param useAdGroups bool = false
 
 var main_principal_2_array = array(userId)
 var all_principals = union(main_principal_2_array,additionalUserIds)
@@ -28,6 +29,7 @@ resource vmAdminLoginRole 'Microsoft.Authorization/roleAssignments@2020-04-01-pr
   properties: {
     roleDefinitionId: VMAdminRoleDefinition.id
     principalId: all_principals[i]
+    principalType:useAdGroups? 'Group':'User'
     description:'Contributor to user ${all_emails[i]} to get VMAdminLogin'
   }
 }]
