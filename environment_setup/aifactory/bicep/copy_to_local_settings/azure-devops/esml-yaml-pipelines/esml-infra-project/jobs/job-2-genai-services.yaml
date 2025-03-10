@@ -114,6 +114,7 @@ steps:
      --parameters azureMachineLearningObjectId="$(azure_machinelearning_sp_oid)" \
      --parameters semanticSearchTier="$(admin_semanticSearchTier)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
      --parameters IPwhiteList="$(project_IP_whitelist)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

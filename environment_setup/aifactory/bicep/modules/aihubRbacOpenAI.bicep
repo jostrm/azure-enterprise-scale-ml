@@ -6,6 +6,7 @@ param openAIName string // Resource ID for Azure OpenAI
 param userObjectIds array // Specific user's object ID's
 @secure()
 param servicePrincipleObjecId string // Service Principle Object ID
+param useAdGroups bool = false
 
 // Storage
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -118,7 +119,7 @@ resource cognitiveServicesContributorRole 'Microsoft.Authorization/roleAssignmen
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'023: cognitiveServicesContributor role to USER with OID  ${userObjectIds[i]} for : ${existingOpenAIResource.name} to call data on data plane'
   }
   scope:existingOpenAIResource
@@ -139,7 +140,7 @@ resource cognitiveServicesUsagesReader 'Microsoft.Authorization/roleAssignments@
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'023: cognitiveServicesUsagesReaderId role to USER with OID  ${userObjectIds[i]} for : ${existingOpenAIResource.name} to call data on data plane'
   }
   scope:existingOpenAIResource
@@ -161,7 +162,7 @@ resource cognitiveServicesOpenAIContributorUsers 'Microsoft.Authorization/roleAs
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'023: OpenAIContributorRole to USER with OID  ${userObjectIds[i]} for : ${existingOpenAIResource.name} to call data on data plane'
   }
   scope:existingOpenAIResource
@@ -183,7 +184,7 @@ resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/rol
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'024: OpenAICognitiveServicesUSer to USER with OID  ${userObjectIds[i]} for : ${existingOpenAIResource.name} to list API keys'
   }
   scope:existingOpenAIResource

@@ -1,6 +1,7 @@
 @description('Additional optional Object ID of more people to access Resource group')
 param user_object_ids array
 param bastion_service_name string
+param useAdGroups bool = false
 
 var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
@@ -18,7 +19,7 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
   properties: {
     roleDefinitionId: readerRoleDefinition.id
     principalId: user_object_ids[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Reader to USER with OID  ${user_object_ids[i]} for Bastion service: ${bastion_service_name}'
   }
   scope:resBastion4project

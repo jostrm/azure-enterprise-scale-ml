@@ -10,6 +10,8 @@ param projectADuser string
 @description('Specifies the name the azure machine learning resource')
 param amlName string
 
+param useAdGroups bool = false
+
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
@@ -55,7 +57,7 @@ resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-pre
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: all_users[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'Contributor to USER with OID  ${all_users[i]} for Azure ML ${amlName}'
   }
   scope:amlNameResource

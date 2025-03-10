@@ -1,5 +1,7 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+param useAdGroups bool = false
+
 // Optional override
 param bastionName string = ''
 param bastionResourceGroup string = ''
@@ -1576,6 +1578,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(service
     adfSP:'null' // this duplicate will be ignored
     projectADuser:technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
+    useAdGroups: useAdGroups
   }
   dependsOn: [
     kv1
@@ -1596,6 +1599,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: technicalAdminsObjectID_array_safe   
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
+    useAdGroups: useAdGroups
   }
   dependsOn: [
     csAzureOpenAI
@@ -1610,6 +1614,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
   params: {
     user_object_ids: technicalAdminsObjectID_array_safe
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
+    useAdGroups: useAdGroups
   }
   dependsOn: [
     csAzureOpenAI
@@ -1634,6 +1639,7 @@ module rbacForOpenAI'../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeplo
     servicePrincipleObjecId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     openAIName:csAzureOpenAI.outputs.cognitiveName
     userObjectIds:technicalAdminsObjectID_array_safe
+    useAdGroups: useAdGroups
   }
 }
 // 6 assignments: OK
@@ -1688,6 +1694,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     aiHubName:aiHub.outputs.name
     aiHubProjectName:aiHub.outputs.aiProjectName
     servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    useAdGroups:useAdGroups
   }
   dependsOn: [
     aiHub

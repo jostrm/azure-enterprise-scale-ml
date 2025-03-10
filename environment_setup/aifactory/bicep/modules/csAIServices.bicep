@@ -19,7 +19,7 @@ param publicNetworkAccess bool = false
 param pendCogSerName string
 param vnetRules array = []
 param ipRules array = []
-param disableLocalAuth bool = false
+param disableLocalAuth bool = true
 param vnetResourceGroupName string
 param acrNameDummy string = ''
 param keyvaultName string
