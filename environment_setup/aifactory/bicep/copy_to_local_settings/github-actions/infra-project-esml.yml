@@ -26,6 +26,7 @@ env:
     admin_commonResourceSuffix: "-001"
     admin_prjResourceSuffix: "-001"
     admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
+    use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
     # ADMIN specific START (only configure once)
     admin_ip_fw: "192.x.x.x" # Do not touch. leave as-is. This is just a placeholder a script will populate later.
@@ -343,6 +344,7 @@ jobs:
             --parameters aml_ci_test_prod_sku_override="${{ env.admin_aml_computeInstance_testProd_sku_override }}" \
             --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
             --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
+            --parameters useAdGroups="${{ env.use_groups }}" \
             --parameters useCommonACR="${{ env.useCommonACR }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist

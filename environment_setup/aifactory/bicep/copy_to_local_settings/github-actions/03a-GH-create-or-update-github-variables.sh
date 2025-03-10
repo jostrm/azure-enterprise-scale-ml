@@ -86,6 +86,12 @@ for env in "${environments[@]}"; do
     create_or_update_variable $env "TENANT_AZUREML_OID" "$TENANT_AZUREML_OID"
     create_or_update_variable $env "LAKE_PREFIX" "$LAKE_PREFIX"
 
+    #RBAC model
+    create_or_update_variable $env "USE_AD_GROUPS" "$USE_AD_GROUPS"
+    create_or_update_variable $env "GROUPS_PROJECT_MEMBERS_ESML" "$GROUPS_PROJECT_MEMBERS_ESML"
+    create_or_update_variable $env "GROUPS_PROJECT_MEMBERS_GENAI_1" "$GROUPS_PROJECT_MEMBERS_GENAI_1"
+    create_or_update_variable $env "GROUPS_CORETEAM_MEMBERS" "$GROUPS_CORETEAM_MEMBERS"
+
     # Cost optimization
     create_or_update_variable $env "USE_COMMON_ACR_FOR_PROJECTS" "$USE_COMMON_ACR_FOR_PROJECTS"
 

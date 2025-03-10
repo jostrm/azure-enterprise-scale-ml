@@ -21,6 +21,7 @@ env:
   cidr_range: "${{ vars.AIFACTORY_CIDR_XX }}" # XX = "17" 
   aiResourceSuffix: "-001" # Suffix on resources within the resource group: -001, -002
   admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
+  use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
   # CORE TEAM MEMBERS specific
   technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}" # "192.x.x.x"
@@ -58,6 +59,7 @@ jobs:
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
             --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+            --parameters useAdGroups="${{ env.use_groups }}" \
             --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
           azcliversion: latest
       - name: 02_az_bicep_private_networking

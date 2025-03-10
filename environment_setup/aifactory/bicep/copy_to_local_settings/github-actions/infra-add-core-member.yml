@@ -24,6 +24,7 @@ env:
     project_number_000: '001' #ESML Projectnumber, three digits: 001
     user_emails_comma_separated_list: "user1@example.com, user2@example.com" # Comma-separated, email(s) of new user(s) to grant admin permissions
     user_object_ids_comma_separated_list: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Comma-separated, ObjectIds of new user(s) to grant admin permissions
+    use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
 jobs:
     add-core-member-dev:

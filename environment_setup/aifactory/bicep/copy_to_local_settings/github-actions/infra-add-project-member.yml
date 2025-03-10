@@ -27,6 +27,7 @@ env:
   common-sp-appid-seeding-kv-name: "esml-common-bicep-sp-id"
   common-sp-objid-seeding-kv-name: "esml-common-bicep-sp-oid"
   common-sp-secret-seeding-kv-name: "esml-common-bicep-sp-secret"
+  use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
 
 jobs:
