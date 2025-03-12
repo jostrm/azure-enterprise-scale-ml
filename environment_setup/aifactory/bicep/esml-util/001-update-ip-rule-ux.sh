@@ -9,9 +9,9 @@ NC='\033[0m' # No Color
 # Static - EDIT THIS ONCE
 prefix="acme-1-" # Prefix for AI Factory common resource group, example: "acme-1-"
 region="-sdc" #short name for location, e.g. -eus2, -weu
-env="-dev"
-rg_instance_suffix="-002" #The suffid on your AIFactory Common resource group
-resource_suffix="-001"
+env="-dev" # -dev, -test, -prod
+rg_instance_suffix="-001" # -001 (The suffix on your AIFactory Common resource group)
+resource_suffix="-001" # -001 (The suffix on your respurces in your project resource group)
 salt="" # 5 chars. replace with your own salt, see keyvault name or aiservices name as example. Should be 5 characters 'asdfg' in the resource name
 # Static - EDIT THIS ONCE, END
 
@@ -23,7 +23,7 @@ read -p "Enter the project number (001,002,...): " project_number
 # Construct resource names using static variables
 resource_suffix_kv="${resource_suffix#-0}" # Remove -0 from the beginning
 resource_suffix_kv="${resource_suffix_kv#-}" # Remove any remaining hyphen: -001 -> 01
-
+az
 rg="${prefix}esml-project${project_number}${region}${env}${rg_instance_suffix}-rg"
 ai_hub="ai-hub-prj${project_number}${region}${env}-${salt}${resource_suffix}"
 ai_project="ai-prj-${project_number}-01${region}${env}-${salt}${resource_suffix}"
