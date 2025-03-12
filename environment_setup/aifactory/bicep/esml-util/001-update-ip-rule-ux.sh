@@ -7,18 +7,15 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Static - EDIT THIS ONCE
-prefix="mrvel-1-" # Prefix for AI Factory common resource group, example: "acme-1-"
-region="-eus2" #short name for location, e.g. -eus2, -weu
+prefix="acme-1-" # Prefix for AI Factory common resource group, example: "acme-1-"
+region="-sdc" #short name for location, e.g. -eus2, -weu
 env="-dev"
-rg_instance_suffix="-004" #The suffid on your AIFactory Common resource group
+rg_instance_suffix="-002" #The suffid on your AIFactory Common resource group
 resource_suffix="-001"
-salt="abtkd" # replace with your own salt, see keuvault name or aiservices name as example. Should be 5 characters 'asdfg' in the resource name
+salt="" # 5 chars. replace with your own salt, see keyvault name or aiservices name as example. Should be 5 characters 'asdfg' in the resource name
 # Static - EDIT THIS ONCE, END
 
 # Dynamic
-#new_ip="10.123.123.10"
-#project_number="001"
-
 read -p "Enter the old IP address (leave blank if you dont know): " old_ip
 read -p "Enter the new, your current IP (IPv4 - run 'curl ifcfg.me' in terminal) address: " new_ip
 read -p "Enter the project number (001,002,...): " project_number
