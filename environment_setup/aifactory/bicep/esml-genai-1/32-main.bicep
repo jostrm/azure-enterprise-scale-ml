@@ -304,10 +304,13 @@ var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, wh
 var defaultSubnet = genaiSubnetName //common_subnet_name
 
 // RBAC
+var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
+
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+
+var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
 // Salt: Project/env specific

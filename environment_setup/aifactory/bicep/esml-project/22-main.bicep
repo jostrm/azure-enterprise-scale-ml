@@ -196,10 +196,14 @@ param IPwhiteList string = ''
 param addBastionHost bool // Dummy: do not correspond to any parameters defined in the template: 'addBastionHost'
 param alsoManagedMLStudio bool = true
 
+// RBAC
+var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
+
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+
+var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 var tags2 = projecttags
 

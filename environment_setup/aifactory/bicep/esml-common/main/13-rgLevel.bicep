@@ -120,10 +120,14 @@ var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroupName}/provi
 var defaultSubnet = common_subnet_name
 var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
 
+// RBAC
+var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
+
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+
+var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 var sweden_central_adf_missing = false // (location == 'swedencentral')?true:false
 
