@@ -18,23 +18,6 @@ resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
     securityRules: [
       // --- Inbound ---
       {
-        name: 'Bastion_AllowHttpsInbound'
-        properties: {
-          description: 'Required for Bastion public IP. Source can be either the Internet or a set of public IP addresses (whitelist) that you specify'
-          protocol: 'Tcp'
-          sourcePortRange: '*'
-          destinationPortRange: '443'
-          destinationAddressPrefix: '*'
-          access: 'Allow'
-          priority: 520
-          direction: 'Inbound'
-          sourcePortRanges: []
-          destinationPortRanges: []
-          sourceAddressPrefixes: IPwhiteList_Array  // If using IP-whitelist from ADO
-          destinationAddressPrefixes: []
-        }
-      }
-      {
         name: 'Bastion_GatewayManagerInbound'
         properties: {
             description: 'Required for Bastion control plane'

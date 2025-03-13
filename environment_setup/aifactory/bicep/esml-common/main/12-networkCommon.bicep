@@ -96,8 +96,21 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
 
 var ipWhitelist_array = empty(IPwhiteList) ? [] : array(split(replace(IPwhiteList, '\\s+', ''), ','))
 
-module nsgBastion '../modules-common/nsgBastion.bicep' = {
+module nsgBastion '../modules-common/nsgBastion.bicep' = if(empty(ipWhitelist_array)==false){
   name: 'nsg-${common_bastion_subnet_name}-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
+  scope: vnetResourceGroup
+  params: {
+    name: 'nsg-${common_bastion_subnet_name}'
+    tags: tags
+    location:location
+    IPwhiteList_Array: ipWhitelist_array
+  }
+  dependsOn:[
+    nsgCommonScoring
+  ]
+}
+module nsgBastionNoWhitelist '../modules-common/nsgBastionNoWhitelist.bicep' = if(empty(ipWhitelist_array)){
+  name: 'nsg-${common_bastion_subnet_name}-NoWLdepl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
