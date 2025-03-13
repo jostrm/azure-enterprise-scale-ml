@@ -23,7 +23,7 @@ read -p "Enter the project number (001,002,...): " project_number
 # Construct resource names using static variables
 resource_suffix_kv="${resource_suffix#-0}" # Remove -0 from the beginning
 resource_suffix_kv="${resource_suffix_kv#-}" # Remove any remaining hyphen: -001 -> 01
-az
+
 rg="${prefix}esml-project${project_number}${region}${env}${rg_instance_suffix}-rg"
 ai_hub="ai-hub-prj${project_number}${region}${env}-${salt}${resource_suffix}"
 ai_project="ai-prj-${project_number}-01${region}${env}-${salt}${resource_suffix}"
