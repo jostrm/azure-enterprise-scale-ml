@@ -23,7 +23,18 @@ resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 var main_principal_2_array = array(principalId)
 var all_principals = union(main_principal_2_array,additionalPrincipalIds)
 
-resource keyVaultAccessPolicyAdditional 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = {
+resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = if (empty(main_principal_2_array)) {
+  parent:keyVault
+  name:policyName
+  properties: {
+    accessPolicies: [for userOID in additionalPrincipalIds:{
+      objectId: userOID // object id (required) and if service principle also OID, not AppId
+      permissions: keyVaultPermissions
+      tenantId: subscription().tenantId
+    }]
+  }
+}
+resource keyVaultAccessPolicyAdditional 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = if (!empty(main_principal_2_array)) {
   parent:keyVault
   name:policyName
   properties: {
