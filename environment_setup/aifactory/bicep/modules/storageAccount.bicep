@@ -109,12 +109,12 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     minimumTlsVersion: 'TLS1_2'
     networkAcls: {
       bypass: 'AzureServices' 
-      defaultAction: 'Deny' 
-      virtualNetworkRules: [for rule in vnetRules: {
+      defaultAction:'Deny' 
+      virtualNetworkRules:[for rule in vnetRules:{
         action: 'Allow'
         id: rule
       }]
-      ipRules: ipRules
+      ipRules:empty(ipRules)?[]:ipRules
     }
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
