@@ -49,10 +49,13 @@ if [[ "$orchestrator" == "a" ]]; then
 
     # Copy AZURE DEVOPS template file and bootstrap files, to root of repository
     cp "$SCRIPT_DIR/bootstrap/01-aif-copy-aifactory-templates.sh" "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
-    cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
     cp "$SCRIPT_DIR/bootstrap/02b-ADO-YAML-bootstrap-files.sh" "$SCRIPT_DIR/../02-ADO-YAML-bootstrap-files.sh"
     cp "$SCRIPT_DIR/bootstrap/03b-ADO-YAML-bootstrap-files-no-var-overwrite.sh" "$SCRIPT_DIR/../03-ADO-YAML-bootstrap-files-no-var-overwrite.sh"
-
+    
+    # Common
+    cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
+    cp "$SCRIPT_DIR/environment_setup/aifactory/bicep/esml-util/001-update-ip-rule-ux.sh" "$SCRIPT_DIR/../12-GENAI-update-ip-rule-ux.sh"
+    
     echo -e "${GREEN}Finished!${NC}"
     echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
 
@@ -87,9 +90,11 @@ elif [[ "$orchestrator" == "g" ]]; then
 
     # Creating GitHub files,  to root of repository
     cp "$SCRIPT_DIR/bootstrap/01-aif-copy-aifactory-templates.sh" "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
-    cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
     cp "$SCRIPT_DIR/bootstrap/02a-GH-bootstrap-files.sh" "$SCRIPT_DIR/../02-GH-bootstrap-files.sh"
     cp "$SCRIPT_DIR/bootstrap/03a-GH-bootstrap-files-no-env-overwrite.sh" "$SCRIPT_DIR/../03-GH-bootstrap-files-no-env-overwrite.sh"
+    # Common
+    cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
+    cp "$SCRIPT_DIR/environment_setup/aifactory/bicep/esml-util/001-update-ip-rule-ux.sh" "$SCRIPT_DIR/../12-GENAI-update-ip-rule-ux.sh"
 
     echo -e "${GREEN}Finished!${NC}"
     echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
