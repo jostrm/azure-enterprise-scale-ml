@@ -16,9 +16,9 @@ param locationSuffix string
 @description('Specifies the tags that should be applied to newly created resources')
 param tags object
 @description('Specifies project owner email and will be used for tagging and RBAC')
-param technicalContactEmail string
+param technicalContactEmail string = ''
 @description('Specifies project owner objectId and will be used for tagging and RBAC')
-param technicalContactId string
+param technicalContactId string = ''
 @description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
 param commonRGNamePrefix string = ''
 @description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')

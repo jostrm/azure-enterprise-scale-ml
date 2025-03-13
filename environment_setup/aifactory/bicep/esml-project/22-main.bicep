@@ -95,15 +95,16 @@ param skuNameStorage string = 'Standard_LRS' //  Cannot be changed after creatio
 @description('Specifies the SKU of the storage account, for AIFactory ESML Datalake')
 param skuNameStorageLake string = 'Standard_ZRS' // Must be the same as ESML Datalke in commmon RG. Cannot be changed after creation
 param keyvaultSoftDeleteDays int=90
-// RBAC START
-@description('Specifies project owner email and will be used for tagging and RBAC')
-param projectOwnerEmail string
-@description('Specifies project owner objectId and will be used for tagging and RBAC')
-param projectOwnerId string
+
+// RBAC - Optionally add a super-admin in core team: UserObjectId
 @description('ESML CoreTeam assigned to help project. Specifies technical contact email and will be used for tagging and RBAC')
-param technicalContactEmail string
+param technicalContactEmail string=''
 @description('ESML CoreTeam assigned to help project.Specifies technical contact objectId and will be used for tagging and RBAC')
-param technicalContactId string
+param technicalContactId string=''
+@description('Specifies project owner email and will be used for tagging and RBAC')
+param projectOwnerEmail string=''
+@description('Specifies project owner objectId and will be used for tagging and RBAC')
+param projectOwnerId string=''
 @description('Specifies the tenant id')
 param tenantId string
 

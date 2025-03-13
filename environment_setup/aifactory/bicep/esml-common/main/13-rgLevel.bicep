@@ -69,9 +69,9 @@ param hybridBenefit bool
 @description('(Required) true if Bastion Host should be created')
 param addBastionHost bool
 @description('Specifies project owner email and will be used for tagging and RBAC')
-param technicalContactEmail string
+param technicalContactEmail string=''
 @description('Specifies project owner objectId and will be used for tagging and RBAC')
-param technicalContactId string
+param technicalContactId string=''
 @description('Common service principle keuvault secret key name for Object ID')
 param commonServicePrincipleOIDKey string
 param databricksOID string

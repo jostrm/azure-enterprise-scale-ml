@@ -214,14 +214,14 @@ param env string
 param skuNameStorage string = 'Standard_ZRS'
 @description('RBAC purposes:ObjectID to set Contributor on project resource group. ESML CoreTeam assigned to help project. Will be used for RBAC')
 
-// RBAC
-param technicalContactId string
+// RBAC - Optionally add a super-admin in core team: UserObjectId
+param technicalContactId string=''
 @description('ESML CoreTeam assigned to help project. Specifies technical contact email and will be used for tagging')
-param technicalContactEmail string
+param technicalContactEmail string=''
 @description('RBAC: Specifies the tenant id')
-param tenantId string
 
-// RBAC: AzureDevops Variable Overrides
+param tenantId string
+// RBAC: AzureDevops Variable Overrides: Microsft EntraID ObjectID, can be a semcolon-separeted array
 @description('Semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf". AzureDevops Variable Overrides')
 param technicalAdminsObjectID string = 'null'
 @description('Semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf". AzureDevops Variable Overrides.')
@@ -258,9 +258,9 @@ param lakeContainerName string
 @description('Specifies the tags2 that should be applied to newly created resources')
 param projecttags object
 @description('Specifies project owner email and will be used for tagging and RBAC')
-param projectOwnerEmail string
+param projectOwnerEmail string=''
 @description('Specifies project owner objectId and will be used for tagging and RBAC')
-param projectOwnerId string
+param projectOwnerId string=''
 @description('not set in genai-1')
 param databricksOID string = 'not set in genai-1'
 @description('not set in genai-1')
