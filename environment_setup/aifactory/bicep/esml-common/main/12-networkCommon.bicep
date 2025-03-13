@@ -94,7 +94,7 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
   ]
 }
 
-var ipWhitelist_array = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+var ipWhitelist_array = empty(IPwhiteList) ? [] : array(split(replace(IPwhiteList, '\\s+', ''), ','))
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = {
   name: 'nsg-${common_bastion_subnet_name}-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
@@ -103,7 +103,7 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = {
     name: 'nsg-${common_bastion_subnet_name}'
     tags: tags
     location:location
-    IPwhiteList_Array:ipWhitelist_array
+    IPwhiteList_Array: ipWhitelist_array
   }
   dependsOn:[
     nsgCommonScoring
