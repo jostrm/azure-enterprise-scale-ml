@@ -23,7 +23,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 var main_principal_2_array = array(principalId)
 var all_principals = union(main_principal_2_array,additionalPrincipalIds)
 
-resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = if (empty(main_principal_2_array)) {
+resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = if (empty(main_principal_2_array) || principalId == '') {
   parent:keyVault
   name:policyName
   properties: {
@@ -34,7 +34,7 @@ resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPo
     }]
   }
 }
-resource keyVaultAccessPolicyAdditional 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = if (!empty(main_principal_2_array)) {
+resource keyVaultAccessPolicyAdditional 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = if (!empty(main_principal_2_array) || principalId != '') {
   parent:keyVault
   name:policyName
   properties: {
