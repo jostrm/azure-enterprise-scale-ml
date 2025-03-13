@@ -6,14 +6,17 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+
 # Static - EDIT THIS ONCE
 prefix="acme-1-" # Prefix for AI Factory common resource group, example: "acme-1-"
-region="-sdc" #short name for location, e.g. -eus2, -weu
-env="-dev" # -dev, -test, -prod
-rg_instance_suffix="-001" # -001 (The suffix on your AIFactory Common resource group)
-resource_suffix="-001" # -001 (The suffix on your respurces in your project resource group)
-salt="" # 5 chars. replace with your own salt, see keyvault name or aiservices name as example. Should be 5 characters 'asdfg' in the resource name
-# Static - EDIT THIS ONCE, END
+region="sdc" #short name for location, e.g. eus2, weu
+env="dev" # dev, test, prod
+rg_instance_suffix="-001" # -001 (The suffix on your AIFactory Common resource group and suffix on project resource group)
+resource_suffix="-001" # -001 (The suffix on your resources inside of project resource group, such as Azure AI Foundry, in your project resource group)
+salt="abcde" # 5 chars. replace with your own salt, see keyvault name or aiservices name as example. Should be 5 characters 'asdfg' in the resource name
+# Static - EDIT THIS ONCE, END 
+
+echo -e "${GREEN}NB! This is for AI Project type: GenAI-1  with Azure AI Foundry (GenAIOps) ${NC}"
 
 # Dynamic
 read -p "Enter the old IP address (leave blank if you dont know): " old_ip
@@ -24,9 +27,9 @@ read -p "Enter the project number (001,002,...): " project_number
 resource_suffix_kv="${resource_suffix#-0}" # Remove -0 from the beginning
 resource_suffix_kv="${resource_suffix_kv#-}" # Remove any remaining hyphen: -001 -> 01
 
-rg="${prefix}esml-project${project_number}${region}${env}${rg_instance_suffix}-rg"
-ai_hub="ai-hub-prj${project_number}${region}${env}-${salt}${resource_suffix}"
-ai_project="ai-prj-${project_number}-01${region}${env}-${salt}${resource_suffix}"
+rg="${prefix}esml-project${project_number}-${region}-${env}${rg_instance_suffix}-rg"
+ai_hub="ai-hub-prj${project_number}-${region}-${env}-${salt}${resource_suffix}"
+ai_project="ai-prj-${project_number}-01-${region}-${env}-${salt}${resource_suffix}"
 
 ai_services="aiservicesprj${project_number}${region}${env}${salt}${resource_suffix}"
 ai_services="${ai_services//-/}" # Remove all hyphens
@@ -34,7 +37,8 @@ ai_services="${ai_services//-/}" # Remove all hyphens
 ai_search="aisearchprj${project_number}${region}${env}${salt}${resource_suffix}"
 ai_search="${ai_search//-/}" # Remove all hyphens
 
-keyvault="kv-p${project_number}${region}${env}-${salt}${resource_suffix_kv}"
+keyvault="kv-p${project_number}-${region}-${env}-${salt}${resource_suffix_kv}"
+
 storage_account_1="saprj${project_number}${region}${salt}1${resource_suffix}${env}" 
 storage_account_1="${storage_account_1//-/}" # Remove all hyphens
 
