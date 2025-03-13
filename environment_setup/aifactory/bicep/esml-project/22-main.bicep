@@ -223,9 +223,11 @@ var sweden_central_adf_missing =  false // (location == 'swedencentral')?true:fa
 var sweden_central_appInsight_classic_missing = (location == 'swedencentral')?true:false
 
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
-param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
-var privDnsResourceGroupName = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
+param centralDnsZoneByPolicyInHub bool = false // DONE: jå HUB
+
+// Networking - Private DNS: Centralized or Standalone
+var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = (privDnsSubscription_param != ''&& centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 // 2024-09-15: 25 entries
 var privateDnsZoneName =  {

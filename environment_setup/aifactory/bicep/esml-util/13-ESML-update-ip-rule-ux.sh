@@ -7,7 +7,7 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Static - EDIT THIS ONCE
-prefix="acme-1-" # Prefix for AI Factory common resource group, example: "acme-1-"
+prefix="acme-1-" # Prefix for AI Factory common resource group, example: "acme-1-", "acme-"
 region="sdc" #short name for location, e.g. eus2, weu
 env="dev" # dev, test, prod
 rg_instance_suffix="-001" # -001 (The suffix on your AIFactory Common resource group and suffix on project resource group)

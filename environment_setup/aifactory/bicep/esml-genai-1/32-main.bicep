@@ -324,9 +324,9 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 // Salt: AIFactory instance/env specific
 var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 
-// Networking - Private DNS
-var privDnsResourceGroupName = privDnsResourceGroup_param != '' ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = privDnsSubscription_param != '' ? privDnsSubscription_param : subscriptionIdDevTestProd
+// Networking - Private DNS: Centralized or Standalone
+var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = (privDnsSubscription_param != ''&& centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 // 2024-09-15: 25 entries, and special keyes
 var privateDnsZoneName =  {

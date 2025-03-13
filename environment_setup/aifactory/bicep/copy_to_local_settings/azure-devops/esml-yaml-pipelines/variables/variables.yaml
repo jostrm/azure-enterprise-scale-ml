@@ -3,7 +3,7 @@ variables:
   admin_location: "swedencentral"
   admin_locationSuffix: "sdc"
   admin_semanticSearchTier: "disabled" # "free", "standard", "disabled" (For Sweden Central and regions not supporting SemanticSearch for AI Search, this needs to be "disabled")
-  admin_aifactoryPrefixRG: "acme-ai-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
+  admin_aifactoryPrefixRG: "acme-ai-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-","acme-"" "mrvel-1-", "contoso-", "ms-ai-"]
   admin_aifactorySuffixRG: "-001" #<-XXX> If you have mutliple AIFactory's in same regions: Examples: ["-001", "-002", "-003"]
   admin_bicep_input_keyvault_subscription: "" # seeding keuvyalt, subscription id
   admin_bicep_kv_fw: "kv-seeding-sdc-001" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
