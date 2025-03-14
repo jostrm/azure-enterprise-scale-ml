@@ -8,12 +8,16 @@ NC='\033[0m' # No Color
 
 
 # Static - EDIT THIS ONCE
-prefix="acme-1-" # Prefix for AI Factory common resource group, example: "acme-1-"
-region="sdc" #short name for location, e.g. eus2, weu
+prefix="mrvel-1-" # Prefix for AI Factory common resource group, example: "acme-1-"
+region="eus2" #short name for location, e.g. eus2, weu, sdc
 env="dev" # dev, test, prod
-rg_instance_suffix="-001" # -001 (The suffix on your AIFactory Common resource group and suffix on project resource group)
+rg_instance_suffix="-005" # -001 (The suffix on your AIFactory Common resource group and suffix on project resource group)
 resource_suffix="-001" # -001 (The suffix on your resources inside of project resource group, such as Azure AI Foundry, in your project resource group)
-salt="abcde" # 5 chars. replace with your own salt, see keyvault name or aiservices name as example. Should be 5 characters 'asdfg' in the resource name
+
+rg_instance_suffix="-004" # -001 (The suffix on your AIFactory Common resource group and suffix on project resource group)
+salt="abtkd" # 5 chars. replace with your own salt, see keyvault name or aiservices name as example. Should be 5 characters 'asdfg' in the resource name
+rg_instance_suffix="-005" # -001 (The suffix on your AIFactory Common resource group and suffix on project resource group)
+salt="avhwo"
 # Static - EDIT THIS ONCE, END 
 
 echo -e "${GREEN}NB! This is for AI Project type: GenAI-1  with Azure AI Foundry (GenAIOps) ${NC}"
@@ -22,6 +26,10 @@ echo -e "${GREEN}NB! This is for AI Project type: GenAI-1  with Azure AI Foundry
 read -p "Enter the old IP address (leave blank if you dont know): " old_ip
 read -p "Enter the new, your current IP (IPv4 - run 'curl ifcfg.me' in terminal) address: " new_ip
 read -p "Enter the project number (001,002,...): " project_number
+
+# Trim leading and trailing whitespace from new_ip
+new_ip="${new_ip#"${new_ip%%[![:space:]]*}"}"   # Remove leading whitespace
+new_ip="${new_ip%"${new_ip##*[![:space:]]}"}"   # Remove trailing whitespace
 
 # Construct resource names using static variables
 resource_suffix_kv="${resource_suffix#-0}" # Remove -0 from the beginning
@@ -49,40 +57,6 @@ storage_account_2="${storage_account_2//-/}" # Remove all hyphens
 #az search service show --resource-group $rg --name $ai_search --query "networkRuleSet"
 #az search service update --resource-group $rg --name $ai_search --set networkRuleSet.bypass="AzureServices"
 #az search service update --resource-group $rg --name $ai_search --set properties.networkRuleSet.bypass="AzureServices"
-
-########### ADD new IP #########
-
-echo -e "${GREEN}Adding NEW ip${NC}"
-
-# 1) AI Services (Cognitive services)
-echo -e "${YELLOW} 1/7: AI Services: Adding new IP:"$new_ip"...${NC}"
-az cognitiveservices account network-rule add -g $rg --name $ai_services --ip-address "$new_ip"
-
-# 2) AI Search
-echo -e "${YELLOW}2/7: AI Search: Adding new IP: "$new_ip"...${NC}"
-#az search service update --resource-group $rg --name $ai_search --set properties.networkRuleSet.ipRules="[{'value':'$new_ip'}]"
-az search service update --resource-group $rg --name $ai_search --ip-rules $new_ip
-
-# 3) Azure AI Project: Update the Azure ML aiproject with the new IP rule
-echo -e "${YELLOW}3/7: AI Foundry Project: Adding new IP:"$new_ip"...${NC}"
-az ml workspace update --name $ai_project --resource-group $rg --network-acls "$new_ip"
-# Other commands (if needed)
-#az ml workspace update --resource-group $rg --name $aiproject --file 001-aml.yml
-
-# 4) Azure AI Hub: Update the Azure ML ai_hub with the new IP rule
-echo -e "${YELLOW}4/7: AI Foundry Hub: Adding new IP: "$new_ip"...${NC}"
-az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$new_ip"
-
-# 5) Keyvault
-#az keyvault update --name $keyvault --resource-group $rg --set properties.networkAcls.ipRules="[{'value':'$new_ip'}]"
-echo -e "${YELLOW}5/7: Azure Keyvault: Adding new IP: "$new_ip"...${NC}"
-az keyvault network-rule add --resource-group $rg --name $keyvault --ip-address "$new_ip"
-
-# 6,7) Storage account 1,2
-echo -e "${YELLOW}6/7: Azure Storage Account 1: Adding new IP: "$new_ip"...${NC}"
-az storage account network-rule add --resource-group $rg  --account-name $storage_account_1 --ip-address "$new_ip"
-echo -e "${YELLOW}7/7: Azure Storage Account 2: Adding new IP: "$new_ip"...${NC}"
-az storage account network-rule add --resource-group $rg  --account-name $storage_account_2 --ip-address "$new_ip"
 
 ########### REMOVE OLD IP's #########
 
@@ -122,6 +96,42 @@ if [ -n "$old_ip" ]; then
     #Error: Couldn't find 'networkAcls' in 'networkAcls'. Available options: []
 
 fi
+
+########### ADD new IP #########
+
+echo -e "${GREEN}Adding NEW ip${NC}"
+
+# 1) AI Services (Cognitive services)
+echo -e "${YELLOW} 1/7: AI Services: Adding new IP:"$new_ip"...${NC}"
+az cognitiveservices account network-rule add -g $rg --name $ai_services --ip-address "$new_ip"
+
+# 2) AI Search
+echo -e "${YELLOW}2/7: AI Search: Adding new IP: "$new_ip"...${NC}"
+#az search service update --resource-group $rg --name $ai_search --set properties.networkRuleSet.ipRules="[{'value':'$new_ip'}]"
+az search service update --resource-group $rg --name $ai_search --ip-rules $new_ip
+
+# 3) Azure AI Project: Update the Azure ML aiproject with the new IP rule
+echo -e "${YELLOW}3/7: AI Foundry Project: Adding new IP:"$new_ip"...${NC}"
+az ml workspace update --name $ai_project --resource-group $rg --network-acls "$new_ip"
+
+# 4) Azure AI Hub: Update the Azure ML ai_hub with the new IP rule
+echo -e "${YELLOW}4/7: AI Foundry Hub: Adding new IP: "$new_ip"...${NC}"
+az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$new_ip"
+
+# 5) Keyvault
+#az keyvault update --name $keyvault --resource-group $rg --set properties.networkAcls.ipRules="[{'value':'$new_ip'}]"
+echo -e "${YELLOW}5/7: Azure Keyvault: Adding new IP: "$new_ip"...${NC}"
+az keyvault network-rule add --resource-group $rg --name $keyvault --ip-address "$new_ip"
+
+# 6,7) Storage account 1,2
+echo -e "${YELLOW}6/7: Azure Storage Account 1: Adding new IP: "$new_ip"...${NC}"
+az storage account network-rule add --resource-group $rg  --account-name $storage_account_1 --ip-address "$new_ip"
+echo -e "${YELLOW}7/7: Azure Storage Account 2: Adding new IP: "$new_ip"...${NC}"
+az storage account network-rule add --resource-group $rg  --account-name $storage_account_2 --ip-address "$new_ip"
+
+# AML enabler
+echo -e "${YELLOW}+ Enable Azure ML Private Link...${NC}"
+az ml workspace update --resource-group $rg --name $ai_project --file ./aifactory/esml-util/001-aml.yml
 
 echo -e "${GREEN}Finished! ${NC}"
 echo -e "${GREEN}Be sure to update your Excel sheet, with your new IP adress for future updates (new_ip, old_ip)${NC}"
