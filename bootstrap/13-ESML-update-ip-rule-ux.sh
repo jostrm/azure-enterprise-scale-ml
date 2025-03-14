@@ -54,7 +54,7 @@ az storage account network-rule add --resource-group $rg  --account-name $storag
 
 # Azure ML v2: Update the Azure ML v1 with the new IP rule
 echo -e "${YELLOW}3/6: Azure ML v2: Adding new IP:"$new_ip"...${NC}"
-az ml workspace update --name $aml2 --resource-group $rg --network-acls "$new_ip"
+#az ml workspace update --name $aml2 --resource-group $rg --network-acls "$new_ip"
 # Other commands (if needed)
 #az ml workspace update --resource-group $rg --name $aiproject --file 001-aml.yml
 
@@ -68,7 +68,7 @@ az storage account network-rule add --resource-group $rg  --account-name $storag
 
 # 4) Azure ML v1: Update the Azure ML v2 with the new IP rule
 echo -e "${YELLOW}6/6: Azure ML v1: Adding new IP: "$new_ip"...${NC}"
-az ml workspace update --name $aml --resource-group $rg --network-acls "$new_ip"
+#az ml workspace update --name $aml --resource-group $rg --network-acls "$new_ip"
 
 # EventHubs
 #echo -e "${YELLOW}2/7: EventHubs Namespace: Adding new IP: "$new_ip"...${NC}"

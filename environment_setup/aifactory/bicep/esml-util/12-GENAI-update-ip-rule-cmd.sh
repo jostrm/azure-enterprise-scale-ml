@@ -140,17 +140,15 @@ az search service update --resource-group $rg --name $ai_search --ip-rules $new_
 # 3) Azure AI Project: Update the Azure ML aiproject with the new IP rule
 echo -e "${YELLOW}3/7: AI Foundry Project: Adding new IP:"$new_ip"...${NC}"
 az ml workspace update --name $ai_project --resource-group $rg --network-acls "$new_ip"
-# Other commands (if needed)
-#az ml workspace update --resource-group $rg --name $aiproject --file 001-aml.yml
 
 # 4) Azure AI Hub: Update the Azure ML ai_hub with the new IP rule
 echo -e "${YELLOW}4/7: AI Foundry Hub: Adding new IP: "$new_ip"...${NC}"
-az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$new_ip"
+#az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$new_ip"
 
 # 5) Keyvault
 #az keyvault update --name $keyvault --resource-group $rg --set properties.networkAcls.ipRules="[{'value':'$new_ip'}]"
 echo -e "${YELLOW}5/7: Azure Keyvault: Adding new IP: "$new_ip"...${NC}"
-az keyvault network-rule add --resource-group $rg --name $keyvault --ip-address "$new_ip"
+#az keyvault network-rule add --resource-group $rg --name $keyvault --ip-address "$new_ip"
 
 # 6,7) Storage account 1,2
 echo -e "${YELLOW}6/7: Azure Storage Account 1: Adding new IP: "$new_ip"...${NC}"

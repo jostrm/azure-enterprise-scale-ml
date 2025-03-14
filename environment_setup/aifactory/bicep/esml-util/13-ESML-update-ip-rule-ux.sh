@@ -53,8 +53,8 @@ echo -e "${YELLOW}2/6: Azure Storage Account (for AML v2): Adding new IP: "$new_
 az storage account network-rule add --resource-group $rg  --account-name $storage_account_2 --ip-address "$new_ip"
 
 # Azure ML v2: Update the Azure ML v1 with the new IP rule
-echo -e "${YELLOW}3/6: Azure ML v2: Adding new IP:"$new_ip"...${NC}"
-az ml workspace update --name $aml2 --resource-group $rg --network-acls "$new_ip"
+echo -e "${YELLOW}-3/6: Azure ML v2: Adding new IP:"$new_ip"...${NC}"
+#az ml workspace update --name $aml2 --resource-group $rg --network-acls "$new_ip"
 # Other commands (if needed)
 #az ml workspace update --resource-group $rg --name $aiproject --file 001-aml.yml
 
@@ -67,8 +67,8 @@ echo -e "${YELLOW}5/6: Azure Storage Account 2: Adding new IP: "$new_ip"...${NC}
 az storage account network-rule add --resource-group $rg  --account-name $storage_account_1 --ip-address "$new_ip"
 
 # 4) Azure ML v1: Update the Azure ML v2 with the new IP rule
-echo -e "${YELLOW}6/6: Azure ML v1: Adding new IP: "$new_ip"...${NC}"
-az ml workspace update --name $aml --resource-group $rg --network-acls "$new_ip"
+echo -e "${YELLOW}-6/6: Azure ML v1: Adding new IP: "$new_ip"...${NC}"
+#az ml workspace update --name $aml --resource-group $rg --network-acls "$new_ip"
 
 # EventHubs
 #echo -e "${YELLOW}2/7: EventHubs Namespace: Adding new IP: "$new_ip"...${NC}"
@@ -98,13 +98,13 @@ if [ -n "$old_ip" ]; then
 
     # 1) Azure AI Project: Update the Azure ML aiproject with the new IP rule
     #az ml workspace update --name $aml2 --resource-group $rg --network-acls "$old_ip"
-    echo -e "${YELLOW}5/6: Azure ML v1: REMOVING old IP:"$old_ip"...${NC}"
+    echo -e "${YELLOW}-5/6: Azure ML v1: REMOVING old IP:"$old_ip"...${NC}"
     #az ml workspace update --name $aml2 --resource-group $rg --remove networkAcls.ipRules "[{'value':'$old_ip'}]"
     #Error: Couldn't find 'networkAcls' in 'networkAcls'. Available options: []
 
     # 2) Azure AI Hub: Update the Azure ML aml with the new IP rule
     #az ml workspace update --name $aml --resource-group $rg --network-acls "$old_ip"
-    echo -e "${YELLOW}6/6: Azure ML v2: REMOVING old IP:"$old_ip"...${NC}"
+    echo -e "${YELLOW}-6/6: Azure ML v2: REMOVING old IP:"$old_ip"...${NC}"
     #az ml workspace update --name $aml --resource-group $rg --remove networkAcls.ipRules "[{'value':'$old_ip'}]"
     #Error: Couldn't find 'networkAcls' in 'networkAcls'. Available options: []
 

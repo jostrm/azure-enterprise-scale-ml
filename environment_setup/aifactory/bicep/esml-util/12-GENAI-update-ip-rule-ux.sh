@@ -64,14 +64,12 @@ echo -e "${YELLOW}2/7: AI Search: Adding new IP: "$new_ip"...${NC}"
 az search service update --resource-group $rg --name $ai_search --ip-rules $new_ip
 
 # 3) Azure AI Project: Update the Azure ML aiproject with the new IP rule
-echo -e "${YELLOW}3/7: AI Foundry Project: Adding new IP:"$new_ip"...${NC}"
-az ml workspace update --name $ai_project --resource-group $rg --network-acls "$new_ip"
-# Other commands (if needed)
-#az ml workspace update --resource-group $rg --name $aiproject --file 001-aml.yml
+echo -e "${YELLOW}-3/7: AI Foundry Project: Adding new IP:"$new_ip"...${NC}"
+#az ml workspace update --name $ai_project --resource-group $rg --network-acls "$new_ip"
 
 # 4) Azure AI Hub: Update the Azure ML ai_hub with the new IP rule
-echo -e "${YELLOW}4/7: AI Foundry Hub: Adding new IP: "$new_ip"...${NC}"
-az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$new_ip"
+echo -e "${YELLOW}-4/7: AI Foundry Hub: Adding new IP: "$new_ip"...${NC}"
+#az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$new_ip"
 
 # 5) Keyvault
 #az keyvault update --name $keyvault --resource-group $rg --set properties.networkAcls.ipRules="[{'value':'$new_ip'}]"
@@ -105,19 +103,19 @@ if [ -n "$old_ip" ]; then
     az storage account network-rule remove --resource-group $rg  --account-name $storage_account_2 --ip-address $old_ip
 
     # Search
-    echo -e "${YELLOW}5/7: Azure AI Search: REMOVING old IP:"$old_ip"...${NC}"
+    echo -e "${YELLOW}-5/7: Azure AI Search: REMOVING old IP:"$old_ip"...${NC}"
     #az search service update --resource-group $rg --name $ai_search --remove ipRules $old_ip
     #Error: Couldn't find 'ipRules' in ''
 
     # 1) Azure AI Project: Update the Azure ML aiproject with the new IP rule
     #az ml workspace update --name $ai_project --resource-group $rg --network-acls "$old_ip"
-    echo -e "${YELLOW}6/7: Azure AI Foundry Project: REMOVING old IP:"$old_ip"...${NC}"
+    echo -e "${YELLOW}-6/7: Azure AI Foundry Project: REMOVING old IP:"$old_ip"...${NC}"
     #az ml workspace update --name $ai_project --resource-group $rg --remove networkAcls.ipRules "[{'value':'$old_ip'}]"
     #Error: Couldn't find 'networkAcls' in 'networkAcls'. Available options: []
 
     # 2) Azure AI Hub: Update the Azure ML ai_hub with the new IP rule
     #az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$old_ip"
-    echo -e "${YELLOW}7/7: Azure AI Foundry Hub: REMOVING old IP:"$old_ip"...${NC}"
+    echo -e "${YELLOW}-7/7: Azure AI Foundry Hub: REMOVING old IP:"$old_ip"...${NC}"
     #az ml workspace update --name $ai_hub --resource-group $rg --remove networkAcls.ipRules "[{'value':'$old_ip'}]"
     #Error: Couldn't find 'networkAcls' in 'networkAcls'. Available options: []
 
