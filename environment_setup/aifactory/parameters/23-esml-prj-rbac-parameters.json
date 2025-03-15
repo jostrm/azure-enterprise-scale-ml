@@ -2,18 +2,6 @@
     "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "projectOwnerId": {
-            "value": "TODO_ObjectId_For_AD_User"
-        },
-        "projectOwnerEmail": {
-            "value": "batman@gothamcity.dc_"
-        },
-        "technicalContactId": {
-            "value": "TODO_ObjectId_For_AD_User"
-        },
-        "technicalContactEmail": {
-            "value": "batman@gothamcity.dc_"
-        },
         "projectServicePrincipleOID_SeedingKeyvaultName": {
             "value": "esml-project001-sp-oid"
         },

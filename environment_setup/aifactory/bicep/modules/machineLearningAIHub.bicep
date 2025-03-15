@@ -169,7 +169,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     enableDataIsolation: enablePublicGenAIAccess?false:true // tomten
 
     // network settings
-    publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' 
+    publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'

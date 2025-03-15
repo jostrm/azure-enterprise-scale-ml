@@ -60,14 +60,14 @@ param tenantId string
 param vnetNameBase string
 @description('Deployment location')
 param location string
-@description('Specifies wether or not the virtual machine should have a public IP address or not')
+@description('Specifies if private VM  - access via Bastion or Azure VPN')
 param enableAdminVM bool = false
+@description('true if Bastion Host should be created')
+param addBastionHost bool
 @description('Common default subnet')
 param common_subnet_name string
 @description('(Required) true if Hybrid benefits for Windows server VMs, else FALSE for Pay-as-you-go')
 param hybridBenefit bool
-@description('(Required) true if Bastion Host should be created')
-param addBastionHost bool
 @description('Specifies project owner email and will be used for tagging and RBAC')
 param technicalContactEmail string=''
 @description('Specifies project owner objectId and will be used for tagging and RBAC')

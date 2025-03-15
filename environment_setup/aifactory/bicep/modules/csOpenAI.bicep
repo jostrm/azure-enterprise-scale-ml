@@ -6,10 +6,6 @@ param tags object
 param location string
 @description('Specifies the SKU, where default is standard')
 param sku string = 'S0'
-//@description('Specifies the VNET id that will be associated with the private endpoint')
-//param vnetId string
-//@description('ResourceID of subnet for private endpoints')
-//param subnetId string
 @description('Specifies the VNET name that will be associated with the private endpoint')
 param vnetName string
 @description('Specifies the subnet name that will be associated with the private endpoint')
@@ -53,11 +49,6 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
 //var subnetRef = subnet.id
 
 // TODO: in ADO pipeline: https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#grant-access-to-trusted-azure-services-for-azure-openai
-//bypass:'AzureServices'
-//resource cognitive 'Microsoft.CognitiveServices/accounts@2023-10-01' = {
-//resource cognitive 'Microsoft.CognitiveServices/accounts@2022-03-01' = {
-//resource cognitive 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
-//resource cognitive 'Microsoft.CognitiveServices/accounts@2024-06-01-preview' = {
 resource cognitiveOpenAI 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: cognitiveName
   location: location
@@ -81,13 +72,14 @@ resource cognitiveOpenAI 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
-        ignoreMissingVnetServiceEndpoint: true // tomten false to true
+        ignoreMissingVnetServiceEndpoint: true
       }]
       ipRules: ipRules
     }
   }
 }
 
+/*
 resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
   name: 'gpt-4'
   parent: cognitiveOpenAI
@@ -106,6 +98,7 @@ resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-
   }
 
 }
+*/
 
 resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
   name: 'text-embedding-ada-002'
@@ -124,7 +117,7 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
   dependsOn: [
-    gpt4modelOpenAI
+    cognitiveOpenAI
   ]
 }
 
