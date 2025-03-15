@@ -67,7 +67,7 @@ resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAss
 
 @description('Role Assignment for Azure Storage: StorageBlobDataContributor for Azure OpenAI MI')
 resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, '${openAIServicePrincipal}+013')
+  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -78,7 +78,7 @@ resource roleAssignmentStorageBlobDataContributor 'Microsoft.Authorization/roleA
 }
 @description('Role Assignment for Azure Storage 2: StorageBlobDataContributor for Azure OpenAI MI')
 resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, '${openAIServicePrincipal}+014')
+  name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -90,7 +90,7 @@ resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/role
 
 @description('Role Assignment for Azure Storage: File Data Privileged Contributor for Azure OpenAI MI')
 resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId, '${openAIServicePrincipal}+01b')
+  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
@@ -101,7 +101,7 @@ resource roleAssignmentStorageFileDataPrivilegedContributor 'Microsoft.Authoriza
 }
 @description('Role Assignment for Azure Storage 2: File Data Privileged Contributor for Azure OpenAI MI')
 resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, '${openAIServicePrincipal}+019a')
+  name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
