@@ -834,6 +834,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
     restore:restore
     location: location
     vnetResourceGroupName: vnetResourceGroupName
+    commonResourceGroupName: commonResourceGroup
     sku: csOpenAISKU
     vnetName: vnetNameFull
     subnetName: genaiSubnetName
@@ -873,6 +874,7 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(serviceSettingDe
   ]
 }
 
+/*
 module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = if(serviceSettingDeployAzureOpenAI==true && centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'diagOpenAI${deploymentProjSpecificUniqueSuffix}'
@@ -884,11 +886,10 @@ module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = i
     projectResourceGroup
   ]
 }
+*/
 
 // LogAnalytics
 var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-//resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-//resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
 
 resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: laName

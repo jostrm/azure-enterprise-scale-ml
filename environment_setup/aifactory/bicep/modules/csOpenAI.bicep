@@ -30,12 +30,14 @@ param modelGPT4Version string = '1106-Preview' // If your region doesn't support
 param laWorkspaceName string
 param keyvaultName string
 param vnetResourceGroupName string
+param commonResourceGroupName string
 param aiSearchPrincipalId string
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: laWorkspaceName
+  scope: resourceGroup(commonResourceGroupName)
 }
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
@@ -174,11 +176,15 @@ resource pendCognitiveServicesOpenAI 'Microsoft.Network/privateEndpoints@2023-04
   ]
 }
 
+/*
 resource keyVaultOpenAI 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
   scope: resourceGroup()
 }
+*/
 
+// Failed to list key. disableLocalAuth is set to be true
+/*
 @description('Key Vault: Azure OpenAI K in vault as S')
 resource kValueOpenAI 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVaultOpenAI
@@ -191,6 +197,8 @@ resource kValueOpenAI 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
     }
   }
 }
+
+*/
 
 // Search -> OpenAI
 var cognitiveServicesOpenAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
