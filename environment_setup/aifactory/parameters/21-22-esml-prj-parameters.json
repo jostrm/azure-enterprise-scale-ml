@@ -11,6 +11,9 @@
         "AMLStudioUIPrivate":{
             "value": true
         },
+        "serviceSettingDeployProjectVM": {
+            "value": false
+        },
         "projecttags": {
             "value": {
                 "Application Name": "Enterprise AI Factory on Azure",

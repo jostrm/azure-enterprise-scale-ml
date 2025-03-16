@@ -14,12 +14,6 @@
         "addBastionHost":{
             "value": true
         },
-        "enableAdminVM": {
-            "value": true
-        },
-        "serviceSettingDeployProjectVM": {
-            "value": true
-        },
         "lakeContainerName":{
 			"value": "lake3"
 		},
