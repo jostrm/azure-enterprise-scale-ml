@@ -20,7 +20,7 @@ env:
   admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"  # <company>-<aifactoryname> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   cidr_range: "${{ vars.AIFACTORY_CIDR_XX }}" # XX = "17" 
   aiResourceSuffix: "-001" # Suffix on resources within the resource group: -001, -002
-  admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
+  admin_keyvaultSoftDeleteDays: "${{ vars.KEYVAULT_SOFT_DELETE}}" # 90 days is default. 0 is disabled. 90 days is recommended.
   use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
   # CORE TEAM MEMBERS specific
