@@ -27,6 +27,7 @@ param technicalAdminsObjectID string = 'null'
 param technicalAdminsEmail string = 'null'
 param commonResourceGroup_param string = ''
 param useAdGroups bool = false
+param enableAdminVM bool = false
 
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
