@@ -27,6 +27,7 @@ env:
     admin_prjResourceSuffix: "-001"
     admin_keyvaultSoftDeleteDays:  "${{ vars.KEYVAULT_SOFT_DELETE}}" # 90 days is default. 0 is disabled. 90 days is recommended.
     use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
+    tenantId: "${{ secrets.TENANT_ID }}" # "12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
     # ADMIN specific START (only configure once)
     admin_ip_fw: "192.x.x.x" # Do not touch. leave as-is. This is just a placeholder a script will populate later.
@@ -345,7 +346,8 @@ jobs:
             --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
             --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
             --parameters useAdGroups="${{ env.use_groups }}" \
-            --parameters useCommonACR="${{ env.useCommonACR }}"
+            --parameters useCommonACR="${{ env.useCommonACR }}" \
+            --parameters tenantId="${{ env.tenantId }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
         uses: azure/cli@v2

@@ -22,7 +22,8 @@ env:
   aiResourceSuffix: "-001" # Suffix on resources within the resource group: -001, -002
   admin_keyvaultSoftDeleteDays: "${{ vars.KEYVAULT_SOFT_DELETE}}" # 90 days is default. 0 is disabled. 90 days is recommended.
   use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
-
+  tenantId: "${{ secrets.TENANT_ID }}" # "12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  
   # CORE TEAM MEMBERS specific
   technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}" # "192.x.x.x"
   technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"  # comma separated list with no spaces: "012345ab-xxxx-xxxx-xxxx-xxxxxxxxxxxx,1234f-af-234-adfssdf,12312-aef23431"
@@ -115,5 +116,6 @@ jobs:
             --parameters inputKeyvaultSubscription="${{ env.admin_input_keyvault_subscription }}" \
             --parameters inputKeyvaultResourcegroup="${{ env.admin_input_keyvault_rg }}" \
             --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
-            --parameters inputKeyvault="${{ env.admin_input_keyvault_name }}"
+            --parameters inputKeyvault="${{ env.admin_input_keyvault_name }}" \
+            --parameters tenantId="${{ env.tenantId }}"
           azcliversion: latest

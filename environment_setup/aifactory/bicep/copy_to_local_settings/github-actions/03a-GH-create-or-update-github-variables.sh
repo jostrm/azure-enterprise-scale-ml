@@ -124,6 +124,8 @@ for env in "${environments[@]}"; do
     # Project Specifics (1st project bootstrap): 
     create_or_update_secret $env "PROJECT_MEMBERS" "$PROJECT_MEMBERS"
     create_or_update_secret $env "PROJECT_MEMBERS_IP_ADDRESS" "$PROJECT_MEMBERS_IP_ADDRESS"
+
+    create_or_update_secret $env "TENANT_ID" "$TENANT_ID"
 done
 
 # DEV variables
