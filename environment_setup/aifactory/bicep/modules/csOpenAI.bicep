@@ -201,6 +201,7 @@ resource kValueOpenAI 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
 */
 
 // Search -> OpenAI
+/*
 var cognitiveServicesOpenAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
 resource openAIAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(cognitiveOpenAI.id, cognitiveServicesOpenAIContributorRoleId, aiSearchPrincipalId)  
@@ -212,6 +213,7 @@ resource openAIAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authoriza
   }
   scope: cognitiveOpenAI
 }
+  */
 
 // Users -> OpenAI
 
