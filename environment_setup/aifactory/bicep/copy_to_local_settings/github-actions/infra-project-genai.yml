@@ -25,7 +25,7 @@ env:
     admin_hybridBenefit: false # Enable Hybrid Benefits if provisioning VM access via Bastion
     admin_commonResourceSuffix: "-001"
     admin_prjResourceSuffix: "-001"
-    admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
+    admin_keyvaultSoftDeleteDays: "${{ vars.KEYVAULT_SOFT_DELETE}}"  # 90 days is default. 0 is disabled. 90 days is recommended.
     use_groups: "${{ vars.USE_AD_GROUPS }}" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
     # ADMIN specific START (only configure once)
