@@ -61,6 +61,8 @@ Stanalone mode, meaning the AIFactory has its own "hub" with own private DNS zon
 Private DNS zones - Compute, Storage, WebApp, CosmosDB: 
 There is 25 mandatory, to support ESML and GENAI-1 project types in the AIFactory.
 
+There is an automation script in the AI Factory accelerator to [create these Private DNS zones](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1)
+
 |Counter |Service | Project type |Private DNS Zone Name | Public DNS zone forwarders (to add in on-prem DNS) | Subresource | Description|
 |---|---|---|---|---|---|---|
 1|Azure Datafactory |ESML|privatelink.adf.azure.com |adf.azure.com | dataFactory |-|
@@ -97,6 +99,7 @@ Note: Default behaviour of Microsoft Private DNS, they are registered in global.
 
 A) If you run the AIFactory in isolated mode (for DEMO purposes) which is default, they are created automatically via BICEP. <br>
 B) If you run the AIFactory in production mode, peered to your HUB, which is the recommended way, you need to ensure/create the Private DNS zones manually, e.g. no automation in ESML AIFactory yet).
+- Script: [Create these Private DNS zones](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1)
 
 ## AIFactory vNets in its spokes: Dev, Test, Prod - address space
 
