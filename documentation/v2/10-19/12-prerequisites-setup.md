@@ -30,9 +30,11 @@
                 - Core team: Github workflows, needs Service principle information.
         - **Object ID's** and **EMAIL-addressess**, for all end-users to be onboarded to the AI Factory project
             - Format: Comma-separated list
-        - **IP-addresses** for all end-users to be onboarded to the AI Factory project
+        - **IP-addresses** for all end-users to be onboarded to the AI Factory project. 
             - Format: Comma-separated list
-        - **Object ID** for the global Azure Machine Learning application
+            - Note: Only Needed for AI Factory standalone mode. And only if not using VPN in Standalone mode.
+        - **Object ID** for the global Azure Machine Learning Enterprise application, called `Azure Machine Learning` in Entra ID
+        - **Object ID** for the global `AzureDatabricks` Enterprise Application (Same manouver like finding the Azure Machine Learning), in Entra ID
 - **Verify E2E** 
     - Step 6) Verify before running any pipelines, that all configuration and artifacts exists, such as Azure Resource providers.
 
@@ -122,7 +124,7 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
         - Format: Comma-separated list
     - **IP-addresses** for all end-users to be onboarded to the AI Factory project
         - Format: Comma-separated list
-    - **Object ID** for the global Azure Machine Learning application. 
+    - **Object ID** for the global Azure Machine Learning application. (same for `AzureDatabricks`)
         - 1) Go to: Enterprise applications
         - 2) Filter on Microsoft applications
         - 3) Search "Azure Machine Learning"

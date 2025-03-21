@@ -41,7 +41,7 @@ OUTPUT: The file structure should now look something like below:
 
 5) Authenticate to  Azure and Github
 You need to login via `Azure CLI` and `Github CLI`, but recommendation is to also test login via `Powershell`. 
-- NB! Recommendation is to use a service principal when logging in. Not your user id.
+- NB! Recommendation is to use a service principal when logging in, such as `esml-commmon-bicep-sp`, see your ``. You may also use your user id (for Github this is the usual case).
 - The Service Principal should have OWNER permission to all 3 subscriptions (Dev, Test, Prod), such as the `esml-common-bicep-sp` service principle.
 - Test the login for all 3 subscriptions using `az cli` and `powershell` as below: 
 
