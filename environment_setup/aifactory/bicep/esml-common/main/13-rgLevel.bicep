@@ -109,6 +109,7 @@ param subnetProjDatabricksPrivate string = ''
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
+
 var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
@@ -826,7 +827,7 @@ module privateDnsKeyVaultCmn2 '../../modules/privateDns.bicep' = if(centralDnsZo
   ]
 }
 
-module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privDnsZoneKVCmnAdmin${uniqueInAIFenv}'
   params: {
@@ -851,7 +852,7 @@ module privateDnsKeyVaultAdmin2 '../../modules/privateDns.bicep' = if(centralDns
   ]
 }
 
-module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false ){
+module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privDnsZoneADFCmn${uniqueInAIFenv}'
   params: {
