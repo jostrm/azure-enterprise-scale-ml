@@ -45,6 +45,16 @@ param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param useCommonACR bool = true
+param BYO_subnets bool = false
+param network_env string =''
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
 // To get TAGS from file: 10-esml-globals-1.json

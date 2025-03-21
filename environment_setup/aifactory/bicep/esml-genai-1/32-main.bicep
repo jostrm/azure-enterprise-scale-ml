@@ -164,6 +164,7 @@ param aksDockerBridgeCidr string = '172.17.0.1/16'
 @description('Paramenter file dynamicNetworkParams.json contains this. Written after dynamic IP calculation is done')
 param genaiSubnetId string
 
+
 // Seeding Keyvault & Bastion access
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
 param inputKeyvault string
@@ -284,9 +285,18 @@ param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
+param BYO_subnets bool = false
+param network_env string =''
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
 
 // Parameters to variables
-var vnetNameFull = vnetNameFull_param != '' ? vnetNameFull_param : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetNameFull = vnetNameFull_param != '' ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
 // ESML convention (that you may override)
 var projectName = 'prj${projectNumber}'
@@ -294,14 +304,20 @@ var cmnName = 'cmn'
 var genaiName = 'genai'
 var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
-var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroup
+var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
 var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
+
+// BYOSubnet: common_subnet_name,common_subnet_scoring_name,common_pbi_subnet_name,common_bastion_subnet_name
+var common_subnet_name_local = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
 // Gen genaiSubnetName from genaiSubnetId which is resourceID
 var segments = split(genaiSubnetId, '/')
 var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName //common_subnet_name
+var defaultSubnet = genaiSubnetName 
+
+var segmentsAKS = split(aksSubnetId, '/')
+var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
@@ -756,7 +772,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -804,7 +820,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      //'${vnetId}/subnets/snt-${projectName}-aks'
+      //'${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -847,7 +863,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
     disableLocalAuth:disableLocalAuth
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -1014,7 +1030,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     ]
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     corsRules: [
       {
@@ -1109,7 +1125,7 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
     containerRegistryName: acrCommonNameSafe
     skuName: 'Premium'
     vnetId: vnetId
-    subnetName: common_subnet_name // snet-esml-cmn-001
+    subnetName: common_subnet_name_local // snet-esml-cmn-001
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: acrCommon.tags
     location:acrCommon.location
@@ -1151,7 +1167,7 @@ module sacc '../modules/storageAccount.bicep' = {
     ]
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -1211,7 +1227,7 @@ module kv1 '../modules/keyVault.bicep' = {
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
@@ -1412,7 +1428,6 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 
 // ------------------------------ SERVICES (Azure Machine Learning)  ------------------------------//
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
 param aks_dev_defaults array = [

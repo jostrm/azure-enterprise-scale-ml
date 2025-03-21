@@ -37,6 +37,16 @@ param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param useCommonACR bool = true
+param BYO_subnets bool = false
+param network_env string =''
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+
 // To get TAGS from file: 10-esml-globals-1.json
 param tags object
 param aifactorySuffixRG string = '' // dummy

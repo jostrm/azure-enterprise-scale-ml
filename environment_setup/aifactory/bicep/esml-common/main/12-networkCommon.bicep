@@ -47,6 +47,15 @@ param commonResourceGroup_param string = ''
 param datalakeName_param string = ''
 param kvNameFromCOMMON_param string = ''
 param useCommonACR bool = true
+param BYO_subnets bool = false
+param network_env string =''
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
@@ -56,7 +65,7 @@ var common_bastion_subnet_cidr_v = replace(common_bastion_subnet_cidr,'XX',cidr_
 var common_subnet_scoring_cidr_v = replace(common_subnet_scoring_cidr,'XX',cidr_range)
 var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // esml-common-weu-dev-002 // esml-common-weu-dev-002 // DEPENDENCIES - should exist
 
-var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroupName
+var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
 var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001 @
 
 resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {

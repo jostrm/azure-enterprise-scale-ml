@@ -18,7 +18,9 @@ param (
     [Parameter(Mandatory = $false, HelpMessage="Use service principal")][switch]$useServicePrincipal=$false,
     [Parameter(Mandatory = $false, HelpMessage="Specifies the object id for service principal")][string]$spObjId,
     [Parameter(Mandatory = $false, HelpMessage="Specifies the secret for service principal")][string]$spSecret,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5,
+    [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets, true or false string")][string]$BYO_subnets,
+    [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets. <network_env> dev-, test-, prod- or other env name")][string]$network_env
 )
 
 function Set-DeployedOnTag {
@@ -40,6 +42,28 @@ function Set-DeployedOnTag {
         }
         $InputObject
     }
+}
+
+function Get-AzureSubnetId {
+    param (
+        [string]$subscriptionId,
+        [string]$resourceGroupName,
+        [string]$vnetName,
+        [string]$subnetName,
+        [string]$projectNumber = "",
+        [string]$networkEnv = ""
+    )
+    
+    # Replace placeholders if network environment is specified
+    if ($networkEnv -ne "") {
+        $vnetName = $vnetName -replace '<network_env>', $networkEnv
+        $subnetName = $subnetName -replace '<network_env>', $networkEnv
+    }
+    if ($projectNumber -ne "") {
+        $subnetName = $subnetName -replace '<xxx>', $projectNumber
+    }
+    
+    return "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Network/virtualNetworks/$vnetName/subnets/$subnetName"
 }
 
 Import-Module -Name "./modules/pipelineFunctions.psm1"
@@ -104,43 +128,124 @@ $vnetResourceGroup = if ( $null -eq $vnetResourceGroup_param -or "" -eq $vnetRes
     "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix-$env$aifactorySuffix"
 }
 else {
-    $vnetResourceGroup_param
+    if ( $null -eq $network_env -or "" -eq $network_env )
+    {
+        $vnetResourceGroup_param
+    }
+    else { 
+        $vnetResourceGroup_param -replace '<network_env>', $network_env # Replace <network_env> placeholder with actual network_env value
+    }
+    
 }
 
 write-host "RESULT (vnetResourceGroup): $($vnetResourceGroup)"
 write-host "Deployment to lookup (earlier subnets): $($deploymentPrefix)SubnetDeplProj" # Deployment to lookup (earlier subnets): esml-p001-dev-swc-001SubnetDeplProj
 
-# project001dev
-
-# Get-AzResourceGroupDeployment : Resource group 'msftesml-common-swcdev-001' could not be found.
-# Deployment 'esml-p001-dev-swc-001SubnetDeplProj' could not be found.
-
-Write-host "The following parameters are added to template"
-
-$aksSubnetId=(Get-AzResourceGroupDeployment `
-  -ResourceGroupName "$vnetResourceGroup" `
-  -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
-
-if($projectTypeADO.Trim().ToLower() -eq "esml"){
-    $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$vnetResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
-
-    $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$vnetResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
-    
-    Write-host "dbxPubSubnetName: $dbxPubSubnetName"
-    Write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
-    Write-host "aksSubnetId: $aksSubnetId"
+# First, normalize the BYO_subnets parameter since it's a string
+$BYO_subnets_bool = if ($null -eq $BYO_subnets -or "" -eq $BYO_subnets -or $BYO_subnets -eq "false") {
+    $false
+} else {
+    $true
 }
 
-if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
-    $genaiSubnetId=(Get-AzResourceGroupDeployment `
+$aksSubnetId=""
+$dbxPubSubnetName=""
+$dbxPrivSubnetName=""
+$genaiSubnetId=""
+
+# Check if BYO_subnets is false
+if ($BYO_subnets_bool -eq $false) {
+
+    Write-host "The following parameters are added to template"
+
+    $aksSubnetId=(Get-AzResourceGroupDeployment `
     -ResourceGroupName "$vnetResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
-    Write-host "genaiSubnetId: $genaiSubnetId"
-    Write-host "aksSubnetId: $aksSubnetId"
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
+
+    if($projectTypeADO.Trim().ToLower() -eq "esml"){
+        $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
+        -ResourceGroupName "$vnetResourceGroup" `
+        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
+
+        $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
+        -ResourceGroupName "$vnetResourceGroup" `
+        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
+        
+        Write-host "dbxPubSubnetName: $dbxPubSubnetName"
+        Write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
+        Write-host "aksSubnetId: $aksSubnetId"
+    }
+
+    if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+        $genaiSubnetId=(Get-AzResourceGroupDeployment `
+        -ResourceGroupName "$vnetResourceGroup" `
+        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
+        Write-host "genaiSubnetId: $genaiSubnetId"
+        Write-host "aksSubnetId: $aksSubnetId"
+    }
+}else {
+    <# Action when all if and elseif conditions are false #>
+    # Replace placeholders in vnet and subnet names
+    $vnetName = $vnetNameFull_param -replace '<network_env>', $network_env
+
+    if ($null -ne $subnetCommon -and $subnetCommon -ne "") {
+        # Common subnets
+        $subnetCommonId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommon -networkEnv $network_env
+        $subnetCommonScoringId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonScoring -networkEnv $network_env
+        $subnetCommonPowerbiGwId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonPowerbiGw -networkEnv $network_env
+
+        Write-host "COMMON subnets: Just FYI - since these are specified directly in BICEP"
+        Write-host "subnetCommonId: $subnetCommonId"
+        Write-host "subnetCommonScoringId: $subnetCommonScoringId"
+        Write-host "subnetCommonPowerbiGwId: $subnetCommonPowerbiGwId"
+    }
+
+    if($projectTypeADO.Trim().ToLower() -eq "esml"){
+
+        if ($null -ne $subnetProjAKS -and $subnetProjAKS -ne "") {
+            # ESML project subnets
+            $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
+
+            $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
+            $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<xxx>', $projectNumber
+
+            # These can be full IDs if needed
+            $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
+            $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
+
+            Write-host "Databricks: Only the name is needed. Just FYI:"
+            Write-host "dbxPubSubnetId: $dbxPubSubnetId"
+            Write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
+
+            Write-host "AKS full resoiurce ID, and Databrick subnet names:"
+            Write-host "aksSubnetId: $aksSubnetId"
+            Write-host "dbxPubSubnet Name: $dbxPubSubnetName"
+            Write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
+        }
+
+    }
+    else {
+         Write-host "AIF-WARNING:BYOSubnets:subnetProjAKS is not set. This is needed for AKS deployment. Please check your parameters.json file."
+    }
+
+    if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+
+        if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
+            $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
+            Write-host "genaiSubnetId: $genaiSubnetId"
+
+            try {
+                $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
+                Write-host "aksSubnetId: $aksSubnetId"    
+            }
+            catch {
+                Write-host "AIF-WARNING: aksSubnetId could not be generated. Please check your parameters.json file."    
+            }
+        }
+    }
+    else {
+        Write-host "AIF-WARNING:BYOSubnets:subnetProjGenAI: subnetProjGenAI is not set. This is needed for GenAI deployment. Please check your parameters.json file."
+   }
 }
 
 $templateEsml = @"

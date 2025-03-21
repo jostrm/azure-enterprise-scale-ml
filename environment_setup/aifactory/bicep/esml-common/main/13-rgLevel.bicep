@@ -96,11 +96,19 @@ param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
 param enablePurgeProtection bool = true
 param keyvaultSoftDeleteDays int = 90
-//param useAdGroups bool = false
+param BYO_subnets bool = false
+param network_env string =''
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
-var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_param : commonResourceGroupName
+var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
 var privDnsResourceGroupName = privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub ? privDnsSubscription_param : subscriptionIdDevTestProd
 

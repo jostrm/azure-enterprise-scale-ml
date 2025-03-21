@@ -164,13 +164,21 @@ param aml_cluster_test_prod_nodes_override int = -1
 // ENABLE/DISABLE: Optional exclusions in deployment
 @description('Azure ML workspace can only be called once from BICEP, otherwise COMPUTE name will give error 2nd time. ')
 param enableAML bool = true
-
 @description('if Eventhubs, Streaming use cases to be enabled and provisioned by default, or added.')
 param enableEventhubs bool = true
 
-// ENABLE/DISABLE end
+// BYOsubnet
+param BYO_subnets bool = false
+param network_env string =''
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
 
-var vnetNameFull = vnetNameFull_param != '' ? vnetNameFull_param : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetNameFull = vnetNameFull_param != '' ?  replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
 @description('Meta. Needed to calculate subnet: subnetCalc and genDynamicNetworkParamFile')
 param vnetResourceGroupBase string
@@ -185,6 +193,12 @@ var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var defaultSubnet = common_subnet_name //'snet-esmlcmn-001'
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
+
+// BYOSubnet: common_subnet_name,common_subnet_scoring_name,common_pbi_subnet_name,common_bastion_subnet_name
+var common_subnet_name_local = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
+
+var segmentsAKS = split(aksSubnetId, '/')
+var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
 
 // ADO comma separated VARIABLE to ARRAY
 @description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')
@@ -622,7 +636,7 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
     containerRegistryName: acrCommonNameSafe
     skuName: 'Premium'
     vnetId: vnetId
-    subnetName: common_subnet_name // snet-esml-cmn-001
+    subnetName: common_subnet_name_local // snet-esml-cmn-001
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: acrCommon.tags
     location:acrCommon.location
@@ -660,7 +674,7 @@ module sacc '../modules/storageAccount.bicep' = {
     ]
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -740,7 +754,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
     ]
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -808,8 +822,8 @@ module kv1 '../modules/keyVault.bicep' = {
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
-      '${vnetId}/subnets/snt-${projectName}-dbxpub'
+      '${vnetId}/subnets/${aksSubnetName}'
+      '${vnetId}/subnets/${dbxPubSubnetName}'
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
@@ -846,8 +860,8 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     privateEndpointName: 'pend-${projectName}-kv2-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/snt-${projectName}-aks'
-      '${vnetId}/subnets/snt-${projectName}-dbxpub'
+      '${vnetId}/subnets/${aksSubnetName}'
+      '${vnetId}/subnets/${dbxPubSubnetName}'
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
@@ -975,7 +989,6 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
 
 var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var amlManagedName ='aml2-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-var aksSubnetName  = 'snt-prj${projectNumber}-aks'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
 param aks_dev_defaults array = [
