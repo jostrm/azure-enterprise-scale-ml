@@ -222,10 +222,10 @@ if ($BYO_subnets_bool -eq $false) {
             Write-host "dbxPubSubnet Name: $dbxPubSubnetName"
             Write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
         }
+        else {
+            Write-host "AIF-WARNING:BYOSubnets:subnetProjAKS is not set. This is needed for AKS deployment. Please check your parameters.json file."
+       }
 
-    }
-    else {
-         Write-host "AIF-WARNING:BYOSubnets:subnetProjAKS is not set. This is needed for AKS deployment. Please check your parameters.json file."
     }
 
     if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
