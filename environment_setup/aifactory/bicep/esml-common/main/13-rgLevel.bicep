@@ -125,8 +125,18 @@ var cmnName = 'cmn' // needs to be short. KV, ADF, LA, STORAGE needs to be globa
 var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}' //kv-cmn-prod-12345-004 (21/24)
 var kvNameCommonAdmin = 'kv-${cmnName}adm${env}-${uniqueInAIFenv}${commonResourceSuffix}' // kv-cmnadm-prod-12345-004 (24, 24max)
 var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
-var defaultSubnet = common_subnet_name
 var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
+
+// snets
+//param BYO_subnets bool = false
+//param network_env string =''
+//param subnetCommon string = ''
+//param subnetCommonScoring string = ''
+//param subnetCommonPowerbiGw string = ''
+
+var defaultSubnet = (BYO_subnets)?replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
+var commonSubnetScoring = (BYO_subnets)?replace(subnetCommonScoring, '<network_env>', network_env) : '${common_subnet_name}-scoring'
+var commonSubnetPowerBI = (BYO_subnets)?replace(subnetCommonPowerbiGw, '<network_env>', network_env) : 'snet-esml-cmn-pbi-001'
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
