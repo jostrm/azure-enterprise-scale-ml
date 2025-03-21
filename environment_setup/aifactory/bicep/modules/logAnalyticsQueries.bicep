@@ -177,6 +177,6 @@ resource wsSearch 'Microsoft.OperationalInsights/workspaces/savedSearches@2020-0
     displayName: item.displayName
     query: item.query
     version: 2
-    etag: '*'
+    //etag: '*'
   }  
 }]
