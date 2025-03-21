@@ -109,8 +109,8 @@ param subnetProjDatabricksPrivate string = ''
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
-var privDnsResourceGroupName = privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub ? privDnsSubscription_param : subscriptionIdDevTestProd
+var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = (privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 // DEPENDENCIES - should exist
 resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
@@ -136,7 +136,7 @@ var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${repla
 
 var defaultSubnet = (BYO_subnets)?replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 var commonSubnetScoring = (BYO_subnets)?replace(subnetCommonScoring, '<network_env>', network_env) : '${common_subnet_name}-scoring'
-var commonSubnetPowerBI = (BYO_subnets)?replace(subnetCommonPowerbiGw, '<network_env>', network_env) : 'snet-esml-cmn-pbi-001'
+var commonSubnetPowerBI = (BYO_subnets)?replace(subnetCommonPowerbiGw, '<network_env>', network_env) : 'snet-esml-cmn-pbi-001' // common_pbi_subnet_name
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
@@ -778,7 +778,7 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM 
   ]
 }
 
-module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==false) {
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privDnsZoneAndLinkLake${uniqueInAIFenv}'
   params: {
@@ -789,10 +789,33 @@ module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneBy
     createPrivateDnsZonesIfNotExists
   ]
 }
+module privateDnsDatalake2 '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==true) {
+  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
+  name: 'privDnsZoneAndLinkLake2${uniqueInAIFenv}'
+  params: {
+    dnsConfig: dataLake.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZonesIfNotExists
+  ]
+}
 
-module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==false){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privDnsZoneAndLinkKeyVaultCmn${uniqueInAIFenv}'
+  params: {
+    dnsConfig: kvCmn.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZonesIfNotExists
+    kvCmn
+  ]
+}
+module privateDnsKeyVaultCmn2 '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==true){
+  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
+  name: 'privDnsZoneAndLinkKeyVaultCmn2${uniqueInAIFenv}'
   params: {
     dnsConfig: kvCmn.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -815,8 +838,20 @@ module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZ
     kvAdmin
   ]
 }
+module privateDnsKeyVaultAdmin2 '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==true){
+  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
+  name: 'privDnsZoneKVCmnAdmin2${uniqueInAIFenv}'
+  params: {
+    dnsConfig: kvAdmin.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZonesIfNotExists
+    kvAdmin
+  ]
+}
 
-module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && sweden_central_adf_missing== false){
+module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false ){
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'privDnsZoneADFCmn${uniqueInAIFenv}'
   params: {
@@ -828,3 +863,16 @@ module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralD
     adf
   ]
 }
+module privateDnsAzureDatafactory2 '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false && BYO_subnets==true){
+  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
+  name: 'privDnsZoneADFCmn2${uniqueInAIFenv}'
+  params: {
+    dnsConfig: adf.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZonesIfNotExists
+    adf
+  ]
+}
+
