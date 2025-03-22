@@ -153,7 +153,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
 }
 
 resource pendSacc 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in groupIds: {
-  name: 'p-${obj.name}'
+  name: obj.name
   location: location
   tags: tags
   properties: {
@@ -161,10 +161,10 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in 
       id: subnetRef
       name: subnetName
     }
-    customNetworkInterfaceName: 'p-${obj.name}-nic'
+    //customNetworkInterfaceName: obj.name
     privateLinkServiceConnections: [
       {
-        name: 'p-${obj.name}'
+        //name: obj.name
         properties: {
           privateLinkServiceId: sacc.id
           groupIds: [
