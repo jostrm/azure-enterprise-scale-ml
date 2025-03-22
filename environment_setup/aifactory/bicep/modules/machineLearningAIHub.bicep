@@ -44,6 +44,7 @@ param locationSuffix string
 param resourceSuffix string
 param applicationInsightsName string
 param ipWhitelist_array array = []
+param enablePublicAccessWithPerimeter bool = false
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var privateDnsZoneName =  {
@@ -86,11 +87,13 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
+/*
 var azureMLMetricsWriter ='635dd51f-9968-44d3-b7fb-6d9a6bd613ae' // EP -> AI project
 resource amlMetricsWriterRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
   name: azureMLMetricsWriter
   scope: subscription()
 }
+*/
 
 @description('Built-in Role: [Cognitive Services OpenAI User](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#cognitive-services-openai-user)')
 resource cognitiveServicesOpenAiUserRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
@@ -161,14 +164,14 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     provisionNetworkNow: true
-    enableDataIsolation: enablePublicGenAIAccess?false:true // tomten
+    enableDataIsolation:enablePublicAccessWithPerimeter?false: enablePublicGenAIAccess?false:true
 
     // network settings
-    publicNetworkAccess:  enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    publicNetworkAccess:enablePublicAccessWithPerimeter?'Enabled': enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode: 'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      isolationMode:enablePublicAccessWithPerimeter? 'Disabled': 'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
@@ -201,7 +204,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     }
     ipAllowlist:ipWhitelist_array
     networkAcls: {
-      defaultAction:'Deny' // If not Deny, then ipRules will be ignored.
+      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny'  // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }

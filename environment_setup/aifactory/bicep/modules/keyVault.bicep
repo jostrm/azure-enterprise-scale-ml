@@ -31,6 +31,7 @@ param enablePurgeProtection bool = true
 
 @description('Location')
 param location string =  resourceGroup().location
+param enablePublicAccessWithPerimeter bool = false
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
@@ -46,11 +47,12 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = if(enablePurgeProtect
     enableSoftDelete: true
     softDeleteRetentionInDays:soft_delete_days // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
     enablePurgeProtection: enablePurgeProtection
-    publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
+    publicNetworkAccess: enablePublicAccessWithPerimeter?'Enabled':'Disabled'
+    //publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
     tenantId: tenantIdentity
     networkAcls: {
       bypass: 'AzureServices'
-      defaultAction: 'Deny'
+      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' 
       ipRules: ipRules
       virtualNetworkRules: [for rule in keyvaultNetworkPolicySubnets: {
         id: rule

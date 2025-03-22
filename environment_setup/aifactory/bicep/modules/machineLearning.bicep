@@ -97,6 +97,7 @@ param acrName string
 param acrRGName string
 param appInsightsName string
 param ipWhitelist_array array = []
+param enablePublicAccessWithPerimeter bool = false
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
@@ -153,15 +154,15 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     v1LegacyMode:false
 
     // network settings
-    publicNetworkAccess: 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    publicNetworkAccess: enablePublicAccessWithPerimeter? 'Enabled': 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
+    allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode: 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      isolationMode:enablePublicAccessWithPerimeter? 'Disabled': 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
     }
     ipAllowlist: ipWhitelist_array
     networkAcls: {
-      defaultAction:'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
+      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }

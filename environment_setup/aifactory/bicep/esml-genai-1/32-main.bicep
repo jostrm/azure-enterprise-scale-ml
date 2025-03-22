@@ -36,6 +36,7 @@ param modelVersionEmbeddingVersion string = '1'
 param restore bool = false
 param keyvaultEnablePurgeProtection bool = true // The property "enablePurgeProtection" cannot be set to false.
 param disableLocalAuth bool = true
+param enablePublicAccessWithPerimeter bool = true
 
 @allowed([
   'S0' // 'Free': Invalid SKU name
@@ -1035,6 +1036,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
@@ -1176,6 +1178,7 @@ module sacc '../modules/storageAccount.bicep' = {
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
@@ -1250,6 +1253,7 @@ module kv1 '../modules/keyVault.bicep' = {
     enablePurgeProtection:keyvaultEnablePurgeProtection
     soft_delete_days: keyvaultSoftDeleteDays
     tenantIdentity: tenantId
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     vnetId: vnetId
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
@@ -1536,6 +1540,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     privateEndpointName: 'pend-${projectName}-aml${genaiName}-to-vntcmn'
     amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
     notebookPrivateDnsZoneID:privateLinksDnsZones.notebooks.id
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     allowPublicAccessWhenBehindVnet:allowPublicAccessWhenBehindVnet
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
@@ -1583,6 +1588,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     subnetName: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess:enablePublicGenAIAccess
     aiSearchName: aiSearchService.outputs.aiSearchName

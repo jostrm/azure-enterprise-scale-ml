@@ -15,7 +15,6 @@ param restore bool
 param privateLinksDnsZones object
 param centralDnsZoneByPolicyInHub bool = true
 param kind string = 'AIServices'
-param publicNetworkAccess bool = false
 param pendCogSerName string
 param vnetRules array = []
 param ipRules array = []
@@ -23,6 +22,8 @@ param disableLocalAuth bool = true
 param vnetResourceGroupName string
 param acrNameDummy string = ''
 param keyvaultName string
+param publicNetworkAccess bool = false
+param enablePublicAccessWithPerimeter bool = false
 /*
 @allowed([
   '1106-Preview'
@@ -55,7 +56,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: 'Enabled' //03-02: Change to Enabled // If not Deny/Disabled, then ipRules will be ignored (cannot be changed later either) publicNetworkAccess? 'Enabled': 'Disabled' 
+    publicNetworkAccess: (enablePublicAccessWithPerimeter ||publicNetworkAccess) ? 'Enabled':'Disabled' //03-02: Change to Enabled // If not Deny/Disabled, then ipRules will be ignored (cannot be changed later either) publicNetworkAccess? 'Enabled': 'Disabled' 
     restore: restore
     restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true
     disableLocalAuth: disableLocalAuth
@@ -64,7 +65,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     }
     networkAcls: {
       bypass:'AzureServices'
-      defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
+      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
         ignoreMissingVnetServiceEndpoint: true

@@ -32,6 +32,7 @@ param privateEndpointName string
 param semanticSearchTier string = 'disabled'
 param publicNetworkAccess bool = false
 param ipRules array = []
+param enablePublicAccessWithPerimeter bool = false
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
@@ -54,7 +55,7 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess:publicNetworkAccess? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
+    publicNetworkAccess:(enablePublicAccessWithPerimeter || publicNetworkAccess)? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
       bypass: 'AzureServices' //'None', 'AzureServices', 'None', 'AzurePortal'
       ipRules: ipRules
@@ -89,9 +90,9 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess:publicNetworkAccess? 'Enabled': 'Disabled'
+    publicNetworkAccess:(enablePublicAccessWithPerimeter || publicNetworkAccess)? 'Enabled': 'Disabled'
     networkRuleSet: {
-      bypass: 'AzurePortal' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'. AIServices did not work
+      bypass: 'AzureServices' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'. AIServices did not work
       ipRules: ipRules // only IP addresses. Not also "action: 'Allow'"
     }
     
