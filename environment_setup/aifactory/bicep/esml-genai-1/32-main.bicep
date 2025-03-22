@@ -1151,7 +1151,7 @@ module sacc '../modules/storageAccount.bicep' = {
     storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetId: vnetId
-    subnetName: defaultSubnet
+    subnetName:'vaip-tst-prj001-genai-eus2-subnet' //defaultSubnet
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
@@ -1169,7 +1169,7 @@ module sacc '../modules/storageAccount.bicep' = {
       }
     ]
     vnetRules: [
-      '/subscriptions/612e830e-b795-424e-ba5d-cd0a5dadecf4/resourceGroups/byosnet-esml-common-eus2-dev-007-rg/providers/Microsoft.Network/virtualNetworks/vnet-byo-esml-common-eus2-tst-007/subnets/vaip-tst-common-eus2-subnet'
+      '/subscriptions/612e830e-b795-424e-ba5d-cd0a5dadecf4/resourceGroups/byosnet-esml-common-eus2-dev-007-rg/providers/Microsoft.Network/virtualNetworks/vnet-byo-esml-common-eus2-tst-007/subnets/vaip-tst-prj001-genai-eus2-subnet'
       //'${vnetId}/subnets/${defaultSubnet}'
       //'${vnetId}/subnets/${aksSubnetName}'
     ]
