@@ -1219,7 +1219,6 @@ module sacc '../modules/storageAccount.bicep' = {
           'https://42.swedencentral.instances.azureml.ms'
           'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
-          '*'
         ]
         allowedMethods: [
           'GET'
