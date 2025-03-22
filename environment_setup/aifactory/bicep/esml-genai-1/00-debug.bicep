@@ -22,7 +22,7 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   location: location
   kind: 'AzurePowerShell'
   properties: {
-    azPowerShellVersion: 'LatestVersion'
+    azPowerShellVersion: '3.0'
     scriptContent: '''
       Write-Host "DEBUG OUTPUT VARIABLES:"
       Write-Host "vnetId: ${debug_vnetId}"
