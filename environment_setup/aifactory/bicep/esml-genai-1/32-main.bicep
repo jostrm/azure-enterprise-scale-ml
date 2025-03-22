@@ -613,6 +613,7 @@ module debug './00-debug.bicep' = {
     aksSubnetId: aksSubnetId
     aksSubnetName: aksSubnetName
     debug_vnetId: vnetId
+    subscriptions_subscriptionId:subscriptions_subscriptionId
   }
 }
 

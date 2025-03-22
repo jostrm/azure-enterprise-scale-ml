@@ -14,6 +14,7 @@ param genaiSubnetName string = ''
 param defaultSubnet string = ''
 param aksSubnetId string = ''
 param aksSubnetName string = ''
+param subscriptions_subscriptionId string = ''
 
 // Use this in a resource description or as a dummy resource to see the values
 resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
@@ -21,25 +22,26 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   location: location
   kind: 'AzurePowerShell'
   properties: {
-    azPowerShellVersion: '3.0'
+    azPowerShellVersion: 'LatestVersion'
     scriptContent: '''
-      Write-Output "DEBUG OUTPUT VARIABLES:"
-      Write-Output "vnetId: ${debug_vnetId}"
-      Write-Output "projectName: ${projectName}"
-      Write-Output "projectNumber: ${projectNumber}"
-      Write-Output "env: ${env}"
-      Write-Output "location: ${location}"
-      Write-Output "locationSuffix: ${locationSuffix}"
-      Write-Output "commonResourceGroup: ${commonResourceGroup}"
-      Write-Output "targetResourceGroup: ${targetResourceGroup}"
-      Write-Output "vnetNameFull: ${vnetNameFull}"
-      Write-Output "vnetResourceGroupName: ${vnetResourceGroupName}"
-      Write-Output "common_subnet_name_local: ${common_subnet_name_local}"
-      Write-Output "genaiSubnetId: ${genaiSubnetId}"
-      Write-Output "genaiSubnetName: ${genaiSubnetName}" 
-      Write-Output "defaultSubnet: ${defaultSubnet}"
-      Write-Output "aksSubnetId: ${aksSubnetId}" 
-      Write-Output "aksSubnetName: ${aksSubnetName}"
+      Write-Host "DEBUG OUTPUT VARIABLES:"
+      Write-Host "vnetId: ${debug_vnetId}"
+      Write-Host "projectName: ${projectName}"
+      Write-Host "projectNumber: ${projectNumber}"
+      Write-Host "env: ${env}"
+      Write-Host "location: ${location}"
+      Write-Host "locationSuffix: ${locationSuffix}"
+      Write-Host "commonResourceGroup: ${commonResourceGroup}"
+      Write-Host "targetResourceGroup: ${targetResourceGroup}"
+      Write-Host "vnetNameFull: ${vnetNameFull}"
+      Write-Host "vnetResourceGroupName: ${vnetResourceGroupName}"
+      Write-Host "common_subnet_name_local: ${common_subnet_name_local}"
+      Write-Host "genaiSubnetId: ${genaiSubnetId}"
+      Write-Host "genaiSubnetName: ${genaiSubnetName}" 
+      Write-Host "defaultSubnet: ${defaultSubnet}"
+      Write-Host "aksSubnetId: ${aksSubnetId}" 
+      Write-Host "aksSubnetName: ${aksSubnetName}"
+      Write-Host "aksSubnetName: ${subscriptions_subscriptionId}"
     '''
     retentionInterval: 'PT1H'
   }
