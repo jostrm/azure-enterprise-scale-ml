@@ -9,7 +9,7 @@ param name string
 param addressPrefix string
 
 @description('Specifies the location where new subnet is deployed. Defaults to resourceGroup.location')
-param location string = resourceGroup().location
+param location string
 
 @description('Specifies an array of service endpoints that should be enabled on the new subnet')
 param serviceEndpoints array = []

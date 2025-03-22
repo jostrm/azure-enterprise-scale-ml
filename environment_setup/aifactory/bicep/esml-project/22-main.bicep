@@ -657,6 +657,7 @@ module sacc '../modules/storageAccount.bicep' = {
     skuName: skuNameStorage
     vnetId: vnetId
     subnetName: defaultSubnet
+    location: location
     blobPrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
     filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
     queuePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
@@ -737,6 +738,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
     skuName: skuNameStorage
     vnetId: vnetId
     subnetName: defaultSubnet
+    location: location
     blobPrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
     filePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
     queuePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'

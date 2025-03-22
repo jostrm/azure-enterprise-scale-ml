@@ -2,7 +2,7 @@
 param name string
 
 @description('Specifies the location where the databricks network security group should be deployed. Defaults to resourceGroup.location')
-param location string = resourceGroup().location
+param location string
 
 @description('Specifies the tags that should be applied to the databricks network security group')
 param tags object

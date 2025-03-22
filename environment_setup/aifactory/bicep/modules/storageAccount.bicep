@@ -42,8 +42,8 @@ param subnetName string
 param tags object
 param vnetRules array = []
 param ipRules array = []
+param location string
 
-var location = resourceGroup().location
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 var groupIds = [
   {

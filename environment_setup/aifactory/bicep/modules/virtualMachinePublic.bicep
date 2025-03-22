@@ -11,7 +11,7 @@ param adminUsername string
 param vmSize string = 'Standard_D2_v3'
 
 @description('location for all resources')
-param location string = resourceGroup().location
+param location string
 
 @description('Specifies the name of the virtual machine')
 param vmName string

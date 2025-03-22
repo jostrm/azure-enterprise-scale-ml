@@ -1037,6 +1037,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
+    location: location
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}'
@@ -1179,6 +1180,7 @@ module sacc '../modules/storageAccount.bicep' = {
     skuName: 'Standard_LRS'
     vnetId: vnetId
     subnetName: defaultSubnet
+    location: location
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'

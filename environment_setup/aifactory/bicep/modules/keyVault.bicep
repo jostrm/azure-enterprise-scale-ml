@@ -30,7 +30,7 @@ param soft_delete_days int = 7
 param enablePurgeProtection bool = true
 
 @description('Location')
-param location string =  resourceGroup().location
+param location string
 param enablePublicAccessWithPerimeter bool = false
 
 var subnetRef = '${vnetId}/subnets/${subnetName}'

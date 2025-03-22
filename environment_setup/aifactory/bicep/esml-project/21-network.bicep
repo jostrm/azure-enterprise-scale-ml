@@ -124,10 +124,10 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = {
   params: {
     name: 'snt-${projectName}-dbxpub'
     virtualNetworkName: vnetNameFull
-    addressPrefix: dataBricksPublicSubnetSettings['cidr']
+    addressPrefix: dataBricksPublicSubnetSettings.cidr
     location: location
-    serviceEndpoints: dataBricksPublicSubnetSettings['serviceEndpoints']
-    delegations: dataBricksPublicSubnetSettings['delegations']
+    serviceEndpoints: dataBricksPublicSubnetSettings.serviceEndpoints
+    delegations: dataBricksPublicSubnetSettings.delegations
     nsgId: nsg.outputs.nsgId
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
@@ -142,10 +142,10 @@ module dbxPrivSnt '../modules/subnetWithNsg.bicep' = {
   params: {
     name: 'snt-${projectName}-dbxpriv'
     virtualNetworkName: vnetNameFull
-    addressPrefix: dataBricksPrivateSubnetSettings['cidr']
+    addressPrefix: dataBricksPrivateSubnetSettings.cidr
     location: location
-    serviceEndpoints: dataBricksPrivateSubnetSettings['serviceEndpoints']
-    delegations: dataBricksPrivateSubnetSettings['delegations']
+    serviceEndpoints: dataBricksPrivateSubnetSettings.serviceEndpoints
+    delegations: dataBricksPrivateSubnetSettings.delegations
     nsgId: nsg.outputs.nsgId
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
@@ -164,10 +164,10 @@ module aksSnt '../modules/subnetWithNsg.bicep' = {
   params: {
     name: 'snt-${projectName}-aks'
     virtualNetworkName: vnetNameFull
-    addressPrefix: aksSubnetSettings['cidr']
+    addressPrefix: aksSubnetSettings.cidr
     location: location
-    serviceEndpoints: aksSubnetSettings['serviceEndpoints']
-    delegations: aksSubnetSettings['delegations']
+    serviceEndpoints: aksSubnetSettings.serviceEndpoints
+    delegations: aksSubnetSettings.delegations
     nsgId:nsgAKS.outputs.nsgId
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }

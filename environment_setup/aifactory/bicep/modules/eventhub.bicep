@@ -19,7 +19,7 @@ var subnetRef = '${vnetId}/subnets/${subnetName}'
 param tags object
 
 @description('Specifies the Azure location for all resources.')
-param location string = resourceGroup().location
+param location string
 
 @description('')
 param eHRuleName string = 'rule'
