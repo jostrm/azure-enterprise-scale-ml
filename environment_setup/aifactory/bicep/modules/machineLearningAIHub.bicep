@@ -86,13 +86,7 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-var azureMachineLearningWorkspaceConnectionSecretsReaderRoleId = 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'  // SP, user, EP -> AI Hub, AI Project (RG)
 var azureMLMetricsWriter ='635dd51f-9968-44d3-b7fb-6d9a6bd613ae' // EP -> AI project
-
-resource amlConnectionReaderRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
-  name: azureMachineLearningWorkspaceConnectionSecretsReaderRoleId
-  scope: subscription()
-}
 resource amlMetricsWriterRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
   name: azureMLMetricsWriter
   scope: subscription()
@@ -104,6 +98,7 @@ resource cognitiveServicesOpenAiUserRole 'Microsoft.Authorization/roleDefinition
   scope: subscription()
 }
 
+// SP, user, EP -> AI Hub, AI Project (RG)
 @description('Built-in Role: [Azure Machine Learning Workspace Connection Secrets Reader](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles)')
 resource amlWorkspaceSecretsReaderRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
   name: 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'

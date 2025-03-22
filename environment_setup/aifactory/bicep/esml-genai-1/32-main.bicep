@@ -311,7 +311,7 @@ var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroup
 // BYOSubnet: common_subnet_name,common_subnet_scoring_name,common_pbi_subnet_name,common_bastion_subnet_name
 var common_subnet_name_local_1 = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
-// Troubleshooting
+// Troubleshooting001
 var common_subnet_name_local = common_subnet_name_local_1 != '' ? common_subnet_name_local_1 : 'vaip-tst-common-eus2-subnet'
 
 // Gen genaiSubnetName from genaiSubnetId which is resourceID
@@ -1169,8 +1169,9 @@ module sacc '../modules/storageAccount.bicep' = {
       }
     ]
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      '/subscriptions/612e830e-b795-424e-ba5d-cd0a5dadecf4/resourceGroups/byosnet-esml-common-eus2-dev-007-rg/providers/Microsoft.Network/virtualNetworks/vnet-byo-esml-common-eus2-tst-007/subnets/vaip-tst-common-eus2-subnet'
+      //'${vnetId}/subnets/${defaultSubnet}'
+      //'${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -1189,6 +1190,7 @@ module sacc '../modules/storageAccount.bicep' = {
           'https://42.swedencentral.instances.azureml.ms'
           'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
+          '*'
         ]
         allowedMethods: [
           'GET'
