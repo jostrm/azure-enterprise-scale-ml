@@ -592,6 +592,30 @@ resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' ex
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
 }
 
+module debug './00-debug.bicep' = {
+  name: 'debug${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    projectName: projectName
+    projectNumber: projectNumber
+    env: env
+    location: location
+    locationSuffix: locationSuffix
+    commonResourceGroup: commonResourceGroup
+    targetResourceGroup: targetResourceGroup
+    vnetNameFull: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    common_subnet_name_local: common_subnet_name_local
+    genaiSubnetId: genaiSubnetId
+    genaiSubnetName: genaiSubnetName
+    defaultSubnet: defaultSubnet
+    aksSubnetId: aksSubnetId
+    aksSubnetName: aksSubnetName
+    debug_vnetId: vnetId
+  }
+}
+
+
 // Resource Groups
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)
@@ -1150,8 +1174,8 @@ module sacc '../modules/storageAccount.bicep' = {
   params: {
     storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
-    vnetId: '/subscriptions/612e830e-b795-424e-ba5d-cd0a5dadecf4/resourceGroups/byosnet-esml-common-eus2-dev-007-rg/providers/Microsoft.Network/virtualNetworks/vnet-byo-esml-common-eus2-tst-007'//vnetId
-    subnetName:'vaip-tst-prj001-genai-eus2-subnet' //defaultSubnet
+    vnetId: vnetId
+    subnetName: defaultSubnet
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
@@ -1169,9 +1193,8 @@ module sacc '../modules/storageAccount.bicep' = {
       }
     ]
     vnetRules: [
-      '/subscriptions/612e830e-b795-424e-ba5d-cd0a5dadecf4/resourceGroups/byosnet-esml-common-eus2-dev-007-rg/providers/Microsoft.Network/virtualNetworks/vnet-byo-esml-common-eus2-tst-007/subnets/vaip-tst-prj001-genai-eus2-subnet'
-      //'${vnetId}/subnets/${defaultSubnet}'
-      //'${vnetId}/subnets/${aksSubnetName}'
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -1851,3 +1874,10 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   ]
 }
 
+output debug_vnetId string = vnetId
+output debug_common_subnet_name_local string = common_subnet_name_local
+output debug_genaiSubnetId string = genaiSubnetId
+output debug_genaiSubnetName string = genaiSubnetName
+output debug_defaultSubnet string = defaultSubnet
+output debug_aksSubnetId string = aksSubnetId
+output debug_aksSubnetName string = aksSubnetName
