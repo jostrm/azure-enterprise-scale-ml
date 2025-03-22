@@ -309,7 +309,10 @@ var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 
 // BYOSubnet: common_subnet_name,common_subnet_scoring_name,common_pbi_subnet_name,common_bastion_subnet_name
-var common_subnet_name_local = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
+var common_subnet_name_local_1 = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
+
+// Troubleshooting
+var common_subnet_name_local = common_subnet_name_local_1 != '' ? common_subnet_name_local_1 : 'vaip-tst-common-eus2-subnet'
 
 // Gen genaiSubnetName from genaiSubnetId which is resourceID
 var segments = split(genaiSubnetId, '/')
