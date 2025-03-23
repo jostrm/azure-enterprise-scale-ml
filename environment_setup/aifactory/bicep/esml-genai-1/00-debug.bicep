@@ -15,6 +15,8 @@ param defaultSubnet string = ''
 param aksSubnetId string = ''
 param aksSubnetName string = ''
 param subscriptions_subscriptionId string = ''
+param vnetRule1 string = ''
+param vnetRule2 string = ''
 
 // Use this in a resource description or as a dummy resource to see the values
 resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
@@ -23,25 +25,102 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   kind: 'AzurePowerShell'
   properties: {
     azPowerShellVersion: '3.0'
+    // Pass the parameters as environment variables instead of trying to interpolate them in the script
+    environmentVariables: [
+      {
+        name: 'DEBUG_VNET_ID'
+        value: debug_vnetId
+      }
+      {
+        name: 'PROJECT_NAME'
+        value: projectName
+      }
+      {
+        name: 'PROJECT_NUMBER'
+        value: projectNumber
+      }
+      {
+        name: 'ENV_NAME'
+        value: env
+      }
+      {
+        name: 'LOCATION_SUFFIX'
+        value: locationSuffix
+      }
+      {
+        name: 'COMMON_RG'
+        value: commonResourceGroup
+      }
+      {
+        name: 'TARGET_RG'
+        value: targetResourceGroup
+      }
+      {
+        name: 'VNET_NAME_FULL'
+        value: vnetNameFull
+      }
+      {
+        name: 'VNET_RG_NAME'
+        value: vnetResourceGroupName
+      }
+      {
+        name: 'COMMON_SUBNET_NAME'
+        value: common_subnet_name_local
+      }
+      {
+        name: 'GENAI_SUBNET_ID'
+        value: genaiSubnetId
+      }
+      {
+        name: 'GENAI_SUBNET_NAME'
+        value: genaiSubnetName
+      }
+      {
+        name: 'DEFAULT_SUBNET'
+        value: defaultSubnet
+      }
+      {
+        name: 'AKS_SUBNET_ID'
+        value: aksSubnetId
+      }
+      {
+        name: 'AKS_SUBNET_NAME'
+        value: aksSubnetName
+      }
+      {
+        name: 'SUBSCRIPTION_ID'
+        value: subscriptions_subscriptionId
+      }
+      {
+        name: 'VNET_RULE_1'
+        value: vnetRule1
+      }
+      {
+        name: 'VNET_RULE_2'
+        value: vnetRule2
+      }
+    ]
     scriptContent: '''
       Write-Host "DEBUG OUTPUT VARIABLES:"
-      Write-Host "vnetId: ${debug_vnetId}"
-      Write-Host "projectName: ${projectName}"
-      Write-Host "projectNumber: ${projectNumber}"
-      Write-Host "env: ${env}"
-      Write-Host "location: ${location}"
-      Write-Host "locationSuffix: ${locationSuffix}"
-      Write-Host "commonResourceGroup: ${commonResourceGroup}"
-      Write-Host "targetResourceGroup: ${targetResourceGroup}"
-      Write-Host "vnetNameFull: ${vnetNameFull}"
-      Write-Host "vnetResourceGroupName: ${vnetResourceGroupName}"
-      Write-Host "common_subnet_name_local: ${common_subnet_name_local}"
-      Write-Host "genaiSubnetId: ${genaiSubnetId}"
-      Write-Host "genaiSubnetName: ${genaiSubnetName}" 
-      Write-Host "defaultSubnet: ${defaultSubnet}"
-      Write-Host "aksSubnetId: ${aksSubnetId}" 
-      Write-Host "aksSubnetName: ${aksSubnetName}"
-      Write-Host "aksSubnetName: ${subscriptions_subscriptionId}"
+      Write-Host "vnetId: $env:DEBUG_VNET_ID"
+      Write-Host "projectName: $env:PROJECT_NAME"
+      Write-Host "projectNumber: $env:PROJECT_NUMBER"
+      Write-Host "env: $env:ENV_NAME"
+      Write-Host "location: $env:LOCATION"
+      Write-Host "locationSuffix: $env:LOCATION_SUFFIX"
+      Write-Host "commonResourceGroup: $env:COMMON_RG"
+      Write-Host "targetResourceGroup: $env:TARGET_RG"
+      Write-Host "vnetNameFull: $env:VNET_NAME_FULL"
+      Write-Host "vnetResourceGroupName: $env:VNET_RG_NAME"
+      Write-Host "common_subnet_name_local: $env:COMMON_SUBNET_NAME"
+      Write-Host "genaiSubnetId: $env:GENAI_SUBNET_ID"
+      Write-Host "genaiSubnetName: $env:GENAI_SUBNET_NAME"
+      Write-Host "defaultSubnet: $env:DEFAULT_SUBNET"
+      Write-Host "aksSubnetId: $env:AKS_SUBNET_ID"
+      Write-Host "aksSubnetName: $env:AKS_SUBNET_NAME"
+      Write-Host "subscriptionId: $env:SUBSCRIPTION_ID"
+      Write-Host "vnetRule1: $env:VNET_RULE_1"
+      Write-Host "vnetRule2: $env:VNET_RULE_2"
     '''
     retentionInterval: 'PT1H'
   }
@@ -64,3 +143,5 @@ output debug_genaiSubnetName string = genaiSubnetName
 output debug_defaultSubnet string = defaultSubnet
 output debug_aksSubnetId string = aksSubnetId
 output debug_aksSubnetName string = aksSubnetName
+output debug_vnetRule1 string = vnetRule1
+output debug_vnetRule2 string = vnetRule2

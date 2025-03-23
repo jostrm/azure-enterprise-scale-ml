@@ -614,6 +614,8 @@ module debug './00-debug.bicep' = {
     aksSubnetName: aksSubnetName
     debug_vnetId: vnetId
     subscriptions_subscriptionId:subscriptions_subscriptionId
+    vnetRule1:'${vnetId}/subnets/${defaultSubnet}'
+    vnetRule2:'${vnetId}/subnets/${aksSubnetName}'
   }
 }
 
