@@ -1,7 +1,5 @@
 @description('Name of service')
 param aiSearchName string
-@description('Specifies the VNET id that will be associated with the private endpoint')
-param vnetId string
 @description('Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
 param tags object
@@ -33,8 +31,20 @@ param semanticSearchTier string = 'disabled'
 param publicNetworkAccess bool = false
 param ipRules array = []
 param enablePublicAccessWithPerimeter bool = false
+param vnetName string
+param vnetResourceGroupName string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
+//var subnetRef = '${vnetId}/subnets/${subnetName}'
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
 
 resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enableSharedPrivateLink == true) {
   name: aiSearchName
@@ -106,7 +116,7 @@ resource pendAISearch 'Microsoft.Network/privateEndpoints@2022-01-01' = {
   location: location
   properties: {
     subnet: {
-      id: subnetRef
+      id: subnet.id
     }
     privateLinkServiceConnections: [
       {

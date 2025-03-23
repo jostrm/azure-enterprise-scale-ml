@@ -405,7 +405,8 @@ module acrCommon '../../modules/containerRegistry.bicep' ={
   params: {
     containerRegistryName:acrCommonName
     skuName: 'Premium'
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: tags
@@ -523,7 +524,8 @@ module kvCmn '../../modules/keyVault.bicep' = {
     tenantIdentity: tenantId
     enablePurgeProtection:enablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${kvNameCommon}-to-vnt-esmlcmn'
     keyvaultNetworkPolicySubnets: [
@@ -658,7 +660,8 @@ module kvAdmin '../../modules/keyVault.bicep' = {
     location: location
     tags: tags
     tenantIdentity: tenantId
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     enablePurgeProtection:enablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
@@ -740,7 +743,8 @@ module dataLake '../../modules/dataLake.bicep' = {
     containerName: lakeContainerName
     skuName: skuNameStorage //'Standard_LRS'
     location: location
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-vnt-esmlcmn'
     filePrivateEndpointName: 'pend-${datalakeName}-file-to-vnt-esmlcmn'

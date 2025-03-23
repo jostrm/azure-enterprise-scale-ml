@@ -607,7 +607,8 @@ module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
   params: {
     containerRegistryName: 'acr${projectName}${locationSuffix}${uniqueInAIFenv}${env}${prjResourceSuffixNoDash}'
     skuName: 'Premium'
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}${locationSuffix}-containerreg-to-vnt-mlcmn'
     tags: tags2
@@ -635,7 +636,8 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
   params: {
     containerRegistryName: acrCommonNameSafe
     skuName: 'Premium'
-    vnetId: vnetId
+    vnetName:vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: common_subnet_name_local // snet-esml-cmn-001
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: acrCommon.tags
@@ -1244,7 +1246,8 @@ module dataLake '../modules/dataLake.bicep' = {
     containerName: lakeContainerName
     skuName: skuNameStorageLake
     location: keepLocation
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-vnt-esmlcmn'
     filePrivateEndpointName: 'pend-${datalakeName}-file-to-vnt-esmlcmn'

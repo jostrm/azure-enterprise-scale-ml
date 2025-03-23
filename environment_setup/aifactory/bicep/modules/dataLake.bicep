@@ -22,11 +22,7 @@ param storageAccountName string
 ])
 @description('Specifies the SKU of the storage account')
 param skuName string
-
 param location string
-
-@description('Specifies the id of the virtual network used for private endpoints')
-param vnetId string
 
 @description('Specifies the id of the subnet used for the private endpoints')
 param subnetName string
@@ -65,6 +61,8 @@ param ipWhitelist_array array = []
 param virtualNetworkRules_array array = []
 param containers array = ['lake3']
 param files array = []
+param vnetName string
+param vnetResourceGroupName string
 param corsRules array = [
   {
     allowedOrigins: [
@@ -95,8 +93,6 @@ param corsRules array = [
   }
 ]
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
-
 var groupIds = [
   {
     name: blobPrivateEndpointName
@@ -119,6 +115,17 @@ var groupIds = [
     gid: 'table'
   }
 ]
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
+
 
 //resource lake 'Microsoft.Storage/storageAccounts@2021-02-01'= {
 resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -207,23 +214,22 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     }
   }
 }
-
-resource pendSacc 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in groupIds: {
-  name: obj.name
+resource pendSaccBlob 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: blobPrivateEndpointName
   location: location
   tags: tags
   properties: {
     subnet: {
-      id: subnetRef
-      name: subnetName
+      id: subnet.id
     }
+    customNetworkInterfaceName: '${blobPrivateEndpointName}-nic'
     privateLinkServiceConnections: [
       {
-        id: 'string'
+        name: blobPrivateEndpointName
         properties: {
           privateLinkServiceId: lake.id
           groupIds: [
-            obj.gid
+            'blob'
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
@@ -231,38 +237,145 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in 
             actionsRequired: 'None'
           }
         }
-        name: 'string'
       }
     ]
   }
-}]
+}
+resource pendSaccFile 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: filePrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${filePrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: filePrivateEndpointName
+        properties: {
+          privateLinkServiceId: lake.id
+          groupIds: [
+            'file'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+resource pendSaccQ 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: queuePrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${queuePrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: queuePrivateEndpointName
+        properties: {
+          privateLinkServiceId: lake.id
+          groupIds: [
+            'queue'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+resource pendSaccTable 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: tablePrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${tablePrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: tablePrivateEndpointName
+        properties: {
+          privateLinkServiceId: lake.id
+          groupIds: [
+            'table'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+resource pendSaccDfs 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: dfsPrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${dfsPrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: dfsPrivateEndpointName
+        properties: {
+          privateLinkServiceId: lake.id
+          groupIds: [
+            'dfs'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
 
 output storageAccountId string = lake.id
 output virtualNetworkRules array = lake.properties.networkAcls.virtualNetworkRules
 
 output dnsConfig array = [
   {
-    name: pendSacc[0].name
+    name: pendSaccBlob.name
     type: 'blob'
     id: lake.id
   }
   {
-    name: pendSacc[1].name
+    name: filePrivateEndpointName
     type: 'file'
     id: lake.id
   }
   {
-    name: pendSacc[2].name
+    name: dfsPrivateEndpointName
     type: 'dfs'
     id: lake.id
   }
   {
-    name: pendSacc[3].name
+    name: queuePrivateEndpointName
     type: 'queue'
     id: lake.id
   }
   {
-    name: pendSacc[4].name
+    name: tablePrivateEndpointName
     type: 'table'
     id: lake.id
   }

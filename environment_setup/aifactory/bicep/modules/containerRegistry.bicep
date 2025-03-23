@@ -9,9 +9,6 @@ param containerRegistryName string
 ])
 param skuName string = 'Premium'
 
-@description('(Required) Specifies the VNET id that will be associated with the private endpoint')
-param vnetId string
-
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
 
@@ -21,10 +18,23 @@ param privateEndpointName string
 @description('(Required) Specifies the tags that will be associated with azure container registry resources')
 param tags object
 param location string
+param vnetName string
+param vnetResourceGroupName string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
+//var subnetRef = '${vnetId}/subnets/${subnetName}'
 var policyOn = 'enabled' // 'disabled'
 var containerRegistryNameCleaned = replace(containerRegistryName, '-', '')
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
+
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: containerRegistryNameCleaned
@@ -66,8 +76,7 @@ resource pendAcr 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   properties: {
     customNetworkInterfaceName: '${privateEndpointName}-nic'
     subnet: {
-      id: subnetRef
-      name: subnetName
+      id: subnet.id
     }
     privateLinkServiceConnections: [
       {
