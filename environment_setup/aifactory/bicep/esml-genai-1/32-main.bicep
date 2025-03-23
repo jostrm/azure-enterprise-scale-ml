@@ -318,7 +318,7 @@ var common_subnet_name_local = common_subnet_name_local_1 != '' ? common_subnet_
 // Gen genaiSubnetName from genaiSubnetId which is resourceID
 var segments = split(genaiSubnetId, '/')
 var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName 
+var defaultSubnet = genaiSubnetName
 
 var segmentsAKS = split(aksSubnetId, '/')
 var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
@@ -1200,12 +1200,10 @@ module sacc '../modules/storageAccount.bicep' = {
         name: 'default'
       }
     ]
-    /*
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      genaiSubnetId
+      aksSubnetId
     ]
-    */
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
       value: ip
