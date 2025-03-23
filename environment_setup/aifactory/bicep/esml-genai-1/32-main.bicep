@@ -36,7 +36,7 @@ param modelVersionEmbeddingVersion string = '1'
 param restore bool = false
 param keyvaultEnablePurgeProtection bool = true // The property "enablePurgeProtection" cannot be set to false.
 param disableLocalAuth bool = true
-param enablePublicAccessWithPerimeter bool = true
+param enablePublicAccessWithPerimeter bool = false
 
 @allowed([
   'S0' // 'Free': Invalid SKU name
