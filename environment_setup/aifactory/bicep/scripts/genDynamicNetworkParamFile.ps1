@@ -158,9 +158,20 @@ if ($BYO_subnets_bool -eq $false) {
 
     write-host "The following parameters are added to template"
 
+    write-host "Project type all :  trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj for AKS name"
     $aksSubnetId=(Get-AzResourceGroupDeployment `
     -ResourceGroupName "$vnetResourceGroup" `
     -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
+
+    if ([string]::IsNullOrEmpty($aksSubnetId)) {
+        Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues."
+        
+        # A) Fail the pipeline when aksSubnetId is missing:
+        # Write-Host "##vso[task.complete result=Failed;]AksSubnetId is null or empty. The AKS deployment will fail without a valid subnet ID."
+        
+        # B) provide a default or dummy value to allow the template to be created
+        $aksSubnetId = "MISSING_REQUIRED_SUBNET_ID"
+    }
 
     if($projectTypeADO.Trim().ToLower() -eq "esml"){
         write-host "Project type: esml - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
