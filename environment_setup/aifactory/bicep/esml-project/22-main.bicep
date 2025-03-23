@@ -655,7 +655,8 @@ module sacc '../modules/storageAccount.bicep' = {
   params: {
     storageAccountName: saccName
     skuName: skuNameStorage
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     location: location
     blobPrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
@@ -736,7 +737,8 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
   params: {
     storageAccountName: sacc2Name
     skuName: skuNameStorage
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     location: location
     blobPrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-blob-to-vnt-mlcmn'
@@ -819,7 +821,8 @@ module kv1 '../modules/keyVault.bicep' = {
     enablePurgeProtection:keyvaultEnablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
     tenantIdentity: tenantId
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
@@ -857,7 +860,8 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     enablePurgeProtection:keyvaultEnablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
     tenantIdentity: tenantId
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv2-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [

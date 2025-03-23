@@ -13,9 +13,6 @@ param keyvaultNetworkPolicySubnets array = []
 @description('(Optional) Specifies an array of objects containing access policies')
 param accessPolicies array = []
 
-@description('(Required) Specifies the virtual network id associated with private endpoint')
-param vnetId string
-
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
 
@@ -32,9 +29,20 @@ param enablePurgeProtection bool = true
 @description('Location')
 param location string
 param enablePublicAccessWithPerimeter bool = false
+param vnetName string
+param vnetResourceGroupName string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
+//var subnetRef = '${vnetId}/subnets/${subnetName}'
 
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = if(enablePurgeProtection){
   name: keyvaultName
   tags: tags
@@ -102,8 +110,7 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   tags: tags
   properties: {
     subnet: {
-      id: subnetRef
-      name: subnetName
+      id: subnet.id
     }
     customNetworkInterfaceName: '${privateEndpointName}-nic'
     privateLinkServiceConnections: [

@@ -1037,7 +1037,8 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
   params: {
     storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     location: location
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
@@ -1180,7 +1181,8 @@ module sacc '../modules/storageAccount.bicep' = {
   params: {
     storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     location: location
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
@@ -1258,7 +1260,8 @@ module kv1 '../modules/keyVault.bicep' = {
     soft_delete_days: keyvaultSoftDeleteDays
     tenantIdentity: tenantId
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
-    vnetId: vnetId
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [

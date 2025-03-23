@@ -32,8 +32,8 @@ param enablePublicAccessWithPerimeter bool = false
 @description('Specifies the name of the storage account SKU')
 param skuName string
 
-@description('Specifies the id of the virtual network used for private endpoints')
-param vnetId string
+//@description('Specifies the id of the virtual network used for private endpoints')
+//param vnetId string
 
 @description('Specifies the id of the subnet used for the private endpoints')
 param subnetName string
@@ -43,8 +43,10 @@ param tags object
 param vnetRules array = []
 param ipRules array = []
 param location string
+param vnetName string
+param vnetResourceGroupName string
 
-var subnetRef = '${vnetId}/subnets/${subnetName}'
+//var subnetRef = '${vnetId}/subnets/${subnetName}'
 var groupIds = [
   {
     name: blobPrivateEndpointName
@@ -63,6 +65,16 @@ var groupIds = [
     gid: 'table'
   }
 ]
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetName
+  parent: vnet
+}
 
 resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -158,13 +170,12 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in 
   tags: tags
   properties: {
     subnet: {
-      id: subnetRef
-      name: subnetName
+      id: subnet.id
     }
-    //customNetworkInterfaceName: obj.name
+    customNetworkInterfaceName: '${obj.name}-nic'
     privateLinkServiceConnections: [
       {
-        //name: obj.name
+        name: obj.name
         properties: {
           privateLinkServiceId: sacc.id
           groupIds: [
