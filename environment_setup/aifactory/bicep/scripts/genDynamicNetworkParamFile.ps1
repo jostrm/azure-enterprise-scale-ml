@@ -156,13 +156,15 @@ $genaiSubnetId=""
 # Check if BYO_subnets is false
 if ($BYO_subnets_bool -eq $false) {
 
-    Write-host "The following parameters are added to template"
+    write-host "The following parameters are added to template"
 
     $aksSubnetId=(Get-AzResourceGroupDeployment `
     -ResourceGroupName "$vnetResourceGroup" `
     -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
 
     if($projectTypeADO.Trim().ToLower() -eq "esml"){
+        write-host "Project type: esml - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
+
         $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
         -ResourceGroupName "$vnetResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
@@ -171,18 +173,24 @@ if ($BYO_subnets_bool -eq $false) {
         -ResourceGroupName "$vnetResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
         
-        Write-host "dbxPubSubnetName: $dbxPubSubnetName"
-        Write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
-        Write-host "aksSubnetId: $aksSubnetId"
-    }
-
-    if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+        write-host "dbxPubSubnetName: $dbxPubSubnetName"
+        write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
+        write-host "aksSubnetId: $aksSubnetId"
+    }elseif($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+        
+        write-host "Project type: genai-1 - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
+        
         $genaiSubnetId=(Get-AzResourceGroupDeployment `
         -ResourceGroupName "$vnetResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
-        Write-host "genaiSubnetId: $genaiSubnetId"
-        Write-host "aksSubnetId: $aksSubnetId"
+        write-host "genaiSubnetId: $genaiSubnetId"
+        write-host "aksSubnetId: $aksSubnetId"
     }
+    else
+    {
+        write-host "Unsupported projectTypeADO value: '$projectTypeADO'"
+    }
+
 }else {
     <# Action when all if and elseif conditions are false #>
     # Replace placeholders in vnet and subnet names
@@ -194,14 +202,15 @@ if ($BYO_subnets_bool -eq $false) {
         $subnetCommonScoringId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonScoring -networkEnv $network_env
         $subnetCommonPowerbiGwId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonPowerbiGw -networkEnv $network_env
 
-        Write-host "COMMON subnets: Just FYI - since these are specified directly in BICEP"
-        Write-host "subnetCommonId: $subnetCommonId"
-        Write-host "subnetCommonScoringId: $subnetCommonScoringId"
-        Write-host "subnetCommonPowerbiGwId: $subnetCommonPowerbiGwId"
+        write-host "COMMON subnets: Just FYI - since these are specified directly in BICEP"
+        write-host "subnetCommonId: $subnetCommonId"
+        write-host "subnetCommonScoringId: $subnetCommonScoringId"
+        write-host "subnetCommonPowerbiGwId: $subnetCommonPowerbiGwId"
     }
 
     if($projectTypeADO.Trim().ToLower() -eq "esml"){
 
+        write-host "Project type: esml - now generating subnet IDs for AKS and Databricks, via in-parameters BYOSnets"
         if ($null -ne $subnetProjAKS -and $subnetProjAKS -ne "") {
             # ESML project subnets
             $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
@@ -213,38 +222,39 @@ if ($BYO_subnets_bool -eq $false) {
             $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
             $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
 
-            Write-host "Databricks: Only the name is needed. Just FYI:"
-            Write-host "dbxPubSubnetId: $dbxPubSubnetId"
-            Write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
+            write-host "Databricks: Only the name is needed. Just FYI:"
+            write-host "dbxPubSubnetId: $dbxPubSubnetId"
+            write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
 
-            Write-host "AKS full resoiurce ID, and Databrick subnet names:"
-            Write-host "aksSubnetId: $aksSubnetId"
-            Write-host "dbxPubSubnet Name: $dbxPubSubnetName"
-            Write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
+            write-host "AKS full resoiurce ID, and Databrick subnet names:"
+            write-host "aksSubnetId: $aksSubnetId"
+            write-host "dbxPubSubnet Name: $dbxPubSubnetName"
+            write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
         }
         else {
-            Write-host "AIF-WARNING:BYOSubnets:subnetProjAKS is not set. This is needed for AKS deployment. Please check your parameters.json file."
+            write-host "AIF-WARNING:BYOSubnets:subnetProjAKS is not set. This is needed for AKS deployment. Please check your parameters.json file."
        }
 
     }
 
     if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
+        write-host "Project type: genai-1 : now generating subnet IDs for AKS and GenAI, via in-parameters BYOSnets"
 
         if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
             $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
-            Write-host "genaiSubnetId: $genaiSubnetId"
+            write-host "genaiSubnetId: $genaiSubnetId"
 
             try {
                 $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
-                Write-host "aksSubnetId: $aksSubnetId"    
+                write-host "aksSubnetId: $aksSubnetId"    
             }
             catch {
-                Write-host "AIF-WARNING: aksSubnetId could not be generated. Please check your parameters.json file."    
+                write-host "AIF-WARNING: aksSubnetId could not be generated. Please check your parameters.json file."    
             }
         }
     }
     else {
-        Write-host "AIF-WARNING:BYOSubnets:subnetProjGenAI: subnetProjGenAI is not set. This is needed for GenAI deployment. Please check your parameters.json file."
+        write-host "AIF-WARNING:BYOSubnets:subnetProjGenAI: subnetProjGenAI is not set. This is needed for GenAI deployment. Please check your parameters.json file."
    }
 }
 
@@ -284,15 +294,15 @@ $templateGenaI = @"
 $template = "not set"
 
 if($projectTypeADO.Trim().ToLower() -eq "esml"){
-    Write-host "Template for dynamicNetworkParams.json is projectType:esml"
+    write-host "Template for dynamicNetworkParams.json is projectType:esml"
     $template = $templateEsml
 }
 elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
-    Write-host "Template for dynamicNetworkParams.json is projectType:genai-1"
+    write-host "Template for dynamicNetworkParams.json is projectType:genai-1"
     $template = $templateGenaI
 }
 else{
-    Write-host "Template for dynamicNetworkParams.json is projectType:unsupported value: '$projectTypeADO'"
+    write-host "Template for dynamicNetworkParams.json is projectType:unsupported value: '$projectTypeADO'"
     $template = $templateEsml
 }
 $template | Out-File "$filePath/$templateName"
