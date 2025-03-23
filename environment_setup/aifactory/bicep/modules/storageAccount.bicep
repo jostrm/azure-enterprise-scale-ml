@@ -86,7 +86,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
   properties:{
     accessTier: 'Hot'
-    publicNetworkAccess: enablePublicAccessWithPerimeter?'Enabled':'Disabled'
+    publicNetworkAccess:'Enabled' //enablePublicAccessWithPerimeter?'Enabled':'Disabled'
     allowCrossTenantReplication: true
     allowSharedKeyAccess: true
     allowBlobPublicAccess: false
