@@ -119,6 +119,7 @@ var aiHubProjectName ='ai-prj-${aifactoryProjectNumber}-01-${locationSuffix}-${e
 var aiProjectDiagSettingName ='aiProjectDiagnosticSetting'
 var aiHubDiagSettingName ='aiHubDiagnosticSetting'
 var epDefaultName ='ep-${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
+var epDefaultName2 ='ep-${aifactoryProjectNumber}-1-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 
 
 /*
@@ -232,7 +233,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
 }
 
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
-resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' ={
+resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   name: aiHubDiagSettingName
   scope:enablePublicAccessWithPerimeter? aiHub2:aiHub
   properties: {
@@ -251,7 +252,7 @@ resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: aiHubProjectName
   location: location
   kind: 'Project'
@@ -277,8 +278,8 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-pre
     //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
   }
 
-  resource endpoint2 'onlineEndpoints' = {
-    name: epDefaultName
+  resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==true) {
+    name: epDefaultName2
     location: location
     kind: 'Managed'
     identity: {
@@ -365,7 +366,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     }
   }
 
-  resource aoaiConnection 'connections' = {
+  resource aoaiConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
     name: azureOpenAIConnectionName
     properties: {
       authType: 'AAD'
@@ -382,7 +383,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
       target: aiServices.properties.endpoints['OpenAI Language Model Instance API']
     }
   }
-  resource aiServicesConnection 'connections' = {
+  resource aiServicesConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
     name: azureAIServicesConnectionName
     properties: {
       authType: 'AAD'
@@ -401,7 +402,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   }
 
   resource searchConnection 'connections' =
-  if (!empty(azureAISearchConnectionName)) {
+  if (!empty(azureAISearchConnectionName) && enablePublicAccessWithPerimeter==false) {
     name: azureAISearchConnectionName
     properties: {
       authType: 'AAD'
