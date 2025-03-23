@@ -879,6 +879,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     projectResourceGroup
     sacc
     kv1
+    sa4AIsearch
     //acr
     //acrCommon2
   ]
@@ -918,6 +919,8 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
   dependsOn: [
     projectResourceGroup
     kv1
+    sacc
+    sa4AIsearch
   ]
 }
 
