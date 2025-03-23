@@ -141,7 +141,7 @@ az ml -h
 az extension update -n ml
 
 */
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: name
   location: location
   identity: {
@@ -164,14 +164,170 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     provisionNetworkNow: true
-    enableDataIsolation:enablePublicAccessWithPerimeter?false: enablePublicGenAIAccess?false:true
+    enableDataIsolation:enablePublicAccessWithPerimeter?false:true
 
     // network settings
-    publicNetworkAccess:enablePublicAccessWithPerimeter?'Enabled': enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    publicNetworkAccess:'Enabled'
     allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode:enablePublicAccessWithPerimeter? 'Disabled': 'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      isolationMode:'Disable'
+    }
+  }
+  resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter==true) {
+    name: azureOpenAIConnectionName
+    properties: {
+      authType: 'AAD'
+      category: 'AzureOpenAI'
+      isSharedToAll: true
+      useWorkspaceManagedIdentity: true
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      sharedUserList: []
+      metadata: {
+        ApiType: 'Azure'
+        ResourceId: aiServices.id
+      }
+      target: aiServices.properties.endpoints['OpenAI Language Model Instance API']
+    }
+  }
+  resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter==true) {
+    name: azureAIServicesConnectionName
+    properties: {
+      authType: 'AAD'
+      category: 'AIServices'
+      isSharedToAll: true
+      useWorkspaceManagedIdentity: true
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      sharedUserList: []
+      metadata: {
+        ApiType: 'Azure'
+        ResourceId: aiServices.id
+      }
+      target: aiServices.properties.endpoint
+    }
+  }
+
+  resource searchConnection2 'connections' =
+  if (!empty(azureAISearchConnectionName) && enablePublicAccessWithPerimeter==true) {
+    name: azureAISearchConnectionName
+    properties: {
+      authType: 'AAD'
+      category: 'CognitiveSearch'
+      isSharedToAll: true
+      useWorkspaceManagedIdentity: true
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      target: 'https://${aiSearch.name}.search.windows.net/'
+      metadata: {
+        ApiType: 'Azure'
+        ResourceId: aiSearch.id
+      }
+      //authType: 'ApiKey'
+      //credentials: {
+      //      key: !empty(aiSearchName) ? search.listAdminKeys().primaryKey : ''
+      //}
+    }
+  }
+}
+
+@description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
+resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' ={
+  name: aiHubDiagSettingName
+  scope:enablePublicAccessWithPerimeter? aiHub2:aiHub
+  properties: {
+    workspaceId: logWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+  }
+}
+
+@description('This is a container for the ai foundry project.')
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+  name: aiHubProjectName
+  location: location
+  kind: 'Project'
+  sku: {
+    name: 'Basic'
+    tier: 'Basic'
+  }
+  identity: {
+    type: 'SystemAssigned'  // This resource's identity is automatically assigned priviledge access to ACR, Storage, Key Vault, and Application Insights. 
+                            // Since the priveleges are granted at the project/hub level have elevated access to the resources, it is recommended to isolate these resources
+                            // to a resource group that only contains the project/hub.
+  }
+  properties: {
+    friendlyName: aiHubProjectName
+    description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
+    v1LegacyMode: false
+    publicNetworkAccess: allowPublicAccessWhenBehindVnet?'Enabled':'Disabled' // enablePublicGenAIAccess?'Enabled':'Disabled'
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    enableDataIsolation: enablePublicAccessWithPerimeter?false:true
+    hubResourceId:aiHub2.id
+    // configuration for workspaces with private link endpoint -> Error, not possible/allowed
+    //imageBuildCompute: 'buildcluster001' -> Error, not possible/allowed
+    //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
+  }
+
+  resource endpoint2 'onlineEndpoints' = {
+    name: epDefaultName
+    location: location
+    kind: 'Managed'
+    identity: {
+      type: 'SystemAssigned' // This resource's identity is automatically assigned AcrPull access to ACR, Storage Blob Data Contributor, and AML Metrics Writer on the project. It is also assigned two additional permissions below.
+                             // Given the permissions assigned to the identity, it is recommended only include deployments in the Azure OpenAI service that are trusted to be invoked from this endpoint.
+    }
+    properties: {
+      description: 'This is the default inference endpoint for the AI Factory project, prompt flow deployment. Called by the UI hosted in Web Apps.'
+      authMode: 'Key' // Ideally this should be based on Microsoft Entra ID access. This sample however uses a key stored in Key Vault.
+      publicNetworkAccess: 'Enabled'
+    }
+
+    // Note: If you reapply this Bicep after an AI Foundry managed compute deployment has happened in this endpoint, the traffic routing reverts to 0% to all existing deployments. You'll need to set that back to 100% to your desired deployment.
+  }
+}
+
+// ############################### Private ################
+
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+  name: name
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  tags: tags
+  kind: kindAIHub
+  properties: {
+    allowRoleAssignmentOnRG: true
+    friendlyName: '${name}-${env}-${aiFactoryNumber}'
+    description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
+
+     // dependent resources
+    applicationInsights: appInsights.id 
+    storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
+    containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
+    keyVault: keyVault.id
+
+    // configuration
+    systemDatastoresAuthMode: 'identity'
+    hbiWorkspace:false
+    provisionNetworkNow: true
+    enableDataIsolation:allowPublicAccessWhenBehindVnet?false:true // enablePublicGenAIAccess?false:true
+
+    // network settings
+    publicNetworkAccess:allowPublicAccessWhenBehindVnet?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    managedNetwork: {
+      firewallSku:'Basic' // 'Standard'
+      isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
@@ -204,7 +360,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     }
     ipAllowlist:ipWhitelist_array
     networkAcls: {
-      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny'  // If not Deny, then ipRules will be ignored.
+      defaultAction:'Deny'  // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }
@@ -266,26 +422,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   }
 }
 
-@description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
-resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  name: aiHubDiagSettingName
-  scope: aiHub
-  properties: {
-    workspaceId: logWorkspace.id
-    logs: [
-      {
-        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
-        enabled: true
-        retentionPolicy: {
-          enabled: false
-          days: 0
-        }
-      }
-    ]
-  }
-}
 @description('This is a container for the ai foundry project.')
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: aiHubProjectName
   location: location
   kind: 'Project'
@@ -302,16 +440,16 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
+    publicNetworkAccess: 'Enabled' // enablePublicGenAIAccess?'Enabled':'Disabled'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    enableDataIsolation: true
+    enableDataIsolation: enablePublicGenAIAccess?false:true
     hubResourceId: aiHub.id
     // configuration for workspaces with private link endpoint -> Error, not possible/allowed
     //imageBuildCompute: 'buildcluster001' -> Error, not possible/allowed
     //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
   }
 
-  resource endpoint 'onlineEndpoints' = {
+  resource endpoint 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==false) {
     name: epDefaultName
     location: location
     kind: 'Managed'
@@ -332,7 +470,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
 
 // Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added manually
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==false) {
   scope: aiProject
   name: guid(aiProject.id, aiProject::endpoint.id, amlWorkspaceSecretsReaderRole.id)
   properties: {
@@ -343,7 +481,7 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
 }
 
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==false) {
   scope: aiServices
   name: guid(aiServices.id, aiProject::endpoint.id, cognitiveServicesOpenAiUserRole.id)
   properties: {
@@ -354,7 +492,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
 }
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
-resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: aiProjectDiagSettingName
   scope: aiProject
   properties: {
@@ -374,7 +512,7 @@ resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-
 }
 
 @description('Azure Diagnostics: AI Foundry chat project online endpoint - allLogs')
-resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: 'chatProjectOnlineEndpointDiagSettingsDefault'
   scope: aiProject::endpoint
   properties: {
@@ -396,7 +534,7 @@ resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSet
 // pre-shared keys. This sample implementation uses a pre-shared key, and should be rewritten to use the managed identity
 // provided by Azure Web Apps.
 @description('Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app.')
-resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(enablePublicAccessWithPerimeter==false) {
   parent: keyVault
   name: 'aifactory-proj-ep-default-api-key'
   properties: {
@@ -409,7 +547,7 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
 }
 
 // privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
-resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePublicAccessWithPerimeter==false) {
   name: privateEndpointName
   location: location
   tags: tags
@@ -437,7 +575,7 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false && enablePublicAccessWithPerimeter==false) {
   name: '${pendAIHub.name}DnsZone'
   parent: pendAIHub
   properties:{
@@ -458,12 +596,142 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
   }
 }
 
-output id string = aiHub.id
-output name string = aiHub.name
-output principalId string = aiHub.identity.principalId
-output projectPrincipalId string = aiProject.identity.principalId
-output aiProjectName string = aiProject.name
+// Hub 2
 
+// Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added manually
+@description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
+resource projectSecretsReaderForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==true) {
+  scope: aiProject2
+  name: guid(aiProject2.id, aiProject2::endpoint2.id, amlWorkspaceSecretsReaderRole.id)
+  properties: {
+    roleDefinitionId: amlWorkspaceSecretsReaderRole.id
+    principalType: 'ServicePrincipal'
+    principalId: aiProject2::endpoint2.identity.principalId
+  }
+}
+
+@description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
+resource projectOpenAIUserForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==true) {
+  scope: aiServices
+  name: guid(aiServices.id, aiProject2::endpoint2.id, cognitiveServicesOpenAiUserRole.id)
+  properties: {
+    roleDefinitionId: cognitiveServicesOpenAiUserRole.id
+    principalType: 'ServicePrincipal'
+    principalId: aiProject2::endpoint2.identity.principalId
+  }
+}
+
+@description('Azure Diagnostics: AI Foundry chat project - allLogs')
+resource chatProjectDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+  name: aiProjectDiagSettingName
+  scope: aiProject2
+  properties: {
+    workspaceId: logWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs' // Production readiness change: In production, all logs are probably excessive. Please tune to just the log streams that add value to your workload's operations.
+                                 // This this scenario, the logs of interest are mostly found in AmlComputeClusterEvent, AmlDataSetEvent, AmlEnvironmentEvent, and AmlModelsEvent
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+  }
+}
+
+@description('Azure Diagnostics: AI Foundry chat project online endpoint - allLogs')
+resource chatProjectOnlineEndpointDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+  name: 'chatProjectOnlineEndpointDiagSettingsDefault2'
+  scope: aiProject2::endpoint2
+  properties: {
+    workspaceId: logWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+  }
+}
+
+// Production readiness change: Client applications that run from compute on Azure should use managed identities instead of
+// pre-shared keys. This sample implementation uses a pre-shared key, and should be rewritten to use the managed identity
+// provided by Azure Web Apps.
+@description('Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app.')
+resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(enablePublicAccessWithPerimeter==true) {
+  parent: keyVault
+  name: 'aifactory-proj-ep-default2-api-key'
+  properties: {
+    value: aiProject2::endpoint2.listKeys().primaryKey // This key is technically already in Key Vault, but it's name is not something that is easy to reference.
+    contentType: 'text/plain'
+    attributes: {
+      enabled: true
+    }
+  }
+}
+
+// privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
+resource pendAIHub2 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePublicAccessWithPerimeter==true) {
+  name: privateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    customNetworkInterfaceName: 'pend-nic-aihub-${aiHub2.name}'
+    privateLinkServiceConnections: [
+      {
+        name: privateEndpointName
+        properties: {
+          groupIds: [
+            'amlworkspace'
+          ]
+          privateLinkServiceId: aiHub2.id
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+    subnet: {
+      id: subnet.id
+    }
+  }
+}
+
+resource privateEndpointDns2 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false && enablePublicAccessWithPerimeter==true) {
+  name: '${pendAIHub2.name}DnsZone'
+  parent: pendAIHub2
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateDnsZoneName[environment().name]
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.amlworkspace.id 
+        }
+      }
+      {
+        name: privateDnsZoneNameNotebooks[environment().name]
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.notebooks.id 
+        }
+      }
+    ]
+  }
+}
+
+
+output id string = (enablePublicAccessWithPerimeter==false)? aiHub.id:aiHub2.id
+output name string =(enablePublicAccessWithPerimeter==false)? aiHub.name:aiHub2.name
+output principalId string = (enablePublicAccessWithPerimeter==false)?aiHub.identity.principalId:aiHub2.identity.principalId
+output projectPrincipalId string = (enablePublicAccessWithPerimeter==false)? aiProject.identity.principalId:aiProject2.identity.principalId
+output aiProjectName string = (enablePublicAccessWithPerimeter==false)? aiProject.name: aiProject2.name
 
 /*
 @description('Assign the online endpoint the ability to read connections from AI Project. This is needed to execute the prompt flow from the managed endpoint.')
