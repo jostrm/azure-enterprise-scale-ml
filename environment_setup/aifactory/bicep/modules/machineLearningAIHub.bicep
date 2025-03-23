@@ -118,6 +118,7 @@ var azureAISearchConnectionName ='azureAISearch'
 var aiHubProjectName ='ai-prj-${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 var aiProjectDiagSettingName ='aiProjectDiagnosticSetting'
 var aiHubDiagSettingName ='aiHubDiagnosticSetting'
+var aiHubDiagSettingName2 ='aiHubDiagnosticSetting2'
 var epDefaultName ='ep-${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 var epDefaultName2 ='ep-${aifactoryProjectNumber}-1-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 
@@ -233,9 +234,9 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
 }
 
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
-resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: aiHubDiagSettingName
-  scope:enablePublicAccessWithPerimeter? aiHub2:aiHub
+  scope:aiHub
   properties: {
     workspaceId: logWorkspace.id
     logs: [
@@ -250,7 +251,24 @@ resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
     ]
   }
 }
-
+@description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
+resource aiHubDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+  name: aiHubDiagSettingName2
+  scope:aiHub2
+  properties: {
+    workspaceId: logWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+  }
+}
 @description('This is a container for the ai foundry project.')
 resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: aiHubProjectName
