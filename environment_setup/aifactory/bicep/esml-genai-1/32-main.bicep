@@ -1198,10 +1198,12 @@ module sacc '../modules/storageAccount.bicep' = {
         name: 'default'
       }
     ]
+    /*
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/${aksSubnetName}'
     ]
+    */
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
       value: ip
