@@ -593,6 +593,20 @@ resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' ex
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
 }
 
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetNameFull
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet_genai_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: defaultSubnet
+  parent: vnet
+}
+resource subnet_aks_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: aksSubnetName
+  parent: vnet
+}
+
 module debug './00-debug.bicep' = {
   name: 'debug${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1202,9 +1216,9 @@ module sacc '../modules/storageAccount.bicep' = {
         name: 'default'
       }
     ]
-    vnetRules: [
-      genaiSubnetId
-      aksSubnetId
+    vnetRules: [ // Require  ServiceEndpoints for Microsoft.Storage on the subnets
+      subnet_genai_ref.id 
+      subnet_aks_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'

@@ -172,10 +172,10 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in 
     subnet: {
       id: subnet.id
     }
-    customNetworkInterfaceName: '${obj.name}-nic'
+    //customNetworkInterfaceName: '${obj.name}-nic'
     privateLinkServiceConnections: [
       {
-        name: obj.name
+        //name: obj.name
         properties: {
           privateLinkServiceId: sacc.id
           groupIds: [
