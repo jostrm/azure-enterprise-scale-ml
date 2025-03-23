@@ -163,7 +163,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
   
 }
-
+/*
 resource pendSacc 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in groupIds: {
   name: obj.name
   location: location
@@ -191,27 +191,137 @@ resource pendSacc 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in 
     ]
   }
 }]
+*/
+resource pendSaccBlob 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: blobPrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${blobPrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: blobPrivateEndpointName
+        properties: {
+          privateLinkServiceId: sacc.id
+          groupIds: [
+            'blob'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+resource pendSaccFile 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: filePrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${filePrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: filePrivateEndpointName
+        properties: {
+          privateLinkServiceId: sacc.id
+          groupIds: [
+            'file'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+resource pendSaccQ 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: queuePrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${queuePrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: queuePrivateEndpointName
+        properties: {
+          privateLinkServiceId: sacc.id
+          groupIds: [
+            'queue'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+resource pendSaccTable 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
+  name: tablePrivateEndpointName
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: subnet.id
+    }
+    customNetworkInterfaceName: '${tablePrivateEndpointName}-nic'
+    privateLinkServiceConnections: [
+      {
+        name: tablePrivateEndpointName
+        properties: {
+          privateLinkServiceId: sacc.id
+          groupIds: [
+            'table'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+}
+
 
 output storageAccountId string = sacc.id
 output storageAccountName string = sacc.name
 output dnsConfig array = [
   {
-    name: pendSacc[0].name
+    name: pendSaccBlob.name
     type: 'blob'
     id:sacc.id
   }
   {
-    name: pendSacc[1].name
+    name: filePrivateEndpointName
     type: 'file'
     id:sacc.id
   }
   {
-    name: pendSacc[2].name
+    name: queuePrivateEndpointName
     type: 'queue'
     id:sacc.id
   }
   {
-    name: pendSacc[3].name
+    name: tablePrivateEndpointName
     type: 'table'
     id:sacc.id
   }
