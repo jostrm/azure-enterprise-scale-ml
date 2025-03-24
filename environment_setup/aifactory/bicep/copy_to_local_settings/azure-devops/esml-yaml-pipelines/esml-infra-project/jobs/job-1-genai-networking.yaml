@@ -63,10 +63,6 @@ steps:
     scriptType: bash
     scriptLocation: 'inlineScript'
     inlineScript: |
-    
-     # value='${{ convertToJson(parameters.aifactory_tags) }}'
-     # echo '##vso[task.setvariable parameters.aifactory_tags.value]'$value
-
      echo "Deploying subnets and NSG to subscription: $(dev_test_prod_sub_id)"
      az account set --subscription "$(dev_test_prod_sub_id)"
      az deployment group create \

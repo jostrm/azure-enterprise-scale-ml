@@ -14,8 +14,6 @@ variables:
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
   admin_hybridBenefit: "false"
   admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 0 is disabled. 90 days is recommended.
-
-  # optional
   azure_machinelearning_sp_oid: "" # Azure Machine Learning service principle Object ID. Find it in Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
   
   # ONCE: AI Factory - Environments: Dev, Stage, Prod (needed for project provisioning)
@@ -28,6 +26,12 @@ variables:
   dev_cidr_range: "11" # DEV_CIDR_RANGE will replace XX in the template: 10.XX.0.0/16
   test_cidr_range: "12" # will replace XX in the template: 10.XX.0.0/16
   prod_cidr_range: "13" # will replace XX in the template: 10.XX.0.0/16
+
+  # Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
+  BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
+  network_env_dev: "" # Example: "dev-" Default is empty string. Set to empty if  BYO_subnets: "false"
+  network_env_stage: "" # Example: "stage-"
+  network_env_prod: "" # # Example: "prod-"
 
   dev_seeding_kv_service_connection: "" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
   test_seeding_kv_service_connection: "" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection

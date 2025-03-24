@@ -21,9 +21,10 @@ stages:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: "$(dev_sub_id)"
     admin_projectType: "esml"
+    network_env: "$(network_env_dev)"
   jobs:
     - deployment: ESML_Networking
-      condition: eq(variables['runNetworkingVar'], 'true')
+      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
       displayName: Deploy Private Network
       pool: 
         vmImage: windows-latest
@@ -37,7 +38,7 @@ stages:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
     - deployment: ESML_Services
-      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'))
+      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESML_Networking
       displayName: Deploy ESML services,Personas,RBAC,ACL,CAF & WAF Policys
       variables:
@@ -61,9 +62,10 @@ stages:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
     admin_projectType: "esml"
+    network_env: "$(network_env_dev)"
   jobs:
     - deployment: ESML_Networking
-      condition: eq(variables['runNetworkingVar'], 'true')
+      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
       displayName: Deploy Private Network
       pool:
         vmImage: windows-latest
@@ -77,7 +79,7 @@ stages:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
     - deployment: ESML_Services
-      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'))
+      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESML_Networking
       displayName: DDeploy ESML services,Personas,RBAC,ACL,CAF & WAF Policys
       pool:
@@ -97,9 +99,10 @@ stages:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
     admin_projectType: "esml"
+    network_env: "$(network_env_dev)"
   jobs:
     - deployment: ESML_Networking
-      condition: eq(variables['runNetworkingVar'], 'true')
+      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
       displayName: Deploy Private Network
       pool:
         vmImage: windows-latest
@@ -113,7 +116,7 @@ stages:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
     - deployment: ESML_Services
-      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'))
+      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESML_Networking
       displayName: DDeploy ESML services,Personas,RBAC,ACL,CAF & WAF Policys
       pool:

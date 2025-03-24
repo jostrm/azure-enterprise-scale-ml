@@ -16,7 +16,8 @@ Quick Setup
 * [23) DataOps template: How-to: Setup DataOps via PIPELINE templates (CoreTeam)](#23-templates-dataops---how-to-setup-dataops-via-pipeline-templates)
 * [24) End-2-End setup tutorial: AIFactory (4-8 hours) - How-to](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to)
 * [25) Personas: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)](#25-personas-connecting-people--agents-to-processes-dataops-mlops-genaiops--toolsarchitectures-and-services)
-
+* [26) UPDATE AIFactory: Update with new features](../v2/20-29/26-update-AIFactory.md)
+* [26) EXTEND AIFactory project type: With new Services, Your BICEP](../v2/20-29/27-extend-AIF-pipelines.md)
 
 
 **Consumer related** - relevant for developers, data scientists, data engineers (ProjectTeam: 30-39)

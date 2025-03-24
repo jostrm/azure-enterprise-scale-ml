@@ -42,6 +42,7 @@ steps:
 
 - task: AzureCLI@2
   displayName: '02_az_bicep_networking'
+  condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -100,5 +101,7 @@ steps:
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
-     --parameters inputKeyvault="$(admin_bicep_kv_fw)"
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters BYO_subnets="$(BYO_subnets)" \
+     --parameters network_env="$(network_env)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'

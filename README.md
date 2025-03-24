@@ -14,6 +14,8 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 [How-to SETUP](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
 - **Includes two setup modes: Fully private** Peered AI factory, Standalone AI Factory (VPN, IP whitelist, Bastion)
 
+[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md)<br>
+
 [Documentation](./documentation/readme.md)
 
 ## This accelerator: Main purpose: 
