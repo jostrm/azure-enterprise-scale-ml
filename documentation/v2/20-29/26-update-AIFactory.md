@@ -10,10 +10,10 @@ When a feature is updated, or bug-fixes occur, e.g. if pipelines is untouched, a
 You may use `VS Code` on the GIT tab, and just "Pull" the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location. Open a new terminal `Git Bash` or similar: 
 
 ```
-git submodule update --init --recursive
+git submodule update --init --recursive --remote
 ```
 ``` 
-git submodule foreach 'git checkout main'
+git submodule foreach 'git checkout main && git pull origin main'
 ```
 
 **Finished!**
@@ -41,10 +41,10 @@ The below files will be updated via `bash` scripts:
     - You may use `VS Code` on the GIT tab, and just **Pull** the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location:
 
     ```bash
-    git submodule update --init --recursive
+    git submodule update --init --recursive --remote
     ```
     ``` 
-    git submodule foreach 'git checkout main'
+    git submodule foreach 'git checkout main && git pull origin main'
     ```
 
 2) Run the START script - to ensure you have the latest bootstrap scripts. 
@@ -93,10 +93,10 @@ The below files will be updated via `bash` scripts:
 You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location:
 
     ```bash
-    git submodule update --init --recursive
+    git submodule update --init --recursive --remote
     ```
     ``` 
-    git submodule foreach 'git checkout main'
+    git submodule foreach 'git checkout main && git pull origin main'
     ```
 2) Run the START script - to ensure you have the latest bootstrap scripts. 
     - friendly, will never overwrite anything exist .sh files at root
