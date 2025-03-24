@@ -3,10 +3,10 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "vnetResourceGroup_param": {
-            "value": ""
+            "value": "byosnet-esml-common-eus2-<network_env>001-rg"
         },
         "vnetNameFull_param": {
-            "value": ""
+            "value": "byovnet-esml-common-eus2-<network_env>001"
         },
         "commonResourceGroup_param": {
             "value": ""
@@ -19,6 +19,27 @@
         },
         "useCommonACR": {
             "value": true
+        },
+        "subnetCommon": {
+            "value": "acme-<network_env>common-eus2-subnet"
+        },
+        "subnetCommonScoring": {
+            "value": "acme-<network_env>common-scoring-eus2-subnet"
+        },
+        "subnetCommonPowerbiGw": {
+            "value": "acme-<network_env>common-pbi-eus2-subnet"
+        },
+        "subnetProjGenAI": {
+            "value": "acme-<network_env>prj<xxx>-genai-eus2-subnet"
+        },
+        "subnetProjAKS": {
+            "value": "acme-<network_env>prj<xxx>-aks-eus2-subnet"
+        },
+        "subnetProjDatabricksPublic": {
+            "value": "acme-<network_env>prj<xxx>-dbxpub-eus2-subnet"
+        },
+        "subnetProjDatabricksPrivate": {
+            "value": "acme-<network_env>prj<xxx>-dbxpriv-eus2-subnet"
         }
     }
 }

@@ -8,6 +8,9 @@
         "allowPublicAccessWhenBehindVnet": {
             "value": false
         },
+        "enablePublicAccessWithPerimeter": {
+            "value": false
+        },
         "aiSearchEnableSharedPrivateLink":{ 
             "value": false
         },
