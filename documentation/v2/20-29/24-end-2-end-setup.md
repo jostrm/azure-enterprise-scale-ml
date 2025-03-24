@@ -17,7 +17,7 @@
     - TODO: Joakim
 
 ### Very detailed setup info with screenshots (Azure Devops classic)
-Just for information: 
+
 [Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
 
 ## Result: 
