@@ -54,8 +54,8 @@ if [[ "$orchestrator" == "a" ]]; then
     
     # Common
     cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
-    cp "$SCRIPT_DIR/bootstrap/12-GENAI-update-ip-rule-ux.sh" "$SCRIPT_DIR/../12-GENAI-update-ip-rule-ux.sh"
-    cp "$SCRIPT_DIR/bootstrap/13-ESML-update-ip-rule-ux.sh" "$SCRIPT_DIR/../13-ESML-update-ip-rule-ux.sh"
+    #cp "$SCRIPT_DIR/bootstrap/12-GENAI-update-ip-rule-ux.sh" "$SCRIPT_DIR/../12-GENAI-update-ip-rule-ux.sh"
+    #cp "$SCRIPT_DIR/bootstrap/13-ESML-update-ip-rule-ux.sh" "$SCRIPT_DIR/../13-ESML-update-ip-rule-ux.sh"
     
     echo -e "${GREEN}Finished!${NC}"
     echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
@@ -95,8 +95,8 @@ elif [[ "$orchestrator" == "g" ]]; then
     cp "$SCRIPT_DIR/bootstrap/03a-GH-bootstrap-files-no-env-overwrite.sh" "$SCRIPT_DIR/../03-GH-bootstrap-files-no-env-overwrite.sh"
     # Common
     cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
-    cp "$SCRIPT_DIR/bootstrap/12-GENAI-update-ip-rule-ux.sh" "$SCRIPT_DIR/../12-GENAI-update-ip-rule-ux.sh"
-    cp "$SCRIPT_DIR/bootstrap/13-ESML-update-ip-rule-ux.sh" "$SCRIPT_DIR/../13-ESML-update-ip-rule-ux.sh"
+    #cp "$SCRIPT_DIR/bootstrap/12-GENAI-update-ip-rule-ux.sh" "$SCRIPT_DIR/../12-GENAI-update-ip-rule-ux.sh"
+    #cp "$SCRIPT_DIR/bootstrap/13-ESML-update-ip-rule-ux.sh" "$SCRIPT_DIR/../13-ESML-update-ip-rule-ux.sh"
 
     echo -e "${GREEN}Finished!${NC}"
     echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
