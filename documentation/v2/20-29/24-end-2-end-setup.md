@@ -30,7 +30,7 @@ This is what you will get:
 ## Advanced Configuration: Standalone VS Hub-connected centralized private DNS zones
 
 ### When to choose What? 
-Recommended approach is to combine `BYOvNet` with `Hub-Connected & Centralized private DNZ zones`. This enables all 4 access modes: `Peering, VPN, Bastion, Whitelistlisting user IP's`, and separates the networking from the AI Factory common area, to your centralized Hub (Hub/Spoke).
+Recommended approach is to combine `BYOvNet` with `Hub-Connected & Centralized private DNZ zones`. This enables all 4 access modes: `Peering, VPN, Bastion, Whitelistlisting user IP's` and separates the networking from the AI Factory common area, to your centralized Hub (Hub/Spoke).
 - **Scenarios**: Production scenario.
 
 But if you want simplicty or want to setup an AI Factory in an isolated bubble - not involving your Hub, choose `Standalone` mode. 
