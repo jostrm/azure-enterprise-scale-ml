@@ -11,12 +11,14 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a sumobule repo.
 >
 
-[How-to SETUP](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
+[How-to SETUP AI Factory](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
 - **Includes two setup modes: Fully private** Peered AI factory, Standalone AI Factory (VPN, IP whitelist, Bastion)
 
 [How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md)<br>
+- **When a new feature arrives**
 
 [Documentation](./documentation/readme.md)
+- **Read more**: How to EXTEND project types. How templates works for DataOps, GenAIOps, MLOps. How RBAC, Persona, Networking, workflows works.
 
 ## This accelerator: Main purpose: 
 1) `Marry multiple best practices & accelerators:` **Secure Enterprise Scale AI Landing Zones + Secure GenAIOps template**  ( since using a GenAIOps/LLMOps template based on unsecure infrastructure (no private endpoints/vNet) will not be compatible with secure infra )
