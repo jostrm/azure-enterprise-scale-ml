@@ -12,6 +12,9 @@ You may use `VS Code` on the GIT tab, and just "Pull" the submodule `azure-enter
 ```
 git submodule update --init --recursive
 ```
+``` 
+git submodule foreach 'git checkout main'
+```
 
 **Finished!**
 
@@ -35,12 +38,14 @@ The below files will be updated via `bash` scripts:
 
 1) UPDATE the submodule to your repo (to get the updates)
 
-You may use `VS Code` on the GIT tab, and just **Pull** the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location:
+    - You may use `VS Code` on the GIT tab, and just **Pull** the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location:
 
-
-```bash
-git submodule update --init --recursive
-```
+    ```bash
+    git submodule update --init --recursive
+    ```
+    ``` 
+    git submodule foreach 'git checkout main'
+    ```
 
 2) Run the START script - to ensure you have the latest bootstrap scripts. 
     - friendly, will never overwrite anything exist .sh files at root
@@ -90,7 +95,9 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
     ```bash
     git submodule update --init --recursive
     ```
-
+    ``` 
+    git submodule foreach 'git checkout main'
+    ```
 2) Run the START script - to ensure you have the latest bootstrap scripts. 
     - friendly, will never overwrite anything exist .sh files at root
     
