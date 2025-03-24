@@ -7,7 +7,7 @@
 # 1) How-to update: UPDATED feature / BUG fixes
 When a feature is updated, or bug-fixes occur, e.g. if pipelines is untouched, and variables.yaml (.env) is untouched. 
 
-You may use `VS Code` on the GIT tab, and just "Pull" the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location:
+You may use `VS Code` on the GIT tab, and just "Pull" the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location. Open a new terminal `GIT Bash`: 
 
     ```
     git submodule update --init --recursive
