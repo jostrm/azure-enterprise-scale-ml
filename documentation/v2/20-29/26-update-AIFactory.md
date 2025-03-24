@@ -19,6 +19,8 @@ git submodule update --init --recursive
 When a new feature is added, which impacts the varables and pipeline. Features sucha as BYOVnet, Subnets, Personas. 
 If such feature is added, the below "pipelines & variables", may need to be updated. 
 
+The below files will be updated via `bash` scripts:
+
 - Option A) Azure Devops: 
     - `Pipeline templates (.yaml)` located `aifactory/esml-infa/azure-devops`
     - `Variables.yaml` located `aifactory/esml-infa/azure-devops/variables`
