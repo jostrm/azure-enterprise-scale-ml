@@ -9,9 +9,9 @@ When a feature is updated, or bug-fixes occur, e.g. if pipelines is untouched, a
 
 You may use `VS Code` on the GIT tab, and just "Pull" the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location. Open a new terminal `Git Bash` or similar: 
 
-    ```
-    git submodule update --init --recursive
-    ```
+```
+git submodule update --init --recursive
+```
 
 **Finished!**
 
@@ -58,9 +58,7 @@ git submodule update --init --recursive
 
 4) Do a "file compare" (using VS code or similar) with  `variables.yaml` VS  `variables-template.yaml`
     - Compare the file, to see if any new variables have been added, that you need to set, then set them
-
     - Example below: 
-
     ```yaml
     # Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
     BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
@@ -113,14 +111,13 @@ Compare the file, to see if any new environment variables have been added, that 
 
 Example below: 
 
-    ```yaml
-    # Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
-    BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
-    network_env_dev: "" # Example: "dev-" Default is empty string. Set to empty if  BYO_subnets: "false"
-    network_env_stage: "" # Example: "stage-"
-    network_env_prod: "" # # Example: "prod-"
-
-    ```
+```yaml
+# Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
+BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
+network_env_dev: "" # Example: "dev-" Default is empty string. Set to empty if  BYO_subnets: "false"
+network_env_stage: "" # Example: "stage-"
+network_env_prod: "" # # Example: "prod-"
+```
 
 5) `Rare cases`: Added or updated base `parameter` files, or parameters inside of files
     - Friendly: It will NOT overwrie your `aifactory` folder. It will create a new folder at root called `aifactory-templates`
