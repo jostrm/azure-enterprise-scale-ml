@@ -18,6 +18,7 @@ param containers array = []
 param files array = []
 param networkAcls object = {}
 param enablePublicAccessWithPerimeter bool = false
+param enablePublicGenAIAccess bool = false
 
 @allowed([
   'Standard_LRS'
@@ -76,7 +77,7 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+resource sacc2 'Microsoft.Storage/storageAccounts@2023-05-01' = if(enablePublicGenAIAccess) {
   name: storageAccountName
   tags: tags
   location: location
@@ -145,7 +146,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     resource container 'containers' = [for container in containers: {
       name: container.name
       properties: {
-        publicAccess: contains(container, 'publicAccess') ? container.publicAccess : 'None'
+        publicAccess:'None'
       }
     }]
   }
@@ -163,35 +164,93 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
   
 }
-/*
-resource pendSacc 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in groupIds: {
-  name: obj.name
-  location: location
+resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = if(enablePublicGenAIAccess == false) {
+  name: storageAccountName
   tags: tags
-  properties: {
-    subnet: {
-      id: subnet.id
-    }
-    //customNetworkInterfaceName: '${obj.name}-nic'
-    privateLinkServiceConnections: [
-      {
-        //name: obj.name
-        properties: {
-          privateLinkServiceId: sacc.id
-          groupIds: [
-            obj.gid
-          ]
-          privateLinkServiceConnectionState: {
-            status: 'Approved'
-            description: 'Auto-Approved'
-            actionsRequired: 'None'
-          }
+  location: location
+  kind: 'StorageV2'
+  sku: {
+    name: skuName
+  }
+  properties:{
+    accessTier: 'Hot'
+    publicNetworkAccess:'Disabled'
+    allowCrossTenantReplication: true
+    allowSharedKeyAccess: false
+    allowBlobPublicAccess: false
+    isHnsEnabled: false
+    isNfsV3Enabled: false
+    enableExtendedGroups: false
+    supportsHttpsTrafficOnly: true
+    encryption: {
+      keySource: 'Microsoft.Storage'
+      requireInfrastructureEncryption: false
+      services: {
+        blob: {
+          enabled: true
+          keyType: 'Account'
+        }
+        file: {
+          enabled: true
+          keyType: 'Account'
+        }
+        queue: {
+          enabled: true
+          keyType: 'Service'
+        }
+        table: {
+          enabled: true
+          keyType: 'Service'
         }
       }
-    ]
+    }
+    keyPolicy: {
+      keyExpirationPeriodInDays: 7
+    }
+    largeFileSharesState: 'Disabled'
+    minimumTlsVersion: 'TLS1_2'
+    networkAcls: {
+      bypass: 'AzureServices' 
+      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' 
+      virtualNetworkRules:[for rule in vnetRules:{
+        action: 'Allow'
+        id: rule
+      }]
+    }
   }
-}]
-*/
+  resource blobServices 'blobServices' = if (!empty(containers)) {
+    name: 'default'
+    properties: {
+      cors: {
+        corsRules: corsRules
+      }
+      deleteRetentionPolicy: {
+        enabled: true
+        days: 7
+      }
+    }
+    resource container 'containers' = [for container in containers: {
+      name: container.name
+      properties: {
+        publicAccess: 'None'
+      }
+    }]
+  }
+  resource fileServices 'fileServices' = if (!empty(files)) {
+    name: 'default'
+    properties: {
+      cors: {
+        corsRules: corsRules
+      }
+      shareDeleteRetentionPolicy: {
+        enabled: true
+        days: 7
+      }
+    }
+  }
+  
+}
+
 resource pendSaccBlob 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
   name: blobPrivateEndpointName
   location: location

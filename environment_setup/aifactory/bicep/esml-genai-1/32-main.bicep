@@ -131,7 +131,7 @@ param aiSearchEnableSharedPrivateLink_DOCS string = 'https://learn.microsoft.com
 
 @description('Default is false. May be needed if Azure OpenAI should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessForCognitive bool = true
-@description('Default is true. May be needed if Azure AI Search, if it should be public, which is neeed for some features, such as Azure AI Fundry on your data feature.')
+@description('Default is true. May be needed if Azure AI Search, if it should be public, which is neeed for some features, such as Azure AI Foudnry on your data feature.')
 param enablePublicNetworkAccessForAISearch bool = true
 @description('Default is false. May be needed if Azure Storage used by AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessFoAIStorage bool = false
@@ -1060,6 +1060,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     location: location
+    enablePublicGenAIAccess:enablePublicGenAIAccess
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}'
@@ -1206,6 +1207,7 @@ module sacc '../modules/storageAccount.bicep' = {
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     location: location
+    enablePublicGenAIAccess:enablePublicGenAIAccess
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
