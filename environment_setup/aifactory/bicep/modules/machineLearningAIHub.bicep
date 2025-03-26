@@ -342,7 +342,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     enableDataIsolation:allowPublicAccessWhenBehindVnet?false:true // enablePublicGenAIAccess?false:true
 
     // network settings
-    publicNetworkAccess:allowPublicAccessWhenBehindVnet?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'

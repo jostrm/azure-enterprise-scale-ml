@@ -131,14 +131,14 @@ param aiSearchEnableSharedPrivateLink_DOCS string = 'https://learn.microsoft.com
 
 @description('Default is false. May be needed if Azure OpenAI should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessForCognitive bool = true
-@description('Default is true. May be needed if Azure AI Search, if it should be public, which is neeed for some features, such as Azure AI Foudnry on your data feature.')
+@description('Default is true. May be needed if Azure AI Search, if it should be public, which is neeed for some features, such as Azure AI Fundry on your data feature.')
 param enablePublicNetworkAccessForAISearch bool = true
 @description('Default is false. May be needed if Azure Storage used by AI Search, if it should be public, which is neeed for some features, such as Azure AI Studio on your data feature.')
 param enablePublicNetworkAccessFoAIStorage bool = false
 @description('Default is false. If true, it will flip all flags for GenAI RAG, such as Azure OpenAI, Azure AI Search, CosmosDB, WebApp, Azure Machine Learning')
 param enablePublicGenAIAccess bool = false
-@description('Default is true.')
-param allowPublicAccessWhenBehindVnet bool = true
+@description('Default is false.')
+param allowPublicAccessWhenBehindVnet bool = false
 
 // Azure Machine Learning
 param aks_dev_sku_override string = ''  // Override: AKS -  Azure Machine Learning
@@ -295,6 +295,7 @@ param subnetProjGenAI string = ''
 param subnetProjAKS string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
+param enableDebugging bool = false
 
 // Parameters to variables
 var vnetNameFull = vnetNameFull_param != '' ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
@@ -607,7 +608,7 @@ resource subnet_aks_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' e
   parent: vnet
 }
 
-module debug './00-debug.bicep' = {
+module debug './00-debug.bicep' = if(enableDebugging){
   name: 'debug${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
@@ -862,7 +863,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     modelGPT4Version:modelGPT4Version
     kind: kindAIServices
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
-    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    publicNetworkAccess: enablePublicGenAIAccess
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       //'${vnetId}/subnets/${aksSubnetName}'
@@ -905,7 +906,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
     aiSearchPrincipalId: aiSearchService.outputs.principalId
     kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
-    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
+    publicNetworkAccess: enablePublicGenAIAccess
     disableLocalAuth:disableLocalAuth
     vnetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
@@ -1017,13 +1018,13 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     subnetName: defaultSubnet
     tags: tags
     semanticSearchTier: (location != 'swedencentral')? semanticSearchTier: 'disabled'
-    publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForAISearch
-    skuName: aiSearchSKUName //enablePublicGenAIAccess? aiSearchSKUName: aiSearchSKUSharedPrivate
+    publicNetworkAccess: enablePublicGenAIAccess
+    skuName: aiSearchSKUName
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow' // Only IP addresses to AISearch are allowed, according to docs? 
+      action: 'Allow'
       value: ip
     }]
   }

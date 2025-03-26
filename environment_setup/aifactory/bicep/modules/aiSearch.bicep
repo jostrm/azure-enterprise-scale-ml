@@ -100,9 +100,9 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
     replicaCount: replicaCount
     hostingMode: hostingMode
     partitionCount: partitionCount
-    publicNetworkAccess:(enablePublicAccessWithPerimeter || publicNetworkAccess)? 'Enabled': 'Disabled'
+    publicNetworkAccess:(enablePublicAccessWithPerimeter || publicNetworkAccess)? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
-      bypass: 'AzureServices' //'None' (GH copilot say also: 'AzureServices') // Azure docs says: 'AzurePortal'. AIServices did not work
+      bypass: 'AzureServices'
       ipRules: ipRules // only IP addresses. Not also "action: 'Allow'"
     }
     
