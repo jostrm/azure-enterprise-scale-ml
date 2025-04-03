@@ -85,6 +85,7 @@ for env in "${environments[@]}"; do
     create_or_update_variable $env "AIFACTORY_PREFIX" "$AIFACTORY_PREFIX"
     create_or_update_variable $env "TENANT_AZUREML_OID" "$TENANT_AZUREML_OID"
     create_or_update_variable $env "LAKE_PREFIX" "$LAKE_PREFIX"
+    create_or_update_variable $env "AISEARCH_SEMANTIC_TIER" "$AISEARCH_SEMANTIC_TIER"
 
     #RBAC model
     create_or_update_variable $env "USE_AD_GROUPS" "$USE_AD_GROUPS"
