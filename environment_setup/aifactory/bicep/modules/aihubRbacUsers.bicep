@@ -25,6 +25,7 @@ var roleBasedAccessControlAdministratorRG = 'f58310d9-a9f6-439a-9e8d-f62e7b41a16
 // ############## RG LEVEL END
 
 // Search
+var searchIndexDataReader = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 //Lets you manage Search services, but not access to them.
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
@@ -62,7 +63,7 @@ resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' 
   name: storageAccountName2
 }
 
-resource existingAiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing = {
+resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
   name: aiSearchName
 }
 
@@ -90,6 +91,17 @@ resource searchIndexDataContributor 'Microsoft.Authorization/roleAssignments@202
   }
   scope:existingAiSearch
 }]
+resource searchIndexDataReaderAssign 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(existingAiSearch.id, searchIndexDataReader, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReader)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'021: searchIndexDataReader to USER with OID  ${userObjectIds[i]} for : ${existingAiSearch.name}'
+  }
+  scope:existingAiSearch
+}]
+
 resource searchIndexDataContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, servicePrincipleObjectId)
   properties: {

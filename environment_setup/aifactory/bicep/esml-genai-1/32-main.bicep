@@ -19,7 +19,8 @@ param vmSKU array = [
   'Standard_D4s_v3'
   'standard_D2as_v5'
 ]
-
+@description('The API version of the OpenAI resource')
+param openAiApiVersion string = '2024-08-01-preview'
 // Cognitive Service types & settings
 @allowed([
   'AIServices'
@@ -69,8 +70,10 @@ param keyvaultSoftDeleteDays int=90
 */
 param modelGPT4Version string = '1106-Preview' // If your region doesn't support this version, please change it.
 
-
+param serviceSettingDeployAppInsightsDashboard bool = true
 // ### FALSE as default - START ### 
+param serviceSettingDeployBingSearch bool = false
+param bingSearchSKU string = 'G1'
 
 // Standalone: Speech, Vision, DocIntelligence
 @description('Service setting: Deploy Azure AI Document Intelligence for project')
@@ -84,9 +87,14 @@ param serviceSettingDeployProjectVM bool = false
 @description('Service setting:Deploy Azure Machine Learning - classic, not in hub mode')
 param serviceSettingDeployAzureMLClassic bool = false
 
+param serviceSettingDeployContainerApps bool = false
+param acaImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param acaCustomDomainsArray array = []
+
 // UI and History in RAG
-@description('Service setting:Deploy CosmosDB')
 param serviceSettingDeployCosmosDB bool = false
+param cosmosDBSKU string = 'Standard'
+
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
 @description('Service setting: Deploy Content Safety for project')
@@ -349,6 +357,16 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (privDnsSubscription_param != ''&& centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetNameFull
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+// Get the CIDR address prefixes from the vNet's properties
+var vnetAddressPrefixes = vnet.properties.addressSpace.addressPrefixes
+// If you want just the first CIDR (most common case)
+var vnetCidr = vnetAddressPrefixes[0]
+
 // 2024-09-15: 25 entries, and special keyes
 var privateDnsZoneName =  {
   azureusgovernment: 'privatelink.api.ml.azure.us'
@@ -464,6 +482,10 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
     name:'privatelink.agentsvc.azure-automation.net'
   }
+  azurecontainerapps: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.${location}.azurecontainerapps.io'
+    name:'privatelink.${location}.azurecontainerapps.io'
+  }
 }
 
 var privateLinksDnsZonesArray = [
@@ -567,6 +589,10 @@ var privateLinksDnsZonesArray = [
     name: privateLinksDnsZones.azuremonitoragentsvc.name
     id: privateLinksDnsZones.azuremonitoragentsvc.id
   }
+  {
+    name: privateLinksDnsZones.azurecontainerapps.name
+    id: privateLinksDnsZones.azurecontainerapps.id
+  }
 ]
 
 output privateLinksDnsZones object = privateLinksDnsZones
@@ -592,11 +618,6 @@ module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centr
 resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = if (centralDnsZoneByPolicyInHub==false){
   name: 'privatelink.cognitiveservices.azure.com'
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-}
-
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  name: vnetNameFull
-  scope: resourceGroup(vnetResourceGroupName)
 }
 
 resource subnet_genai_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
@@ -1329,7 +1350,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDep
     hybridBenefit: hybridBenefit
     vmSize: vmSKU[vmSKUSelectedArrayIndex]
     location: location
-    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+    vmName: 'dsvm-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: tags
@@ -1488,8 +1509,232 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(centralDns
   ]
 }
 
+// cosmosdb.bicep, bing.bicep, aca.bicep (webapp.bicep, azurefunction.bicep)
+module bing '../modules/bing.bicep' = if(serviceSettingDeployBingSearch==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'BingSearch4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    location: location
+    sku: bingSearchSKU
+    tags: tags
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'CosmosDB4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    location: location
+    enablePublicGenAIAccess:enablePublicGenAIAccess
+    ipRules:ipWhitelist_array
+    vNetRules: [
+      '${vnetId}/subnets/${defaultSubnet}'
+      '${vnetId}/subnets/${aksSubnetName}'
+    ]
+    kind: 'GlobalDocumentDB'
+    tags: tags
+    corsRules: [
+      {
+        allowedOrigins: 'https://mlworkspace.azure.ai,https://ml.azure.com,https://*.ml.azure.com,https://ai.azure.com,https://*.ai.azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://42.swedencentral.instances.azureml.ms,https://*.instances.azureml.ms,https://*.azureml.ms'
+        allowedMethods: 'GET,HEAD,POST,PUT,DELETE,OPTIONS,PATCH'
+        allowedHeaders: '*'
+        exposedHeaders: '*'
+        maxAgeInSeconds: 1800
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppInsightsDashboard==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'appinsights-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    location: location
+    tags: tags
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight.id
+    dashboardName: 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+  // It is critical that the identity is granted ACR pull access before the app is created
+  // otherwise the container app will throw a provision error
+  // This also forces us to use an user assigned managed identity since there would no way to 
+  // provide the system assigned identity with the ACR pull access before the app is created
+
+  module miForAca '../modules/mi.bicep' = {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'miForAca4${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      name: 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      location: location
+      tags: tags
+    }
+    dependsOn: [
+      projectResourceGroup
+    ]
+  }
+
+  module miRbac '../modules/miRbac.bicep' = {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'miRbac-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+      principalId: miForAca.outputs.managedIdentityPrincipalId
+    }
+    dependsOn: [
+      projectResourceGroup
+      miForAca
+    ]
+  }
+
+  var allowedOrigins = [
+    'https://mlworkspace.azure.ai'
+    'https://ml.azure.com'
+    'https://*.ml.azure.com'
+    'https://ai.azure.com'
+    'https://*.ai.azure.com'
+    'https://mlworkspacecanary.azure.ai'
+    'https://mlworkspace.azureml-test.net'
+    'https://42.swedencentral.instances.azureml.ms'
+    'https://*.instances.azureml.ms'
+    'https://*.azureml.ms'
+  ]
+  
+  var imageName = ''
+  
+  module containerApps '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'acas-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      name: 'acas-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      location: location
+      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+      tags: tags
+      containerAppsEnvironmentName: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      logAnalyticsWorkspaceName: laName
+      applicationInsightsName: appinsights.outputs.name
+      enablePublicGenAIAccess: enablePublicGenAIAccess
+      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      subnetNamePend: defaultSubnet
+      subnetAcaDedicatedName: aksSubnetName
+    }
+    dependsOn: [
+      projectResourceGroup
+      miForAca
+      miRbac  // It is critical that the identity is granted ACR pull access before the app is created
+    ] 
+  }
+
+  // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
+  var ipSecurityRestrictions =[for ip in ipWhitelist_array: {
+      name: replace(replace(ip, ',', ''), '/', '_')  // Replace commas with nothing and slashes with underscores
+      ipAddressRange: ip
+      action: 'Allow'
+    }]
+  
+  var vnetAllow = [
+    {
+      name: 'AllowVNet'
+      ipAddressRange: vnetCidr // VNet CIDR from your existing variable
+      action: 'Allow'
+    }
+  ]
+
+  var unionIpSec = union(ipSecurityRestrictions,vnetAllow)
+
+  module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'aca-api-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      name: 'aca-api-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      location: location
+      tags: tags
+      ipSecurityRestrictions: enablePublicGenAIAccess? ipSecurityRestrictions: []
+      enablePublicGenAIAccess: enablePublicGenAIAccess
+      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      subnetNamePend: defaultSubnet
+      subnetAcaDedicatedName: aksSubnetName
+      customDomains:acaCustomDomainsArray
+      resourceGroupName: targetResourceGroup
+      identityId: miForAca.outputs.managedIdentityClientId
+      identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
+      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+      containerAppsEnvironmentName: containerApps.outputs.environmentName
+      openAiDeploymentName: 'gpt-4'
+      openAiEvalDeploymentName:'gpt-4-evals'
+      openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
+      openAiEndpoint: aiServices.outputs.openAIEndpoint //ai.outputs.openAiEndpoint
+      openAiName: aiServices.outputs.name //ai.outputs.openAiName
+      openAiType: 'azure'
+      openAiApiVersion: openAiApiVersion
+      aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint // ai.outputs.searchServiceEndpoint
+      aiSearchIndexName: 'index-${projectName}-default${uniqueInAIFenv}${resourceSuffix}'
+      appinsightsConnectionstring: appinsights.outputs.connectionString // ai.outputs.applicationInsightsConnectionString
+      bingName: bing.outputs.bingName //ai.outputs.bingName
+      bingApiEndpoint: bing.outputs.endpoint // ai.outputs.bingEndpoint
+      bingApiKey: bing.outputs.bingApiKey  //ai.outputs.bingApiKey
+      aiProjectName: aiHub.outputs.aiProjectName //ai.outputs.projectName
+      subscriptionId: subscriptionIdDevTestProd
+
+    }
+    dependsOn: [
+      containerApps
+    ] 
+  }
+  module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name:'aca-api-${deployment().name}-${deploymentProjSpecificUniqueSuffix}' 
+    params: {
+      location: location
+      tags: tags
+      name: 'aca-api-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
+      containerAppsEnvironmentName: containerApps.outputs.environmentName
+      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+      identityId: miForAca.outputs.managedIdentityClientId
+      identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
+    }
+    dependsOn: [
+      containerApps
+      acaApi
+    ]
+  }
+
+  module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
+    params:{
+      aiSearchName: aiSearchService.outputs.aiSearchName
+      appInsightsName: appinsights.outputs.name
+      principalIdMI: miForAca.outputs.managedIdentityPrincipalId
+      resourceGroupId: targetResourceGroupId
+    }
+    dependsOn: [
+      projectResourceGroup
+      containerApps
+      acaApi
+    ]
+  }
+  
+// 
 // ------------------------------ SERVICES (Azure Machine Learning)  ------------------------------//
-var amlName ='aml-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var amlName ='aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
 param aks_dev_defaults array = [

@@ -35,8 +35,8 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-
-resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+// 2023-11-01-preview needed for metadataSearch (prev: registries@2023-07-01, 2023-11-01-preview)
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-preview' = {
   name: containerRegistryNameCleaned
   tags: tags
   location: location
@@ -101,6 +101,7 @@ resource pendAcr 'Microsoft.Network/privateEndpoints@2024-05-01' = {
 
 output containerRegistryId string = containerRegistry.id
 output containerRegistryName string = containerRegistry.name
+output registryLoginServer string = containerRegistry.properties.loginServer
 output dnsConfig array = [
   {
     name: pendAcr.name
