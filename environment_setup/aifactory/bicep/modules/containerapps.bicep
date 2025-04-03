@@ -17,7 +17,7 @@ param applicationInsightsName string = ''
 param containerRegistryResourceGroupName string = ''
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
-  name: '${name}-container-apps-environment'
+  name: 'aca-env-${name}-${deployment().name}-depl'
   params: {
     name: containerAppsEnvironmentName
     location: location

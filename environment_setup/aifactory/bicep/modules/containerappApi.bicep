@@ -33,10 +33,10 @@ param subnetAcaDedicatedName string = ''
 @secure()
 param bingApiKey string
 param bingApiEndpoint string
-
+param allowedOrigins array = []
 
 module app './containerappUpsert.bicep' = {
-  name: '${serviceName}-container-app-module'
+  name: 'aca-upsert-${serviceName}-${deployment().name}'
   params: {
     name: name
     location: location
@@ -53,6 +53,7 @@ module app './containerappUpsert.bicep' = {
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: subnetNamePend
     subnetAcaDedicatedName: subnetAcaDedicatedName
+    allowedOrigins: allowedOrigins
     secrets: {
       'bing-search-key': bingApiKey
     }

@@ -1599,26 +1599,11 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     ]
   }
 
-  var allowedOrigins = [
-    'https://mlworkspace.azure.ai'
-    'https://ml.azure.com'
-    'https://*.ml.azure.com'
-    'https://ai.azure.com'
-    'https://*.ai.azure.com'
-    'https://mlworkspacecanary.azure.ai'
-    'https://mlworkspace.azureml-test.net'
-    'https://42.swedencentral.instances.azureml.ms'
-    'https://*.instances.azureml.ms'
-    'https://*.azureml.ms'
-  ]
-  
-  var imageName = ''
-  
-  module containerApps '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps==true) {
+  module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'acas-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+    name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
     params: {
-      name: 'acas-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       location: location
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       tags: tags
@@ -1656,14 +1641,28 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
 
   var unionIpSec = union(ipSecurityRestrictions,vnetAllow)
 
+  var allowedOrigins = [
+    'https://mlworkspace.azure.ai'
+    'https://ml.azure.com'
+    'https://*.ml.azure.com'
+    'https://ai.azure.com'
+    'https://*.ai.azure.com'
+    'https://mlworkspacecanary.azure.ai'
+    'https://mlworkspace.azureml-test.net'
+    'https://42.swedencentral.instances.azureml.ms'
+    'https://*.instances.azureml.ms'
+    'https://*.azureml.ms'
+  ]
+    
   module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'aca-api-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+    name: 'aca-api-${deploymentProjSpecificUniqueSuffix}-depl'
     params: {
-      name: 'aca-api-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: 'aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       location: location
       tags: tags
       ipSecurityRestrictions: enablePublicGenAIAccess? ipSecurityRestrictions: []
+      allowedOrigins: allowedOrigins
       enablePublicGenAIAccess: enablePublicGenAIAccess
       enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
       vnetName: vnetNameFull
@@ -1675,7 +1674,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       identityId: miForAca.outputs.managedIdentityClientId
       identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
-      containerAppsEnvironmentName: containerApps.outputs.environmentName
+      containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
       openAiDeploymentName: 'gpt-4'
       openAiEvalDeploymentName:'gpt-4-evals'
       openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
@@ -1694,24 +1693,24 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
 
     }
     dependsOn: [
-      containerApps
+      containerAppsEnv
     ] 
   }
   module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name:'aca-api-${deployment().name}-${deploymentProjSpecificUniqueSuffix}' 
+    name:'aca-web-${deploymentProjSpecificUniqueSuffix}-depl' 
     params: {
       location: location
       tags: tags
-      name: 'aca-api-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: 'aca-web-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
-      containerAppsEnvironmentName: containerApps.outputs.environmentName
+      containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       identityId: miForAca.outputs.managedIdentityClientId
       identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
     }
     dependsOn: [
-      containerApps
+      containerAppsEnv
       acaApi
     ]
   }
@@ -1727,7 +1726,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     }
     dependsOn: [
       projectResourceGroup
-      containerApps
+      containerAppsEnv
       acaApi
     ]
   }

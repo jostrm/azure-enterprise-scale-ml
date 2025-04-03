@@ -54,7 +54,7 @@ create_or_update_secret() {
 }
 
 # Prompt user for orchestrator choice
-echo -e "${YELLOW}Do you want to use overwrite AZURE_CREDENTIALS with dummy value? Usually only the 1st time this is needed, to create the variable in Github (Enter 'y' or 'n')${NC}"
+echo -e "${YELLOW}Do you want to overwrite AZURE_CREDENTIALS with dummy value? Usually only the 1st time this is needed, to create the variable in Github (Enter 'y' or 'n')${NC}"
 read -p "overwrite_azure_credential: " overwrite_azure_credential
 
 echo -e "${YELLOW}Bootstraps config from .env as Github environment variables and secrets. ${NC}"

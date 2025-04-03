@@ -88,7 +88,7 @@ param subnetNamePend string = ''
 param subnetAcaDedicatedName string = ''
 
 module app 'containerapp.bicep' = {
-  name: 'aca-upsert-${deployment().name}'
+  name: 'aca-ca-${deployment().name}-depl'
   params: {
     name: name
     location: location
