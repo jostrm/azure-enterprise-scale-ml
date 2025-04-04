@@ -1515,7 +1515,7 @@ module bing '../modules/bing.bicep' = if(serviceSettingDeployBingSearch==true) {
   name: 'BingSearch4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-    location: location
+    location: 'global'
     sku: bingSearchSKU
     tags: tags
   }
