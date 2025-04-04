@@ -1607,7 +1607,6 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       location: location
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       tags: tags
-      containerAppsEnvironmentName: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       logAnalyticsWorkspaceName: laName
       applicationInsightsName: appinsights.outputs.name
       enablePublicGenAIAccess: enablePublicGenAIAccess
@@ -1717,7 +1716,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
 
   module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
+    name: 'rbacForContainerAppsMI${deploymentProjSpecificUniqueSuffix}'
     params:{
       aiSearchName: aiSearchService.outputs.aiSearchName
       appInsightsName: appinsights.outputs.name

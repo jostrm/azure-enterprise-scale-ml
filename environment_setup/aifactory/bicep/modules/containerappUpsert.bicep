@@ -87,8 +87,8 @@ param subnetNamePend string = ''
 @description('Subnet name for the dedicated container apps subnet')
 param subnetAcaDedicatedName string = ''
 
-module app 'containerapp.bicep' = {
-  name: 'aca-ca-${deployment().name}-depl'
+module appUpsert 'containerapp.bicep' = {
+  name: 'depl-${name}-${deployment().name}'
   params: {
     name: name
     location: location
@@ -125,7 +125,7 @@ module app 'containerapp.bicep' = {
   }
 }
 
-output defaultDomain string = app.outputs.defaultDomain
-output imageName string = app.outputs.imageName
-output name string = app.outputs.name
-output uri string = app.outputs.uri
+output defaultDomain string = appUpsert.outputs.defaultDomain
+output imageName string = appUpsert.outputs.imageName
+output name string = appUpsert.outputs.name
+output uri string = appUpsert.outputs.uri

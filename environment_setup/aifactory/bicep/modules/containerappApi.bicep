@@ -35,8 +35,8 @@ param bingApiKey string
 param bingApiEndpoint string
 param allowedOrigins array = []
 
-module app './containerappUpsert.bicep' = {
-  name: 'aca-upsert-${serviceName}-${deployment().name}'
+module appApi './containerappUpsert.bicep' = {
+  name: 'depl-${name}-${deployment().name}'
   params: {
     name: name
     location: location
@@ -135,6 +135,6 @@ module app './containerappUpsert.bicep' = {
   }
 }
 
-output SERVICE_ACA_NAME string = app.outputs.name
-output SERVICE_ACA_URI string = app.outputs.uri
-output SERVICE_ACA_IMAGE_NAME string = app.outputs.imageName
+output SERVICE_ACA_NAME string = appApi.outputs.name
+output SERVICE_ACA_URI string = appApi.outputs.uri
+output SERVICE_ACA_IMAGE_NAME string = appApi.outputs.imageName

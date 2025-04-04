@@ -11,7 +11,7 @@ param apiEndpoint string
 param targetPort int = 80
 
 module app './containerappUpsert.bicep' = {
-  name: 'aca-upsert-web-${serviceName}-${deployment().name}'
+  name: 'depl-${name}-${deployment().name}'
   params: {
     name: name
     location: location

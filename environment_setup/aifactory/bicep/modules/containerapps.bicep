@@ -2,8 +2,6 @@ metadata description = 'Creates an Azure Container Registry and an Azure Contain
 param name string
 param location string
 param tags object
-
-param containerAppsEnvironmentName string
 param containerRegistryName string
 param vnetName string
 param vnetResourceGroupName string
@@ -17,9 +15,9 @@ param applicationInsightsName string = ''
 param containerRegistryResourceGroupName string = ''
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
-  name: 'aca-env-${name}-${deployment().name}-depl'
+  name: 'depl-${name}-${deployment().name}'
   params: {
-    name: containerAppsEnvironmentName
+    name: name
     location: location
     tags: tags
     logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
