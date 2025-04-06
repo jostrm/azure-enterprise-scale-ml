@@ -148,6 +148,9 @@ var acaSubnetSettings =   {
     'Microsoft.KeyVault'
     'Microsoft.Storage'
     'Microsoft.CognitiveServices'
+    'Microsoft.ContainerRegistry'
+    'Microsoft.AzureCosmosDB'
+    'Microsoft.Web'
   ]
 }
 
