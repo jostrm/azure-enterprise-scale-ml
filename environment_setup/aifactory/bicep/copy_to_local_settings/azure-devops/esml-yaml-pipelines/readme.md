@@ -24,7 +24,7 @@ Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline
     ```
    bash ./azure-enterprise-scale-ml/00-start.sh
     ```
-2) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for GHA workflows, and parameters.
+2) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for Azure Devops Build pipelines, variables and a `parameter`folder.
     ```
    bash ./01-aif-copy-aifactory-templates.sh
     ```

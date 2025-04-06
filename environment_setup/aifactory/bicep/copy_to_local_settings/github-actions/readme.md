@@ -39,6 +39,11 @@ OUTPUT: The file structure should now look something like below:
 
 ## Continue with steps:5-9:
 
+5) Authenticate to Github CLI, with a user that is Administrator (Can create Environemnts, variables, secrets, Github Action workflows)
+   ```sh
+    gh auth login
+   ```
+<!--
 5) Authenticate to  Azure and Github
 You need to login via `Azure CLI` and `Github CLI`, but recommendation is to also test login via `Powershell`. 
 - NB! Recommendation is to use a service principal when logging in, such as `esml-commmon-bicep-sp`, see your ``. You may also use your user id (for Github this is the usual case).
@@ -58,13 +63,7 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
     az account set --subscription $subscriptionId
    ```
 
-   b) Log in to `GitHub CLI:`
-
-   ```sh
-    gh auth login
-   ```
-
-
+-->
 
 6) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
 7) Edit the [.env] variables at your root. (These will override some of the base parameters)

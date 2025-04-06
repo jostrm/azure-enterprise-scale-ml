@@ -2,7 +2,6 @@ metadata description = 'Creates an Azure Container Registry and an Azure Contain
 param name string
 param location string
 param tags object
-param containerRegistryName string
 param vnetName string
 param vnetResourceGroupName string
 param subnetNamePend string
@@ -12,7 +11,6 @@ param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param containerRegistryAdminUserEnabled bool = false
 param applicationInsightsName string = ''
-param containerRegistryResourceGroupName string = ''
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
   name: 'depl-${name}-${deployment().name}'

@@ -1540,7 +1540,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     tags: tags
     corsRules: [
       {
-        allowedOrigins: 'https://mlworkspace.azure.ai,https://ml.azure.com,https://*.ml.azure.com,https://ai.azure.com,https://*.ai.azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://42.swedencentral.instances.azureml.ms,https://*.instances.azureml.ms,https://*.azureml.ms'
+        allowedOrigins: 'https://mlworkspace.azure.ai,https://ml.azure.com,https://ai.azure.com,https://azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://42.swedencentral.instances.azureml.ms'
         allowedMethods: 'GET,HEAD,POST,PUT,DELETE,OPTIONS,PATCH'
         allowedHeaders: '*'
         exposedHeaders: '*'
@@ -1585,12 +1585,23 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       projectResourceGroup
     ]
   }
-
-  module miRbac '../modules/miRbac.bicep' = {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'miRbac-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  module miRbac '../modules/miRbac.bicep'  = if(useCommonACR) {
+    scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+    name: 'miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
     params: {
-      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+      containerRegistryName:acrCommon2.outputs.containerRegistryName
+      principalId: miForAca.outputs.managedIdentityPrincipalId
+    }
+    dependsOn: [
+      commonResourceGroupRef
+      miForAca
+    ]
+  }
+  module miRbacProj '../modules/miRbac.bicep'  = if(useCommonACR==false) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      containerRegistryName: acr.outputs.containerRegistryName
       principalId: miForAca.outputs.managedIdentityPrincipalId
     }
     dependsOn: [
@@ -1605,7 +1616,6 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       name: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       location: location
-      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       tags: tags
       logAnalyticsWorkspaceName: laName
       applicationInsightsName: appinsights.outputs.name
