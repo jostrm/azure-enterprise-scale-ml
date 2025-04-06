@@ -93,7 +93,8 @@ param acaCustomDomainsArray array = []
 
 // UI and History in RAG
 param serviceSettingDeployCosmosDB bool = false
-param cosmosDBSKU string = 'Standard'
+param cosmosTotalThroughputLimit int = 1000
+param cosmosKind string = 'GlobalDocumentDB'
 
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
@@ -1532,11 +1533,12 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     location: location
     enablePublicGenAIAccess:enablePublicGenAIAccess
     ipRules:ipWhitelist_array
+    totalThroughputLimit:cosmosTotalThroughputLimit
     vNetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/${aksSubnetName}'
     ]
-    kind: 'GlobalDocumentDB'
+    kind: cosmosKind
     tags: tags
     corsRules: [
       {
