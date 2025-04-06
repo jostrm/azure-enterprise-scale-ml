@@ -11,6 +11,7 @@ param daprEnabled bool = false
 
 @description('Name of the Log Analytics workspace')
 param logAnalyticsWorkspaceName string
+param logAnalyticsWorkspaceRG string
 param vnetName string
 param vnetResourceGroupName string
 param subnetNamePend string = ''
@@ -53,6 +54,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
   name: logAnalyticsWorkspaceName
+  scope: resourceGroup(logAnalyticsWorkspaceRG)
 }
 
 resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing = if (daprEnabled && !empty(applicationInsightsName)) {

@@ -39,7 +39,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
       totalThroughputLimit: totalThroughputLimit
     }
     //capabilities: [ { name: 'EnableServerless' } ]
-    enableFreeTier: true
+    enableFreeTier: false
     ipRules: [for rule in ipRules: {
         ipAddressOrRange: rule
     }]

@@ -7,6 +7,7 @@ param vnetResourceGroupName string
 param subnetNamePend string
 param subnetAcaDedicatedName string
 param logAnalyticsWorkspaceName string
+param logAnalyticsWorkspaceRG string
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param containerRegistryAdminUserEnabled bool = false
@@ -19,6 +20,7 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
     location: location
     tags: tags
     logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
+    logAnalyticsWorkspaceRG: logAnalyticsWorkspaceRG
     applicationInsightsName: applicationInsightsName
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter

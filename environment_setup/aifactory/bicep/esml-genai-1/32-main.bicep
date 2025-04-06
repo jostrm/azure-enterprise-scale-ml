@@ -1620,6 +1620,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       location: location
       tags: tags
       logAnalyticsWorkspaceName: laName
+      logAnalyticsWorkspaceRG: commonResourceGroup
       applicationInsightsName: appinsights.outputs.name
       enablePublicGenAIAccess: enablePublicGenAIAccess
       enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
