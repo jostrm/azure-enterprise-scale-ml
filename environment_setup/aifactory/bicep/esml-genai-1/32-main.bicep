@@ -334,7 +334,8 @@ var defaultSubnet = genaiSubnetName
 var segmentsAKS = split(aksSubnetId, '/')
 var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
 
-var acaSubnetName = empty(subnetProjACA)? aksSubnetName : subnetProjACA
+var segmentsACA = split(acaSubnetId, '/')
+var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
