@@ -302,6 +302,7 @@ param subnetCommonScoring string = ''
 param subnetCommonPowerbiGw string = ''
 param subnetProjGenAI string = ''
 param subnetProjAKS string = ''
+param subnetProjACA string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
 param enableDebugging bool = false
@@ -332,6 +333,8 @@ var defaultSubnet = genaiSubnetName
 
 var segmentsAKS = split(aksSubnetId, '/')
 var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
+
+var acaSubnetName = empty(subnetProjACA)? aksSubnetName : subnetProjACA
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
@@ -1627,7 +1630,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       vnetName: vnetNameFull
       vnetResourceGroupName: vnetResourceGroupName
       subnetNamePend: defaultSubnet
-      subnetAcaDedicatedName: aksSubnetName
+      subnetAcaDedicatedName: acaSubnetName // at least /23
     }
     dependsOn: [
       projectResourceGroup

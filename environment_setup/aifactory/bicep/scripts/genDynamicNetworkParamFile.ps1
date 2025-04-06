@@ -152,6 +152,7 @@ $aksSubnetId=""
 $dbxPubSubnetName=""
 $dbxPrivSubnetName=""
 $genaiSubnetId=""
+$acaSubnetId=""
 
 # Check if BYO_subnets is false
 if ($BYO_subnets_bool -eq $false) {
@@ -196,6 +197,11 @@ if ($BYO_subnets_bool -eq $false) {
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
         write-host "genaiSubnetId: $genaiSubnetId"
         write-host "aksSubnetId: $aksSubnetId"
+
+        $acaSubnetId=(Get-AzResourceGroupDeployment `
+        -ResourceGroupName "$vnetResourceGroup" `
+        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.acaSubnetId.Value
+        write-host "acaSubnetId: $acaSubnetId"
     }
     else
     {
@@ -262,6 +268,14 @@ if ($BYO_subnets_bool -eq $false) {
             catch {
                 write-host "AIF-WARNING: aksSubnetId could not be generated. Please check your parameters.json file."    
             }
+
+            try {
+                $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
+                write-host "acaSubnetId: $acaSubnetId"
+            }
+            catch {
+                write-host "AIF-WARNING: acaSubnetId could not be generated. Please check your parameters.json file."    
+            }
         }
     }
     else {
@@ -297,6 +311,9 @@ $templateGenaI = @"
         },
         "genaiSubnetId": {
             "value": "$genaiSubnetId"
+        },
+        "acaSubnetId": {
+            "value": "$acaSubnetId"
         }
     }
 }

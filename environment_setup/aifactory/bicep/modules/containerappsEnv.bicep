@@ -29,7 +29,7 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-
+//  Provided subnet must have a size of at least /23 or larger.
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
   name: name
   location: location

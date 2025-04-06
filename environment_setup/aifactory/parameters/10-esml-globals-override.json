@@ -35,6 +35,9 @@
         "subnetProjAKS": {
             "value": "acme-<network_env>prj<xxx>-aks-eus2-subnet"
         },
+        "subnetProjACA": {
+            "value": ""
+        },
         "subnetProjDatabricksPublic": {
             "value": "acme-<network_env>prj<xxx>-dbxpub-eus2-subnet"
         },

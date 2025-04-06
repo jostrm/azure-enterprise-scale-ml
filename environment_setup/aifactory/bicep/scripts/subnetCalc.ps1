@@ -419,6 +419,7 @@ if ($(Get-AzContext).Subscription -ne "") {
             $requiredSubnets = [PsObject]@{
                 genaiSubnetCidr  = '25'
                 aksSubnetCidr     = '25'
+                acaSubnetCidr     = '23'
             }
         }
         else {
@@ -524,6 +525,9 @@ if ($(Get-AzContext).Subscription -ne "") {
         "aksSubnetCidr": {
             "value": "$($result["aksSubnetCidr"])"
         },
+        "acaSubnetCidr": {
+            "value": "$($result["acaSubnetCidr"])"
+        },
         "genaiSubnetCidr": {
             "value": "$($result["genaiSubnetCidr"])"
         },
@@ -560,6 +564,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         $template = $templateGenaI
         write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
         write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
+        write-host "acaSubnetCidr : $($result["acaSubnetCidr"])"
     }
     else{
         Write-host "Template for subnetParameters.json is projectType:unsupported value: '$projectTypeADO'"
