@@ -152,7 +152,7 @@ var acaSubnetSettings =   {
 }
 
 module nsgAca '../modules/nsgGenAI.bicep' = {
-  name: 'nsgGenAI-${deploymentProjSpecificUniqueSuffix}'
+  name: 'nsgAca-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'genai-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
