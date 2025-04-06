@@ -173,7 +173,7 @@ param aksDockerBridgeCidr string = '172.17.0.1/16'
 // Networking: GenAI 
 @description('Paramenter file dynamicNetworkParams.json contains this. Written after dynamic IP calculation is done')
 param genaiSubnetId string
-
+param acaSubnetId string = ''
 
 // Seeding Keyvault & Bastion access
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
