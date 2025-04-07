@@ -306,6 +306,7 @@ param subnetProjACA string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
 param enableDebugging bool = false
+param randomValue string = newGuid()
 
 // Parameters to variables
 var vnetNameFull = vnetNameFull_param != '' ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
@@ -352,7 +353,10 @@ resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-
   name: targetResourceGroup
   scope:subscription(subscriptionIdDevTestProd)
 }
+
+
 var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
+var randomSalt = substring(randomValue, 6, 10)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // Salt: AIFactory instance/env specific
@@ -872,6 +876,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 
 
 // """"" Azure AI Services """"""
+var aiServicesName = 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${prjResourceSuffixNoDash}'
 module aiServices '../modules/csAIServices.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AIServices4${deploymentProjSpecificUniqueSuffix}'
@@ -880,7 +885,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     sku: csAIservicesSKU
     tags: tags
     vnetResourceGroupName: vnetResourceGroupName
-    cognitiveName: 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}'
+    cognitiveName: aiServicesName
     pendCogSerName: 'p-${projectName}-aiservices-${genaiName}'
     restore: restore
     subnetName: defaultSubnet
