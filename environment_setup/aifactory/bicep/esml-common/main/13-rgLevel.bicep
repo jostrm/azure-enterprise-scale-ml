@@ -105,6 +105,10 @@ param subnetProjGenAI string = ''
 param subnetProjAKS string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
+param subnetProjACA string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
