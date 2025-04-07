@@ -2,11 +2,14 @@
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
+        "DOCS_byovnet_example": {
+            "value": "esml-common-eus2-<network_env>001-rg"
+        },
         "vnetResourceGroup_param": {
-            "value": "byosnet-esml-common-eus2-<network_env>001-rg"
+            "value": ""
         },
         "vnetNameFull_param": {
-            "value": "byovnet-esml-common-eus2-<network_env>001"
+            "value": ""
         },
         "commonResourceGroup_param": {
             "value": ""
@@ -20,29 +23,35 @@
         "useCommonACR": {
             "value": true
         },
-        "subnetCommon": {
+        "DOCS_byosnet_common_example": {
             "value": "acme-<network_env>common-eus2-subnet"
         },
+        "subnetCommon": {
+            "value": ""
+        },
         "subnetCommonScoring": {
-            "value": "acme-<network_env>common-scoring-eus2-subnet"
+            "value": ""
         },
         "subnetCommonPowerbiGw": {
-            "value": "acme-<network_env>common-pbi-eus2-subnet"
+            "value": ""
         },
-        "subnetProjGenAI": {
+        "DOCS_byosnet_project_example": {
             "value": "acme-<network_env>prj<xxx>-genai-eus2-subnet"
         },
+        "subnetProjGenAI": {
+            "value": ""
+        },
         "subnetProjAKS": {
-            "value": "acme-<network_env>prj<xxx>-aks-eus2-subnet"
+            "value": ""
         },
         "subnetProjACA": {
             "value": ""
         },
         "subnetProjDatabricksPublic": {
-            "value": "acme-<network_env>prj<xxx>-dbxpub-eus2-subnet"
+            "value": ""
         },
         "subnetProjDatabricksPrivate": {
-            "value": "acme-<network_env>prj<xxx>-dbxpriv-eus2-subnet"
+            "value": ""
         }
     }
 }

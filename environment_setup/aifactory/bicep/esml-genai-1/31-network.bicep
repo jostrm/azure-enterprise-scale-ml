@@ -48,6 +48,9 @@ param subnetProjGenAI string = ''
 param subnetProjAKS string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
 
 // To get TAGS from file: 10-esml-globals-1.json
 param tags object
