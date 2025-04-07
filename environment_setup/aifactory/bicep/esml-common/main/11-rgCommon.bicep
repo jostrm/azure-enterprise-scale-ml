@@ -51,7 +51,7 @@ module contributorPermissions '../../modules/contributorRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'ContributorPermissionsOnRGCmn-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
-    userId: technicalContactId
+    //userId: technicalContactId
     userEmail: technicalContactEmail
     additionalUserIds: technicalAdminsObjectID_array_safe
     additionalUserEmails: technicalAdminsEmail_array_safe
@@ -65,7 +65,7 @@ module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'VMAdminLoginPermissions-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
-    userId: technicalContactId
+    //userId: technicalContactId
     userEmail: technicalContactEmail
     additionalUserIds: technicalAdminsObjectID_array_safe
     additionalUserEmails: technicalAdminsEmail_array_safe

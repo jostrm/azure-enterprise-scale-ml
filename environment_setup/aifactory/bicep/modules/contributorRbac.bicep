@@ -1,5 +1,5 @@
 @description('Specifies the objectId of the person that ordered the resources')
-param userId string
+param userId string =''
 
 @description('Specifies the email address of the person that ordered the resources')
 param userEmail string
@@ -22,7 +22,7 @@ var main_principal_2_array = array(userId)
 var main_email_2_array = array(userEmail)
 var all_emails = union(main_email_2_array,additionalUserEmails)
 
-resource contributorRole2userOrGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):{
+resource contributorRole2userOrGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):if(!empty(additionalUserIds)){
   name: guid('${additionalUserIds[i]}-contributor-${resourceGroup().id}')
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
@@ -32,7 +32,7 @@ resource contributorRole2userOrGroup 'Microsoft.Authorization/roleAssignments@20
   }
 }]
 
-resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(main_principal_2_array)): if(useAdGroups==false){
+resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(main_principal_2_array)): if(useAdGroups==false && !empty(userId)){
   name: guid('${main_principal_2_array[i]}-contributor-${resourceGroup().id}')
   properties: {
     roleDefinitionId: contributorRoleDefinition.id

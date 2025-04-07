@@ -1,5 +1,5 @@
 @description('Specifies the objectId of the person that ordered the resources')
-param userId string
+param userId string = ''
 
 @description('Specifies the email address of the person that ordered the resources')
 param userEmail string
@@ -23,7 +23,7 @@ var main_email_2_array = array(userEmail)
 //var all_emails = union(main_email_2_array,additionalUserEmails)
 
 // Users or groups that will be assigned the VMAdminLogin role
-resource vmAdminLoginRole 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):{
+resource vmAdminLoginRole 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):if(!empty(additionalUserIds)){
   name: guid('${additionalUserIds[i]}-vmadminlogin-${resourceGroup().id}')
   properties: {
     roleDefinitionId: VMAdminRoleDefinition.id
@@ -35,7 +35,7 @@ resource vmAdminLoginRole 'Microsoft.Authorization/roleAssignments@2020-04-01-pr
 
 // Users - disabled if not using groups
 
-resource vmAdminLoginRoleUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(main_principal_2_array)): if(useAdGroups==false){
+resource vmAdminLoginRoleUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(main_principal_2_array)): if(useAdGroups==false && !empty(userId)){
   name: guid('${main_principal_2_array[i]}-vmadminlogin-${resourceGroup().id}')
   properties: {
     roleDefinitionId: VMAdminRoleDefinition.id
