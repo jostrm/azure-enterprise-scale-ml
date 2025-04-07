@@ -1718,6 +1718,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       projectResourceGroup
       miForAca
       miRbac  // It is critical that the identity is granted ACR pull access before the app is created
+      subnetDelegationAca
     ] 
   }
 
@@ -1741,7 +1742,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   }]
 
     // In your main deployment file
-  module subnetDelegation '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
+  module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
     name: 'subnetDelegationServerFarm${deploymentProjSpecificUniqueSuffix}'
     scope: resourceGroup(vnetResourceGroupName)
     params: {
@@ -1749,6 +1750,33 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       subnetName: aksSubnetName // TODO: Have a dedicated for WebApp and FunctionApp
       location: location
       vnetResourceGroupName: vnetResourceGroupName
+      delegations: [
+        {
+          name: 'webapp-delegation'
+          properties: {
+            serviceName: 'Microsoft.Web/serverFarms'
+          }
+        }
+      ]
+    }
+  }
+
+  module subnetDelegationAca '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
+    name: 'subnetDelegationAcaEnv${deploymentProjSpecificUniqueSuffix}'
+    scope: resourceGroup(vnetResourceGroupName)
+    params: {
+      vnetName: vnetNameFull
+      subnetName: acaSubnetName // TODO: Have a dedicated for WebApp and FunctionApp
+      location: location
+      vnetResourceGroupName: vnetResourceGroupName
+      delegations: [
+        {
+          name: 'aca-delegation'
+          properties: {
+            serviceName: 'Microsoft.App/environments'
+          }
+        }
+      ]
     }
   }
 
@@ -1794,7 +1822,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       sa4AIsearch
       aiServices
       aiHub
-      subnetDelegation
+      subnetDelegationServerFarm
     ]
   }
   
@@ -1870,7 +1898,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       sacc
       aiServices
       aiHub
-      subnetDelegation
+      subnetDelegationServerFarm
     ]
   }
 
