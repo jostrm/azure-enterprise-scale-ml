@@ -14,17 +14,3 @@ resource privateEndpointDnsZone 'Microsoft.Network/privateEndpoints/privateDnsZo
     ]
   }
 }]
-
-/*
-{
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        properties: {
-          privateDnsZoneId: '/subscriptions/451967ad-7751-478e-8c64-cd0e7afa64ed/resourceGroups/sweco-1-esml-common-sdc-dev-001/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
-        }
-      }
-    ]
-  }
-}
-*/

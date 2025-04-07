@@ -159,7 +159,7 @@ output name string = cosmos.name
 output dnsConfig array = [
   {
     name: !enablePublicAccessWithPerimeter? pendCosmos.name: ''
-    type: 'Sql'
+    type: 'cosmosdbnosql'
     id:!enablePublicAccessWithPerimeter? pendCosmos.id: ''
   }
 ]
