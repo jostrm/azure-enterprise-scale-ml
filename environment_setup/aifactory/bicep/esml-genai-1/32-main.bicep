@@ -1543,6 +1543,9 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     enablePublicGenAIAccess:enablePublicGenAIAccess
     ipRules:ipWhitelist_array
     totalThroughputLimit:cosmosTotalThroughputLimit
+    subnetNamePend: defaultSubnet
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
     vNetRules: [
       '${vnetId}/subnets/${defaultSubnet}'
       '${vnetId}/subnets/${aksSubnetName}'
@@ -1563,6 +1566,20 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     projectResourceGroup
   ]
 }
+
+module privateDnsCosmos '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployCosmosDB == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkCosmos${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: cosmosdb.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+
 
 module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppInsightsDashboard==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1645,6 +1662,20 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     ] 
   }
 
+  module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployContainerApps == true){
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      dnsConfig: containerAppsEnv.outputs.dnsConfig
+      privateLinksDnsZones: privateLinksDnsZones
+    }
+    dependsOn: [
+      createPrivateDnsZones
+      projectResourceGroup
+    ]
+  }
+
+  
   // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
   var ipSecurityRestrictions =[for ip in ipWhitelist_array: {
       name: replace(replace(ip, ',', ''), '/', '_')  // Replace commas with nothing and slashes with underscores

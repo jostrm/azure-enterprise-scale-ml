@@ -90,16 +90,6 @@ var usePrivateRegistry = !empty(identityUserPrincipalId) && !empty(containerRegi
 // Automatically set to `UserAssigned` when an `identityName` has been set
 var normalizedIdentityType = !empty(identityUserPrincipalId) ? 'UserAssigned' : identityType
 
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  name: vnetName
-  scope: resourceGroup(vnetResourceGroupName)
-}
-
-resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  name: subnetNamePend
-  parent: vnet
-}
-
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
   name: containerAppsEnvironmentName
 }
@@ -178,43 +168,9 @@ resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
 }
 
 
-resource pendAca 'Microsoft.Network/privateEndpoints@2022-01-01' = {
-  name: 'pend-aca-${name}'
-  location: location
-  properties: {
-    subnet: {
-      id: subnetPend.id
-    }
-    privateLinkServiceConnections: [
-      {
-        name: 'pend-aca-${name}'
-        properties: {
-          privateLinkServiceId: app.id
-          groupIds: [
-            'managedEnvironments'
-          ]
-          privateLinkServiceConnectionState: {
-            status: 'Approved'
-            description: 'Auto-Approved'
-            actionsRequired: 'None'
-          }
-        }
-      }
-    ]
-  }
-  
-}
-
 output defaultDomain string = containerAppsEnvironment.properties.defaultDomain
 output identityPrincipalId string = normalizedIdentityType == 'None' ? '' : (empty(identityUserPrincipalId) ? app.identity.principalId : identityUserPrincipalId)
 output imageName string = imageName
 output name string = app.name
 output serviceBind object = !empty(serviceType) ? { serviceId: app.id, name: name } : {}
 output uri string = ingressEnabled ? 'https://${app.properties.configuration.ingress.fqdn}' : ''
-output dnsConfig array = [
-  {
-    name: pendAca.name
-    type: 'managedEnvironments'
-    id:pendAca.id
-  }
-]

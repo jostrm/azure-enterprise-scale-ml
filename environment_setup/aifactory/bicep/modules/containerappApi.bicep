@@ -36,7 +36,7 @@ param bingApiEndpoint string
 param allowedOrigins array = []
 
 module appApi './containerappUpsert.bicep' = {
-  name: 'depl-${name}-${deployment().name}'
+  name: 'depl-${name}-1'
   params: {
     name: name
     location: location

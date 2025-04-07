@@ -28,6 +28,10 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetAcaDedicatedName
   parent: vnet
 }
+resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetNamePend
+  parent: vnet
+}
 
 //  Provided subnet must have a size of at least /23 or larger.
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' = {
@@ -44,6 +48,16 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
     }
     daprAIInstrumentationKey: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.InstrumentationKey : ''
     daprAIConnectionString: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.ConnectionString : ''
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        maximumCount: 1000
+        minimumCount: 0
+        workloadProfileType: 'Consumption' // 'Serverless'
+      }
+      // Add other workload profiles as needed
+    ]
+
     vnetConfiguration: {
       infrastructureSubnetId: subnet.id
       internal: enablePublicAccessWithPerimeter? false:true
@@ -61,6 +75,41 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing
   name: applicationInsightsName
 }
 
+resource pendAca 'Microsoft.Network/privateEndpoints@2022-01-01' = if(enablePublicAccessWithPerimeter==false) {
+  name: 'pend-acaenv-${name}'
+  location: location
+  properties: {
+    subnet: {
+      id: subnetPend.id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'pend-aca-${name}'
+        properties: {
+          privateLinkServiceId: containerAppsEnvironment.id
+          groupIds: [
+            'managedEnvironment'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
+  
+}
+
 output defaultDomain string = containerAppsEnvironment.properties.defaultDomain
 output id string = containerAppsEnvironment.id
 output name string = containerAppsEnvironment.name
+output dnsConfig array = [
+  {
+    name: !enablePublicAccessWithPerimeter? pendAca.name: ''
+    type: 'managedEnvironment'
+    id:!enablePublicAccessWithPerimeter? pendAca.id: ''
+  }
+]
+

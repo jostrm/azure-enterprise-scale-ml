@@ -14,7 +14,7 @@ param containerRegistryAdminUserEnabled bool = false
 param applicationInsightsName string = ''
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
-  name: 'depl-${name}-${deployment().name}'
+  name: 'depl-${name}'
   params: {
     name: name
     location: location
@@ -34,4 +34,5 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
 output defaultDomain string = containerAppsEnvironment.outputs.defaultDomain
 output environmentName string = containerAppsEnvironment.outputs.name
 output environmentId string = containerAppsEnvironment.outputs.id
+output dnsConfig array = containerAppsEnvironment.outputs.dnsConfig
 
