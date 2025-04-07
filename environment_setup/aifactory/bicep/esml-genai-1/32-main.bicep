@@ -1571,10 +1571,52 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     tags: tags
     corsRules: [
       {
-        allowedOrigins: 'https://mlworkspace.azure.ai,https://ml.azure.com,https://ai.azure.com,https://azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://42.swedencentral.instances.azureml.ms'
-        allowedMethods: 'GET,HEAD,POST,PUT,DELETE,OPTIONS,PATCH'
-        allowedHeaders: '*'
-        exposedHeaders: '*'
+        allowedOrigins: [
+          'https://mlworkspace.azure.ai'
+          'https://ml.azure.com'
+          'https://ai.azure.com'
+          'https://azure.com'
+          'https://mlworkspacecanary.azure.ai'
+          'https://mlworkspace.azureml-test.net'
+          'https://42.swedencentral.instances.azureml.ms'
+        ]
+        allowedMethods: [
+          'GET'
+          'HEAD'
+          'POST'
+          'PUT'
+          'DELETE'
+          'OPTIONS'
+          'PATCH'
+        ]
+        allowedHeaders: [
+          'Content-Type'
+          'Accept'
+          'Authorization'
+          'x-ms-blob-type'
+          'x-ms-blob-content-type'
+          'x-ms-version'
+          'x-ms-date'
+          'x-ms-copy-source'
+          'Content-Length'
+          'Origin'
+          'Access-Control-Request-Method'
+          'Access-Control-Request-Headers'
+        ]
+        exposedHeaders: [
+          'Content-Length'
+          'Content-Type'
+          'Content-Range'
+          'Content-Encoding'
+          'Content-Language'
+          'Cache-Control'
+          'Last-Modified'
+          'ETag'
+          'x-ms-request-id'
+          'x-ms-version'
+          'x-ms-copy-status'
+          'x-ms-copy-progress'
+        ]
         maxAgeInSeconds: 1800
       }
     ]
@@ -1622,7 +1664,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'miForAca4${deploymentProjSpecificUniqueSuffix}'
     params: {
-      name: 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
       location: location
       tags: tags
     }

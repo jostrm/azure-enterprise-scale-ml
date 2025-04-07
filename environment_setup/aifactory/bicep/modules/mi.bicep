@@ -14,7 +14,7 @@ resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-
 // Assign the Cognitive Services User role to the user-defined managed identity used by workloads
 resource cognitiveServicesUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(managedIdentity.id, cognitiveServicesUserRoleDefinitionId)
-  scope: resourceGroup()
+  //scope: resourceGroup()
   properties: {
     roleDefinitionId: cognitiveServicesUserRoleDefinitionId
     principalId: managedIdentity.properties.principalId

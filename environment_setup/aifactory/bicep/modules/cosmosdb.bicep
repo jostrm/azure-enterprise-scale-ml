@@ -13,6 +13,7 @@ param kind string
 param vnetName string
 param subnetNamePend string
 param vnetResourceGroupName string
+param capacityMode string = 'Serverless' // 'Serverless' or 'Provisioned'
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -47,10 +48,10 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
     apiProperties: (kind == 'MongoDB') ? { serverVersion: '4.2' } : {}
-    capacityMode: 'Serverless' // 'Serverless' or 'Provisioned'
-    capacity: {
+    capacityMode: capacityMode // Use the parameter
+    capacity: (capacityMode == 'Serverless') ? {
       totalThroughputLimit: totalThroughputLimit
-    }
+    } : {}
     //capabilities: [ { name: 'EnableServerless' } ]
     enableFreeTier: false
     ipRules: [for rule in ipRules: {
@@ -111,11 +112,11 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
         ]
       }
     }
-    options: {
+    options: (capacityMode == 'Provisioned') ? {
       autoscaleSettings: {
         maxThroughput: autoscaleMaxThroughput
       }
-    }
+    } : {}
   }
 }
 resource pendCosmos 'Microsoft.Network/privateEndpoints@2022-01-01' = if(enablePublicAccessWithPerimeter==false) {

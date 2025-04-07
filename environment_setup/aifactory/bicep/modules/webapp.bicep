@@ -63,7 +63,12 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
 }
 
 var formattedIpRules = [for (ip, i) in ipRules: {
-  ipAddress: contains(ip, 'ipAddress') ? ip.ipAddress : ip // Handle both formats
+  // Ensure IP addresses are properly formatted with CIDR notation
+  ipAddress: contains(ip, 'ipAddress') 
+    ? ip.ipAddress 
+    : (contains(ip, '/') 
+      ? ip 
+      : '${ip}/32')  // Add /32 mask if it's a single IP without mask
   action: contains(ip, 'action') ? ip.action : 'Allow'
   priority: contains(ip, 'priority') ? ip.priority : (100 + i)
   name: contains(ip, 'name') ? ip.name : 'Rule-${i}'
