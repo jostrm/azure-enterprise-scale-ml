@@ -37,7 +37,7 @@ resource contributorRole2user 'Microsoft.Authorization/roleAssignments@2020-04-0
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: main_principal_2_array[i]
-    principalType:'User'
+    principalType:useAdGroups? 'Group':'User'
     description: 'Contributor to user ${main_email_2_array[i]} to get Contributor on resource group: ${resourceGroup().name}'
   }
 }]
