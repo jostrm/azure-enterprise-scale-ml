@@ -1746,12 +1746,12 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     scope: resourceGroup(vnetResourceGroupName)
     params: {
       vnetName: vnetNameFull
-      subnetName: defaultSubnet
+      subnetName: aksSubnetName // TODO: Have a dedicated for WebApp and FunctionApp
       location: location
       vnetResourceGroupName: vnetResourceGroupName
     }
   }
-  
+
   // AZURE WEBAPP
   module webapp '../modules/webapp.bicep' = if(serviceSettingDeployWebApp==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1764,6 +1764,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       vnetName: vnetNameFull
       vnetResourceGroupName: vnetResourceGroupName
       subnetNamePend: defaultSubnet
+      subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
       enablePublicGenAIAccess: enablePublicGenAIAccess
       enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
       applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
@@ -1839,6 +1840,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       vnetName: vnetNameFull
       vnetResourceGroupName: vnetResourceGroupName
       subnetNamePend: defaultSubnet
+      subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
       storageAccountName: sacc.outputs.storageAccountName
       enablePublicGenAIAccess: enablePublicGenAIAccess
       enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter

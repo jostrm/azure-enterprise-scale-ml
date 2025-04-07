@@ -31,6 +31,7 @@ param logAnalyticsWorkspaceName string
 param logAnalyticsWorkspaceRG string
 param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
 param pythonVersion string = '3.11' // Used if runtime is 'python'
+param subnetIntegrationName string  // Name of the subnet for VNet integration
 
 // Use provided name or create one based on WebApp name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
@@ -48,6 +49,11 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' exis
 // Get subnet reference for private endpoint
 resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
   name: '${vnetName}/${subnetNamePend}'
+  scope: resourceGroup(vnetResourceGroupName)
+}
+// Get subnet reference for VNet integration
+resource integrationSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
+  name: '${vnetName}/${subnetIntegrationName}'
   scope: resourceGroup(vnetResourceGroupName)
 }
 
@@ -95,7 +101,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
-    virtualNetworkSubnetId: enablePublicAccessWithPerimeter ? null : subnet.id
+    virtualNetworkSubnetId: enablePublicAccessWithPerimeter ? null : integrationSubnet.id
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : (enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       alwaysOn: true
