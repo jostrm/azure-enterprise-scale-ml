@@ -21,7 +21,7 @@ param delegations array
 param virtualNetworkName string
 
 @description('Specifies a boolean to control if private endpoint network policies should be enabled or not')
-param privateEndpointNetworkPolicies string = 'Enabled'
+param privateEndpointNetworkPolicies string = 'Disabled'
 
 @description('Specifies a boolean to control if private link network policies should be enabled or not')
 param privateLinkServiceNetworkPolicies string = 'Enabled'

@@ -70,7 +70,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
       ipAddressOrRange: string(rule) // Ensure proper string conversion
     }]
     isVirtualNetworkFilterEnabled: vNetRules != []
-    cors: length(corsRules) > 0 ? corsRules : null
+    //TODO-1: cors: length(corsRules) > 0 ? corsRules : null
     networkAclBypass:'AzureServices'
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled'
     virtualNetworkRules: [for rule in vNetRules: {

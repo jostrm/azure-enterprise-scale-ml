@@ -1740,7 +1740,17 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     name: replace(replace(ip, '.', '-'), '/', '_')
   }]
 
-    
+    // In your main deployment file
+  module subnetDelegation '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
+    name: 'subnetDelegationServerFarm${deploymentProjSpecificUniqueSuffix}'
+    scope: resourceGroup(vnetResourceGroupName)
+    params: {
+      vnetName: vnetNameFull
+      subnetName: defaultSubnet
+      location: location
+      vnetResourceGroupName: vnetResourceGroupName
+    }
+  }
   // AZURE WEBAPP
   module webapp '../modules/webapp.bicep' = if(serviceSettingDeployWebApp==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1782,6 +1792,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       sa4AIsearch
       aiServices
       aiHub
+      subnetDelegation
     ]
   }
   
@@ -1856,6 +1867,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       sacc
       aiServices
       aiHub
+      subnetDelegation
     ]
   }
 
