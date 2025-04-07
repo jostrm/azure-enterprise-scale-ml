@@ -98,6 +98,7 @@ param cosmosKind string = 'GlobalDocumentDB'
 
 param serviceSettingDeployFunction bool = false
 param functionRuntime string = 'python' //'node', 'dotnet', 'java', 'python'
+param functionPyVersion string = '3.11'
 param functionSKU object = {
   name: 'EP1' // Private endpoint support
   tier: 'ElasticPremium'
@@ -107,6 +108,8 @@ param functionSKU object = {
 
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
+param webAppRuntime string = 'python'  // Set to 'python' for Python apps
+param webAppRuntimeVersion string = '3.11'  // Specify the Python version
 param webappSKU object = {
   name: 'S1'
   tier: 'Standard'
@@ -1710,10 +1713,9 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
       logAnalyticsWorkspaceName: laName
       logAnalyticsWorkspaceRG: commonResourceGroup
-      ipRules: [for ip in ipWhitelist_array: {
-        action: 'Allow'
-        value: ip
-      }]
+      runtime: webAppRuntime  // Set to 'python' for Python apps
+      pythonVersion: webAppRuntimeVersion // Specify the Python version
+      ipRules: ipWhitelist_array
       appSettings: [
         {
           name: 'AZURE_OPENAI_ENDPOINT'
@@ -1786,10 +1788,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
       logAnalyticsWorkspaceName: laName
       logAnalyticsWorkspaceRG: commonResourceGroup
-      ipRules: [for ip in ipWhitelist_array: {
-        action: 'Allow'
-        value: ip
-      }]
+      ipRules:ipWhitelist_array
       appSettings: [
         {
           name: 'AZURE_OPENAI_ENDPOINT'
@@ -1805,6 +1804,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
         }
       ]
       runtime: functionRuntime // Choose based on your needs: 'node', 'dotnet', 'java', 'python'
+      pythonVersion: functionPyVersion // Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12 (if available)
     }
     dependsOn: [
       projectResourceGroup

@@ -31,7 +31,8 @@ param allowedOrigins array = [
 param applicationInsightsName string = ''
 param logAnalyticsWorkspaceName string = ''
 param logAnalyticsWorkspaceRG string = ''
-param runtime string = 'dotnet'  // Options: 'node', 'dotnet', 'java', 'python'
+param runtime string = 'python'  // Options: 'node', 'dotnet', 'java', 'python'
+param pythonVersion string = '3.11' // Used if runtime is 'python'
 
 // Use provided name or create one based on Function name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
@@ -67,6 +68,22 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   }
 }
 
+var formattedIpRules = [for (ip, i) in ipRules: {
+  ipAddress: contains(ip, 'ipAddress') ? ip.ipAddress : ip // Handle both formats
+  action: contains(ip, 'action') ? ip.action : 'Allow'
+  priority: contains(ip, 'priority') ? ip.priority : (100 + i)
+  name: contains(ip, 'name') ? ip.name : 'Rule-${i}'
+  description: contains(ip, 'description') ? ip.description : 'Allow access from IP'
+}]
+// Add a deny all rule
+var denyAllRule = {
+  ipAddress: '0.0.0.0/0'
+  action: 'Deny'
+  priority: 2147483647 // Highest possible priority number (lowest precedence)
+  name: 'Deny-All'
+  description: 'Deny all access by default'
+}
+
 // Create Function App
 resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
   name: name
@@ -86,7 +103,8 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
       cors: {
         allowedOrigins: allowedOrigins
       }
-      ipSecurityRestrictions: enablePublicAccessWithPerimeter ? [] : ipRules
+      ipSecurityRestrictions: enablePublicAccessWithPerimeter ? [] : concat(formattedIpRules, [denyAllRule])
+      linuxFxVersion: runtime == 'python' ? 'PYTHON|${pythonVersion}' : runtime == 'node' ? 'NODE|18-lts' : runtime == 'java' ? 'JAVA|17' : ''
       appSettings: concat([
         {
           name: 'AzureWebJobsStorage'
@@ -100,13 +118,23 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           name: 'FUNCTIONS_WORKER_RUNTIME'
           value: runtime
         }
+        // For Python, avoid default content storage which doesn't work well with Python
         {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
+          value: runtime != 'python' ? 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}' : ''
         }
         {
           name: 'WEBSITE_CONTENTSHARE'
-          value: toLower(name)
+          value: runtime != 'python' ? toLower(name) : ''
+        }
+        // Add Python-specific app settings
+        {
+          name: 'ENABLE_ORYX_BUILD'
+          value: runtime == 'python' ? 'true' : 'false'
+        }
+        {
+          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+          value: runtime == 'python' ? 'true' : 'false'
         }
         {
           name: 'WEBSITE_VNET_ROUTE_ALL'

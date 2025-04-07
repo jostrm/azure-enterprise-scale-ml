@@ -29,7 +29,8 @@ param allowedOrigins array = [
 param applicationInsightsName string
 param logAnalyticsWorkspaceName string
 param logAnalyticsWorkspaceRG string
-
+param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
+param pythonVersion string = '3.11' // Used if runtime is 'python'
 
 // Use provided name or create one based on WebApp name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
@@ -57,8 +58,24 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   tags: tags
   sku: sku
   properties: {
-    reserved: false // Set to true for Linux runtime == 'node' || runtime == 'python' // Set to true for Linux
+    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes
   }
+}
+
+var formattedIpRules = [for (ip, i) in ipRules: {
+  ipAddress: contains(ip, 'ipAddress') ? ip.ipAddress : ip // Handle both formats
+  action: contains(ip, 'action') ? ip.action : 'Allow'
+  priority: contains(ip, 'priority') ? ip.priority : (100 + i)
+  name: contains(ip, 'name') ? ip.name : 'Rule-${i}'
+  description: contains(ip, 'description') ? ip.description : 'Allow access from IP'
+}]
+// Add a deny all rule
+var denyAllRule = {
+  ipAddress: '0.0.0.0/0'
+  action: 'Deny'
+  priority: 2147483647 // Highest possible priority number (lowest precedence)
+  name: 'Deny-All'
+  description: 'Deny all access by default'
 }
 
 // Create Web App
@@ -66,6 +83,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   name: name
   location: location
   tags: tags
+  kind: runtime == 'node' || runtime == 'python' ? 'app,linux' : 'app'
   identity: {
     type: 'SystemAssigned'
   }
@@ -79,7 +97,10 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
       cors: {
         allowedOrigins: allowedOrigins
       }
-      ipSecurityRestrictions: enablePublicAccessWithPerimeter ? [] : ipRules
+      ipSecurityRestrictions: enablePublicAccessWithPerimeter ? [] : concat(formattedIpRules, [denyAllRule])
+      // Set the appropriate runtime stack
+      linuxFxVersion: runtime == 'python' ? 'PYTHON|${pythonVersion}' : runtime == 'node' ? 'NODE|18-lts' : runtime == 'java' ? 'JAVA|17-java17' : ''
+      netFrameworkVersion: runtime == 'dotnet' ? 'v7.0' : null // Only set netFrameworkVersion for Windows/.NET apps
       appSettings: concat(appSettings, !empty(applicationInsightsName) ? [
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
