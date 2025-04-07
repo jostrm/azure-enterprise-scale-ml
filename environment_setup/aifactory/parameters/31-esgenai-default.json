@@ -11,7 +11,10 @@
         "enablePublicAccessWithPerimeter": {
             "value": false
         },
-        "aiSearchEnableSharedPrivateLink":{ 
+        "serviceSettingDeployFunction": {
+            "value": false
+        },
+        "serviceSettingDeployWebApp": {
             "value": false
         },
         "serviceSettingDeployContainerApps": {
@@ -29,9 +32,6 @@
         "serviceSettingDeployAzureOpenAI": {
             "value": false
         },
-        "aiSearchEnableSharedPrivateLink_DOCS":{ 
-            "value": "SharedPrivateLinks for Azure AI Search requires SKU standard2 or higher, you many need to apply for that. Alternative: In Azure Portal, AISearch, click Allow Azure services checkbox and do not created SharedPrivateLinks"
-        },
         "serviceSettingDeployAzureAIVision": {
             "value": false
         },
@@ -39,6 +39,12 @@
             "value": false
         },
         "serviceSettingDeployAIDocIntelligence":{ 
+            "value": false
+        },
+        "aiSearchEnableSharedPrivateLink_DOCS":{ 
+            "value": "SharedPrivateLinks for Azure AI Search requires SKU standard2 or higher, you many need to apply for that. Alternative: In Azure Portal, AISearch, click Allow Azure services checkbox and do not created SharedPrivateLinks"
+        },
+        "aiSearchEnableSharedPrivateLink":{ 
             "value": false
         },
         "modelGPT4Version": {

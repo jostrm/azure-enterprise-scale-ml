@@ -59,7 +59,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
     ]
 
     vnetConfiguration: {
-      infrastructureSubnetId: subnet.id
+      infrastructureSubnetId: enablePublicAccessWithPerimeter ? null : subnet.id
       internal: enablePublicAccessWithPerimeter? false:true
     }
 

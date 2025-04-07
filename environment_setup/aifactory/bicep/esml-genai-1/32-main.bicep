@@ -96,15 +96,26 @@ param serviceSettingDeployCosmosDB bool = false
 param cosmosTotalThroughputLimit int = 1000
 param cosmosKind string = 'GlobalDocumentDB'
 
+param serviceSettingDeployFunction bool = false
+param functionRuntime string = 'python' //'node', 'dotnet', 'java', 'python'
+param functionSKU object = {
+  name: 'EP1' // Private endpoint support
+  tier: 'ElasticPremium'
+  family: 'EP'
+  capacity: 1
+}
+
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
+param webappSKU object = {
+  name: 'S1'
+  tier: 'Standard'
+  capacity: 1
+}
 @description('Service setting: Deploy Content Safety for project')
 param serviceSettingDeployContentSafety bool = false
 @description('Service setting: Deploy Azure OpenAI for project')
 param serviceSettingDeployAzureOpenAI bool = false
-// ### FALSE as default - END ### 
-
-// ### TRUE as default - START ### 
 @description('Service setting: Deploy Azure AI Vision for project')
 param serviceSettingDeployAzureAIVision bool = true
 
@@ -1674,8 +1685,166 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       projectResourceGroup
     ]
   }
+  var webappIPrules = [for ip in ipWhitelist_array: {
+    ipAddress: ip
+    action: 'Allow'
+    priority: 300
+    name: replace(replace(ip, '.', '-'), '/', '_')
+  }]
 
+    
+  // AZURE WEBAPP
+  module webapp '../modules/webapp.bicep' = if(serviceSettingDeployWebApp==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'WebApp4${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      name: 'webapp-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      location: location
+      tags: tags
+      sku: webappSKU
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      subnetNamePend: defaultSubnet
+      enablePublicGenAIAccess: enablePublicGenAIAccess
+      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+      applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
+      logAnalyticsWorkspaceName: laName
+      logAnalyticsWorkspaceRG: commonResourceGroup
+      ipRules: [for ip in ipWhitelist_array: {
+        action: 'Allow'
+        value: ip
+      }]
+      appSettings: [
+        {
+          name: 'AZURE_OPENAI_ENDPOINT'
+          value: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.azureOpenAIEndpoint : aiServices.outputs.openAIEndpoint
+        }
+        {
+          name: 'AZURE_SEARCH_ENDPOINT'
+          value: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchEndpoint : ''
+        }
+        {
+          name: 'WEBSITE_VNET_ROUTE_ALL'
+          value: '1'
+        }
+      ]
+    }
+    dependsOn: [
+      projectResourceGroup
+      sacc
+      sa4AIsearch
+      aiServices
+      aiHub
+    ]
+  }
   
+  module privateDnsWebapp '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployWebApp == true){
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      dnsConfig: webapp.outputs.dnsConfig
+      privateLinksDnsZones: privateLinksDnsZones
+    }
+    dependsOn: [
+      createPrivateDnsZones
+      projectResourceGroup
+    ]
+  }
+
+  // Add RBAC for WebApp MSI to access other resources
+  module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(serviceSettingDeployWebApp==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      storageAccountName: sacc.outputs.storageAccountName
+      storageAccountName2: sa4AIsearch.outputs.storageAccountName
+      aiSearchName: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchName : ''
+      webAppPrincipalId: webapp.outputs.principalId
+      openAIName: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.cognitiveName : aiServices.outputs.name
+    }
+    dependsOn: [
+      webapp
+    ]
+  }
+  // AZURE WEBAPP END
+  
+  // AZURE FUNCTION
+  module function '../modules/function.bicep' = if(serviceSettingDeployFunction==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'Function4${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      name: 'func-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      location: location
+      tags: tags
+      sku: functionSKU
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      subnetNamePend: defaultSubnet
+      storageAccountName: sacc.outputs.storageAccountName
+      enablePublicGenAIAccess: enablePublicGenAIAccess
+      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+      applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
+      logAnalyticsWorkspaceName: laName
+      logAnalyticsWorkspaceRG: commonResourceGroup
+      ipRules: [for ip in ipWhitelist_array: {
+        action: 'Allow'
+        value: ip
+      }]
+      appSettings: [
+        {
+          name: 'AZURE_OPENAI_ENDPOINT'
+          value: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.azureOpenAIEndpoint : aiServices.outputs.openAIEndpoint
+        }
+        {
+          name: 'AZURE_SEARCH_ENDPOINT'
+          value: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchEndpoint : ''
+        }
+        {
+          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
+          value: 'true'
+        }
+      ]
+      runtime: functionRuntime // Choose based on your needs: 'node', 'dotnet', 'java', 'python'
+    }
+    dependsOn: [
+      projectResourceGroup
+      sacc
+      aiServices
+      aiHub
+    ]
+  }
+
+  // Add DNS zone configuration for the Azure Function private endpoint
+  module privateDnsFunction '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployFunction == true){
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      dnsConfig: function.outputs.dnsConfig
+      privateLinksDnsZones: privateLinksDnsZones
+    }
+    dependsOn: [
+      createPrivateDnsZones
+      projectResourceGroup
+    ]
+  }
+
+  // Add RBAC for Function App MSI to access other resources
+  module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(serviceSettingDeployFunction==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'rbacForFunction${deploymentProjSpecificUniqueSuffix}'
+    params: {
+      storageAccountName: sacc.outputs.storageAccountName
+      storageAccountName2: sa4AIsearch.outputs.storageAccountName
+      aiSearchName: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchName : ''
+      functionPrincipalId: function.outputs.principalId
+      openAIName: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.cognitiveName : aiServices.outputs.name
+    }
+    dependsOn: [
+      function
+    ]
+  }
+  // AZURE FUNCTION END
+
   // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
   var ipSecurityRestrictions =[for ip in ipWhitelist_array: {
       name: replace(replace(ip, ',', ''), '/', '_')  // Replace commas with nothing and slashes with underscores
