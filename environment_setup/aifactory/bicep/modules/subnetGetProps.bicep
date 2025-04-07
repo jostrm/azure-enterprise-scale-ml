@@ -1,0 +1,15 @@
+param vnetName string
+param subnetName string
+
+resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' existing = {
+  name: vnetName
+}
+
+resource existingSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
+  parent: vnet
+  name: subnetName
+}
+
+output addressPrefix string = existingSubnet.properties.addressPrefix
+output serviceEndpoints array = existingSubnet.properties.serviceEndpoints ?? []
+output delegations array = existingSubnet.properties.delegations ?? []

@@ -1751,6 +1751,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       vnetResourceGroupName: vnetResourceGroupName
     }
   }
+  
   // AZURE WEBAPP
   module webapp '../modules/webapp.bicep' = if(serviceSettingDeployWebApp==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
