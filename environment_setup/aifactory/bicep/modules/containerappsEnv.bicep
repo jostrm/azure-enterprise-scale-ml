@@ -46,7 +46,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
     daprAIConnectionString: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.ConnectionString : ''
     vnetConfiguration: {
       infrastructureSubnetId: subnet.id
-      internal: true //enablePublicAccessWithPerimeter? false:true
+      internal: enablePublicAccessWithPerimeter? false:true
     }
 
   }
