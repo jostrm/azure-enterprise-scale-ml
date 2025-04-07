@@ -51,7 +51,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
     workloadProfiles: [
       {
         name: 'Consumption'
-        maximumCount: 1000
+        //maximumCount: 1000 // Not supported for Consumption
         workloadProfileType: 'Consumption' // 'Serverless'
       }
       // Add other workload profiles as needed
