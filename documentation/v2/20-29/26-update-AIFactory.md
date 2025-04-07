@@ -1,10 +1,11 @@
 # Update existing AI Factory
+There are two types of updates you can do: `Library-UPDATE` or `Feature-UPDATE`. 
 
 ## Prerequisites: An existing AI Factory
 [Prerequisites - End-2-end setup](./24-end-2-end-setup.md)
 
 
-# 1) How-to update: UPDATED feature / BUG fixes
+# 1) Library-UPDATE: (UPDATED feature / BUG fixes)
 When a feature is updated, or bug-fixes occur, e.g. if pipelines is untouched, and variables.yaml (.env) is untouched. 
 
 You may use `VS Code` on the GIT tab, and just "Pull" the submodule `azure-enterprise-scale-ml`, or just run the below from your repo root location. Open a new terminal `Git Bash` or similar: 
@@ -18,7 +19,7 @@ git submodule foreach 'git checkout main && git pull origin main'
 
 **Finished!**
 
-# 2) How-to update: NEW feature: such as "BYOVnet"
+# 2) Feature-UPDATE: NEW feature: such as "BYOVnet"
 When a new feature is added, which impacts the varables and pipeline. Features sucha as BYOVnet, Subnets, Personas. 
 If such feature is added, the below "pipelines & variables", may need to be updated. 
 
