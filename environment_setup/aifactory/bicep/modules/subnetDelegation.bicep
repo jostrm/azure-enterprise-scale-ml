@@ -37,6 +37,12 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   properties: {
     addressPrefix: !empty(addressPrefix) ? addressPrefix : (!empty(existingAddressPrefix) ? existingAddressPrefix : existingSubnet.outputs.addressPrefix)
     serviceEndpoints: !empty(serviceEndpoints) ? serviceEndpoints : existingSubnet.outputs.serviceEndpoints
+    routeTable: {
+      id:existingSubnet.outputs.routeTableId
+    }
+    networkSecurityGroup: {
+      id:existingSubnet.outputs.networkSecurityGroupId
+    }
     delegations: union(
       existingSubnet.outputs.delegations ?? [],
       delegations
@@ -44,6 +50,9 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
     privateEndpointNetworkPolicies: 'Disabled' //  (recommended for most cases):securely connect to private endpoints without being blocked by NSGs
     privateLinkServiceNetworkPolicies: 'Enabled' //  (default setting):NSG rules are applied to private link services
   }
+  dependsOn:[
+    existingSubnet
+  ]
 }
 
 output subnetId string = subnet.id
