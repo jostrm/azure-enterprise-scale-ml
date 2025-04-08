@@ -37,9 +37,9 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   properties: {
     addressPrefix: !empty(addressPrefix) ? addressPrefix : (!empty(existingAddressPrefix) ? existingAddressPrefix : existingSubnet.outputs.addressPrefix)
     serviceEndpoints: !empty(serviceEndpoints) ? serviceEndpoints : existingSubnet.outputs.serviceEndpoints
-    routeTable: {
-      id:existingSubnet.outputs.routeTableId
-    }
+    //routeTable: {
+//      id:existingSubnet.outputs.routeTableId
+    //}
     networkSecurityGroup: {
       id:existingSubnet.outputs.networkSecurityGroupId
     }
