@@ -1743,7 +1743,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
 
     // In your main deployment file
   module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
-    name: 'subnetDelegationServerFarm${deploymentProjSpecificUniqueSuffix}'
+    name: 'subnetDelegationServerFarm1${deploymentProjSpecificUniqueSuffix}'
     scope: resourceGroup(vnetResourceGroupName)
     params: {
       vnetName: vnetNameFull
@@ -1778,6 +1778,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
         }
       ]
     }
+    
   }
 
   // AZURE WEBAPP

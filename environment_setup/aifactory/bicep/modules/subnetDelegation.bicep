@@ -5,14 +5,7 @@ param vnetResourceGroupName string
 param addressPrefix string = ''
 param existingAddressPrefix string = ''
 param serviceEndpoints array = []
-param delegations array = [
-  {
-    name: 'webapp-delegation'
-    properties: {
-      serviceName: 'Microsoft.Web/serverFarms'
-    }
-  }
-]
+param delegations array
 
 // Get the existing VNet
 resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' existing = {

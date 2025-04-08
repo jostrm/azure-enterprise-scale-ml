@@ -13,6 +13,7 @@ var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 
 // Search
+var searchIndexDataReader = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
 
@@ -45,6 +46,16 @@ resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-0
     principalId: openAIServicePrincipal
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
+    description: '010'
+  }
+  scope: existingAiSearch
+}
+resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(existingAiSearch.id, searchIndexDataReader, existingOpenAIResource.id)
+  properties: {
+    principalId: existingOpenAIResource.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReader)
     description: '010'
   }
   scope: existingAiSearch
@@ -174,6 +185,18 @@ resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssig
     principalId: servicePrincipleObjecId
     principalType: 'ServicePrincipal'
     description:'cognitiveServicesOpenAIContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingOpenAIResource.name}'
+  }
+  scope:existingOpenAIResource
+}
+
+// AI Search -> OpenAI Service
+resource cognitiveServicesOpenAIContributorAISearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIContributorRoleId, existingAiSearch.id)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
+    principalId: existingAiSearch.identity.principalId
+    principalType: 'ServicePrincipal'
+    description:'cognitiveServicesOpenAIContributorRoleId to project service principal OID:${existingAiSearch.identity.principalId} to ${existingAiSearch.name}'
   }
   scope:existingOpenAIResource
 }

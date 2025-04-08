@@ -29,6 +29,7 @@ var storageFileDataContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd' //
 var cognitiveServicesOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // SP, User, AI Search, AIHub, AIProject -> AI service, OpenAI
 
 // Search
+var searchIndexDataReader = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, AIHub, AIProject, App Service/FunctionApp -> AI Search
 //var userAccessAdministratorRoleId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9' // AI services, AI Hub, AI Project <-> AI SEARCH
@@ -58,7 +59,16 @@ resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
   scope: existingAiSearch
 }
-
+resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(existingAiSearch.id, searchIndexDataReader, aiServicesPrincipalId)
+  properties: {
+    principalId: aiServicesPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReader)
+    description: '010'
+  }
+  scope: existingAiSearch
+}
 
 resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, aiServicesPrincipalId)
