@@ -87,7 +87,7 @@ resource pendAca 'Microsoft.Network/privateEndpoints@2022-01-01' = if(enablePubl
         properties: {
           privateLinkServiceId: containerAppsEnvironment.id
           groupIds: [
-            'managedEnvironment'
+            'managedEnvironments'
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
@@ -107,7 +107,7 @@ output name string = containerAppsEnvironment.name
 output dnsConfig array = [
   {
     name: !enablePublicAccessWithPerimeter? pendAca.name: ''
-    type: 'managedEnvironment'
+    type: 'azurecontainerapps'
     id:!enablePublicAccessWithPerimeter? pendAca.id: ''
   }
 ]

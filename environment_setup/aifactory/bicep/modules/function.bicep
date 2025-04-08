@@ -131,29 +131,37 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
           name: 'FUNCTIONS_WORKER_RUNTIME'
           value: runtime
         }
-        // For Python, avoid default content storage which doesn't work well with Python
+      ], 
+      // Only add content settings for non-Python runtimes
+      runtime != 'python' ? [
         {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: runtime != 'python' ? 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}' : ''
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
         }
         {
           name: 'WEBSITE_CONTENTSHARE'
-          value: runtime != 'python' ? toLower(name) : ''
+          value: toLower(name)
         }
-        // Add Python-specific app settings
+      ] : [],
+      // Add Python-specific app settings
+      runtime == 'python' ? [
         {
           name: 'ENABLE_ORYX_BUILD'
-          value: runtime == 'python' ? 'true' : 'false'
+          value: 'true'
         }
         {
           name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: runtime == 'python' ? 'true' : 'false'
+          value: 'true'
         }
+      ] : [],
+      [
         {
           name: 'WEBSITE_VNET_ROUTE_ALL'
           value: '1'
         }
-      ], appSettings, !empty(applicationInsightsName) ? [
+      ],
+      appSettings, 
+      !empty(applicationInsightsName) ? [
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsights.properties.ConnectionString
@@ -198,7 +206,7 @@ output principalId string = functionApp.identity.principalId
 output dnsConfig array = [
   {
     name: !enablePublicAccessWithPerimeter ? privateEndpoint.name : ''
-    type: 'sites'
+    type: 'azurewebapps'
     id: !enablePublicAccessWithPerimeter ? privateEndpoint.id : ''
   }
 ]

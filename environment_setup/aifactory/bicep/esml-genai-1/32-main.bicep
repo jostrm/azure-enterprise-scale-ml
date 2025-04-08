@@ -1833,6 +1833,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       dnsConfig: webapp.outputs.dnsConfig
       privateLinksDnsZones: privateLinksDnsZones
+      
     }
     dependsOn: [
       createPrivateDnsZones

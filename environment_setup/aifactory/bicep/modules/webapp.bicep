@@ -161,7 +161,7 @@ output principalId string = webApp.identity.principalId
 output dnsConfig array = [
   {
     name: !enablePublicAccessWithPerimeter? privateEndpoint.name: ''
-    type: 'sites'
+    type: 'azurewebapps'
     id:!enablePublicAccessWithPerimeter? privateEndpoint.id: ''
   }
 ]
