@@ -90,6 +90,7 @@ param serviceSettingDeployAzureMLClassic bool = false
 param serviceSettingDeployContainerApps bool = false
 param acaImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 param acaCustomDomainsArray array = []
+param acaAppWorkloadProfileName string = '' // 'Consumption' 
 
 // UI and History in RAG
 param serviceSettingDeployCosmosDB bool = false
@@ -2002,6 +2003,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       bingApiKey: bing.outputs.bingApiKey  //ai.outputs.bingApiKey
       aiProjectName: aiHub.outputs.aiProjectName //ai.outputs.projectName
       subscriptionId: subscriptionIdDevTestProd
+      appWorkloadProfileName: acaAppWorkloadProfileName
 
     }
     dependsOn: [
@@ -2021,6 +2023,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       identityId: miForAca.outputs.managedIdentityClientId
       identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
+      appWorkloadProfileName:acaAppWorkloadProfileName
     }
     dependsOn: [
       containerAppsEnv

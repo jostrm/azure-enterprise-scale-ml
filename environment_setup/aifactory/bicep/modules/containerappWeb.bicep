@@ -10,6 +10,7 @@ param containerRegistryName string
 param serviceName string = 'web'
 param apiEndpoint string
 param targetPort int = 80
+param appWorkloadProfileName string = ''
 
 module app './containerappUpsert.bicep' = {
   name: 'depl-${name}-${deployment().name}'
@@ -22,6 +23,7 @@ module app './containerappUpsert.bicep' = {
     containerAppsEnvironmentName: containerAppsEnvironmentName
     containerAppsEnvironmentId: containerAppsEnvironmentId
     containerRegistryName: containerRegistryName
+    appWorkloadProfileName: appWorkloadProfileName
     env: [
       {
         name: 'AZURE_CLIENT_ID'

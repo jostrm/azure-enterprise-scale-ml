@@ -87,6 +87,7 @@ param subnetNamePend string = ''
 
 @description('Subnet name for the dedicated container apps subnet')
 param subnetAcaDedicatedName string = ''
+param appWorkloadProfileName string = ''
 
 module appUpsert 'containerapp.bicep' = {
   name: 'depl-${name}-2'
@@ -124,6 +125,7 @@ module appUpsert 'containerapp.bicep' = {
     targetPort: targetPort
     serviceBinds: serviceBinds
     customDomains: customDomains
+    appWorkloadProfileName: appWorkloadProfileName
   }
 }
 

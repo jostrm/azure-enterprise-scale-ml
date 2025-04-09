@@ -18,6 +18,8 @@ param subnetNamePend string = ''
 param subnetAcaDedicatedName string
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
+param wlProfileDedicatedName string = 'Dedicated-D4'
+param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -51,10 +53,21 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
     workloadProfiles: [
       {
         name: 'Consumption'
-        //maximumCount: 1000 // Not supported for Consumption
-        workloadProfileType: 'Consumption' // 'Serverless'
+        workloadProfileType: 'Consumption'
       }
-      // Add other workload profiles as needed
+      {
+        name: 'Serverless'
+        workloadProfileType:'Serverless'
+      }
+      {
+        name: wlProfileDedicatedName
+        workloadProfileType: 'Dedicated'
+      }
+      {
+        name: wlProfileGPUConsumptionName
+        workloadProfileType:'Consumption-GPU'
+      }
+      
     ]
 
     vnetConfiguration: {

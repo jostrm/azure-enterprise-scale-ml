@@ -85,6 +85,7 @@ param vnetName string = ''
 param vnetResourceGroupName string = ''
 param subnetNamePend string = ''
 param subnetAcaDedicatedName string = ''
+param appWorkloadProfileName string = '' 
 
 // Private registry support requires both an ACR name and a User Assigned managed identity
 var usePrivateRegistry = !empty(identityUserPrincipalId) && !empty(containerRegistryName)
@@ -114,8 +115,8 @@ resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
     }
   }
   properties: {
-    //managedEnvironmentId: containerAppsEnvironmentId // containerAppsEnvironment.id
-    workloadProfileName: 'Consumption'
+    //Deprecated: managedEnvironmentId: containerAppsEnvironmentId // containerAppsEnvironment.id
+    workloadProfileName: empty(appWorkloadProfileName)? null : appWorkloadProfileName
     environmentId: containerAppsEnvironment.id
     configuration: {
       activeRevisionsMode: revisionMode

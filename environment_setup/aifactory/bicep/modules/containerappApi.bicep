@@ -30,6 +30,7 @@ param vnetName string = ''
 param vnetResourceGroupName string = ''
 param subnetNamePend string = ''
 param subnetAcaDedicatedName string = ''
+param appWorkloadProfileName string = ''
 
 @secure()
 param bingApiKey string
@@ -56,6 +57,7 @@ module appApi './containerappUpsert.bicep' = {
     subnetNamePend: subnetNamePend
     subnetAcaDedicatedName: subnetAcaDedicatedName
     allowedOrigins: allowedOrigins
+    appWorkloadProfileName: appWorkloadProfileName
     secrets: {
       'bing-search-key': bingApiKey
     }
