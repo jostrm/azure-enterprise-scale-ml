@@ -74,7 +74,7 @@ These are the two 2 project types, template architectures (ESML, GenAI) that are
 -**ESML**: Enterprise Scale Machine Learning
 -**GenAI**: Enteprise Scale GenAI
 
-![AI Factory project types](./documentation/v2/10-19/images/10-personas-2-architectures.png)
+![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 
 ## ESML with FABRIC flavour
 You can optionally setup the ESML project type with Microsoft Fabric, as below:
