@@ -96,6 +96,8 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
   name: containerAppsEnvironmentName
 }
 
+var rId = resourceId('Microsoft.App/managedEnvironments@2023-05-01', containerAppsEnvironmentName)
+
 resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
   name: name
   location: location
@@ -112,7 +114,7 @@ resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
     }
   }
   properties: {
-    managedEnvironmentId: containerAppsEnvironment.id
+    managedEnvironmentId: containerAppsEnvironmentId // containerAppsEnvironment.id
     configuration: {
       activeRevisionsMode: revisionMode
       ingress: ingressEnabled ? {
