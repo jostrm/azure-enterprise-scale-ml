@@ -59,13 +59,13 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
         name: 'Serverless'
         workloadProfileType:'Serverless'
         minimumCount: 0
-        maximumCount: 10
+        maximumCount: 5
       }
       {
         name: wlProfileDedicatedName
         workloadProfileType: 'Dedicated'
         minimumCount: 1
-        maximumCount: 10
+        maximumCount: 5
       }
       {
         name: wlProfileGPUConsumptionName
