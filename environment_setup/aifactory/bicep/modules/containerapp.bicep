@@ -12,7 +12,7 @@ param containerAppsEnvironmentName string
 param containerAppsEnvironmentId string
 
 @description('CPU cores allocated to a single container instance, e.g., 0.5')
-param containerCpuCoreCount string = '0.5'
+param containerCpuCoreCount int = 1
 
 @description('The maximum number of replicas to run. Must be at least 1.')
 @minValue(1)
@@ -160,7 +160,7 @@ resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
           name: containerName
           env: env
           resources: {
-            cpu: json(containerCpuCoreCount)
+            cpu: containerCpuCoreCount //json(containerCpuCoreCount)
             memory: containerMemory
           }
         }
