@@ -11,6 +11,9 @@ param containerAppsEnvironmentId string
 param containerCpuCoreCount int = 1 //0.5
 @description('Memory allocated to a single container instance, e.g., 1Gi')
 param containerMemory string = '2.0Gi' //'1.0Gi'
+param wlMinCountServerless int = 0
+param wlMinCountDedicated int = 1
+param wlMaxCount int = 5
 
 @description('The maximum number of replicas to run. Must be at least 1.')
 @minValue(1)
@@ -125,6 +128,7 @@ module appUpsert 'containerapp.bicep' = {
     serviceBinds: serviceBinds
     customDomains: customDomains
     appWorkloadProfileName: appWorkloadProfileName
+
   }
 }
 

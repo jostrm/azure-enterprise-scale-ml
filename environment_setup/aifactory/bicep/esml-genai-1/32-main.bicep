@@ -93,6 +93,9 @@ param acaCustomDomainsArray array = []
 param acaAppWorkloadProfileName string = '' // 'Consumption' 
 param containerCpuCoreCount int = 1 // 0.5, 1.0, 2.0, 4.0, 8.0
 param containerMemory string = '2.0Gi' // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
+param wlMinCountServerless int = 0
+param wlMinCountDedicated int = 1
+param wlMaxCount int = 5
 
 // UI and History in RAG
 param serviceSettingDeployCosmosDB bool = false
@@ -1959,6 +1962,9 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       vnetResourceGroupName: vnetResourceGroupName
       subnetNamePend: defaultSubnet
       subnetAcaDedicatedName: acaSubnetName // at least /23
+      wlMinCountServerless:wlMinCountServerless
+      wlMinCountDedicated: wlMinCountDedicated
+      wlMaxCount: wlMaxCount
     }
     dependsOn: [
       projectResourceGroup

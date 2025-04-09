@@ -12,6 +12,9 @@ param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param containerRegistryAdminUserEnabled bool = false
 param applicationInsightsName string
+param wlMinCountServerless int = 0
+param wlMinCountDedicated int = 1
+param wlMaxCount int = 5
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
   name: 'depl-${name}'
@@ -28,6 +31,9 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: subnetNamePend
     subnetAcaDedicatedName: subnetAcaDedicatedName
+    wlMinCountServerless: wlMinCountServerless
+    wlMinCountDedicated: wlMinCountDedicated
+    wlMaxCount: wlMaxCount
   }
 }
 

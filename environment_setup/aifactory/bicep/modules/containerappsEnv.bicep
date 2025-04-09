@@ -20,6 +20,9 @@ param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param wlProfileDedicatedName string = 'Dedicated-D4'
 param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
+param wlMinCountServerless int = 0
+param wlMinCountDedicated int = 1
+param wlMaxCount int = 5
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -58,14 +61,14 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
       {
         name: 'Serverless'
         workloadProfileType:'Serverless'
-        minimumCount: 0
-        maximumCount: 5
+        minimumCount: wlMinCountServerless
+        maximumCount: wlMaxCount
       }
       {
         name: wlProfileDedicatedName
         workloadProfileType: 'Dedicated'
-        minimumCount: 1
-        maximumCount: 5
+        minimumCount: wlMinCountDedicated
+        maximumCount: wlMaxCount
       }
       {
         name: wlProfileGPUConsumptionName
