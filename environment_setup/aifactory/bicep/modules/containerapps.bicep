@@ -11,7 +11,7 @@ param logAnalyticsWorkspaceRG string
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param containerRegistryAdminUserEnabled bool = false
-param applicationInsightsName string = ''
+param applicationInsightsName string
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
   name: 'depl-${name}'

@@ -5,6 +5,7 @@ param tags object
 
 @description('The environment name for the container apps')
 param containerAppsEnvironmentName string
+param containerAppsEnvironmentId string
 
 @description('The number of CPU cores allocated to a single container instance, e.g., 0.5')
 param containerCpuCoreCount string = '0.5'
@@ -105,6 +106,7 @@ module appUpsert 'containerapp.bicep' = {
     ingressEnabled: ingressEnabled
     containerName: containerName
     containerAppsEnvironmentName: containerAppsEnvironmentName
+    containerAppsEnvironmentId: containerAppsEnvironmentId
     containerRegistryName: containerRegistryName
     containerRegistryHostSuffix: containerRegistryHostSuffix
     containerCpuCoreCount: containerCpuCoreCount

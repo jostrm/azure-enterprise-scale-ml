@@ -5,6 +5,7 @@ param tags object
 param identityUserPrincipalId string
 param identityId string
 param containerAppsEnvironmentName string
+param containerAppsEnvironmentId string
 param containerRegistryName string
 param serviceName string = 'api'
 param openAiDeploymentName string
@@ -44,6 +45,7 @@ module appApi './containerappUpsert.bicep' = {
     identityUserPrincipalId: identityUserPrincipalId
     identityType: 'UserAssigned'
     containerAppsEnvironmentName: containerAppsEnvironmentName
+    containerAppsEnvironmentId: containerAppsEnvironmentId
     containerRegistryName: containerRegistryName
     customDomains:customDomains
     ipSecurityRestrictions: ipSecurityRestrictions

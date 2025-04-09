@@ -8,6 +8,8 @@ param allowedOrigins array = []
 
 @description('Name of the environment for container apps')
 param containerAppsEnvironmentName string
+@description('ID of the environment for container apps')
+param containerAppsEnvironmentId string
 
 @description('CPU cores allocated to a single container instance, e.g., 0.5')
 param containerCpuCoreCount string = '0.5'

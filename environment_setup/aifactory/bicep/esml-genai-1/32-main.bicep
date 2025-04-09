@@ -1833,7 +1833,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       dnsConfig: webapp.outputs.dnsConfig
       privateLinksDnsZones: privateLinksDnsZones
-      
+
     }
     dependsOn: [
       createPrivateDnsZones
@@ -1979,13 +1979,14 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       vnetName: vnetNameFull
       vnetResourceGroupName: vnetResourceGroupName
       subnetNamePend: defaultSubnet
-      subnetAcaDedicatedName: aksSubnetName
+      subnetAcaDedicatedName: acaSubnetName
       customDomains:acaCustomDomainsArray
       resourceGroupName: targetResourceGroup
       identityId: miForAca.outputs.managedIdentityClientId
       identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
+      containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
       openAiDeploymentName: 'gpt-4'
       openAiEvalDeploymentName:'gpt-4-evals'
       openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
@@ -1994,7 +1995,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       openAiType: 'azure'
       openAiApiVersion: openAiApiVersion
       aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint // ai.outputs.searchServiceEndpoint
-      aiSearchIndexName: 'index-${projectName}-default${uniqueInAIFenv}${resourceSuffix}'
+      aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
       appinsightsConnectionstring: appinsights.outputs.connectionString // ai.outputs.applicationInsightsConnectionString
       bingName: bing.outputs.bingName //ai.outputs.bingName
       bingApiEndpoint: bing.outputs.endpoint // ai.outputs.bingEndpoint
