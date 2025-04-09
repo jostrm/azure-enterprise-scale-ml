@@ -1697,31 +1697,6 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     ]
   }
 
-  module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps==true) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
-    params: {
-      name: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-      location: location
-      tags: tags
-      logAnalyticsWorkspaceName: laName
-      logAnalyticsWorkspaceRG: commonResourceGroup
-      applicationInsightsName: appinsights.outputs.name
-      enablePublicGenAIAccess: enablePublicGenAIAccess
-      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-      vnetName: vnetNameFull
-      vnetResourceGroupName: vnetResourceGroupName
-      subnetNamePend: defaultSubnet
-      subnetAcaDedicatedName: acaSubnetName // at least /23
-    }
-    dependsOn: [
-      projectResourceGroup
-      miForAca
-      miRbac  // It is critical that the identity is granted ACR pull access before the app is created
-      subnetDelegationAca
-    ] 
-  }
-
   module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployContainerApps == true){
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
@@ -1965,6 +1940,31 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     'https://*.azureml.ms'
   ]
     
+  module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps==true) {
+    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+    name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
+    params: {
+      name: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      location: location
+      tags: tags
+      logAnalyticsWorkspaceName: laName
+      logAnalyticsWorkspaceRG: commonResourceGroup
+      applicationInsightsName: appinsights.outputs.name
+      enablePublicGenAIAccess: enablePublicGenAIAccess
+      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      subnetNamePend: defaultSubnet
+      subnetAcaDedicatedName: acaSubnetName // at least /23
+    }
+    dependsOn: [
+      projectResourceGroup
+      miForAca
+      miRbac  // It is critical that the identity is granted ACR pull access before the app is created
+      subnetDelegationAca
+    ] 
+  }
+
   module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'aca-api-${deploymentProjSpecificUniqueSuffix}-depl'
