@@ -114,7 +114,9 @@ resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
     }
   }
   properties: {
-    managedEnvironmentId: containerAppsEnvironmentId // containerAppsEnvironment.id
+    //managedEnvironmentId: containerAppsEnvironmentId // containerAppsEnvironment.id
+    workloadProfileName: 'Consumption'
+    environmentId: containerAppsEnvironment.id
     configuration: {
       activeRevisionsMode: revisionMode
       ingress: ingressEnabled ? {
