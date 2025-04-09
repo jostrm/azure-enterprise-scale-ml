@@ -43,10 +43,11 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
     networkSecurityGroup: {
       id:existingSubnet.outputs.networkSecurityGroupId
     }
-    delegations: union(
-      existingSubnet.outputs.delegations ?? [],
-      delegations
-    )
+    delegations: delegations
+    //delegations: union(
+      //existingSubnet.outputs.delegations ?? [],
+      //delegations
+    //)
     privateEndpointNetworkPolicies: 'Disabled' //  (recommended for most cases):securely connect to private endpoints without being blocked by NSGs
     privateLinkServiceNetworkPolicies: 'Enabled' //  (default setting):NSG rules are applied to private link services
   }
