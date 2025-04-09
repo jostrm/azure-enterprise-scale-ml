@@ -1999,17 +1999,17 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       openAiDeploymentName: 'gpt-4'
       openAiEvalDeploymentName:'gpt-4-evals'
       openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
-      openAiEndpoint: aiServices.outputs.openAIEndpoint //ai.outputs.openAiEndpoint
-      openAiName: aiServices.outputs.name //ai.outputs.openAiName
+      openAiEndpoint: aiServices.outputs.openAIEndpoint
+      openAiName: aiServices.outputs.name
       openAiType: 'azure'
       openAiApiVersion: openAiApiVersion
-      aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint // ai.outputs.searchServiceEndpoint
+      aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint
       aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
-      appinsightsConnectionstring: appinsights.outputs.connectionString // ai.outputs.applicationInsightsConnectionString
-      bingName: bing.outputs.bingName //ai.outputs.bingName
-      bingApiEndpoint: bing.outputs.endpoint // ai.outputs.bingEndpoint
-      bingApiKey: bing.outputs.bingApiKey  //ai.outputs.bingApiKey
-      aiProjectName: aiHub.outputs.aiProjectName //ai.outputs.projectName
+      appinsightsConnectionstring: appinsights.outputs.connectionString
+      bingName: bing.outputs.bingName
+      bingApiEndpoint: bing.outputs.endpoint
+      bingApiKey: bing.outputs.bingApiKey
+      aiProjectName: aiHub.outputs.aiProjectName
       subscriptionId: subscriptionIdDevTestProd
       appWorkloadProfileName: acaAppWorkloadProfileName
       containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
