@@ -7,15 +7,14 @@ param tags object
 param containerAppsEnvironmentName string
 param containerAppsEnvironmentId string
 
-@description('The number of CPU cores allocated to a single container instance, e.g., 0.5')
-param containerCpuCoreCount int = 1
+@description('CPU cores allocated to a single container instance, e.g., 0.5')
+param containerCpuCoreCount int = 1 //0.5
+@description('Memory allocated to a single container instance, e.g., 1Gi')
+param containerMemory string = '2.0Gi' //'1.0Gi'
 
 @description('The maximum number of replicas to run. Must be at least 1.')
 @minValue(1)
 param containerMaxReplicas int = 10
-
-@description('The amount of memory allocated to a single container instance, e.g., 1Gi')
-param containerMemory string = '1.0Gi'
 
 @description('The minimum number of replicas to run. Must be at least 1.')
 @minValue(1)
