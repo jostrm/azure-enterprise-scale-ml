@@ -5,6 +5,7 @@ param tags object
 param identityUserPrincipalId string
 param identityId string
 param containerAppsEnvironmentName string
+param containerAppsEnvironmentId string
 param containerRegistryName string
 param serviceName string = 'web'
 param apiEndpoint string
@@ -19,6 +20,7 @@ module app './containerappUpsert.bicep' = {
     identityUserPrincipalId: identityUserPrincipalId
     identityType: 'UserAssigned'
     containerAppsEnvironmentName: containerAppsEnvironmentName
+    containerAppsEnvironmentId: containerAppsEnvironmentId
     containerRegistryName: containerRegistryName
     env: [
       {

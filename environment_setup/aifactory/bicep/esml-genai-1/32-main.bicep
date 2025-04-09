@@ -2017,6 +2017,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       name: 'aca-web-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
       containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
+      containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       identityId: miForAca.outputs.managedIdentityClientId
       identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
