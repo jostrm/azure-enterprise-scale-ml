@@ -36,6 +36,10 @@ param appWorkloadProfileName string = ''
 param bingApiKey string
 param bingApiEndpoint string
 param allowedOrigins array = []
+@description('CPU cores allocated to a single container instance, e.g., 0.5')
+param containerCpuCoreCount int = 1 //0.5
+@description('Memory allocated to a single container instance, e.g., 1Gi')
+param containerMemory string = '2.0Gi' //'1.0Gi'
 
 module appApi './containerappUpsert.bicep' = {
   name: 'depl-${name}-1'
@@ -58,6 +62,8 @@ module appApi './containerappUpsert.bicep' = {
     subnetAcaDedicatedName: subnetAcaDedicatedName
     allowedOrigins: allowedOrigins
     appWorkloadProfileName: appWorkloadProfileName
+    containerCpuCoreCount: containerCpuCoreCount
+    containerMemory: containerMemory
     secrets: {
       'bing-search-key': bingApiKey
     }

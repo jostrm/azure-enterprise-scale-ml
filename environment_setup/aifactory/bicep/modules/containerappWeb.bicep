@@ -11,6 +11,10 @@ param serviceName string = 'web'
 param apiEndpoint string
 param targetPort int = 80
 param appWorkloadProfileName string = ''
+@description('CPU cores allocated to a single container instance, e.g., 0.5')
+param containerCpuCoreCount int = 1 //0.5
+@description('Memory allocated to a single container instance, e.g., 1Gi')
+param containerMemory string = '2.0Gi' //'1.0Gi'
 
 module app './containerappUpsert.bicep' = {
   name: 'depl-${name}-${deployment().name}'
@@ -24,6 +28,8 @@ module app './containerappUpsert.bicep' = {
     containerAppsEnvironmentId: containerAppsEnvironmentId
     containerRegistryName: containerRegistryName
     appWorkloadProfileName: appWorkloadProfileName
+    containerCpuCoreCount: containerCpuCoreCount
+    containerMemory: containerMemory
     env: [
       {
         name: 'AZURE_CLIENT_ID'
