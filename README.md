@@ -53,10 +53,18 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 ## Feature Roadmap
 
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
-    - STATUS: Ongoing (2025-04)
+    - STATUS: Ongoing (2025-03)
+- **Networking Access modes**: Adding a new mode for GenAI project type called `enablePublicAccessWithPerimeter`
+    - With the new mode, the total is 5 ways for user access:
+        - 1) `private-peered` (top recommendation)
+        - 2) `private-standalone with Azure VPN` (recommended. If you cannot do: Hub-peering)
+        - 3) `private-standalone with public IP-whitelisting` (DEMO option, or if you cannot to Hub-peering, or cannot use VPN)
+        - 4) `private-standalone/peered with Azure Bastion` (only for admin, a few users, trouble shooting. Not recommended for end-users)
+        - 5) `public-secure perimeter with conditional-access`(If you cannot do: Hub-peering, VPN, cannot work with IP-whitelisting due to split-tunneling/dynamic IP)
+    - STATUS: Ongoing (2025-03)
 - **Exposing on/off for more services in GENAI type**: Base parameter file `31-esgenai-default.json` to include more true/false flags if to create the following services: `Container Apps, App Service/WebApp, Function App, Bing, CosmosDB, Azure Dashboard for Apps`.
     - [Go here for full list of services and on/off](./documentation/v2/20-29/24-configure-AIfactory-project.md)
-    - STATUS: Completed (2025-04)
+    - STATUS: Completed (2025-03)
 - **BYOVnet**: Bring your own vNet in a separate resource group, instead of having the AI Factory create it.
     - STATUS: Completed (2024-05)
 - **Shared Container Registry**: Optional flag, saving 30% run/idle cost per use case, by sharing container registry across Azure ML workspaces/Azure AI foundry

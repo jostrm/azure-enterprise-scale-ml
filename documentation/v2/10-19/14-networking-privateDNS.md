@@ -18,12 +18,17 @@ You can choose to have Private DNS Zones Centrally in HUB (recommended) or in th
 The AI Factory has 4 access modes. Only 1-3 is enables when the AI Factory is setup in standalone mode.
 Stanalone mode, meaning the AIFactory has its own "hub" with own private DNS zones, e.g. it is not peered to your central hub.
 
-1. **Azure VPN** (either to a Windows 11 DevBox/AVD or from client computer)
-2. **Bastion and bootrapped VM** VM with private IP-adress (client computer IP needs to be whitelisted for Bastion subnet).
-    - Alternatively: DevBox, VDI,AVD
-3. **Service endpoints & IP-address whitelisting (WIP)** whitelist client IP's (service endpoints) for end-users to access UI for some services, such as AI Foundry UI, Azure Machine Learning UI, Azure Keyvault, and Storage accounts. Peering it still recommended. 
-    - NB! For Azure Machine Learning/Azure AI Foundry this is new, announced at Microsoft IGNITE Nov 2025 (preview)
-4. **Peering** with central hub (client has direct line of sight if on corp network, and can use regular VPN from home)
+1. **Private Peered** (top recommendation) with central hub (client has direct line of sight if on corp network, and can use regular VPN from home)
+    - Top recommended.
+2. **Private Standalone: Azure VPN** User have access via secrue VPN from Mac, Linux, Windows, from home or work, and all private endpoints.
+    - Recommended when: If you cannot do: Hub-peering
+3. **Private Standalone: IP-address whitelisting (WIP)** whitelist client IP's (service endpoints) for end-users to access UI for some services, such as AI Foundry UI, Azure Machine Learning UI, Azure Keyvault, and Storage accounts. Peering it still recommended. 
+    - Recommended when: If you cannot do: Hub-peering or VPN. This is usually the DEMO-mode.
+4. **Private Standalone or Peered: Bastion and bootrapped VM** Widnows VM with private IP-adress (client computer IP needs to be whitelisted for Bastion subnet).
+    - Recommended when: only for admin, a few users, trouble shooting. Not recommended for end-users.
+5. **Public with secure perimeter**: public access to user interfaces (portals), with MFA conditional access, and secure perimeter.
+    - Recommended when: If you cannot do: Hub-peering, VPN, cannot work with IP-whitelisting due to split-tunneling/dynamic IP
+6. **Private standalone: Jump host**: Some customers already have "jump host" solutions: DevBox, VDI,AVD
 
 > [!NOTE]
 > **AI Factory Standalone mode** has been used, when an organization cannot use private endpoints, or cannot peer anything to the HUB due to Private DNS Zone complexity.

@@ -73,12 +73,6 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
         name: wlProfileGPUConsumptionName
         workloadProfileType:'Consumption-GPU'
       }
-      {
-        name: wlProfileDedicatedGPUName
-        workloadProfileType: 'Dedicated-GPU'
-        minimumCount: wlMinCountDedicatedGPU
-        maximumCount: wlMaxCountDedicatedGPU
-      }
       
     ]
 
