@@ -1465,6 +1465,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   dependsOn: [
     addSecret
     aiServices
+    miRbac
   ]
 }
 
