@@ -1448,6 +1448,10 @@ var secretGet = {
 }
 
 // PROJECT Keyvault where technicalContactId GET,LIST, SET
+
+var mi_array = array(miForAca.outputs.managedIdentityPrincipalId)
+var all_principals = union(technicalAdminsObjectID_array_safe, mi_array)
+
 module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: '${keyvaultName}AP${deploymentProjSpecificUniqueSuffix}'
@@ -1456,7 +1460,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
     keyVaultResourceName: kv1.outputs.keyvaultName
     policyName: 'add'
     principalId: technicalContactId
-    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+    additionalPrincipalIds:all_principals
   }
   dependsOn: [
     addSecret
@@ -2018,6 +2022,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       appWorkloadProfileName: acaAppWorkloadProfileName
       containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
       containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
+      keyVaultUrl: kv1.outputs.keyvaultUri
     }
     dependsOn: [
       aiServices
@@ -2043,6 +2048,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       appWorkloadProfileName:acaAppWorkloadProfileName
       containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
       containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
+      keyVaultUrl: kv1.outputs.keyvaultUri
     }
     dependsOn: [
       containerAppsEnv

@@ -84,7 +84,8 @@ param vnetName string = ''
 param vnetResourceGroupName string = ''
 param subnetNamePend string = ''
 param subnetAcaDedicatedName string = ''
-param appWorkloadProfileName string = '' 
+param appWorkloadProfileName string = ''
+param keyVaultUrl string = ''
 
 // Private registry support requires both an ACR name and a User Assigned managed identity
 var usePrivateRegistry = !empty(identityUserPrincipalId) && !empty(containerRegistryName)
@@ -124,6 +125,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       ingress: ingressEnabled ? {
         external: external
         targetPort: targetPort
+        allowInsecure: true
         transport: 'auto'
         ipSecurityRestrictions: (!empty(ipSecurityRestrictions) && !enablePublicGenAIAccess)? ipSecurityRestrictions: null
         corsPolicy: {
@@ -145,6 +147,8 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       secrets: [for secret in items(secrets): {
         name: secret.key
         value: secret.value
+        identity: identityUserPrincipalId
+        keyVaultUrl: keyVaultUrl
       }]
       service: !empty(serviceType) ? { type: serviceType } : null
       registries: usePrivateRegistry ? [

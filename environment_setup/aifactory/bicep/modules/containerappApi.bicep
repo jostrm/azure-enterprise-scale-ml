@@ -31,6 +31,7 @@ param vnetResourceGroupName string = ''
 param subnetNamePend string = ''
 param subnetAcaDedicatedName string = ''
 param appWorkloadProfileName string = ''
+param keyVaultUrl string = ''
 
 @secure()
 param bingApiKey string
@@ -64,6 +65,7 @@ module appApi './containerappUpsert.bicep' = {
     appWorkloadProfileName: appWorkloadProfileName
     containerCpuCoreCount: containerCpuCoreCount
     containerMemory: containerMemory
+    keyVaultUrl: keyVaultUrl
     secrets: {
       'bing-search-key': bingApiKey
     }
