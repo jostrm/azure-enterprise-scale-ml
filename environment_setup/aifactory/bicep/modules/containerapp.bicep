@@ -152,8 +152,8 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       secrets: [for secret in items(secrets): {
         name: secret.key
         value: secret.value
-        identity: userIdentity.id
-        keyVaultUrl: '${keyVaultUrl}/secrets/aifactory-proj-${secret.key}'
+        //identity: userIdentity.id
+        //keyVaultUrl: '${keyVaultUrl}secrets/aifactory-proj-${secret.key}'
       }]
       service: !empty(serviceType) ? { type: serviceType } : null
       registries: usePrivateRegistry ? [
