@@ -18,7 +18,7 @@ param subnetNamePend string = ''
 param subnetAcaDedicatedName string
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
-param wlProfileDedicatedName string = 'Dedicated-D4'
+param wlProfileDedicatedName string = 'D4'
 param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
@@ -65,13 +65,13 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
       }
       {
         name: wlProfileDedicatedName
-        workloadProfileType: 'Dedicated'
+        workloadProfileType: wlProfileDedicatedName
         minimumCount: wlMinCountDedicated
         maximumCount: wlMaxCount
       }
       {
         name: wlProfileGPUConsumptionName
-        workloadProfileType:'Consumption-GPU'
+        workloadProfileType:wlProfileGPUConsumptionName
       }
       
     ]

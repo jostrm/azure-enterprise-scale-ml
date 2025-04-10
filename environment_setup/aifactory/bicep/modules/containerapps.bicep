@@ -15,6 +15,8 @@ param applicationInsightsName string
 param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
+param wlProfileDedicatedName string = 'D4' // 'D4', 'D8', 'D16', 'D32', 'D64', 'E4', 'E8'
+param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
   name: 'depl-${name}'
@@ -34,6 +36,9 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
     wlMinCountServerless: wlMinCountServerless
     wlMinCountDedicated: wlMinCountDedicated
     wlMaxCount: wlMaxCount
+    wlProfileDedicatedName: wlProfileDedicatedName
+    wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
+
   }
 }
 

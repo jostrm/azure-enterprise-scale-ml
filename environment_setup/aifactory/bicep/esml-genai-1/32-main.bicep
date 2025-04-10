@@ -93,6 +93,8 @@ param acaCustomDomainsArray array = []
 param acaAppWorkloadProfileName string = '' // 'Consumption' 
 param containerCpuCoreCount int = 1 // 0.5, 1.0, 2.0, 4.0, 8.0
 param containerMemory string = '2.0Gi' // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
+param wlProfileDedicatedName string = 'D4' // 'D4', 'D8', 'D16', 'D32', 'D64', 'E4', 'E8'
+param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
@@ -1965,6 +1967,8 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       wlMinCountServerless:wlMinCountServerless
       wlMinCountDedicated: wlMinCountDedicated
       wlMaxCount: wlMaxCount
+      wlProfileDedicatedName: wlProfileDedicatedName
+      wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
     }
     dependsOn: [
       projectResourceGroup
