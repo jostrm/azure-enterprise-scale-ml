@@ -69,10 +69,6 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
         minimumCount: wlMinCountDedicated
         maximumCount: wlMaxCount
       }
-      {
-        name: wlProfileGPUConsumptionName
-        workloadProfileType:wlProfileGPUConsumptionName
-      }
       
     ]
 
