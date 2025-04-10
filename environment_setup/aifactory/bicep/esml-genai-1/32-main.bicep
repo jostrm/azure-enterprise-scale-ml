@@ -2020,6 +2020,10 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
     }
     dependsOn: [
+      aiServices
+      aiHub
+      aiSearchService
+      cmnRbacACR
       containerAppsEnv
     ] 
   }
