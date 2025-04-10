@@ -50,7 +50,7 @@ param ingressEnabled bool = true
 param identityType string = 'None'
 
 @description('The ID of the user-assigned identity')
-param identityUserPrincipalId string = ''
+param identityName string = ''
 
 // ############## NB! 
 @description('The secrets required for the container')
@@ -106,7 +106,7 @@ module appUpsert 'containerapp.bicep' = {
     subnetNamePend: subnetNamePend
     subnetAcaDedicatedName: subnetAcaDedicatedName
     identityType: identityType
-    identityUserPrincipalId:identityUserPrincipalId
+    identityName:identityName
     ingressEnabled: ingressEnabled
     containerName: containerName
     containerAppsEnvironmentName: containerAppsEnvironmentName

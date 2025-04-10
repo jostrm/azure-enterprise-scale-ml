@@ -2001,7 +2001,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       customDomains:acaCustomDomainsArray
       resourceGroupName: targetResourceGroup
       identityId: miForAca.outputs.managedIdentityClientId
-      identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
+      identityName: miForAca.outputs.managedIdentityName
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
       containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
@@ -2045,7 +2045,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       identityId: miForAca.outputs.managedIdentityClientId
-      identityUserPrincipalId: miForAca.outputs.managedIdentityPrincipalId
+      identityName: miForAca.outputs.managedIdentityName
       appWorkloadProfileName:acaAppWorkloadProfileName
       containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
       containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi

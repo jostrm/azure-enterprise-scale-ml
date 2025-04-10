@@ -2,7 +2,7 @@ param name string
 param location string
 param resourceGroupName string
 param tags object
-param identityUserPrincipalId string
+param identityName string
 param identityId string
 param containerAppsEnvironmentName string
 param containerAppsEnvironmentId string
@@ -48,7 +48,7 @@ module appApi './containerappUpsert.bicep' = {
     name: name
     location: location
     tags: union(tags, { 'azd-service-name': serviceName })
-    identityUserPrincipalId: identityUserPrincipalId
+    identityName: identityName
     identityType: 'UserAssigned'
     containerAppsEnvironmentName: containerAppsEnvironmentName
     containerAppsEnvironmentId: containerAppsEnvironmentId

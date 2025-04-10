@@ -49,7 +49,7 @@ param env array = []
 param external bool = true
 
 @description('The ID of the user-assigned identity')
-param identityUserPrincipalId string = ''
+param identityName string = ''
 
 @description('The type of identity for the resource')
 @allowed([ 'None', 'SystemAssigned', 'UserAssigned' ])
@@ -88,10 +88,10 @@ param appWorkloadProfileName string = ''
 param keyVaultUrl string = ''
 
 // Private registry support requires both an ACR name and a User Assigned managed identity
-var usePrivateRegistry = !empty(identityUserPrincipalId) && !empty(containerRegistryName)
+var usePrivateRegistry = !empty(identityName) && !empty(containerRegistryName)
 
 // Automatically set to `UserAssigned` when an `identityName` has been set
-var normalizedIdentityType = !empty(identityUserPrincipalId) ? 'UserAssigned' : identityType
+var normalizedIdentityType = !empty(identityName) ? 'UserAssigned' : identityType
 
 //resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01' existing = {
@@ -99,6 +99,11 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01'
 }
 
 var rId = resourceId('Microsoft.App/managedEnvironments@2023-05-01', containerAppsEnvironmentName)
+
+resource userIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if (!empty(identityName)) {
+  name: identityName
+}
+
 
 //resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
 resource app 'Microsoft.App/containerApps@2025-01-01' = {
@@ -113,13 +118,13 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
   identity: {
     type: normalizedIdentityType
     userAssignedIdentities:{
-      '${identityUserPrincipalId}': {}
+      '${userIdentity.id}': {}
     }
   }
   properties: {
     //Deprecated: managedEnvironmentId: containerAppsEnvironmentId // containerAppsEnvironment.id
     workloadProfileName: empty(appWorkloadProfileName)? null : appWorkloadProfileName
-    environmentId: rId //containerAppsEnvironment.id
+    environmentId: containerAppsEnvironment.id
     configuration: {
       activeRevisionsMode: revisionMode
       ingress: ingressEnabled ? {
@@ -147,14 +152,14 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       secrets: [for secret in items(secrets): {
         name: secret.key
         value: secret.value
-        identity: identityUserPrincipalId
+        identity: userIdentity.id
         keyVaultUrl: keyVaultUrl
       }]
       service: !empty(serviceType) ? { type: serviceType } : null
       registries: usePrivateRegistry ? [
         {
           server: '${containerRegistryName}.${containerRegistryHostSuffix}'
-          identity: identityUserPrincipalId
+          identity: userIdentity.id
         }
       ] : []
     }
@@ -181,7 +186,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
 
 
 output defaultDomain string = containerAppsEnvironment.properties.defaultDomain
-output identityPrincipalId string = normalizedIdentityType == 'None' ? '' : (empty(identityUserPrincipalId) ? app.identity.principalId : identityUserPrincipalId)
+output identityPrincipalId string = normalizedIdentityType == 'None' ? '' : (empty(identityName) ? app.identity.principalId : userIdentity.properties.principalId)
 output imageName string = imageName
 output name string = app.name
 output serviceBind object = !empty(serviceType) ? { serviceId: app.id, name: name } : {}
