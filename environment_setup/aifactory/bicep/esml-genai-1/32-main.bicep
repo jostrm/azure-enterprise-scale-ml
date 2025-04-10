@@ -1987,7 +1987,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'aca-api-${deploymentProjSpecificUniqueSuffix}-depl'
     params: {
-      name: 'aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: 'aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${substring(resourceSuffix, 1)}' // max 32 chars
       location: location
       tags: tags
       ipSecurityRestrictions: enablePublicGenAIAccess? ipSecurityRestrictions: []
