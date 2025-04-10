@@ -1985,9 +1985,9 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
 
   module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'aca-api-${deploymentProjSpecificUniqueSuffix}-depl'
+    name: 'aca-a-${deploymentProjSpecificUniqueSuffix}-depl'
     params: {
-      name: 'aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${substring(resourceSuffix, 1)}' // max 32 chars
+      name: 'aca-a-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${substring(resourceSuffix, 1)}' // max 32 chars
       location: location
       tags: tags
       ipSecurityRestrictions: enablePublicGenAIAccess? ipSecurityRestrictions: []
@@ -2035,11 +2035,11 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   }
   module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name:'aca-web-${deploymentProjSpecificUniqueSuffix}-depl' 
+    name:'aca-w-${deploymentProjSpecificUniqueSuffix}-depl' 
     params: {
       location: location
       tags: tags
-      name: 'aca-web-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: 'aca-w-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'
       apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
       containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
       containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
