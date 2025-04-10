@@ -92,13 +92,15 @@ var usePrivateRegistry = !empty(identityUserPrincipalId) && !empty(containerRegi
 // Automatically set to `UserAssigned` when an `identityName` has been set
 var normalizedIdentityType = !empty(identityUserPrincipalId) ? 'UserAssigned' : identityType
 
-resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
+//resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' existing = {
+resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01' existing = {
   name: containerAppsEnvironmentName
 }
 
 var rId = resourceId('Microsoft.App/managedEnvironments@2023-05-01', containerAppsEnvironmentName)
 
-resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
+//resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
+resource app 'Microsoft.App/containerApps@2025-01-01' = {
   name: name
   location: location
   tags: tags
