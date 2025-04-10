@@ -115,7 +115,7 @@ resource amlWorkspaceSecretsReaderRole 'Microsoft.Authorization/roleDefinitions@
 var azureOpenAIConnectionName ='azureOpenAI'
 var azureAIServicesConnectionName ='azureAIServices'
 var azureAISearchConnectionName ='azureAISearch'
-var aiHubProjectName ='ai-prj-${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
+var aiHubProjectName ='ai-prj${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 var aiProjectDiagSettingName ='aiProjectDiagnosticSetting'
 var aiHubDiagSettingName ='aiHubDiagnosticSetting'
 var aiHubDiagSettingName2 ='aiHubDiagnosticSetting2'
