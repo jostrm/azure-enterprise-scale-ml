@@ -24,6 +24,11 @@ param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
 
+// TODO: Expose these parameters to the user
+param wlProfileDedicatedGPUName string = 'Dedicated-GPU-NC24-A100'
+param wlMinCountDedicatedGPU int = 1
+param wlMaxCountDedicatedGPU int = 5
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
@@ -59,12 +64,6 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
         workloadProfileType: 'Consumption'
       }
       {
-        name: 'Serverless'
-        workloadProfileType:'Serverless'
-        minimumCount: wlMinCountServerless
-        maximumCount: wlMaxCount
-      }
-      {
         name: wlProfileDedicatedName
         workloadProfileType: 'Dedicated'
         minimumCount: wlMinCountDedicated
@@ -73,6 +72,12 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
       {
         name: wlProfileGPUConsumptionName
         workloadProfileType:'Consumption-GPU'
+      }
+      {
+        name: wlProfileDedicatedGPUName
+        workloadProfileType: 'Dedicated-GPU'
+        minimumCount: wlMinCountDedicatedGPU
+        maximumCount: wlMaxCountDedicatedGPU
       }
       
     ]

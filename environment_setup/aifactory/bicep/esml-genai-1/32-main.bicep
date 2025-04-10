@@ -1996,8 +1996,8 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
       containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
       containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
-      openAiDeploymentName: 'gpt-4'
-      openAiEvalDeploymentName:'gpt-4-evals'
+      openAiDeploymentName: 'gpt'
+      openAiEvalDeploymentName:'gpt-evals'
       openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
       openAiEndpoint: aiServices.outputs.openAIEndpoint
       openAiName: aiServices.outputs.name

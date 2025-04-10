@@ -154,7 +154,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
   properties: {
     allowRoleAssignmentOnRG: true
     friendlyName: '${name}-${env}-${aiFactoryNumber}'
-    description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
+    description: 'TODO if using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models (GPT-4o), called: gpt,gpt-evals'
 
      // dependent resources
     applicationInsights: appInsights.id 
