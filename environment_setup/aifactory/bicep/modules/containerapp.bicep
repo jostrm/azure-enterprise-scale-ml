@@ -116,7 +116,7 @@ resource app 'Microsoft.App/containerApps@2023-05-02-preview' = {
   properties: {
     //Deprecated: managedEnvironmentId: containerAppsEnvironmentId // containerAppsEnvironment.id
     workloadProfileName: empty(appWorkloadProfileName)? null : appWorkloadProfileName
-    environmentId: containerAppsEnvironment.id
+    environmentId: rId //containerAppsEnvironment.id
     configuration: {
       activeRevisionsMode: revisionMode
       ingress: ingressEnabled ? {
