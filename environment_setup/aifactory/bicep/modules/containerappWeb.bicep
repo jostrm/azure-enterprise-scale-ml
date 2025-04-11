@@ -15,6 +15,7 @@ param containerCpuCoreCount int = 1 //0.5
 @description('Memory allocated to a single container instance, e.g., 1Gi')
 param containerMemory string = '2.0Gi' //'1.0Gi'
 param keyVaultUrl string = ''
+param allowedOrigins array = []
 
 module app './containerappUpsert.bicep' = {
   name: 'depl-${name}-${deployment().name}'
@@ -24,6 +25,7 @@ module app './containerappUpsert.bicep' = {
     tags: union(tags, { 'azd-service-name': serviceName })
     identityName: identityName
     identityType: 'UserAssigned'
+    allowedOrigins: allowedOrigins
     containerAppsEnvironmentName: containerAppsEnvironmentName
     containerAppsEnvironmentId: containerAppsEnvironmentId
     containerRegistryName: containerRegistryName

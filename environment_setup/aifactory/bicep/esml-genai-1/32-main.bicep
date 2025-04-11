@@ -1941,17 +1941,20 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   var unionIpSec = union(ipSecurityRestrictions,vnetAllow)
 
   var allowedOrigins = [
+    'https://portal.azure.com'
+    'https://ms.portal.azure.com'
     'https://mlworkspace.azure.ai'
     'https://ml.azure.com'
-    'https://*.ml.azure.com'
     'https://ai.azure.com'
-    'https://*.ai.azure.com'
     'https://mlworkspacecanary.azure.ai'
     'https://mlworkspace.azureml-test.net'
     'https://42.swedencentral.instances.azureml.ms'
-    'https://*.instances.azureml.ms'
-    'https://*.azureml.ms'
   ]
+
+  //'https://*.instances.azureml.ms'
+  //'https://*.azureml.ms'
+  //'https://*.ai.azure.com'
+  //'https://*.ml.azure.com'
     
   module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps==true) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -2041,6 +2044,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       tags: tags
       name: 'aca-w-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'
       apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
+      allowedOrigins: allowedOrigins
       containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
       containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
       containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
