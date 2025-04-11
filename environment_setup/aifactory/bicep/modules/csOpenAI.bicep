@@ -15,7 +15,7 @@ param publicNetworkAccess bool = false
 param pendCogSerName string
 param vnetRules array = []
 param ipRules array = []
-param restore bool
+param restore bool=false
 param disableLocalAuth bool = true
 /*
 @allowed([
