@@ -25,7 +25,7 @@ steps:
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: ps
-    scriptLocation: 'inlineScript'
+    scriptLocation: inlineScript
     inlineScript: |
       $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
       Write-Host $resp
@@ -38,6 +38,7 @@ steps:
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
+    scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
      az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
