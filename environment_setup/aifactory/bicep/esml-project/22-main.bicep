@@ -168,6 +168,9 @@ param enableAML bool = true
 param enableEventhubs bool = true
 
 // BYOsubnet
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
 param BYO_subnets bool = false
 param network_env string =''
 param subnetCommon string = ''
@@ -175,6 +178,7 @@ param subnetCommonScoring string = ''
 param subnetCommonPowerbiGw string = ''
 param subnetProjGenAI string = ''
 param subnetProjAKS string = ''
+param subnetProjACA string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
 
@@ -358,6 +362,10 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
     name:'privatelink.agentsvc.azure-automation.net'
   }
+  azurecontainerapps: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.${location}.azurecontainerapps.io'
+    name:'privatelink.${location}.azurecontainerapps.io'
+  }
 }
 
 var privateLinksDnsZonesArray = [
@@ -460,6 +468,10 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.azuremonitoragentsvc.name
     id: privateLinksDnsZones.azuremonitoragentsvc.id
+  }
+  {
+    name: privateLinksDnsZones.azurecontainerapps.name
+    id: privateLinksDnsZones.azurecontainerapps.id
   }
 ]
 

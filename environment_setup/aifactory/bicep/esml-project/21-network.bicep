@@ -54,6 +54,9 @@ param subnetProjGenAI string = ''
 param subnetProjAKS string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
 
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj HUB
@@ -189,3 +192,4 @@ output dbxPubSubnetName string = 'snt-${projectName}-dbxpub' //dbxPubSnt.outputs
 output dbxPrivSubnetName string = 'snt-${projectName}-dbxpriv'//dbxPrivSnt.outputs.name // 'snt-${dbxPrivSnt.name}'
 output aksSubnetId string = aksSnt.outputs.subnetId
 output genaiSubnetId string = ''
+output acaSubnetId string =''
