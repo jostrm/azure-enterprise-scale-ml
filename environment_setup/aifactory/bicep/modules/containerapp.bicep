@@ -4,7 +4,7 @@ param location string
 param tags object
 
 @description('Allowed origins')
-param allowedOrigins array = []
+param allowedOrigins array
 
 @description('Name of the environment for container apps')
 param containerAppsEnvironmentName string
@@ -136,7 +136,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
         corsPolicy: {
           maxAge: 3600
           allowCredentials: true
-          allowedOrigins: allowedOrigins //union([ 'https://portal.azure.com', 'https://ms.portal.azure.com' ], allowedOrigins)
+          allowedOrigins: union([ 'https://portal.azure.com', 'https://ms.portal.azure.com' ], allowedOrigins)
           allowedMethods: [ 'GET', 'POST', 'PUT', 'DELETE', 'OPTIONS' ]
           allowedHeaders: [ '*' ]
           exposeHeaders: [ '*' ]

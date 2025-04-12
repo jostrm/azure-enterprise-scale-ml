@@ -70,7 +70,7 @@ param serviceBinds array = []
 
 @description('The target port for the container')
 param targetPort int = 80
-param allowedOrigins array = []
+param allowedOrigins array
 param imageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 param customDomains array = []
 param ipSecurityRestrictions array = []
