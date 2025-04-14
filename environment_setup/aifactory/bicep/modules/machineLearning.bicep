@@ -129,7 +129,7 @@ resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-07-01' existin
 }
 
 
-resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(alsoManagedMLStudio) {
+resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(alsoManagedMLStudio) {
   name: nameManaged
   location: location
   identity: {
@@ -191,7 +191,8 @@ module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
 
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
-resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(env == 'dev' && enableAMLWorkspaceVersion1) {
+//resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = {
+resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(env == 'dev' && enableAMLWorkspaceVersion1) {
   name: name
   location: location
   identity: {
@@ -233,7 +234,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     aksDev
   ]
 }
-resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'  = if(env == 'test' || env == 'prod' && enableAMLWorkspaceVersion1) {
+resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'  = if(env == 'test' || env == 'prod' && enableAMLWorkspaceVersion1) {
   name: name
   location: location
   identity: {

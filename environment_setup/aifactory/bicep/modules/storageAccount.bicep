@@ -77,7 +77,7 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-resource sacc2 'Microsoft.Storage/storageAccounts@2023-05-01' = if(enablePublicGenAIAccess) {
+resource sacc2 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGenAIAccess) {
   name: storageAccountName
   tags: tags
   location: location
@@ -164,7 +164,7 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2023-05-01' = if(enablePublicG
   }
   
 }
-resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = if(enablePublicGenAIAccess == false) {
+resource sacc 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGenAIAccess == false) {
   name: storageAccountName
   tags: tags
   location: location
@@ -216,6 +216,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2023-05-01' = if(enablePublicGe
         action: 'Allow'
         id: rule
       }]
+      ipRules:empty(ipRules)?[]:ipRules
     }
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {

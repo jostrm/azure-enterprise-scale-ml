@@ -143,7 +143,7 @@ az ml -h
 az extension update -n ml
 
 */
-resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: name
   location: location
   identity: {
@@ -270,7 +270,7 @@ resource aiHubDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
   }
 }
 @description('This is a container for the ai foundry project.')
-resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: aiHubProjectName
   location: location
   kind: 'Project'
@@ -316,7 +316,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-pre
 
 // ############################### Private ################
 
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: name
   location: location
   identity: {
@@ -442,7 +442,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: aiHubProjectName
   location: location
   kind: 'Project'
