@@ -98,6 +98,7 @@ param acrRGName string
 param appInsightsName string
 param ipWhitelist_array array = []
 param enablePublicAccessWithPerimeter bool = false
+param enableAMLWorkspaceVersion1 bool = true
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
@@ -188,7 +189,7 @@ module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
 
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-04-01' = {
-resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(env == 'dev') {
+resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(env == 'dev' && enableAMLWorkspaceVersion1) {
   name: name
   location: location
   identity: {
@@ -220,7 +221,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     enableDataIsolation: false // tomten
     ipAllowlist: ipWhitelist_array
     networkAcls: {
-      defaultAction:'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
+      defaultAction:'Allow' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
   }
@@ -228,7 +229,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     aksDev
   ]
 }
-resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'  = if(env == 'test' || env == 'prod') {
+resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'  = if(env == 'test' || env == 'prod' && enableAMLWorkspaceVersion1) {
   name: name
   location: location
   identity: {
@@ -274,7 +275,7 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
   params: {
     location: location
     tags: tags
-    workspaceArmId: machineLearningStudio.id
+    workspaceArmId: (env=='dev')? machineLearningStudio.id: machineLearningStudioTestProd.id
     subnetId: subnetRef
     machineLearningPleName: privateEndpointName
     amlPrivateDnsZoneID: amlPrivateDnsZoneID
@@ -347,7 +348,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
 }
 
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(ownSSL == 'disabled') {
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(ownSSL == 'disabled' && env=='dev') {	
   name: aksName
   parent: machineLearningStudio
   location: location
@@ -376,9 +377,38 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     machineLearningStudio
   ]
 }
-
+//AKS attach compute PRIVATE cluster, without SSL
+resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(ownSSL == 'disabled' && env=='test' || env=='prod') {	
+  name: aksName
+  parent: machineLearningStudioTestProd
+  location: location
+  properties: {
+    computeType: 'AKS'
+    computeLocation: location
+    description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    resourceId: ((env =='dev') ? aksDev.outputs.aksId : aksTestProd.outputs.aksId)  
+    properties: {
+      agentCount:  ((env =='dev') ? 1 :  3)
+      clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
+      agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
+      loadBalancerType: 'InternalLoadBalancer'
+      aksNetworkingConfiguration:  {
+        subnetId: aksSubnetId
+        dnsServiceIP:aksDnsServiceIP
+        dockerBridgeCidr:aksDockerBridgeCidr
+        serviceCidr:aksServiceCidr
+      }
+      loadBalancerSubnet: aksSubnetName // aks-subnet is default
+      
+    }
+  }
+  dependsOn:[
+    machineLearningPrivateEndpoint
+    machineLearningStudioTestProd
+  ]
+}
 //CPU Cluster
-resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = {
+resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(env =='dev') {
   name: 'p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
   parent: machineLearningStudio
   location: location
@@ -411,6 +441,41 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
   dependsOn:[
     machineLearningPrivateEndpoint
     machineLearningStudio
+  ]
+}
+resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(env =='test' || env =='prod') {
+  name: 'p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
+  parent: machineLearningStudioTestProd
+  location: location
+  tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    computeType: 'AmlCompute'
+    computeLocation: location
+    description: 'CPU cluster for batch training models ( or batch scoring with AML pipeline) for ${projectName} in ESML-${env} AI Factory. Defaults: Dev=${amlComputeDefaultVmSize_dev}. TestProd=${amlComputeDefaultVmSize_testProd}'
+    disableLocalAuth: true
+    properties: {
+      vmPriority: 'Dedicated'
+      vmSize: ((env =='dev') ? amlComputeDefaultVmSize_dev : amlComputeDefaultVmSize_testProd)
+      enableNodePublicIp: false
+      isolatedNetwork: false
+      osType: 'Linux'
+      remoteLoginPortPublicAccess: 'Disabled'
+      scaleSettings: {
+        minNodeCount: 0
+        maxNodeCount: ((env =='dev') ? amlComputeMaxNodex_dev :  amlComputeMaxNodex_testProd)
+        nodeIdleTimeBeforeScaleDown: 'PT120S'
+      }
+      subnet: {
+        id: subnetRef
+      }
+    }
+  }
+  dependsOn:[
+    machineLearningPrivateEndpoint
+    machineLearningStudioTestProd
   ]
 }
 
@@ -448,9 +513,9 @@ resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/wo
   ]
 }
 
-output amlId string = machineLearningStudio.id
-output amlName string = machineLearningStudio.name
-output principalId string = machineLearningStudio.identity.principalId
+output amlId string = (env=='dev')? machineLearningStudio.id: machineLearningStudioTestProd.id
+output amlName string =(env=='dev')? machineLearningStudio.name: machineLearningStudioTestProd.name
+output principalId string = (env=='dev')?machineLearningStudio.identity.principalId:  machineLearningStudioTestProd.identity.principalId
 
 // ###############  AML networking - custom networking ###############
 output dnsConfig array = [
