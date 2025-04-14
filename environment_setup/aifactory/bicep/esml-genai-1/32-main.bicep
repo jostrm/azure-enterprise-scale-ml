@@ -1152,7 +1152,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
           'https://*.ai.azure.com'
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
-          'https://42.swedencentral.instances.azureml.ms'
+          'https://42.${location}.instances.azureml.ms'
           'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
@@ -1299,7 +1299,7 @@ module sacc '../modules/storageAccount.bicep' = {
           'https://*.ai.azure.com'
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
-          'https://42.swedencentral.instances.azureml.ms'
+          'https://42.${location}.instances.azureml.ms'
           'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
@@ -1591,7 +1591,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
           'https://azure.com'
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
-          'https://42.swedencentral.instances.azureml.ms'
+          'https://42.${location}.instances.azureml.ms'
         ]
         allowedMethods: [
           'GET'
@@ -1948,7 +1948,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     'https://ai.azure.com'
     'https://mlworkspacecanary.azure.ai'
     'https://mlworkspace.azureml-test.net'
-    'https://42.swedencentral.instances.azureml.ms'
+    'https://42.${location}.instances.azureml.ms'
   ]
 
   //'https://*.instances.azureml.ms'
