@@ -28,7 +28,7 @@ param esmlSubscriptionID string = 'esml-subscription-id'
 param esmlSubscriptionIDSecret string = subscription().subscriptionId
 
 @description('default keyvault secret expiration date in inteter, EPOC, seconds after 1970')
-param expiration_date_default_2025_01_10_epoch int = 1736467877 // 2025 if created 2022 (3yr)
+param expiration_date_default_2025_01_10_epoch int =1799626400 // 2027 if created 2022 (3yr)
 
 @description('secret name of Object ID for service principle')
 param spOIDKey string = 'esml-project-sp-oid'
