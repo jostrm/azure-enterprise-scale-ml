@@ -365,8 +365,7 @@ var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
-//var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
-var ipWhitelist_array = array('90.231.154.59')
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
 var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
@@ -1126,7 +1125,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     tags: tags
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
-      value: contains(ip, '/') ? ip : '${ip}/32'
+      value: ip //contains(ip, '/') ? ip : '${ip}/32'
     }]
     containers: [
       {
@@ -1286,7 +1285,7 @@ module sacc '../modules/storageAccount.bicep' = {
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
-      value: contains(ip, '/') ? ip : '${ip}/32'
+      value: ip // contains(ip, '/') ? ip : '${ip}/32'
     }] // https://mlworkspace.azure.ai,https://ml.azure.com,https://*.ml.azure.com,https://ai.azure.com,https://*.ai.azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://*.azureml.ms,https://42.swedencentral.instances.azureml.ms,https://*.instances.azureml.ms
     corsRules: [
       {
