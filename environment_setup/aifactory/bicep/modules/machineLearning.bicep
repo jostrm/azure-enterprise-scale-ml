@@ -162,10 +162,12 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
       isolationMode:enablePublicAccessWithPerimeter? 'Disabled': 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
     }
     ipAllowlist: ipWhitelist_array
+    /*
     networkAcls: {
-      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
+      defaultAction:'Allow' // enablePublicAccessWithPerimeter? 'Allow':'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
+    */
   }
   dependsOn:[
     machineLearningStudio
@@ -220,10 +222,12 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     //provisionNetworkNow: false // tomten
     enableDataIsolation: false // tomten
     ipAllowlist: ipWhitelist_array
+    /*
     networkAcls: {
       defaultAction:'Allow' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
+    */
   }
   dependsOn:[
     aksDev
