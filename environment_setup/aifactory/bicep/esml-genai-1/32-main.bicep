@@ -1123,7 +1123,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
     tags: tags
-    networkAcls: networkAcls
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
       value: contains(ip, '/') ? ip : '${ip}/32'
@@ -1248,10 +1247,10 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
   ]
 }
 
-param networkAcls object = {
-  bypass: 'AzureServices'
-  defaultAction: 'Allow'
-}
+//param networkAcls object = {
+//  bypass: 'AzureServices'
+//  defaultAction: 'Allow'
+//}
 
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1270,7 +1269,6 @@ module sacc '../modules/storageAccount.bicep' = {
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}ml'
     tags: tags
-    networkAcls: networkAcls
     containers: [
       {
         name: 'default'

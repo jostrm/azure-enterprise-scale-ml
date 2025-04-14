@@ -16,7 +16,6 @@ param tablePrivateEndpointName string
 param corsRules array = []
 param containers array = []
 param files array = []
-param networkAcls object = {}
 param enablePublicAccessWithPerimeter bool = false
 param enablePublicGenAIAccess bool = false
 
