@@ -13,8 +13,9 @@ resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018
 
 @description('Additional optional Object ID of more people to access Resource group')
 param additionalUserIds array
-var main_principal_2_array = array(userPrincipalId)
-var all_principals = union(main_principal_2_array,additionalUserIds)
+//var main_principal_2_array = array(userPrincipalId)
+//var all_principals = union(main_principal_2_array,additionalUserIds)
+var all_principals = additionalUserIds
 
 resource datafactoryRes 'Microsoft.DataFactory/factories@2018-06-01' existing = {
   name: datafactoryName
