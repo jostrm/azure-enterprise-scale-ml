@@ -216,7 +216,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGe
         action: 'Allow'
         id: rule
       }]
-      ipRules:empty(ipRules)?[]:ipRules
+      //ipRules:empty(ipRules)?[]:ipRules
     }
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
