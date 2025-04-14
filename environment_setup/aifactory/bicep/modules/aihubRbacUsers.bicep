@@ -55,6 +55,9 @@ var cognitiveServicesOpenAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf
 var cognitiveServicesContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442' // All, except: Access quota | Make inference API call with Microsoft Entra ID
 var cognitiveServicesUsagesReaderId = 'bba48692-92b0-4667-a9ad-c31c7b334ac2' // Only Access quota (Minimal permission to view Cognitive Services usages)
 
+// SDK API auth
+var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908' // User, SP to AI services/OpenAI or on RG
+
 // Existing resources for scoping role assignments
 resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
@@ -411,6 +414,30 @@ resource aiDevOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01'
 }
 
 // ----------------RG LEVEL---------------------//
+
+@description('RG:AI Project: AzureAIInferenceDeploymentOperator:Can perform all actions required to create a resource deployment within a resource group. ')
+resource cogServicesUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(resourceGroupId, cognitiveServicesUserRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'044 cognitiveServicesUserRoleId role to USER with OID  ${userObjectIds[i]} for RG level'
+  }
+  scope:resourceGroup()
+}]
+
+resource cogServicesUserSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroupId, cognitiveServicesUserRoleId, servicePrincipleObjectId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+    principalId: servicePrincipleObjectId
+    principalType: 'ServicePrincipal'
+    description:'cognitiveServicesUserRoleId to project service principal OID:${servicePrincipleObjectId} to RG level'
+  }
+  scope:resourceGroup()
+}
+
 
 // --------------- RG: AI Project//
 @description('RG:AI Project: AzureAIInferenceDeploymentOperator:Can perform all actions required to create a resource deployment within a resource group. ')
