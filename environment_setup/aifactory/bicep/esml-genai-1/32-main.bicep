@@ -2221,7 +2221,8 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     aifactorySalt: uniqueInAIFenv
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
-      value: contains(ip, '/') ? ip : '${ip}/32'
+      value:ip
+      //value: contains(ip, '/') ? ip : '${ip}/32' // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
     }]
     ipWhitelist_array: ipWhitelist_array
   }
@@ -2229,6 +2230,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     projectResourceGroup
     aiServices
     aiSearchService
+    applicationInsightSWC
   ]
 }
 
