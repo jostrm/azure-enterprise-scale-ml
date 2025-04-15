@@ -24,7 +24,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
     WorkspaceResourceId:logAnalyticsWorkspace.id
     //DisableIpMasking: false  // tomten
     //DisableLocalAuth: false  // tomten
-    Flow_Type: 'Bluefield'
+    //Flow_Type: 'Bluefield' // todo1
     //ForceCustomerStorageForProfiler: false  // tomten
     //ImmediatePurgeDataOn30Days: true // Not available in Sweden Central. Error: ImmediatePurgeDataOn30Days cannot be set on current api-version
     //IngestionMode: 'LogAnalytics' // Cannot set ApplicationInsights as IngestionMode on consolidated applications // tomten

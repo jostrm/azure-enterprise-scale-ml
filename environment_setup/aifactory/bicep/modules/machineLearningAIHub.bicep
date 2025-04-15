@@ -344,6 +344,10 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
     // network settings
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    serverlessComputeSettings: {
+      serverlessComputeCustomSubnet: subnet.id
+      serverlessComputeNoPublicIP: allowPublicAccessWhenBehindVnet
+    }
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
