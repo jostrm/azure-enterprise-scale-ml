@@ -392,9 +392,11 @@ var processedIpRulesAIHub = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: contains(ip, '/') ? ip : '${ip}/32'
 }]
-
-// AI Search - Cannot have overlappning subnets. 10.0.0.1.50 and 10.0.0.1.0/24 is not allowed
-// ...But /24 or /32 is allowed for AI Search
+// AI Search - Cannot have overlappning subnets. But /24 or /32 is allowed for AI Search
+var processedIpRulesAISearch = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
 
 var ipWhitelist_remove_ending_32 = [for ip in ipWhitelist_array: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip]
 var ipWhitelist_remove_ending_slash_something = [for ip in ipWhitelist_array: (contains(ip, '/') ? substring(ip, 0, indexOf(ip, '/')) : ip)]
@@ -1100,7 +1102,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
-    ipRules: empty(ipWhitelist_array)?[]:ipWhitelist_array
+    ipRules: empty(processedIpRulesAISearch)?[]:processedIpRulesAISearch
   }
   dependsOn: [
     projectResourceGroup

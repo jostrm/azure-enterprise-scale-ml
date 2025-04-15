@@ -103,7 +103,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
     publicNetworkAccess:(enablePublicAccessWithPerimeter || publicNetworkAccess)? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
     networkRuleSet: {
       bypass: 'AzureServices'
-      ipRules: ipRules // only IP addresses. Not also "action: 'Allow'"
+      ipRules: ipRules // [{value: 'ip'}], .e.g. only IP addresses. Not also "action: 'Allow'"
     }
     
     semanticSearch: semanticSearchTier
