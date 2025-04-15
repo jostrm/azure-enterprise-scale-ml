@@ -2225,8 +2225,8 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     aifactorySalt: uniqueInAIFenv
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
-      value:ip
-      //value: contains(ip, '/') ? ip : '${ip}/32' // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
+      //value:ip // Invalid","target":"workspaceDto","message":"IP allowlist contains one or more invalid IP address masks, or exceeds maximum of 200 entries.
+      value: contains(ip, '/') ? ip : '${ip}/32' // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
     }]
     ipWhitelist_array: ipWhitelist_array
   }

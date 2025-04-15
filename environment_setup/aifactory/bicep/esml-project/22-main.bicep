@@ -1123,7 +1123,8 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     ciVmSku_testProd: aml_ci_test_prod_sku_param
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
-      value: ip
+      //value:ip // Invalid","target":"workspaceDto","message":"IP allowlist contains one or more invalid IP address masks, or exceeds maximum of 200 entries.
+      value: contains(ip, '/') ? ip : '${ip}/32' // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
     }]
     ipWhitelist_array: ipWhitelist_array
     alsoManagedMLStudio:alsoManagedMLStudio
