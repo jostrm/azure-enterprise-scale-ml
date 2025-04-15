@@ -373,12 +373,20 @@ var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || tech
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
+var processedIpRulesSa = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+var processedIpRulesKv = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
 // Salt: Project/env specific
 resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
   name: targetResourceGroup
   scope:subscription(subscriptionIdDevTestProd)
 }
-
 
 var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
 var randomSalt = substring(randomValue, 6, 10)
@@ -747,7 +755,7 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
+      subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -789,7 +797,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
+      subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -830,7 +838,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
+      subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -872,8 +880,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -901,6 +908,11 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 
 
 // """"" Azure AI Services """"""
+var processedIpRulesAIServices = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
 var aiServicesName = 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${prjResourceSuffixNoDash}'
 module aiServices '../modules/csAIServices.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -921,13 +933,9 @@ module aiServices '../modules/csAIServices.bicep' = {
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     publicNetworkAccess: enablePublicGenAIAccess
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      //'${vnetId}/subnets/${aksSubnetName}'
+      subnet_genai_ref.id
     ]
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
+    ipRules: empty(processedIpRulesAIServices)?[]:processedIpRulesAIServices
     disableLocalAuth: disableLocalAuth
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
@@ -965,8 +973,8 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
     publicNetworkAccess: enablePublicGenAIAccess
     disableLocalAuth:disableLocalAuth
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      subnet_genai_ref.id
+      subnet_aks_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -1079,10 +1087,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
+    ipRules: empty(ipWhitelist_array)?[]:ipWhitelist_array
   }
   dependsOn: [
     projectResourceGroup
@@ -1123,10 +1128,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
     tags: tags
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip //contains(ip, '/') ? ip : '${ip}/32'
-    }]
+    ipRules: empty(processedIpRulesSa)?[]:processedIpRulesSa
     containers: [
       {
         name: 'default'
@@ -1138,8 +1140,8 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
       }
     ]
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      subnet_genai_ref.id
+      subnet_aks_ref.id
     ]
     corsRules: [
       {
@@ -1247,11 +1249,6 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
   ]
 }
 
-//param networkAcls object = {
-//  bypass: 'AzureServices'
-//  defaultAction: 'Allow'
-//}
-
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
@@ -1283,10 +1280,7 @@ module sacc '../modules/storageAccount.bicep' = {
       subnet_genai_ref.id 
       subnet_aks_ref.id
     ]
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip // contains(ip, '/') ? ip : '${ip}/32'
-    }] // https://mlworkspace.azure.ai,https://ml.azure.com,https://*.ml.azure.com,https://ai.azure.com,https://*.ai.azure.com,https://mlworkspacecanary.azure.ai,https://mlworkspace.azureml-test.net,https://*.azureml.ms,https://42.swedencentral.instances.azureml.ms,https://*.instances.azureml.ms
+    ipRules: empty(processedIpRulesSa)? []: processedIpRulesSa
     corsRules: [
       {
         allowedOrigins: [
@@ -1346,10 +1340,7 @@ module kv1 '../modules/keyVault.bicep' = {
       subnet_aks_ref.id
     ]
     accessPolicies: [] 
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
+    ipRules: empty(processedIpRulesKv)?[]:processedIpRulesKv
   }
   dependsOn: [
     projectResourceGroup
@@ -1577,8 +1568,8 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     vNetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      subnet_genai_ref.id
+      subnet_aks_ref.id
     ]
     kind: cosmosKind
     tags: tags
@@ -2192,6 +2183,10 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
+var processedIpRules = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
@@ -2223,11 +2218,9 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     locationSuffix:locationSuffix
     resourceSuffix:resourceSuffix
     aifactorySalt: uniqueInAIFenv
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      //value:ip // Invalid","target":"workspaceDto","message":"IP allowlist contains one or more invalid IP address masks, or exceeds maximum of 200 entries.
-      value: contains(ip, '/') ? ip : '${ip}/32' // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
-    }]
+    ipRules: empty(processedIpRules) ? [] : processedIpRules
+    //value:ip // Invalid","target":"workspaceDto","message":"IP allowlist contains one or more invalid IP address masks, or exceeds maximum of 200 entries.
+    // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
     ipWhitelist_array: ipWhitelist_array
   }
   dependsOn: [

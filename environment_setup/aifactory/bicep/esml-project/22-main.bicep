@@ -681,6 +681,11 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
 
 var saccName = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
 
+var processedIpRulesSa = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
@@ -712,10 +717,8 @@ module sacc '../modules/storageAccount.bicep' = {
       //'${vnetId}/subnets/${defaultSubnet}'
       //'${vnetId}/subnets/${aksSubnetName}'
     ]
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
+    ipRules: empty(processedIpRulesSa)? []: processedIpRulesSa
+    enablePublicGenAIAccess:!empty(processedIpRulesSa)
     corsRules: [
       {
         allowedOrigins: [
@@ -726,7 +729,7 @@ module sacc '../modules/storageAccount.bicep' = {
           'https://*.ai.azure.com'
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
-          'https://42.swedencentral.instances.azureml.ms'
+          'https://42.${location}.instances.azureml.ms'
           'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
@@ -794,10 +797,8 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
       subnet_default_ref.id
       subnet_aks_ref.id
     ]
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
+    enablePublicGenAIAccess:!empty(processedIpRulesSa)
+    ipRules:empty(processedIpRulesSa)? []: processedIpRulesSa
     corsRules: [
       {
         allowedOrigins: [
@@ -808,7 +809,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
           'https://*.ai.azure.com'
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
-          'https://42.swedencentral.instances.azureml.ms'
+          'https://42.${location}.instances.azureml.ms'
           'https://*.instances.azureml.ms'
           'https://*.azureml.ms'
         ]
@@ -849,6 +850,10 @@ resource existingKv1cors 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 
 module kv1 '../modules/keyVault.bicep' = if(existingKv1.id == null) {
 */
+var processedIpRulesKv = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
 module kv1 '../modules/keyVault.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
@@ -869,10 +874,8 @@ module kv1 '../modules/keyVault.bicep' = {
       subnet_dbx_pub_ref.id
     ]
     accessPolicies: [] 
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
+    ipRules: empty(processedIpRulesKv)?[]:processedIpRulesKv
+    enablePublicGenAIAccess: !empty(processedIpRulesKv)
   }
   dependsOn: [
     projectResourceGroup
@@ -897,6 +900,7 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     tags: tags2
     enablePurgeProtection:keyvaultEnablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
+    enablePublicGenAIAccess: !empty(processedIpRulesKv)
     tenantIdentity: tenantId
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -908,13 +912,11 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
       subnet_dbx_pub_ref.id
     ]
     accessPolicies: [] 
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
+    ipRules: empty(processedIpRulesKv)?[]:processedIpRulesKv
   }
   dependsOn: [
     projectResourceGroup
+    kv1
   ]
 }
 
@@ -1083,6 +1085,12 @@ var aml_cluster_test_prod_sku_param = aml_cluster_test_prod_sku_override != '' ?
 var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
 var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 
+// Define a variable that processes the array first
+var processedIpRules = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AML1classic${deploymentProjSpecificUniqueSuffix}'
@@ -1121,11 +1129,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      //value:ip // Invalid","target":"workspaceDto","message":"IP allowlist contains one or more invalid IP address masks, or exceeds maximum of 200 entries.
-      value: contains(ip, '/') ? ip : '${ip}/32' // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
-    }]
+    ipRules: empty(processedIpRules) ? [] : processedIpRules
     ipWhitelist_array: ipWhitelist_array
     alsoManagedMLStudio:alsoManagedMLStudio
     managedMLStudioName:amlManagedName

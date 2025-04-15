@@ -346,7 +346,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     serverlessComputeSettings: {
       serverlessComputeCustomSubnet: subnet.id
-      serverlessComputeNoPublicIP: allowPublicAccessWhenBehindVnet
+      serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
     }
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
@@ -381,11 +381,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
         }
       }
     }
-    // ipAllowlist:ipWhitelist_array
-    networkAcls: {
-      defaultAction:'Deny'  // If not Deny, then ipRules will be ignored.
-      ipRules: ipRules
-    }
+    ipAllowlist:ipWhitelist_array
+    //networkAcls: {
+      //defaultAction:'Deny'  // If not Deny, then ipRules will be ignored.
+      //ipRules: ipRules
+    //}
   }
 
   resource aoaiConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
