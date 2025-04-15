@@ -1342,8 +1342,8 @@ module kv1 '../modules/keyVault.bicep' = {
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      subnet_genai_ref.id 
+      subnet_aks_ref.id
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
@@ -1353,6 +1353,8 @@ module kv1 '../modules/keyVault.bicep' = {
   }
   dependsOn: [
     projectResourceGroup
+    subnet_genai_ref
+    subnet_aks_ref
   ]
 }
 
@@ -2181,6 +2183,8 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
 
   dependsOn: [
     projectResourceGroup
+    subnet_genai_ref
+    subnet_aks_ref
   ]
   
 }
@@ -2231,6 +2235,8 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     aiServices
     aiSearchService
     applicationInsightSWC
+    subnet_genai_ref
+    subnet_aks_ref
   ]
 }
 

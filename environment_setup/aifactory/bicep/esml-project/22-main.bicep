@@ -493,6 +493,24 @@ module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centr
   }
 }
 */
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetNameFull
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnet_default_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: defaultSubnet
+  parent: vnet
+}
+resource subnet_aks_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: aksSubnetName
+  parent: vnet
+}
+resource subnet_dbx_pub_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetProjDatabricksPublic
+  parent: vnet
+}
+
 
 // Verify that at least 1 Private DNS zones exists in privDnsResourceGroupName and privDnsSubscription  before continuing
 resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = {
@@ -689,8 +707,10 @@ module sacc '../modules/storageAccount.bicep' = {
       }
     ]
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      subnet_default_ref
+      subnet_aks_ref
+      //'${vnetId}/subnets/${defaultSubnet}'
+      //'${vnetId}/subnets/${aksSubnetName}'
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -771,8 +791,8 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
       }
     ]
     vnetRules: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
+      subnet_default_ref
+      subnet_aks_ref
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -840,9 +860,12 @@ module kv1 '../modules/keyVault.bicep' = {
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
-      '${vnetId}/subnets/${dbxPubSubnetName}'
+      subnet_default_ref
+      subnet_aks_ref
+      subnet_dbx_pub_ref
+      //'${vnetId}/subnets/${defaultSubnet}'
+      //'${vnetId}/subnets/${aksSubnetName}'
+      //'${vnetId}/subnets/${dbxPubSubnetName}'
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
@@ -879,9 +902,9 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv2-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
-      '${vnetId}/subnets/${defaultSubnet}'
-      '${vnetId}/subnets/${aksSubnetName}'
-      '${vnetId}/subnets/${dbxPubSubnetName}'
+      subnet_default_ref
+      subnet_aks_ref
+      subnet_dbx_pub_ref
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
