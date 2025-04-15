@@ -707,8 +707,8 @@ module sacc '../modules/storageAccount.bicep' = {
       }
     ]
     vnetRules: [
-      subnet_default_ref
-      subnet_aks_ref
+      subnet_default_ref.id
+      subnet_aks_ref.id
       //'${vnetId}/subnets/${defaultSubnet}'
       //'${vnetId}/subnets/${aksSubnetName}'
     ]
@@ -791,8 +791,8 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
       }
     ]
     vnetRules: [
-      subnet_default_ref
-      subnet_aks_ref
+      subnet_default_ref.id
+      subnet_aks_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -843,6 +843,10 @@ resource existingKv1cors 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
 }
 
+//'${vnetId}/subnets/${defaultSubnet}'
+      //'${vnetId}/subnets/${aksSubnetName}'
+      //'${vnetId}/subnets/${dbxPubSubnetName}'
+
 module kv1 '../modules/keyVault.bicep' = if(existingKv1.id == null) {
 */
 module kv1 '../modules/keyVault.bicep' = {
@@ -860,12 +864,9 @@ module kv1 '../modules/keyVault.bicep' = {
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
-      subnet_default_ref
-      subnet_aks_ref
-      subnet_dbx_pub_ref
-      //'${vnetId}/subnets/${defaultSubnet}'
-      //'${vnetId}/subnets/${aksSubnetName}'
-      //'${vnetId}/subnets/${dbxPubSubnetName}'
+      subnet_default_ref.id
+      subnet_aks_ref.id
+      subnet_dbx_pub_ref.id
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
@@ -902,9 +903,9 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv2-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
-      subnet_default_ref
-      subnet_aks_ref
-      subnet_dbx_pub_ref
+      subnet_default_ref.id
+      subnet_aks_ref.id
+      subnet_dbx_pub_ref.id
     ]
     accessPolicies: [] 
     ipRules: [for ip in ipWhitelist_array: {
