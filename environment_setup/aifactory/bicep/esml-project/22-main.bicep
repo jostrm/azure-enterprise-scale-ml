@@ -247,6 +247,26 @@ param centralDnsZoneByPolicyInHub bool = false // DONE: jå HUB
 var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (privDnsSubscription_param != ''&& centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
+// Storage + AI Services: Do not allow /32
+var processedIpRulesSa = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip
+}]
+
+// Kv+AIHuv -> Do allow and prefer /32
+var processedIpRulesKv = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
+var processedIpRulesAzureML = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+var ipWhitelist_remove_ending_32 = [for ip in ipWhitelist_array: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip]
+//var ipWhitelist_remove_ending_slash_something = [for ip in ipWhitelist_array: (contains(ip, '/') ? substring(ip, 0, indexOf(ip, '/')) : ip)]
+
+
 // 2024-09-15: 25 entries
 var privateDnsZoneName =  {
   azureusgovernment: 'privatelink.api.ml.azure.us'
@@ -681,11 +701,6 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
 
 var saccName = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}','-','')
 
-var processedIpRulesSa = [for ip in ipWhitelist_array: {
-  action: 'Allow'
-  value: contains(ip, '/') ? ip : '${ip}/32'
-}]
-
 module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLStorageAcc4${deploymentProjSpecificUniqueSuffix}'
@@ -850,10 +865,7 @@ resource existingKv1cors 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 
 module kv1 '../modules/keyVault.bicep' = if(existingKv1.id == null) {
 */
-var processedIpRulesKv = [for ip in ipWhitelist_array: {
-  action: 'Allow'
-  value: contains(ip, '/') ? ip : '${ip}/32'
-}]
+
 module kv1 '../modules/keyVault.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLKeyVault4${deploymentProjSpecificUniqueSuffix}'
@@ -1085,12 +1097,6 @@ var aml_cluster_test_prod_sku_param = aml_cluster_test_prod_sku_override != '' ?
 var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
 var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 
-// Define a variable that processes the array first
-var processedIpRules = [for ip in ipWhitelist_array: {
-  action: 'Allow'
-  value: contains(ip, '/') ? ip : '${ip}/32'
-}]
-
 module aml '../modules/machineLearning.bicep'= if(enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AML1classic${deploymentProjSpecificUniqueSuffix}'
@@ -1129,8 +1135,8 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
-    ipRules: empty(processedIpRules) ? [] : processedIpRules
-    ipWhitelist_array: ipWhitelist_array
+    ipRules: empty(processedIpRulesAzureML) ? [] : processedIpRulesAzureML
+    ipWhitelist_array:empty(ipWhitelist_remove_ending_32)?[]:ipWhitelist_remove_ending_32
     alsoManagedMLStudio:alsoManagedMLStudio
     managedMLStudioName:amlManagedName
     privateEndpointName2: alsoManagedMLStudio? 'pend-${projectName}-aml2-to-vnt-mlcmn': ''

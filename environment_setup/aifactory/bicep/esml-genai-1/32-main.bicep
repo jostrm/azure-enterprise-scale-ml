@@ -373,14 +373,31 @@ var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || tech
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
+//AI Services,Storage Do not allow /32 - "The prefix must be smaller than or equal to 30."
 var processedIpRulesSa = [for ip in ipWhitelist_array: {
   action: 'Allow'
-  value: contains(ip, '/') ? ip : '${ip}/32'
+  value: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip
 }]
+var processedIpRulesAIServices = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip
+}]
+
+// Kv+AIHuv -> Do allow and prefer /32
 var processedIpRulesKv = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: contains(ip, '/') ? ip : '${ip}/32'
 }]
+var processedIpRulesAIHub = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
+// AI Search - Cannot have overlappning subnets. 10.0.0.1.50 and 10.0.0.1.0/24 is not allowed
+// ...But /24 or /32 is allowed for AI Search
+
+var ipWhitelist_remove_ending_32 = [for ip in ipWhitelist_array: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip]
+var ipWhitelist_remove_ending_slash_something = [for ip in ipWhitelist_array: (contains(ip, '/') ? substring(ip, 0, indexOf(ip, '/')) : ip)]
 
 // Salt: Project/env specific
 resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
@@ -907,11 +924,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 }
 
 
-// """"" Azure AI Services """"""
-var processedIpRulesAIServices = [for ip in ipWhitelist_array: {
-  action: 'Allow'
-  value: contains(ip, '/') ? ip : '${ip}/32'
-}]
+// """"" Azure AI Services """"""  value: (contains(ip, '/') || endsWith(ip, '/32')) ? ip : '${ip}/32'
 
 var aiServicesName = 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${prjResourceSuffixNoDash}'
 module aiServices '../modules/csAIServices.bicep' = {
@@ -1081,7 +1094,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     tags: tags
-    semanticSearchTier: (location != 'swedencentral')? semanticSearchTier: 'disabled'
+    semanticSearchTier: semanticSearchTier
     publicNetworkAccess: enablePublicGenAIAccess
     skuName: aiSearchSKUName
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
@@ -1562,7 +1575,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     name: 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     location: location
     enablePublicGenAIAccess:enablePublicGenAIAccess
-    ipRules:ipWhitelist_array
+    ipRules:empty(ipWhitelist_array) || !enablePublicGenAIAccess? []:ipWhitelist_array
     totalThroughputLimit:cosmosTotalThroughputLimit
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
@@ -1713,13 +1726,6 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       projectResourceGroup
     ]
   }
-  var webappIPrules = [for ip in ipWhitelist_array: {
-    ipAddress: ip
-    action: 'Allow'
-    priority: 300
-    name: replace(replace(ip, '.', '-'), '/', '_')
-  }]
-
     // In your main deployment file
   module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
     name: 'subnetDelegationServerFarm1${deploymentProjSpecificUniqueSuffix}'
@@ -2165,11 +2171,8 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
-    ipRules: [for ip in ipWhitelist_array: {
-      action: 'Allow'
-      value: ip
-    }]
-
+    ipRules: empty(processedIpRulesAIHub)?[]:processedIpRulesAIHub
+    ipWhitelist_array: empty(ipWhitelist_remove_ending_32)?[]:ipWhitelist_remove_ending_32
   }
 
   dependsOn: [
@@ -2182,11 +2185,6 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
 
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-
-var processedIpRules = [for ip in ipWhitelist_array: {
-  action: 'Allow'
-  value: contains(ip, '/') ? ip : '${ip}/32'
-}]
 module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAIHub == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
@@ -2218,10 +2216,10 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     locationSuffix:locationSuffix
     resourceSuffix:resourceSuffix
     aifactorySalt: uniqueInAIFenv
-    ipRules: empty(processedIpRules) ? [] : processedIpRules
+    ipRules: empty(processedIpRulesAIHub) ? [] : processedIpRulesAIHub
     //value:ip // Invalid","target":"workspaceDto","message":"IP allowlist contains one or more invalid IP address masks, or exceeds maximum of 200 entries.
     // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
-    ipWhitelist_array: ipWhitelist_array
+    ipWhitelist_array: empty(ipWhitelist_remove_ending_32)?[]:ipWhitelist_remove_ending_32
   }
   dependsOn: [
     projectResourceGroup
