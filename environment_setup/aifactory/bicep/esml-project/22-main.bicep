@@ -527,10 +527,9 @@ resource subnet_aks_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' e
   parent: vnet
 }
 resource subnet_dbx_pub_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  name: subnetProjDatabricksPublic
+  name: dbxPubSubnetName
   parent: vnet
 }
-
 
 // Verify that at least 1 Private DNS zones exists in privDnsResourceGroupName and privDnsSubscription  before continuing
 resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = {
