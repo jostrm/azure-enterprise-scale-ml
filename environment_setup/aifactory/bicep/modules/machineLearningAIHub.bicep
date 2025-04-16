@@ -381,7 +381,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
     }
     ipAllowlist: enablePublicGenAIAccess ? ipWhitelist_array: null
     networkAcls: enablePublicGenAIAccess ? {
-      defaultAction: 'Allow'
+      defaultAction: 'Deny'
       ipRules: ipRules
     } : null
   }
