@@ -379,12 +379,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
         }
       }
     }
-    ipAllowlist:ipWhitelist_array
-    networkAcls: {
-      defaultAction:'Deny'  // If not Deny, then ipRules will be ignored.
-      //bypass:'AzureServices'
+    ipAllowlist: enablePublicGenAIAccess ? ipWhitelist_array: null
+    networkAcls: enablePublicGenAIAccess ? {
+      defaultAction: 'Allow'
       ipRules: ipRules
-    }
+    } : null
   }
 
   resource aoaiConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {

@@ -170,11 +170,11 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
       enableNetworkMonitor:false
     }
     //softDeleteEnabled: false
-    ipAllowlist: ipWhitelist_array
-    networkAcls: {
-      defaultAction:'Allow' // enablePublicAccessWithPerimeter? 'Allow':'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
+    ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
+    networkAcls: allowPublicAccessWhenBehindVnet ? {
+      defaultAction: 'Allow'
       ipRules: ipRules
-    }
+    } : null
     
   }
   dependsOn:[
