@@ -351,11 +351,13 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     enableDataIsolation:false // påsk - allowPublicAccessWhenBehindVnet?false:true
     v1LegacyMode:false
 
+     // network settings
+    //serverlessComputeSettings: {
+    //  serverlessComputeCustomSubnet: subnet.id
+    //  serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
+    //}
+
     // network settings
-    serverlessComputeSettings: {
-      serverlessComputeCustomSubnet: subnet.id
-      serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
-    }
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
@@ -479,10 +481,12 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-prev
     hubResourceId: aiHub.id
 
      // network settings
-    serverlessComputeSettings: {
-      serverlessComputeCustomSubnet: subnet.id
-      serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
-    }
+    //serverlessComputeSettings: {
+    //  serverlessComputeCustomSubnet: subnet.id
+    //  serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
+    //}
+
+    // network settings
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
