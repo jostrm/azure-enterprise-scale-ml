@@ -287,13 +287,10 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-pre
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    publicNetworkAccess: allowPublicAccessWhenBehindVnet?'Enabled':'Disabled' // enablePublicGenAIAccess?'Enabled':'Disabled'
+    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enableDataIsolation: enablePublicAccessWithPerimeter?false:true
     hubResourceId:aiHub2.id
-    // configuration for workspaces with private link endpoint -> Error, not possible/allowed
-    //imageBuildCompute: 'buildcluster001' -> Error, not possible/allowed
-    //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
   }
 
   resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==true) {
@@ -351,6 +348,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      //enableNetworkMonitor:false
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
@@ -382,10 +380,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
       }
     }
     ipAllowlist:ipWhitelist_array
-    //networkAcls: {
-      //defaultAction:'Deny'  // If not Deny, then ipRules will be ignored.
-      //ipRules: ipRules
-    //}
+    networkAcls: {
+      defaultAction:'Deny'  // If not Deny, then ipRules will be ignored.
+      //bypass:'AzureServices'
+      ipRules: ipRules
+    }
   }
 
   resource aoaiConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
@@ -463,13 +462,10 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-prev
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    publicNetworkAccess: 'Enabled' // enablePublicGenAIAccess?'Enabled':'Disabled'
+    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enableDataIsolation: enablePublicGenAIAccess?false:true
     hubResourceId: aiHub.id
-    // configuration for workspaces with private link endpoint -> Error, not possible/allowed
-    //imageBuildCompute: 'buildcluster001' -> Error, not possible/allowed
-    //imageBuildCompute: '${aiHubProjectName}/buildcluster001' //'cluster001'
   }
 
   resource endpoint 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==false) {

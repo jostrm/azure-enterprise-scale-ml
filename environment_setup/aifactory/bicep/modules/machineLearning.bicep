@@ -128,10 +128,15 @@ resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-07-01' existin
   scope: resourceGroup(acrRGName)
 }
 
-
-resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(alsoManagedMLStudio) {
+// Portal: 2024-10-01-preview, 2025-01-01-preview
+resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(alsoManagedMLStudio) {
   name: nameManaged
   location: location
+  kind:'Default'
+  sku: {
+    name:'Basic'
+    tier:'Basic'
+  }
   identity: {
     type: 'SystemAssigned'
   }
@@ -141,7 +146,9 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     friendlyName: nameManaged
     description: 'Azure ML Studio, managed networking, not using legacy V1 mode'
 
-     // dependent resources
+    // Other
+
+    // dependent resources
     storageAccount: existingStorageAccount2.id
     keyVault: existingKeyvault2.id
     containerRegistry: existingAcr.id
@@ -160,7 +167,9 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:enablePublicAccessWithPerimeter? 'Disabled': 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      //enableNetworkMonitor:false
     }
+    //softDeleteEnabled: false
     ipAllowlist: ipWhitelist_array
     /*
     networkAcls: {
