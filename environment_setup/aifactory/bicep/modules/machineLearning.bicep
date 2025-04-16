@@ -167,7 +167,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:enablePublicAccessWithPerimeter? 'Disabled': 'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
-      //enableNetworkMonitor:false
+      enableNetworkMonitor:false
     }
     //softDeleteEnabled: false
     ipAllowlist: ipWhitelist_array
