@@ -2499,6 +2499,30 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   ]
 }
 
+var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
+resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
+  name: datalakeName
+  scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+ 
+}
+module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacLake4PrjGenAI${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    amlPrincipalId: aiHub.outputs.principalId
+    projectTeamGroupOrUser: technicalAdminsObjectID_array_safe
+    adfPrincipalId: ''
+    datalakeName: datalakeName
+    useAdGroups:useAdGroups
+  }
+  dependsOn: [
+    cmnRbacACR
+    esmlCommonLake
+    aiHub
+    logAnalyticsWorkspaceOpInsight
+  ]
+}
+
 output debug_vnetId string = vnetId
 output debug_common_subnet_name_local string = common_subnet_name_local
 output debug_genaiSubnetId string = genaiSubnetId

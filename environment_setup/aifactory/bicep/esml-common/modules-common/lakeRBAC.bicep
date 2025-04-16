@@ -1,5 +1,6 @@
 param amlPrincipalId string
-param userPrincipalId string
+//param userPrincipalId string
+param projectTeamGroupOrUser string[] = []
 param adfPrincipalId string
 param useAdGroups bool = false
 
@@ -18,10 +19,12 @@ resource readerAML 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' 
     roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${readerRoleDefinitionId}'
     principalId: amlPrincipalId
     principalType: 'ServicePrincipal'
-    description: 'READER to ServicePrincipal ${amlPrincipalId} for Azure ML Studio to get access to datalake: ${datalakeName}'
+    description: 'READER to AML Managed Identity: ${amlPrincipalId} for Azure ML Studio to get access to datalake: ${datalakeName}'
   }
   scope:datalakeFromCommon
 }
+
+/*
 resource readerUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
   name: guid('${readerRoleDefinitionId}-reader-${userPrincipalId}-${resourceGroup().id}')
   properties: {
@@ -32,13 +35,25 @@ resource readerUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview'
   }
   scope:datalakeFromCommon
 }
-resource storageBlobDataContributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid('${readerRoleDefinitionId}-storageBlobDataContributor-${adfPrincipalId}-${resourceGroup().id}')
+*/
+resource readerUserGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(projectTeamGroupOrUser)):{
+  name: guid('${projectTeamGroupOrUser[i]}-reader-${readerRoleDefinitionId}-${resourceGroup().id}')
+  properties: {
+    roleDefinitionId: readerRoleDefinitionId
+    principalId: projectTeamGroupOrUser[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'READER to USER or Group with OID  ${projectTeamGroupOrUser[i]} for Databricks: ${datalakeName}'
+  }
+  scope:datalakeFromCommon
+}]
+
+resource storageBlobDataContributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if(!empty(adfPrincipalId)) {
+  name: guid('${readerRoleDefinitionId}-reader-${adfPrincipalId}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${storageBlobDataContributor}'
     principalId: adfPrincipalId
     principalType:'ServicePrincipal'
-    description: 'READER to ServicePrincipal ${adfPrincipalId} for Azure Datafactory to get accesst to datalake: ${datalakeName}'
+    description: 'READER to ADF Managed Identity: ${adfPrincipalId} for Azure Datafactory to get accesst to datalake: ${datalakeName}'
   }
   scope:datalakeFromCommon
 }

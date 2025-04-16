@@ -1444,7 +1444,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = if(sweden_centr
   name: 'rbacLake4Prj${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlPrincipalId: aml.outputs.principalId
-    userPrincipalId: technicalContactId
+    projectTeamGroupOrUser: technicalAdminsObjectID_array_safe
     adfPrincipalId: adf.outputs.principalId
     datalakeName: datalakeName
     useAdGroups:useAdGroups
