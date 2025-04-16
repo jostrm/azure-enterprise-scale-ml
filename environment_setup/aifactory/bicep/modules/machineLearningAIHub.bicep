@@ -9,6 +9,7 @@ param location string
 param env string
 @description('Specifies the storageaccount id used for the machine learning studio')
 param storageAccount string
+param storageAccountName string
 @description('Specifies the container registry id used for the machine learning studio')
 param containerRegistry string
 @description('Specifies the keyvault id used for the machine learning studio')
@@ -45,6 +46,8 @@ param resourceSuffix string
 param applicationInsightsName string
 param ipWhitelist_array array = []
 param enablePublicAccessWithPerimeter bool = false
+param acrName string
+param acrRGName string
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var privateDnsZoneName =  {
@@ -62,21 +65,26 @@ var privateDnsZoneNameNotebooks = {
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   name: applicationInsightsName
 }
-resource aiSearch 'Microsoft.Search/searchServices@2021-04-01-preview' existing = {
+resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
   name: aiSearchName
 }
 
-resource aiServices 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
+resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
   name: aiServicesName
 }
-resource logWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
+resource logWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logWorkspaceName
   scope:resourceGroup(logWorkspaceResoureGroupName)
 }
-resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
   scope: resourceGroup()
 }
+
+resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
+  name: storageAccountName
+}
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
@@ -86,7 +94,10 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetName
   parent: vnet
 }
-
+resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: acrName
+  scope: resourceGroup(acrRGName)
+}
 /*
 var azureMLMetricsWriter ='635dd51f-9968-44d3-b7fb-6d9a6bd613ae' // EP -> AI project
 resource amlMetricsWriterRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
@@ -154,12 +165,12 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview
   properties: {
     allowRoleAssignmentOnRG: true
     friendlyName: '${name}-${env}-${aiFactoryNumber}'
-    description: 'TODO if using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models (GPT-4o), called: gpt,gpt-evals'
+    description: 'AI Hub with optional enablePublicAccessWithPerimeter. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals'
 
      // dependent resources
     applicationInsights: appInsights.id 
-    storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
-    containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
+    storageAccount: existingStorageAccount.id // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
+    containerRegistry:existingAcr.id // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
 
     // configuration
@@ -271,7 +282,7 @@ resource aiHubDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
   }
 }
 @description('This is a container for the ai foundry project.')
-resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: aiHubProjectName
   location: location
   kind: 'Project'
@@ -312,9 +323,9 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-pre
   }
 }
 
-// ############################### Private ################
+// ############################### Private ################ 2025-01-01-preview
 
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: name
   location: location
   identity: {
@@ -325,27 +336,33 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
   properties: {
     allowRoleAssignmentOnRG: true
     friendlyName: '${name}-${env}-${aiFactoryNumber}'
-    description: 'AI Foundry hub requires an underlying Azure ML workspace. This is setup for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
+    description: 'AI Foundry hub requires an underlying Azure ML workspace. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals'
 
      // dependent resources
     applicationInsights: appInsights.id 
-    storageAccount: storageAccount // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
-    containerRegistry:containerRegistry // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
+    storageAccount: existingStorageAccount.id // resourceId('Microsoft.Storage/storageAccounts', storageAccount)
+    containerRegistry:existingAcr.id // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
 
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     provisionNetworkNow: true
-    enableDataIsolation:allowPublicAccessWhenBehindVnet?false:true // enablePublicGenAIAccess?false:true
+    enableDataIsolation:false // påsk - allowPublicAccessWhenBehindVnet?false:true
+    v1LegacyMode:false
 
     // network settings
-    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     serverlessComputeSettings: {
       serverlessComputeCustomSubnet: subnet.id
       serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
     }
+    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
+    networkAcls: allowPublicAccessWhenBehindVnet ? {
+      defaultAction: 'Deny'
+      ipRules: ipRules
+    } : null
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
@@ -380,11 +397,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
         }
       }
     }
-    ipAllowlist: enablePublicGenAIAccess ? ipWhitelist_array: null
-    networkAcls: enablePublicGenAIAccess ? {
-      defaultAction: 'Deny'
-      ipRules: ipRules
-    } : null
+
   }
 
   resource aoaiConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
@@ -462,10 +475,47 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-prev
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    enableDataIsolation: enablePublicGenAIAccess?false:true
+    enableDataIsolation: false // påsk enablePublicGenAIAccess?false:true
     hubResourceId: aiHub.id
+
+     // network settings
+    serverlessComputeSettings: {
+      serverlessComputeCustomSubnet: subnet.id
+      serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
+    }
+    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
+    networkAcls: allowPublicAccessWhenBehindVnet ? {
+      defaultAction: 'Deny'
+      ipRules: ipRules
+    } : null
+    managedNetwork: {
+      firewallSku:'Basic' // 'Standard'
+      isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      enableNetworkMonitor:false
+      outboundRules: {
+        search: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: aiSearch.id
+            subresourceTarget: 'searchService'
+            sparkEnabled: false
+            sparkStatus: 'Inactive'
+          }
+        } 
+        OpenAI: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: aiServices.id
+            subresourceTarget: 'account'
+            sparkEnabled: false
+            sparkStatus: 'Active'
+          }
+          status: 'Active'
+        }
+      }
+    }
   }
 
   resource endpoint 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==false) {

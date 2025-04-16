@@ -2197,11 +2197,14 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(serviceSettingDeployAI
     aifactorySuffix: aifactorySuffixRG
     applicationInsightsName: applicationInsightSWC.outputs.name
     containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
+    acrName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+    acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
     env: env
     keyVaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
     aifactoryProjectNumber: projectNumber
     storageAccount: sacc.outputs.storageAccountId
+    storageAccountName: sacc.outputs.storageAccountName
     subnetName: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
