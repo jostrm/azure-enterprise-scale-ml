@@ -348,7 +348,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview'
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
-      //enableNetworkMonitor:false
+      enableNetworkMonitor:false
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
