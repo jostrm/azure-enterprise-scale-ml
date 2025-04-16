@@ -171,12 +171,11 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     }
     //softDeleteEnabled: false
     ipAllowlist: ipWhitelist_array
-    /*
     networkAcls: {
       defaultAction:'Allow' // enablePublicAccessWithPerimeter? 'Allow':'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
-    */
+    
   }
   dependsOn:[
     machineLearningStudio
