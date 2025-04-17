@@ -1464,7 +1464,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(
   ]
 }
 
-module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = if(sweden_central_adf_missing== false){
+module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacLake4Prj${deploymentProjSpecificUniqueSuffix}'
   params: {

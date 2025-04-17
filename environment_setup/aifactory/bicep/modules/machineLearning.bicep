@@ -162,8 +162,8 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     v1LegacyMode:false
 
     // network settings
-    publicNetworkAccess: enablePublicAccessWithPerimeter? 'Enabled': 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
-    allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
+    publicNetworkAccess: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
+    allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
@@ -172,7 +172,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     //softDeleteEnabled: false
     ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
     networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: 'Allow'
+      defaultAction: 'Deny'
       ipRules: ipRules
     } : null
     
