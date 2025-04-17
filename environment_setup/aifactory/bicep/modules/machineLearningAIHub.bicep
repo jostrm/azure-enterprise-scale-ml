@@ -153,7 +153,12 @@ az ml -h
 az extension update -n ml
 
 */
-resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+
+// GH example: workspaces@2024-01-01-preview
+// AIF Hub 1 working: workspaces@2024-10-01-preview with project '2025-01-01-preview' failing: 
+// TODO 1: Try "2024-10-01-preview" for project as well
+
+resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: name
   location: location
   identity: {
@@ -284,6 +289,7 @@ resource aiHubDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
 resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: aiHubProjectName
   location: location
+  tags: tags
   kind: 'Project'
   sku: {
     name: 'Basic'
@@ -298,10 +304,12 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-pre
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    enableDataIsolation: enablePublicAccessWithPerimeter?false:true
+    hbiWorkspace: false
     hubResourceId:aiHub2.id
+    //enableDataIsolation: enablePublicAccessWithPerimeter?false:true
+    //publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
+    //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    
   }
 
   resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==true) {
@@ -459,9 +467,10 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: aiHubProjectName
   location: location
+  tags: tags
   kind: 'Project'
   sku: {
     name: 'Basic'
@@ -476,49 +485,9 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-prev
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    enableDataIsolation: false // påsk enablePublicGenAIAccess?false:true
+    hbiWorkspace: false
+    //publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     hubResourceId: aiHub.id
-
-     // network settings
-    //serverlessComputeSettings: {
-    //  serverlessComputeCustomSubnet: subnet.id
-    //  serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
-    //}
-
-    // network settings
-    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
-    networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: 'Deny'
-      ipRules: ipRules
-    } : null
-    managedNetwork: {
-      firewallSku:'Basic' // 'Standard'
-      isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
-      enableNetworkMonitor:false
-      outboundRules: {
-        search: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiSearch.id
-            subresourceTarget: 'searchService'
-            sparkEnabled: false
-            sparkStatus: 'Inactive'
-          }
-        } 
-        OpenAI: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiServices.id
-            subresourceTarget: 'account'
-            sparkEnabled: false
-            sparkStatus: 'Active'
-          }
-          status: 'Active'
-        }
-      }
-    }
   }
 
   resource endpoint 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==false) {

@@ -298,10 +298,11 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = 
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    hbiWorkspace: false
     enableDataIsolation: enablePublicAccessWithPerimeter?false:true
     hubResourceId:aiHub2.id
+    //publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
+    //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
   }
 
   resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==true) {
@@ -476,49 +477,9 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = i
     friendlyName: aiHubProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
-    enableDataIsolation: false // påsk enablePublicGenAIAccess?false:true
+    hbiWorkspace: false
     hubResourceId: aiHub.id
-
-     // network settings
-    //serverlessComputeSettings: {
-    //  serverlessComputeCustomSubnet: subnet.id
-    //  serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
-    //}
-
-    // network settings
-    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    // !ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
-    // !networkAcls: allowPublicAccessWhenBehindVnet ? {
-      // !defaultAction: 'Deny'
-      // !ipRules: ipRules
-    // !} : null
-    managedNetwork: {
-      firewallSku:'Basic' // 'Standard'
-      isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
-      // !enableNetworkMonitor:false
-      outboundRules: {
-        search: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiSearch.id
-            subresourceTarget: 'searchService'
-            sparkEnabled: false
-            sparkStatus: 'Inactive'
-          }
-        } 
-        OpenAI: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiServices.id
-            subresourceTarget: 'account'
-            sparkEnabled: false
-            sparkStatus: 'Active'
-          }
-          status: 'Active'
-        }
-      }
-    }
+    //enableDataIsolation: enablePublicGenAIAccess?false:true
   }
 
   resource endpoint 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==false) {
