@@ -153,7 +153,7 @@ az ml -h
 az extension update -n ml
 
 */
-resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = if(enablePublicAccessWithPerimeter==true) {
   name: name
   location: location
   identity: {
@@ -162,7 +162,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview
   tags: tags
   kind: kindAIHub
   properties: {
-    allowRoleAssignmentOnRG: true
+    // ! allowRoleAssignmentOnRG: true
     friendlyName: '${name}-${env}-${aiFactoryNumber}'
     description: 'AI Hub with optional enablePublicAccessWithPerimeter. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals'
 
@@ -173,9 +173,9 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview
     keyVault: keyVault.id
 
     // configuration
-    systemDatastoresAuthMode: 'identity'
+    // !  systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: true
+    // ! provisionNetworkNow: true
     enableDataIsolation:enablePublicAccessWithPerimeter?false:true
 
     // network settings
@@ -184,7 +184,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound'
-      enableNetworkMonitor:false
+      // !  enableNetworkMonitor:false
     }
   }
   resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter==true) {
@@ -193,9 +193,9 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview
       authType: 'AAD'
       category: 'AzureOpenAI'
       isSharedToAll: true
-      useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      // ! useWorkspaceManagedIdentity: true
+      // ! peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      // ! peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -210,9 +210,9 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview
       authType: 'AAD'
       category: 'AIServices'
       isSharedToAll: true
-      useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      // ! useWorkspaceManagedIdentity: true
+      // ! peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      // ! peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -229,8 +229,8 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview
       authType: 'AAD'
       category: 'CognitiveSearch'
       isSharedToAll: true
-      useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      // ! useWorkspaceManagedIdentity: true
+      // ! peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
       target: 'https://${aiSearch.name}.search.windows.net/'
       metadata: {
         ApiType: 'Azure'
@@ -281,7 +281,7 @@ resource aiHubDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
   }
 }
 @description('This is a container for the ai foundry project.')
-resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = if(enablePublicAccessWithPerimeter==true) {
   name: aiHubProjectName
   location: location
   kind: 'Project'
@@ -324,7 +324,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-pre
 
 // ############################### Private ################ 2025-01-01-preview
 
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = if(enablePublicAccessWithPerimeter==false) {
   name: name
   location: location
   identity: {
@@ -333,7 +333,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   tags: tags
   kind: kindAIHub
   properties: {
-    allowRoleAssignmentOnRG: true
+    // ! allowRoleAssignmentOnRG: true
     friendlyName: '${name}-${env}-${aiFactoryNumber}'
     description: 'AI Foundry hub requires an underlying Azure ML workspace. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals'
 
@@ -344,9 +344,9 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     keyVault: keyVault.id
 
     // configuration
-    systemDatastoresAuthMode: 'identity'
+    // ! systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: true
+    // ! provisionNetworkNow: true
     enableDataIsolation:false // påsk - allowPublicAccessWhenBehindVnet?false:true
     v1LegacyMode:false
 
@@ -359,15 +359,15 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     // network settings
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
-    networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: 'Deny'
-      ipRules: ipRules
-    } : null
+    // ! ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
+    // !networkAcls: allowPublicAccessWhenBehindVnet ? {
+      // !defaultAction: 'Deny'
+      // !ipRules: ipRules
+    // !} : null
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
-      enableNetworkMonitor:false
+      // ! enableNetworkMonitor:false
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
@@ -407,9 +407,9 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
       authType: 'AAD'
       category: 'AzureOpenAI'
       isSharedToAll: true
-      useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      // !useWorkspaceManagedIdentity: true
+     // ! peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      // !peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -424,9 +424,9 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
       authType: 'AAD'
       category: 'AIServices'
       isSharedToAll: true
-      useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
-      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      // !useWorkspaceManagedIdentity: true
+      // !peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
+      // !peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -459,7 +459,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01' = if(enablePublicAccessWithPerimeter==false) {
   name: aiHubProjectName
   location: location
   kind: 'Project'
@@ -488,15 +488,15 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-01-01-prev
     // network settings
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
-    networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: 'Deny'
-      ipRules: ipRules
-    } : null
+    // !ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
+    // !networkAcls: allowPublicAccessWhenBehindVnet ? {
+      // !defaultAction: 'Deny'
+      // !ipRules: ipRules
+    // !} : null
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
-      enableNetworkMonitor:false
+      // !enableNetworkMonitor:false
       outboundRules: {
         search: {
           type: 'PrivateEndpoint'
