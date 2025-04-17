@@ -1722,6 +1722,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     dependsOn: [
       projectResourceGroup
       miForAca
+      aiHub
     ]
   }
 
@@ -2255,6 +2256,7 @@ module miForPrj '../modules/mi.bicep' = {
   }
   dependsOn: [
     projectResourceGroup
+    aiHub
   ]
 }
 
