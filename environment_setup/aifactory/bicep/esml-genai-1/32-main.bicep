@@ -140,7 +140,7 @@ param serviceSettingOverrideRegionAzureAISearchShort string = ''
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
 @description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in AI hub mode, with AIServices and 1 project')
-param serviceSettingEnableAIHubPreview bool = true
+param serviceSettingEnableAIHubPreview bool = false
 
 // ### TRUE as default - END ###
 
@@ -2247,7 +2247,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = {
 }
 module aiHubPreview '../modules/machineLearningAIHub.bicep' = if(serviceSettingEnableAIHubPreview == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${aiHubNameShort}Preview${deploymentProjSpecificUniqueSuffix}'
+  name: '${aiHubNameShort}-p-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
     location: location
