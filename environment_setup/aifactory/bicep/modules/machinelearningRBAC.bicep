@@ -1,5 +1,4 @@
-@secure()
-param projectSP string
+param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 
 @description('Specifies the objectId of the Data factory managed identity')
 param adfSP string
@@ -28,16 +27,17 @@ resource amlNameResource 'Microsoft.MachineLearningServices/workspaces@2021-04-0
   name: amlName
 }
 
-resource contributorSP 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid('${projectSP}-contributor-${amlName}-${resourceGroup().id}')
+resource contributorSP 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid('${servicePrincipleAndMIArray[i]}-contributor-${amlName}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
-    principalId: projectSP
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'Contributor to service principal ${projectSP} for Azure ML ${amlName}'
+    description:'Contributor to service principal ${servicePrincipleAndMIArray[i]} for Azure ML ${amlName}'
   }
   scope:amlNameResource
-}
+}]
+
 resource contributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if(adfSP!='null') {
   name: guid('${adfSP}-contributor-${amlName}-${resourceGroup().id}')
   properties: {

@@ -4,8 +4,7 @@
 param storageAccountName string // Name of Azure Storage Account
 param resourceGroupId string // Resource group ID where resources are located
 param userObjectIds array // Specific user's object ID's
-@secure()
-param servicePrincipleObjectId string // Service Principle Object ID
+param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 param azureMLworkspaceName string
 param useAdGroups bool = false
 
@@ -44,16 +43,16 @@ resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignm
   scope:existingStorageAccount
 }]
 
-resource userStorageBlobDataContributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, servicePrincipleObjectId)
+resource userStorageBlobDataContributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingStorageAccount.id, storageBlobDataContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'storageBlobDataContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingStorageAccount.name}'
+    description:'storageBlobDataContributorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
-}
+}]
 
 @description('Azure Storage 1: FileDataPrivilegedContributor. Allows for read, write, delete, and modify ACLs on files/directories in Azure file shares by overriding existing ACLs/NTFS permissions. This role has no built-in equivalent on Windows file servers.')
 resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
@@ -67,16 +66,16 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Autho
   scope:existingStorageAccount
 }]
 
-resource roleAssignmentStorageUserFileDataPrivilegedContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId, servicePrincipleObjectId)
+resource roleAssignmentStorageUserFileDataPrivilegedContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingStorageAccount.id, storageFileDataContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataContributorRoleId)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'storageFileDataContributorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingStorageAccount.name}'
+    description:'storageFileDataContributorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
-}
+}]
 
 //  Azure ML -> AI Hub & AI Project //
 // --------------- AI Hub - specific ---------------- //
@@ -92,16 +91,16 @@ resource azureAIDeveloperRole 'Microsoft.Authorization/roleAssignments@2022-04-0
   scope:existingAmlWorkspace
 }]
 
-resource azureAIDeveloperRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAmlWorkspace.id, azureAIDeveloperRoleId, servicePrincipleObjectId)
+resource azureAIDeveloperRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingAmlWorkspace.id, azureAIDeveloperRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'azureAIDeveloperRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAmlWorkspace.name}'
+    description:'azureAIDeveloperRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAmlWorkspace.name}'
   }
   scope:existingAmlWorkspace
-}
+}]
 
 // --------------- Azure ML specific ---------------- //
 
@@ -116,16 +115,16 @@ resource azureAIAdministratorAssignment 'Microsoft.Authorization/roleAssignments
   }
   scope:existingAmlWorkspace
 }]
-resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAmlWorkspace.id, azureAIAdministrator, servicePrincipleObjectId)
+resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingAmlWorkspace.id, azureAIAdministrator, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'azureAIAdministrator to project service principal OID:${servicePrincipleObjectId} to ${existingAmlWorkspace.name}'
+    description:'azureAIAdministrator to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAmlWorkspace.name}'
   }
   scope:existingAmlWorkspace
-}
+}]
 
 // ----------------RG LEVEL---------------------//
 
@@ -142,16 +141,16 @@ resource azureAIInferenceDeploymentOperatorRole 'Microsoft.Authorization/roleAss
   scope:existingAmlWorkspace
 }]
 
-resource azureAIInferenceDeploymentOperatorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAmlWorkspace.id, azureAIInferenceDeploymentOperatorRoleId, servicePrincipleObjectId)
+resource azureAIInferenceDeploymentOperatorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingAmlWorkspace.id, azureAIInferenceDeploymentOperatorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIInferenceDeploymentOperatorRoleId)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'azureAIInferenceDeploymentOperatorRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAmlWorkspace.name} on RG level'
+    description:'azureAIInferenceDeploymentOperatorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAmlWorkspace.name} on RG level'
   }
   scope:existingAmlWorkspace
-}
+}]
 
 // --------------- RG:AI Hub + Project --//
 
@@ -192,13 +191,13 @@ resource amlWorkspaceConnectionSecretsReader 'Microsoft.Authorization/roleAssign
   scope:existingAmlWorkspace
 }]
 
-resource amlWorkspaceConnectionSecretsReaderSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingAmlWorkspace.id, azureMachineLearningWorkspaceConnectionSecretsReaderRoleId, servicePrincipleObjectId)
+resource amlWorkspaceConnectionSecretsReaderSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingAmlWorkspace.id, azureMachineLearningWorkspaceConnectionSecretsReaderRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureMachineLearningWorkspaceConnectionSecretsReaderRoleId)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'azureMachineLearningWorkspaceConnectionSecretsReaderRoleId to project service principal OID:${servicePrincipleObjectId} to ${existingAmlWorkspace.name} on RG level'
+    description:'azureMachineLearningWorkspaceConnectionSecretsReaderRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAmlWorkspace.name} on RG level'
   }
   scope:existingAmlWorkspace
-}
+}]

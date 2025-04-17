@@ -1,7 +1,6 @@
 param commonRGId string
 param userObjectIds array
-@secure()
-param servicePrincipleObjectId string
+param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 param useAdGroups bool = false // Use AD groups for role assignments
 
 // Container Registry (EP, WebApp, Azure Function)
@@ -21,14 +20,14 @@ resource acrPushCmn 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for 
   scope:resourceGroup()
 }]
 
-resource acrPushSPCmn 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(commonRGId, acrPushRoleId, servicePrincipleObjectId)
+resource acrPushSPCmn 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(commonRGId, acrPushRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPushRoleId)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'acrPush role to project service principal OID:${servicePrincipleObjectId} for RG: ${commonRGId}'
+    description:'acrPush role to project service principal OID:${servicePrincipleAndMIArray[i]} for RG: ${commonRGId}'
   }
   scope:resourceGroup()
-}
+}]
 

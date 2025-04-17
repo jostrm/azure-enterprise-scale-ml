@@ -181,6 +181,7 @@ param subnetProjAKS string = ''
 param subnetProjACA string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
+param randomValue string = newGuid()
 
 var vnetNameFull = vnetNameFull_param != '' ?  replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 
@@ -513,6 +514,30 @@ module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centr
   }
 }
 */
+
+var randomSalt = substring(randomValue, 6, 10)
+module miForPrj '../modules/mi.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'miForPrj${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+    location: location
+    tags: tags
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    managedIdentityOID: miForPrj.outputs.managedIdentityPrincipalId
+    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+}
+var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
   scope: resourceGroup(vnetResourceGroupName)
@@ -1491,12 +1516,12 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
 
 // Needed if connnecting from Databricks to Azure ML workspace
 // Note: SP OID: it must be the OBJECT ID of a service principal, not the OBJECT ID of an Application, different thing, and I have to agree it is very confusing.
-module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing== false){
+module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDBX2AMLPrjSP${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlName:amlName
-    projectSP:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleAndMIArray: spAndMiArray
     adfSP:adf.outputs.principalId
     projectADuser:technicalContactId
     additionalUserIds: technicalAdminsObjectID_array_safe
@@ -1508,24 +1533,9 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = if(sweden_cen
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
-module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(sweden_central_adf_missing==true){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbacDBX2AMLPrjSWC${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    amlName:amlName
-    projectSP:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
-    adfSP:'null' // this duplicate will be ignored
-    projectADuser:technicalContactId
-    additionalUserIds: technicalAdminsObjectID_array_safe
-    useAdGroups:useAdGroups
-  }
-  dependsOn: [
-    aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
-    logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
-  ]
-}
 
-module rbacADFfromUser '../modules/datafactoryRBAC.bicep' = if(sweden_central_adf_missing== false){
+
+module rbacADFfromUser '../modules/datafactoryRBAC.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacADFAMProjSP${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1548,7 +1558,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
-    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleAndMIArray:spAndMiArray
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1566,7 +1576,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
     user_object_ids: technicalAdminsObjectID_array_safe
     vNetName: vnetNameFullBastion
     common_bastion_subnet_name: 'AzureBastionSubnet'
-    project_service_principle: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleAndMIArray:spAndMiArray
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1620,7 +1630,7 @@ module rbacAml1 '../modules/rbacStorageAml.bicep' = {
     resourceGroupId: targetResourceGroupId
     userObjectIds: technicalAdminsObjectID_array_safe
     azureMLworkspaceName:aml.outputs.amlName
-    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleAndMIArray:spAndMiArray
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1636,7 +1646,7 @@ module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
     resourceGroupId: targetResourceGroupId
     userObjectIds: technicalAdminsObjectID_array_safe
     azureMLworkspaceName:amlManagedName
-    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleAndMIArray:spAndMiArray
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1650,7 +1660,7 @@ module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
   name: 'rbacUsersAMLRG${deploymentProjSpecificUniqueSuffix}'
   params: {
     resourceGroupId: targetResourceGroupId
-    servicePrincipleObjectId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleAndMIArray: spAndMiArray
     userObjectIds: technicalAdminsObjectID_array_safe
     useAdGroups:useAdGroups
   }
@@ -1668,7 +1678,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   name: 'rbacUsersToCmnACR${deploymentProjSpecificUniqueSuffix}'
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
-    servicePrincipleObjectId:externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleAndMIArray:spAndMiArray
     userObjectIds: technicalAdminsObjectID_array_safe
     useAdGroups: useAdGroups
   }

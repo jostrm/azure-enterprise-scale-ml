@@ -1,13 +1,10 @@
 @description('Specifies the name the datafactory resource')
 param vNetName string
 param common_bastion_subnet_name string
-@secure()
-param project_service_principle string
+param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 @description('Additional optional Object ID of more people to access Resource group')
 param user_object_ids array
 param useAdGroups bool = false // Use AD groups for role assignments
-
-var service_principle_array = project_service_principle == ''? []: array(split(project_service_principle,','))
 
 var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
@@ -41,13 +38,13 @@ resource networkContributorUserVnet 'Microsoft.Authorization/roleAssignments@202
   scope:vNetNameResource
 }]
 
-resource networkContributorSPVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(service_principle_array)):{
-  name: guid('${service_principle_array[i]}-nwContribSP-${vNetName}-${resourceGroup().id}')
+resource networkContributorSPVnet 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid('${servicePrincipleAndMIArray[i]}-nwContribSP-${vNetName}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: networkContributorRoleDefinition.id
-    principalId: service_principle_array[i]
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'Network Contributor to SERVICE PRINCIPLE with OID  ${service_principle_array[i]} for vNet: ${vNetName}'
+    description:'Network Contributor to SERVICE PRINCIPLE with OID  ${servicePrincipleAndMIArray[i]} for vNet: ${vNetName}'
   }
   scope:vNetNameResource
 }]

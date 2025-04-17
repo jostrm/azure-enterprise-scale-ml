@@ -4,8 +4,7 @@ param storageAccountName2 string // Name of Azure Storage Account
 param aiSearchName string // Resource ID for Azure AI Search
 param openAIName string // Resource ID for Azure OpenAI
 param userObjectIds array // Specific user's object ID's
-@secure()
-param servicePrincipleObjecId string // Service Principle Object ID
+param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 param useAdGroups bool = false
 
 // Storage
@@ -135,16 +134,17 @@ resource cognitiveServicesContributorRole 'Microsoft.Authorization/roleAssignmen
   }
   scope:existingOpenAIResource
 }]
-resource cognitiveServicesContributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingOpenAIResource.id, cognitiveServicesContributorRoleId, servicePrincipleObjecId)
+resource cognitiveServicesContributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01'= [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingOpenAIResource.id, cognitiveServicesContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'cognitiveServicesContributor role to project service principal OID:${servicePrincipleObjecId} to ${existingOpenAIResource.name}'
+    description:'cognitiveServicesContributor role to project service principal/Mi OID:${servicePrincipleAndMIArray[i]} to ${existingOpenAIResource.name}'
   }
   scope:existingOpenAIResource
-}
+}]
+
 @description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
 resource cognitiveServicesUsagesReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(existingOpenAIResource.id, cognitiveServicesUsagesReaderId, userObjectIds[i])
@@ -156,16 +156,16 @@ resource cognitiveServicesUsagesReader 'Microsoft.Authorization/roleAssignments@
   }
   scope:existingOpenAIResource
 }]
-resource cognitiveServicesUsagesReaderSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingOpenAIResource.id, cognitiveServicesUsagesReaderId, servicePrincipleObjecId)
+resource cognitiveServicesUsagesReaderSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingOpenAIResource.id, cognitiveServicesUsagesReaderId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'cognitiveServicesUsagesReader role to project service principal OID:${servicePrincipleObjecId} to ${existingOpenAIResource.name}'
+    description:'cognitiveServicesUsagesReader role to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingOpenAIResource.name}'
   }
   scope:existingOpenAIResource
-}
+}]
 
 @description('Users to Azure AI Services: Cognitive Services OpenAI Contributor for users. Full access including the ability to fine-tune, deploy and generate text')
 resource cognitiveServicesOpenAIContributorUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
@@ -178,16 +178,16 @@ resource cognitiveServicesOpenAIContributorUsers 'Microsoft.Authorization/roleAs
   }
   scope:existingOpenAIResource
 }]
-resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIContributorRoleId, servicePrincipleObjecId)
+resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'cognitiveServicesOpenAIContributorRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingOpenAIResource.name}'
+    description:'cognitiveServicesOpenAIContributorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingOpenAIResource.name}'
   }
   scope:existingOpenAIResource
-}
+}]
 
 // AI Search -> OpenAI Service
 resource cognitiveServicesOpenAIContributorAISearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -212,16 +212,16 @@ resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/rol
   }
   scope:existingOpenAIResource
 }]
-resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIUserRoleId, servicePrincipleObjecId)
+resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIUserRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
-    principalId: servicePrincipleObjecId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'cognitiveServicesOpenAIUserRoleId to project service principal OID:${servicePrincipleObjecId} to ${existingOpenAIResource.name}'
+    description:'cognitiveServicesOpenAIUserRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingOpenAIResource.name}'
   }
   scope:existingOpenAIResource
-}
+}]
 
 output roleAssignmentSearchIndexDataContributorGUID string = guid(existingAiSearch.id, searchIndexDataContributorRoleId, openAIServicePrincipal)
 output roleAssignmentSearchServiceContributorGUID string = guid(existingAiSearch.id, searchServiceContributorRoleId, openAIServicePrincipal)

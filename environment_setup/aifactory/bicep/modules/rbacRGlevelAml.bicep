@@ -1,10 +1,7 @@
 // Parameters
 @description('The list of user object IDs to assign roles to.')
 param userObjectIds array
-
-@description('The object ID of the service principal.')
-@secure()
-param servicePrincipleObjectId string
+param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 
 @description('The resource group ID.')
 param resourceGroupId string
@@ -30,16 +27,16 @@ resource roleBasedAccessControlAdminRGRole 'Microsoft.Authorization/roleAssignme
   }
   scope:resourceGroup()
 }]
-resource roleBasedAccessControlAdminRGRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, roleBasedAccessControlAdministratorRG, servicePrincipleObjectId)
+resource roleBasedAccessControlAdminRGRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01'  = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(resourceGroupId, roleBasedAccessControlAdministratorRG, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleBasedAccessControlAdministratorRG)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'roleBasedAccessControlAdministrator to project service principal OID:${servicePrincipleObjectId} for RG: ${resourceGroupId}'
+    description:'roleBasedAccessControlAdministrator to project service principal OID:${servicePrincipleAndMIArray[i]} for RG: ${resourceGroupId}'
   }
   scope:resourceGroup()
-}
+}]
 
 // --------------- RG: Container Registry, PULL //
 @description('Role Assignment for ResoureGroup: acrPushRoleId for users.')
@@ -54,16 +51,17 @@ resource acrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i i
   scope:resourceGroup()
 }]
 
-resource acrPushSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroupId, acrPushRoleId, servicePrincipleObjectId)
+resource acrPushSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(resourceGroupId, acrPushRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPushRoleId)
-    principalId: servicePrincipleObjectId
+    principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'acrPush role to project service principal OID:${servicePrincipleObjectId} for RG: ${resourceGroupId}'
+    description:'acrPush role to project service principal OID:${servicePrincipleAndMIArray[i]} for RG: ${resourceGroupId}'
   }
   scope:resourceGroup()
-}
+}]
+
 // --------------- USERS END ---------------- //
 
 

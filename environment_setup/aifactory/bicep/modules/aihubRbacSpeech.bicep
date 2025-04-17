@@ -4,6 +4,7 @@ param storageAccountName2 string // Name of Azure Storage Account
 param speechServiceName string
 param userObjectIds array // Specific user's object ID's for "User to Service Table"
 param useAdGroups bool = false // Use AD groups for role assignments
+param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 
 // Role Definition IDs: Cognitive Services OpenAI Contributor
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -72,4 +73,16 @@ resource speechServiceOpenAICotributorUsers 'Microsoft.Authorization/roleAssignm
   scope:speechService
 }]
 
+// MI and SP to Speech
+
+resource searchIndexDataContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(speechService.id, cognitiveServicesContributorRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'cognitiveServicesContributorRoleId to project service principal OID: ${servicePrincipleAndMIArray[i]} to ${speechService.name}'
+  }
+  scope:speechService
+}]
 
