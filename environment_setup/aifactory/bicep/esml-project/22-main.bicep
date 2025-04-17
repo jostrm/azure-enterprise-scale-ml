@@ -267,6 +267,8 @@ var processedIpRulesAzureML = [for ip in ipWhitelist_array: {
 var ipWhitelist_remove_ending_32 = [for ip in ipWhitelist_array: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip]
 //var ipWhitelist_remove_ending_slash_something = [for ip in ipWhitelist_array: (contains(ip, '/') ? substring(ip, 0, indexOf(ip, '/')) : ip)]
 
+var cmnName = 'cmn'
+var kvNameCommon = kvNameFromCOMMON_param != '' ? kvNameFromCOMMON_param : 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 
 // 2024-09-15: 25 entries
 var privateDnsZoneName =  {
@@ -998,8 +1000,8 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   ]
 }
 
-var kvNameCommon = kvNameFromCOMMON_param != '' ? kvNameFromCOMMON_param : 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+
+resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: kvNameCommon
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
 }
@@ -1440,26 +1442,18 @@ module spDatabricksAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = i
   ]
 }
 
-var cmnName = 'cmn'
-var kvNameFromCOMMON = kvNameFromCOMMON_param != '' ? kvNameFromCOMMON_param : 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-
-resource kvFromCommon 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: kvNameFromCOMMON
-}
-
 module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'spCmnKVGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGet
-    keyVaultResourceName: kvFromCommon.name
+    keyVaultResourceName: commonKv.name
     policyName: 'add'
     principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds:[]
   }
   dependsOn: [
-    kvFromCommon
+    commonKv
     aml // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
