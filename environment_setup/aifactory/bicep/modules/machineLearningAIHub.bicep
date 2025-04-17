@@ -307,7 +307,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-pre
     hbiWorkspace: false
     hubResourceId:aiHub2.id
     //enableDataIsolation: enablePublicAccessWithPerimeter?false:true
-    //publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
+    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
     //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     
   }
@@ -486,7 +486,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
     hbiWorkspace: false
-    //publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     hubResourceId: aiHub.id
   }
 
