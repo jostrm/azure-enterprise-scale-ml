@@ -1486,7 +1486,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
 
 // COMMON Keyvault where technicalContactId GET,LIST
 var kvNameCommon = kvNameFromCOMMON_param != '' ? kvNameFromCOMMON_param : 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-resource commonKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: kvNameCommon
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
 }
