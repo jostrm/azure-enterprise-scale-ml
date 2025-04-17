@@ -49,15 +49,6 @@ env:
     admin_projectType: "esml" # Project type, [esml,genai-1]
     useCommonACR: "${{ vars.USE_COMMON_ACR_FOR_PROJECTS }}" # Use common Azure Container Registry (save cost), insted of each project having its own.
 
-    # OPTIONAL - GENAI specific
-    admin_enablePublicGenAIAccess: true # Enable public access to GenAI
-    optional_serviceSettingDeployAIDocIntelligence: false # Deploy AI Doc Intelligence
-    optional_serviceSettingDeployAzureAIVision: false # Deploy Azure AI Vision
-    optional_serviceSettingDeployAzureSpeech: false # Deploy Azure Speech
-    optional_serviceSettingDeployAzureAppService: false # Deploy Azure App Service and a WebApp
-    optional_serviceSettingDeployAzureFunction: false # Deploy Azure App Service and a WebApp
-    optional_serviceSettingDeployAzureContainerApps: false # Deploy Azure ContainerApps
-    optional_serviceSettingDeployAzureCosmosDB: false # Deploy Azure CosmosDB
     # OPTIONAL - ESML specific https://learn.microsoft.com/en-us/azure/virtual-machines/ncads-h100-v5
     admin_aks_gpu_sku_dev_override: "Standard_B4ms" # GPU train: [Standard_NC24rs_v3,Standard_ND96amsr_A100_v4] GPU Inference [Standard_NC40ads_H100_v5,Standard_NC80adis_H100_v5]. CPU["Standard_B4ms"]
     admin_aks_gpu_sku_test_prod_override: Standard_DS13-2_v2 # AKS GPU SKU for test/prod
