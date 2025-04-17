@@ -2247,7 +2247,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = {
 }
 module aiHubPreview '../modules/machineLearningAIHub.bicep' = if(serviceSettingEnableAIHubPreview == true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
+  name: '${aiHubNameShort}Preview${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
     location: location
