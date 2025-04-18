@@ -23,12 +23,12 @@ param vnetName string
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
 param vnetResourceGroupName string
-@description('Azure ML allowPublicAccessWhenBehindVnet')
-param allowPublicAccessWhenBehindVnet bool
-@description('AI Hub public access')
-param enablePublicGenAIAccess bool
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
+
 param centralDnsZoneByPolicyInHub bool
+param allowPublicAccessWhenBehindVnet bool=false
+param enablePublicGenAIAccess bool=false
+param enablePublicAccessWithPerimeter bool = false
 param aiSearchName string
 param aifactorySalt string
 param privateLinksDnsZones object
@@ -44,7 +44,6 @@ param locationSuffix string
 param resourceSuffix string
 param applicationInsightsName string
 param ipWhitelist_array array = []
-param enablePublicAccessWithPerimeter bool = false
 param acrName string
 param acrRGName string
 
