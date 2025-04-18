@@ -1149,6 +1149,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
     notebookPrivateDnsZoneID:privateLinksDnsZones.notebooks.id
     allowPublicAccessWhenBehindVnet:(AMLStudioUIPrivate == true && empty(ipWhitelist_remove_ending_32))? false:true
+    enablePublicAccessWithPerimeter: AMLStudioUIPrivate == false ? true: false
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
     aksVmSku_testProd: aks_test_prod_sku_param
