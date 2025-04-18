@@ -53,7 +53,7 @@ param notebookPrivateDnsZoneID string
 @description('AKS Kubernetes version and AgentPool orchestrator version')
 param kubernetesVersionAndOrchestrator string
 @description('Azure ML allowPublicAccessWhenBehindVnet')
-param allowPublicAccessWhenBehindVnet bool = true
+param allowPublicAccessWhenBehindVnet bool = false
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj
 
@@ -162,11 +162,11 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     v1LegacyMode:false
 
     // network settings
-    publicNetworkAccess: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // tomten: enablePublicGenAIAccess?'Enabled':'Disabled' -> 'Disabled' 
-    allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet
+    publicNetworkAccess: (enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
+    allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode:'AllowInternetOutBound' // tomten: enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      isolationMode:'AllowInternetOutBound' //'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
       enableNetworkMonitor:false
     }
     //softDeleteEnabled: false
@@ -223,14 +223,19 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true
     imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
-    allowPublicAccessWhenBehindVnet: true //allowPublicAccessWhenBehindVnet tomten
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: (enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
+    allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     systemDatastoresAuthMode: 'identity'
-    hbiWorkspace:false // tomten
-    v1LegacyMode:true // tomten
-    //provisionNetworkNow: false // tomten
-    enableDataIsolation: false // tomten
-    ipAllowlist: ipWhitelist_array
+    hbiWorkspace:false
+    v1LegacyMode:true
+    //provisionNetworkNow: false
+    enableDataIsolation: false
+    ipAllowlist: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? ipWhitelist_array: null
+    networkAcls: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? {
+      defaultAction: 'Deny'
+      ipRules: ipRules
+    } : null
+    //ipAllowlist: ipWhitelist_array
     /*
     networkAcls: {
       defaultAction:'Allow' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
@@ -265,17 +270,20 @@ resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/worksp
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true
     imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
-    allowPublicAccessWhenBehindVnet: true //allowPublicAccessWhenBehindVnet tomten
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: (enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
+    allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     systemDatastoresAuthMode: 'identity'
-    hbiWorkspace:false // tomten
-    v1LegacyMode:true // tomten
-    //provisionNetworkNow: false // tomten
-    enableDataIsolation: false // tomten
+    hbiWorkspace:false
+    v1LegacyMode:true
+    //provisionNetworkNow: false
+    enableDataIsolation: false
+    ipAllowlist: ipWhitelist_array
+    /*
     networkAcls: {
-      defaultAction:'Allow'
+      defaultAction:'Allow' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       ipRules: ipRules
     }
+    */
   }
   dependsOn:[
     aksTestProd

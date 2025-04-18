@@ -364,11 +364,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     //}
 
     // network settings
-    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet // true: Allows controlled public access through IP allow lists while maintaining VNet integration
     ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
     networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: 'Deny'
+      defaultAction: 'Deny' // Deny all, except the ipRules - that should include the ipAllowList
       ipRules: ipRules
     } : null
     managedNetwork: {
