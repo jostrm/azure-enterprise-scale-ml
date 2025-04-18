@@ -1148,7 +1148,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     privateEndpointName: 'pend-${projectName}-aml-to-vnt-mlcmn'
     amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
     notebookPrivateDnsZoneID:privateLinksDnsZones.notebooks.id
-    allowPublicAccessWhenBehindVnet:(AMLStudioUIPrivate == true)? false:true
+    allowPublicAccessWhenBehindVnet:(AMLStudioUIPrivate == true && empty(ipWhitelist_remove_ending_32))? false:true
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
     aksVmSku_testProd: aks_test_prod_sku_param
