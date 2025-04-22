@@ -158,11 +158,11 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     provisionNetworkNow: true
-    enableDataIsolation: false // tomten
+    enableDataIsolation: false
     v1LegacyMode:false
 
     // network settings
-    publicNetworkAccess: (enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
+    publicNetworkAccess: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
     allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
@@ -224,12 +224,12 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true
     imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
-    publicNetworkAccess: (enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
+    publicNetworkAccess: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)?'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
     allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     v1LegacyMode:true
-    //provisionNetworkNow: false
+    provisionNetworkNow: false
     enableDataIsolation: false
     ipAllowlist: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? ipWhitelist_array: null
     networkAcls: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? {
@@ -271,12 +271,12 @@ resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/worksp
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true
     imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
-    publicNetworkAccess: (enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
+    publicNetworkAccess:(!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
     allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     v1LegacyMode:true
-    //provisionNetworkNow: false
+    provisionNetworkNow: false
     enableDataIsolation: false
     ipAllowlist: ipWhitelist_array
     /*

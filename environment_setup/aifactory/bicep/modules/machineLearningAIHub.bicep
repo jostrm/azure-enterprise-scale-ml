@@ -354,7 +354,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
     provisionNetworkNow: true
-    enableDataIsolation:false // påsk - allowPublicAccessWhenBehindVnet?false:true
+    enableDataIsolation:false
     v1LegacyMode:false
 
      // network settings
