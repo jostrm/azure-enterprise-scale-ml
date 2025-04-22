@@ -1758,12 +1758,12 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     }
   }
 
-  module subnetDelegationAca '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
+  module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (serviceSettingDeployContainerApps) {
     name: 'subnetDelegationAcaEnv${deploymentProjSpecificUniqueSuffix}'
     scope: resourceGroup(vnetResourceGroupName)
     params: {
       vnetName: vnetNameFull
-      subnetName: acaSubnetName // TODO: Have a dedicated for WebApp and FunctionApp
+      subnetName: acaSubnetName
       location: location
       vnetResourceGroupName: vnetResourceGroupName
       delegations: [
