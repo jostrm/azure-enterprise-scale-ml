@@ -38,7 +38,7 @@ resource csAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
     networkAcls: {
-      bypass:'AzureServices'
+      //bypass:'AzureServices'
       defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
