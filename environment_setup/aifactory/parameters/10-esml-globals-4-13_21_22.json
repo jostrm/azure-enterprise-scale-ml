@@ -12,7 +12,7 @@
             "value": true
         },
         "addBastionHost":{
-            "value": true
+            "value": false
         },
         "lakeContainerName":{
 			"value": "lake3"
