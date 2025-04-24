@@ -55,7 +55,7 @@ param aiSearchSKUSharedPrivate string = 'standard' // Needed for shared Private 
 ])
 param csContentSafetySKU string = 'S0' // 'Basic' = S0
 param csSpeechSKU string = 'S0'
-param csVisionSKU string = 'S0'
+param csVisionSKU string = 'S1'
 param csDocIntelligenceSKU string = 'S0'
 param csAIservicesSKU string = 'S0'
 param csOpenAISKU string = 'S0'
