@@ -511,10 +511,6 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
     name:'privatelink.cognitiveservices.azure.com'
   }
-  azurewebappsscm: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/scm.privatelink.azurewebsites.net'
-    name:'scm.privatelink.azurewebsites.net'
-  }
   azuredatabricks: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
     name:'privatelink.azuredatabricks.net'
@@ -617,10 +613,6 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.cognitiveservices.name
     id: privateLinksDnsZones.cognitiveservices.id
-  }
-  {
-    name: privateLinksDnsZones.azurewebappsscm.name
-    id: privateLinksDnsZones.azurewebappsscm.id
   }
   {
     name: privateLinksDnsZones.azuredatabricks.name

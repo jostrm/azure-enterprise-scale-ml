@@ -237,10 +237,11 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
     name:'privatelink.cognitiveservices.azure.com'
   }
+  /* Not needed: https://learn.microsoft.com/en-us/azure/app-service/overview-private-endpoint#dns  + Provides error if https://github.com/Azure/azure-cli/issues/25814
   azurewebappsscm: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/scm.privatelink.azurewebsites.net'
     name:'scm.privatelink.azurewebsites.net'
-  }
+  }*/
   azuredatabricks: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
     name:'privatelink.azuredatabricks.net'
@@ -350,10 +351,11 @@ var privateLinksDnsZonesArray = [
     name: privateLinksDnsZones.cognitiveservices.name
     id: privateLinksDnsZones.cognitiveservices.id
   }
+  /* Not needed: https://learn.microsoft.com/en-us/azure/app-service/overview-private-endpoint#dns  + Provides error if https://github.com/Azure/azure-cli/issues/25814
   {
     name: privateLinksDnsZones.azurewebappsscm.name
     id: privateLinksDnsZones.azurewebappsscm.id
-  }
+  }*/
   {
     name: privateLinksDnsZones.azuredatabricks.name
     id: privateLinksDnsZones.azuredatabricks.id
