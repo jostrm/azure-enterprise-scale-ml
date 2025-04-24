@@ -84,7 +84,8 @@ There is an automation script in the AI Factory accelerator to [create these Pri
 13|Azure Storage |All|privatelink.file.core.windows.net |file.core.windows.net|file|-|
 14|Azure Storage |All|privatelink.dfs.core.windows.net | dfs.core.windows.net |dfs, dfs_secondary|-|
 15,16|Cognitive Services (Azure OpenAI, Speech, etc) |ESGenAI|privatelink.cognitiveservices.azure.com<br>privatelink.openai.azure.com |cognitiveservices.azure.com<br>openai.azure.com| account |-|
-17,18|Azure Webapps |ESGenAI|privatelink.azurewebsites.net<br>scm.privatelink.azurewebsites.net|azurewebsites.net<br>scm.azurewebsites.net |sites |azureAppServicesPrivateDnsZoneId. Azure App Service hosts Azure Webapps, Azure Functions, Azure Logi Apps, Azure API mgmt. [More info](https://techcommunity.microsoft.com/t5/nonprofit-techies/understanding-azure-web-apps-and-azure-app-service/ba-p/3812572)|
+17,18|Azure Webapps |ESGenAI|privatelink.azurewebsites.net<br><del>scm.privatelink.azurewebsites.net</del>|azurewebsites.net<br>scm.azurewebsites.net |sites |azureAppServicesPrivateDnsZoneId. Azure App Service hosts Azure Webapps, Azure Functions, Azure Logi Apps, Azure API mgmt. [More info](https://techcommunity.microsoft.com/t5/nonprofit-techies/understanding-azure-web-apps-and-azure-app-service/ba-p/3812572) [SCM not needed](https://learn.microsoft.com/en-us/azure/app-service/overview-private-endpoint#dns) [SCM error](https://github.com/Azure/azure-cli/issues/25814)
+]|
 19|Cosmos DB |ESGenAI| privatelink.documents.azure.com |documents.azure.com|Sql|-|
 20|Cosmos DB |ESGenAI| privatelink.table.cosmos.azure.com |table.cosmos.azure.com|Table|-|
 21|Azure AI Search |ESGenAI| privatelink.search.windows.net |search.windows.net|searchService|-|
