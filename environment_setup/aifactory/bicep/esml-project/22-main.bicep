@@ -1633,6 +1633,7 @@ module rbacAml1 '../modules/rbacStorageAml.bicep' = {
   ]
 }
 
+/*TODO: Påsk test
 module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacUsersAML_AIFactory${deploymentProjSpecificUniqueSuffix}'
@@ -1649,6 +1650,7 @@ module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
     rbacAml1
   ]
 }
+*/
 
 module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1662,7 +1664,6 @@ module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
   dependsOn: [
     aml
     rbacAml1
-    rbacAml2
   ]
 }
 
@@ -1680,7 +1681,6 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   dependsOn: [
     rbacKeyvaultCommon4Users
     rbacAml1
-    rbacAml2
     rbacAmlRGLevel
     aml
     acrCommon2
