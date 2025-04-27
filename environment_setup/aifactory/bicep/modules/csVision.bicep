@@ -43,7 +43,7 @@ resource visionAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       responsibleAiNotice: 'Acknowledged'
     }
     networkAcls: {
-      bypass:'AzureServices'
+      //bypass:'AzureServices'
       defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
       virtualNetworkRules: [for rule in vnetRules: {
         id: rule
