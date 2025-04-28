@@ -1540,7 +1540,7 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = {
   ]
 }
 
-/* TODO-4
+/* TODO-4 */
 
 module rbacADFfromUser '../modules/datafactoryRBAC.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1557,9 +1557,7 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep'= {
   ]
 }
 
-*/
-
-/* TODO-5
+/* TODO-5 */
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
   name: 'rbacUsersToCmnVnetBastion${deploymentProjSpecificUniqueSuffix}'
@@ -1577,9 +1575,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
   ]
 }
 
-*/
-
-/* TODO-6
+/* TODO-6 */
 module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost==true && empty(bastionSubscription)==false) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbacUsersToCmnVnetExtBast2${deploymentProjSpecificUniqueSuffix}'
@@ -1597,9 +1593,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
   ]
 }
 
-*/
-
-/* TODO-7
+/* TODO-7 */
 
 module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
@@ -1619,9 +1613,8 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
   ]
 }
 
-*/
 
-/* TODO-8
+/* TODO-8 */
 module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false && addBastionHost==true) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbacGenAIReadBastion${deploymentProjSpecificUniqueSuffix}'
@@ -1637,8 +1630,6 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
     rbacReadUsersToCmnVnetBastionExt
   ]
 }
-
-*/
 
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 module rbacAml1 '../modules/rbacStorageAml.bicep' = {
