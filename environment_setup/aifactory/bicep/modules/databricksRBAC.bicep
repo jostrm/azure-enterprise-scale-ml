@@ -21,7 +21,7 @@ resource databricks4Project 'Microsoft.Databricks/workspaces@2021-04-01-preview'
 }
 
 resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):{
-  name: guid('${additionalUserIds[i]}-contributor-${databricksName}-${resourceGroup().id}')
+  name: guid(additionalUserIds[i],contributorRoleDefinition.id,databricks4Project.id)
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: additionalUserIds[i]

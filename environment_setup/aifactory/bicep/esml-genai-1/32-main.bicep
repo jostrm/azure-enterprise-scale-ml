@@ -365,13 +365,13 @@ var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
-var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : union(ipWhitelist_array_1,[]) // remove dups
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+var p011_genai_team_lead_array = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : union(technicalAdminsObjectID_array,[])
 
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
+var p011_genai_team_lead_email_array = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
 //AI Services,Storage Do not allow /32 - "The prefix must be smaller than or equal to 30."
 var processedIpRulesSa = [for ip in ipWhitelist_array: {
@@ -745,8 +745,8 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
   params: {
     userId: technicalContactId
     userEmail: technicalContactEmail
-    additionalUserEmails: technicalAdminsEmail_array_safe
-    additionalUserIds:technicalAdminsObjectID_array_safe
+    additionalUserEmails: p011_genai_team_lead_email_array
+    additionalUserIds:p011_genai_team_lead_array
     useAdGroups:useAdGroups
   }
   dependsOn:[
@@ -1457,7 +1457,7 @@ var secretGet = {
 // PROJECT Keyvault where technicalContactId GET,LIST, SET
 
 var mi_array = array(miForAca.outputs.managedIdentityPrincipalId)
-var all_principals = union(technicalAdminsObjectID_array_safe, mi_array)
+var all_principals = union(p011_genai_team_lead_array, mi_array)
 
 module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1491,7 +1491,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
     keyVaultResourceName: kvNameCommon
     policyName: 'add'
     principalId: technicalContactId
-    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+    additionalPrincipalIds:p011_genai_team_lead_array
   }
   dependsOn: [
     commonKv
@@ -2317,7 +2317,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(service
     servicePrincipleAndMIArray: spAndMiArray
     adfSP:miForPrj.outputs.managedIdentityPrincipalId
     projectADuser:technicalContactId
-    additionalUserIds: technicalAdminsObjectID_array_safe
+    additionalUserIds: p011_genai_team_lead_array
     useAdGroups: useAdGroups
   }
   dependsOn: [
@@ -2337,7 +2337,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
   name: 'rbac1GenAIReadUsersCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    user_object_ids: technicalAdminsObjectID_array_safe   
+    user_object_ids: p011_genai_team_lead_array   
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
     useAdGroups: useAdGroups
   }
@@ -2351,7 +2351,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbac2GenAIUsersBastionExt${deploymentProjSpecificUniqueSuffix}'
   params: {
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: p011_genai_team_lead_array
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
     useAdGroups: useAdGroups
   }
@@ -2376,7 +2376,7 @@ module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDepl
     openAIServicePrincipal:csAzureOpenAI.outputs.principalId
     servicePrincipleAndMIArray: spAndMiArray
     openAIName:csAzureOpenAI.outputs.cognitiveName
-    userObjectIds:technicalAdminsObjectID_array_safe
+    userObjectIds:p011_genai_team_lead_array
     useAdGroups: useAdGroups
   }
 }
@@ -2427,7 +2427,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
     aiSearchName: aiSearchService.outputs.aiSearchName
     resourceGroupId: targetResourceGroupId
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead_array
     aiServicesName:aiServices.outputs.name
     aiHubName:aiHub.outputs.name
     aiHubProjectName:aiHub.outputs.aiProjectName
@@ -2452,7 +2452,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
     aiVisionMIObjectId: csVision.outputs.principalId
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead_array
     visonServiceName: csVision.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
@@ -2466,7 +2466,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
     aiSpeechMIObjectId: csSpeech.outputs.principalId
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead_array
     speechServiceName: csSpeech.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
@@ -2478,7 +2478,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead_array
     aiDocsIntelMIObjectId: csDocIntelligence.outputs.principalId
     docsServiceName: csDocIntelligence.outputs.name
     useAdGroups:useAdGroups
@@ -2491,7 +2491,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
   scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
   name: 'rbac12GenAIRUsersVnet${deploymentProjSpecificUniqueSuffix}'
   params: {
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: p011_genai_team_lead_array
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     servicePrincipleAndMIArray: spAndMiArray
@@ -2512,7 +2512,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbac13UsersVnet${deploymentProjSpecificUniqueSuffix}'
   params: {
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: p011_genai_team_lead_array
     vNetName: vnetNameFullBastion
     common_bastion_subnet_name: 'AzureBastionSubnet'
     servicePrincipleAndMIArray: spAndMiArray
@@ -2536,7 +2536,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleAndMIArray: spAndMiArray
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead_array
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -2558,7 +2558,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   name: 'rbacLake4PrjGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlPrincipalId: aiHub.outputs.principalId
-    projectTeamGroupOrUser: technicalAdminsObjectID_array_safe
+    projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''
     datalakeName: datalakeName
     useAdGroups:useAdGroups

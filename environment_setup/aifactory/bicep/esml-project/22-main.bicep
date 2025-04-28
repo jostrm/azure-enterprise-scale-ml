@@ -218,10 +218,10 @@ param alsoManagedMLStudio bool = true
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
-var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : union(ipWhitelist_array_1,[]) // remove dups
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var p011_genai_team_lead_array = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+var p011_genai_team_lead_array = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : union(technicalAdminsObjectID_array,[]) // remove dups
 
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var p011_genai_team_lead_email = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
@@ -537,7 +537,7 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = {
     servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
 }
-var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
+var spAndMiArray = union(spAndMI2Array.outputs.spAndMiArray,[]) // remove possible dups
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull

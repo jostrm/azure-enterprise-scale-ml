@@ -28,7 +28,7 @@ resource amlNameResource 'Microsoft.MachineLearningServices/workspaces@2021-04-0
 }
 
 resource contributorSP 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(servicePrincipleAndMIArray)):{
-  name: guid('${servicePrincipleAndMIArray[i]}-contributor-${amlName}-${resourceGroup().id}')
+  name: guid(servicePrincipleAndMIArray[i],contributorRoleDefinition.id,amlNameResource.id)
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: servicePrincipleAndMIArray[i]
@@ -38,8 +38,8 @@ resource contributorSP 'Microsoft.Authorization/roleAssignments@2020-04-01-previ
   scope:amlNameResource
 }]
 
-resource contributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if(adfSP!='null') {
-  name: guid('${adfSP}-contributor-${amlName}-${resourceGroup().id}')
+resource contributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if(!empty(adfSP)) {
+  name: guid(adfSP,contributorRoleDefinition.id,amlNameResource.id)
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: adfSP
@@ -53,7 +53,7 @@ resource contributorADF 'Microsoft.Authorization/roleAssignments@2020-04-01-prev
 }
 
 resource contributorUserOrGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)):{
-  name: guid('${additionalUserIds[i]}-${amlName}-${resourceGroup().id}')
+  name: guid(additionalUserIds[i],contributorRoleDefinition.id,amlNameResource.id)
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: additionalUserIds[i]
@@ -67,8 +67,10 @@ resource contributorUserOrGroup 'Microsoft.Authorization/roleAssignments@2020-04
   ]
 }]
 
+/* dup
+
 resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(additionalUserIds)): if(useAdGroups==false){
-  name: guid('${additionalUserIds[i]}-${amlName}-${resourceGroup().id}')
+  name: guid(additionalUserIds[i]},contributorRoleDefinition.id,amlNameResource.id)
   properties: {
     roleDefinitionId: contributorRoleDefinition.id
     principalId: additionalUserIds[i]
@@ -81,4 +83,6 @@ resource contributorUser 'Microsoft.Authorization/roleAssignments@2020-04-01-pre
     contributorADF
   ]
 }]
+
+*/
  
