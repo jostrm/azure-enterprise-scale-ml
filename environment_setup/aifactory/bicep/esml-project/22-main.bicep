@@ -48,9 +48,9 @@ param aksDockerBridgeCidr string = '172.17.0.1/16'
 @description('Common default subnet')
 param common_subnet_name string
 
-@description('tags')
+@description('tags for common resources')
 param tags object
-@description('Specifies the tags2 that should be applied to newly created resources')
+@description('Specifies the project specific tags that should be applied to newly created resources')
 param projecttags object
 @description('Deployment location.')
 param location string
@@ -221,11 +221,10 @@ var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+var p011_genai_team_lead = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
 
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
-var tags2 = projecttags
+var p011_genai_team_lead_email = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
 // Salt: Project/env specific
 resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
@@ -524,7 +523,7 @@ module miForPrj '../modules/mi.bicep' = {
   params: {
     name: 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
     location: location
-    tags: tags
+    tags: projecttags
   }
   dependsOn: [
     projectResourceGroup
@@ -570,7 +569,7 @@ module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   params: {
     rgName: targetResourceGroup
     location: location
-    tags: tags2
+    tags: projecttags
   }
 }
 
@@ -589,8 +588,8 @@ module ownerPermissions '../modules/contributorRbac.bicep' = {
   params: {
     userId: technicalContactId
     userEmail: technicalContactEmail
-    additionalUserEmails: technicalAdminsEmail_array_safe
-    additionalUserIds:technicalAdminsObjectID_array_safe
+    additionalUserEmails: p011_genai_team_lead_email
+    additionalUserIds:p011_genai_team_lead
     useAdGroups: useAdGroups
   }
   dependsOn:[
@@ -603,8 +602,8 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = {
   params: {
     userId: technicalContactId
     userEmail: technicalContactEmail
-    additionalUserEmails: technicalAdminsEmail_array_safe
-    additionalUserIds:technicalAdminsObjectID_array_safe
+    additionalUserEmails: p011_genai_team_lead_email
+    additionalUserIds:p011_genai_team_lead
     useAdGroups: useAdGroups
   }
   dependsOn:[
@@ -625,7 +624,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     logWorkspaceName: laName
     logWorkspaceNameRG: commonResourceGroup
-    tags: tags2
+    tags: projecttags
     location: location
   }
 
@@ -645,7 +644,7 @@ module adf '../modules/dataFactory.bicep' = if(sweden_central_adf_missing== fals
     subnetName: defaultSubnet
     portalPrivateEndpointName: 'pend-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-adfportal-to-vnt-mlcmn'
     runtimePrivateEndpointName: 'pend-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-adfruntime-to-vnt-mlcmn'
-    tags: tags2
+    tags: projecttags
   }
 
   dependsOn: [
@@ -665,7 +664,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep'  = if(serviceSettingDe
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
     subnetName: defaultSubnet
     vnetId: vnetId
-    tags: tags2
+    tags: projecttags
     keyvaultName: kv1.outputs.keyvaultName
   }
   dependsOn: [
@@ -687,7 +686,7 @@ module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}${locationSuffix}-containerreg-to-vnt-mlcmn'
-    tags: tags2
+    tags: projecttags
     location:location
   }
 
@@ -741,7 +740,7 @@ module sacc '../modules/storageAccount.bicep' = {
     filePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
     queuePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
     tablePrivateEndpointName: 'pend-sa-${projectName}${locationSuffix}${env}-table-to-vnt-mlcmn'
-    tags: tags2
+    tags: projecttags
     containers: [
       {
         name: 'default'
@@ -823,7 +822,7 @@ module sacc2 '../modules/storageAccount.bicep' = if(alsoManagedMLStudio == true)
     filePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-file-to-vnt-mlcmn'
     queuePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-queue-to-vnt-mlcmn'
     tablePrivateEndpointName: 'pend-sa2-${projectName}${locationSuffix}${env}-table-to-vnt-mlcmn'
-    tags: tags2
+    tags: projecttags
     containers: [
       {
         name: 'default'
@@ -898,7 +897,7 @@ module kv1 '../modules/keyVault.bicep' = {
   params: {
     keyvaultName: keyvaultName
     location: location
-    tags: tags2
+    tags: projecttags
     enablePurgeProtection:keyvaultEnablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
     tenantIdentity: tenantId
@@ -935,7 +934,7 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
   params: {
     keyvaultName: keyvaultName2
     location: location
-    tags: tags2
+    tags: projecttags
     enablePurgeProtection:keyvaultEnablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
     enablePublicGenAIAccess: !empty(processedIpRulesKv)
@@ -993,7 +992,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
     keyVaultResourceName: kv1.outputs.keyvaultName
     policyName: 'add'
     principalId: technicalContactId
-    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+    additionalPrincipalIds:p011_genai_team_lead
   }
   dependsOn: [
     addSecret
@@ -1014,7 +1013,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
     keyVaultResourceName: kvNameCommon
     policyName: 'add'
     principalId: technicalContactId
-    additionalPrincipalIds:technicalAdminsObjectID_array_safe
+    additionalPrincipalIds:p011_genai_team_lead
   }
   dependsOn: [
     commonKv
@@ -1142,7 +1141,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     aksSubnetName:aksSubnetName
     aksDnsServiceIP:aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
-    tags: tags2
+    tags: projecttags
     vnetId: vnetId
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-aml-to-vnt-mlcmn'
@@ -1194,7 +1193,7 @@ module eventHubLogging '../modules/eventhub.bicep' = if(enableEventhubs) {
     namespaceName: evenhubNameSpaceAndWsName
     location:location
     privateEndpointName:'pend-${projectName}-ev-to-vnt-mlcmn'
-    tags: tags2
+    tags: projecttags
     vnetId: vnetId
     subnetName: defaultSubnet
     keyvaultName: kv1.outputs.keyvaultName
@@ -1226,7 +1225,7 @@ module dbx '../modules/dataBricks.bicep'  = if(databricksPrivate == false) {
     databricksPrivateSubnet: dbxPrivSubnetName
     databricksPublicSubnet: dbxPubSubnetName
     vnetId: vnetId
-    tags: tags2
+    tags: projecttags
   }
   dependsOn: [
     projectResourceGroup
@@ -1244,7 +1243,7 @@ module dbxPrivate '../modules/databricksPrivate.bicep' = if(databricksPrivate ==
     managedResourceGroupId: databricksManagedRGId
     name: databricksNameP
     skuName: 'standard'
-    tags: tags2
+    tags: projecttags
     vnetId: vnetId
     privateEndpointName: 'pend-${databricksNameP}-to-vnt-mlcmn'
     subnetName: dbxPubSubnetName
@@ -1464,7 +1463,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   name: 'rbacLake4Prj${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlPrincipalId: aml.outputs.principalId
-    projectTeamGroupOrUser: technicalAdminsObjectID_array_safe
+    projectTeamGroupOrUser: p011_genai_team_lead
     adfPrincipalId: adf.outputs.principalId
     datalakeName: datalakeName
     useAdGroups:useAdGroups
@@ -1483,7 +1482,7 @@ module rbackDatabricks '../modules/databricksRBAC.bicep' = if(databricksPrivate 
   params: {
     databricksName: databricksName
     userPrincipalId: technicalContactId
-    additionalUserIds: technicalAdminsObjectID_array_safe
+    additionalUserIds: p011_genai_team_lead
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1498,7 +1497,7 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
   params: {
     databricksName: databricksNameP
     userPrincipalId: technicalContactId
-    additionalUserIds: technicalAdminsObjectID_array_safe
+    additionalUserIds: p011_genai_team_lead
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1519,7 +1518,7 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = {
     servicePrincipleAndMIArray: spAndMiArray
     adfSP:adf.outputs.principalId
     projectADuser:technicalContactId
-    additionalUserIds: technicalAdminsObjectID_array_safe
+    additionalUserIds: p011_genai_team_lead
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1536,7 +1535,7 @@ module rbacADFfromUser '../modules/datafactoryRBAC.bicep'= {
   params: {
     datafactoryName:adfName
     userPrincipalId:technicalContactId
-    additionalUserIds: technicalAdminsObjectID_array_safe
+    additionalUserIds: p011_genai_team_lead
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1550,7 +1549,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
   scope: resourceGroup(subscriptionIdDevTestProd,vnetResourceGroupName)
   name: 'rbacUsersToCmnVnetBastion${deploymentProjSpecificUniqueSuffix}'
   params: {
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: p011_genai_team_lead
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
     servicePrincipleAndMIArray:spAndMiArray
@@ -1568,7 +1567,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbacUsersToCmnVnetExtBast2${deploymentProjSpecificUniqueSuffix}'
   params: {
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: p011_genai_team_lead
     vNetName: vnetNameFullBastion
     common_bastion_subnet_name: 'AzureBastionSubnet'
     servicePrincipleAndMIArray:spAndMiArray
@@ -1587,7 +1586,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
   name: 'rbacUsersToCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: p011_genai_team_lead
     addBastion: addBastionHost
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
     useAdGroups:useAdGroups
@@ -1604,7 +1603,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbacGenAIReadBastion${deploymentProjSpecificUniqueSuffix}'
   params: {
-    user_object_ids: technicalAdminsObjectID_array_safe
+    user_object_ids: p011_genai_team_lead
     bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
     useAdGroups:useAdGroups
   }
@@ -1623,34 +1622,34 @@ module rbacAml1 '../modules/rbacStorageAml.bicep' = {
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     resourceGroupId: targetResourceGroupId
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead
     azureMLworkspaceName:aml.outputs.amlName
     servicePrincipleAndMIArray:spAndMiArray
     useAdGroups:useAdGroups
+    user2Storage:true
   }
   dependsOn: [
     aml
   ]
 }
 
-/*TODO: Påsk test
 module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacUsersAML_AIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     resourceGroupId: targetResourceGroupId
-    userObjectIds: technicalAdminsObjectID_array_safe
-    azureMLworkspaceName:amlManagedName
+    userObjectIds: p011_genai_team_lead
+    azureMLworkspaceName:aml.outputs.amlManagedName
     servicePrincipleAndMIArray:spAndMiArray
     useAdGroups:useAdGroups
+    user2Storage:false
   }
   dependsOn: [
     aml
     rbacAml1
   ]
 }
-*/
 
 module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1658,7 +1657,7 @@ module rbacAmlRGLevel '../modules/rbacRGlevelAml.bicep' = {
   params: {
     resourceGroupId: targetResourceGroupId
     servicePrincipleAndMIArray: spAndMiArray
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1675,7 +1674,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleAndMIArray:spAndMiArray
-    userObjectIds: technicalAdminsObjectID_array_safe
+    userObjectIds: p011_genai_team_lead
     useAdGroups: useAdGroups
   }
   dependsOn: [

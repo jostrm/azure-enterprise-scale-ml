@@ -538,6 +538,7 @@ resource machineLearningComputeInstance001 'Microsoft.MachineLearningServices/wo
 output amlId string = (env=='dev')? machineLearningStudio.id: machineLearningStudioTestProd.id
 output amlName string =(env=='dev')? machineLearningStudio.name: machineLearningStudioTestProd.name
 output principalId string = (env=='dev')?machineLearningStudio.identity.principalId:  machineLearningStudioTestProd.identity.principalId
+output amlManagedName string = alsoManagedMLStudio? machineLearningStudioManaged.name: ''
 
 // ###############  AML networking - custom networking ###############
 output dnsConfig array = [

@@ -210,7 +210,7 @@ param adminPassword string
 param adminUsername string
 
 // Metadata
-@description('tags')
+@description('tags for common resources')
 param tags object
 param location string
 @description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')
@@ -288,7 +288,7 @@ param commonLakeNamePrefixMax8chars string
 param lakeContainerName string
 
 // Metadata
-@description('Specifies the tags2 that should be applied to newly created resources')
+@description('Specifies project specific tags that should be applied to newly created resources')
 param projecttags object
 @description('Specifies project owner email and will be used for tagging and RBAC')
 param projectOwnerEmail string=''
@@ -725,7 +725,7 @@ module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   params: {
     rgName: targetResourceGroup
     location: location
-    tags: tags
+    tags: projecttags
   }
 }
 
@@ -936,7 +936,7 @@ module aiServices '../modules/csAIServices.bicep' = {
   params: {
     location: location
     sku: csAIservicesSKU
-    tags: tags
+    tags: projecttags
     vnetResourceGroupName: vnetResourceGroupName
     cognitiveName: aiServicesName
     pendCogSerName: 'p-${projectName}-aiservices-${genaiName}'
@@ -972,7 +972,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
     cognitiveName:'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-    tags: tags
+    tags: projecttags
     laWorkspaceName:laName
     restore:restore
     location: location
@@ -1096,7 +1096,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
-    tags: tags
+    tags: projecttags
     semanticSearchTier: semanticSearchTier
     publicNetworkAccess: enablePublicGenAIAccess
     skuName: aiSearchSKUName
@@ -1143,7 +1143,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
-    tags: tags
+    tags: projecttags
     ipRules: empty(processedIpRulesSa)?[]:processedIpRulesSa
     containers: [
       {
@@ -1227,7 +1227,7 @@ module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}${locationSuffix}-containerreg-to-vnt-mlcmn'
-    tags: tags
+    tags: projecttags
     location:location
   }
 
@@ -1281,7 +1281,7 @@ module sacc '../modules/storageAccount.bicep' = {
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}ml'
-    tags: tags
+    tags: projecttags
     containers: [
       {
         name: 'default'
@@ -1342,7 +1342,7 @@ module kv1 '../modules/keyVault.bicep' = {
   params: {
     keyvaultName: keyvaultName
     location: location
-    tags: tags
+    tags: projecttags
     enablePurgeProtection:keyvaultEnablePurgeProtection
     soft_delete_days: keyvaultSoftDeleteDays
     tenantIdentity: tenantId
@@ -1374,7 +1374,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
     logWorkspaceName: laName
     logWorkspaceNameRG: commonResourceGroup
     //logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
-    tags: tags
+    tags: projecttags
     location: location
   }
 
@@ -1395,7 +1395,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(serviceSettingDep
     vmName: 'dsvm-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     subnetName: defaultSubnet
     vnetId: vnetId
-    tags: tags
+    tags: projecttags
     keyvaultName: kv1.outputs.keyvaultName
   }
 
@@ -1564,7 +1564,7 @@ module bing '../modules/bing.bicep' = if(serviceSettingDeployBingSearch==true) {
     name: 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     location: 'global'
     sku: bingSearchSKU
-    tags: tags
+    tags: projecttags
   }
   dependsOn: [
     projectResourceGroup
@@ -1588,7 +1588,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
       subnet_aks_ref.id
     ]
     kind: cosmosKind
-    tags: tags
+    tags: projecttags
     corsRules: [
       {
         allowedOrigins: [
@@ -1666,7 +1666,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   params: {
     name: 'appinsights-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     location: location
-    tags: tags
+    tags: projecttags
     logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight.id
     dashboardName: 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
   }
@@ -1686,7 +1686,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       name: 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
       location: location
-      tags: tags
+      tags: projecttags
     }
     dependsOn: [
       projectResourceGroup
@@ -1777,7 +1777,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       name: 'webapp-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       location: location
-      tags: tags
+      tags: projecttags
       sku: webappSKU
       vnetName: vnetNameFull
       vnetResourceGroupName: vnetResourceGroupName
@@ -1854,7 +1854,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       name: 'func-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       location: location
-      tags: tags
+      tags: projecttags
       sku: functionSKU
       vnetName: vnetNameFull
       vnetResourceGroupName: vnetResourceGroupName
@@ -1963,7 +1963,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       name: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
       location: location
-      tags: tags
+      tags: projecttags
       logAnalyticsWorkspaceName: laName
       logAnalyticsWorkspaceRG: commonResourceGroup
       applicationInsightsName: appinsights.outputs.name
@@ -1993,7 +1993,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       name: 'aca-a-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${substring(resourceSuffix, 1)}' // max 32 chars
       location: location
-      tags: tags
+      tags: projecttags
       ipSecurityRestrictions: enablePublicGenAIAccess? ipSecurityRestrictions: []
       allowedOrigins: allowedOrigins
       enablePublicGenAIAccess: enablePublicGenAIAccess
@@ -2042,7 +2042,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     name:'aca-w-${deploymentProjSpecificUniqueSuffix}-depl' 
     params: {
       location: location
-      tags: tags
+      tags: projecttags
       name: 'aca-w-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'
       apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
       allowedOrigins: allowedOrigins
@@ -2155,7 +2155,7 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
     aksSubnetName:aksSubnetName
     aksDnsServiceIP:aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
-    tags: tags
+    tags: projecttags
     vnetId: vnetId
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-aml${genaiName}-to-vntcmn'
@@ -2195,7 +2195,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = {
   params: {
     name: aiHubName
     location: location
-    tags: tags
+    tags: projecttags
     aifactorySuffix: aifactorySuffixRG
     applicationInsightsName: applicationInsightSWC.outputs.name
     containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
@@ -2243,7 +2243,7 @@ module aiHubPreview '../modules/machineLearningAIHub.bicep' = if(serviceSettingE
   params: {
     name: aiHubName
     location: location
-    tags: tags
+    tags: projecttags
     aifactorySuffix: aifactorySuffixRG
     applicationInsightsName: applicationInsightSWC.outputs.name
     containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
@@ -2292,7 +2292,7 @@ module miForPrj '../modules/mi.bicep' = {
   params: {
     name: 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
     location: location
-    tags: tags
+    tags: projecttags
   }
   dependsOn: [
     projectResourceGroup
