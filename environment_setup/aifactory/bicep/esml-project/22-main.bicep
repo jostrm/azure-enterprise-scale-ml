@@ -1482,7 +1482,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   ]
 }
 
-/* TODO-2
+/* TODO-2 */
 
 module rbackDatabricks '../modules/databricksRBAC.bicep' = if(databricksPrivate == false) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1499,8 +1499,6 @@ module rbackDatabricks '../modules/databricksRBAC.bicep' = if(databricksPrivate 
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
-
-*/
 
 
 module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPrivate == true) {
@@ -1523,7 +1521,7 @@ module rbackDatabricksPriv '../modules/databricksRBAC.bicep' = if(databricksPriv
 // Needed if connnecting from Databricks to Azure ML workspace
 // Note: SP OID: it must be the OBJECT ID of a service principal, not the OBJECT ID of an Application, different thing, and I have to agree it is very confusing.
 
-/* TODO-3
+/* TODO-3 */
 module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDBX2AMLPrjSP${deploymentProjSpecificUniqueSuffix}'
@@ -1541,7 +1539,6 @@ module rbackSPfromDBX2AML '../modules/machinelearningRBAC.bicep' = {
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
-*/
 
 /* TODO-4
 
