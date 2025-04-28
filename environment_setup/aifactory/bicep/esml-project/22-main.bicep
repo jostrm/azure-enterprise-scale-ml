@@ -1462,7 +1462,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(
 // ############################################################################################### RBAC ###############################
 //
 
-/* TODO-1
+/* TODO-1 */
 
 module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
@@ -1481,8 +1481,6 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
     logAnalyticsWorkspaceOpInsight
   ]
 }
-
-*/
 
 /* TODO-2
 
