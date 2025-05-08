@@ -115,7 +115,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
       appSettings: concat(appSettings, !empty(applicationInsightsName) ? [
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: appInsights.properties.ConnectionString
+          value: (!empty(applicationInsightsName))? appInsights.properties.ConnectionString: ''
         }
         {
           name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
