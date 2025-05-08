@@ -1966,7 +1966,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       tags: projecttags
       logAnalyticsWorkspaceName: laName
       logAnalyticsWorkspaceRG: commonResourceGroup
-      applicationInsightsName: appinsights.outputs.name
+      applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name:''
       enablePublicGenAIAccess: enablePublicGenAIAccess
       enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
       vnetName: vnetNameFull
@@ -2018,7 +2018,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       openAiApiVersion: openAiApiVersion
       aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint
       aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
-      appinsightsConnectionstring: appinsights.outputs.connectionString
+      appinsightsConnectionstring:serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.connectionString:''
       bingName: (serviceSettingDeployBingSearch)? bing.outputs.bingName: ''
       bingApiEndpoint: (serviceSettingDeployBingSearch)? bing.outputs.endpoint:''
       bingApiKey: (serviceSettingDeployBingSearch)? bing.outputs.bingApiKey:''
@@ -2067,7 +2067,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     name: 'rbacForContainerAppsMI${deploymentProjSpecificUniqueSuffix}'
     params:{
       aiSearchName: aiSearchService.outputs.aiSearchName
-      appInsightsName: appinsights.outputs.name
+      appInsightsName: serviceSettingDeployAppInsightsDashboard ?appinsights.outputs.name:''
       principalIdMI: miForAca.outputs.managedIdentityPrincipalId
       resourceGroupId: targetResourceGroupId
     }

@@ -18,7 +18,7 @@ var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05' // User, SP,
 resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
   name: aiSearchName
 }
-resource existingAppInsights 'Microsoft.Insights/components@2020-02-02' existing = {
+resource existingAppInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!empty(appInsightsName)){
   name: appInsightsName
 }
 
@@ -45,7 +45,7 @@ resource searchServiceContributorRoleIdMI 'Microsoft.Authorization/roleAssignmen
 }
 
 // App Insights
-resource monitoringMetricsPublisherRoleIdMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource monitoringMetricsPublisherRoleIdMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(appInsightsName)){
   name: guid(existingAppInsights.id, monitoringMetricsPublisherRoleId, principalIdMI)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringMetricsPublisherRoleId)
@@ -55,7 +55,7 @@ resource monitoringMetricsPublisherRoleIdMI 'Microsoft.Authorization/roleAssignm
   }
   scope:existingAppInsights
 }
-resource monitoringReaderRoleIdMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource monitoringReaderRoleIdMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(appInsightsName)){
   name: guid(existingAppInsights.id, monitoringReaderRoleId, principalIdMI)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', monitoringReaderRoleId)
