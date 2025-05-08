@@ -233,7 +233,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     enableDataIsolation: false
     ipAllowlist: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? ipWhitelist_array: null
     networkAcls: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? {
-      defaultAction: 'Allow' // TODO: DTO error for some regions if not 'Allow'
+      defaultAction: 'Deny' // TODO: DTO error for some regions if not 'Allow'
       ipRules: ipRules
     } : null
     //ipAllowlist: ipWhitelist_array

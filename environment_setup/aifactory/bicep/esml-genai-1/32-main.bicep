@@ -2019,9 +2019,9 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint
       aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
       appinsightsConnectionstring: appinsights.outputs.connectionString
-      bingName: bing.outputs.bingName
-      bingApiEndpoint: bing.outputs.endpoint
-      bingApiKey: bing.outputs.bingApiKey
+      bingName: (serviceSettingDeployBingSearch)? bing.outputs.bingName: ''
+      bingApiEndpoint: (serviceSettingDeployBingSearch)? bing.outputs.endpoint:''
+      bingApiKey: (serviceSettingDeployBingSearch)? bing.outputs.bingApiKey:''
       aiProjectName: aiHub.outputs.aiProjectName
       subscriptionId: subscriptionIdDevTestProd
       appWorkloadProfileName: acaAppWorkloadProfileName
