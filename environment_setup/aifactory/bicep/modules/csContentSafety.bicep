@@ -11,6 +11,7 @@ param ipRules array = []
 param pendCogSerName string
 param restore bool
 param vnetResourceGroupName string
+param enablePublicAccessWithPerimeter bool = false
 
 //param vnetId string
 //param subnetName string
@@ -26,6 +27,11 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
 }
 var nameCleaned = toLower(replace(contentsafetyName, '-', ''))
 
+var rules = [for rule in vnetRules: {
+  id: rule
+  ignoreMissingVnetServiceEndpoint: true
+}]
+
 resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: contentsafetyName
   location: location
@@ -38,18 +44,15 @@ resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' 
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: publicNetworkAccess? 'Enabled': 'Disabled'
+    publicNetworkAccess: publicNetworkAccess || enablePublicAccessWithPerimeter? 'Enabled': 'Disabled'
     restore: restore
-    restrictOutboundNetworkAccess: publicNetworkAccess? false:true
-    networkAcls: {
+    restrictOutboundNetworkAccess: publicNetworkAccess || enablePublicAccessWithPerimeter? false:true
+    networkAcls: !enablePublicAccessWithPerimeter ? {
       bypass:'AzureServices'
       defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
-      virtualNetworkRules: [for rule in vnetRules: {
-        id: rule
-        ignoreMissingVnetServiceEndpoint: true
-      }]
+      virtualNetworkRules: rules
       ipRules: ipRules
-    }
+    } : null
   }
   
 }

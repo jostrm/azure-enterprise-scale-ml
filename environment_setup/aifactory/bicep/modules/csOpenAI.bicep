@@ -32,6 +32,7 @@ param keyvaultName string
 param vnetResourceGroupName string
 param commonResourceGroupName string
 param aiSearchPrincipalId string
+param enablePublicAccessWithPerimeter bool = false
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 
@@ -51,8 +52,10 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-//var subnetRef = subnet.id
-
+var rules = [for rule in vnetRules: {
+  id: rule
+  ignoreMissingVnetServiceEndpoint: true
+}]
 // TODO: in ADO pipeline: https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#grant-access-to-trusted-azure-services-for-azure-openai
 resource cognitiveOpenAI 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: cognitiveName
@@ -68,19 +71,16 @@ resource cognitiveOpenAI 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   properties: {
     allowedFqdnList: []
     customSubDomainName: nameCleaned
-    publicNetworkAccess: publicNetworkAccess? 'Enabled': 'Disabled'
+    publicNetworkAccess: publicNetworkAccess||enablePublicAccessWithPerimeter? 'Enabled': 'Disabled'
     restore: restore
-    restrictOutboundNetworkAccess: publicNetworkAccess? false:true
+    restrictOutboundNetworkAccess: publicNetworkAccess||enablePublicAccessWithPerimeter? false:true
     disableLocalAuth: disableLocalAuth
-    networkAcls: {
+    networkAcls: !enablePublicAccessWithPerimeter ? {
       bypass:'AzureServices'
       defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
-      virtualNetworkRules: [for rule in vnetRules: {
-        id: rule
-        ignoreMissingVnetServiceEndpoint: true
-      }]
+      virtualNetworkRules: rules
       ipRules: ipRules
-    }
+    }:null
   }
 }
 

@@ -14,5 +14,8 @@ output addressPrefix string = existingSubnet.properties.addressPrefix
 output serviceEndpoints array = existingSubnet.properties.serviceEndpoints ?? []
 output delegations array = existingSubnet.properties.delegations ?? []
 output networkSecurityGroupId string = existingSubnet.properties.networkSecurityGroup.id ?? ''
-//output routeTableId string = existingSubnet.properties
+output routeTableId string = existingSubnet.properties.routeTable.id ?? ''
+output natGatewayId string = existingSubnet.properties.natGateway.id ?? ''
+output privateEndpointNetworkPolicies string = existingSubnet.properties.privateEndpointNetworkPolicies ?? ''
+output privateLinkServiceNetworkPolicies string = existingSubnet.properties.privateLinkServiceNetworkPolicies ?? ''
 

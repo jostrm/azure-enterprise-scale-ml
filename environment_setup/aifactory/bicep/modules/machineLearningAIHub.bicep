@@ -157,7 +157,7 @@ az extension update -n ml
 // AIF Hub 1 working: workspaces@2024-10-01-preview with project '2025-01-01-preview' failing: 
 // TODO 1: Try "2024-10-01-preview" for project as well
 
-resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: name
   location: location
   identity: {
@@ -187,7 +187,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
     allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode:'AllowInternetOutBound'
+      isolationMode:'AllowInternetOutBound' //'Disabled' meaning no restrictions
       enableNetworkMonitor:false
     }
   }

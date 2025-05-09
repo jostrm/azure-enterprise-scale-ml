@@ -39,6 +39,11 @@ resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' exist
 
 // Contoso: databaseAccounts@2022-08-15
 // Change API version to a stable, well-supported version
+var rules = [for rule in vNetRules: {
+  id: string(rule)
+  ignoreMissingVNetServiceEndpoint: true
+}]
+
 resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
   name: name
   kind: kind
@@ -72,11 +77,8 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
     isVirtualNetworkFilterEnabled: vNetRules != []
     //TODO-1: cors: length(corsRules) > 0 ? corsRules : null
     networkAclBypass:'AzureServices'
-    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled'
-    virtualNetworkRules: [for rule in vNetRules: {
-      id: string(rule)
-      ignoreMissingVNetServiceEndpoint: true
-    }]
+    publicNetworkAccess:enablePublicGenAIAccess||enablePublicAccessWithPerimeter?'Enabled':'Disabled'
+    virtualNetworkRules: !enablePublicAccessWithPerimeter?rules:null
   }
 }
 

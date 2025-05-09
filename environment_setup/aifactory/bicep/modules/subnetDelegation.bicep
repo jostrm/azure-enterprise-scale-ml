@@ -23,13 +23,6 @@ module existingSubnet 'subnetGetProps.bicep' = {
   }
 }
 
-// Fix: Instead of using a symbolic reference to existingSubnet, 
-// use a reference() function for current subnet properties
-//var existingSubnet = reference(
-//  resourceId(vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, subnetName), 
-//  '2023-05-01'
-//)
-
 // Update subnet with delegations
 resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   parent: vnet
@@ -37,19 +30,18 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   properties: {
     addressPrefix: !empty(addressPrefix) ? addressPrefix : (!empty(existingAddressPrefix) ? existingAddressPrefix : existingSubnet.outputs.addressPrefix)
     serviceEndpoints: !empty(serviceEndpoints) ? serviceEndpoints : existingSubnet.outputs.serviceEndpoints
-    //routeTable: {
-//      id:existingSubnet.outputs.routeTableId
-    //}
-    networkSecurityGroup: {
+    routeTable: !empty(existingSubnet.outputs.routeTableId)?{
+      id:existingSubnet.outputs.routeTableId
+    }:null
+    networkSecurityGroup: !empty(existingSubnet.outputs.networkSecurityGroupId)?{
       id:existingSubnet.outputs.networkSecurityGroupId
-    }
+    }:null
+    natGateway: !empty(existingSubnet.outputs.natGatewayId)?{
+      id:existingSubnet.outputs.natGatewayId
+    }:null
     delegations: delegations
-    //delegations: union(
-      //existingSubnet.outputs.delegations ?? [],
-      //delegations
-    //)
-    privateEndpointNetworkPolicies: 'Disabled' //  (recommended for most cases):securely connect to private endpoints without being blocked by NSGs
-    privateLinkServiceNetworkPolicies: 'Enabled' //  (default setting):NSG rules are applied to private link services
+    privateEndpointNetworkPolicies: (existingSubnet.outputs.privateEndpointNetworkPolicies!='Disabled')?existingSubnet.outputs.privateEndpointNetworkPolicies:'Disabled' //  (Disabled:recommended for most cases):securely connect to private endpoints without being blocked by NSGs
+    privateLinkServiceNetworkPolicies:(existingSubnet.outputs.privateLinkServiceNetworkPolicies!='Enabled')?existingSubnet.outputs.privateLinkServiceNetworkPolicies :'Enabled' //  (default setting):NSG rules are applied to private link services
   }
   dependsOn:[
     existingSubnet

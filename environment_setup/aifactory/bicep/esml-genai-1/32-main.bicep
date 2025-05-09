@@ -781,6 +781,7 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
       action: 'Allow'
       value: ip
     }]
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
@@ -823,6 +824,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
       action: 'Allow'
       value: ip
     }]
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
@@ -864,6 +866,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
       action: 'Allow'
       value: ip
     }]
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
@@ -906,6 +909,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
       action: 'Allow'
       value: ip
     }]
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
@@ -955,6 +959,7 @@ module aiServices '../modules/csAIServices.bicep' = {
     disableLocalAuth: disableLocalAuth
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
@@ -996,6 +1001,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
       action: 'Allow'
       value: ip
     }]
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
@@ -1104,6 +1110,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzu
     sharedPrivateLinks:sharedPrivateLinkResources
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: empty(processedIpRulesAISearch)?[]:processedIpRulesAISearch
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
@@ -1229,6 +1236,7 @@ module acr '../modules/containerRegistry.bicep' = if (useCommonACR == false){
     privateEndpointName: 'pend-${projectName}${locationSuffix}-containerreg-to-vnt-mlcmn'
     tags: projecttags
     location:location
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
 
   dependsOn: [
@@ -1258,6 +1266,7 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: acrCommon.tags
     location:acrCommon.location
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
 
   dependsOn: [
@@ -1373,9 +1382,9 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
     name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     logWorkspaceName: laName
     logWorkspaceNameRG: commonResourceGroup
-    //logAnalyticsWorkspaceID:logAnalyticsWorkspaceOpInsight.id
     tags: projecttags
     location: location
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
 
   dependsOn: [
@@ -1583,6 +1592,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     vNetRules: [
       subnet_genai_ref.id
       subnet_aks_ref.id
@@ -1718,7 +1728,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     ]
   }
 
-  module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployContainerApps == true){
+  module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployContainerApps && !enablePublicAccessWithPerimeter) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
     params: {
@@ -1816,7 +1826,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     ]
   }
   
-  module privateDnsWebapp '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployWebApp == true){
+  module privateDnsWebapp '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployWebApp && !enablePublicAccessWithPerimeter){
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
     params: {
@@ -1831,7 +1841,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   }
 
   // Add RBAC for WebApp MSI to access other resources
-  module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(serviceSettingDeployWebApp==true) {
+  module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(serviceSettingDeployWebApp) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
     params: {
@@ -1848,7 +1858,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   // AZURE WEBAPP END
   
   // AZURE FUNCTION
-  module function '../modules/function.bicep' = if(serviceSettingDeployFunction==true) {
+  module function '../modules/function.bicep' = if(serviceSettingDeployFunction) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'Function4${deploymentProjSpecificUniqueSuffix}'
     params: {
@@ -1894,7 +1904,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   }
 
   // Add DNS zone configuration for the Azure Function private endpoint
-  module privateDnsFunction '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployFunction == true){
+  module privateDnsFunction '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployFunction && !enablePublicAccessWithPerimeter) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
     params: {
@@ -1908,7 +1918,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   }
 
   // Add RBAC for Function App MSI to access other resources
-  module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(serviceSettingDeployFunction==true) {
+  module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(serviceSettingDeployFunction) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'rbacForFunction${deploymentProjSpecificUniqueSuffix}'
     params: {
@@ -1957,7 +1967,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   //'https://*.ai.azure.com'
   //'https://*.ml.azure.com'
     
-  module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps==true) {
+  module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
     params: {
@@ -1987,7 +1997,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     ] 
   }
 
-  module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps==true) {
+  module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'aca-a-${deploymentProjSpecificUniqueSuffix}-depl'
     params: {
@@ -2037,7 +2047,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       containerAppsEnv
     ] 
   }
-  module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps==true) {
+  module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name:'aca-w-${deploymentProjSpecificUniqueSuffix}-depl' 
     params: {
@@ -2062,7 +2072,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     ]
   }
 
-  module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps==true) {
+  module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps) {
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'rbacForContainerAppsMI${deploymentProjSpecificUniqueSuffix}'
     params:{
@@ -2366,7 +2376,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
 
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 
-module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch==true && serviceSettingDeployAzureOpenAI==true) {
+module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch && serviceSettingDeployAzureOpenAI) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
   params:{

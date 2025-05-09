@@ -44,7 +44,12 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetName
   parent: vnet
 }
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = if(enablePurgeProtection){
+var rules = [for rule in keyvaultNetworkPolicySubnets: {
+  id: rule
+  ignoreMissingVnetServiceEndpoint: true
+}]
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: keyvaultName
   tags: tags
   location: location
@@ -54,49 +59,17 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = if(enablePurgeProtect
     enableRbacAuthorization: false       // Using RBAC
     enabledForDiskEncryption: false
     enableSoftDelete: true
-    softDeleteRetentionInDays:soft_delete_days // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
+    softDeleteRetentionInDays:enablePurgeProtection?soft_delete_days: null // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
     enablePurgeProtection: enablePurgeProtection
     publicNetworkAccess: ((enablePublicGenAIAccess && !empty(ipRules)) || enablePublicAccessWithPerimeter)?'Enabled':'Disabled'
-    //publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
+    // Above, if Disabled, will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
     tenantId: tenantIdentity
-    networkAcls: {
+    networkAcls: !enablePublicAccessWithPerimeter?{
       bypass: 'AzureServices'
       defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' 
       ipRules: ipRules
-      virtualNetworkRules: [for rule in keyvaultNetworkPolicySubnets: {
-        id: rule
-        ignoreMissingVnetServiceEndpoint: true // tomten false to true
-      }]
-    }
-    accessPolicies: accessPolicies
-    sku: {
-      name: 'standard'
-      family: 'A'
-    }
-  }
-}
-resource keyVault2 'Microsoft.KeyVault/vaults@2023-07-01' = if(!enablePurgeProtection){
-  name: keyvaultName
-  tags: tags
-  location: location
-  properties: {
-    enabledForDeployment: true          // VMs can retrieve certificates
-    enabledForTemplateDeployment: true  // ARM can retrieve values
-    enableRbacAuthorization: false       // Using RBAC
-    enabledForDiskEncryption: false
-    enableSoftDelete: false
-    enablePurgeProtection: false
-    publicNetworkAccess: 'Enabled' //'Disabled' This will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
-    tenantId: tenantIdentity
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Deny'
-      ipRules: ipRules
-      virtualNetworkRules: [for rule in keyvaultNetworkPolicySubnets: {
-        id: rule
-        ignoreMissingVnetServiceEndpoint: true // tomten false to true
-      }]
-    }
+      virtualNetworkRules: rules
+    }:null
     accessPolicies: accessPolicies
     sku: {
       name: 'standard'
@@ -118,7 +91,7 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
       {
         name: privateEndpointName
         properties: {
-          privateLinkServiceId: (enablePurgeProtection==true)? keyVault.id: keyVault2.id
+          privateLinkServiceId: keyVault.id
           groupIds: [
             'vault'
           ]
@@ -133,13 +106,13 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   }
 }
 
-output keyvaultId string = (enablePurgeProtection==true)? keyVault.id: keyVault2.id
-output keyvaultName string = (enablePurgeProtection==true)? keyVault.name: keyVault2.name
-output keyvaultUri string =(enablePurgeProtection==true)? keyVault.properties.vaultUri: keyVault2.properties.vaultUri
+output keyvaultId string = keyVault.id
+output keyvaultName string = keyVault.name
+output keyvaultUri string = keyVault.properties.vaultUri
 output dnsConfig array = [
   {
     name: pendKeyv.name
     type: 'vault'
-    id: (enablePurgeProtection==true)? keyVault.id: keyVault2.id
+    id: keyVault.id
   }
 ]

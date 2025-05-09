@@ -11,6 +11,7 @@ param subnetName string
 param restore bool
 param keyvaultName string
 param vnetResourceGroupName string
+param enablePublicAccessWithPerimeter bool = false
 
 var nameCleaned = toLower(replace(name, '-', ''))
 
@@ -23,6 +24,10 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetName
   parent: vnet
 }
+var rules = [for rule in vnetRules: {
+  id: rule
+  ignoreMissingVnetServiceEndpoint: true
+}]
 
 resource csAccountDocInt 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: name
@@ -36,18 +41,15 @@ resource csAccountDocInt 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
   properties: {
     customSubDomainName: nameCleaned
-    publicNetworkAccess: publicNetworkAccess? 'Enabled': 'Disabled'
+    publicNetworkAccess: publicNetworkAccess||enablePublicAccessWithPerimeter? 'Enabled': 'Disabled'
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
-    networkAcls: {
+    networkAcls: !enablePublicAccessWithPerimeter ? {
       //bypass:'AzureServices'
       defaultAction:'Deny'
-      virtualNetworkRules: [for rule in vnetRules: {
-        id: rule
-        ignoreMissingVnetServiceEndpoint: true
-      }]
+      virtualNetworkRules: rules
       ipRules: ipRules
-    }
+    }:null
   }
   
 }

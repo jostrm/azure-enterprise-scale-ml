@@ -20,6 +20,7 @@ param tags object
 param location string
 param vnetName string
 param vnetResourceGroupName string
+param enablePublicAccessWithPerimeter bool = false
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var policyOn = 'enabled' // 'disabled'
@@ -45,12 +46,13 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-pr
   }
   properties: {
     adminUserEnabled: true
-    networkRuleSet: {
+    networkRuleSet: !enablePublicAccessWithPerimeter ? {
       defaultAction: 'Deny'
       ipRules: []
-    }
+    }:null
     dataEndpointEnabled: false
-    networkRuleBypassOptions: 'AzureServices'
+    //networkRuleBypassOptions: !enablePublicAccessWithPerimeter? 'AzureServices': null
+    networkRuleBypassOptions:'AzureServices'
     policies: {
       quarantinePolicy: {
         status: policyOn
@@ -64,7 +66,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-pr
         type: 'Notary'
       }
     }
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: !enablePublicAccessWithPerimeter? 'Disabled': 'Enabled'
     zoneRedundancy: 'Disabled'
   }
 }

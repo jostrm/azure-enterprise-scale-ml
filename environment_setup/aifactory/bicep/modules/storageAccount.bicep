@@ -75,8 +75,12 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetName
   parent: vnet
 }
+var rules = [for rule in vnetRules:{
+  action: 'Allow'
+  id: rule
+}]
 
-resource sacc2 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGenAIAccess) {
+resource sacc2 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGenAIAccess||enablePublicAccessWithPerimeter) {
   name: storageAccountName
   tags: tags
   location: location
@@ -86,7 +90,7 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicG
   }
   properties:{
     accessTier: 'Hot'
-    publicNetworkAccess:'Enabled' //enablePublicAccessWithPerimeter?'Enabled':'Disabled'
+    publicNetworkAccess:'Enabled'
     allowCrossTenantReplication: true
     allowSharedKeyAccess: true
     allowBlobPublicAccess: false
@@ -121,15 +125,12 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicG
     }
     largeFileSharesState: 'Disabled'
     minimumTlsVersion: 'TLS1_2'
-    networkAcls: {
+    networkAcls: !enablePublicAccessWithPerimeter ? {
       bypass: 'AzureServices' 
-      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' 
-      virtualNetworkRules:[for rule in vnetRules:{
-        action: 'Allow'
-        id: rule
-      }]
+      defaultAction: 'Deny' 
+      virtualNetworkRules:rules
       ipRules:empty(ipRules)?[]:ipRules
-    }
+    }:null
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
     name: 'default'
@@ -208,14 +209,11 @@ resource sacc 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGe
     }
     largeFileSharesState: 'Disabled'
     minimumTlsVersion: 'TLS1_2'
-    networkAcls: {
+    networkAcls:{
       bypass: 'AzureServices' 
-      defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' 
-      virtualNetworkRules:[for rule in vnetRules:{
-        action: 'Allow'
-        id: rule
-      }]
-      //ipRules:empty(ipRules)?[]:ipRules
+      defaultAction: 'Deny' 
+      virtualNetworkRules:rules
+      ipRules:empty(ipRules)?[]:ipRules
     }
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
@@ -264,7 +262,7 @@ resource pendSaccBlob 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: blobPrivateEndpointName
         properties: {
-          privateLinkServiceId: sacc.id
+          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
           groupIds: [
             'blob'
           ]
@@ -291,7 +289,7 @@ resource pendSaccFile 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: filePrivateEndpointName
         properties: {
-          privateLinkServiceId: sacc.id
+          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
           groupIds: [
             'file'
           ]
@@ -318,7 +316,7 @@ resource pendSaccQ 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: queuePrivateEndpointName
         properties: {
-          privateLinkServiceId: sacc.id
+          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
           groupIds: [
             'queue'
           ]
@@ -345,7 +343,7 @@ resource pendSaccTable 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: tablePrivateEndpointName
         properties: {
-          privateLinkServiceId: sacc.id
+          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
           groupIds: [
             'table'
           ]
@@ -361,27 +359,27 @@ resource pendSaccTable 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
 }
 
 
-output storageAccountId string = sacc.id
-output storageAccountName string = sacc.name
+output storageAccountId string = !enablePublicGenAIAccess? sacc.id: sacc2.id
+output storageAccountName string = !enablePublicGenAIAccess? sacc.name: sacc2.name
 output dnsConfig array = [
   {
     name: pendSaccBlob.name
     type: 'blob'
-    id:sacc.id
+    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
   }
   {
     name: filePrivateEndpointName
     type: 'file'
-    id:sacc.id
+    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
   }
   {
     name: queuePrivateEndpointName
     type: 'queue'
-    id:sacc.id
+    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
   }
   {
     name: tablePrivateEndpointName
     type: 'table'
-    id:sacc.id
+    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
   }
 ]

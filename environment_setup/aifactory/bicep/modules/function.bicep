@@ -167,7 +167,7 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
 }
 
 // Create private endpoint
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(enablePublicAccessWithPerimeter==false) {
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(!enablePublicAccessWithPerimeter) {
   name: 'p-${name}-function'
   location: location
   tags: tags

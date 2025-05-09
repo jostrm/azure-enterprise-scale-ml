@@ -9,6 +9,7 @@ param location string
 
 param logWorkspaceName string
 param logWorkspaceNameRG string
+param enablePublicAccessWithPerimeter bool = false
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
   name: logWorkspaceName
   scope:resourceGroup(logWorkspaceNameRG)

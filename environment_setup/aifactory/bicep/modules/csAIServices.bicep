@@ -45,7 +45,10 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetName
   parent: vnet
 }
-
+var rules = [for rule in vnetRules: {
+  id: rule
+  ignoreMissingVnetServiceEndpoint: true
+}]
 resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: nameCleaned
   location: location
@@ -60,15 +63,12 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     restore: restore
     restrictOutboundNetworkAccess: false // publicNetworkAccess? false:true
     disableLocalAuth: disableLocalAuth
-    networkAcls: {
+    networkAcls: !enablePublicAccessWithPerimeter ? {
       bypass:'AzureServices'
       defaultAction: enablePublicAccessWithPerimeter? 'Allow':'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
-      virtualNetworkRules: [for rule in vnetRules: {
-        id: rule
-        ignoreMissingVnetServiceEndpoint: true
-      }]
+      virtualNetworkRules: rules
       ipRules: ipRules
-    }
+    }:null
   }
   identity: {
     type: 'SystemAssigned'
