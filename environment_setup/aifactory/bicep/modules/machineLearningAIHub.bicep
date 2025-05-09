@@ -248,9 +248,28 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
 }
 
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
-resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter == false) {
   name: aiHubDiagSettingName
-  scope: enablePublicAccessWithPerimeter ? aiHub2 : aiHub
+  scope: aiHub
+  properties: {
+    workspaceId: logWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+  }
+}
+
+@description('Azure Diagnostics: Azure AI Foundry hub 2 - allLogs')
+resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter == true) {
+  name: aiHubDiagSettingName
+  scope: aiHub2
   properties: {
     workspaceId: logWorkspace.id
     logs: [
