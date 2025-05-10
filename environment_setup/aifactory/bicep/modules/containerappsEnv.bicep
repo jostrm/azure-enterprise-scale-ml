@@ -18,6 +18,7 @@ param subnetNamePend string = ''
 param subnetAcaDedicatedName string
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
+param createPrivateEndpoint bool = true
 param wlProfileDedicatedName string = 'D4'
 param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 param wlMinCountServerless int = 0
@@ -89,7 +90,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing
   name: applicationInsightsName
 }
 
-resource pendAca 'Microsoft.Network/privateEndpoints@2022-01-01' = if(enablePublicAccessWithPerimeter==false) {
+resource pendAca 'Microsoft.Network/privateEndpoints@2022-01-01' = if(createPrivateEndpoint) {
   name: 'pend-acaenv-${name}'
   location: location
   properties: {
@@ -121,9 +122,9 @@ output id string = containerAppsEnvironment.id
 output name string = containerAppsEnvironment.name
 output dnsConfig array = [
   {
-    name: !enablePublicAccessWithPerimeter? pendAca.name: ''
+    name: createPrivateEndpoint? pendAca.name: ''
     type: 'azurecontainerapps'
-    id:!enablePublicAccessWithPerimeter? pendAca.id: ''
+    id:createPrivateEndpoint? pendAca.id: ''
   }
 ]
 

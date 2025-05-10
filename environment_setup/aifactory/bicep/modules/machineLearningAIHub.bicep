@@ -29,6 +29,7 @@ param centralDnsZoneByPolicyInHub bool
 param allowPublicAccessWhenBehindVnet bool=false
 param enablePublicGenAIAccess bool=false
 param enablePublicAccessWithPerimeter bool = false
+param createPrivateEndpoint bool = true
 param aiSearchName string
 param aifactorySalt string
 param privateLinksDnsZones object
@@ -186,7 +187,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
     allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode:'Disabled' //'Disabled' meaning no restrictions
+      isolationMode:'AllowInternetOutbound' //'Disabled' meaning no restrictions
       enableNetworkMonitor:false
     }
   }
@@ -724,7 +725,7 @@ resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023
 }
 
 // privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
-resource pendAIHub2 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePublicAccessWithPerimeter==true) {
+resource pendAIHub2 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePublicAccessWithPerimeter && createPrivateEndpoint) {
   name: privateEndpointName
   location: location
   tags: tags
@@ -752,7 +753,7 @@ resource pendAIHub2 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enableP
   }
 }
 
-resource privateEndpointDns2 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false && enablePublicAccessWithPerimeter==true) {
+resource privateEndpointDns2 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && enablePublicAccessWithPerimeter && createPrivateEndpoint) {
   name: '${pendAIHub2.name}DnsZone'
   parent: pendAIHub2
   properties:{
@@ -779,29 +780,3 @@ output name string =(enablePublicAccessWithPerimeter==false)? aiHub.name:aiHub2.
 output principalId string = (enablePublicAccessWithPerimeter==false)?aiHub.identity.principalId:aiHub2.identity.principalId
 output projectPrincipalId string = (enablePublicAccessWithPerimeter==false)? aiProject.identity.principalId:aiProject2.identity.principalId
 output aiProjectName string = (enablePublicAccessWithPerimeter==false)? aiProject.name: aiProject2.name
-
-/*
-@description('Assign the online endpoint the ability to read connections from AI Project. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectEPConnections 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: aiProject
-  name: guid(aiProject.id, aiProject::endpoint.id, amlConnectionReaderRole.id)
-  properties: {
-    roleDefinitionId: amlConnectionReaderRole.id
-    principalType: 'ServicePrincipal'
-    principalId: aiProject::endpoint.identity.principalId
-  }
-}
-*/
-
-/*
-@description('Assign the online endpoint the ability to write metrics. This is needed to enable monitoring and logging to the prompt flow from the managed endpoint.')
-resource projectEPMetricsWriter 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: aiProject
-  name: guid(aiProject.id, aiProject::endpoint.id, amlMetricsWriterRole.id)
-  properties: {
-    roleDefinitionId: amlMetricsWriterRole.id
-    principalType: 'ServicePrincipal'
-    principalId: aiProject::endpoint.identity.principalId
-  }
-}
-*/

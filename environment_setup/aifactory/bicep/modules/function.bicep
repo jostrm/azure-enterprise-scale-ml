@@ -11,6 +11,7 @@ param sku object = {
 param appSettings array = []
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
+param createPrivateEndpoint bool = true
 param vnetName string
 param vnetResourceGroupName string
 param subnetNamePend string
@@ -167,7 +168,7 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
 }
 
 // Create private endpoint
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(!enablePublicAccessWithPerimeter) {
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(createPrivateEndpoint) {
   name: 'p-${name}-function'
   location: location
   tags: tags
@@ -200,8 +201,8 @@ output defaultHostname string = functionApp.properties.defaultHostName
 output principalId string = functionApp.identity.principalId
 output dnsConfig array = [
   {
-    name: !enablePublicAccessWithPerimeter ? privateEndpoint.name : ''
+    name: createPrivateEndpoint ? privateEndpoint.name : ''
     type: 'azurewebapps'
-    id: !enablePublicAccessWithPerimeter ? privateEndpoint.id : ''
+    id: createPrivateEndpoint ? privateEndpoint.id : ''
   }
 ]

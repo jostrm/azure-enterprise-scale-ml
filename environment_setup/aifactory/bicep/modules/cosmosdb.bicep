@@ -5,6 +5,7 @@ param tags object
 param vNetRules array = []
 param ipRules array = []
 param enablePublicGenAIAccess bool = false
+param createPrivateEndpoint bool = true
 param corsRules array = []
 @allowed(['Serverless', 'Provisioned'])
 param capacityMode string = 'Serverless'
@@ -128,7 +129,7 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
     } : {}
   }
 }
-resource pendCosmos 'Microsoft.Network/privateEndpoints@2022-01-01' = if(enablePublicAccessWithPerimeter==false) {
+resource pendCosmos 'Microsoft.Network/privateEndpoints@2022-01-01' = if(createPrivateEndpoint) {
   name: 'pend-cosmosdb-sql-${name}'
   location: location
   properties: {
@@ -160,9 +161,9 @@ output id string = cosmos.id
 output name string = cosmos.name
 output dnsConfig array = [
   {
-    name: !enablePublicAccessWithPerimeter? pendCosmos.name: ''
+    name: createPrivateEndpoint? pendCosmos.name: ''
     type: 'cosmosdbnosql'
-    id:!enablePublicAccessWithPerimeter? pendCosmos.id: ''
+    id:createPrivateEndpoint? pendCosmos.id: ''
   }
 ]
 
