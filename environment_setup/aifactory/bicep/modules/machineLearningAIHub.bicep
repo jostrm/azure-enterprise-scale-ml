@@ -197,8 +197,10 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
       category: 'AzureOpenAI'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      //peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      //peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peRequirement: 'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: 'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -214,8 +216,10 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
       category: 'AIServices'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      //peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      //peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peRequirement: 'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: 'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -233,7 +237,9 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
       category: 'CognitiveSearch'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      //peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      peRequirement: 'Required'
+      peStatus: 'Active'
       target: 'https://${aiSearch.name}.search.windows.net/'
       metadata: {
         ApiType: 'Azure'
