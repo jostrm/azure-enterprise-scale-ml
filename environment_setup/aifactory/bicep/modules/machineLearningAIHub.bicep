@@ -209,6 +209,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
           }
           status: 'Active'
         }
+        /*
         AmlWorkspace: {
           type: 'PrivateEndpoint'
           destination: {
@@ -219,6 +220,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
           }
           status: 'Active'
         }
+        */
         SaBlob: {
           type: 'PrivateEndpoint'
           destination: {
