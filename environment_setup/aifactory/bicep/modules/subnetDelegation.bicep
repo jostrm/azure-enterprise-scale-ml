@@ -14,7 +14,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-05-01' existing = {
 }
 
 // First module - Get subnet properties
-module existingSubnet 'subnetGetProps.bicep' = {
+module existingSnet 'subnetGetProps.bicep' = {
   name: 'get-snet-props-${uniqueString(deployment().name)}'
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -28,23 +28,23 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   parent: vnet
   name: subnetName
   properties: {
-    addressPrefix: !empty(addressPrefix) ? addressPrefix : (!empty(existingAddressPrefix) ? existingAddressPrefix : existingSubnet.outputs.addressPrefix)
-    serviceEndpoints: !empty(serviceEndpoints) ? serviceEndpoints : existingSubnet.outputs.serviceEndpoints
-    routeTable: !empty(existingSubnet.outputs.routeTableId)?{
-      id:existingSubnet.outputs.routeTableId
+    addressPrefix: !empty(addressPrefix) ? addressPrefix : (!empty(existingAddressPrefix) ? existingAddressPrefix : existingSnet.outputs.addressPrefix)
+    serviceEndpoints: !empty(serviceEndpoints) ? serviceEndpoints : existingSnet.outputs.serviceEndpoints
+    routeTable: !empty(existingSnet.outputs.routeTableId)?{
+      id:existingSnet.outputs.routeTableId
     }:null
-    networkSecurityGroup: !empty(existingSubnet.outputs.networkSecurityGroupId)?{
-      id:existingSubnet.outputs.networkSecurityGroupId
+    networkSecurityGroup: !empty(existingSnet.outputs.networkSecurityGroupId)?{
+      id:existingSnet.outputs.networkSecurityGroupId
     }:null
-    natGateway: !empty(existingSubnet.outputs.natGatewayId)?{
-      id:existingSubnet.outputs.natGatewayId
+    natGateway: !empty(existingSnet.outputs.natGatewayId)?{
+      id:existingSnet.outputs.natGatewayId
     }:null
     delegations: delegations
-    privateEndpointNetworkPolicies: (existingSubnet.outputs.privateEndpointNetworkPolicies!='Disabled')?existingSubnet.outputs.privateEndpointNetworkPolicies:'Disabled' //  (Disabled:recommended for most cases):securely connect to private endpoints without being blocked by NSGs
-    privateLinkServiceNetworkPolicies:(existingSubnet.outputs.privateLinkServiceNetworkPolicies!='Enabled')?existingSubnet.outputs.privateLinkServiceNetworkPolicies :'Enabled' //  (default setting):NSG rules are applied to private link services
+    privateEndpointNetworkPolicies: (existingSnet.outputs.privateEndpointNetworkPolicies!='Disabled')?existingSnet.outputs.privateEndpointNetworkPolicies:'Disabled' //  (Disabled:recommended for most cases):securely connect to private endpoints without being blocked by NSGs
+    privateLinkServiceNetworkPolicies:(existingSnet.outputs.privateLinkServiceNetworkPolicies!='Enabled')?existingSnet.outputs.privateLinkServiceNetworkPolicies :'Enabled' //  (default setting):NSG rules are applied to private link services
   }
   dependsOn:[
-    existingSubnet
+    existingSnet
   ]
 }
 
