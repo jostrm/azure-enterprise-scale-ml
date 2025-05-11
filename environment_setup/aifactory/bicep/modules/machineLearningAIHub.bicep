@@ -189,6 +189,28 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutbound' //'Disabled' meaning no restrictions
       enableNetworkMonitor:false
+      outboundRules: {
+        search: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: aiSearch.id
+            subresourceTarget: 'searchService'
+            sparkEnabled: false
+            sparkStatus: 'Inactive'
+          }
+        } 
+        OpenAI: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: aiServices.id
+            subresourceTarget: 'account'
+            sparkEnabled: false
+            sparkStatus: 'Active'
+          }
+          status: 'Active'
+        }
+      }
+      
     }
   }
   resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter==true) {
