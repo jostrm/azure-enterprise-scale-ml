@@ -1190,7 +1190,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
           'OPTIONS'
           'PATCH'
         ]
-        maxAgeInSeconds: 1800
+        maxAgeInSeconds: 2520
         exposedHeaders: [
           '*'
         ]
@@ -1331,7 +1331,7 @@ module sacc '../modules/storageAccount.bicep' = {
           'OPTIONS'
           'PATCH'
         ]
-        maxAgeInSeconds: 1800
+        maxAgeInSeconds: 2520
         exposedHeaders: [
           '*'
         ]
@@ -1650,7 +1650,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
           'x-ms-copy-status'
           'x-ms-copy-progress'
         ]
-        maxAgeInSeconds: 1800
+        maxAgeInSeconds: 2520
       }
     ]
   }
