@@ -209,6 +209,36 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
           }
           status: 'Active'
         }
+        AmlWorkspace: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: resourceId('Microsoft.MachineLearningServices/workspaces', name)
+            subresourceTarget: 'amlworkspace'
+            sparkEnabled: true
+            sparkStatus: 'Active'
+          }
+          status: 'Active'
+        }
+        SaBlob: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: existingStorageAccount.id
+            subresourceTarget: 'blob'
+            sparkEnabled: true
+            sparkStatus: 'Active'
+          }
+          status: 'Active'
+        }
+        SaFile: {
+          type: 'PrivateEndpoint'
+          destination: {
+            serviceResourceId: existingStorageAccount.id
+            subresourceTarget: 'file'
+            sparkEnabled: true
+            sparkStatus: 'Active'
+          }
+          status: 'Active'
+        }
       }
       
     }
