@@ -50,10 +50,22 @@ Usage: You can fork it, or use it as a submodule in your own repo.
 -	`Microsoft: AI Factory (Well-architected framework)` documentation : WAF AI workload - Well-architected Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/well-architected/ai/personas
     
-## Feature Roadmap
+## Feature Roadmap & Next Release: 1.21
+- **Next Release: 1.21** will include below up until 2024-05
+- **Current release 1.20** includes all Done up until 2024-04
 
+Ongoing<br>
+- **BYOAppServiceEnv**: Deploy Azure function, Azure WebApp as usual via AIFactory, but connect to your own App services environment
+    - STATUS: Ongoing (2025-05)
+- **PostGreSQL (flexible servers), SQL Database, Redis Cache**: Add more Database engines, optionally to choose from
+    - STATUS: Ongoing (2025-05)
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
-    - STATUS: Ongoing (2025-03)
+    - STATUS: Ongoing (2025-05)
+
+Done<br>
+- **AI Gateway**: Integrate AI Gateway (AI Hub gateway, with advancede cross-charging reports) including networking, to AI Factory common area.
+    - STATUS: Done (2025-04)
+        - https://github.com/Azure-Samples/ai-hub-gateway-solution-accelerator/blob/main/guides/bring-your-own-network.md
 - **Networking Access modes**: Adding a new mode for GenAI project type called `enablePublicAccessWithPerimeter`
     - With the new mode, the total is 5 ways for user access:
         - 1) `private-peered` (top recommendation)
@@ -61,13 +73,15 @@ Usage: You can fork it, or use it as a submodule in your own repo.
         - 3) `private-standalone with public IP-whitelisting` (DEMO option, or if you cannot to Hub-peering, or cannot use VPN)
         - 4) `private-standalone/peered with Azure Bastion` (only for admin, a few users, trouble shooting. Not recommended for end-users)
         - 5) `public-secure perimeter with conditional-access`(If you cannot do: Hub-peering, VPN, cannot work with IP-whitelisting due to split-tunneling/dynamic IP)
-    - STATUS: Ongoing (2025-03)
+    - STATUS: Done (2025-04)
 - **Exposing on/off for more services in GENAI type**: Base parameter file `31-esgenai-default.json` to include more true/false flags if to create the following services: `Container Apps, App Service/WebApp, Function App, Bing, CosmosDB, Azure Dashboard for Apps`.
     - [Go here for full list of services and on/off](./documentation/v2/20-29/24-configure-AIfactory-project.md)
     - STATUS: Completed (2025-03)
-- **BYOVnet**: Bring your own vNet in a separate resource group, instead of having the AI Factory create it.
+- **BYOVnet + BYOsubnets**: Bring your own vNet in a separate resource group,  instead of having the AI Factory create it. Also BYOsubnets.
     - STATUS: Completed (2024-05)
 - **Shared Container Registry**: Optional flag, saving 30% run/idle cost per use case, by sharing container registry across Azure ML workspaces/Azure AI foundry
+    - STATUS: Completed (2024-08)
+- **Azure ContainerApps (with Env), Bing Search, CosmosDB, Azure OpenAI standalone**: Added. All are optional with feature flags (true/false)
     - STATUS: Completed (2024-08)
 
  See [Feature list for all features](./documentation/v2/10-19/11-architecture-diagrams.md)
