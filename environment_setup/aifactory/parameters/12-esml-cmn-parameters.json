@@ -23,6 +23,9 @@
         "common_bastion_subnet_cidr": {
 			"value": "10.XX.33.0/26"
 		},
+		"deployAIGatewayNetworking": {
+			"value": false
+		},
 		"ai_gateway_app_cidr": {
 			"value": "10.XX.33.64/27"
 		},
