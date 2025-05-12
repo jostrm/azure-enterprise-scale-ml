@@ -33,7 +33,7 @@
 			"value": "10.XX.33.64/27"
 		},
 		"ai_gateway_apim_cidr": {
-			"value": "10.XX.33.96/22"
+			"value": "10.XX.34.0/22"
 		}
     }
 }
