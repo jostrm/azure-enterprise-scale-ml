@@ -27,9 +27,11 @@ param privateEndpointNetworkPolicies string = 'Disabled'
 param privateLinkServiceNetworkPolicies string = 'Enabled'
 
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
-param centralDnsZoneByPolicyInHub bool = false // TODO: jåaj - add ROUTING tables from HUB
+param centralDnsZoneByPolicyInHub bool = false
+param routeTableId string = ''
+param natGatewayId string = ''
 
-resource snt 'Microsoft.Network/virtualNetworks/subnets@2020-06-01' = {
+resource snt 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   name: '${virtualNetworkName}/${name}'
   properties: {
     addressPrefix: addressPrefix
@@ -47,10 +49,15 @@ resource snt 'Microsoft.Network/virtualNetworks/subnets@2020-06-01' = {
       }]
     privateEndpointNetworkPolicies: privateEndpointNetworkPolicies
     privateLinkServiceNetworkPolicies: privateLinkServiceNetworkPolicies
-    //routeTable: // TODO if centralDnsZoneByPolicyInHub=true
+    routeTable: !empty(routeTableId) ? {
+      id: routeTableId
+    } : null
     networkSecurityGroup: {
       id: nsgId
     }
+    natGateway: !empty(natGatewayId)?{
+      id:natGatewayId
+    }:null
   }
 }
 

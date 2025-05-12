@@ -60,6 +60,9 @@ param subnetProjACA string = ''
 param DOCS_byovnet_example string = ''
 param DOCS_byosnet_common_example string = ''
 param DOCS_byosnet_project_example string = ''
+param deployAIGatewayNetworking bool = false // If true, deploys the AI Gateway networking also
+param ai_gateway_apim_cidr string = ''
+param ai_gateway_app_cidr string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
@@ -67,23 +70,25 @@ var common_subnet_cidr_v = replace(common_subnet_cidr,'XX',cidr_range)
 var common_pbi_subnet_cidr_v = replace(common_pbi_subnet_cidr,'XX',cidr_range)
 var common_bastion_subnet_cidr_v = replace(common_bastion_subnet_cidr,'XX',cidr_range)
 var common_subnet_scoring_cidr_v = replace(common_subnet_scoring_cidr,'XX',cidr_range)
+var ai_gateway_apim_cidr_v = deployAIGatewayNetworking? replace(ai_gateway_apim_cidr,'XX',cidr_range): ''
+var ai_gateway_app_cidr_v = deployAIGatewayNetworking? replace(ai_gateway_app_cidr,'XX',cidr_range):''
+
 var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // esml-common-weu-dev-002 // esml-common-weu-dev-002 // DEPENDENCIES - should exist
 
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
 var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001 @
+
+var vNetRGsalt = substring(uniqueString(vnetResourceGroup.id), 0, 5)
+var commmonRGsalt = substring(uniqueString(commonResourceGroupName), 0, 5)
+var uniqueDetermenistic = '${commmonRGsalt}${vNetRGsalt}'
 
 resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
   name: vnetResourceGroupName
   scope:subscription(subscriptionIdDevTestProd)
 }
 
-resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
-  name: commonResourceGroupName
-  scope:subscription(subscriptionIdDevTestProd)
-}
-
 module nsgCommon '../modules-common/nsgCommon.bicep' = {
-  name: 'nsg-${common_subnet_name}-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
+  name: 'nsg-${common_subnet_name}-depl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}'
@@ -94,7 +99,7 @@ module nsgCommon '../modules-common/nsgCommon.bicep' = {
 }
 
 module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
-  name: 'nsg-${common_subnet_name}-scoring-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
+  name: 'nsg-${common_subnet_name}-scoring-depl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}-scoring'
@@ -110,7 +115,7 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
 var ipWhitelist_array = empty(IPwhiteList) ? [] : array(split(replace(IPwhiteList, '\\s+', ''), ','))
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = if(empty(ipWhitelist_array)==false){
-  name: 'nsg-${common_bastion_subnet_name}-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
+  name: 'nsg-${common_bastion_subnet_name}-depl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
@@ -123,7 +128,7 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = if(empty(ipWhitelist_ar
   ]
 }
 module nsgBastionNoWhitelist '../modules-common/nsgBastionNoWhitelist.bicep' = if(empty(ipWhitelist_array)){
-  name: 'nsg-${common_bastion_subnet_name}-NoWLdepl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
+  name: 'nsg-${common_bastion_subnet_name}-NoWLdepl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
@@ -138,7 +143,7 @@ module nsgBastionNoWhitelist '../modules-common/nsgBastionNoWhitelist.bicep' = i
 
 module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
   scope: vnetResourceGroup
-  name: 'nsg-${common_pbi_subnet_name}-depl${commonRGNamePrefix}${aifactorySuffixRG}${locationSuffix}${env}'
+  name: 'nsg-${common_pbi_subnet_name}-depl${uniqueDetermenistic}'
   params: {
     name: 'nsg-${common_pbi_subnet_name}'
     tags: tags
@@ -150,7 +155,7 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
 }
 module vNetCommon '../modules-common/vNetCommon.bicep' = {
   scope: vnetResourceGroup
-  name: '${vnetNameFull}depl${commonRGNamePrefix}${locationSuffix}${env}'
+  name: '${vnetNameFull}depl${uniqueDetermenistic}'
   params: {
     location: location
     common_pbi_subnet_cidr: common_pbi_subnet_cidr_v
@@ -170,6 +175,35 @@ module vNetCommon '../modules-common/vNetCommon.bicep' = {
     nsgBastion
     nsgPBI
     nsgCommonScoring
+  ]
+}
+
+//var aiGwNetworkingName = 'ai-gateway-${locationSuffix}-${env}-${commonResourceSuffix}'
+var aiGwNetworkingName = 'ai-gateway'
+module aiGatewayNetworking '../ai-gateway/14-add-networking-aigw.bicep' = if(deployAIGatewayNetworking){
+  name: 'ai-gateway-networking-${uniqueDetermenistic}'
+  scope: vnetResourceGroup
+  params: {
+    name: aiGwNetworkingName
+    location: location
+    tags: tags
+    aifactorySuffixRG: aifactorySuffixRG
+    commonResourceSuffix: commonResourceSuffix
+    commonRGNamePrefix: commonRGNamePrefix
+    env: env
+    locationSuffix: locationSuffix
+    subscriptionIdDevTestProd: subscriptionIdDevTestProd
+    vnetName: vnetNameFull
+    vnetNameBase: vnetNameBase
+    network_env: network_env
+    vnetNameFull_param: vnetNameFull_param
+    vnetResourceGroup_param: vnetResourceGroup_param
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+    CIDRApim: ai_gateway_apim_cidr_v
+    CIDRFunctionApp: ai_gateway_app_cidr_v  
+  }
+  dependsOn:[
+    vNetCommon
   ]
 }
 

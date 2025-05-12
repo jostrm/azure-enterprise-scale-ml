@@ -22,6 +22,12 @@
 		},
         "common_bastion_subnet_cidr": {
 			"value": "10.XX.33.0/26"
+		},
+		"ai_gateway_app_cidr": {
+			"value": "10.XX.33.64/27"
+		},
+		"ai_gateway_apim_cidr": {
+			"value": "10.XX.33.96/22"
 		}
     }
 }
