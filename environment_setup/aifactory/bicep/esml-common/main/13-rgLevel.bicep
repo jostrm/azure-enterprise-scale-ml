@@ -18,7 +18,7 @@ param adminPassword string
 param adminUsername string
 @description('Log analytics can only add search queries in BICEP once, otherwise will give error 2nd time, entry key already exists')
 param enableLogAnalyticsQueries bool = true
-
+param deployOnlyAIGatewayNetworking bool = false
 param vmSKUSelectedArrayIndex int = 0
 param vmSKU array = [
   'Standard_E2s_v3'
@@ -395,7 +395,7 @@ var privateLinksDnsZonesArray = [
 ]
 
 
-module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = if(!centralDnsZoneByPolicyInHub) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'PrivDnsZonesIfNotExistsCmn-${uniqueInAIFenv}'
   params: {
@@ -413,7 +413,7 @@ module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bic
 }
 
 var acrCommonName = 'acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}'
-module acrCommon '../../modules/containerRegistry.bicep' ={
+module acrCommon '../../modules/containerRegistry.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: 'CommonACR4CommonRG${uniqueInAIFenv}'
   params: {
@@ -431,7 +431,7 @@ module acrCommon '../../modules/containerRegistry.bicep' ={
     esmlCommonResourceGroup
   ]
 }
-module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: 'privDnsCommonACR${uniqueInAIFenv}'
   params: {
@@ -447,7 +447,7 @@ module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(c
 
 // Log analytics WORKSPACE (dev,test,prod - 3 in the AI Factory, one per landingzone/environment)
 var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep' = {
+module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: 'LogAnCmn4${uniqueInAIFenv}'
   params: {
@@ -463,8 +463,8 @@ module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep
   ]
 }
 
-module wsQueries '../../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyticsQueries == true){
-  scope: esmlCommonResourceGroup //resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+module wsQueries '../../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyticsQueries && !deployOnlyAIGatewayNetworking) {
+  scope: esmlCommonResourceGroup
   name: 'logAnalyticsCmnQs${uniqueInAIFenv}'
   params: {
     logAnalyticsName:laName
@@ -476,7 +476,7 @@ module wsQueries '../../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyti
 
 
 var adfName = 'adf-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}' // globally unique: adf-cmn-weu-prod-1234-004 (25/63)
-module adf '../../modules/dataFactory.bicep' = if(sweden_central_adf_missing== false) {
+module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'DataFactoryCmn${uniqueInAIFenv}'
   params: {
@@ -505,13 +505,13 @@ resource subnetCommonDefaultResource 'Microsoft.Network/virtualNetworks/subnets@
 }
 
 var bastion_subnet_name = 'AzureBastionSubnet'
-resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = if(addBastionHost == true) {
+resource subnetBastion 'Microsoft.Network/virtualNetworks/subnets@2021-05-01' existing = if(addBastionHost && !deployOnlyAIGatewayNetworking) {
   name:'${vnetId}/${bastion_subnet_name}'
   scope: esmlCommonResourceGroup
 }
 
 var common_bastion_host_name = 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'
-module bastionHost '../modules-common/bastionHostCommon.bicep' = if(addBastionHost == true) { 
+module bastionHost '../modules-common/bastionHostCommon.bicep' = if(addBastionHost && !deployOnlyAIGatewayNetworking) { 
   scope: esmlCommonResourceGroup
   name: 'common_bastion-depl${uniqueInAIFenv}'
   params: {
@@ -528,7 +528,7 @@ module bastionHost '../modules-common/bastionHostCommon.bicep' = if(addBastionHo
 
 var kvNameCommonNoDash = replace(kvNameCommon,'-','')
 
-module kvCmn '../../modules/keyVault.bicep' = {
+module kvCmn '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: '${kvNameCommonNoDash}-depl-${uniqueInAIFenv}'
   params: {
@@ -577,7 +577,7 @@ var secretAll = {
 }
 
 // AzureDatabricks - if set, and if this EnterpriseApplication already exists (can be that a project needs to be provisoned first..)
-module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(databricksOID != null) {
+module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!empty(databricksOID) && !deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'spDBXAPGet${uniqueInAIFenv}'
   params: {
@@ -592,11 +592,11 @@ module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if
   ]
 }
 // Note: az keyvault update  --name msft-weu-dev-cmnai-kv --enabled-for-template-deployment true
-resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = if(!deployOnlyAIGatewayNetworking){
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription,inputKeyvaultResourcegroup)
 }
-module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = {
+module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'spCmnAPGet${uniqueInAIFenv}'
   params: {
@@ -611,7 +611,7 @@ module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = {
     spDatabricksAccessPolicyGet
   ]
 }
-module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(sweden_central_adf_missing== false) {
+module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'adfAPGet${uniqueInAIFenv}'
   params: {
@@ -628,7 +628,7 @@ module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(sweden_c
     spCmnAccessPolicyGet
   ]
 }
-module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = {
+module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'kvCmnAPTechContact${uniqueInAIFenv}'
   params: {
@@ -646,7 +646,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bi
   ]
 }
 
-module addSecret '../modules-common/kvSecretsCmn.bicep' = {
+module addSecret '../modules-common/kvSecretsCmn.bicep' = if(!deployOnlyAIGatewayNetworking){
   name: '${kvNameCommonNoDash}sec${uniqueInAIFenv}'
   scope: esmlCommonResourceGroup
   params: {
@@ -666,7 +666,7 @@ module addSecret '../modules-common/kvSecretsCmn.bicep' = {
 }
 
 var kvAdminNoDash = replace(kvNameCommonAdmin,'-','')
-module kvAdmin '../../modules/keyVault.bicep' = {
+module kvAdmin '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}${uniqueInAIFenv}'
   params: {
@@ -694,7 +694,7 @@ module kvAdmin '../../modules/keyVault.bicep' = {
     subnetCommonDefaultResource
   ]
 }
-module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = {
+module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}AP${uniqueInAIFenv}' 
   params: {
@@ -708,14 +708,14 @@ module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.
     kvAdmin
   ]
 }
-module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = {
+module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}AP2${uniqueInAIFenv}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommonAdmin
     policyName: 'add'
-    principalId: externalKv.getSecret(commonServicePrincipleOIDKey) //commonServicePrincipleOID
+    principalId: externalKv.getSecret(commonServicePrincipleOIDKey)
     additionalPrincipalIds:[]
   }
   dependsOn: [
@@ -724,7 +724,7 @@ module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = {
   ]
 }
 
-module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(sweden_central_adf_missing== false) {
+module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}APadf${uniqueInAIFenv}'
   params: {
@@ -749,7 +749,7 @@ var virtualNetworkRules2Add = [
     state: 'succeeded'
   }
 ]
-module dataLake '../../modules/dataLake.bicep' = {
+module dataLake '../../modules/dataLake.bicep' = if(!deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: '${datalakeName}${uniqueInAIFenv}'
   params: {
@@ -775,7 +775,7 @@ module dataLake '../../modules/dataLake.bicep' = {
   ]
 }
 
-module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM == true) {
+module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM && !deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'privateVirtualMachine${uniqueInAIFenv}'
   params: {
@@ -797,7 +797,7 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM 
   ]
 }
 
-module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+module privateDnsDatalake '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneAndLinkLake2${uniqueInAIFenv}'
   params: {
@@ -810,7 +810,7 @@ module privateDnsDatalake '../../modules/privateDns.bicep' = if(centralDnsZoneBy
 }
 
 
-module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneAndLinkKeyVaultCmn2${uniqueInAIFenv}'
   params: {
@@ -823,7 +823,7 @@ module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(centralDnsZon
   ]
 }
 
-module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneKVCmnAdmin2${uniqueInAIFenv}'
   params: {
@@ -836,7 +836,7 @@ module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(centralDnsZ
   ]
 }
 
-module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub==false){
+module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneADFCmn2${uniqueInAIFenv}'
   params: {
