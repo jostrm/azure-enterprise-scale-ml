@@ -61,6 +61,7 @@ param DOCS_byovnet_example string = ''
 param DOCS_byosnet_common_example string = ''
 param DOCS_byosnet_project_example string = ''
 param deployAIGatewayNetworking bool = false // If true, deploys the AI Gateway networking also
+param deployOnlyAIGatewayNetworking bool = false
 param ai_gateway_apim_cidr string = ''
 param ai_gateway_app_cidr string = ''
 

@@ -132,14 +132,14 @@ resource functionAppNSG 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       {
-        name: 'Allow-AppInsights'
+        name: 'Allow-AppInsights-AzureMonitor'
         properties: {
           description: 'Allow access to Application Insights'
           protocol: 'Tcp'
           sourcePortRange: '*'
-          destinationPortRange: '443'
+          destinationPortRanges: ['1886', '443']
           sourceAddressPrefix: '*'
-          destinationAddressPrefix: 'ApplicationInsights'
+          destinationAddressPrefix: 'AzureMonitor'
           access: 'Allow'
           priority: 130
           direction: 'Outbound'
