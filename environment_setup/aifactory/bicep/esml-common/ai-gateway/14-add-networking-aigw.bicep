@@ -35,10 +35,10 @@ var commmonRGsalt = substring(uniqueString(commonResourceGroupName), 0, 5)
 var uniqueDetermenistic = '${commmonRGsalt}${vNetRGsalt}'
 
 module nsgAIGateway '../modules-common/nsgAIGateway.bicep' = {
-  name: 'depl-aigw-nsg-${name}-${uniqueDetermenistic}'
+  name: 'depl-aigw-apim-nsg-${name}-${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
-    name: 'nsg-${name}'
+    name: 'nsg-${name}-apim'
     tags: tags
     location:location
   }
@@ -109,10 +109,10 @@ var functionAppSubnetSettings =   {
 }
 
 module nsgFunctionApp '../modules-common/nsgFunctionApp.bicep' = {
-  name: 'depl-aigw-nsg-${name}-${uniqueDetermenistic}'
+  name: 'depl-aigw-func-nsg-${name}-${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
-    name: 'nsg-${name}'
+    name: 'nsg-${name}-function-app'
     tags: tags
     location:location
   }
