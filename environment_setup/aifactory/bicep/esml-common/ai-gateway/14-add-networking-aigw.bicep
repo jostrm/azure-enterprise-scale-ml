@@ -87,6 +87,8 @@ module subnetApimAIGw '../../modules/subnetWithNsg.bicep' = {
   }
   dependsOn: [
     vnetResourceGroup
+    nsgAIGateway
+    routeTableAIGateway
   ]
 }
 
@@ -131,6 +133,6 @@ module subnetFunctionApp '../../modules/subnetWithNsg.bicep' = {
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
   dependsOn: [
-    vnetResourceGroup
+    subnetApimAIGw
   ]
 }
