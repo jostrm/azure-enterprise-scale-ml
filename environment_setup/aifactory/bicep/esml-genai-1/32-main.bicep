@@ -140,7 +140,7 @@ param serviceSettingOverrideRegionAzureAISearchShort string = ''
 @description('Service setting:Deploy Azure AI Search')
 param serviceSettingDeployAzureAISearch bool = true
 @description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in AI hub mode, with AIServices and 1 project')
-param serviceSettingEnableAIHubPreview bool = false
+param serviceSettingEnableAIFoundryPreview bool = false
 
 // ### TRUE as default - END ###
 
@@ -2201,59 +2201,24 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
   
 }
 
+var aifName ='aif-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifProjectName ='aif-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(serviceSettingEnableAIFoundryPreview) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AIFoundryPrevview4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: aifName
+    projectName: aifProjectName
+    enablePublicAccessWithPerimeter:true
+    //location: location
+  }
+}
+
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
 var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 module aiHub '../modules/machineLearningAIHub.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: aiHubName
-    location: location
-    tags: projecttags
-    aifactorySuffix: aifactorySuffixRG
-    applicationInsightsName: applicationInsightSWC.outputs.name
-    containerRegistry: useCommonACR? acrCommon2.outputs.containerRegistryId:acr.outputs.containerRegistryId
-    acrName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
-    acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
-    env: env
-    keyVaultName: kv1.outputs.keyvaultName
-    privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
-    aifactoryProjectNumber: projectNumber
-    storageAccount: sacc.outputs.storageAccountId
-    storageAccountName: sacc.outputs.storageAccountName
-    subnetName: defaultSubnet
-    vnetName: vnetNameFull
-    vnetResourceGroupName: vnetResourceGroupName
-    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
-    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    enablePublicGenAIAccess:enablePublicGenAIAccess
-    aiSearchName: aiSearchService.outputs.aiSearchName
-    privateLinksDnsZones: privateLinksDnsZones
-    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
-    kindAIHub:'Hub'
-    aiServicesName: aiServices.outputs.name
-    logWorkspaceName:logAnalyticsWorkspaceOpInsight.name
-    logWorkspaceResoureGroupName:commonResourceGroup
-    locationSuffix:locationSuffix
-    resourceSuffix:resourceSuffix
-    aifactorySalt: uniqueInAIFenv
-    ipRules: empty(processedIpRulesAIHub) ? [] : processedIpRulesAIHub
-    //value:ip // Invalid","target":"workspaceDto","message":"IP allowlist contains one or more invalid IP address masks, or exceeds maximum of 200 entries.
-    // ValidationError: workspaceDto: Can't enable network monitor in region: francecentral
-    ipWhitelist_array: empty(ipWhitelist_remove_ending_32)?[]:ipWhitelist_remove_ending_32
-  }
-  dependsOn: [
-    projectResourceGroup
-    aiServices
-    aiSearchService
-    applicationInsightSWC
-    subnet_genai_ref
-    subnet_aks_ref
-  ]
-}
-module aiHubPreview '../modules/machineLearningAIHub.bicep' = if(serviceSettingEnableAIHubPreview == true) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: '${aiHubNameShort}-p-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
     location: location
