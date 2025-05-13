@@ -1583,6 +1583,7 @@ module bing '../modules/bing.bicep' = if(serviceSettingDeployBingSearch==true) {
   ]
 }
 
+// 'https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.${location}.api.azureml.ms'
 module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'CosmosDB4${deploymentProjSpecificUniqueSuffix}'
@@ -1590,7 +1591,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     name: 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
     location: location
     enablePublicGenAIAccess:enablePublicGenAIAccess
-    ipRules:empty(ipWhitelist_array) || !enablePublicGenAIAccess? []:ipWhitelist_array
+    ipRules:(empty(ipWhitelist_array) || !enablePublicGenAIAccess || enablePublicAccessWithPerimeter)? []:ipWhitelist_array
     totalThroughputLimit:cosmosTotalThroughputLimit
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
@@ -1613,7 +1614,6 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
           'https://mlworkspacecanary.azure.ai'
           'https://mlworkspace.azureml-test.net'
           'https://42.${location}.instances.azureml.ms'
-          'https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.${location}.api.azureml.ms'
         ]
         allowedMethods: [
           'GET'

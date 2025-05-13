@@ -79,8 +79,8 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     isVirtualNetworkFilterEnabled: vNetRules != []
     //TODO-1: cors: length(corsRules) > 0 ? corsRules : null
     networkAclBypass:'AzureServices'
-    publicNetworkAccess:enablePublicGenAIAccess||enablePublicAccessWithPerimeter?'Enabled':'Disabled'
-    virtualNetworkRules: !enablePublicAccessWithPerimeter?rules:null
+    publicNetworkAccess:(enablePublicGenAIAccess||enablePublicAccessWithPerimeter)?'Enabled':'Disabled'
+    virtualNetworkRules: enablePublicAccessWithPerimeter?null:rules
   }
 }
 
