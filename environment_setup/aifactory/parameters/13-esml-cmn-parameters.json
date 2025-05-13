@@ -21,7 +21,7 @@
             "value": "esml-common-sp-oid"
         },
         "deployOnlyAIGatewayNetworking": {
-			"value": true
+			"value": false
 		}
     }
 }
