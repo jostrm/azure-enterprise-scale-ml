@@ -170,9 +170,9 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
       enableNetworkMonitor:false
     }
     //softDeleteEnabled: false
-    ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
-    networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: 'Deny'
+    ipAllowlist: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? ipWhitelist_array: null
+    networkAcls: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? {
+      defaultAction: 'Deny' // TODO: DTO error for some regions if not 'Allow'
       ipRules: ipRules
     } : null
     
@@ -233,16 +233,9 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
     enableDataIsolation: false
     ipAllowlist: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? ipWhitelist_array: null
     networkAcls: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? {
-      defaultAction: 'Deny' // TODO: DTO error for some regions if not 'Allow'
+      defaultAction: 'Deny'
       ipRules: ipRules
     } : null
-    //ipAllowlist: ipWhitelist_array
-    /*
-    networkAcls: {
-      defaultAction:'Allow' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.
-      ipRules: ipRules
-    }
-    */
   }
   dependsOn:[
     aksDev
