@@ -47,8 +47,8 @@ var rules = [for rule in vNetRules: {
 
 // v2 (no capacityMode): @2024-11-15
 // serverless: resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
-// serverless: 2025-05-01-preview
-resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+// serverless: 2025-05-01-preview, 2024-12-01-preview
+resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
   name: name
   kind: kind
   location: location
@@ -67,10 +67,10 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
     apiProperties: (kind == 'MongoDB') ? { serverVersion: '4.2' } : {}
-    //capacityMode: capacityMode // Use the parameter
-    //capacity: (capacityMode == 'Serverless') ? {
-      //totalThroughputLimit: totalThroughputLimit
-    //} : null
+    capacityMode: capacityMode // Use the parameter
+    capacity: (capacityMode == 'Serverless') ? {
+      totalThroughputLimit: totalThroughputLimit
+    } : null
     
     enableFreeTier: false
     ipRules: [for rule in ipRules: {
@@ -80,7 +80,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     //TODO-1: cors: length(corsRules) > 0 ? corsRules : null
     networkAclBypass:'AzureServices'
     publicNetworkAccess:(enablePublicGenAIAccess||enablePublicAccessWithPerimeter)?'Enabled':'Disabled'
-    virtualNetworkRules: enablePublicAccessWithPerimeter?null:rules
+    virtualNetworkRules: enablePublicAccessWithPerimeter?[]:rules
   }
 }
 
