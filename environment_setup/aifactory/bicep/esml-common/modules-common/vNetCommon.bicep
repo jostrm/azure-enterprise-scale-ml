@@ -21,20 +21,21 @@ param common_bastion_subnet_name string
 @description('common Bastion host subnet CIDR')
 param common_bastion_subnet_cidr string
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
-param centralDnsZoneByPolicyInHub bool = false // TODO: jåaj add ROUTE tables from Hub, to subnets here (as parameter/array)
+param centralDnsZoneByPolicyInHub bool = false
+param deployOnlyAIGatewayNetworking bool = false
 
 resource nsgCommon 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = {
   name: 'nsg-${common_subnet_name}'
 }
-resource nsgBastion 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = {
+resource nsgBastion 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = if(!deployOnlyAIGatewayNetworking) {
   name: 'nsg-${common_bastion_subnet_name}'
 }
 
-resource nsgPBI 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = {
+resource nsgPBI 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = if(!deployOnlyAIGatewayNetworking) {
   name: 'nsg-${common_pbi_subnet_name}'
 }
 
-resource nsgCommonScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = {
+resource nsgCommonScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = if(!deployOnlyAIGatewayNetworking) {
   name: 'nsg-${common_subnet_name}-scoring'
 }
 
@@ -80,7 +81,7 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = {
           privateLinkServiceNetworkPolicies: 'Disabled'
         }
       }
-      { 
+      !deployOnlyAIGatewayNetworking? { 
         name: '${common_subnet_name}-scoring' // Note: Here we need ServiceEndpoints (KV, Storage. Optional: ContainerRegistry)
         properties: {
           addressPrefix: common_subnet_scoring_cidr
@@ -101,8 +102,8 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = {
             id: nsgCommonScoring.id
           }  
         }
-      }
-      {
+      }: {}
+      !deployOnlyAIGatewayNetworking? {
         name: common_pbi_subnet_name
         properties: {
           addressPrefix: common_pbi_subnet_cidr
@@ -119,8 +120,8 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = {
             id: nsgPBI.id
           }
         }
-      }
-      {
+      }:{}
+      !deployOnlyAIGatewayNetworking? {
         name: common_bastion_subnet_name
         properties: {
           addressPrefix: common_bastion_subnet_cidr
@@ -130,20 +131,20 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = {
             id: nsgBastion.id
           }
         }
-      }
+      }:{}
     ]
 
   }
   resource subnet1 'subnets' existing = {
     name: common_subnet_name
   }
-  resource subnet2 'subnets' existing = {
+  resource subnet2 'subnets' existing = if (!deployOnlyAIGatewayNetworking){
     name: common_pbi_subnet_name
   }
-  resource subnet3 'subnets' existing = {
+  resource subnet3 'subnets' existing = if(!deployOnlyAIGatewayNetworking){
     name: common_bastion_subnet_name
   }
 }
 output subnet1ResourceId string = virtualNetwork::subnet1.id
-output subnet2ResourceId string = virtualNetwork::subnet2.id
-output subnetBastionId string = virtualNetwork::subnet3.id
+output subnet2ResourceId string = !deployOnlyAIGatewayNetworking? virtualNetwork::subnet2.id: ''
+output subnetBastionId string = !deployOnlyAIGatewayNetworking? virtualNetwork::subnet3.id: ''

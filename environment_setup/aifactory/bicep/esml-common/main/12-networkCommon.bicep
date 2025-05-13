@@ -170,6 +170,7 @@ module vNetCommon '../modules-common/vNetCommon.bicep' = {
     tags: tags
     vnetNameFull: vnetNameFull
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+    deployOnlyAIGatewayNetworking:deployOnlyAIGatewayNetworking
   }
   dependsOn: [
     nsgCommon
