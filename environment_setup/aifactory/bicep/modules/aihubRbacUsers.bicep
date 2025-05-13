@@ -11,6 +11,7 @@ param aiHubName string
 param aiHubProjectName string
 param useAdGroups bool = false // Use AD groups for role assignments
 param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
+param disableContributorAccessForUsers bool = false // Disable contributor access for users
 
 // ############## RG level ##############
 
@@ -484,7 +485,7 @@ resource amlWorkspaceConnectionSecretsReaderSP 'Microsoft.Authorization/roleAssi
 
 // --------------- RG:CONTRIBUTOR//
 @description('Role Assignment for ResoureGroup: CONTRIBUTOR for users.')
-resource contributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource contributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!disableContributorAccessForUsers){
   name: guid(resourceGroupId, contributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
@@ -495,7 +496,7 @@ resource contributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   scope:resourceGroup()
 }]
 
-resource contributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource contributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):if(!disableContributorAccessForUsers){
   name: guid(resourceGroupId, contributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)

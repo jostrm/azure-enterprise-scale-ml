@@ -141,6 +141,7 @@ param serviceSettingOverrideRegionAzureAISearchShort string = ''
 param serviceSettingDeployAzureAISearch bool = true
 @description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in AI hub mode, with AIServices and 1 project')
 param serviceSettingEnableAIFoundryPreview bool = false
+param disableContributorAccessForUsers bool = false
 
 // ### TRUE as default - END ###
 
@@ -2413,6 +2414,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     aiHubProjectName:aiHub.outputs.aiProjectName
     servicePrincipleAndMIArray: spAndMiArray
     useAdGroups:useAdGroups
+    disableContributorAccessForUsers:disableContributorAccessForUsers
   }
   dependsOn: [
     aiHub
