@@ -29,6 +29,7 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
     applicationInsightsName: applicationInsightsName
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
     vnetName: vnetName
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: subnetNamePend
@@ -38,7 +39,6 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
     wlMaxCount: wlMaxCount
     wlProfileDedicatedName: wlProfileDedicatedName
     wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
-
   }
 }
 

@@ -45,7 +45,10 @@ var rules = [for rule in vNetRules: {
   ignoreMissingVNetServiceEndpoint: true
 }]
 
-resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
+// v2 (no capacityMode): @2024-11-15
+// serverless: resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+// serverless: 2025-05-01-preview
+resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2025-05-01-preview' = {
   name: name
   kind: kind
   location: location
@@ -65,8 +68,6 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
     enableMultipleWriteLocations: false
     apiProperties: (kind == 'MongoDB') ? { serverVersion: '4.2' } : {}
     capacityMode: capacityMode // Use the parameter
-    // Fix the capacity property to ensure it's correctly formatted
-    // Only include if using Serverless mode
     capacity: (capacityMode == 'Serverless') ? {
       totalThroughputLimit: totalThroughputLimit
     } : null
