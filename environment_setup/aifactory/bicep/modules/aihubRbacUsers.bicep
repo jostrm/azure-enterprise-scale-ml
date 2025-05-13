@@ -496,7 +496,7 @@ resource contributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
   scope:resourceGroup()
 }]
 
-resource contributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):if(!disableContributorAccessForUsers){
+resource contributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
   name: guid(resourceGroupId, contributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
