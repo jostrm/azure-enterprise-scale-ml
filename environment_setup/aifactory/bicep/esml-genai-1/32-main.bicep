@@ -1595,6 +1595,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
+    createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
     vNetRules: [
       subnet_genai_ref.id
       subnet_aks_ref.id
@@ -1659,7 +1660,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
   ]
 }
 
-module privateDnsCosmos '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployCosmosDB == true){
+module privateDnsCosmos '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployCosmosDB && !enablePublicAccessWithPerimeter){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkCosmos${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1673,7 +1674,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 }
 
 
-module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppInsightsDashboard==true) {
+module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppInsightsDashboard) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
   params: {
