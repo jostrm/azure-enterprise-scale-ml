@@ -2319,7 +2319,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: p011_genai_team_lead_array   
-    bastion_service_name: (!empty(bastionName))?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
+    bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
     useAdGroups: useAdGroups
   }
   dependsOn: [
@@ -2333,7 +2333,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
   name: 'rbac2GenAIUsersBastionExt${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: p011_genai_team_lead_array
-    bastion_service_name: (!empty(bastionName))?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
+    bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
     useAdGroups: useAdGroups
   }
   dependsOn: [
