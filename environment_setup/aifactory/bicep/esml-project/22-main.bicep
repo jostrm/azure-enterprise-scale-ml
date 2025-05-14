@@ -998,7 +998,20 @@ module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
     addSecret
   ]
 }
-
+module kv2CmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: '${keyvaultName2}APTechContact${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultPermissions: secretGetListSet
+    keyVaultResourceName: kv2.outputs.keyvaultName
+    policyName: 'add'
+    principalId: technicalContactId
+    additionalPrincipalIds:p011_genai_team_lead_array
+  }
+  dependsOn: [
+    addSecret
+  ]
+}
 
 resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: kvNameCommon
@@ -1595,14 +1608,14 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
 
 /* TODO-7 */
 
-module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)==true){
+module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empty(bastionResourceGroup)){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacUsersToCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     common_kv_name:'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     user_object_ids: p011_genai_team_lead_array
     addBastion: addBastionHost
-    bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  // bastion-uks-dev-001 or custom name
+    bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
     useAdGroups:useAdGroups
   }
   dependsOn: [
@@ -1615,12 +1628,12 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
 
 
 /* TODO-8 */
-module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bastionResourceGroup)==false && empty(bastionSubscription)==false && addBastionHost==true) {
+module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(bastionResourceGroup) && !empty(bastionSubscription) && addBastionHost) {
   scope: resourceGroup(bastionSubscription,bastionResourceGroup)
   name: 'rbacGenAIReadBastion${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: p011_genai_team_lead_array
-    bastion_service_name: (empty(bastionName) != false)?bastionName: 'bastion-${locationSuffix}-${env}${commonResourceSuffix}'  //custom resource group, subscription
+    bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
     useAdGroups:useAdGroups
   }
   dependsOn: [

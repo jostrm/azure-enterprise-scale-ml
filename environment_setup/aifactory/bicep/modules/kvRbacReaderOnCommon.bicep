@@ -2,7 +2,6 @@ param common_kv_name string
 @description('Additional optional Object ID of more people to access Resource group')
 param user_object_ids array
 param bastion_service_name string
-param bastion_service_resource_group string = ''
 param addBastion bool = false
 param useAdGroups bool = false
 
