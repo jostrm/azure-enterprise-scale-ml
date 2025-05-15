@@ -102,10 +102,10 @@ Currently there are 2 project types, template architectures (ESML, GenAI) that l
 
 ## AI Factory project types: ESML, GenAI-1
 These are the two 2 project types, template architectures (ESML, GenAI) that are automated (IaC) to be setup as AI Factory projects for a use case, team, or business unit.
--**ESML**: Enterprise Scale Machine Learning
--**GenAI**: Enteprise Scale GenAI
-    - Deploys AI hub and AI project into a virtual network with all dependent services connected via private end points.
-    - Configures AI Foundry, adhering to the best practices outlined in the Well Architected Framework (see Enterprise Scale AI Factory in images)
+- **ESML**: Enterprise Scale Machine Learning
+- **GenAI**: Enteprise Scale GenAI
+    - Deploys AI hub and AI project into a virtual network with all dependent services connected via private endpoints (optionally Private DNS Zones centralized or standalone)
+    - Configures AI Foundry, adhering to the best practices outlined in the Well Architected Framework - WAF([WAF AI - Enterprise Scale AI Factory](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas))
     - Provides the ability to add additional Azure services during deployment, configured to connect via isolation to enrich your AI project. (API Management, CosmosDB, Azure SQL DB)
     - Contains an existing Azure AI Project which will provision dependent Azure resources based on the Project's established connections within AI Foundry.
 
