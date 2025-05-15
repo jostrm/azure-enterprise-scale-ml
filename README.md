@@ -1,11 +1,16 @@
 # Enterprise Scale AI Factory - submodule
 ![Header](documentation/v2/10-19/images/header.png)
 
-Welcome to the official `Enterprise Scale AI Factory` repository.
-This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
-- Plug and play accelerator for: AI ready landingzones with templates for DataOps, MLOps, GenAIOps to get an enterprise scale environment.
+Welcome to the official `Enterprise Scale AI Factory` repository.<br>
+This is a foundational deployment solution for deploying an AI Foundry (optionally via the new resource provider) and project into multiple isolated environments (Dev,Stage,Prod) within Azure. The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. 
 
-Usage: You can fork it, or use it as a submodule in your own repo.
+> [!NOTE] Since Well-architected framework does not recommend using the Azure Developer CLI (AZD) in production (or any other developled technology such as Azure Verified Module) we removed that, to only use Azure CLI and BICEP, with Github Action pipelines or Azure Devops pipelines. 
+> - Also both a Managed Identity and Service principal is created for your team, to be able to automate the full GenAIOps process (via the GenAIOps template)
+
+This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
+- AI ready landingzones with templates for DataOps, MLOps, GenAIOps to get an enterprise scale environment.
+
+Usage: You can fork it, or use it as a submodule in your own repo. the latter is highly recommended.
 
 > [!NOTE]
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a sumobule repo.
@@ -98,6 +103,10 @@ Currently there are 2 project types, template architectures (ESML, GenAI) that l
 These are the two 2 project types, template architectures (ESML, GenAI) that are automated (IaC) to be setup as AI Factory projects for a use case, team, or business unit.
 -**ESML**: Enterprise Scale Machine Learning
 -**GenAI**: Enteprise Scale GenAI
+    - Deploys AI hub and AI project into a virtual network with all dependent services connected via private end points.
+    - Configures AI Foundry, adhering to the best practices outlined in the Well Architected Framework (see Enterprise Scale AI Factory in images)
+    - Provides the ability to add additional Azure services during deployment, configured to connect via isolation to enrich your AI project. (API Management, CosmosDB, Azure SQL DB)
+    - Contains an existing Azure AI Project which will provision dependent Azure resources based on the Project's established connections within AI Foundry.
 
 ![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 
