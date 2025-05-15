@@ -2,7 +2,7 @@
 ![Header](documentation/v2/10-19/images/header.png)
 
 Welcome to the official `Enterprise Scale AI Factory` repository.<br>
-This is a foundational deployment solution for deploying an AI Foundry (optionally via the new resource provider) and project into multiple isolated environments (Dev,Stage,Prod) within Azure. The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. 
+This is a foundational deployment solution for deploying an AI Foundry (optionally via the new resource provider) or Azure Machine learning, with additional services tnto multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. 
 
 > [!NOTE] Since Well-architected framework does not recommend using the Azure Developer CLI (AZD) in production (or any other developled technology such as Azure Verified Module) we removed that, to only use Azure CLI and BICEP, with Github Action pipelines or Azure Devops pipelines. 
 > - Also both a Managed Identity and Service principal is created for your team, to be able to automate the full GenAIOps process (via the GenAIOps template)
