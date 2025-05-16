@@ -274,6 +274,7 @@ Example quetions:
 - Q: Why can't it find the path in my submodule?
 - Q: DataOps: How to work with Azure DataFactory, and branching? 
 - Q: MLOps: Azure Devops and GIT Branching stragey - DEV, TEST, PROD, many models branches? 
+- Q: How to get more technical quota for resources. AI Factory scale sets
 
 [FAQ - FAQ-1](../v2/40-49/41-FAQ-01.md)
 
@@ -295,7 +296,13 @@ Example questions:
 
 [FAQ - FAQ-43](../v2/40-49/41-FAQ-01.md)
 
-## 44) RESOURCES: TABULAR, TEXT, IMAGES, GenAI - Is there any Microsoft Github code examples I can try? 
+## 44) FAQ - Increase technical quota, "AI Factory scale sets"
+Q: How to increase quota? 
+A: You can setup another AI Factory "scale set", change suffix and deploy another instance (AI Factory-DEV 002, AI Factory-DEV 003, etc)
+- **What**: The new subscription, in same region, will reset the shared quota on a subscription (more tokens for a model deployment, more AI Search)
+- **Example:** You can have that new quota dedicated to a specific token-heavy use case, or if you cannot deploy anymore AI Search instances of a specific SKU
+
+## 45) RESOURCES: TABULAR, TEXT, IMAGES, GenAI - Is there any Microsoft Github code examples I can try? 
 
 ### ESML Project (Azure Machine Learning: TABULAR, TEXT, IMAGES)
 
@@ -322,4 +329,4 @@ Example questions:
 
 ### ESGenaAI Project: RAG with Azure AI Foundry, Azure AI Search
 
-- [Advanced - code first RAG](https://learn.microsoft.com/en-us/azure/search/tutorial-rag-build-solution)    
+- [Advanced - code first RAG](https://learn.microsoft.com/en-us/azure/search/tutorial-rag-build-solution)  
