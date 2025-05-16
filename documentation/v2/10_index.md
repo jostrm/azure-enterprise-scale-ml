@@ -304,9 +304,10 @@ A: You can setup another AI Factory "scale set", change suffix and deploy anothe
 - **How-to**:
     - 1) Change 1 parameter `aifactorySuffix='-001'` from `-001` to `-002`, in your .env file (Github) or variables.yaml(Azure Devops)
     - 2) **Run AI Factory common pipeline:**
-        - Everything will now ne "resetted", you have NEW quota for all services, and project-number starts over from `001`
+        - Great! Everything (quota, projects) will now be "resetted", you have NEW quota for all services, and project-number starts over from `001`
     - 3) **Run project-genai pipeline:** or project-esml pipelines, with your new first project `001`
         - E.g. edit the variable `project_number_000='001'`
+- **Tip**: You can still add the project from different AI Factory scale sets, into the same Azure DASHBOARD, to get a good overview of all projects
         
 
 ## 45) RESOURCES: TABULAR, TEXT, IMAGES, GenAI - Is there any Microsoft Github code examples I can try? 
