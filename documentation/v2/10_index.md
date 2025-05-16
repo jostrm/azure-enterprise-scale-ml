@@ -301,6 +301,13 @@ Q: How to increase quota?
 A: You can setup another AI Factory "scale set", change suffix and deploy another instance (AI Factory-DEV 002, AI Factory-DEV 003, etc)
 - **What**: The new subscription, in same region, will reset the shared quota on a subscription (more tokens for a model deployment, more AI Search)
 - **Example:** You can have that new quota dedicated to a specific token-heavy use case, or if you cannot deploy anymore AI Search instances of a specific SKU
+- **How-to**:
+    - 1) Change 1 parameter `aifactorySuffix='-001'` from `-001` to `-002`, in your .env file (Github) or variables.yaml(Azure Devops)
+    - 2) **Run AI Factory common pipeline:**
+        - Everything will now ne "resetted", you have NEW quota for all services, and project-number starts over from `001`
+    - 3) **Run project-genai pipeline:** or project-esml pipelines, with your new first project `001`
+        - E.g. edit the variable `project_number_000='001'`
+        
 
 ## 45) RESOURCES: TABULAR, TEXT, IMAGES, GenAI - Is there any Microsoft Github code examples I can try? 
 
