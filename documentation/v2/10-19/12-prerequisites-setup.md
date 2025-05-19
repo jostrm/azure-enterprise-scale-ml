@@ -222,7 +222,10 @@ git submodule foreach 'git checkout main || git checkout -b main origin/main'
 
 ## Pre-requisite to run script in BASH, Powershell, Azure CLI
 ### Install: BASH (Windows | GNU bash version 5.2.37 or higher)
-Most scripts (starting with bash) is bash script has been tested with Git bash on Windows (GNU bash version 5.2.37 or higher). [Download BASH via Git Bash here](https://git-scm.com/downloads)
+Most scripts (starting with bash) is bash script has been tested with Git bash on Windows (GNU bash version 5.2.37 or higher). 
+
+[Download & Install BASH, via Git Bash here](https://git-scm.com/downloads)
+
 - Note: It has been tested in UBUNTU and on Mac OS, where it does not work straight of the box (extra bash libraries needs to be installed)
 
 ### Install Powershell: Version 7.5.1 or higher
