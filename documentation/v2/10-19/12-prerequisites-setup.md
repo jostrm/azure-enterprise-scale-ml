@@ -259,7 +259,7 @@ Run from your repo root location (e.g. dir/ls should list the **azure-enterprise
 bash ./01-aif-copy-aifactory-templates.sh
 ```
 
->[!NOTE]
+>[!IMPORTANT]
 > This will copy all template files to a folder at root called **aifactory-template**. You need to rename that folder to **aifactory**, then you can edit parameters and variables. After this **Local-repo-link** and the code examples will work.
 
 ## D) `HOWTO: Refresh IaC pipelines`, without updating/overwriting the Variable files? 
