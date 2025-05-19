@@ -221,7 +221,7 @@ git submodule foreach 'git checkout main || git checkout -b main origin/main'
 # SCRIPTS
 
 ## Pre-requisite to run script in BASH, Powershell
-Most scripts (starting with bash) is bash script has been tested with Gitbash on Windows. 
+Most scripts (starting with bash) is bash script has been tested with Gitbash on Windows. [Download BASH via Git Bash here](https://git-scm.com/downloads)
 - Note: It has been tested in UBUNTU and on Mac OS, where it does not work straight of the box (extra bash libraries needs to be installed)
 One script, is POWERSHELL, such as [Verify resource providers](#e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
 
