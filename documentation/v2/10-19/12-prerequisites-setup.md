@@ -135,13 +135,13 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
 ## Step 6: Verify: Resource Providers, Private DNS zones (if not standalone)
 VERIFY, BEFORE running any pipelines. See [Scripts to run to verify/create if not exists](#scripts)
 - Ensure Azure `Resource providers` are enabled (create if not exists)
-    - [Script: E](#scripts)
+    - [Script: E](#e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
 - Ensure `Private DNS zones` exists in "hub", if flag is set to true
     - Note: Not needed for `Standalone AI Factory`
-    - [Script: H](#scripts)
+    - [Script: H](#h-verify-before-running-any-pipelinesensure-private-dns-zones-exists-in-hub-if-flag-is-set-to-true)
 - Ensure policies are created on Subscription level (Note: Need to be manually edited for region/location)
     - Note: Not needed for `Standalone AI Factory`
-    - [Script: I](#scripts)
+    - [Script: I](#i-before-running-any-pipelines-ensure-policies-are-created-on-subscription-level-note-need-to-be-manually-edited-for-regionlocation)
 
 After all pre-requisites are verified - [go to the SETUP page and choose your preffered orchestrator: Azure Devops - YAML or Github Actions](../20-29/24-end-2-end-setup.md)
 
@@ -218,16 +218,18 @@ git submodule foreach 'git checkout main || git checkout -b main origin/main'
 > Note: Local-repo-link only works, after you have finished step 1. Docs-link will work relative from this Github documentation, useful to browser the file wherof Local-repo-link is the filed you may edit.
 > 
 
-# MORE INFO - SCRIPTS & Quickstart
+# SCRIPTS
 
-## Pre-requisite to run script
-The bash script has been tested with Gitbash on Windows
+## Pre-requisite to run script in BASH, Powershell
+Most scripts (starting with bash) is bash script has been tested with Gitbash on Windows. 
+- Note: It has been tested in UBUNTU and on Mac OS, where it does not work straight of the box (extra bash libraries needs to be installed)
+One script, is POWERSHELL, such as [Verify resource providers](#e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
 
 ## A) Add the submodule to your repo (to get the bootstrap files) 
 Run from your repo root location:
 
 ```sh
-git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
+bash git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
 ```
 
 This will add a folder in your repo at root (a GIT submodule) called **azure-enterprise-scale-ml** that contains accelerator code (boostrap scripts, templates)
