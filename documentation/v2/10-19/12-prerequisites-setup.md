@@ -264,12 +264,16 @@ bash ./01-aif-copy-aifactory-templates.sh
 
 ## D) `HOWTO: Refresh IaC pipelines`, without updating/overwriting the Variable files? 
 Purpose: To refresh the IaC pipelines (get new features, added AI Facotry project types etc).
-Info: If you have chosen Azure Devops in step 1, you will see the following files, at your root. It is safe to run the ones starting with `03` without overwriting your configuration. 
-         
+Info: If you have chosen Azure Devops in step 1, you will see the following files, at your root. 
+
+It is safe to run the ones starting with `03` without overwriting your configuration:
+
+1st time - Run this, if it is your initial setup of the AI Factory: 
 ```sh
 bash ./02-ADO-YAML-bootstrap-files.sh
 ```
 
+2nd time and further - Run this, if you already have setup the AI Factory, and want to refresh the Azure Devops pipelines.
 ```sh
 bash ./03-ADO-YAML-bootstrap-files-no-var-overwrite.sh
 ```
