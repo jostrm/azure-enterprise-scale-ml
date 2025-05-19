@@ -33,6 +33,22 @@ param logAnalyticsWorkspaceRG string
 param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
 param pythonVersion string = '3.11' // Used if runtime is 'python'
 param subnetIntegrationName string  // Name of the subnet for VNet integration
+param hostNameSslStates array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
+param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
+param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the resource.
+@description('Optional. Site redundancy mode.')
+@allowed([
+  'ActiveActive'
+  'Failover'
+  'GeoRedundant'
+  'Manual'
+  'None'
+])
+param redundancyMode string = 'None'
+param byoACEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+param byoAceFullResourceId string = '' // Full resource ID of App Service Environment
+param byoAceAppServicePlanRID string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+//Note: No explicit VNet integration needed: ACEv3 is already deployed into its own subnet, so you don't need to specify virtualNetworkSubnetId separately.
 
 // Use provided name or create one based on WebApp name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
@@ -46,6 +62,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' exis
   name: logAnalyticsWorkspaceName
   scope: resourceGroup(logAnalyticsWorkspaceRG)
 }
+
 
 // Get subnet reference for private endpoint
 resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
@@ -90,26 +107,36 @@ var denyAllRule = {
   description: 'Deny all access by default'
 }
 
+var identityType = systemAssignedIdentity 
+  ? (!empty(userAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned') 
+  : (!empty(userAssignedIdentities) ? 'UserAssigned' : 'None')
+
+var identity = identityType != 'None' ? {
+  type: identityType
+  userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
+} : null
+
 // Create Web App
 resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   name: name
   location: location
   tags: tags
-  kind: runtime == 'node' || runtime == 'python' ? 'app,linux' : 'app'
-  identity: {
-    type: 'SystemAssigned'
-  }
+  kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'app,linux' : 'app'
+  identity: identity
   properties: {
-    serverFarmId: appServicePlan.id
+    serverFarmId: byoACEv3? byoAceAppServicePlanRID: appServicePlan.id
     httpsOnly: true
-    virtualNetworkSubnetId: enablePublicAccessWithPerimeter ? null : integrationSubnet.id
-    publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : (enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
+    hostingEnvironmentProfile: !empty(byoAceFullResourceId) ? {
+      id: byoAceFullResourceId
+    } : null
+    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoACEv3 ? any(null) : integrationSubnet.id
+    publicNetworkAccess: byoACEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       alwaysOn: true
       cors: {
         allowedOrigins: allowedOrigins
       }
-      ipSecurityRestrictions: enablePublicAccessWithPerimeter ? [] : concat(formattedIpRules, [denyAllRule])
+      ipSecurityRestrictions: enablePublicAccessWithPerimeter || byoACEv3? [] : concat(formattedIpRules, [denyAllRule])
       // Set the appropriate runtime stack
       linuxFxVersion: runtime == 'python' ? 'PYTHON|${pythonVersion}' : runtime == 'node' ? 'NODE|18-lts' : runtime == 'java' ? 'JAVA|17-java17' : ''
       netFrameworkVersion: runtime == 'dotnet' ? 'v7.0' : null // Only set netFrameworkVersion for Windows/.NET apps
@@ -124,11 +151,13 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
         }
       ] : [])
     }
+    hostNameSslStates: hostNameSslStates
+    redundancyMode: redundancyMode
   }
 }
 
 // Create private endpoint
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(createPrivateEndpoint) {
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(createPrivateEndpoint && !byoACEv3) {
   name: 'p-${name}-webapp'
   location: location
   tags: tags
@@ -161,8 +190,8 @@ output defaultHostname string = webApp.properties.defaultHostName
 output principalId string = webApp.identity.principalId
 output dnsConfig array = [
   {
-    name: createPrivateEndpoint? privateEndpoint.name: ''
+    name: (createPrivateEndpoint && !byoACEv3)? privateEndpoint.name: ''
     type: 'azurewebapps'
-    id:createPrivateEndpoint? privateEndpoint.id: ''
+    id:(createPrivateEndpoint && !byoACEv3)? privateEndpoint.id: ''
   }
 ]

@@ -103,6 +103,7 @@ param wlMaxCount int = 5
 param serviceSettingDeployCosmosDB bool = false
 param cosmosTotalThroughputLimit int = 1000
 param cosmosKind string = 'GlobalDocumentDB'
+param cosmosMinimalTlsVersion string = 'TLS1.2'
 
 param serviceSettingDeployFunction bool = false
 param functionRuntime string = 'python' //'node', 'dotnet', 'java', 'python'
@@ -118,6 +119,19 @@ param functionSKU object = {
 param serviceSettingDeployWebApp bool = false
 param webAppRuntime string = 'python'  // Set to 'python' for Python apps
 param webAppRuntimeVersion string = '3.11'  // Specify the Python version
+@description('Optional. Site redundancy mode.')
+@allowed([
+  'ActiveActive'
+  'Failover'
+  'GeoRedundant'
+  'Manual'
+  'None'
+])
+param appRedundancyMode string = 'None'
+param byoACEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+param byoAceFullResourceId string = '' // Full resource ID of App Service Environment
+param byoAceAppServicePlanResourceId string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+
 param webappSKU object = {
   name: 'S1'
   tier: 'Standard'
@@ -1603,6 +1617,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
       subnet_aks_ref.id
     ]
     kind: cosmosKind
+    minimalTlsVersion:cosmosMinimalTlsVersion
     tags: projecttags
     corsRules: [
       {
@@ -1804,6 +1819,10 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       logAnalyticsWorkspaceName: laName
       logAnalyticsWorkspaceRG: commonResourceGroup
       runtime: webAppRuntime  // Set to 'python' for Python apps
+      redundancyMode: appRedundancyMode
+      byoACEv3: byoACEv3
+      byoAceFullResourceId: byoAceFullResourceId
+      byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
       pythonVersion: webAppRuntimeVersion // Specify the Python version
       ipRules: ipWhitelist_array
       appSettings: [
@@ -1881,6 +1900,10 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
       logAnalyticsWorkspaceName: laName
       logAnalyticsWorkspaceRG: commonResourceGroup
+      redundancyMode: appRedundancyMode
+      byoACEv3: byoACEv3
+      byoAceFullResourceId: byoAceFullResourceId
+      byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
       ipRules:ipWhitelist_array
       appSettings: [
         {

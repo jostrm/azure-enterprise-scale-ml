@@ -25,6 +25,7 @@ param autoscaleMaxThroughput int = 4000
 param databaseName string = 'defaultdb'
 param containerName string = 'defaultcontainer'
 param partitionKeyPath string = '/id'
+param minimalTlsVersion string = 'TLS1.2'
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -63,6 +64,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
       }
     ]
     createMode: 'Default'
+    minimalTlsVersion: minimalTlsVersion
     databaseAccountOfferType: 'Standard'
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
