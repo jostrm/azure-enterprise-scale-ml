@@ -220,10 +220,19 @@ git submodule foreach 'git checkout main || git checkout -b main origin/main'
 
 # SCRIPTS
 
-## Pre-requisite to run script in BASH, Powershell
-Most scripts (starting with bash) is bash script has been tested with Gitbash on Windows. [Download BASH via Git Bash here](https://git-scm.com/downloads)
+## Pre-requisite to run script in BASH, Powershell, Azure CLI
+### Install: BASH (Windows | GNU bash version 5.2.37 or higher)
+Most scripts (starting with bash) is bash script has been tested with Git bash on Windows (GNU bash version 5.2.37 or higher). [Download BASH via Git Bash here](https://git-scm.com/downloads)
 - Note: It has been tested in UBUNTU and on Mac OS, where it does not work straight of the box (extra bash libraries needs to be installed)
-One script, is POWERSHELL, such as [Verify resource providers](#e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
+
+### Install Powershell: Version 7.5.1 or higher
+Scripts starting with pwsh,is POWERSHELL commands, such as [Verify resource providers](#e-verify-before-running-any-pipelines-ensure-azure-resource-providers-are-enabled-create-if-not-exists)
+
+- [Download & Install Powershell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5)
+
+### Install Azure CLI: Version 2.71 or higher
+
+- [Download & Install Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 
 ## A) Add the submodule to your repo (to get the bootstrap files) 
 Run from your repo root location:
