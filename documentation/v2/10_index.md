@@ -267,7 +267,7 @@ It also comes with DEMO data, per project team.
 # 40) FAQ
 Here you can browse some Q's, and jump into relevant section. We tried to group the FAQ's into different roles & services
 
-## 41) FAQ - Core team & AFactory infra
+## 41) FAQ - Core team & AI Factory infra
 
 Example quetions: 
 - Q: How-to clone repo with submodule to local computer? the folder  `azure-enterprise-scale-ml` is empty? 
@@ -308,8 +308,13 @@ A: You can setup another AI Factory "scale set", change suffix and deploy anothe
                 - `pwsh ./aifactory/esml-util/26-enable-resource-providers.ps1 -SubscriptionName 'TODO' -Readonly $false`
                 - Note: Script above is from Prerequisite documentation
             2) PERMISSION: You need to provide the service principle `esml-common-bicep-sp` "OWNER" on all subscriptions
+                - Why: For you to use same Azure Devops service connection, or Github Action credentionas
     - CONFIG & RUN
-        - 1) Change 1 parameter `aifactorySuffix='-001'` from `-001` to `-002`, in your .env file (Github) or variables.yaml(Azure Devops)
+        - 1) Change VARIABLES:
+            -  `aifactorySuffix='-001'` from `-001` to `-002`, and respective in your .env file (Github) or variables.yaml(Azure Devops)
+            -  `dev_sub_id`=`TODO_Subscription_ID`
+            -  `dev_cidr_range`=`XX`
+                - Recommendation: If you pre-allocate in your IP plan 11-40, and start with `dev_cidr=11`,`dev_cidr=21`,`dev_cidr=31`, then you can expand `dev_cidr=12` (between 11-20) and test between 21-30, prod 31-40
         - 2) **Run AI Factory common pipeline:**
             - Great! Everything (quota, projects) will now be "resetted", you have NEW quota for all services, and project-number starts over from `001`
         - 3) **Run project-genai pipeline:** or project-esml pipelines, with your new first project `001`
