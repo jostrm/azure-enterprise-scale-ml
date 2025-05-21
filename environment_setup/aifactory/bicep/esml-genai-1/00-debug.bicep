@@ -17,6 +17,7 @@ param aksSubnetName string = ''
 param subscriptions_subscriptionId string = ''
 param vnetRule1 string = ''
 param vnetRule2 string = ''
+param postGreSQLExists bool = true
 
 // Use this in a resource description or as a dummy resource to see the values
 resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
@@ -99,6 +100,10 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
         name: 'VNET_RULE_2'
         value: vnetRule2
       }
+      {
+        name: 'postGreSQLExists'
+        value: postGreSQLExists ? 'true' : 'false'
+      }
     ]
     scriptContent: '''
       Write-Host "DEBUG OUTPUT VARIABLES:"
@@ -121,6 +126,7 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
       Write-Host "subscriptionId: $env:SUBSCRIPTION_ID"
       Write-Host "vnetRule1: $env:VNET_RULE_1"
       Write-Host "vnetRule2: $env:VNET_RULE_2"
+      Write-Host "postGreSQLExists: $env:postGreSQLExists"
     '''
     retentionInterval: 'PT1H'
   }
@@ -145,3 +151,4 @@ output debug_aksSubnetId string = aksSubnetId
 output debug_aksSubnetName string = aksSubnetName
 output debug_vnetRule1 string = vnetRule1
 output debug_vnetRule2 string = vnetRule2
+output debug_postGreSQLExists bool = postGreSQLExists

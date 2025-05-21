@@ -882,6 +882,7 @@ module debug './00-debug.bicep' = if(enableDebugging){
     subscriptions_subscriptionId:subscriptions_subscriptionId
     vnetRule1:'${vnetId}/subnets/${defaultSubnet}'
     vnetRule2:'${vnetId}/subnets/${aksSubnetName}'
+    postGreSQLExists: existingResource.outputs.postgreSQLExists
   }
 }
 
