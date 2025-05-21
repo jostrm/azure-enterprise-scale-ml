@@ -747,7 +747,7 @@ var newPrivateLinksDnsZones = [
 
 module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'CheckPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
+  name: 'CheckIfNewPrivateDnsZonesMissing${deploymentProjSpecificUniqueSuffix}'
   params: {
     privateLinksDnsZones: newPrivateLinksDnsZones
     privDnsResourceGroup: privDnsResourceGroupName
@@ -761,7 +761,7 @@ module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = i
 // ### Create NEW Private DNS zones: if they do not exist
 module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZonesIfNotExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(subscriptionIdDevTestProd,privDnsResourceGroupName)
-  name: 'createPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
+  name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
   params: {
     privateLinksDnsZones: newPrivateLinksDnsZones
     privDnsSubscription: privDnsSubscription
