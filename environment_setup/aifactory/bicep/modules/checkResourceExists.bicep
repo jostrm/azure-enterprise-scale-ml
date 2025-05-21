@@ -11,4 +11,4 @@ resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' e
 output exists bool = isStorageAccount ? !empty(existingStorageAccount.id) : false
 */
 
-output exists bool = !empty(subscriptionResourceId(resourceGroupName, resourceType, resourceName))
+output exists bool = !empty(resourceId(resourceGroupName, resourceType, resourceName))

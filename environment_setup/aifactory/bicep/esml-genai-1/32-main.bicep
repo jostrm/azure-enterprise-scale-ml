@@ -117,7 +117,7 @@ param serviceSettingDeploySQLDatabase bool = false
 param serviceSettingDeployCosmosDB bool = false
 param cosmosTotalThroughputLimit int = 1000
 param cosmosKind string = 'GlobalDocumentDB'
-param cosmosMinimalTlsVersion string = 'TLS1.2'
+param cosmosMinimalTlsVersion string = 'Tls1_2'
 
 // Databases
 
