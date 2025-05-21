@@ -87,6 +87,41 @@ param serviceSettingDeployProjectVM bool = false
 @description('Service setting:Deploy Azure Machine Learning - classic, not in hub mode')
 param serviceSettingDeployAzureMLClassic bool = false
 
+// Databases:PostGreSQL
+param serviceSettingDeployPostgreSQL bool = false
+param postgreSQLSKU_Name string = 'Standard_B1ms' // Basic tier with 1 vCore
+param postgreSQLSKU_Tier string = 'Burstable'     // Burstable tier
+param postgreSQLSKU_Family string = 'Gen5'        // Generation 5 hardware
+param postgreSQLSKU_Capacity int = 1           // 1 vCore
+var postgreSQLSKU = {
+  name: postgreSQLSKU_Name 
+  tier: postgreSQLSKU_Tier
+  family: postgreSQLSKU_Family
+  capacity: postgreSQLSKU_Capacity
+}
+param postgreSQLStorage_Size int = 32 // 32 GB of storage
+param postgreSQLStorage_Iops int = 120 // Input/output operations per second
+param postgreSQLStorage_AutoGrow bool = true // Enable auto-grow for storage
+var postgreSQLStorage = {
+  storageSizeGB: postgreSQLStorage_Size
+  iops: postgreSQLStorage_Iops         
+  autoGrow: postgreSQLStorage_AutoGrow
+}
+param postgreSQLVersion string = '11' // PostgreSQL version
+
+// Databases:REDIS
+param serviceSettingDeployRedisCache bool = false
+// Databases:SQL Database
+param serviceSettingDeploySQLDatabase bool = false
+// Databases:CosmosDB
+param serviceSettingDeployCosmosDB bool = false
+param cosmosTotalThroughputLimit int = 1000
+param cosmosKind string = 'GlobalDocumentDB'
+param cosmosMinimalTlsVersion string = 'TLS1.2'
+
+// Databases
+
+// Apps
 param serviceSettingDeployContainerApps bool = false
 param acaImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 param acaCustomDomainsArray array = []
@@ -98,12 +133,6 @@ param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
-
-// UI and History in RAG
-param serviceSettingDeployCosmosDB bool = false
-param cosmosTotalThroughputLimit int = 1000
-param cosmosKind string = 'GlobalDocumentDB'
-param cosmosMinimalTlsVersion string = 'TLS1.2'
 
 param serviceSettingDeployFunction bool = false
 param functionRuntime string = 'python' //'node', 'dotnet', 'java', 'python'
@@ -558,6 +587,18 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.${location}.azurecontainerapps.io'
     name:'privatelink.${location}.azurecontainerapps.io'
   }
+  redis: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.redis.cache.windows.net'
+    name:'privatelink.redis.cache.windows.net'
+  }
+  postgres: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com'
+    name:'privatelink.postgres.database.azure.com'
+  }
+  sql: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net'
+    name:'privatelink.database.windows.net'
+  }
 }
 
 var privateLinksDnsZonesArray = [
@@ -661,31 +702,143 @@ var privateLinksDnsZonesArray = [
     name: privateLinksDnsZones.azurecontainerapps.name
     id: privateLinksDnsZones.azurecontainerapps.id
   }
+  {
+    name: privateLinksDnsZones.redis.name
+    id: privateLinksDnsZones.redis.id
+  }
+  {
+    name: privateLinksDnsZones.postgres.name
+    id: privateLinksDnsZones.postgres.id
+  }
+  {
+    name: privateLinksDnsZones.sql.name
+    id: privateLinksDnsZones.sql.id
+  }
 ]
 
 output privateLinksDnsZones object = privateLinksDnsZones
+// Baseline is already created in esml-common/main/13-rgLevel.bicep 
+// Verify that at least 1 Private DNS zones exists in privDnsResourceGroupName and privDnsSubscription  before continuing
+resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = if (centralDnsZoneByPolicyInHub==false){
+  name: 'privatelink.cognitiveservices.azure.com'
+  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+}
 
-/*Is already created in esml-common/main/13-rgLevel.bicep  */
-/*
-module createPrivateDnsZones '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+
+// ### Check: IF to create New Private DNS zones: if new ones have been added since AIFactory COMMON was created
+var newPrivateLinksDnsZones = [
+  {
+    name: privateLinksDnsZones.azurecontainerapps.name
+    id: privateLinksDnsZones.azurecontainerapps.id
+  }
+  {
+    name: privateLinksDnsZones.redis.name
+    id: privateLinksDnsZones.redis.id
+  }
+  {
+    name: privateLinksDnsZones.postgres.name
+    id: privateLinksDnsZones.postgres.id
+  }
+  {
+    name: privateLinksDnsZones.sql.name
+    id: privateLinksDnsZones.sql.id
+  }
+]
+
+module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,privDnsResourceGroupName)
+  name: 'CheckPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    privateLinksDnsZones: newPrivateLinksDnsZones
+    privDnsResourceGroup: privDnsResourceGroupName
+  }
+  dependsOn: [
+    createPrivateDnsZones
+  ]
+} //output dnsZonesExistence array = checkIfDnsZonesExists.outputs.existingPrivateDnsZones
+// ### End Check
+
+// ### Create NEW Private DNS zones: if they do not exist
+module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZonesIfNotExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(subscriptionIdDevTestProd,privDnsResourceGroupName)
   name: 'createPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
   params: {
-    privateLinksDnsZones: privateLinksDnsZonesArray
+    privateLinksDnsZones: newPrivateLinksDnsZones
     privDnsSubscription: privDnsSubscription
     privDnsResourceGroup: privDnsResourceGroupName
     vNetName: vnetNameFull
     vNetResourceGroup: vnetResourceGroupName
     location: location
     allGlobal:privateDnsAndVnetLinkAllGlobalLocation
+    dnsZonesExistence:checkIfDnsZonesExists.outputs.existingPrivateDnsZones
   }
 }
-*/
+// ### End Create NEW Private DNS zones
 
-// Verify that at least 1 Private DNS zones exists in privDnsResourceGroupName and privDnsSubscription  before continuing
-resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' existing = if (centralDnsZoneByPolicyInHub==false){
-  name: 'privatelink.cognitiveservices.azure.com'
-  scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
+var aiHubName = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifProjectName = 'aif-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'), '-', '')
+var dashboardInsightsName = 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var applicationInsightName = 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aiServicesName = 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${prjResourceSuffixNoDash}'
+var bingName = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var containerAppsEnvName = 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var containerAppAName = 'aca-a-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${substring(resourceSuffix, 1)}'
+var containerAppWName = 'aca-w-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'
+var cosmosDBName = 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var functionAppName = 'func-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var webAppName = 'webapp-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var funcAppServicePlanName = 'func-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}-plan'
+var webbAppServicePlanName = 'webapp-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}-plan'
+var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
+var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+var storageAccount1001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}', '-', '')
+var storageAccount2001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}', '-', '')
+
+var aifName ='aif-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var redisName ='redis-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var postgreSQLName ='pg-flex-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var sqlServerName ='sql-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var sqlDBName ='sqldb-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+
+// Call the module using the defined variables
+module existingResource '../modules/checkExistingResources.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'existingResource-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    resourceGroupName: targetResourceGroup
+    resourceNames: {
+      aiFoundryHub: aiHubName
+      aiFoundryProject: aifProjectName
+      mlEndpoint: amlName
+      aiSearch: safeNameAISearch
+      dashboardInsights: dashboardInsightsName
+      applicationInsight: applicationInsightName
+      aiServices: aiServicesName
+      bing: bingName
+      containerAppsEnv: containerAppsEnvName
+      containerAppA: containerAppAName
+      containerAppW: containerAppWName
+      cosmosDB: cosmosDBName
+      functionApp: functionAppName
+      webApp: webAppName
+      funcAppServicePlan: funcAppServicePlanName
+      webbAppServicePlan: webbAppServicePlanName
+      keyvault: keyvaultName
+      miACA: miACAName
+      miPrj: miPrjName
+      storageAccount1001: storageAccount1001Name
+      storageAccount2001: storageAccount2001Name
+      redis: redisName
+      postgreSQL: postgreSQLName
+      sqlServer:sqlServerName
+      sqlDatabase:sqlDBName
+      aiFoundry: aifName
+    }
+  }
 }
 
 resource subnet_genai_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
@@ -748,9 +901,6 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
   name: commonResourceGroup
   scope:subscription(subscriptionIdDevTestProd)
 }
-
-var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
-var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
 
 // ------------------------------ RBAC ResourceGroups, Bastion,vNet, VMAdminLogin  ------------------------------//
 
@@ -947,8 +1097,6 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 
 
 // """"" Azure AI Services """"""  value: (contains(ip, '/') || endsWith(ip, '/32')) ? ip : '${ip}/32'
-
-var aiServicesName = 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${prjResourceSuffixNoDash}'
 module aiServices '../modules/csAIServices.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AIServices4${deploymentProjSpecificUniqueSuffix}'
@@ -1102,8 +1250,6 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   }
 ]
 
-var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}') ,'-','')
-
 module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzureAISearch==true) {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1153,7 +1299,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'GenAISAAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName: storageAccount2001Name //replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -1294,7 +1440,7 @@ module sacc '../modules/storageAccount.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}','-','')
+    storageAccountName:storageAccount1001Name //replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}','-','')
     skuName: 'Standard_LRS'
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -1396,7 +1542,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    name: applicationInsightName
     logWorkspaceName: laName
     logWorkspaceNameRG: commonResourceGroup
     tags: projecttags
@@ -1587,7 +1733,7 @@ module bing '../modules/bing.bicep' = if(serviceSettingDeployBingSearch==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'BingSearch4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    name: bingName
     location: 'global'
     sku: bingSearchSKU
     tags: projecttags
@@ -1597,12 +1743,13 @@ module bing '../modules/bing.bicep' = if(serviceSettingDeployBingSearch==true) {
   ]
 }
 
+// DATABASES - START
 // 'https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.${location}.api.azureml.ms'
-module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==true) {
+module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'CosmosDB4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    name: cosmosDBName
     location: location
     enablePublicGenAIAccess:enablePublicGenAIAccess
     ipRules:(empty(ipWhitelist_array) || !enablePublicGenAIAccess || enablePublicAccessWithPerimeter)? []:ipWhitelist_array
@@ -1612,6 +1759,7 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
     vnetResourceGroupName: vnetResourceGroupName
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
+    keyvaultName: kv1.outputs.keyvaultName
     vNetRules: [
       subnet_genai_ref.id
       subnet_aks_ref.id
@@ -1676,6 +1824,16 @@ module cosmosdb '../modules/cosmosdb.bicep' = if(serviceSettingDeployCosmosDB==t
   ]
 }
 
+module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(serviceSettingDeployCosmosDB==true){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'cosmosRbac${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    cosmosName: cosmosdb.outputs.name
+    usersOrAdGroupArray: p011_genai_team_lead_array
+    servicePrincipleAndMIArray: spAndMiArray
+  }
+}
+
 module privateDnsCosmos '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployCosmosDB && !enablePublicAccessWithPerimeter){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkCosmos${deploymentProjSpecificUniqueSuffix}'
@@ -1689,6 +1847,60 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!centralDnsZoneByPoli
   ]
 }
 
+module postgreSQL '../modules/databases/postgreSQL/postgreSQLFlexibleServer.bicep' = if(serviceSettingDeployPostgreSQL){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'PostgreSQL4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: postgreSQLName
+    location: location
+    tags: projecttags
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetNamePend: defaultSubnet
+    keyvaultName: kv1.outputs.keyvaultName
+    createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
+    sku: postgreSQLSKU
+    storage: postgreSQLStorage
+    version: postgreSQLVersion
+    resourceExists: existingResource.outputs.postgreSQLExists
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+module postgreSQLRbac '../modules/databases/postgreSQL/postgreSQLFlexibleServerRbac.bicep' = if(serviceSettingDeployPostgreSQL){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    postgreSqlServerName: postgreSQL.outputs.name
+    useAdGroups: useAdGroups
+    usersOrAdGroupArray: p011_genai_team_lead_array
+    servicePrincipleAndMIArray: spAndMiArray
+    resourceCreatedNow: (!existingResource.outputs.postgreSQLExists && !empty(postgreSQL.outputs.name))? true:false // It did not exist before, but now, so we need to create the RBAC
+  }
+  dependsOn: [
+    postgreSQL // postgreSQL module will run, that said the module can avoid creating the actual service, if it already existed before
+  ]
+}
+
+module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployPostgreSQL && !enablePublicAccessWithPerimeter){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkPostgreSQL${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: cosmosdb.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+    resourceCreatedNow: (existingResource.outputs.postgreSQLExists || empty(postgreSQL.outputs.name))? false:true // It did exist before, hence not created now, no need for RBAC
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+
+// REDIS
+// SQL DATABASE
+
+// DATABASES - END
 
 module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppInsightsDashboard) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1698,7 +1910,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     location: location
     tags: projecttags
     logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight.id
-    dashboardName: 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
+    dashboardName: dashboardInsightsName
   }
   dependsOn: [
     projectResourceGroup
@@ -1714,7 +1926,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'miForAca4${deploymentProjSpecificUniqueSuffix}'
     params: {
-      name: 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+      name: miACAName
       location: location
       tags: projecttags
     }
@@ -1805,7 +2017,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'WebApp4${deploymentProjSpecificUniqueSuffix}'
     params: {
-      name: 'webapp-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: webAppName
       location: location
       tags: projecttags
       sku: webappSKU
@@ -1886,7 +2098,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'Function4${deploymentProjSpecificUniqueSuffix}'
     params: {
-      name: 'func-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: functionAppName
       location: location
       tags: projecttags
       sku: functionSKU
@@ -2000,7 +2212,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
     name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
     params: {
-      name: 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+      name: containerAppsEnvName
       location: location
       tags: projecttags
       logAnalyticsWorkspaceName: laName
@@ -2082,7 +2294,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
     params: {
       location: location
       tags: projecttags
-      name: 'aca-w-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'
+      name: containerAppWName
       apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
       allowedOrigins: allowedOrigins
       containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
@@ -2119,7 +2331,6 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   
 // 
 // ------------------------------ SERVICES (Azure Machine Learning)  ------------------------------//
-var amlName ='aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // AKS: NB! Standard_D12 is not allowed in WE for agentpool   [standard_a4_v2]
 param aks_dev_defaults array = [
@@ -2226,8 +2437,6 @@ module aml '../modules/machineLearning.bicep'= if(serviceSettingDeployAzureMLCla
   
 }
 
-var aifName ='aif-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifProjectName ='aif-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(serviceSettingEnableAIFoundryPreview) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AIFoundryPrevview4${deploymentProjSpecificUniqueSuffix}'
@@ -2240,7 +2449,6 @@ module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(serviceSetti
 }
 
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-var aiHubName ='ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 module aiHub '../modules/machineLearningAIHub.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
@@ -2294,7 +2502,7 @@ module miForPrj '../modules/mi.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'miForPrj${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+    name: miPrjName
     location: location
     tags: projecttags
   }

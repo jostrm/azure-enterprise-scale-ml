@@ -6,6 +6,7 @@ param aiSearchName string // Resource ID for Azure AI Search
 param resourceGroupId string // Resource group ID where resources are located
 param userObjectIds array // Specific user's object ID's for "User to Service Table"
 param aiServicesName string // AIServices name, e.g. AIStudio name
+param useAdGroups bool
 
 // Role Definition IDs
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
@@ -188,7 +189,7 @@ resource roleAssignmentSearchIndexUserDataContributor 'Microsoft.Authorization/r
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'020: SearchIndexUserDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingAiSearch.name}'
   }
   scope:existingAiSearch
@@ -199,7 +200,7 @@ resource roleAssignmentSearchContributor 'Microsoft.Authorization/roleAssignment
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'021: Contributor to USER with OID  ${userObjectIds[i]} for : ${existingAiSearch.name}'
   }
   scope:existingAiSearch
@@ -212,7 +213,7 @@ resource userRoleAssignmentContributorAiSearch 'Microsoft.Authorization/roleAssi
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'022: CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name}'
   }
   scope:existingAiSearch
@@ -223,7 +224,7 @@ resource roleAssignmentCognitiveServicesOpenAICotributorUsers 'Microsoft.Authori
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'023: OpenAIContributorRole to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to call data on data plane'
   }
   scope:existingAiServicesResource
@@ -234,7 +235,7 @@ resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/rol
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'024: OpenAICognitiveServicesUSer to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to list API keys'
   }
   scope:existingAiServicesResource
@@ -246,7 +247,7 @@ resource userRoleAssignmentContributorAiServices 'Microsoft.Authorization/roleAs
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'025: CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name}'
   }
   scope:existingAiServicesResource
@@ -259,7 +260,7 @@ resource userStorageBlobDataContributorRole 'Microsoft.Authorization/roleAssignm
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'027a: StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
@@ -269,7 +270,7 @@ resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssign
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'027b: StorageBlobDataContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
@@ -280,7 +281,7 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor 'Microsoft.Autho
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'028a: FileDataPrivilegedContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
   }
   scope:existingStorageAccount
@@ -290,7 +291,7 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Auth
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
     principalId: userObjectIds[i]
-    principalType: 'User'
+    principalType:useAdGroups? 'Group':'User'
     description:'028b: FileDataPrivilegedContributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2

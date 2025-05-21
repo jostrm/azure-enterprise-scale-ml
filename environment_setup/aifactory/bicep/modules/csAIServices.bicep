@@ -173,7 +173,6 @@ resource keyVaultOpenAI 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup()
 }
 
-
 @description('Key Vault: Azure AI Services endpoint in vault as S')
 resource epValueAIServices 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVaultOpenAI

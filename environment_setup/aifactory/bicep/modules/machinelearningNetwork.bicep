@@ -35,7 +35,7 @@ var privateAznbDnsZoneName = {
     azurecloud: 'privatelink.notebooks.azure.net'
 }
 
-resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2020-11-01' = {
+resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: machineLearningPleName
   location: location
   tags: tags
@@ -62,7 +62,7 @@ resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2020
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (centralDnsZoneByPolicyInHub == false) {
   name: '${machineLearningPrivateEndpoint.name}/${machineLearningPrivateEndpoint.name}DnsZone'
   properties:{
     privateDnsZoneConfigs: [

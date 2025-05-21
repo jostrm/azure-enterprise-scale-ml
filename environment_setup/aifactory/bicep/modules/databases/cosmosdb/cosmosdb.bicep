@@ -22,10 +22,14 @@ param vnetResourceGroupName string
 @minValue(4000)
 @maxValue(1000000)
 param autoscaleMaxThroughput int = 4000
-param databaseName string = 'defaultdb'
+param databaseName string = 'aifdb'
 param containerName string = 'defaultcontainer'
 param partitionKeyPath string = '/id'
 param minimalTlsVersion string = 'TLS1.2'
+param connectionStringKey string = 'aifactory-proj-cosmosdb-con-string'
+param keyvaultName string
+@description('Default TTL in seconds. Set to -1 to disable or positive integer for automatic document expiration')
+param defaultTtl int = -1
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -79,7 +83,10 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
       ipAddressOrRange: string(rule) // Ensure proper string conversion
     }]
     isVirtualNetworkFilterEnabled: vNetRules != []
-    //TODO-1: cors: length(corsRules) > 0 ? corsRules : null
+    //TODO-1: cors
+    //cors: length(corsRules) > 0 ? {
+    //      allowedOrigins: corsRules
+    //} : null
     networkAclBypass:'AzureServices'
     publicNetworkAccess:(enablePublicGenAIAccess||enablePublicAccessWithPerimeter)?'Enabled':'Disabled'
     virtualNetworkRules: enablePublicAccessWithPerimeter?[]:rules
@@ -90,6 +97,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
 resource cosmosDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-12-01-preview' = if(kind == 'GlobalDocumentDB') {
   parent: cosmos
   name: databaseName
+  tags:tags
   properties: {
     resource: {
       id: databaseName
@@ -124,6 +132,7 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
           }
         ]
       }
+      defaultTtl: defaultTtl // TTL in seconds, -1 to disable, positive for expiration time
     }
     options: (capacityMode == 'Provisioned') ? {
       autoscaleSettings: {
@@ -132,7 +141,47 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
     } : {}
   }
 }
-resource pendCosmos 'Microsoft.Network/privateEndpoints@2022-01-01' = if(createPrivateEndpoint) {
+// Add MongoDB database and collection resources
+
+// MongoDB database
+resource mongoDatabase 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases@2024-12-01-preview' = if(kind == 'MongoDB') {
+  parent: cosmos
+  name: databaseName
+  tags:tags
+  properties: {
+    resource: {
+      id: databaseName
+    }
+  }
+}
+
+// MongoDB collection
+resource mongoCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2024-12-01-preview' = if(kind == 'MongoDB') {
+  parent: mongoDatabase
+  name: containerName
+  tags:tags
+  properties: {
+    resource: {
+      id: containerName
+      shardKey: {
+        '${replace(partitionKeyPath, '/', '')}': 'Hash'
+      }
+      indexes: [
+        {
+          key: {
+            keys: ['_id']
+          }
+        }
+      ]
+    }
+    options: (capacityMode == 'Provisioned') ? {
+      autoscaleSettings: {
+        maxThroughput: autoscaleMaxThroughput
+      }
+    } : {}
+  }
+}
+resource pendCosmos 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
   name: 'pend-cosmosdb-sql-${name}'
   location: location
   properties: {
@@ -156,7 +205,24 @@ resource pendCosmos 'Microsoft.Network/privateEndpoints@2022-01-01' = if(createP
       }
     ]
   }
-  
+}
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName
+  scope: resourceGroup()
+}
+
+@description('Key Vault: CosmosDB')
+resource cosmosConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: connectionStringKey
+  properties: {
+    value: cosmos.listConnectionStrings().connectionStrings[0].connectionString
+    contentType: 'text/plain'
+    attributes: {
+      enabled: true
+    }
+  }
 }
 
 output endpoint string = cosmos.properties.documentEndpoint

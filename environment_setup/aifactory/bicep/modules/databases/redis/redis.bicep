@@ -3,26 +3,21 @@
 @minLength(1)
 param name string
 
-@description('Optional. The location to deploy the Redis cache service.')
-param location string = resourceGroup().location
-
-@description('Optional. Tags of the resource.')
-param tags object = {}
-
+param connectionStringKey string = 'aifactory-proj-redis-con-string'
+param redisVersion string = '7.2'
+param minimumTlsVersion string = '1.2'
+param vnetName string
+param subnetNamePend string
+param vnetResourceGroupName string
+param location string
+param tags object
 @description('The name of an existing keyvault, that it will be used to store secrets (connection string)' )
 param keyvaultName string
-
-// @description('Optional. Enables system assigned managed identity on the resource.')
-// param systemAssignedIdentity bool = false
-
-// @description('Optional. The ID(s) to assign to the resource.')
-// param userAssignedIdentities object = {}
+param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
+param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the resource.
 
 @description('Optional. Specifies whether the non-ssl Redis server port (6379) is enabled.')
 param enableNonSslPort bool = false
-
-@description('Optional. All Redis Settings. Few possible keys: rdb-backup-enabled,rdb-storage-connection-string,rdb-backup-frequency,maxmemory-delta,maxmemory-policy,notify-keyspace-events,maxmemory-samples,slowlog-log-slower-than,slowlog-max-len,list-max-ziplist-entries,list-max-ziplist-value,hash-max-ziplist-entries,hash-max-ziplist-value,set-max-intset-entries,zset-max-ziplist-entries,zset-max-ziplist-value etc.')
-param redisConfiguration object = {}
 
 @minValue(1)
 @description('Optional. The number of replicas to be created per primary.')
@@ -83,7 +78,42 @@ param diagnosticMetricsToEnable array = [
 ]
 
 @description('Has the resource private endpoint?')
-param hasPrivateLink bool = false
+param createPrivateEndpoint bool
+
+
+@description('Optional. Redis configuration. See https://docs.microsoft.com/azure/azure-cache-for-redis/cache-configure for valid values.')
+param redisConfiguration object = {
+  'maxmemory-policy': 'volatile-lru'
+  'maxmemory-reserved': '50'
+  'maxfragmentationmemory-reserved': '50'
+}
+
+// Add an update channel parameter
+@allowed([
+  'None'
+  'Patch'
+  'Minor'
+  'Major'
+])
+@description('Optional. Specifies which Redis updates are automatically applied. Default is None.')
+param updateChannel string = 'None'
+
+// Add a zonal allocation policy parameter for Premium SKUs
+@allowed([
+  ''
+  'Enabled'
+  'Disabled'
+])
+@description('Optional. Specifies distribution of Redis cache nodes across Availability Zones. Only supported for Premium SKUs.')
+param zonalAllocationPolicy string = ''
+
+// Add option for disabling access key authentication (useful for AAD auth)
+@description('Optional. Disables access via Redis keys. Requires AAD integration.')
+param disableAccessKeyAuthentication bool = false
+
+// Add AAD integration option
+@description('Optional. Enables Azure Active Directory authentication.')
+param enableAadIntegration bool = false
 
 var diagnosticsLogsSpecified = [for category in filter(diagnosticLogCategoriesToEnable, item => item != 'allLogs'): {
   category: category
@@ -103,31 +133,45 @@ var diagnosticsMetrics = [for metric in diagnosticMetricsToEnable: {
   enabled: true
 }]
 
-// var identityType = systemAssignedIdentity ? 'SystemAssigned' : !empty(userAssignedIdentities) ? 'UserAssigned' : 'None'
+var identityType = systemAssignedIdentity 
+  ? (!empty(userAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned') 
+  : (!empty(userAssignedIdentities) ? 'UserAssigned' : 'None')
 
-// var identity = {
-//   type: identityType
-//   userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
-// }
+var identity = identityType != 'None' ? {
+  type: identityType
+  userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
+} : null
 
-resource keyVault 'Microsoft.KeyVault/vaults@2022-11-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
 }
 
-resource redisCache 'Microsoft.Cache/redis@2021-06-01' = {
+/*
+Default values for common Redis configuration settings
+Support for features like update channels and zonal allocation
+Include options for modern authentication methods
+Make explicit some default values that were implicit before
+*/
+resource redisCache 'Microsoft.Cache/redis@2024-11-01' = {
   name: name
   location: location
   tags: tags
-//  identity: identity    //20230301-getting a strange error that publcNetworkAccess and Identity cannot be set at the same time. The following updates can't be processed in one single request, please send seperate request to update them: 'properties.publicNetworkAccess,identity
+  identity: identity
   properties: {
     enableNonSslPort: enableNonSslPort
-    minimumTlsVersion: '1.2'
-    publicNetworkAccess: hasPrivateLink ? 'Disabled' : null
-    redisConfiguration: !empty(redisConfiguration) ? redisConfiguration : null
-    redisVersion: '6'
+    minimumTlsVersion: minimumTlsVersion
+    publicNetworkAccess: createPrivateEndpoint ? 'Disabled' : 'Enabled'
+    redisConfiguration: union(
+      redisConfiguration,
+      enableAadIntegration ? { 'aad-enabled': 'true' } : {}
+    )
+    redisVersion: redisVersion
     replicasPerMaster: skuName == 'Premium' ? replicasPerMaster : null
     replicasPerPrimary: skuName == 'Premium' ? replicasPerPrimary : null
-    shardCount: skuName == 'Premium' ? shardCount : null // Not supported in free tier
+    shardCount: skuName == 'Premium' ? shardCount : null
+    disableAccessKeyAuthentication: disableAccessKeyAuthentication
+    updateChannel: updateChannel
+    zonalAllocationPolicy: skuName == 'Premium' ? zonalAllocationPolicy : null
     sku: {
       capacity: capacity
       family: skuName == 'Premium' ? 'P' : 'C'
@@ -138,13 +182,18 @@ resource redisCache 'Microsoft.Cache/redis@2021-06-01' = {
   zones: skuName == 'Premium' ? pickZones('Microsoft.Cache', 'redis', location, 1) : null
 }
 
-resource redisConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2018-02-14' = {
-  name: 'redisConStrSecret'
+@description('Key Vault: REDIS')
+resource redisConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
+  name: connectionStringKey
   properties: {
     value: '${redisCache.properties.hostName},password=${redisCache.listKeys().primaryKey},ssl=True,abortConnect=False' //'${name}.redis.cache.windows.net,abortConnect=false,ssl=true,password=${listKeys(redis.id, redis.apiVersion).primaryKey}'
+    contentType: 'text/plain'
+    attributes: {
+      enabled: true
+    }
   }
-} 
+}
 
 resource redisCache_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if ( !empty(diagnosticWorkspaceId) ) {
   name: diagnosticSettingsName
@@ -157,6 +206,42 @@ resource redisCache_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@20
     logs:  empty(diagnosticWorkspaceId) ? null : diagnosticsLogs
   }
   scope: redisCache
+}
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+  scope: resourceGroup(vnetResourceGroupName)
+}
+
+resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  name: subnetNamePend
+  parent: vnet
+}
+
+resource pendRedis 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
+  name: 'pend-redis-${name}'
+  location: location
+  properties: {
+    subnet: {
+      id: subnetPend.id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'pend-redis-${name}'
+        properties: {
+          privateLinkServiceId: redisCache.id
+          groupIds: [
+            'redisCache'
+          ]
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+  }
 }
 
 @description('The resource name.')
@@ -179,3 +264,12 @@ output location string = redisCache.location
 
 @description('The name of the secret in keyvault, holding the connection string to redis.')
 output redisConnectionStringSecretName string = redisConnectionStringSecret.name
+output dnsConfig array = [
+  {
+    name: createPrivateEndpoint? redisCache.name: ''
+    type: 'redis'
+    id:createPrivateEndpoint? redisCache.id: ''
+  }
+]
+
+
