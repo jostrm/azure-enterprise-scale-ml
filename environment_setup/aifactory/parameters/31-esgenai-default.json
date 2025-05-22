@@ -44,6 +44,12 @@
         "serviceSettingDeployPostgreSQL":{ 
             "value": false
         },
+        "serviceSettingDeployRedisCache":{ 
+            "value": false
+        },
+        "serviceSettingDeploySQLDatabase":{ 
+            "value": false
+        },
         "disableContributorAccessForUsers": {
             "value": false
         },
