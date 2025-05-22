@@ -7,12 +7,7 @@ param vnetName string
 param subnetNamePend string
 param vnetResourceGroupName string
 param createPrivateEndpoint bool
-param skuObject object = {
-  name: 'Standard'
-  tier: 'Standard'
-  capacity: 1
-  family: 'Gen5'
-}
+param skuObject object
 
 param appUser string = 'aifactory-user'
 param sqlAdmin string = 'aifactory-admin'
@@ -50,7 +45,7 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
   resource database 'databases' = {
     name: databaseName
     location: location
-    sku: skuObject
+    sku: !empty(skuObject)? skuObject: {}
   }
 
   resource firewall 'firewallRules' = {

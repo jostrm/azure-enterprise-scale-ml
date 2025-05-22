@@ -29,6 +29,13 @@ create_or_update_variable() {
   local env=$1
   local name=$2
   local value=$3
+  # Check if the value is empty
+  if [[ -z "$value" ]]; then
+    # #echo -e "${RED}Error: Variable '$name' for environment '$env' has an empty value. Skipping.${NC}"
+    echo -e "${YELLOW}Skipping variable '$name' for environment '$env' because the value is empty.${NC}"
+    return
+  fi
+
   if check_variable_exists $env $name; then
     gh api --method PATCH -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/$env/variables/$name -f value="$value"
   else
@@ -125,11 +132,11 @@ for env in "${environments[@]}"; do
     # Project Specifics (1st project bootstrap): 
     create_or_update_secret $env "PROJECT_MEMBERS" "$PROJECT_MEMBERS"
     create_or_update_secret $env "PROJECT_MEMBERS_IP_ADDRESS" "$PROJECT_MEMBERS_IP_ADDRESS"
-
     create_or_update_secret $env "TENANT_ID" "$TENANT_ID"
-    create_or_update_secret $env "BYO_SUBNETS" "$BYO_SUBNETS"
-    create_or_update_secret $env "AIFACTORY_VERSION_MAJOR" "$BYO_SUBNETS"
-    create_or_update_secret $env "AIFACTORY_VERSION_MINOR" "$AIFACTORY_VERSION_MINOR"
+    # Variables: 
+    create_or_update_variable $env "BYO_SUBNETS" "$BYO_SUBNETS"
+    create_or_update_variable $env "AIFACTORY_VERSION_MAJOR" "$BYO_SUBNETS"
+    create_or_update_variable $env "AIFACTORY_VERSION_MINOR" "$AIFACTORY_VERSION_MINOR"
 done
 
 # DEV variables

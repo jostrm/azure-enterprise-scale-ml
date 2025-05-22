@@ -130,17 +130,21 @@ param sqlServerFamily string = 'Gen5'
 param sqlServerStorageSize int = 32
 param sqlServerStorageIops int = 120
 param sqlServerStorageAutogrow bool = true
+var sqlServerSKUObject = ''
+/*
 var sqlServerSKUObject = {
   name: sqlServerSKU
   tier: sqlServerTier
   family: sqlServerFamily
   capacity: sqlServerCapacity
 }
+*/
+
 // Databases:CosmosDB
 param serviceSettingDeployCosmosDB bool = false
 param cosmosTotalThroughputLimit int = 1000
 param cosmosKind string = 'GlobalDocumentDB'
-param cosmosMinimalTlsVersion string = 'Tls1_2'
+param cosmosMinimalTlsVersion string = 'Tls12' //<-docs error -> 'Tls1_2'
 
 // Databases
 
@@ -2003,7 +2007,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(servi
     databaseName: sqlDBName
     location: location
     tags: projecttags
-    skuObject: sqlServerSKUObject
+    skuObject: empty(sqlServerSKUObject)?{}:sqlServerSKUObject
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName

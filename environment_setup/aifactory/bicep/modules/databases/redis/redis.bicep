@@ -4,7 +4,7 @@
 param name string
 
 param connectionStringKey string = 'aifactory-proj-redis-con-string'
-param redisVersion string = '7.2'
+param redisVersion string = '7.0' //'7.2'
 param minimumTlsVersion string = '1.2'
 param vnetName string
 param subnetNamePend string

@@ -25,7 +25,7 @@ param autoscaleMaxThroughput int = 4000
 param databaseName string = 'aifdb'
 param containerName string = 'defaultcontainer'
 param partitionKeyPath string = '/id'
-param minimalTlsVersion string = 'Tls1_2' //'Tls1_1', 'Tls1_0'
+param minimalTlsVersion string = 'Tls12' // docs. //todo: 'TLS 1.2' //done-error: 'Tls1_2'
 param connectionStringKey string = 'aifactory-proj-cosmosdb-con-string'
 param keyvaultName string
 @description('Default TTL in seconds. Set to -1 to disable or positive integer for automatic document expiration')
