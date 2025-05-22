@@ -13,7 +13,10 @@ env:
     ENABLE_STEP: 'false' # Enable/Disable a step
     ENABLE_DEBUG_STEP: 'false' # Enable/Disable a step
     ENABLE_NETWORKING_JOB: "${{ vars.RUN_JOB1_NETWORKING }}"
-        
+    
+    AIFACTORY_VERSION_MAJOR: "${{ vars.AIFACTORY_VERSION_MAJOR }}" # Minor version of the AIFactory. 1 in 1.12
+    AIFACTORY_VERSION_MINOR: "${{ vars.AIFACTORY_VERSION_MINOR }}" # Minor as 21 in 1.21 
+    
     # ADMIN usual culprits - verify, twice. (only configure once)
     admin_bicep_input_keyvault_subscription: "${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}" # seeding keyvault, subscription id
     admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}" # seeding keyvault, name
