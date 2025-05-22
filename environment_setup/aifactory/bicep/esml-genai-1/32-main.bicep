@@ -1,5 +1,7 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+param aifactoryVersionMajor int = 1
+param aifactoryVersionMinor int = 26
 param useAdGroups bool = false
 
 // Optional override
@@ -744,7 +746,11 @@ var newPrivateLinksDnsZones = [
     id: privateLinksDnsZones.sql.id
   }
 ]
-module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZonesIfNotExistsv2.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+
+var aifactoryVersionString = '${aifactoryVersionMajor}${aifactoryVersionMinor}'
+var aifactoryVersion = int(aifactoryVersionString)
+
+module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false && aifactoryVersion <121) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -757,7 +763,6 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZonesIfNo
     allGlobal:privateDnsAndVnetLinkAllGlobalLocation
   }
 }
-
 
 /*
 module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
@@ -2029,7 +2034,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
         }
       ]
     }
-    
+
   }
 
   // AZURE WEBAPP
@@ -2306,6 +2311,7 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
       aiSearchService
       cmnRbacACR
       containerAppsEnv
+      subnetDelegationAca
     ] 
   }
   module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps) {

@@ -24,7 +24,6 @@ resource postgreSqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-
 }
 
 // Role assignments for users or AD groups
-@onlyIfNotExists()
 resource userPostgreSqlRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in usersOrAdGroupArray: {
 //resource userPostgreSqlRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in usersOrAdGroupArray:  if(resourceCreatedNow) {
   name: guid(postgreSqlServer.id, contributorRoleId, principalId)
@@ -41,7 +40,6 @@ resource userPostgreSqlRoleAssignment 'Microsoft.Authorization/roleAssignments@2
 Service Principals cannot generate AAD_AUTH_TOKENTYPE_APP_USER tokens for role-based access 1. 
 This means managed identities or service principals may not be suitable for direct database login unless explicitly supported.
 */
-@onlyIfNotExists()
 resource spPostgreSqlRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in servicePrincipleAndMIArray:{
 //resource spPostgreSqlRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in servicePrincipleAndMIArray:  if(resourceCreatedNow) {
   name: guid(postgreSqlServer.id, contributorRoleId, principalId) // Updated to use Admin role

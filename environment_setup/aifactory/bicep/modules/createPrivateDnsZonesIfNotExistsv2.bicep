@@ -15,9 +15,18 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 @onlyIfNotExists()
 resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for (zone, index) in privateLinksDnsZones: {
   name: zone.name
+  location: locationGlobal
+  properties: {}
+}]
+
+/*
+@onlyIfNotExists()
+resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for (zone, index) in privateLinksDnsZones: {
+  name: zone.name
   location: (zone.name == '${location}.data.privatelink.azurecr.io' && allGlobal == false) ? location : locationGlobal
   properties: {}
 }]
+*/
 
 @onlyIfNotExists()
 resource filePrivateDnsZoneVnetLinkLoop 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = [for (zone, index) in privateLinksDnsZones: {

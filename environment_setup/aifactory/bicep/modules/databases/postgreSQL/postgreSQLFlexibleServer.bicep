@@ -46,7 +46,7 @@ var defaultDbName = 'aifdb' // Default database name
 var dbNameToUse = !empty(databaseNames) ? first(databaseNames) : defaultDbName
 
 //resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' = if(!resourceExists) {
-@onlyIfNotExists()
+
 #disable-next-line BCP081
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' = {
   location: location
@@ -63,13 +63,13 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-pr
       mode: 'Disabled'
     }
   }
-  @onlyIfNotExists()
+
   #disable-next-line BCP081
   resource database 'databases' = [for name in databaseNames:{
   //resource database 'databases' = [for name in databaseNames: if(!resourceExists){
     name: name
   }]
-  @onlyIfNotExists()
+
   #disable-next-line BCP081
   resource firewall_all 'firewallRules' = if (allowAllIPsFirewall) {
   //resource firewall_all 'firewallRules' = if (allowAllIPsFirewall && !resourceExists) {
@@ -79,7 +79,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-pr
       endIpAddress: '255.255.255.255'
     }
   }
-  @onlyIfNotExists()
+
   #disable-next-line BCP081
   resource firewall_azure 'firewallRules' = if (allowAzureIPsFirewall) {
   //resource firewall_azure 'firewallRules' = if (allowAzureIPsFirewall && !resourceExists) {
@@ -89,7 +89,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-pr
       endIpAddress: '0.0.0.0'
     }
   }
-  @onlyIfNotExists()
+
   #disable-next-line BCP081
   resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: {
   //resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: if(!resourceExists){
@@ -101,21 +101,18 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-pr
   }]
 
 }
-@onlyIfNotExists()
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 //resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = if(!resourceExists){
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
 }
 
-@onlyIfNotExists()
 resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
 //resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = if(!resourceExists){
   name: subnetNamePend
   parent: vnet
 }
 
-@onlyIfNotExists()
 resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
 //resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint && !resourceExists) {
   name: 'pend-postgreSQLFlexibleServer-${name}'
@@ -143,14 +140,12 @@ resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if
   }
 }
 
-@onlyIfNotExists()
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 //resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = if(!resourceExists){
   name: keyvaultName
 }
 
 @description('Key Vault: PostgreSQL connection string')
-@onlyIfNotExists()
 resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
 //resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!resourceExists){
   parent: keyVault

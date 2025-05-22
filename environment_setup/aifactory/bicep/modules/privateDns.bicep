@@ -3,8 +3,6 @@ param privateLinksDnsZones object
 param resourceCreatedNow bool = false
 
 //resource privateEndpointDnsZone 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-08-01' = [ for obj in dnsConfig: if(resourceCreatedNow){
-
-@onlyIfNotExists()
 resource privateEndpointDnsZone 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-08-01' = [ for obj in dnsConfig: {
   name: '${obj.name}/${obj.name}DnsZone'
   properties: {

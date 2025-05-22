@@ -27,8 +27,5 @@
                 }
             }
         }
-    },
-    "experimentalFeaturesEnabled": {
-    "onlyIfNotExists": true
-  }
+    }
 }
