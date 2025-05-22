@@ -7,6 +7,12 @@ param vnetName string
 param subnetNamePend string
 param vnetResourceGroupName string
 param createPrivateEndpoint bool
+param skuObject object = {
+  name: 'Standard'
+  tier: 'Standard'
+  capacity: 1
+  family: 'Gen5'
+}
 
 param appUser string = 'aifactory-user'
 param sqlAdmin string = 'aifactory-admin'
@@ -14,11 +20,20 @@ param databaseName string ='aifdb'
 param connectionStringKey string = 'aifactory-proj-sqldb-con-string'
 
 @secure()
-param sqlAdminPassword string
+param sqlAdminPassword string = ''
 @secure()
-param appUserPassword string
+param appUserPassword string = ''
 
 var connectionString = 'Server=${sqlServer.properties.fullyQualifiedDomainName}; Database=${sqlServer::database.name}; User=${appUser}'
+var seed = uniqueString(resourceGroup().id, subscription().subscriptionId, deployment().name)
+var uppercaseLetter = substring(toUpper(seed), 0, 1)
+var lowercaseLetter = substring(toLower(seed), 1, 1)
+var numbers = substring(seed, 2, 4)
+var specialChar = '!@#$'
+var randomSpecialChar = substring(specialChar, length(seed) % length(specialChar), 1)
+var randomSpecialChar2 = substring(specialChar, length(seed) % length(specialChar), 1)
+var adminPwd = empty(sqlAdminPassword)? '${uppercaseLetter}${lowercaseLetter}${randomSpecialChar}${numbers}${guid(deployment().name)}': sqlAdminPassword
+var userPwd = empty(appUserPassword)? '${uppercaseLetter}${lowercaseLetter}${randomSpecialChar2}${numbers}${guid(deployment().name)}': appUserPassword
 
 resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
   name: serverName
@@ -29,12 +44,13 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
     minimalTlsVersion: '1.2'
     publicNetworkAccess: 'Enabled'
     administratorLogin: sqlAdmin
-    administratorLoginPassword: sqlAdminPassword
+    administratorLoginPassword: adminPwd
   }
 
   resource database 'databases' = {
     name: databaseName
     location: location
+    sku: skuObject
   }
 
   resource firewall 'firewallRules' = {
@@ -65,7 +81,7 @@ resource sqlDeploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' 
       }
       {
         name: 'APPUSERPASSWORD'
-        secureValue: appUserPassword
+        secureValue: userPwd
       }
       {
         name: 'DBNAME'
@@ -111,7 +127,7 @@ resource sqlAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =
   parent: keyVault
   name: 'sqlAdminPassword'
   properties: {
-    value: sqlAdminPassword
+    value: adminPwd
     contentType: 'text/plain'
     attributes: {
       enabled: true
@@ -123,7 +139,7 @@ resource appUserPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = 
   parent: keyVault
   name: 'appUserPassword'
   properties: {
-    value: appUserPassword
+    value: userPwd
     contentType: 'text/plain'
     attributes: {
       enabled: true
@@ -135,7 +151,7 @@ resource sqlAzureConnectionStringSercret 'Microsoft.KeyVault/vaults/secrets@2023
   parent: keyVault
   name: connectionStringKey
   properties: {
-    value: '${connectionString}; Password=${appUserPassword}'
+    value: '${connectionString}; Password=${userPwd}'
     contentType: 'text/plain'
     attributes: {
       enabled: true

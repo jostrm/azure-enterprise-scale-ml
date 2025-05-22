@@ -114,8 +114,28 @@ param postgreSQLVersion string = '11' // PostgreSQL version
 
 // Databases:REDIS
 param serviceSettingDeployRedisCache bool = false
+@allowed([
+  'Basic'
+  'Premium'
+  'Standard'
+])
+param redisSKU string = 'Standard' // 'Basic' 'Standard' 'Premium'
+
 // Databases:SQL Database
 param serviceSettingDeploySQLDatabase bool = false
+param sqlServerSKU string = 'Standard'
+param sqlServerCapacity int = 1
+param sqlServerTier string = 'Standard'
+param sqlServerFamily string = 'Gen5'
+param sqlServerStorageSize int = 32
+param sqlServerStorageIops int = 120
+param sqlServerStorageAutogrow bool = true
+var sqlServerSKUObject = {
+  name: sqlServerSKU
+  tier: sqlServerTier
+  family: sqlServerFamily
+  capacity: sqlServerCapacity
+}
 // Databases:CosmosDB
 param serviceSettingDeployCosmosDB bool = false
 param cosmosTotalThroughputLimit int = 1000
@@ -1926,7 +1946,74 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneBy
 }
 
 // REDIS
+
+module redisCache '../modules/databases/redis/redis.bicep' = if(serviceSettingDeployRedisCache) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'RedisCache4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: redisName
+    location: location
+    tags: projecttags
+    skuName: redisSKU
+    subnetNamePend: defaultSubnet
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    keyvaultName: kv1.outputs.keyvaultName
+    createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(serviceSettingDeployRedisCache) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'RedisCacheRbac4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    redisName: redisCache.outputs.name
+    useAdGroups: useAdGroups
+    usersOrAdGroupArray: p011_genai_team_lead_array
+    servicePrincipleAndMIArray: spAndMiArray
+  }
+  dependsOn: [
+    redisCache
+  ]
+}
+
+module privateDnsRedisCache '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployRedisCache && !enablePublicAccessWithPerimeter){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkRedisCache${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: redisCache.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+
 // SQL DATABASE
+
+module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(serviceSettingDeploySQLDatabase) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'SqlServer4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    serverName: sqlServerName
+    databaseName: sqlDBName
+    location: location
+    tags: projecttags
+    skuObject: sqlServerSKUObject
+    subnetNamePend: defaultSubnet
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    keyvaultName: kv1.outputs.keyvaultName
+    createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
 
 // DATABASES - END
 

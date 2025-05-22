@@ -2,7 +2,6 @@ metadata description = 'Creates role assignments for Redis Cache.'
 param usersOrAdGroupArray array
 param servicePrincipleAndMIArray array
 param redisName string
-param resourceGroupName string
 param useAdGroups bool
 
 // Redis Cache built-in roles
