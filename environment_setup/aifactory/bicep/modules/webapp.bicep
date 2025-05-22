@@ -58,12 +58,6 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!
   name: applicationInsightsName
 }
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = if (!empty(logAnalyticsWorkspaceName)) {
-  name: logAnalyticsWorkspaceName
-  scope: resourceGroup(logAnalyticsWorkspaceRG)
-}
-
-
 // Get subnet reference for private endpoint
 resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
   name: '${vnetName}/${subnetNamePend}'

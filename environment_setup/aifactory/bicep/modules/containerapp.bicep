@@ -151,6 +151,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       } : { enabled: false }
       secrets: [for secret in items(secrets): {
         name: secret.key
+        #disable-next-line use-secure-value-for-secure-inputs
         value: secret.value
         //identity: userIdentity.id
         //keyVaultUrl: '${keyVaultUrl}secrets/aifactory-proj-${secret.key}'

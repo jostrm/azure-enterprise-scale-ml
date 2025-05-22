@@ -167,6 +167,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' //'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      #disable-next-line BCP037
       enableNetworkMonitor:false
     }
     //softDeleteEnabled: false

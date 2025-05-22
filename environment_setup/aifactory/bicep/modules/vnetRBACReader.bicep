@@ -6,20 +6,11 @@ param servicePrincipleAndMIArray array // Service Principle Object ID, User crea
 param user_object_ids array
 param useAdGroups bool = false // Use AD groups for role assignments
 
-var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
-@description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
-resource readerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
-  scope: subscription()
-  name: readerRoleDefinitionId
-}
-
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource networkContributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
   name: '4d97b98b-1d4f-4787-a291-c67834d212e7'
 }
-
-
 
 // vNet - Network Contributor: Reader was not enough. Network Contributor is needed, to be able to JOIN subnets
 // subet - Microsoft.Network/virtualNetworks/subnets/join/action

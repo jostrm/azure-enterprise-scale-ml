@@ -47,6 +47,7 @@ var dbNameToUse = !empty(databaseNames) ? first(databaseNames) : defaultDbName
 
 //resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' = if(!resourceExists) {
 @onlyIfNotExists()
+#disable-next-line BCP081
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' = {
   location: location
   tags: tags
@@ -63,11 +64,13 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-pr
     }
   }
   @onlyIfNotExists()
+  #disable-next-line BCP081
   resource database 'databases' = [for name in databaseNames:{
   //resource database 'databases' = [for name in databaseNames: if(!resourceExists){
     name: name
   }]
   @onlyIfNotExists()
+  #disable-next-line BCP081
   resource firewall_all 'firewallRules' = if (allowAllIPsFirewall) {
   //resource firewall_all 'firewallRules' = if (allowAllIPsFirewall && !resourceExists) {
     name: 'allow-all-IPs'
@@ -77,6 +80,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-pr
     }
   }
   @onlyIfNotExists()
+  #disable-next-line BCP081
   resource firewall_azure 'firewallRules' = if (allowAzureIPsFirewall) {
   //resource firewall_azure 'firewallRules' = if (allowAzureIPsFirewall && !resourceExists) {
     name: 'allow-all-azure-internal-IPs'
@@ -86,6 +90,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-pr
     }
   }
   @onlyIfNotExists()
+  #disable-next-line BCP081
   resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: {
   //resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: if(!resourceExists){
     name: 'allow-single-${replace(ip, '.', '')}'
@@ -158,7 +163,7 @@ resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07
     }
   }
 }
-
+#disable-next-line BCP081
 resource postgresServerExists 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' existing = {
   name: name
 }

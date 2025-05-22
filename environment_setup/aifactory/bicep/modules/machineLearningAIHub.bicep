@@ -188,6 +188,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutbound' //'Disabled' meaning no restrictions
+      #disable-next-line BCP037
       enableNetworkMonitor:false
       outboundRules: {
         search: {
@@ -436,6 +437,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      #disable-next-line BCP037
       enableNetworkMonitor:false
       outboundRules: {
         search: {

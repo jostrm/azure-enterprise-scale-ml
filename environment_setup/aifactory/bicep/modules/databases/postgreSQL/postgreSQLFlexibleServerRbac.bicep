@@ -17,6 +17,7 @@ var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
 var postgreSqlReaderRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'       // Reader role
 var postgreSqlContributorRoleId = 'a9f2b5d7-5c0c-4d8e-bd6f-3f9c0f9d5f9b' // PostgreSQL DB Contributor
 
+#disable-next-line BCP081
 resource postgreSqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' existing = {
 //resource postgreSqlServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' existing = if(resourceCreatedNow) {
   name: postgreSqlServerName

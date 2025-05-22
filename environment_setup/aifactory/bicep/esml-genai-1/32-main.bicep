@@ -597,6 +597,7 @@ var privateLinksDnsZones = {
   }
   sql: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net'
+    #disable-next-line no-hardcoded-env-urls
     name:'privatelink.database.windows.net'
   }
 }

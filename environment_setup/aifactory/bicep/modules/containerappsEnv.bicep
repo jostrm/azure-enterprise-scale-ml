@@ -54,10 +54,13 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01'
       destination: 'log-analytics'
       logAnalyticsConfiguration: {
         customerId: logAnalyticsWorkspace.properties.customerId
+        #disable-next-line use-secure-value-for-secure-inputs
         sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
       }
     }
+    #disable-next-line use-secure-value-for-secure-inputs
     daprAIInstrumentationKey: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.InstrumentationKey : ''
+    #disable-next-line use-secure-value-for-secure-inputs
     daprAIConnectionString: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.ConnectionString : ''
     workloadProfiles: [
       {

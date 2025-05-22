@@ -28,7 +28,7 @@ resource existingAiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' ex
   name: resourceName
   scope: resourceGroup(resourceGroupName)
 }
-
+#disable-next-line BCP081
 resource existingBing 'Microsoft.Bing/accounts@2020-06-10' existing = if (resourceType == 'Microsoft.Bing/accounts') {
   name: resourceName
   scope: resourceGroup(resourceGroupName)
@@ -79,6 +79,7 @@ resource existingRedis 'Microsoft.Cache/Redis@2024-11-01' existing = if (resourc
   scope: resourceGroup(resourceGroupName)
 }
 
+#disable-next-line BCP081
 resource existingPostgreSQL 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' existing = if (resourceType == 'Microsoft.DBforPostgreSQL/servers') {
   name: resourceName
   scope: resourceGroup(resourceGroupName)
