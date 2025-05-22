@@ -7,4 +7,4 @@ resource existingPrivDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' exis
   scope: resourceGroup(resourceGroupName)
 }
 
-output exists bool = !empty(resourceId('Microsoft.Network/privateDnsZones@2024-06-01', resourceName)) ? true : false
+output exists bool = (empty(existingPrivDnsZone)) ? false : !empty(existingPrivDnsZone.id)
