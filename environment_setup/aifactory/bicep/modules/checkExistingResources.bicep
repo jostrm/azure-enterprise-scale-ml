@@ -1,11 +1,11 @@
 param resourceGroupName string
 param resourceNames object
 
+// mlEndpoint: 'Microsoft.MachineLearningServices/workspaces/onlineEndpoints'
 @description('Array of resource types to check existence for')
 param resourceTypes object = {
   aiFoundryHub: 'Microsoft.MachineLearningServices/workspaces'
   aiFoundryProject: 'Microsoft.MachineLearningServices/workspaces'
-  mlEndpoint: 'Microsoft.MachineLearningServices/workspaces'
   aiSearch: 'Microsoft.Search/searchServices'
   dashboardInsights: 'Microsoft.Portal/dashboards'
   applicationInsight: 'Microsoft.Insights/components'
@@ -25,12 +25,22 @@ param resourceTypes object = {
   storageAccount1001: 'Microsoft.Storage/storageAccounts'
   storageAccount2001: 'Microsoft.Storage/storageAccounts'
   redis: 'Microsoft.Cache/Redis'
-  postgreSQL: 'Microsoft.DBforPostgreSQL/servers'
+  postgreSQL: 'Microsoft.DBforPostgreSQL/flexibleServers'
   sqlServer: 'Microsoft.Sql/servers'
   sqlDatabase: 'Microsoft.Sql/servers/databases'
   aiFoundry: 'Microsoft.CognitiveServices/accounts'
 }
 
+//Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview
+//Microsoft.DBforPostgreSQL/servers
+
+/*
+  {
+    name: 'mlEndpoint'
+    resourceName: resourceNames.mlEndpoint
+    resourceType: resourceTypes.mlEndpoint
+  }
+*/
 var allResourceInfo = [
   {
     name: 'aiFoundryHub'
@@ -41,11 +51,6 @@ var allResourceInfo = [
     name: 'aiFoundryProject'
     resourceName: resourceNames.aiFoundryProject
     resourceType: resourceTypes.aiFoundryProject
-  }
-  {
-    name: 'mlEndpoint'
-    resourceName: resourceNames.mlEndpoint
-    resourceType: resourceTypes.mlEndpoint
   }
   {
     name: 'aiSearch'
@@ -177,7 +182,7 @@ module checkResourceExists 'checkResourceExists.bicep' = [for (resourceInfo, i) 
 
 output aiFoundryHubExists bool = length(resourceNames.aiFoundryHub) > 0 ? checkResourceExists[0].outputs.exists : false
 output aiFoundryProjectExists bool = length(resourceNames.aiFoundryProject) > 0 ? checkResourceExists[1].outputs.exists : false
-output mlEndpointExists bool = length(resourceNames.mlEndpoint) > 0 ? checkResourceExists[2].outputs.exists : false
+//output mlEndpointExists bool = length(resourceNames.mlEndpoint) > 0 ? checkResourceExists[2].outputs.exists : false
 output aiSearchExists bool = length(resourceNames.aiSearch) > 0 ? checkResourceExists[3].outputs.exists : false
 output dashboardInsightsExists bool = length(resourceNames.dashboardInsights) > 0 ? checkResourceExists[4].outputs.exists : false
 output applicationInsightExists bool = length(resourceNames.applicationInsight) > 0 ? checkResourceExists[5].outputs.exists : false
@@ -201,3 +206,7 @@ output postgreSQLExists bool = length(resourceNames.postgreSQL) > 0 ? checkResou
 output sqlServerExists bool = length(resourceNames.sqlServer) > 0 ? checkResourceExists[18].outputs.exists : false
 output sqlDatabaseExists bool = length(resourceNames.sqlDatabase) > 0 ? checkResourceExists[19].outputs.exists : false
 output aiFoundryExists bool = length(resourceNames.aiFoundry) > 0 ? checkResourceExists[20].outputs.exists : false
+
+// Debug Resource IDs
+output keyvaultResourceId string = length(resourceNames.keyvault) > 0 ? checkResourceExists[13].outputs.resourceId : ''
+output aiSearchResourceId string = length(resourceNames.keyvault) > 0 ? checkResourceExists[13].outputs.resourceId : ''
