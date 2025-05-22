@@ -135,7 +135,7 @@ for env in "${environments[@]}"; do
     create_or_update_secret $env "TENANT_ID" "$TENANT_ID"
     # Variables: 
     create_or_update_variable $env "BYO_SUBNETS" "$BYO_SUBNETS"
-    create_or_update_variable $env "AIFACTORY_VERSION_MAJOR" "$BYO_SUBNETS"
+    create_or_update_variable $env "AIFACTORY_VERSION_MAJOR" "$AIFACTORY_VERSION_MAJOR"
     create_or_update_variable $env "AIFACTORY_VERSION_MINOR" "$AIFACTORY_VERSION_MINOR"
 done
 
