@@ -9,6 +9,10 @@ variables:
   admin_bicep_kv_fw: "kv-seeding-sdc-001" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
   admin_bicep_kv_fw_rg: "rg-seeding-sdc-001" # Resource Group name for seeding Keyvault
 
+  # 1.20 (120)
+  aifactoryVersionMajor: 1
+  aifactoryVersionMinor: 20
+
   project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt

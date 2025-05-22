@@ -1,7 +1,7 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
 param aifactoryVersionMajor int = 1
-param aifactoryVersionMinor int = 26
+param aifactoryVersionMinor int = 20
 param useAdGroups bool = false
 
 // Optional override
