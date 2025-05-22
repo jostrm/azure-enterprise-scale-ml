@@ -724,7 +724,6 @@ resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' ex
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
 }
 
-
 // ### Check: IF to create New Private DNS zones: if new ones have been added since AIFactory COMMON was created
 var newPrivateLinksDnsZones = [
   {
@@ -744,7 +743,22 @@ var newPrivateLinksDnsZones = [
     id: privateLinksDnsZones.sql.id
   }
 ]
+module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZonesIfNotExistsv2.bicep' = if(centralDnsZoneByPolicyInHub==false) {
+  scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
+  name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    privateLinksDnsZones: newPrivateLinksDnsZones
+    privDnsSubscription: privDnsSubscription
+    privDnsResourceGroup: privDnsResourceGroupName
+    vNetName: vnetNameFull
+    vNetResourceGroup: vnetResourceGroupName
+    location: location
+    allGlobal:privateDnsAndVnetLinkAllGlobalLocation
+  }
+}
 
+
+/*
 module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'CheckIfNewPrivateDnsZonesMissing${deploymentProjSpecificUniqueSuffix}'
@@ -756,6 +770,7 @@ module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = i
     createPrivateDnsZones
   ]
 } //output dnsZonesExistence array = checkIfDnsZonesExists.outputs.existingPrivateDnsZones
+
 // ### End Check
 
 // ### Create NEW Private DNS zones: if they do not exist
@@ -773,6 +788,7 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZonesIfNo
     dnsZonesExistence:checkIfDnsZonesExists.outputs.existingPrivateDnsZones
   }
 }
+  */
 // ### End Create NEW Private DNS zones
 
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
@@ -804,7 +820,7 @@ var postgreSQLName ='pg-flex-${projectName}-${locationSuffix}-${env}-${uniqueInA
 var sqlServerName ='sql-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var sqlDBName ='sqldb-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
-// Call the module using the defined variables
+/*
 module existingResource '../modules/checkExistingResources.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: 'existingResource-${deploymentProjSpecificUniqueSuffix}'
@@ -840,6 +856,7 @@ module existingResource '../modules/checkExistingResources.bicep' = {
     }
   }
 }
+*/
 
 resource subnet_genai_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   name: defaultSubnet
@@ -882,7 +899,7 @@ module debug './00-debug.bicep' = if(enableDebugging){
     subscriptions_subscriptionId:subscriptions_subscriptionId
     vnetRule1:'${vnetId}/subnets/${defaultSubnet}'
     vnetRule2:'${vnetId}/subnets/${aksSubnetName}'
-    postGreSQLExists: existingResource.outputs.postgreSQLExists
+    //postGreSQLExists: existingResource.outputs.postgreSQLExists
   }
 }
 
@@ -1863,12 +1880,13 @@ module postgreSQL '../modules/databases/postgreSQL/postgreSQLFlexibleServer.bice
     sku: postgreSQLSKU
     storage: postgreSQLStorage
     version: postgreSQLVersion
-    resourceExists: existingResource.outputs.postgreSQLExists
+    //resourceExists: existingResource.outputs.postgreSQLExists
   }
   dependsOn: [
     projectResourceGroup
   ]
 }
+
 module postgreSQLRbac '../modules/databases/postgreSQL/postgreSQLFlexibleServerRbac.bicep' = if(serviceSettingDeployPostgreSQL){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}'
@@ -1877,7 +1895,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/postgreSQLFlexibleServerR
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
-    resourceCreatedNow: (!existingResource.outputs.postgreSQLExists && !empty(postgreSQL.outputs.name))? true:false // It did not exist before, but now, so we need to create the RBAC
+    //resourceCreatedNow: (!existingResource.outputs.postgreSQLExists && !empty(postgreSQL.outputs.name))? true:false // It did not exist before, but now, so we need to create the RBAC
   }
   dependsOn: [
     postgreSQL // postgreSQL module will run, that said the module can avoid creating the actual service, if it already existed before
@@ -1890,7 +1908,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneBy
   params: {
     dnsConfig: cosmosdb.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
-    resourceCreatedNow: (existingResource.outputs.postgreSQLExists || empty(postgreSQL.outputs.name))? false:true // It did exist before, hence not created now, no need for RBAC
+    //resourceCreatedNow: (existingResource.outputs.postgreSQLExists || empty(postgreSQL.outputs.name))? false:true // It did exist before, hence not created now, no need for RBAC
   }
   dependsOn: [
     createPrivateDnsZones

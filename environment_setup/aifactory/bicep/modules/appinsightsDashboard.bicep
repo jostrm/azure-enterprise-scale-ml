@@ -65,10 +65,12 @@ resource applicationInsightsDashboard 'Microsoft.Portal/dashboards@2020-09-01-pr
               ]
               #disable-next-line BCP036
               type: 'Extension/AppInsightsExtension/PartType/ProactiveDetectionAsyncPart'
+              #disable-next-line BCP037
               asset: {
                 idInputName: 'ComponentId'
                 type: 'ApplicationInsights'
               }
+              #disable-next-line BCP037
               defaultMenuItemId: 'ProactiveDetection'
             }
           }
@@ -96,6 +98,7 @@ resource applicationInsightsDashboard 'Microsoft.Portal/dashboards@2020-09-01-pr
               ]
               #disable-next-line BCP036
               type: 'Extension/AppInsightsExtension/PartType/QuickPulseButtonSmallPart'
+              #disable-next-line BCP037
               asset: {
                 idInputName: 'ComponentId'
                 type: 'ApplicationInsights'
@@ -137,6 +140,7 @@ resource applicationInsightsDashboard 'Microsoft.Portal/dashboards@2020-09-01-pr
               ]
               #disable-next-line BCP036
               type: 'Extension/AppInsightsExtension/PartType/AvailabilityNavButtonPart'
+              #disable-next-line BCP037
               asset: {
                 idInputName: 'ComponentId'
                 type: 'ApplicationInsights'
@@ -178,6 +182,7 @@ resource applicationInsightsDashboard 'Microsoft.Portal/dashboards@2020-09-01-pr
               ]
               #disable-next-line BCP036
               type: 'Extension/AppInsightsExtension/PartType/AppMapButtonPart'
+              #disable-next-line BCP037
               asset: {
                 idInputName: 'ComponentId'
                 type: 'ApplicationInsights'
@@ -236,6 +241,7 @@ resource applicationInsightsDashboard 'Microsoft.Portal/dashboards@2020-09-01-pr
               ]
               #disable-next-line BCP036
               type: 'Extension/AppInsightsExtension/PartType/UsageUsersOverviewPart'
+              #disable-next-line BCP037
               asset: {
                 idInputName: 'ComponentId'
                 type: 'ApplicationInsights'

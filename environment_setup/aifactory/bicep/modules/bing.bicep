@@ -4,6 +4,8 @@ param location string = 'global'
 param sku string = 'G1'
 param tags object
 
+
+#disable-next-line BCP081
 resource bing 'Microsoft.Bing/accounts@2020-06-10' = {
   name: name
   location: location
