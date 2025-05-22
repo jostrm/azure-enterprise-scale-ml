@@ -773,7 +773,9 @@ var newPrivateLinksDnsZones = [
 ]
 
 var aifactoryVersionString = '${aifactoryVersionMajor}${aifactoryVersionMinor}'
-var aifactoryVersion = contains(aifactoryVersionString, '^[0-9]+$') ? int(aifactoryVersionString) : 199
+var aifactoryVersion = empty(aifactoryVersionString) || !contains(aifactoryVersionString, '^[0-9]+$') 
+    ? 199 
+    : int(aifactoryVersionString)
 
 // AIFACTORY-UPDATE-121
 module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false && aifactoryVersion <121) {
