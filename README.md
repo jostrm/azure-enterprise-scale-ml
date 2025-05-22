@@ -25,6 +25,10 @@ Usage: You can fork it, or use it as a submodule in your own repo. the latter is
 
 [Documentation](./documentation/readme.md)
 - **Read more**: How to EXTEND project types. How templates works for DataOps, GenAIOps, MLOps. How RBAC, Persona, Networking, workflows works.
+- **Below is 2 baseline architectures to choose from**: You may *turn ON/OFF* services. Architecture 02: If you do not need any front end services (1), or database(3)
+
+![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
+*Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. 
 
 ## This accelerator: Main purpose: 
 1) `Marry multiple best practices & accelerators:` **Secure Enterprise Scale AI Landing Zones + Secure GenAIOps template**  ( since using a GenAIOps/LLMOps template based on unsecure infrastructure (no private endpoints/vNet) will not be compatible with secure infra )
