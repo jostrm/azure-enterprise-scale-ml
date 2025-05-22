@@ -155,7 +155,6 @@ var allResourceInfo = [
   {
     name: 'sqlDatabase'
     resourceName: resourceNames.sqlDatabase
-    parentResource: resourceNames.sqlServer
     resourceType: resourceTypes.sqlDatabase
   }
   {
@@ -172,7 +171,7 @@ module checkResourceExists 'checkResourceExists.bicep' = [for (resourceInfo, i) 
     resourceGroupName: resourceGroupName
     resourceName: resourceInfo.resourceName
     resourceType: resourceInfo.resourceType
-    parentResourceName: resourceInfo.name == 'sqlDatabase' ? resourceNames.parentResource : ''
+    parentResourceName: resourceInfo.name == 'sqlDatabase' ? resourceNames.sqlServer : ''
   }
 }]
 
