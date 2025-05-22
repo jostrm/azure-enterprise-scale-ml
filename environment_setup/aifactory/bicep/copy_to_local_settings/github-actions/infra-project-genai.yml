@@ -371,6 +371,10 @@ jobs:
             --parameters useAdGroups="${{ env.use_groups }}" \
             --parameters useCommonACR="${{ env.useCommonACR }}" \
             --parameters tenantId="${{ env.tenantId }}" \
+            --parameters BYO_subnets="${{ env.BYO_SUBNETS }}" \
+            --parameters network_env="${{ env.NETWORK_ENV }}" \
+            --parameters aifactoryVersionMajor="${{ env.AIFACTORY_VERSION_MAJOR }}" \
+            --parameters aifactoryVersionMinor="${{ env.AIFACTORY_VERSION_MINOR }}" \
             --parameters semanticSearchTier="${{ env.semanticSearchTier }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist

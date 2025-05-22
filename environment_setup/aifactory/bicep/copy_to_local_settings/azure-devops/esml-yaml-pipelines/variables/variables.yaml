@@ -9,9 +9,9 @@ variables:
   admin_bicep_kv_fw: "kv-seeding-sdc-001" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
   admin_bicep_kv_fw_rg: "rg-seeding-sdc-001" # Resource Group name for seeding Keyvault
 
-  # 1.20 (120)
+  # UPDATE AIFactory (Long Term Support branches): If you want to upgrade the AIFactory Long Term Support branches. E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
   aifactoryVersionMajor: 1
-  aifactoryVersionMinor: 20
+  aifactoryVersionMinor: 20 # 2025-05-23: 120_LTS
 
   project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)

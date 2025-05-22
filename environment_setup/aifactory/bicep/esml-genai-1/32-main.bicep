@@ -1,5 +1,6 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+@description('UPDATE AIFactory (Long Term Support branches): If you want to upgrade the AIFactory Long Term Support branches. E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)')
 param aifactoryVersionMajor int = 1
 param aifactoryVersionMinor int = 20
 param useAdGroups bool = false
@@ -750,6 +751,7 @@ var newPrivateLinksDnsZones = [
 var aifactoryVersionString = '${aifactoryVersionMajor}${aifactoryVersionMinor}'
 var aifactoryVersion = int(aifactoryVersionString)
 
+// AIFACTORY-UPDATE-121
 module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false && aifactoryVersion <121) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
@@ -763,6 +765,7 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bic
     allGlobal:privateDnsAndVnetLinkAllGlobalLocation
   }
 }
+// AIFACTORY-UPDATE-121-END
 
 /*
 module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {

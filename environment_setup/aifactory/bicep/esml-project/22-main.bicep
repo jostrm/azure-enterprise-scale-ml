@@ -1,5 +1,8 @@
 targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
+@description('UPDATE AIFactory (Long Term Support branches): If you want to upgrade the AIFactory Long Term Support branches. E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)')
+param aifactoryVersionMajor int = 1
+param aifactoryVersionMinor int = 20
 param useAdGroups bool = false
 
 // Optional override
@@ -197,6 +200,8 @@ var vnetResourceGroupName = vnetResourceGroup_param != '' ? vnetResourceGroup_pa
 var subscriptions_subscriptionId = subscription().id
 var vnetId = '${subscriptions_subscriptionId}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
 var defaultSubnet = common_subnet_name //'snet-esmlcmn-001'
+var aifactoryVersionString = '${aifactoryVersionMajor}${aifactoryVersionMinor}'
+var aifactoryVersion = int(aifactoryVersionString)
 // ESML-VANLILA #######################################  You May want to change this template / naming convention ################################
 
 // BYOSubnet: common_subnet_name,common_subnet_scoring_name,common_pbi_subnet_name,common_bastion_subnet_name

@@ -127,12 +127,17 @@ for env in "${environments[@]}"; do
     create_or_update_secret $env "PROJECT_MEMBERS_IP_ADDRESS" "$PROJECT_MEMBERS_IP_ADDRESS"
 
     create_or_update_secret $env "TENANT_ID" "$TENANT_ID"
+    create_or_update_secret $env "BYO_SUBNETS" "$BYO_SUBNETS"
+    create_or_update_secret $env "AIFACTORY_VERSION_MAJOR" "$BYO_SUBNETS"
+    create_or_update_secret $env "AIFACTORY_VERSION_MINOR" "$AIFACTORY_VERSION_MINOR"
 done
 
 # DEV variables
 create_or_update_variable "dev" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
 create_or_update_variable "dev" "AZURE_SUBSCRIPTION_ID" "$DEV_SUBSCRIPTION_ID"
 create_or_update_variable "dev" "AIFACTORY_CIDR_XX" "$DEV_CIDR_RANGE"
+create_or_update_variable "dev" "NETWORK_ENV" "$DEV_NETWORK_ENV"
+
 create_or_update_variable "dev" "GH_CLI_VERSION" "$gh_version"
 
 # DEV: Secrets
@@ -145,6 +150,7 @@ fi
 create_or_update_variable "stage" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
 create_or_update_variable "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
 create_or_update_variable "stage" "AIFACTORY_CIDR_XX" "$STAGE_CIDR_RANGE"
+create_or_update_variable "stage" "NETWORK_ENV" "$STAGE_NETWORK_ENV"
 
 # STAGE: Secrets
 #create_or_update_secret "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
@@ -155,6 +161,7 @@ fi
 create_or_update_variable "prod" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
 create_or_update_variable "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"
 create_or_update_variable "prod" "AIFACTORY_CIDR_XX" "$PROD_CIDR_RANGE"
+create_or_update_variable "dev" "NETWORK_ENV" "$PROD_NETWORK_ENV"
 
 # PROD: Secrets
 #create_or_update_secret "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"
