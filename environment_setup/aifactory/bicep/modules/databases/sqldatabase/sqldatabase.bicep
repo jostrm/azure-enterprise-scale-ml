@@ -41,11 +41,28 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
     administratorLogin: sqlAdmin
     administratorLoginPassword: adminPwd
   }
-
+  /*
+    family: 'string'
+    name: 'string'
+    size: 'string'
+    tier: 'string'
+    capacity: int
+  */
   resource database 'databases' = {
     name: databaseName
     location: location
-    sku: !empty(skuObject)? skuObject: {}
+    sku: !empty(skuObject) ? {
+    name: skuObject.name // Ensure 'name' is provided in skuObject
+    family: skuObject.family // Optional: Add other properties if needed
+    size: skuObject.size // Optional: Add other properties if needed
+    tier: skuObject.tier // Optional: Add other properties if needed
+    capacity: skuObject.capacity // Optional: Add other properties if applicable
+  } : {
+    name: 'Basic' // Default SKU name
+    tier: 'Basic' // Default tier
+    capacity: 5 // Default capacity
+    //family: 'Gen5' // Default family
+  }
   }
 
   resource firewall 'firewallRules' = {

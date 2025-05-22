@@ -124,20 +124,20 @@ param redisSKU string = 'Standard' // 'Basic' 'Standard' 'Premium'
 // Databases:SQL Database
 param serviceSettingDeploySQLDatabase bool = false
 param sqlServerSKU string = 'Standard'
-param sqlServerCapacity int = 1
+param sqlServerCapacity int = 10
 param sqlServerTier string = 'Standard'
 param sqlServerFamily string = 'Gen5'
 param sqlServerStorageSize int = 32
-param sqlServerStorageIops int = 120
-param sqlServerStorageAutogrow bool = true
 var sqlServerSKUObject = ''
 /*
 var sqlServerSKUObject = {
   name: sqlServerSKU
-  tier: sqlServerTier
   family: sqlServerFamily
+  size: sqlServerStorageSize
+  tier: sqlServerTier
   capacity: sqlServerCapacity
 }
+
 */
 
 // Databases:CosmosDB
