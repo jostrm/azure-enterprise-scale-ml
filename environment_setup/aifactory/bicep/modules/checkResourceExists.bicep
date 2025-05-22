@@ -12,6 +12,6 @@ resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' e
 output exists bool = isStorageAccount ? !empty(existingStorageAccount.id) : false
 */
 
-output exists bool = resourceType == 'Microsoft.Sql/servers/databases'
+output exists bool = resourceType == 'Microsoft.Sql/servers/databases' && !empty(parentResourceName)
   ? !empty(resourceId(resourceGroupName, resourceType, parentResourceName, resourceName))
   : !empty(resourceId(resourceGroupName, resourceType, resourceName))
