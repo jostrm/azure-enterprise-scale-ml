@@ -778,7 +778,7 @@ var aifactoryVersion = empty(aifactoryVersionString) || !contains(aifactoryVersi
     : int(aifactoryVersionString)
 
 // AIFACTORY-UPDATE-121
-module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false && aifactoryVersion <121) {
+module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false && (aifactoryVersion <121)) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
   params: {
