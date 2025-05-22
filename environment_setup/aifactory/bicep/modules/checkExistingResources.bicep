@@ -2,6 +2,7 @@ param resourceGroupName string
 param resourceNames object
 
 // mlEndpoint: 'Microsoft.MachineLearningServices/workspaces/onlineEndpoints'
+// 25
 @description('Array of resource types to check existence for')
 param resourceTypes object = {
   aiFoundryHub: 'Microsoft.MachineLearningServices/workspaces'
@@ -34,7 +35,7 @@ param resourceTypes object = {
 //Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview
 //Microsoft.DBforPostgreSQL/servers
 
-/*
+/* 25
   {
     name: 'mlEndpoint'
     resourceName: resourceNames.mlEndpoint
@@ -180,6 +181,7 @@ module checkResourceExists 'checkResourceExists.bicep' = [for (resourceInfo, i) 
   }
 }]
 
+// 25
 output aiFoundryHubExists bool = length(resourceNames.aiFoundryHub) > 0 ? checkResourceExists[0].outputs.exists : false
 output aiFoundryProjectExists bool = length(resourceNames.aiFoundryProject) > 0 ? checkResourceExists[1].outputs.exists : false
 output aiSearchExists bool = length(resourceNames.aiSearch) > 0 ? checkResourceExists[2].outputs.exists : false
@@ -207,5 +209,5 @@ output sqlDatabaseExists bool = length(resourceNames.sqlDatabase) > 0 ? checkRes
 output aiFoundryExists bool = length(resourceNames.aiFoundry) > 0 ? checkResourceExists[24].outputs.exists : false
 
 // Debug Resource IDs
-output keyvaultResourceId string = length(resourceNames.keyvault) > 0 ? checkResourceExists[15].outputs.resourceId : ''
-output aiSearchResourceId string = length(resourceNames.aiSearch) > 0 ? checkResourceExists[2].outputs.resourceId : ''
+//output keyvaultResourceId string = length(resourceNames.keyvault) > 0 ? checkResourceExists[15].outputs.resourceId : ''
+//output aiSearchResourceId string = length(resourceNames.aiSearch) > 0 ? checkResourceExists[2].outputs.resourceId : ''

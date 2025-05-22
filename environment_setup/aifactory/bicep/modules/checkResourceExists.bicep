@@ -93,79 +93,80 @@ resource existingSqlDatabase 'Microsoft.Sql/servers/databases@2022-05-01-preview
   name: '${parentResourceName}/${resourceName}'
   scope: resourceGroup(resourceGroupName)
 }
-
 output exists bool = (resourceType == 'Microsoft.Sql/servers/databases' && !empty(parentResourceName))
-  ? (empty(existingSqlDatabase)) ? false : !empty(existingSqlDatabase.id)
+  ? !empty(existingSqlDatabase)
   : (resourceType == 'Microsoft.Sql/servers')
-    ? (empty(existingSqlServer)) ? false : !empty(existingSqlServer.id)
+    ? !empty(existingSqlServer)
     : (resourceType == 'Microsoft.DBforPostgreSQL/servers')
-      ? (empty(existingPostgreSQL)) ? false : !empty(existingPostgreSQL.id)
+      ? !empty(existingPostgreSQL)
       : (resourceType == 'Microsoft.Cache/Redis')
-        ? (empty(existingRedis)) ? false : !empty(existingRedis.id)
+        ? !empty(existingRedis)
         : (resourceType == 'Microsoft.Storage/storageAccounts')
-          ? (empty(existingStorageAccount)) ? false : !empty(existingStorageAccount.id)
+          ? !empty(existingStorageAccount)
           : (resourceType == 'Microsoft.ManagedIdentity/userAssignedIdentities')
-            ? (empty(existingMi)) ? false : !empty(existingMi.id)
+            ? !empty(existingMi)
             : (resourceType == 'Microsoft.KeyVault/vaults')
-              ? (empty(existingKeyvault)) ? false : !empty(existingKeyvault.id)
+              ? !empty(existingKeyvault)
               : (resourceType == 'Microsoft.Web/serverfarms')
-                ? (empty(existingFuncAppServicePlan)) ? false : !empty(existingFuncAppServicePlan.id)
+                ? !empty(existingFuncAppServicePlan)
                 : (resourceType == 'Microsoft.Web/sites')
-                  ? (empty(existingFunctionApp)) ? false : !empty(existingFunctionApp.id)
+                  ? !empty(existingFunctionApp)
                   : (resourceType == 'Microsoft.DocumentDB/databaseAccounts')
-                    ? (empty(existingCosmosDB)) ? false : !empty(existingCosmosDB.id)
+                    ? !empty(existingCosmosDB)
                     : (resourceType == 'Microsoft.App/containerApps')
-                      ? (empty(existingContainerApp)) ? false : !empty(existingContainerApp.id)
+                      ? !empty(existingContainerApp)
                       : (resourceType == 'Microsoft.App/managedEnvironments')
-                        ? (empty(existingContainerAppsEnv)) ? false : !empty(existingContainerAppsEnv.id)
+                        ? !empty(existingContainerAppsEnv)
                         : (resourceType == 'Microsoft.Bing/accounts')
-                          ? (empty(existingBing)) ? false : !empty(existingBing.id)
+                          ? !empty(existingBing)
                           : (resourceType == 'Microsoft.CognitiveServices/accounts')
-                            ? (empty(existingAiServices)) ? false : !empty(existingAiServices.id)
+                            ? !empty(existingAiServices)
                             : (resourceType == 'Microsoft.Insights/components')
-                              ? (empty(existingApplicationInsight)) ? false : !empty(existingApplicationInsight.id)
+                              ? !empty(existingApplicationInsight)
                               : (resourceType == 'Microsoft.Portal/dashboards')
-                                ? (empty(existingDashboardInsights)) ? false : !empty(existingDashboardInsights.id)
+                                ? !empty(existingDashboardInsights)
                                 : (resourceType == 'Microsoft.Search/searchServices')
-                                  ? (empty(existingAiSearch)) ? false : !empty(existingAiSearch.id)
+                                  ? !empty(existingAiSearch)
                                   : (resourceType == 'Microsoft.MachineLearningServices/workspaces')
-                                    ? (empty(existingAiFoundryHub)) ? false : !empty(existingAiFoundryHub.id)
+                                    ? !empty(existingAiFoundryHub)
                                     : false
-
+/*
 output resourceId string = (resourceType == 'Microsoft.Sql/servers/databases' && !empty(parentResourceName))
-  ? (empty(existingSqlDatabase)) ? '' : existingSqlDatabase.id
+  ? (!empty(existingSqlDatabase) && !empty(existingSqlDatabase.id)) ? existingSqlDatabase.id : ''
   : (resourceType == 'Microsoft.Sql/servers')
-    ? (empty(existingSqlServer)) ? '' : existingSqlServer.id
+    ? (!empty(existingSqlServer) && !empty(existingSqlServer.id)) ? existingSqlServer.id : ''
     : (resourceType == 'Microsoft.DBforPostgreSQL/servers')
-      ? (empty(existingPostgreSQL)) ? '' : existingPostgreSQL.id
+      ? (!empty(existingPostgreSQL) && !empty(existingPostgreSQL.id)) ? existingPostgreSQL.id : ''
       : (resourceType == 'Microsoft.Cache/Redis')
-        ? (empty(existingRedis)) ? '' : existingRedis.id
+        ? (!empty(existingRedis) && !empty(existingRedis.id)) ? existingRedis.id : ''
         : (resourceType == 'Microsoft.Storage/storageAccounts')
-          ? (empty(existingStorageAccount)) ? '' : existingStorageAccount.id
+          ? (!empty(existingStorageAccount) && !empty(existingStorageAccount.id)) ? existingStorageAccount.id : ''
           : (resourceType == 'Microsoft.ManagedIdentity/userAssignedIdentities')
-            ? (empty(existingMi)) ? '' : existingMi.id
+            ? (!empty(existingMi) && !empty(existingMi.id)) ? existingMi.id : ''
             : (resourceType == 'Microsoft.KeyVault/vaults')
-              ? (empty(existingKeyvault)) ? '' : existingKeyvault.id
+              ? (!empty(existingKeyvault) && !empty(existingKeyvault.id)) ? existingKeyvault.id : ''
               : (resourceType == 'Microsoft.Web/serverfarms')
-                ? (empty(existingFuncAppServicePlan)) ? '' : existingFuncAppServicePlan.id
+                ? (!empty(existingFuncAppServicePlan) && !empty(existingFuncAppServicePlan.id)) ? existingFuncAppServicePlan.id : ''
                 : (resourceType == 'Microsoft.Web/sites')
-                  ? (empty(existingFunctionApp)) ? '' : existingFunctionApp.id
+                  ? (!empty(existingFunctionApp) && !empty(existingFunctionApp.id)) ? existingFunctionApp.id : ''
                   : (resourceType == 'Microsoft.DocumentDB/databaseAccounts')
-                    ? (empty(existingCosmosDB)) ? '' : existingCosmosDB.id
+                    ? (!empty(existingCosmosDB) && !empty(existingCosmosDB.id)) ? existingCosmosDB.id : ''
                     : (resourceType == 'Microsoft.App/containerApps')
-                      ? (empty(existingContainerApp)) ? '' : existingContainerApp.id
+                      ? (!empty(existingContainerApp) && !empty(existingContainerApp.id)) ? existingContainerApp.id : ''
                       : (resourceType == 'Microsoft.App/managedEnvironments')
-                        ? (empty(existingContainerAppsEnv)) ? '' : existingContainerAppsEnv.id
+                        ? (!empty(existingContainerAppsEnv) && !empty(existingContainerAppsEnv.id)) ? existingContainerAppsEnv.id : ''
                         : (resourceType == 'Microsoft.Bing/accounts')
-                          ? (empty(existingBing)) ? '' : existingBing.id
+                          ? (!empty(existingBing) && !empty(existingBing.id)) ? existingBing.id : ''
                           : (resourceType == 'Microsoft.CognitiveServices/accounts')
-                            ? (empty(existingAiServices)) ? '' : existingAiServices.id
+                            ? (!empty(existingAiServices) && !empty(existingAiServices.id)) ? existingAiServices.id : ''
                             : (resourceType == 'Microsoft.Insights/components')
-                              ? (empty(existingApplicationInsight)) ? '' : existingApplicationInsight.id
+                              ? (!empty(existingApplicationInsight) && !empty(existingApplicationInsight.id)) ? existingApplicationInsight.id : ''
                               : (resourceType == 'Microsoft.Portal/dashboards')
-                                ? (empty(existingDashboardInsights)) ? '' : existingDashboardInsights.id
+                                ? (!empty(existingDashboardInsights) && !empty(existingDashboardInsights.id)) ? existingDashboardInsights.id : ''
                                 : (resourceType == 'Microsoft.Search/searchServices')
-                                  ? (empty(existingAiSearch)) ? '' : existingAiSearch.id
+                                  ? (!empty(existingAiSearch) && !empty(existingAiSearch.id)) ? existingAiSearch.id : ''
                                   : (resourceType == 'Microsoft.MachineLearningServices/workspaces')
-                                    ? (empty(existingAiFoundryHub)) ? '' : existingAiFoundryHub.id
+                                    ? (!empty(existingAiFoundryHub) && !empty(existingAiFoundryHub.id)) ? existingAiFoundryHub.id : ''
                                     : ''
+
+*/
