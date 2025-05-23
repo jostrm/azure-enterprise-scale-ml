@@ -66,12 +66,10 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
   }
 
   resource database 'databases' = [for name in databaseNames:{
-  //resource database 'databases' = [for name in databaseNames: if(!resourceExists){
     name: name
   }]
 
   resource firewall_all 'firewallRules' = if (allowAllIPsFirewall) {
-  //resource firewall_all 'firewallRules' = if (allowAllIPsFirewall && !resourceExists) {
     name: 'allow-all-IPs'
     properties: {
       startIpAddress: '0.0.0.0'
@@ -80,7 +78,6 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
   }
 
   resource firewall_azure 'firewallRules' = if (allowAzureIPsFirewall) {
-  //resource firewall_azure 'firewallRules' = if (allowAzureIPsFirewall && !resourceExists) {
     name: 'allow-all-azure-internal-IPs'
     properties: {
       startIpAddress: '0.0.0.0'
@@ -89,7 +86,6 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
   }
 
   resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: {
-  //resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: if(!resourceExists){
     name: 'allow-single-${replace(ip, '.', '')}'
     properties: {
       startIpAddress: ip
@@ -98,20 +94,22 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
   }]
 
 }
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+
 //resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = if(!resourceExists){
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
 }
 
-resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
 //resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = if(!resourceExists){
+resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   name: subnetNamePend
   parent: vnet
 }
 
-resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
 //resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint && !resourceExists) {
+
+resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
   name: 'pend-postgreSQLFlexibleServer-${name}'
   location: location
   properties: {
@@ -137,14 +135,16 @@ resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if
   }
 }
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 //resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = if(!resourceExists){
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
 }
 
+//resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!resourceExists){
+
 @description('Key Vault: PostgreSQL connection string')
 resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-//resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!resourceExists){
   parent: keyVault
   name: connectionStringKey
   properties: {
@@ -155,18 +155,14 @@ resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07
     }
   }
 }
-#disable-next-line BCP081
-resource postgresServerExists 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' existing = {
-  name: name
-}
 
 output POSTGRES_DOMAIN_NAME string = postgresServer.properties.fullyQualifiedDomainName
-output name string = postgresServerExists.name
+output name string = postgresServer.name
 output dnsConfig array = [
   {
-    name: createPrivateEndpoint? postgresServerExists.name: ''
+    name: createPrivateEndpoint? postgresServer.name: ''
     type: 'postgres'
-    id: createPrivateEndpoint? postgresServerExists.id: ''
+    id: createPrivateEndpoint? postgresServer.id: ''
   }
 ]
 
