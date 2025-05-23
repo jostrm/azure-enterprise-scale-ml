@@ -12,7 +12,7 @@ param resourceExists bool = false
 param administratorLoginPassword string = ''
 param databaseNames array = []
 param allowAzureIPsFirewall bool = false
-param allowAllIPsFirewall bool = false
+param allowAllIPsFirewall bool = true
 param allowedSingleIPs array = []
 param vnetName string
 param subnetNamePend string

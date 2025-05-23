@@ -110,7 +110,7 @@ var postgreSQLStorage = {
   iops: postgreSQLStorage_Iops         
   autoGrow: postgreSQLStorage_AutoGrow
 }
-param postgreSQLVersion string = '11' // PostgreSQL version
+param postgreSQLVersion string = '16' // PostgreSQL version
 
 // Databases:REDIS
 param serviceSettingDeployRedisCache bool = false
@@ -1903,7 +1903,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!centralDnsZoneByPoli
     projectResourceGroup
   ]
 }
-
+/*
 module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'PostgreSQL4${deploymentProjSpecificUniqueSuffix}'
@@ -1948,6 +1948,8 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneBy
     projectResourceGroup
   ]
 }
+
+*/
 
 // REDIS
 
