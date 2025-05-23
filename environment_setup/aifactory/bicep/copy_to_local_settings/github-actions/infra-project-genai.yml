@@ -16,6 +16,8 @@ env:
     
     AIFACTORY_VERSION_MAJOR: "${{ vars.AIFACTORY_VERSION_MAJOR }}" # Minor version of the AIFactory. 1 in 1.12
     AIFACTORY_VERSION_MINOR: "${{ vars.AIFACTORY_VERSION_MINOR }}" # Minor as 21 in 1.21 
+    BYO_SUBNETS: "${{ vars.BYO_SUBNETS }}" # Minor version of the AIFactory. 1 in 1.12
+    NETWORK_ENV: "${{ vars.NETWORK_ENV }}" # Minor as 21 in 1.21 
     
     # ADMIN usual culprits - verify, twice. (only configure once)
     admin_bicep_input_keyvault_subscription: "${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}" # seeding keyvault, subscription id
