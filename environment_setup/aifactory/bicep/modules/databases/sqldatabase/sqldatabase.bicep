@@ -34,6 +34,9 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
   name: serverName
   location: location
   tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     version: '12.0'
     minimalTlsVersion: '1.2'
@@ -41,13 +44,7 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
     administratorLogin: sqlAdmin
     administratorLoginPassword: adminPwd
   }
-  /*
-    family: 'string'
-    name: 'string'
-    size: 'string'
-    tier: 'string'
-    capacity: int
-  */
+
   resource database 'databases' = {
     name: databaseName
     location: location
@@ -77,6 +74,7 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
   }
 }
 
+/*
 resource sqlDeploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   name: '${serverName}-deployment-script'
   location: location
@@ -130,6 +128,7 @@ SCRIPT_END
     '''
   }
 }
+*/
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
