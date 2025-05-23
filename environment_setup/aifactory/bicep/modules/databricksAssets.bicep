@@ -245,5 +245,5 @@ resource configAdbCluster 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   }
 }
 
-output patOutput object = createAdbPATToken.properties
-output adbCluster object = createAdbCluster.properties
+//output patOutput object = createAdbPATToken.properties
+//output adbCluster object = createAdbCluster.properties

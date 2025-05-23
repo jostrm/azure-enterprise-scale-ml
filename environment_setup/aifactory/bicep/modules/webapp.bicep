@@ -30,7 +30,7 @@ param allowedOrigins array = [
 param applicationInsightsName string
 param logAnalyticsWorkspaceName string
 param logAnalyticsWorkspaceRG string
-param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
+param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java', 'dotnet'
 param pythonVersion string = '3.11' // Used if runtime is 'python'
 param subnetIntegrationName string  // Name of the subnet for VNet integration
 param hostNameSslStates array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
@@ -70,6 +70,7 @@ resource integrationSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01
 }
 
 // Create App Service Plan
+// TODO: Linux or Windows
 resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: servicePlanName
   location: location
@@ -77,6 +78,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   sku: sku
   properties: {
     reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes
+
   }
 }
 

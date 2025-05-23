@@ -45,12 +45,8 @@ var loginPwd = empty(administratorLoginPassword)? '${uppercaseLetter}${lowercase
 var defaultDbName = 'aifdb' // Default database name
 var dbNameToUse = !empty(databaseNames) ? first(databaseNames) : defaultDbName
 
-//resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' = if(!resourceExists) {
-// 2024-08-01
-// 2025-01-01-preview
-
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
-  location: location
+ location: location
   tags: tags
   name: name
   identity: identity
@@ -92,22 +88,17 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
       endIpAddress: ip
     }
   }]
-
 }
 
-//resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = if(!resourceExists){
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
 }
 
-//resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = if(!resourceExists){
 resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   name: subnetNamePend
   parent: vnet
 }
-
-//resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint && !resourceExists) {
 
 resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
   name: 'pend-postgreSQLFlexibleServer-${name}'
@@ -135,15 +126,10 @@ resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if
   }
 }
 
-//resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = if(!resourceExists){
-
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
 }
 
-//resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!resourceExists){
-
-@description('Key Vault: PostgreSQL connection string')
 resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: connectionStringKey
@@ -165,16 +151,3 @@ output dnsConfig array = [
     id: createPrivateEndpoint? postgresServer.id: ''
   }
 ]
-
-/*
-output POSTGRES_DOMAIN_NAME string = resourceExists? postgresServer.properties.fullyQualifiedDomainName: ''
-output name string = resourceExists? postgresServer.name: ''
-output dnsConfig array = [
-  {
-    name: createPrivateEndpoint && !resourceExists? postgresServer.name: ''
-    type: 'postgres'
-    id:createPrivateEndpoint && !resourceExists? postgresServer.id: ''
-  }
-]
-*/
-

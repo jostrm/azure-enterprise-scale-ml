@@ -91,7 +91,7 @@ param serviceSettingDeployProjectVM bool = false
 param serviceSettingDeployAzureMLClassic bool = false
 
 // Databases:PostGreSQL
-param serviceSettingDeployPostgreSQL bool = true
+param serviceSettingDeployPostgreSQL bool = false
 param postgreSQLSKU_Name string = 'Standard_B1ms' // Basic tier with 1 vCore
 param postgreSQLSKU_Tier string = 'Burstable'     // Burstable tier
 param postgreSQLSKU_Family string = 'Gen5'        // Generation 5 hardware
@@ -137,7 +137,11 @@ var sqlServerSKUObject = {
   tier: sqlServerTier
   capacity: sqlServerCapacity
 }
-
+      name: skuObject.name // Ensure 'name' is provided in skuObject
+    family: skuObject.family // Optional: Add other properties if needed
+    size: skuObject.size // Optional: Add other properties if needed
+    tier: skuObject.tier // Optional: Add other properties if needed
+    capacity: skuObject.capacity // Optional: Add other properties if applicable
 */
 
 // Databases:CosmosDB
@@ -1900,7 +1904,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!centralDnsZoneByPoli
   ]
 }
 
-module postgreSQL '../modules/databases/postgreSQL/postgreSQLFlexibleServer.bicep' = if(serviceSettingDeployPostgreSQL){
+module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'PostgreSQL4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1915,14 +1919,13 @@ module postgreSQL '../modules/databases/postgreSQL/postgreSQLFlexibleServer.bice
     sku: postgreSQLSKU
     storage: postgreSQLStorage
     version: postgreSQLVersion
-    //resourceExists: existingResource.outputs.postgreSQLExists
   }
   dependsOn: [
     projectResourceGroup
   ]
 }
 
-module postgreSQLRbac '../modules/databases/postgreSQL/postgreSQLFlexibleServerRbac.bicep' = if(serviceSettingDeployPostgreSQL){
+module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1930,20 +1933,15 @@ module postgreSQLRbac '../modules/databases/postgreSQL/postgreSQLFlexibleServerR
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
-    //resourceCreatedNow: (!existingResource.outputs.postgreSQLExists && !empty(postgreSQL.outputs.name))? true:false // It did not exist before, but now, so we need to create the RBAC
   }
-  dependsOn: [
-    postgreSQL // postgreSQL module will run, that said the module can avoid creating the actual service, if it already existed before
-  ]
 }
 
-module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployPostgreSQL && !enablePublicAccessWithPerimeter){
+module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !enablePublicAccessWithPerimeter){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkPostgreSQL${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: cosmosdb.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
-    //resourceCreatedNow: (existingResource.outputs.postgreSQLExists || empty(postgreSQL.outputs.name))? false:true // It did exist before, hence not created now, no need for RBAC
   }
   dependsOn: [
     createPrivateDnsZones
