@@ -267,61 +267,110 @@ jobs:
         run: |
           sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{env.common-sp-appid-value}}' -spSecret '${{env.common-sp-secret-value}}' -useServicePrincipal -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -filePath '../../../../../aifactory/parameters/' -env '${{env.dev_test_prod}}' -locationSuffixADO '${{env.admin_locationSuffix}}' -aifactorySuffixRGADO '${{env.admin_aifactorySuffixRG}}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{env.dev_test_prod_sub_id}}' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -projectTypeADO '${{env.admin_projectType}}'"
         shell: pwsh
-      - name: 05a_pwsh_remove_previous_run_rbac_in_prj_and_cmn_rg
-        if: false
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          pwsh -Command '$technical_admins_ad_object_id = "${{ env.technical_admins_ad_object_id }}"
-            $project_spoid = "${{ env.project_sp_oid_value }}"
-            $sub_id = "${{ env.dev_test_prod_sub_id }}"
-            $oids = $technical_admins_ad_object_id -split "\s*,\s*"
-      
-            Set-AzContext $sub_id
+      - name: Check if all key resources exist in resource group (fuzzy match for randomSalt)
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            #!/bin/bash
+
+            az account set --subscription ${{ env.dev_test_prod_sub_id }}
             
-            # Define the list of MI IDs
-            $managedIdentities = @(
-                "", # AML 1 OID MI
-                "" # AML 2 OID MI
-            )
-      
-            ####### END - EDIT VARIABLES####
-      
-            # Scopes
-            $scopeCommon = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupNameCommon"
-            $rolesCommmonRG = @(
-                "8311e382-0749-4cb8-b61a-304f252e45ec" # "AcrPush"
-            )
-      
-            $scopeProjectResourceGroup = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName"
-            $rolesProjectRG = @(
-                "b24988ac-6180-42a0-ab88-20f7382dd24c", # "Contributor"
-                "8311e382-0749-4cb8-b61a-304f252e45ec", # "AcrPush"
-                "3afb7f49-54cb-416e-8c09-6dc049efa503", # "Azure AI Inference Deployment Operator"
-                "ea01e6af-a1c1-4350-9563-ad00f8c72ec5",# "Azure Machine Learning Workspace Connection Secrets Reader"
-                "f6c7c914-8db3-469d-8ca1-694a8f32e121", #"AzureML Data Scientist"
-                "f58310d9-a9f6-439a-9e8d-f62e7b41a168", #"Role Based Access Control Administrator"
-                "1c0163c0-47e6-4577-8991-ea5c82e286e4" #"Virtual Machine Administrator Login"
-            )
-      
-            Write-Host "Deleting roles on resource group $scopeProjectResourceGroup"
-            Write-Host ""
-      
-            # PROJECT RG - USERS
-            foreach ($oid in $oids) {
-                foreach ($role in $rolesProjectRG) {
-                    az role assignment delete --assignee $oid --role $role --scope $scopeProjectResourceGroup
-                }
+            # Input parameters
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            uniqueInAIFenv="${{ env.uniqueInAIFenv }}" # Set this in your env if needed
+            resourceSuffix="${{ env.admin_prjResourceSuffix }}"
+            prjResourceSuffixNoDash="${resourceSuffix#-}"
+            twoNumbers="${resourceSuffix:2:2}"
+
+            # Construct resource group name
+            projectNameReplaced="${projectName/prj/project}"
+            targetResourceGroup="${commonRGNamePrefix}esml-${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}-rg"
+
+            # Helper function for fuzzy resource existence check
+            resource_exists_fuzzy() {
+              local rg="$1"
+              local type="$2"
+              local prefix="$3"
+              if az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix')]" | grep -q "$prefix"; then
+                echo "true"
+              else
+                echo "false"
+              fi
             }
-      
-            Write-Host "Deleting roles on resource group $resourceGroupNameCommon"
-            Write-Host ""
-            # COMMON - USERS
-            foreach ($oid in $oids) {
-                foreach ($role in $rolesCommmonRG) {
-                    az role assignment delete --assignee $oid --role $role --scope $scopeCommon
-                }
-            }'
+
+            # Helper function for exact resource existence check
+            resource_exists_exact() {
+              local rg="$1"
+              local type="$2"
+              local name="$3"
+              if az resource show --resource-group "$rg" --name "$name" --resource-type "$type" &> /dev/null; then
+                echo "true"
+              else
+                echo "false"
+              fi
+            }
+
+            # Resource name variables (prefixes for fuzzy, full for exact)
+            aiHubName="ai-hub-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            aifProjectName="aif-prj${projectNumber}-01-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            amlName="aml-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            safeNameAISearch="$(echo "aisearch${projectName}${locationSuffix}${envName}${uniqueInAIFenv}${resourceSuffix}" | tr '[:upper:]' '[:lower:]' | tr -d '-')"
+            dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            applicationInsightName="ain-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            aiServicesPrefix="ai-services-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}-"
+            bingName="bing-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            containerAppAName="aca-a-${projectName}${locationSuffix}${envName}${uniqueInAIFenv}${resourceSuffix:1}"
+            containerAppWName="aca-w-${projectName}${locationSuffix}${envName}${uniqueInAIFenv}${resourceSuffix}"
+            cosmosDBName="cosmos-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            functionAppName="func-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            webAppName="webapp-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            funcAppServicePlanName="func-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}-plan"
+            webbAppServicePlanName="webapp-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}-plan"
+            keyvaultName="kv-p${projectNumber}-${locationSuffix}-${envName}-${uniqueInAIFenv}${twoNumbers}"
+            miACAPrefix="mi-aca-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}"
+            miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}"
+            storageAccount1001Name="$(echo "sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${envName}" | tr -d '-')"
+            storageAccount2001Name="$(echo "sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${envName}" | tr -d '-')"
+            aifName="aif-hub-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            redisName="redis-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            sqlServerName="sql-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+
+            # Check resources (fuzzy for those with randomSalt, exact for others)
+            echo "aiHubExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName")" >> $GITHUB_ENV
+            echo "aifProjectExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName")" >> $GITHUB_ENV
+            echo "amlExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName")" >> $GITHUB_ENV
+            echo "aiSearchExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch")" >> $GITHUB_ENV
+            echo "dashboardInsightsExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName")" >> $GITHUB_ENV
+            echo "applicationInsightExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName")" >> $GITHUB_ENV
+            echo "aiServicesExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix")" >> $GITHUB_ENV
+            echo "bingExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName")" >> $GITHUB_ENV
+            echo "containerAppsEnvExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName")" >> $GITHUB_ENV
+            echo "containerAppAExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName")" >> $GITHUB_ENV
+            echo "containerAppWExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppWName")" >> $GITHUB_ENV
+            echo "cosmosDBExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDBName")" >> $GITHUB_ENV
+            echo "functionAppExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/sites" "$functionAppName")" >> $GITHUB_ENV
+            echo "webAppExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/sites" "$webAppName")" >> $GITHUB_ENV
+            echo "funcAppServicePlanExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/serverfarms" "$funcAppServicePlanName")" >> $GITHUB_ENV
+            echo "webbAppServicePlanExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName")" >> $GITHUB_ENV
+            echo "keyvaultExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName")" >> $GITHUB_ENV
+            echo "miACAExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix")" >> $GITHUB_ENV
+            echo "miPrjExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix")" >> $GITHUB_ENV
+            echo "storageAccount1001Exists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name")" >> $GITHUB_ENV
+            echo "storageAccount2001Exists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name")" >> $GITHUB_ENV
+            echo "aifExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifName")" >> $GITHUB_ENV
+            echo "redisExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName")" >> $GITHUB_ENV
+            echo "postgreSQLExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName")" >> $GITHUB_ENV
+            echo "sqlServerExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName")" >> $GITHUB_ENV
+            echo "sqlDBExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName")" >> $GITHUB_ENV
+          azcliversion: latest
       - name: 05_az_bicep_deploy_genai_project
         uses: azure/cli@v2
         with:
@@ -380,7 +429,9 @@ jobs:
             --parameters network_env="${{ env.NETWORK_ENV }}" \
             --parameters aifactoryVersionMajor="${{ env.AIFACTORY_VERSION_MAJOR }}" \
             --parameters aifactoryVersionMinor="${{ env.AIFACTORY_VERSION_MINOR }}" \
-            --parameters semanticSearchTier="${{ env.semanticSearchTier }}"
+            --parameters semanticSearchTier="${{ env.semanticSearchTier }}" \
+            --parameters keyvaultExists="${{ env.keyvaultExists }}" \
+            --parameters aiSearchExists="${{ env.aiSearchExists }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
         uses: azure/cli@v2

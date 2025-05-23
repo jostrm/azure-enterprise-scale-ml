@@ -18,6 +18,8 @@ param subscriptions_subscriptionId string = ''
 param vnetRule1 string = ''
 param vnetRule2 string = ''
 param postGreSQLExists bool = true
+param keyvaultExists bool = false
+param aiSearchExists bool = false
 
 // Use this in a resource description or as a dummy resource to see the values
 resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
@@ -152,3 +154,7 @@ output debug_aksSubnetName string = aksSubnetName
 output debug_vnetRule1 string = vnetRule1
 output debug_vnetRule2 string = vnetRule2
 output debug_postGreSQLExists bool = postGreSQLExists
+
+output debug_keyvaultExists bool = keyvaultExists
+output debug_aiSearchExists bool = aiSearchExists
+

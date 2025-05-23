@@ -5,6 +5,10 @@ param aifactoryVersionMajor int = 1
 param aifactoryVersionMinor int = 20
 param useAdGroups bool = false
 
+// Existing resources
+param keyvaultExists bool = false
+param aiSearchExists bool = false
+
 // Optional override
 param bastionName string = ''
 param bastionResourceGroup string = ''
@@ -938,6 +942,8 @@ module debug './00-debug.bicep' = if(enableDebugging){
     subscriptions_subscriptionId:subscriptions_subscriptionId
     vnetRule1:'${vnetId}/subnets/${defaultSubnet}'
     vnetRule2:'${vnetId}/subnets/${aksSubnetName}'
+    keyvaultExists: keyvaultExists
+    aiSearchExists: aiSearchExists
     //postGreSQLExists: existingResource.outputs.postgreSQLExists
   }
 }
@@ -1903,8 +1909,8 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!centralDnsZoneByPoli
     projectResourceGroup
   ]
 }
-/*
-module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = {
+
+module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(serviceSettingDeployPostgreSQL){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'PostgreSQL4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1925,7 +1931,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = {
   ]
 }
 
-module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bicep' = {
+module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bicep' = if(serviceSettingDeployPostgreSQL){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1936,7 +1942,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
   }
 }
 
-module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !enablePublicAccessWithPerimeter){
+module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployPostgreSQL && !enablePublicAccessWithPerimeter){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkPostgreSQL${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1948,8 +1954,6 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!centralDnsZoneBy
     projectResourceGroup
   ]
 }
-
-*/
 
 // REDIS
 
