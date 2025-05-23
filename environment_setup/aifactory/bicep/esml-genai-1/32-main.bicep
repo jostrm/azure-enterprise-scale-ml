@@ -91,7 +91,7 @@ param serviceSettingDeployProjectVM bool = false
 param serviceSettingDeployAzureMLClassic bool = false
 
 // Databases:PostGreSQL
-param serviceSettingDeployPostgreSQL bool = false
+param serviceSettingDeployPostgreSQL bool = true
 param postgreSQLSKU_Name string = 'Standard_B1ms' // Basic tier with 1 vCore
 param postgreSQLSKU_Tier string = 'Burstable'     // Burstable tier
 param postgreSQLSKU_Family string = 'Gen5'        // Generation 5 hardware
