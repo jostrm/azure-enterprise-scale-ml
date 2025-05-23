@@ -45,6 +45,55 @@ var loginPwd = empty(administratorLoginPassword)? '${uppercaseLetter}${lowercase
 var defaultDbName = 'aifdb' // Default database name
 var dbNameToUse = !empty(databaseNames) ? first(databaseNames) : defaultDbName
 
+resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-11-01-preview' = {
+  name: name
+  location: 'Sweden Central'
+  sku: {
+    name: 'Standard_B2s'
+    tier: 'Burstable'
+  }
+  properties: {
+    replica: {
+      role: 'Primary'
+    }
+    storage: {
+      iops: 120
+      tier: 'P4'
+      storageSizeGB: 32
+      autoGrow: 'Disabled'
+    }
+    network: {
+      publicNetworkAccess: 'Enabled'
+    }
+    dataEncryption: {
+      type: 'SystemManaged'
+    }
+    authConfig: {
+      activeDirectoryAuth: 'Enabled'
+      passwordAuth: 'Enabled'
+      tenantId: 'd06d9bae-d2c3-48a1-a76f-05221564d208'
+    }
+    version: '16'
+    administratorLogin: 'esmladmin'
+    availabilityZone: '1'
+    backup: {
+      backupRetentionDays: 7
+      geoRedundantBackup: 'Disabled'
+    }
+    highAvailability: {
+      mode: 'Disabled'
+    }
+    maintenanceWindow: {
+      customWindow: 'Disabled'
+      dayOfWeek: 0
+      startHour: 0
+      startMinute: 0
+    }
+    replicationRole: 'Primary'
+  }
+}
+
+/*
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
  location: location
   tags: tags
@@ -89,6 +138,8 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
     }
   }]
 }
+
+*/
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
