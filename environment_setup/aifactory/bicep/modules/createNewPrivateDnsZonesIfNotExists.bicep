@@ -5,6 +5,7 @@ param vNetResourceGroup string
 param location string
 param allGlobal bool = true
 param privateLinksDnsZones array
+
 var locationGlobal = 'global' // Using default Microsoft Private DNS, they are registered in global. (you can change this, but need to register, see ref01)
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
@@ -12,24 +13,13 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   scope: resourceGroup(vNetResourceGroup)
 }
 
-@onlyIfNotExists()
-resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for (zone, index) in privateLinksDnsZones: {
-  name: zone.name
-  location: locationGlobal
-  properties: {}
-}]
-
-/*
-@onlyIfNotExists()
-resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for (zone, index) in privateLinksDnsZones: {
+resource privateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' = [for (zone, index) in privateLinksDnsZones: if(zone.exists == false) {
   name: zone.name
   location: (zone.name == '${location}.data.privatelink.azurecr.io' && allGlobal == false) ? location : locationGlobal
   properties: {}
 }]
-*/
 
-@onlyIfNotExists()
-resource filePrivateDnsZoneVnetLinkLoop 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = [for (zone, index) in privateLinksDnsZones: {
+resource privateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = [for (zone, index) in privateLinksDnsZones: if(zone.exists == false) {
   dependsOn: [
     privateDnsZones[index]
   ]

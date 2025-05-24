@@ -3,11 +3,70 @@ targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are
 @description('UPDATE AIFactory (Long Term Support branches): If you want to upgrade the AIFactory Long Term Support branches. E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)')
 param aifactoryVersionMajor int = 1
 param aifactoryVersionMinor int = 20
+var activeVersion = 121
 param useAdGroups bool = false
 
 // Existing resources
-param keyvaultExists bool = false
+param aiHubExists bool = false
+param aifProjectExists bool = false
+param amlExists bool = false
 param aiSearchExists bool = false
+param dashboardInsightsExists bool = false
+param applicationInsightExists bool = false
+param aiServicesExists bool = false
+param bingExists bool = false
+param containerAppsEnvExists bool = false
+param containerAppAExists bool = false
+param containerAppWExists bool = false
+param cosmosDBExists bool = false
+param functionAppExists bool = false
+param webAppExists bool = false
+param funcAppServicePlanExists bool = false
+param webbAppServicePlanExists bool = false
+param keyvaultExists bool = false
+param miACAExists bool = false
+param miPrjExists bool = false
+param storageAccount1001Exists bool = false
+param storageAccount2001Exists bool = false
+param aifExists bool = false
+param redisExists bool = false
+param postgreSQLExists bool = false
+param sqlServerExists bool = false
+param sqlDBExists bool = false
+var resourceExists = {
+  aiHub: aiHubExists
+  aifProject: aifProjectExists
+  aml: amlExists
+  aiSearch: aiSearchExists
+  dashboardInsights: dashboardInsightsExists
+  applicationInsight: applicationInsightExists
+  aiServices: aiServicesExists
+  bing: bingExists
+  containerAppsEnv: containerAppsEnvExists
+  containerAppA: containerAppAExists
+  containerAppW: containerAppWExists
+  cosmosDB: cosmosDBExists
+  functionApp: functionAppExists
+  webApp: webAppExists
+  funcAppServicePlan: funcAppServicePlanExists
+  webbAppServicePlan: webbAppServicePlanExists
+  keyvault: keyvaultExists
+  miACA: miACAExists
+  miPrj: miPrjExists
+  storageAccount1001: storageAccount1001Exists
+  storageAccount2001: storageAccount2001Exists
+  aif: aifExists
+  redis: redisExists
+  postgreSQL: postgreSQLExists
+  sqlServer: sqlServerExists
+  sqlDB: sqlDBExists
+}
+
+param zoneAzurecontainerappsExists bool = false
+param zoneRedisExists bool = false
+param zonePostgresExists bool = false
+param zoneSqlExists bool = false
+param zoneMongoExists bool = false
 
 // Optional override
 param bastionName string = ''
@@ -333,7 +392,7 @@ param technicalContactEmail string=''
 @description('RBAC: Specifies the tenant id')
 
 param tenantId string
-// RBAC: AzureDevops Variable Overrides: Microsft EntraID ObjectID, can be a semcolon-separeted array
+// RBAC: AzureDevops Variable Overrides: Microsft EntraID ObjectID, can be a semicolon-separeted array
 @description('Semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf". AzureDevops Variable Overrides')
 param technicalAdminsObjectID string = 'null'
 @description('Semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf". AzureDevops Variable Overrides.')
@@ -635,120 +694,157 @@ var privateLinksDnsZones = {
     #disable-next-line no-hardcoded-env-urls
     name:'privatelink.database.windows.net'
   }
+  cosmosdbmongo: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.mongo.cosmos.azure.com'
+    name:'privatelink.mongo.cosmos.azure.com'
+  }
 }
 
 var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.blob.name
     id: privateLinksDnsZones.blob.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.file.name
     id: privateLinksDnsZones.file.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.dfs.name
     id: privateLinksDnsZones.dfs.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.queue.name
     id: privateLinksDnsZones.queue.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.table.name
     id: privateLinksDnsZones.table.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.registry.name
     id: privateLinksDnsZones.registry.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.registryregion.name
     id: privateLinksDnsZones.registryregion.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.vault.name
     id: privateLinksDnsZones.vault.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.amlworkspace.name
     id: privateLinksDnsZones.amlworkspace.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.notebooks.name
     id: privateLinksDnsZones.notebooks.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.dataFactory.name
     id: privateLinksDnsZones.dataFactory.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.portal.name
     id: privateLinksDnsZones.portal.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.openai.name
     id: privateLinksDnsZones.openai.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.searchService.name
     id: privateLinksDnsZones.searchService.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azurewebapps.name
     id: privateLinksDnsZones.azurewebapps.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.cosmosdbnosql.name
     id: privateLinksDnsZones.cosmosdbnosql.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.cognitiveservices.name
     id: privateLinksDnsZones.cognitiveservices.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azuredatabricks.name
     id: privateLinksDnsZones.azuredatabricks.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.namespace.name
     id: privateLinksDnsZones.namespace.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azureeventgrid.name
     id: privateLinksDnsZones.azureeventgrid.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azuremonitor.name
     id: privateLinksDnsZones.azuremonitor.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azuremonitoroms.name
     id: privateLinksDnsZones.azuremonitoroms.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azuremonitorods.name
     id: privateLinksDnsZones.azuremonitorods.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azuremonitoragentsvc.name
     id: privateLinksDnsZones.azuremonitoragentsvc.id
+    exists: false
   }
   {
     name: privateLinksDnsZones.azurecontainerapps.name
     id: privateLinksDnsZones.azurecontainerapps.id
+    exists: zoneAzurecontainerappsExists
   }
   {
     name: privateLinksDnsZones.redis.name
     id: privateLinksDnsZones.redis.id
+    exists: zoneRedisExists
   }
   {
     name: privateLinksDnsZones.postgres.name
     id: privateLinksDnsZones.postgres.id
+    exists: zonePostgresExists
   }
   {
     name: privateLinksDnsZones.sql.name
     id: privateLinksDnsZones.sql.id
+    exists: zoneSqlExists
+  }
+  {
+    name: privateLinksDnsZones.cosmosdbmongo.name
+    id: privateLinksDnsZones.cosmosdbmongo.id
+    exists: zoneMongoExists
   }
 ]
 
@@ -760,37 +856,17 @@ resource createPrivateDnsZones 'Microsoft.Network/privateDnsZones@2024-06-01' ex
   scope:resourceGroup(privDnsSubscription,privDnsResourceGroupName)
 }
 
-// ### Check: IF to create New Private DNS zones: if new ones have been added since AIFactory COMMON was created
-var newPrivateLinksDnsZones = [
-  {
-    name: privateLinksDnsZones.azurecontainerapps.name
-    id: privateLinksDnsZones.azurecontainerapps.id
-  }
-  {
-    name: privateLinksDnsZones.redis.name
-    id: privateLinksDnsZones.redis.id
-  }
-  {
-    name: privateLinksDnsZones.postgres.name
-    id: privateLinksDnsZones.postgres.id
-  }
-  {
-    name: privateLinksDnsZones.sql.name
-    id: privateLinksDnsZones.sql.id
-  }
-]
-
 var aifactoryVersionString = '${aifactoryVersionMajor}${aifactoryVersionMinor}'
 var aifactoryVersion = empty(aifactoryVersionString) || !contains(aifactoryVersionString, '^[0-9]+$') 
-    ? 199 
+    ? 999 
     : int(aifactoryVersionString)
 
-// AIFACTORY-UPDATE-121
-module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bicep' = if(centralDnsZoneByPolicyInHub==false && int(aifactoryVersion) < 121) {
+@description('AIFACTORY-UPDATE-121')
+module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesIfNotExists.bicep' = if(centralDnsZoneByPolicyInHub==false && int(aifactoryVersion) < activeVersion) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
   params: {
-    privateLinksDnsZones: newPrivateLinksDnsZones
+    privateLinksDnsZones: privateLinksDnsZonesArray
     privDnsSubscription: privDnsSubscription
     privDnsResourceGroup: privDnsResourceGroupName
     vNetName: vnetNameFull
@@ -801,37 +877,6 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZones.bic
 }
 // AIFACTORY-UPDATE-121-END
 
-/*
-module checkIfDnsZonesExists '../modules/checkIfPrivateDnsZonesExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'CheckIfNewPrivateDnsZonesMissing${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    privateLinksDnsZones: newPrivateLinksDnsZones
-    privDnsResourceGroup: privDnsResourceGroupName
-  }
-  dependsOn: [
-    createPrivateDnsZones
-  ]
-} //output dnsZonesExistence array = checkIfDnsZonesExists.outputs.existingPrivateDnsZones
-
-// ### End Check
-
-// ### Create NEW Private DNS zones: if they do not exist
-module createNewPrivateDnsZonesIfNotExists '../modules/createPrivateDnsZonesIfNotExists.bicep' = if(centralDnsZoneByPolicyInHub==false) {
-  scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
-  name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    privateLinksDnsZones: newPrivateLinksDnsZones
-    privDnsSubscription: privDnsSubscription
-    privDnsResourceGroup: privDnsResourceGroupName
-    vNetName: vnetNameFull
-    vNetResourceGroup: vnetResourceGroupName
-    location: location
-    allGlobal:privateDnsAndVnetLinkAllGlobalLocation
-    dnsZonesExistence:checkIfDnsZonesExists.outputs.existingPrivateDnsZones
-  }
-}
-  */
 // ### End Create NEW Private DNS zones
 
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
@@ -844,7 +889,7 @@ var applicationInsightName = 'ain-${projectName}-${locationSuffix}-${env}-${uniq
 var aiServicesName = 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${prjResourceSuffixNoDash}'
 var bingName = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var containerAppsEnvName = 'aca-env-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var containerAppAName = 'aca-a-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${substring(resourceSuffix, 1)}'
+var containerAppAName = 'aca-a-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'
 var containerAppWName = 'aca-w-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'
 var cosmosDBName = 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var functionAppName = 'func-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
@@ -862,44 +907,6 @@ var redisName ='redis-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}$
 var postgreSQLName ='pg-flex-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var sqlServerName ='sql-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var sqlDBName ='sqldb-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-
-/*
-module existingResource '../modules/checkExistingResources.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'existingResource-${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    resourceGroupName: targetResourceGroup
-    resourceNames: {
-      aiFoundryHub: aiHubName
-      aiFoundryProject: aifProjectName
-      mlEndpoint: amlName
-      aiSearch: safeNameAISearch
-      dashboardInsights: dashboardInsightsName
-      applicationInsight: applicationInsightName
-      aiServices: aiServicesName
-      bing: bingName
-      containerAppsEnv: containerAppsEnvName
-      containerAppA: containerAppAName
-      containerAppW: containerAppWName
-      cosmosDB: cosmosDBName
-      functionApp: functionAppName
-      webApp: webAppName
-      funcAppServicePlan: funcAppServicePlanName
-      webbAppServicePlan: webbAppServicePlanName
-      keyvault: keyvaultName
-      miACA: miACAName
-      miPrj: miPrjName
-      storageAccount1001: storageAccount1001Name
-      storageAccount2001: storageAccount2001Name
-      redis: redisName
-      postgreSQL: postgreSQLName
-      sqlServer:sqlServerName
-      sqlDatabase:sqlDBName
-      aiFoundry: aifName
-    }
-  }
-}
-*/
 
 resource subnet_genai_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   name: defaultSubnet

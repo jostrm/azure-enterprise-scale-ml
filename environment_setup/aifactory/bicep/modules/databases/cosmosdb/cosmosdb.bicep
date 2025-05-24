@@ -13,7 +13,7 @@ param capacityMode string = 'Serverless'
 @maxValue(1000000)
 param totalThroughputLimit int = 1000
 param enablePublicAccessWithPerimeter bool = false
-@allowed([ 'GlobalDocumentDB', 'MongoDB', 'Parse' ])
+@allowed([ 'GlobalDocumentDB', 'MongoDB'])
 param kind string
 param vnetName string
 param subnetNamePend string
@@ -182,7 +182,7 @@ resource mongoCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases
   }
 }
 resource pendCosmos 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
-  name: 'pend-cosmosdb-sql-${name}'
+  name: 'pend-cosmosdb-${kind}-${name}'
   location: location
   properties: {
     subnet: {
@@ -190,11 +190,11 @@ resource pendCosmos 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createP
     }
     privateLinkServiceConnections: [
       {
-        name: 'pend-cosmosdb-sql-${name}'
+        name: 'pend-cosmosdb-${kind}-${name}'
         properties: {
           privateLinkServiceId: cosmos.id
           groupIds: [
-            'Sql'
+            kind == 'GlobalDocumentDB'?'Sql': kind == 'MongoDB'?'MongoDB':'Cassandra'
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
@@ -231,7 +231,7 @@ output name string = cosmos.name
 output dnsConfig array = [
   {
     name: createPrivateEndpoint? pendCosmos.name: ''
-    type: 'cosmosdbnosql'
+    type: kind == 'GlobalDocumentDB'? 'cosmosdbnosql':kind == 'MongoDB'? 'cosmosdbmongo': 'cosmosdbcassandra'
     id:createPrivateEndpoint? pendCosmos.id: ''
   }
 ]

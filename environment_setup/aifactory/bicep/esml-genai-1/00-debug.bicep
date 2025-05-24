@@ -17,7 +17,7 @@ param aksSubnetName string = ''
 param subscriptions_subscriptionId string = ''
 param vnetRule1 string = ''
 param vnetRule2 string = ''
-param postGreSQLExists bool = true
+param postGreSQLExists bool = false
 param keyvaultExists bool = false
 param aiSearchExists bool = false
 
@@ -106,6 +106,14 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
         name: 'postGreSQLExists'
         value: postGreSQLExists ? 'true' : 'false'
       }
+      {
+        name: 'keyvaultExists'
+        value: keyvaultExists ? 'true' : 'false'
+      }
+      {
+        name: 'aiSearchExists'
+        value: aiSearchExists ? 'true' : 'false'
+      }
     ]
     scriptContent: '''
       Write-Host "DEBUG OUTPUT VARIABLES:"
@@ -129,6 +137,8 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
       Write-Host "vnetRule1: $env:VNET_RULE_1"
       Write-Host "vnetRule2: $env:VNET_RULE_2"
       Write-Host "postGreSQLExists: $env:postGreSQLExists"
+      Write-Host "debug_keyvaultExists: $env:keyvaultExists"
+      Write-Host "debug_aiSearchExists: $env:aiSearchExists"
     '''
     retentionInterval: 'PT1H'
   }
