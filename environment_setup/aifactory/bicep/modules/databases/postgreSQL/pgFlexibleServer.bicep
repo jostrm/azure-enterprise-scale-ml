@@ -5,7 +5,7 @@ param tags object
 param sku object 
 param storage object
 param version string
-param administratorLogin string = 'aifactory-admin'
+param administratorLogin string = 'aifactoryadmin'
 param resourceExists bool = false
 @secure()
 @description('Administrator login password. If not provided, a random password will be generated.')
