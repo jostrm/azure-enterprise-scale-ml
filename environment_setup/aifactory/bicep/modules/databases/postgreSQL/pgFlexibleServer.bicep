@@ -74,7 +74,8 @@ resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/f
       tenantId: 'd06d9bae-d2c3-48a1-a76f-05221564d208'
     }
     version: '16'
-    administratorLogin: 'esmladmin'
+    administratorLogin: administratorLogin
+    administratorLoginPassword: loginPwd
     availabilityZone: '1'
     backup: {
       backupRetentionDays: 7
