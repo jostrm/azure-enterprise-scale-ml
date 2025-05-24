@@ -11,6 +11,15 @@
         "enablePublicAccessWithPerimeter": {
             "value": false
         },
+        "enableAIServices": {
+            "value": true
+        },
+        "enableAIFoundryHub": {
+            "value": true
+        },
+        "enableAML": {
+            "value": false
+        },
         "serviceSettingDeployFunction": {
             "value": false
         },

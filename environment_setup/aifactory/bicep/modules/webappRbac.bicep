@@ -3,6 +3,7 @@ param storageAccountName string
 param storageAccountName2 string
 param aiSearchName string = ''
 param openAIName string = ''
+param aiServicesName string = ''
 
 // Get resource references
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
@@ -19,6 +20,9 @@ resource aiSearch 'Microsoft.Search/searchServices@2022-09-01' existing = if (!e
 
 resource openAI 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = if (!empty(openAIName)) {
   name: openAIName
+}
+resource aiServices 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = if (!empty(aiServicesName)) {
+  name: aiServicesName
 }
 
 // Grant Storage Blob Data Reader role to WebApp on storage accounts
@@ -46,6 +50,15 @@ resource storageBlobDataReaderRoleAssignment2 'Microsoft.Authorization/roleAssig
 resource openAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(openAIName)) {
   name: guid(openAI.id, webAppPrincipalId, 'cognitiveServicesUser')
   scope: openAI
+  properties: {
+    principalId: webAppPrincipalId
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908') // Cognitive Services User
+    principalType: 'ServicePrincipal'
+  }
+}
+resource aiServicesUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiServicesName)) {
+  name: guid(aiServices.id, webAppPrincipalId, 'cognitiveServicesUser')
+  scope: aiServices
   properties: {
     principalId: webAppPrincipalId
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', 'a97b65f3-24c7-4388-baec-2e87135dc908') // Cognitive Services User

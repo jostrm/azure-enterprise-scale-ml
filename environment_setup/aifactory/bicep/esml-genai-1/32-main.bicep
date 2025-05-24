@@ -6,9 +6,15 @@ param aifactoryVersionMinor int = 20
 var activeVersion = 121
 param useAdGroups bool = false
 
+// Enable service
+param enableAIServices bool = true
+param enableAIFoundryHub bool = true
+param enableAML bool = true
+
 // Existing resources
 param aiHubExists bool = false
 param aifProjectExists bool = false
+param openaiExists bool = false
 param amlExists bool = false
 param aiSearchExists bool = false
 param dashboardInsightsExists bool = false
@@ -35,8 +41,9 @@ param sqlServerExists bool = false
 param sqlDBExists bool = false
 var resourceExists = {
   aiHub: aiHubExists
-  aifProject: aifProjectExists
+  aiHubProject: aifProjectExists
   aml: amlExists
+  openai: openaiExists
   aiSearch: aiSearchExists
   dashboardInsights: dashboardInsightsExists
   applicationInsight: applicationInsightExists
@@ -60,6 +67,34 @@ var resourceExists = {
   postgreSQL: postgreSQLExists
   sqlServer: sqlServerExists
   sqlDB: sqlDBExists
+}
+resource openaiREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if(resourceExists.openai || serviceSettingDeployAzureOpenAI) {
+  name: aoaiName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+/* Random sale
+resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if(resourceExists.aiServices ||enableAIServices) {
+  name: aiServicesName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+*/
+resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if(resourceExists.aiHub || enableAIFoundryHub) { 
+  name: aiHubName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+resource aiHubProjectREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if(resourceExists.aiHubProject || enableAIFoundryHub) { 
+  name: aifProjectName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+resource aiSearchREF 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(resourceExists.aiHubProject || serviceSettingDeployAzureAISearch) { 
+  name: safeNameAISearch
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
+// Aml
+resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if(resourceExists.aml || enableAML) { 
+  name: amlName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
 param zoneAzurecontainerappsExists bool = false
@@ -882,6 +917,7 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var aiHubName = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var aifProjectName = 'aif-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aoaiName = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'), '-', '')
 var dashboardInsightsName = 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
@@ -1165,9 +1201,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
   ]
 }
 
-
-// """"" Azure AI Services """"""  value: (contains(ip, '/') || endsWith(ip, '/32')) ? ip : '${ip}/32'
-module aiServices '../modules/csAIServices.bicep' = {
+module aiServices '../modules/csAIServices.bicep' = if(!resourceExists.aiServices && enableAIServices) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AIServices4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1205,11 +1239,11 @@ module aiServices '../modules/csAIServices.bicep' = {
 }
 
 // cog-prj003-sdc-dev-3pmpb-001
-module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureOpenAI==true) {
+module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!resourceExists.openai && serviceSettingDeployAzureOpenAI==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    cognitiveName:'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    cognitiveName:aoaiName
     tags: projecttags
     laWorkspaceName:laName
     restore:restore
@@ -1245,7 +1279,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(serviceSettingDeployAzureO
 }
 
 
-module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(serviceSettingDeployAzureOpenAI==true && centralDnsZoneByPolicyInHub==false){
+module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!resourceExists.openai && serviceSettingDeployAzureOpenAI && !centralDnsZoneByPolicyInHub){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privDnsZoneLAOAI${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1258,20 +1292,6 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(serviceSettingDe
   ]
 }
 
-/*
-module diagnosticSettingOpenAI '../modules/diagnosticSettingCognitive.bicep' = if(serviceSettingDeployAzureOpenAI==true && centralDnsZoneByPolicyInHub==false) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'diagOpenAI${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: csAzureOpenAI.outputs.cognitiveName
-    logAnalyticsWorkspaceOpInsightResourceId: logAnalyticsWorkspaceOpInsight.id
-  }
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
-*/
-
 // LogAnalytics
 var laName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 
@@ -1280,44 +1300,40 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   scope:commonResourceGroupRef
 }
 
-// Azure OpenAI - END
-// Azure AI Search
-
- //Deploys AI Search with private endpoints and shared private link connections
- var sharedPrivateLinkResources = [
-  // First storage account with 'blob' groupId
-  {
-    groupId: 'blob'
-    status: 'Approved'
-    provisioningState: 'Succeeded'
-    requestMessage: 'created using the Bicep template'
-    privateLinkResourceId: sa4AIsearch.outputs.storageAccountId
-  }
-  // Second storage account with 'blob' groupId
-  {
-    groupId: 'blob'
-    status: 'Approved'
-    provisioningState: 'Succeeded'
-    requestMessage:  'created using the Bicep template'
-    privateLinkResourceId: sacc.outputs.storageAccountId
-  }
-  /* First OpenAI resource with 'openai' groupId
-  {
-    groupId: 'openai_account'
-    status: 'Approved'
-    provisioningState: 'Succeeded'
-    requestMessage: 'created using the Bicep template'
-    privateLinkResourceId: csAzureOpenAI.outputs.cognitiveId
-  }
-    */
-  // Second OpenAI resource with 'openai' groupId
-  {
-    groupId: 'cognitiveservices_account'
-    status: 'Approved'
-    provisioningState: 'Succeeded'
-    requestMessage:  'created using the Bicep template'
-    privateLinkResourceId: aiServices.outputs.resourceId
-  }
+var sharedPrivateLinkResources = [
+// First storage account with 'blob' groupId
+{
+  groupId: 'blob'
+  status: 'Approved'
+  provisioningState: 'Succeeded'
+  requestMessage: 'created using the Bicep template'
+  privateLinkResourceId: sa4AIsearch.outputs.storageAccountId
+}
+// Second storage account with 'blob' groupId
+{
+  groupId: 'blob'
+  status: 'Approved'
+  provisioningState: 'Succeeded'
+  requestMessage:  'created using the Bicep template'
+  privateLinkResourceId: sacc.outputs.storageAccountId
+}
+/* First OpenAI resource with 'openai' groupId
+{
+  groupId: 'openai_account'
+  status: 'Approved'
+  provisioningState: 'Succeeded'
+  requestMessage: 'created using the Bicep template'
+  privateLinkResourceId: csAzureOpenAI.outputs.cognitiveId
+}
+  */
+// Second OpenAI resource with 'openai' groupId
+{
+  groupId: 'cognitiveservices_account'
+  status: 'Approved'
+  provisioningState: 'Succeeded'
+  requestMessage:  'created using the Bicep template'
+  privateLinkResourceId: aiServices.outputs.resourceId
+}
 ]
 
 module aiSearchService '../modules/aiSearch.bicep' = if (serviceSettingDeployAzureAISearch==true) {
@@ -2049,419 +2065,434 @@ module appinsights '../modules/appinsights.bicep' = if(serviceSettingDeployAppIn
   ]
 }
 
-  // It is critical that the identity is granted ACR pull access before the app is created
-  // otherwise the container app will throw a provision error
-  // This also forces us to use an user assigned managed identity since there would no way to 
-  // provide the system assigned identity with the ACR pull access before the app is created
+// It is critical that the identity is granted ACR pull access before the app is created
+// otherwise the container app will throw a provision error
+// This also forces us to use an user assigned managed identity since there would no way to 
+// provide the system assigned identity with the ACR pull access before the app is created
 
-  module miForAca '../modules/mi.bicep' = {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'miForAca4${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      name: miACAName
-      location: location
-      tags: projecttags
-    }
-    dependsOn: [
-      projectResourceGroup
-    ]
+module miForAca '../modules/mi.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'miForAca4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: miACAName
+    location: location
+    tags: projecttags
   }
-  module miRbac '../modules/miRbac.bicep'  = if(useCommonACR) {
-    scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-    name: 'miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      containerRegistryName:acrCommon2.outputs.containerRegistryName
-      principalId: miForAca.outputs.managedIdentityPrincipalId
-    }
-    dependsOn: [
-      commonResourceGroupRef
-      miForAca
-    ]
-  }
-  module miRbacProj '../modules/miRbac.bicep'  = if(useCommonACR==false) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      containerRegistryName: acr.outputs.containerRegistryName
-      principalId: miForAca.outputs.managedIdentityPrincipalId
-    }
-    dependsOn: [
-      projectResourceGroup
-      miForAca
-      aiHub
-    ]
-  }
-
-  module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployContainerApps && !enablePublicAccessWithPerimeter) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      dnsConfig: containerAppsEnv.outputs.dnsConfig
-      privateLinksDnsZones: privateLinksDnsZones
-    }
-    dependsOn: [
-      createPrivateDnsZones
-      projectResourceGroup
-    ]
-  }
-    // In your main deployment file
-  module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
-    name: 'subnetDelegationServerFarm1${deploymentProjSpecificUniqueSuffix}'
-    scope: resourceGroup(vnetResourceGroupName)
-    params: {
-      vnetName: vnetNameFull
-      subnetName: aksSubnetName // TODO: Have a dedicated for WebApp and FunctionApp
-      location: location
-      vnetResourceGroupName: vnetResourceGroupName
-      delegations: [
-        {
-          name: 'webapp-delegation'
-          properties: {
-            serviceName: 'Microsoft.Web/serverFarms'
-          }
-        }
-      ]
-    }
-  }
-
-  module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (serviceSettingDeployContainerApps) {
-    name: 'subnetDelegationAcaEnv${deploymentProjSpecificUniqueSuffix}'
-    scope: resourceGroup(vnetResourceGroupName)
-    params: {
-      vnetName: vnetNameFull
-      subnetName: acaSubnetName
-      location: location
-      vnetResourceGroupName: vnetResourceGroupName
-      delegations: [
-        {
-          name: 'aca-delegation'
-          properties: {
-            serviceName: 'Microsoft.App/environments'
-          }
-        }
-      ]
-    }
-
-  }
-
-  // AZURE WEBAPP
-  module webapp '../modules/webapp.bicep' = if(serviceSettingDeployWebApp==true) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'WebApp4${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      name: webAppName
-      location: location
-      tags: projecttags
-      sku: webappSKU
-      vnetName: vnetNameFull
-      vnetResourceGroupName: vnetResourceGroupName
-      subnetNamePend: defaultSubnet
-      subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
-      enablePublicGenAIAccess: enablePublicGenAIAccess
-      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-      applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
-      logAnalyticsWorkspaceName: laName
-      logAnalyticsWorkspaceRG: commonResourceGroup
-      runtime: webAppRuntime  // Set to 'python' for Python apps
-      redundancyMode: appRedundancyMode
-      byoACEv3: byoACEv3
-      byoAceFullResourceId: byoAceFullResourceId
-      byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
-      pythonVersion: webAppRuntimeVersion // Specify the Python version
-      ipRules: ipWhitelist_array
-      appSettings: [
-        {
-          name: 'AZURE_OPENAI_ENDPOINT'
-          value: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.azureOpenAIEndpoint : aiServices.outputs.openAIEndpoint
-        }
-        {
-          name: 'AZURE_SEARCH_ENDPOINT'
-          value: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchEndpoint : ''
-        }
-        {
-          name: 'WEBSITE_VNET_ROUTE_ALL'
-          value: '1'
-        }
-      ]
-    }
-    dependsOn: [
-      projectResourceGroup
-      sacc
-      sa4AIsearch
-      aiServices
-      aiHub
-      subnetDelegationServerFarm
-    ]
-  }
-  
-  module privateDnsWebapp '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployWebApp && !enablePublicAccessWithPerimeter){
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      dnsConfig: webapp.outputs.dnsConfig
-      privateLinksDnsZones: privateLinksDnsZones
-
-    }
-    dependsOn: [
-      createPrivateDnsZones
-      projectResourceGroup
-    ]
-  }
-
-  // Add RBAC for WebApp MSI to access other resources
-  module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(serviceSettingDeployWebApp) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      storageAccountName: sacc.outputs.storageAccountName
-      storageAccountName2: sa4AIsearch.outputs.storageAccountName
-      aiSearchName: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchName : ''
-      webAppPrincipalId: webapp.outputs.principalId
-      openAIName: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.cognitiveName : aiServices.outputs.name
-    }
-    dependsOn: [
-      webapp
-    ]
-  }
-  // AZURE WEBAPP END
-  
-  // AZURE FUNCTION
-  module function '../modules/function.bicep' = if(serviceSettingDeployFunction) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'Function4${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      name: functionAppName
-      location: location
-      tags: projecttags
-      sku: functionSKU
-      vnetName: vnetNameFull
-      vnetResourceGroupName: vnetResourceGroupName
-      subnetNamePend: defaultSubnet
-      subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
-      storageAccountName: sacc.outputs.storageAccountName
-      enablePublicGenAIAccess: enablePublicGenAIAccess
-      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-      applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
-      logAnalyticsWorkspaceName: laName
-      logAnalyticsWorkspaceRG: commonResourceGroup
-      redundancyMode: appRedundancyMode
-      byoACEv3: byoACEv3
-      byoAceFullResourceId: byoAceFullResourceId
-      byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
-      ipRules:ipWhitelist_array
-      appSettings: [
-        {
-          name: 'AZURE_OPENAI_ENDPOINT'
-          value: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.azureOpenAIEndpoint : aiServices.outputs.openAIEndpoint
-        }
-        {
-          name: 'AZURE_SEARCH_ENDPOINT'
-          value: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchEndpoint : ''
-        }
-        {
-          name: 'WEBSITES_ENABLE_APP_SERVICE_STORAGE'
-          value: 'true'
-        }
-      ]
-      runtime: functionRuntime // Choose based on your needs: 'node', 'dotnet', 'java', 'python'
-      pythonVersion: functionPyVersion // Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12 (if available)
-    }
-    dependsOn: [
-      projectResourceGroup
-      sacc
-      aiServices
-      aiHub
-      subnetDelegationServerFarm
-    ]
-  }
-
-  // Add DNS zone configuration for the Azure Function private endpoint
-  module privateDnsFunction '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployFunction && !enablePublicAccessWithPerimeter) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      dnsConfig: function.outputs.dnsConfig
-      privateLinksDnsZones: privateLinksDnsZones
-    }
-    dependsOn: [
-      createPrivateDnsZones
-      projectResourceGroup
-    ]
-  }
-
-  // Add RBAC for Function App MSI to access other resources
-  module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(serviceSettingDeployFunction) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'rbacForFunction${deploymentProjSpecificUniqueSuffix}'
-    params: {
-      storageAccountName: sacc.outputs.storageAccountName
-      storageAccountName2: sa4AIsearch.outputs.storageAccountName
-      aiSearchName: serviceSettingDeployAzureAISearch ? aiSearchService.outputs.aiSearchName : ''
-      functionPrincipalId: function.outputs.principalId
-      openAIName: serviceSettingDeployAzureOpenAI ? csAzureOpenAI.outputs.cognitiveName : aiServices.outputs.name
-    }
-    dependsOn: [
-      function
-    ]
-  }
-  // AZURE FUNCTION END
-
-  // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
-  var ipSecurityRestrictions =[for ip in ipWhitelist_array: {
-      name: replace(replace(ip, ',', ''), '/', '_')  // Replace commas with nothing and slashes with underscores
-      ipAddressRange: ip
-      action: 'Allow'
-    }]
-  
-  var vnetAllow = [
-    {
-      name: 'AllowVNet'
-      ipAddressRange: vnetCidr // VNet CIDR from your existing variable
-      action: 'Allow'
-    }
+  dependsOn: [
+    projectResourceGroup
   ]
-
-  var unionIpSec = union(ipSecurityRestrictions,vnetAllow)
-
-  var allowedOrigins = [
-    'https://portal.azure.com'
-    'https://ms.portal.azure.com'
-    'https://mlworkspace.azure.ai'
-    'https://ml.azure.com'
-    'https://ai.azure.com'
-    'https://mlworkspacecanary.azure.ai'
-    'https://mlworkspace.azureml-test.net'
-    'https://42.${location}.instances.azureml.ms'
-    'https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.${location}.api.azureml.ms'
+}
+module miRbac '../modules/miRbac.bicep'  = if(useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName:acrCommon2.outputs.containerRegistryName
+    principalId: miForAca.outputs.managedIdentityPrincipalId
+  }
+  dependsOn: [
+    commonResourceGroupRef
+    miForAca
   ]
+}
+module miRbacProj '../modules/miRbac.bicep'  = if(useCommonACR==false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acr.outputs.containerRegistryName
+    principalId: miForAca.outputs.managedIdentityPrincipalId
+  }
+  dependsOn: [
+    projectResourceGroup
+    miForAca
+    aiHub
+  ]
+}
 
-  //'https://*.instances.azureml.ms'
-  //'https://*.azureml.ms'
-  //'https://*.ai.azure.com'
-  //'https://*.ml.azure.com'
+module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployContainerApps && !enablePublicAccessWithPerimeter) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: containerAppsEnv.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+  // In your main deployment file
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if(serviceSettingDeployWebApp || serviceSettingDeployFunction) {
+  name: 'subnetDelegationServerFarm1${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(vnetResourceGroupName)
+  params: {
+    vnetName: vnetNameFull
+    subnetName: aksSubnetName // TODO: Have a dedicated for WebApp and FunctionApp
+    location: location
+    vnetResourceGroupName: vnetResourceGroupName
+    delegations: [
+      {
+        name: 'webapp-delegation'
+        properties: {
+          serviceName: 'Microsoft.Web/serverFarms'
+        }
+      }
+    ]
+  }
+}
+
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (serviceSettingDeployContainerApps) {
+  name: 'subnetDelegationAcaEnv${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(vnetResourceGroupName)
+  params: {
+    vnetName: vnetNameFull
+    subnetName: acaSubnetName
+    location: location
+    vnetResourceGroupName: vnetResourceGroupName
+    delegations: [
+      {
+        name: 'aca-delegation'
+        properties: {
+          serviceName: 'Microsoft.App/environments'
+        }
+      }
+    ]
+  }
+
+}
+
+
+var openAIEndpoint = !resourceExists.openai
+  ? csAzureOpenAI.outputs.azureOpenAIEndpoint
+  : openaiREF.properties.endpoint
+var aiServicesOpenAIEndpoint = !resourceExists.aiServices
+  ? aiServices.outputs.openAIEndpoint
+  : '' //aiServicesREF.properties.endpoint
+
+var hostName = 'https://${safeNameAISearch}.search.windows.net'
+var searchEndpoint = !resourceExists.aiSearch
+  ? aiSearchService.outputs.aiSearchEndpoint
+  : hostName
+
+// AZURE WEBAPP
+module webapp '../modules/webapp.bicep' = if(serviceSettingDeployWebApp==true) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'WebApp4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: webAppName
+    location: location
+    tags: projecttags
+    sku: webappSKU
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetNamePend: defaultSubnet
+    subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
+    logAnalyticsWorkspaceName: laName
+    logAnalyticsWorkspaceRG: commonResourceGroup
+    runtime: webAppRuntime  // Set to 'python' for Python apps
+    redundancyMode: appRedundancyMode
+    byoACEv3: byoACEv3
+    byoAceFullResourceId: byoAceFullResourceId
+    byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
+    pythonVersion: webAppRuntimeVersion // Specify the Python version
+    ipRules: ipWhitelist_array
+    appSettings: [
+      {
+        name: 'AZURE_OPENAI_ENDPOINT'
+        value: serviceSettingDeployAzureOpenAI ? openAIEndpoint : enableAIServices ? aiServicesOpenAIEndpoint: ''
+      }
+      {
+        name: 'AZURE_SEARCH_ENDPOINT'
+        value: serviceSettingDeployAzureAISearch ? searchEndpoint: ''
+      }
+      {
+        name: 'WEBSITE_VNET_ROUTE_ALL'
+        value: '1'
+      }
+    ]
+  }
+  dependsOn: [
+    projectResourceGroup
+    sacc
+    sa4AIsearch
+    aiServices
+    aiHub
+    subnetDelegationServerFarm
+  ]
+}
+
+module privateDnsWebapp '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployWebApp && !enablePublicAccessWithPerimeter){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: webapp.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+
+// Add RBAC for WebApp MSI to access other resources
+module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(serviceSettingDeployWebApp) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSearchName: resourceExists.aiSearch? safeNameAISearch: serviceSettingDeployAzureAISearch? aiSearchService.name: ''
+    webAppPrincipalId: webapp.outputs.principalId
+    openAIName: resourceExists.openai? aoaiName: serviceSettingDeployAzureOpenAI? csAzureOpenAI.outputs.cognitiveName: ''
+    aiServicesName:resourceExists.aiServices? aiServicesName: enableAIServices? aiServices.outputs.name: ''
+  }
+  dependsOn: [
+    webapp
+  ]
+}
+// AZURE WEBAPP END
+
+// AZURE FUNCTION
+module function '../modules/function.bicep' = if(serviceSettingDeployFunction) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'Function4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: functionAppName
+    location: location
+    tags: projecttags
+    sku: functionSKU
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetNamePend: defaultSubnet
+    subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
+    storageAccountName: sacc.outputs.storageAccountName
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : applicationInsightSWC.outputs.name
+    logAnalyticsWorkspaceName: laName
+    logAnalyticsWorkspaceRG: commonResourceGroup
+    redundancyMode: appRedundancyMode
+    byoACEv3: byoACEv3
+    byoAceFullResourceId: byoAceFullResourceId
+    byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
+    ipRules:ipWhitelist_array
+    appSettings: [
+      {
+        name: 'AZURE_OPENAI_ENDPOINT'
+        value: serviceSettingDeployAzureOpenAI ? openAIEndpoint : enableAIServices ? aiServicesOpenAIEndpoint: ''
+      }
+      {
+        name: 'AZURE_SEARCH_ENDPOINT'
+        value: serviceSettingDeployAzureAISearch ? searchEndpoint: ''
+      }
+      {
+        name: 'WEBSITE_VNET_ROUTE_ALL'
+        value: '1'
+      }
+    ]
+    runtime: functionRuntime // Choose based on your needs: 'node', 'dotnet', 'java', 'python'
+    pythonVersion: functionPyVersion // Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12 (if available)
+  }
+  dependsOn: [
+    projectResourceGroup
+    sacc
+    aiServices
+    aiHub
+    subnetDelegationServerFarm
+  ]
+}
+
+// Add DNS zone configuration for the Azure Function private endpoint
+module privateDnsFunction '../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && serviceSettingDeployFunction && !enablePublicAccessWithPerimeter) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: function.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+
+// Add RBAC for Function App MSI to access other resources
+module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(serviceSettingDeployFunction) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacForFunction${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    aiSearchName: resourceExists.aiSearch? safeNameAISearch: serviceSettingDeployAzureAISearch? aiSearchService.name: ''
+    functionPrincipalId: function.outputs.principalId
+    openAIName: resourceExists.openai? aoaiName: serviceSettingDeployAzureOpenAI? csAzureOpenAI.outputs.cognitiveName: ''
+    aiServicesName:resourceExists.aiServices? aiServicesName: enableAIServices? aiServices.outputs.name: ''
+  }
+  dependsOn: [
+    function
+  ]
+}
+// AZURE FUNCTION END
+
+// Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
+var ipSecurityRestrictions =[for ip in ipWhitelist_array: {
+    name: replace(replace(ip, ',', ''), '/', '_')  // Replace commas with nothing and slashes with underscores
+    ipAddressRange: ip
+    action: 'Allow'
+  }]
+  
+var vnetAllow = [
+  {
+    name: 'AllowVNet'
+    ipAddressRange: vnetCidr // VNet CIDR from your existing variable
+    action: 'Allow'
+  }
+]
+
+var unionIpSec = union(ipSecurityRestrictions,vnetAllow)
+
+var allowedOrigins = [
+  'https://portal.azure.com'
+  'https://ms.portal.azure.com'
+  'https://mlworkspace.azure.ai'
+  'https://ml.azure.com'
+  'https://ai.azure.com'
+  'https://mlworkspacecanary.azure.ai'
+  'https://mlworkspace.azureml-test.net'
+  'https://42.${location}.instances.azureml.ms'
+  'https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.${location}.api.azureml.ms'
+]
+
+//'https://*.instances.azureml.ms'
+//'https://*.azureml.ms'
+//'https://*.ai.azure.com'
+//'https://*.ml.azure.com'
     
-  module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
-    params: {
-      name: containerAppsEnvName
-      location: location
-      tags: projecttags
-      logAnalyticsWorkspaceName: laName
-      logAnalyticsWorkspaceRG: commonResourceGroup
-      applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name:''
-      enablePublicGenAIAccess: enablePublicGenAIAccess
-      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-      vnetName: vnetNameFull
-      vnetResourceGroupName: vnetResourceGroupName
-      subnetNamePend: defaultSubnet
-      subnetAcaDedicatedName: acaSubnetName // at least /23
-      wlMinCountServerless:wlMinCountServerless
-      wlMinCountDedicated: wlMinCountDedicated
-      wlMaxCount: wlMaxCount
-      wlProfileDedicatedName: wlProfileDedicatedName
-      wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
-    }
-    dependsOn: [
-      projectResourceGroup
-      miForAca
-      miRbac  // It is critical that the identity is granted ACR pull access before the app is created
-      subnetDelegationAca
-    ] 
+module containerAppsEnv '../modules/containerapps.bicep' = if(serviceSettingDeployContainerApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
+  params: {
+    name: containerAppsEnvName
+    location: location
+    tags: projecttags
+    logAnalyticsWorkspaceName: laName
+    logAnalyticsWorkspaceRG: commonResourceGroup
+    applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name:''
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetNamePend: defaultSubnet
+    subnetAcaDedicatedName: acaSubnetName // at least /23
+    wlMinCountServerless:wlMinCountServerless
+    wlMinCountDedicated: wlMinCountDedicated
+    wlMaxCount: wlMaxCount
+    wlProfileDedicatedName: wlProfileDedicatedName
+    wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
   }
+  dependsOn: [
+    projectResourceGroup
+    miForAca
+    miRbac  // It is critical that the identity is granted ACR pull access before the app is created
+    subnetDelegationAca
+  ] 
+}
 
-  module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'aca-a-${deploymentProjSpecificUniqueSuffix}-depl'
-    params: {
-      name: 'aca-a-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${substring(resourceSuffix, 1)}' // max 32 chars
-      location: location
-      tags: projecttags
-      ipSecurityRestrictions: enablePublicGenAIAccess? ipSecurityRestrictions: []
-      allowedOrigins: allowedOrigins
-      enablePublicGenAIAccess: enablePublicGenAIAccess
-      enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-      vnetName: vnetNameFull
-      vnetResourceGroupName: vnetResourceGroupName
-      subnetNamePend: defaultSubnet
-      subnetAcaDedicatedName: acaSubnetName
-      customDomains:acaCustomDomainsArray
-      resourceGroupName: targetResourceGroup
-      identityId: miForAca.outputs.managedIdentityClientId
-      identityName: miForAca.outputs.managedIdentityName
-      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
-      containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
-      containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
-      openAiDeploymentName: 'gpt'
-      openAiEvalDeploymentName:'gpt-evals'
-      openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
-      openAiEndpoint: aiServices.outputs.openAIEndpoint
-      openAiName: aiServices.outputs.name
-      openAiType: 'azure'
-      openAiApiVersion: openAiApiVersion
-      aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint
-      aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
-      appinsightsConnectionstring:serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.connectionString:''
-      bingName: (serviceSettingDeployBingSearch)? bing.outputs.bingName: ''
-      bingApiEndpoint: (serviceSettingDeployBingSearch)? bing.outputs.endpoint:''
-      bingApiKey: (serviceSettingDeployBingSearch)? bing.outputs.bingApiKey:''
-      aiProjectName: aiHub.outputs.aiProjectName
-      subscriptionId: subscriptionIdDevTestProd
-      appWorkloadProfileName: acaAppWorkloadProfileName
-      containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
-      containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
-      keyVaultUrl: kv1.outputs.keyvaultUri
-    }
-    dependsOn: [
-      aiServices
-      aiHub
-      aiSearchService
-      cmnRbacACR
-      containerAppsEnv
-      subnetDelegationAca
-    ] 
+module acaApi '../modules/containerappApi.bicep' = if(serviceSettingDeployContainerApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'aca-a-${deploymentProjSpecificUniqueSuffix}-depl'
+  params: {
+    name: 'aca-a-${projectName}${locationSuffix}${env}${uniqueInAIFenv}${substring(resourceSuffix, 1)}' // max 32 chars
+    location: location
+    tags: projecttags
+    ipSecurityRestrictions: enablePublicGenAIAccess? ipSecurityRestrictions: []
+    allowedOrigins: allowedOrigins
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetNamePend: defaultSubnet
+    subnetAcaDedicatedName: acaSubnetName
+    customDomains:acaCustomDomainsArray
+    resourceGroupName: targetResourceGroup
+    identityId: miForAca.outputs.managedIdentityClientId
+    identityName: miForAca.outputs.managedIdentityName
+    containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+    containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
+    containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
+    openAiDeploymentName: 'gpt'
+    openAiEvalDeploymentName:'gpt-evals'
+    openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
+    openAiEndpoint: aiServices.outputs.openAIEndpoint
+    openAiName: aiServices.outputs.name
+    openAiType: 'azure'
+    openAiApiVersion: openAiApiVersion
+    aiSearchEndpoint: aiSearchService.outputs.aiSearchEndpoint
+    aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
+    appinsightsConnectionstring:serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.connectionString:''
+    bingName: (serviceSettingDeployBingSearch)? bing.outputs.bingName: ''
+    bingApiEndpoint: (serviceSettingDeployBingSearch)? bing.outputs.endpoint:''
+    bingApiKey: (serviceSettingDeployBingSearch)? bing.outputs.bingApiKey:''
+    aiProjectName: aiHub.outputs.aiProjectName
+    subscriptionId: subscriptionIdDevTestProd
+    appWorkloadProfileName: acaAppWorkloadProfileName
+    containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
+    containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
+    keyVaultUrl: kv1.outputs.keyvaultUri
   }
-  module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name:'aca-w-${deploymentProjSpecificUniqueSuffix}-depl' 
-    params: {
-      location: location
-      tags: projecttags
-      name: containerAppWName
-      apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
-      allowedOrigins: allowedOrigins
-      containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
-      containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
-      containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
-      identityId: miForAca.outputs.managedIdentityClientId
-      identityName: miForAca.outputs.managedIdentityName
-      appWorkloadProfileName:acaAppWorkloadProfileName
-      containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
-      containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
-      keyVaultUrl: kv1.outputs.keyvaultUri
-    }
-    dependsOn: [
-      containerAppsEnv
-      acaApi
-    ]
+  dependsOn: [
+    aiServices
+    aiHub
+    aiSearchService
+    cmnRbacACR
+    containerAppsEnv
+    subnetDelegationAca
+  ] 
+}
+module webContainerApp '../modules/containerappWeb.bicep' = if(serviceSettingDeployContainerApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name:'aca-w-${deploymentProjSpecificUniqueSuffix}-depl' 
+  params: {
+    location: location
+    tags: projecttags
+    name: containerAppWName
+    apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
+    allowedOrigins: allowedOrigins
+    containerAppsEnvironmentName: containerAppsEnv.outputs.environmentName
+    containerAppsEnvironmentId: containerAppsEnv.outputs.environmentId
+    containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:acr.outputs.containerRegistryName
+    identityId: miForAca.outputs.managedIdentityClientId
+    identityName: miForAca.outputs.managedIdentityName
+    appWorkloadProfileName:acaAppWorkloadProfileName
+    containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
+    containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
+    keyVaultUrl: kv1.outputs.keyvaultUri
   }
+  dependsOn: [
+    containerAppsEnv
+    acaApi
+  ]
+}
 
-  module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps) {
-    scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-    name: 'rbacForContainerAppsMI${deploymentProjSpecificUniqueSuffix}'
-    params:{
-      aiSearchName: aiSearchService.outputs.aiSearchName
-      appInsightsName: serviceSettingDeployAppInsightsDashboard ?appinsights.outputs.name:''
-      principalIdMI: miForAca.outputs.managedIdentityPrincipalId
-      resourceGroupId: targetResourceGroupId
-    }
-    dependsOn: [
-      projectResourceGroup
-      containerAppsEnv
-      acaApi
-    ]
+module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacForContainerAppsMI${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    aiSearchName: aiSearchService.outputs.aiSearchName
+    appInsightsName: serviceSettingDeployAppInsightsDashboard ?appinsights.outputs.name:''
+    principalIdMI: miForAca.outputs.managedIdentityPrincipalId
+    resourceGroupId: targetResourceGroupId
   }
-  
+  dependsOn: [
+    projectResourceGroup
+    containerAppsEnv
+    acaApi
+  ]
+}
+
 // 
 // ------------------------------ SERVICES (Azure Machine Learning)  ------------------------------//
 
@@ -2711,16 +2742,16 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(empty(bas
 
 var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 
-module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureAISearch && serviceSettingDeployAzureOpenAI) {
+module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureOpenAI && !resourceExists.openai) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
     storageAccountName2: sa4AIsearch.outputs.storageAccountName
-    aiSearchName: aiSearchService.outputs.aiSearchName
+    aiSearchName: resourceExists.aiSearch? safeNameAISearch: serviceSettingDeployAzureAISearch? aiSearchService.outputs.aiSearchName: ''
     openAIServicePrincipal:csAzureOpenAI.outputs.principalId
     servicePrincipleAndMIArray: spAndMiArray
-    openAIName:csAzureOpenAI.outputs.cognitiveName
+    openAIName:resourceExists.openai? aoaiName: serviceSettingDeployAzureOpenAI? csAzureOpenAI.outputs.cognitiveName: ''
     userObjectIds:p011_genai_team_lead_array
     useAdGroups: useAdGroups
   }

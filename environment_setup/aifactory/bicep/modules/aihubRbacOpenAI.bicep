@@ -31,7 +31,7 @@ resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' 
   name: storageAccountName2
 }
 
-resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
+resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(!empty(aiSearchName)) {
   name: aiSearchName
 }
 resource existingOpenAIResource 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
@@ -39,7 +39,7 @@ resource existingOpenAIResource 'Microsoft.CognitiveServices/accounts@2024-04-01
 }
 
 @description('Role Assignment for Azure AI Search: SearchIndexDataContributor for Azure OpenAI MI')
-resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
@@ -49,7 +49,7 @@ resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
   scope: existingAiSearch
 }
-resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataReader, existingOpenAIResource.id)
   properties: {
     principalId: existingOpenAIResource.identity.principalId
@@ -61,7 +61,7 @@ resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@202
 }
 
 @description('Role Assignment for Azure AI Search: SearchServiceContributor for Azure OpenAI MI')
-resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
@@ -190,7 +190,7 @@ resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssig
 }]
 
 // AI Search -> OpenAI Service
-resource cognitiveServicesOpenAIContributorAISearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource cognitiveServicesOpenAIContributorAISearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
   name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIContributorRoleId, existingAiSearch.id)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
@@ -223,8 +223,8 @@ resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAs
   scope:existingOpenAIResource
 }]
 
-output roleAssignmentSearchIndexDataContributorGUID string = guid(existingAiSearch.id, searchIndexDataContributorRoleId, openAIServicePrincipal)
-output roleAssignmentSearchServiceContributorGUID string = guid(existingAiSearch.id, searchServiceContributorRoleId, openAIServicePrincipal)
+output roleAssignmentSearchIndexDataContributorGUID string = !empty(aiSearchName)? guid(existingAiSearch.id, searchIndexDataContributorRoleId, openAIServicePrincipal): ''
+output roleAssignmentSearchServiceContributorGUID string = !empty(aiSearchName)?guid(existingAiSearch.id, searchServiceContributorRoleId, openAIServicePrincipal): ''
 output roleAssignmentStorageBlobDataContributorGUID1 string = guid(existingStorageAccount.id, storageBlobDataContributorRoleId, openAIServicePrincipal)
 output roleAssignmentStorageFileDataContributorGUID1 string = guid(existingStorageAccount.id, storageFileDataContributorRoleId, openAIServicePrincipal)
 output roleAssignmentStorageBlobDataContributorGUID2 string = guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, openAIServicePrincipal)
