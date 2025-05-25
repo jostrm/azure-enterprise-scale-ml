@@ -1948,6 +1948,8 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
     sku: postgreSQLSKU
     storage: postgreSQLStorage
     version: postgreSQLVersion
+    tenantId: tenantId
+    useAdGroups: useAdGroups
   }
   dependsOn: [
     projectResourceGroup
