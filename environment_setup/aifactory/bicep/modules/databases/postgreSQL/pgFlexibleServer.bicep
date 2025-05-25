@@ -104,6 +104,9 @@ resource flexibleServers_mypgfrelx001_name_4dd75919_56b3_4e7e_a265_dc96f9cd4a58 
     principalName: entraIdPrincipleAdmin
     tenantId: tenantId
   }
+  dependsOn: [
+    flexibleServers_mypgfrelx001_name_resource
+  ]
 }
 
 resource flexibleServers_mypgfrelx001_name_postgres 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-11-01-preview' = {
@@ -113,6 +116,9 @@ resource flexibleServers_mypgfrelx001_name_postgres 'Microsoft.DBforPostgreSQL/f
     charset: 'UTF8'
     collation: 'en_US.utf8'
   }
+  dependsOn: [
+    flexibleServers_mypgfrelx001_name_resource
+  ]
 }
 
 resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = {
@@ -122,6 +128,9 @@ resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft
     startIpAddress: '0.0.0.0'
     endIpAddress: '255.255.255.255'
   }
+  dependsOn: [
+    flexibleServers_mypgfrelx001_name_resource
+  ]
 }
 
 resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWithinAzureIps_2025_5_23_18_8_9 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = {
@@ -131,6 +140,9 @@ resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWith
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
   }
+  dependsOn: [
+    flexibleServers_mypgfrelx001_name_resource
+  ]
 }
 /*
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
