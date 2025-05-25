@@ -20,7 +20,7 @@ param vnetName string
 param subnetNamePend string
 param vnetResourceGroupName string
 param createPrivateEndpoint bool
-param entraIdPrincipleAdmin string = 'jostrm_microsoft.com#EXT#@MngEnvMCAP806050.onmicrosoft.com'
+param entraIdPrincipleAdmin string = ''
 @description('The name of an existing keyvault, that it will be used to store secrets (connection string)' )
 param keyvaultName string
 param connectionStringKey string = 'aifactory-proj-postgresqlflex-con-string'
@@ -96,6 +96,13 @@ resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/f
     replicationRole: 'Primary'
   }
 }
+/*
+{
+  code: 'AadAuthOperationCannotBePerformedWhenServerIsNotAccessible'
+  message: 'Server \'pg-flex-prj003-sdc-dev-zltme-001\' is not in an accessible state to perform a Microsoft Entra authentication principal operation. Make sure that the server is in an accessible before executing any Microsoft Entra authentication principal operation.'
+}
+*/
+/*
 resource flexibleServers_mypgfrelx001_name_4dd75919_56b3_4e7e_a265_dc96f9cd4a58 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-11-01-preview' = {
   parent: flexibleServers_mypgfrelx001_name_resource
   name: '4dd75919-56b3-4e7e-a265-dc96f9cd4a58'
@@ -108,7 +115,7 @@ resource flexibleServers_mypgfrelx001_name_4dd75919_56b3_4e7e_a265_dc96f9cd4a58 
     flexibleServers_mypgfrelx001_name_resource
   ]
 }
-
+*/
 resource flexibleServers_mypgfrelx001_name_postgres 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-11-01-preview' = {
   parent: flexibleServers_mypgfrelx001_name_resource
   name: dbNameToUse
