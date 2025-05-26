@@ -17,6 +17,9 @@
         "enableAIFoundryHub": {
             "value": true
         },
+        "enableAISearch": {
+            "value": true
+        },
         "enableAML": {
             "value": false
         },

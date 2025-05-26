@@ -66,7 +66,7 @@ resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' 
   name: storageAccountName2
 }
 
-resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
+resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(!empty(aiSearchName)) {
   name: aiSearchName
 }
 
@@ -84,7 +84,7 @@ resource existingAIHubProject 'Microsoft.MachineLearningServices/workspaces@2024
 // --------------- SEARCH ---------------- //
 
 @description('Role Assignment for Azure AI Search: SearchIndexDataContributor for users. 	Grants full access to Azure Cognitive Search index data')
-resource searchIndexDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource searchIndexDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
@@ -94,7 +94,7 @@ resource searchIndexDataContributor 'Microsoft.Authorization/roleAssignments@202
   }
   scope:existingAiSearch
 }]
-resource searchIndexDataReaderAssign 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource searchIndexDataReaderAssign 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataReader, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReader)
@@ -105,7 +105,7 @@ resource searchIndexDataReaderAssign 'Microsoft.Authorization/roleAssignments@20
   scope:existingAiSearch
 }]
 
-resource searchIndexDataContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource searchIndexDataContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
@@ -117,7 +117,7 @@ resource searchIndexDataContributorSP 'Microsoft.Authorization/roleAssignments@2
 }]
 
 @description('Role Assignment for Azure AI Search: Search Service Contributor for users. Lets you manage Search services, but not access to them.')
-resource searchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource searchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
@@ -128,7 +128,7 @@ resource searchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-
   scope:existingAiSearch
 }]
 
-resource searchServiceContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01'  = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource searchServiceContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01'  = [for i in range(0, length(servicePrincipleAndMIArray)):if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)

@@ -45,11 +45,11 @@ resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' 
   name: storageAccountName2
 }
 
-resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
+resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(!empty(aiSearchName)){
   name: aiSearchName
 }
 
-resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, aiServicesPrincipalId)
   properties: {
     principalId: aiServicesPrincipalId
@@ -59,7 +59,7 @@ resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
   scope: existingAiSearch
 }
-resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataReader, aiServicesPrincipalId)
   properties: {
     principalId: aiServicesPrincipalId
@@ -70,7 +70,7 @@ resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@202
   scope: existingAiSearch
 }
 
-resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, aiServicesPrincipalId)
   properties: {
     principalId: aiServicesPrincipalId
@@ -127,8 +127,8 @@ resource roleAssignmentStorageFileDataPrivilegedContributor2 'Microsoft.Authoriz
   scope: existingStorageAccount2
 }
 
-output roleAssignmentSearchIndexDataContributorGUID string = guid(existingAiSearch.id, searchIndexDataContributorRoleId, aiServicesPrincipalId)
-output roleAssignmentSearchServiceContributorGUID string = guid(existingAiSearch.id, searchServiceContributorRoleId, aiServicesPrincipalId)
+output roleAssignmentSearchIndexDataContributorGUID string =!empty(aiSearchName)? guid(existingAiSearch.id, searchIndexDataContributorRoleId, aiServicesPrincipalId): ''
+output roleAssignmentSearchServiceContributorGUID string = !empty(aiSearchName)? guid(existingAiSearch.id, searchServiceContributorRoleId, aiServicesPrincipalId):''
 output roleAssignmentStorageBlobDataContributorGUID1 string = guid(existingStorageAccount.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)
 output roleAssignmentStorageFileDataContributorGUID1 string = guid(existingStorageAccount.id, storageFileDataContributorRoleId, aiServicesPrincipalId)
 output roleAssignmentStorageBlobDataContributorGUID2 string = guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, aiServicesPrincipalId)

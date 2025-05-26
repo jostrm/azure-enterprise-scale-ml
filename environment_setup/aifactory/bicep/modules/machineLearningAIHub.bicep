@@ -10,8 +10,6 @@ param env string
 @description('Specifies the storageaccount id used for the machine learning studio')
 param storageAccount string
 param storageAccountName string
-@description('Specifies the container registry id used for the machine learning studio')
-param containerRegistry string
 @description('Specifies the keyvault id used for the machine learning studio')
 param keyVaultName string
 @description('Specifies the tags that should be applied to machine learning studio resources')
@@ -64,7 +62,7 @@ var privateDnsZoneNameNotebooks = {
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   name: applicationInsightsName
 }
-resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
+resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(!empty(aiSearchName)) {
   name: aiSearchName
 }
 
@@ -190,59 +188,51 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
       isolationMode:'AllowInternetOutbound' //'Disabled' meaning no restrictions
       #disable-next-line BCP037
       enableNetworkMonitor:false
-      outboundRules: {
-        search: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiSearch.id
-            subresourceTarget: 'searchService'
-            sparkEnabled: false
-            sparkStatus: 'Inactive'
+      outboundRules:  union(
+        {
+          OpenAI: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: aiServices.id
+              subresourceTarget: 'account'
+              sparkEnabled: false
+              sparkStatus: 'Active'
+            }
+            status: 'Active'
           }
-        } 
-        OpenAI: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiServices.id
-            subresourceTarget: 'account'
-            sparkEnabled: false
-            sparkStatus: 'Active'
+          SaBlob: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: existingStorageAccount.id
+              subresourceTarget: 'blob'
+              sparkEnabled: true
+              sparkStatus: 'Active'
+            }
+            status: 'Active'
           }
-          status: 'Active'
-        }
-        /*
-        AmlWorkspace: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: resourceId('Microsoft.MachineLearningServices/workspaces', name)
-            subresourceTarget: 'amlworkspace'
-            sparkEnabled: true
-            sparkStatus: 'Active'
+          SaFile: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: existingStorageAccount.id
+              subresourceTarget: 'file'
+              sparkEnabled: true
+              sparkStatus: 'Active'
+            }
+            status: 'Active'
           }
-          status: 'Active'
-        }
-        */
-        SaBlob: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: existingStorageAccount.id
-            subresourceTarget: 'blob'
-            sparkEnabled: true
-            sparkStatus: 'Active'
+        },
+        !empty(aiSearchName) ? {
+          search: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: aiSearch.id
+              subresourceTarget: 'searchService'
+              sparkEnabled: false
+              sparkStatus: 'Inactive'
+            }
           }
-          status: 'Active'
-        }
-        SaFile: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: existingStorageAccount.id
-            subresourceTarget: 'file'
-            sparkEnabled: true
-            sparkStatus: 'Active'
-          }
-          status: 'Active'
-        }
-      }
+        } : {}
+      )
       
     }
   }

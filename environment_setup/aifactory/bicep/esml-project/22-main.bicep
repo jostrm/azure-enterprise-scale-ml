@@ -961,6 +961,18 @@ module kv2 '../modules/keyVault.bicep' = if(alsoManagedMLStudio == true) {
     kv1
   ]
 }
+module kv2PrivateDns '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkKV2${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: kv2.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
 
 // Note: az keyvault update  --name msft-weu-dev-cmnai-kv --enabled-for-template-deployment true
 resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {

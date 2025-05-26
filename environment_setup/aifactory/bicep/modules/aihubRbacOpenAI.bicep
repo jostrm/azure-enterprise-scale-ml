@@ -39,7 +39,7 @@ resource existingOpenAIResource 'Microsoft.CognitiveServices/accounts@2024-04-01
 }
 
 @description('Role Assignment for Azure AI Search: SearchIndexDataContributor for Azure OpenAI MI')
-resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
+resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
@@ -49,7 +49,7 @@ resource roleAssignmentSearch 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
   scope: existingAiSearch
 }
-resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
+resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchIndexDataReader, existingOpenAIResource.id)
   properties: {
     principalId: existingOpenAIResource.identity.principalId
@@ -61,7 +61,7 @@ resource roleAssignmentSearchReader 'Microsoft.Authorization/roleAssignments@202
 }
 
 @description('Role Assignment for Azure AI Search: SearchServiceContributor for Azure OpenAI MI')
-resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
+resource roleAssignmentSearchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiSearchName)){
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, openAIServicePrincipal)
   properties: {
     principalId: openAIServicePrincipal
@@ -190,7 +190,7 @@ resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssig
 }]
 
 // AI Search -> OpenAI Service
-resource cognitiveServicesOpenAIContributorAISearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (empty(aiSearchName)){
+resource cognitiveServicesOpenAIContributorAISearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiSearchName)){
   name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIContributorRoleId, existingAiSearch.id)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
