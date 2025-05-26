@@ -1026,6 +1026,9 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = {
     managedIdentityOID: resourceExists.miPrj? miPrjREF.properties.principalId: miForPrj.outputs.managedIdentityPrincipalId
     servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
+  dependsOn: [
+    miForPrj
+  ]
 }
 var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
 
@@ -1365,49 +1368,14 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   scope:commonResourceGroupRef
 }
 
-var sharedPrivateLinkResources = [
-// First storage account with 'blob' groupId
-{
-  groupId: 'blob'
-  status: 'Approved'
-  provisioningState: 'Succeeded'
-  requestMessage: 'created using the Bicep template'
-  privateLinkResourceId: sa4AIsearch.outputs.storageAccountId
-}
-// Second storage account with 'blob' groupId
-{
-  groupId: 'blob'
-  status: 'Approved'
-  provisioningState: 'Succeeded'
-  requestMessage:  'created using the Bicep template'
-  privateLinkResourceId: sacc.outputs.storageAccountId
-}
-/* First OpenAI resource with 'openai' groupId
-{
-  groupId: 'openai_account'
-  status: 'Approved'
-  provisioningState: 'Succeeded'
-  requestMessage: 'created using the Bicep template'
-  privateLinkResourceId: csAzureOpenAI.outputs.cognitiveId
-}
-  */
-// Second OpenAI resource with 'openai' groupId
-{
-  groupId: 'cognitiveservices_account'
-  status: 'Approved'
-  provisioningState: 'Succeeded'
-  requestMessage:  'created using the Bicep template'
-  privateLinkResourceId: aiServices.outputs.resourceId
-}
-]
+var sharedPrivateLinkResources = []
 
 module aiSearchService '../modules/aiSearch.bicep' = if (!resourceExists.aiSearch && serviceSettingDeployAzureAISearch==true) {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
-    aiSearchName: (!empty(serviceSettingOverrideRegionAzureAISearchShort)) ? replace(toLower('aisearch${projectName}${serviceSettingOverrideRegionAzureAISearchShort}${env}${uniqueInAIFenv}${resourceSuffix}') ,'-','')
-    : replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}') ,'-','')
-    location: (!empty(serviceSettingOverrideRegionAzureAISearch)) ? serviceSettingOverrideRegionAzureAISearch : location
+    aiSearchName:safeNameAISearch
+    location:location
     replicaCount: 1
     partitionCount: 1
     privateEndpointName: 'p-${projectName}-aisearch-${genaiName}'
@@ -1419,13 +1387,16 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!resourceExists.aiSearc
     publicNetworkAccess: enablePublicGenAIAccess
     skuName: aiSearchSKUName
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
-    sharedPrivateLinks:sharedPrivateLinkResources
+    //sharedPrivateLinks:sharedPrivateLinkResources
+    sharedPrivateLinks: []
     acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: empty(processedIpRulesAISearch)?[]:processedIpRulesAISearch
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
+    sacc
+    sa4AIsearch
   ]
 }
 
@@ -2684,6 +2655,8 @@ module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!resourceExi
 }
 
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var storageAccountId1 = !resourceExists.storageAccount1001 ? sacc.outputs.storageAccountId : resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount1001Name)
+
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
@@ -2699,7 +2672,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
     keyVaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
     aifactoryProjectNumber: projectNumber
-    storageAccount: resourceExists.storageAccount1001? storageAccount1001REF.id: sacc.outputs.storageAccountId
+    storageAccount: storageAccountId1
     storageAccountName: resourceExists.storageAccount1001? storageAccount1001Name: sacc.outputs.storageAccountName
     subnetName: defaultSubnet
     vnetName: vnetNameFull
