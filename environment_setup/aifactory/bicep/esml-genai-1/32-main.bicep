@@ -90,7 +90,7 @@ resource aiHubProjectREF 'Microsoft.MachineLearningServices/workspaces@2024-10-0
   name: aifProjectName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
-resource aiSearchREF 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(resourceExists.aiHubProject || serviceSettingDeployAzureAISearch) { 
+resource aiSearchREF 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(resourceExists.aiSearch || enableAISearch) { 
   name: safeNameAISearch
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
@@ -148,6 +148,12 @@ resource storageAccount2001REF 'Microsoft.Storage/storageAccounts@2024-01-01' ex
   name: storageAccount2001Name
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
+
+resource appInsightsREF 'Microsoft.Insights/components@2020-02-02' existing = if(resourceExists.applicationInsight || serviceSettingDeployAppInsightsDashboard) {
+  name: applicationInsightName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
 // Random salt END
 
 param zoneAzurecontainerappsExists bool = false
@@ -362,8 +368,6 @@ param serviceSettingOverrideRegionAzureAIVisionShort string = ''
 param serviceSettingOverrideRegionAzureAISearch string = ''
 param serviceSettingOverrideRegionAzureAISearchShort string = ''
 
-@description('Service setting:Deploy Azure AI Search')
-param serviceSettingDeployAzureAISearch bool = true
 @description('Service setting:Deploy AIHub, e.g. Azure Machine Learning in AI hub mode, with AIServices and 1 project')
 param serviceSettingEnableAIFoundryPreview bool = false
 param disableContributorAccessForUsers bool = false
@@ -966,6 +970,9 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
     location: location
     allGlobal:privateDnsAndVnetLinkAllGlobalLocation
   }
+  dependsOn: [
+    commonResourceGroupRef
+  ]
 }
 // AIFACTORY-UPDATE-121-END
 
@@ -1020,14 +1027,98 @@ resource subnet_aks_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' e
   parent: vnet
 }
 
+module miForPrj '../modules/mi.bicep' = if(!resourceExists.miPrj){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'miForPrj${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: miPrjName
+    location: location
+    tags: projecttags
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+// VARS - only fetch .outputs once!
+var var_miPrj_PrincipalId = resourceExists.miPrj? miPrjREF.properties.principalId: miForPrj.outputs.managedIdentityPrincipalId
+var var_miAca_PrincipalId = resourceExists.miACA? miACAREF.properties.principalId: miForAca.outputs.managedIdentityPrincipalId
+var var_search_pricipalId = resourceExists.aiSearch? aiSearchREF.identity.principalId: aiSearchService.outputs.principalId
+var var_webAppPrincipalId=resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId
+var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
+var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
+var var_aiServices_principalId = resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId
+
+// Array vars
+var mi_array = array(var_miPrj_PrincipalId)
+var mi_array2 = array(var_miAca_PrincipalId)
+var var_all_principals = union(p011_genai_team_lead_array, mi_array, mi_array2)
+
+// Name vars
+var var_kv1_name = resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+var var_kv1_uri = resourceExists.keyvault? kvREF.properties.vaultUri: kv1.outputs.keyvaultUri
+
+var var_app_insight_aca = (serviceSettingDeployAppInsightsDashboard && !resourceExists.applicationInsight) 
+  ? appinsights.outputs.name 
+  : serviceSettingDeployAppInsightsDashboard? applicationInsightName: applicationInsightSWC.outputs.name
+
+var var_acr_cmn_or_prj = useCommonACR? acrCommon2.outputs.containerRegistryName
+  :resourceExists.acrProject? acrProjectName
+  :acr.outputs.containerRegistryName
+
+var var_aca_env_name = resourceExists.containerAppsEnv && serviceSettingDeployContainerApps? containerAppsEnvName
+  : serviceSettingDeployContainerApps? containerAppsEnv.outputs.environmentName: ''
+
+var var_aca_env_id = resourceExists.containerAppsEnv && serviceSettingDeployContainerApps?containerAppsEnvREF.id
+  : serviceSettingDeployContainerApps? containerAppsEnv.outputs.environmentId: ''
+
+var var_storageAccountName=resourceExists.storageAccount1001? storageAccount1001Name: sacc.outputs.storageAccountName
+var var_storageAccountName2=resourceExists.storageAccount2001? storageAccount2001Name: sa4AIsearch.outputs.storageAccountName
+// empty() names: 
+var var_aiSearchName=resourceExists.aiSearch? safeNameAISearch: enableAISearch? aiSearchService.name: ''
+var var_openAIName=resourceExists.openai? aoaiName: serviceSettingDeployAzureOpenAI? csAzureOpenAI.outputs.cognitiveName: ''
+var var_aiServicesName=resourceExists.aiServices? aiServicesName: enableAIServices? aiServices.outputs.name: ''
+
+// Endpoint vars
+var var_openAIEndpoint = (!resourceExists.openai && serviceSettingDeployAzureOpenAI)
+  ? csAzureOpenAI.outputs.azureOpenAIEndpoint
+  : serviceSettingDeployAzureOpenAI? openaiREF.properties.endpoint: ''
+
+var var_aiServicesOpenAIEndpoint = (!resourceExists.aiServices && enableAIServices)
+  ? aiServices.outputs.openAIEndpoint
+  : enableAIServices? aiServicesREF.properties.endpoint: ''
+
+var var_aiservices_openai_endpoint = resourceExists.aiServices && enableAIServices? aiServicesREF.properties.endpoints['OpenAI Language Model Instance API'] 
+  : enableAIServices? aiServices.outputs.openAIEndpoint: ''
+
+var hostname = 'https://${safeNameAISearch}.search.windows.net'
+var var_aisearch_endpoint = (!resourceExists.aiSearch && enableAISearch)
+  ? aiSearchService.outputs.aiSearchEndpoint
+  : enableAISearch? hostname: ''
+
+var var_appinsights_connectionstring= !resourceExists.applicationInsight && serviceSettingDeployAppInsightsDashboard 
+  ?appinsights.outputs.connectionString
+  :serviceSettingDeployAppInsightsDashboard? appInsightsREF.properties.ConnectionString: ''
+
+var var_bingName=(serviceSettingDeployBingSearch && !resourceExists.bing)? bing.outputs.bingName
+  :serviceSettingDeployBingSearch? bingName: ''
+
+var var_bing_endpoint=(serviceSettingDeployBingSearch)? 'https://api.bing.microsoft.com/':''
+var var_bing_api_Key=(serviceSettingDeployBingSearch && !resourceExists.bing)? bing.outputs.bingApiKey
+: serviceSettingDeployBingSearch && resourceExists.bing? bingREF.listKeys().key1:''
+
+var var_aiProjectName=(enableAIFoundryHub && !resourceExists.aiHubProject) ?aiHub.outputs.aiProjectName: aifProjectName
+
+// End of vars
+
 module spAndMI2Array '../modules/spAndMiArray.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
-    managedIdentityOID: resourceExists.miPrj? miPrjREF.properties.principalId: miForPrj.outputs.managedIdentityPrincipalId
+    managedIdentityOID: var_miPrj_PrincipalId
     servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
-    miForPrj
+    ...(resourceExists.miPrj ? [] : [miForPrj])
   ]
 }
 var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
@@ -1149,7 +1240,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     csSKU: csVisionSKU
     location: (!empty(serviceSettingOverrideRegionAzureAIVision)) ? serviceSettingOverrideRegionAzureAIVision : location
     restore:restore
-    keyvaultName: keyvaultName
+    keyvaultName: var_kv1_name
     vnetResourceGroupName: vnetResourceGroupName
     name: (!empty(serviceSettingOverrideRegionAzureAIVisionShort))? 'vision-${projectName}-${serviceSettingOverrideRegionAzureAIVisionShort}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     :'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
@@ -1192,7 +1283,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
     csSKU: csSpeechSKU
     location: location
     restore:restore
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
     vnetResourceGroupName: vnetResourceGroupName
     name: 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'SpeechServices'
@@ -1235,7 +1326,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
     csSKU: csDocIntelligenceSKU
     location: location
     restore:restore
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
     vnetResourceGroupName: vnetResourceGroupName
     name: 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'FormRecognizer'
@@ -1271,6 +1362,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
   ]
 }
 
+
 module aiServices '../modules/csAIServices.bicep' = if(!resourceExists.aiServices && enableAIServices) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AIServices4${deploymentProjSpecificUniqueSuffix}'
@@ -1284,10 +1376,10 @@ module aiServices '../modules/csAIServices.bicep' = if(!resourceExists.aiService
     restore: restore
     subnetName: defaultSubnet
     vnetName: vnetNameFull
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
     modelGPT4Version:modelGPT4Version
     kind: kindAIServices
-    acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
+    //acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     publicNetworkAccess: enablePublicGenAIAccess
     vnetRules: [
       subnet_genai_ref.id
@@ -1300,11 +1392,10 @@ module aiServices '../modules/csAIServices.bicep' = if(!resourceExists.aiService
   }
   dependsOn: [
     projectResourceGroup
-    sacc
-    kv1
-    sa4AIsearch
-    //acr
-    //acrCommon2
+    ...(resourceExists.keyvault ? [] : [kv1])
+    ...(useCommonACR ? [acrCommon2] : [])
+    ...(resourceExists.storageAccount2001 ? [] : [sa4AIsearch])
+    ...(resourceExists.storageAccount1001 ? [] : [sacc])
   ]
 }
 
@@ -1323,9 +1414,9 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!resourceExists.openai && 
     sku: csOpenAISKU
     vnetName: vnetNameFull
     subnetName: genaiSubnetName
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name //resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
     modelGPT4Version:modelGPT4Version
-    aiSearchPrincipalId: aiSearchService.outputs.principalId
+    aiSearchPrincipalId: var_search_pricipalId
     kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
     publicNetworkAccess: enablePublicGenAIAccess
@@ -1342,12 +1433,13 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!resourceExists.openai && 
   }
   dependsOn: [
     projectResourceGroup
-    kv1
-    sacc
-    sa4AIsearch
+    ...(resourceExists.keyvault ? [] : [kv1])
+    ...(useCommonACR ? [acrCommon2] : [])
+    ...(resourceExists.storageAccount2001 ? [] : [sa4AIsearch])
+    ...(resourceExists.storageAccount1001 ? [] : [sacc])
+    //...((!resourceExists.aiSearch && enableAISearch) ? [aiSearchService] : [])
   ]
 }
-
 
 module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!resourceExists.openai && serviceSettingDeployAzureOpenAI && !centralDnsZoneByPolicyInHub){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1370,7 +1462,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
 
 var sharedPrivateLinkResources = []
 
-module aiSearchService '../modules/aiSearch.bicep' = if (!resourceExists.aiSearch && serviceSettingDeployAzureAISearch==true) {
+module aiSearchService '../modules/aiSearch.bicep' = if (!resourceExists.aiSearch && enableAISearch) {
   name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
@@ -1387,20 +1479,20 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!resourceExists.aiSearc
     publicNetworkAccess: enablePublicGenAIAccess
     skuName: aiSearchSKUName
     enableSharedPrivateLink:aiSearchEnableSharedPrivateLink
-    //sharedPrivateLinks:sharedPrivateLinkResources
     sharedPrivateLinks: []
-    acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     ipRules: empty(processedIpRulesAISearch)?[]:processedIpRulesAISearch
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
   dependsOn: [
     projectResourceGroup
-    sacc
-    sa4AIsearch
+    ...(resourceExists.keyvault ? [] : [kv1])
+    ...(useCommonACR ? [acrCommon2] : [])
+    ...(resourceExists.storageAccount2001 ? [] : [sa4AIsearch])
+    ...(resourceExists.storageAccount1001 ? [] : [sacc])
   ]
 }
 
-module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!resourceExists.aiSearch && centralDnsZoneByPolicyInHub==false && serviceSettingDeployAzureAISearch==true){
+module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!resourceExists.aiSearch && centralDnsZoneByPolicyInHub==false && enableAISearch==true){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'priDZoneSA1${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1483,7 +1575,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!resourceExists.storag
       }
     ]
   }
-
   dependsOn: [
     projectResourceGroup
   ]
@@ -1625,6 +1716,19 @@ module sacc '../modules/storageAccount.bicep' = if(!resourceExists.storageAccoun
   ]
 }
 
+module privateDnsStorage '../modules/privateDns.bicep' = if(!resourceExists.storageAccount1001 && centralDnsZoneByPolicyInHub==false){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'priDZoneSA3${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: sacc.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+
 module kv1 '../modules/keyVault.bicep' = if(!resourceExists.keyvault) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}'
@@ -1666,7 +1770,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(!resourceExists.key
     projectResourceGroup
   ]
 }
-module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(!resourceExists.applicationInsight){
+module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep' = { //= if(!resourceExists.applicationInsight){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -1677,7 +1781,6 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep'= if(!r
     location: location
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
   }
-
   dependsOn: [
     projectResourceGroup
   ]
@@ -1696,13 +1799,10 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!resourceExists.v
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: projecttags
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
   }
-
   dependsOn: [
     projectResourceGroup
-    csContentSafety
-    aiServices
   ]
 }
 
@@ -1714,7 +1814,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!resourceExists.v
 
 
 // Seeding Keyvault - Copy secrets to project keyvault
-resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription,inputKeyvaultResourcegroup)
 }
@@ -1727,10 +1827,12 @@ module addSecret '../modules/kvSecretsPrj.bicep' = if(!resourceExists.keyvault) 
     spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)  // projectServicePrincipleOID_SeedingKeyvaultName
 
     spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
+    keyvaultNameRG: projectResourceGroup.name
   }
   dependsOn: [
-    aiServices
+    projectResourceGroup
+    kv1 //...(resourceExists.keyvault ? [] : [kv1])
   ]
 }
 
@@ -1756,23 +1858,19 @@ var secretGet = {
 
 // PROJECT Keyvault where technicalContactId GET,LIST, SET
 
-var mi_array = array(miForAca.outputs.managedIdentityPrincipalId)
-var all_principals = union(p011_genai_team_lead_array, mi_array)
-
-module kvCmnAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = if(!resourceExists.keyvault) {
+module kvPrjAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = if(!resourceExists.keyvault) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: '${keyvaultName}AP${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetListSet
-    keyVaultResourceName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyVaultResourceName: var_kv1_name
     policyName: 'add'
     principalId: technicalContactId
-    additionalPrincipalIds:all_principals
+    additionalPrincipalIds:var_all_principals
   }
   dependsOn: [
     addSecret
-    aiServices
-    miRbac
+    kv1
   ]
 }
 
@@ -1795,7 +1893,6 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   }
   dependsOn: [
     commonKv
-    aiServices
   ]
 }
 
@@ -1811,26 +1908,11 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep'= {
   }
   dependsOn: [
     commonKv
-    kv1
-    aiServices
-    aiHub // aml success, optherwise this needs to be removed manually if aml fails..and rerun
   ]
 }
 
 // Configure Private DNS Zones, if standalone AIFactory. (othwerwise the HUB DNS Zones will be used, and via policy auomatically create A-records in HUB DNS Zones)
 
-module privateDnsStorage '../modules/privateDns.bicep' = if(!resourceExists.storageAccount1001 && centralDnsZoneByPolicyInHub==false){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'priDZoneSA3${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    dnsConfig: sacc.outputs.dnsConfig
-    privateLinksDnsZones: privateLinksDnsZones
-  }
-  dependsOn: [
-    createPrivateDnsZones
-    projectResourceGroup
-  ]
-}
 
 module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(!resourceExists.acrProject && !centralDnsZoneByPolicyInHub && !useCommonACR){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -1875,7 +1957,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!resourceExi
     vnetResourceGroupName: vnetResourceGroupName
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
     vNetRules: [
       subnet_genai_ref.id
       subnet_aks_ref.id
@@ -1937,6 +2019,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!resourceExi
   }
   dependsOn: [
     projectResourceGroup
+    ...(resourceExists.keyvault ? [] : [kv1])
   ]
 }
 
@@ -1948,6 +2031,10 @@ module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!resou
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
   }
+  dependsOn: [
+    cosmosdb
+    spAndMI2Array
+  ]
 }
 
 module privateDnsCosmos '../modules/privateDns.bicep' = if(!resourceExists.cosmosDB && !centralDnsZoneByPolicyInHub && serviceSettingDeployCosmosDB && !enablePublicAccessWithPerimeter){
@@ -1973,7 +2060,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
     createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
     sku: postgreSQLSKU
     storage: postgreSQLStorage
@@ -1983,6 +2070,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
   }
   dependsOn: [
     projectResourceGroup
+    ...(resourceExists.keyvault ? [] : [kv1])
   ]
 }
 
@@ -1995,6 +2083,10 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
   }
+  dependsOn: [
+    postgreSQL
+    spAndMI2Array
+  ]
 }
 
 module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!resourceExists.postgreSQL && !centralDnsZoneByPolicyInHub && serviceSettingDeployPostgreSQL && !enablePublicAccessWithPerimeter){
@@ -2023,11 +2115,12 @@ module redisCache '../modules/databases/redis/redis.bicep' = if(!resourceExists.
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
     createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
   }
   dependsOn: [
     projectResourceGroup
+    ...(resourceExists.keyvault ? [] : [kv1])
   ]
 }
 
@@ -2042,6 +2135,7 @@ module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!resourc
   }
   dependsOn: [
     redisCache
+    spAndMI2Array
   ]
 }
 
@@ -2072,17 +2166,18 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!reso
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
-    keyvaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyvaultName: var_kv1_name
     createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
   }
   dependsOn: [
     projectResourceGroup
+    ...(resourceExists.keyvault ? [] : [kv1])
   ]
 }
 
 // DATABASES - END
 
-module appinsights '../modules/appinsights.bicep' = if(!resourceExists.sqlDB && serviceSettingDeployAppInsightsDashboard) {
+module appinsights '../modules/appinsights.bicep' = if(!resourceExists.applicationInsight && serviceSettingDeployAppInsightsDashboard) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -2118,25 +2213,26 @@ module miRbac '../modules/miRbac.bicep'  = if(!resourceExists.miACA && useCommon
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
-    containerRegistryName:acrCommon2.outputs.containerRegistryName
-    principalId: miForAca.outputs.managedIdentityPrincipalId
-  }
-  dependsOn: [
-    commonResourceGroupRef
-    miForAca
-  ]
-}
-module miRbacProj '../modules/miRbac.bicep'  = if(!resourceExists.miACA && useCommonACR==false) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    containerRegistryName: acr.outputs.containerRegistryName
-    principalId: miForAca.outputs.managedIdentityPrincipalId
+    containerRegistryName: acrCommon2.outputs.containerRegistryName
+    principalId: var_miAca_PrincipalId
   }
   dependsOn: [
     projectResourceGroup
     miForAca
-    aiHub
+    ...(useCommonACR ? [acrCommon2] : [])
+  ]
+}
+module miRbacProj '../modules/miRbac.bicep'  = if(!resourceExists.miACA && !useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acr.outputs.containerRegistryName
+    principalId: var_miAca_PrincipalId
+  }
+  dependsOn: [
+    projectResourceGroup
+    miForAca
+    ...(!useCommonACR ? [acr] : [])
   ]
 }
 
@@ -2170,6 +2266,7 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!res
       }
     ]
   }
+  
 }
 
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (!resourceExists.containerAppsEnv && serviceSettingDeployContainerApps) {
@@ -2193,18 +2290,6 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (!resourceEx
 }
 
 
-var openAIEndpoint = !resourceExists.openai
-  ? csAzureOpenAI.outputs.azureOpenAIEndpoint
-  : openaiREF.properties.endpoint
-var aiServicesOpenAIEndpoint = !resourceExists.aiServices
-  ? aiServices.outputs.openAIEndpoint
-  : '' //aiServicesREF.properties.endpoint
-
-var hostName = 'https://${safeNameAISearch}.search.windows.net'
-var searchEndpoint = !resourceExists.aiSearch
-  ? aiSearchService.outputs.aiSearchEndpoint
-  : hostName
-
 // AZURE WEBAPP
 module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSettingDeployWebApp) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -2220,7 +2305,7 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
     subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : resourceExists.applicationInsight? applicationInsightName: applicationInsightSWC.outputs.name
+    applicationInsightsName: var_app_insight_aca
     logAnalyticsWorkspaceName: laWorkspaceName
     logAnalyticsWorkspaceRG: commonResourceGroup
     runtime: webAppRuntime  // Set to 'python' for Python apps
@@ -2233,11 +2318,15 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
     appSettings: [
       {
         name: 'AZURE_OPENAI_ENDPOINT'
-        value: serviceSettingDeployAzureOpenAI ? openAIEndpoint : enableAIServices ? aiServicesOpenAIEndpoint: ''
+        value: var_openAIEndpoint
+      }
+      {
+        name: 'AZURE_AISERVICES_ENDPOINT'
+        value: var_aiServicesOpenAIEndpoint
       }
       {
         name: 'AZURE_SEARCH_ENDPOINT'
-        value: serviceSettingDeployAzureAISearch ? searchEndpoint: ''
+        value: var_aisearch_endpoint
       }
       {
         name: 'WEBSITE_VNET_ROUTE_ALL'
@@ -2248,10 +2337,11 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
   dependsOn: [
     projectResourceGroup
     sacc
-    sa4AIsearch
-    aiServices
-    aiHub
     subnetDelegationServerFarm
+    ...((!resourceExists.aiHub && enableAIFoundryHub) ? [aiHub] : [])
+    ...((!resourceExists.aiServices && enableAIServices) ? [aiServices] : [])
+    ...((!resourceExists.aiSearch && enableAISearch) ? [aiSearchService] : [])
+    ...((!resourceExists.openai && serviceSettingDeployAzureOpenAI) ? [csAzureOpenAI] : [])
   ]
 }
 
@@ -2274,15 +2364,17 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!resourceExists.webAp
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: resourceExists.storageAccount1001? storageAccount1001Name: sacc.outputs.storageAccountName
-    storageAccountName2:resourceExists.storageAccount1001? storageAccount1001Name: sa4AIsearch.outputs.storageAccountName
-    aiSearchName: resourceExists.aiSearch? safeNameAISearch: serviceSettingDeployAzureAISearch? aiSearchService.name: ''
-    webAppPrincipalId:resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId
-    openAIName: resourceExists.openai? aoaiName: serviceSettingDeployAzureOpenAI? csAzureOpenAI.outputs.cognitiveName: ''
-    aiServicesName:resourceExists.aiServices? aiServicesName: enableAIServices? aiServices.outputs.name: ''
+    storageAccountName: var_storageAccountName
+    storageAccountName2:var_storageAccountName2
+    aiSearchName: var_aiSearchName
+    webAppPrincipalId:var_webAppPrincipalId
+    openAIName: var_openAIName
+    aiServicesName:var_aiServicesName
   }
   dependsOn: [
     webapp
+    sacc
+    sa4AIsearch
   ]
 }
 // AZURE WEBAPP END
@@ -2300,10 +2392,10 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
     subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
-    storageAccountName: sacc.outputs.storageAccountName
+    storageAccountName: var_storageAccountName
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name : resourceExists.applicationInsight? applicationInsightName: applicationInsightSWC.outputs.name
+    applicationInsightsName: var_app_insight_aca
     logAnalyticsWorkspaceName: laWorkspaceName
     logAnalyticsWorkspaceRG: commonResourceGroup
     redundancyMode: appRedundancyMode
@@ -2314,11 +2406,15 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
     appSettings: [
       {
         name: 'AZURE_OPENAI_ENDPOINT'
-        value: serviceSettingDeployAzureOpenAI ? openAIEndpoint : enableAIServices ? aiServicesOpenAIEndpoint: ''
+        value: var_openAIEndpoint
+      }
+      {
+        name: 'AZURE_AISERVICES_ENDPOINT'
+        value: var_aiServicesOpenAIEndpoint
       }
       {
         name: 'AZURE_SEARCH_ENDPOINT'
-        value: serviceSettingDeployAzureAISearch ? searchEndpoint: ''
+        value: var_aisearch_endpoint
       }
       {
         name: 'WEBSITE_VNET_ROUTE_ALL'
@@ -2356,12 +2452,12 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!resourceExists.f
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacForFunction${deploymentProjSpecificUniqueSuffix}'
   params: {
-    storageAccountName: sacc.outputs.storageAccountName
-    storageAccountName2: sa4AIsearch.outputs.storageAccountName
-    aiSearchName: resourceExists.aiSearch? safeNameAISearch: serviceSettingDeployAzureAISearch? aiSearchService.name: ''
-    functionPrincipalId: resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
-    openAIName: resourceExists.openai? aoaiName: serviceSettingDeployAzureOpenAI? csAzureOpenAI.outputs.cognitiveName: ''
-    aiServicesName:resourceExists.aiServices? aiServicesName: enableAIServices? aiServices.outputs.name: ''
+    storageAccountName: var_storageAccountName
+    storageAccountName2: var_storageAccountName2
+    aiSearchName: var_aiSearchName
+    functionPrincipalId: var_functionPrincipalId
+    openAIName: var_openAIName
+    aiServicesName: var_aiServicesName
   }
   dependsOn: [
     function
@@ -2412,7 +2508,7 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!resourceExists.co
     tags: projecttags
     logAnalyticsWorkspaceName: laWorkspaceName
     logAnalyticsWorkspaceRG: commonResourceGroup
-    applicationInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name:''
+    applicationInsightsName: var_app_insight_aca
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     vnetName: vnetNameFull
@@ -2427,8 +2523,8 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!resourceExists.co
   }
   dependsOn: [
     projectResourceGroup
-    miForAca
-    miRbac  // It is critical that the identity is granted ACR pull access before the app is created
+    ...(resourceExists.miACA ? [] : [miForAca])
+    ...(useCommonACR && !resourceExists.miACA ? [miRbac] : []) // It is critical that the identity is granted ACR pull access before the app is created
     subnetDelegationAca
   ] 
 }
@@ -2450,38 +2546,43 @@ module acaApi '../modules/containerappApi.bicep' = if(!resourceExists.containerA
     subnetAcaDedicatedName: acaSubnetName
     customDomains:acaCustomDomainsArray
     resourceGroupName: targetResourceGroup
-    identityId: resourceExists.miACA? miACAREF.properties.principalId: miForAca.outputs.managedIdentityClientId
-    identityName:resourceExists.miACA? miACAName: miForAca.outputs.managedIdentityName
-    containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName: resourceExists.acrProject? acrProjectName: acr.outputs.containerRegistryName
-    containerAppsEnvironmentName: resourceExists.containerAppsEnv? containerAppsEnvName: containerAppsEnv.outputs.environmentName
-    containerAppsEnvironmentId:resourceExists.containerAppsEnv? containerAppsEnvREF.id : containerAppsEnv.outputs.environmentId
+    identityId: var_miAca_PrincipalId
+    identityName: miACAName
+    containerRegistryName: var_acr_cmn_or_prj
+    containerAppsEnvironmentName: var_aca_env_name
+    containerAppsEnvironmentId:var_aca_env_id
     openAiDeploymentName: 'gpt'
     openAiEvalDeploymentName:'gpt-evals'
     openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
-    openAiEndpoint: resourceExists.aiServices? aiServicesREF.properties.endpoints['OpenAI Language Model Instance API'] : aiServices.outputs.openAIEndpoint
-    openAiName: resourceExists.aiServices? aiServicesName: aiServices.outputs.name
+    openAiEndpoint: var_aiservices_openai_endpoint
+    openAiName: var_aiServicesName
     openAiType: 'azure'
     openAiApiVersion: openAiApiVersion
-    aiSearchEndpoint: resourceExists.aiSearch? 'https://${safeNameAISearch}.search.windows.net': aiSearchService.outputs.aiSearchEndpoint
+    aiSearchEndpoint: var_aisearch_endpoint
     aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
-    appinsightsConnectionstring:serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.connectionString:''
-    bingName: (serviceSettingDeployBingSearch)? resourceExists.bing? bingName: bing.outputs.bingName: ''
-    bingApiEndpoint: (serviceSettingDeployBingSearch)? resourceExists.bing? 'https://api.bing.microsoft.com/': bing.outputs.endpoint:''
-    bingApiKey: (serviceSettingDeployBingSearch)?resourceExists.bing? bingREF.listKeys().key1: bing.outputs.bingApiKey:''
-    aiProjectName: resourceExists.aiHubProject? aifProjectName: aiHub.outputs.aiProjectName
+    appinsightsConnectionstring: var_appinsights_connectionstring
+    bingName: var_bingName
+    bingApiEndpoint: var_bing_endpoint
+    bingApiKey: var_bing_api_Key
+    aiProjectName: var_aiProjectName
     subscriptionId: subscriptionIdDevTestProd
     appWorkloadProfileName: acaAppWorkloadProfileName
     containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
     containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
-    keyVaultUrl: resourceExists.keyvault? kvREF.properties.vaultUri: kv1.outputs.keyvaultUri
+    keyVaultUrl: var_kv1_uri
   }
   dependsOn: [
-    //aiServices // MayTheForceBeWithYou
-    //aiHub// MayTheForceBeWithYou
-    //aiSearchService // MayTheForceBeWithYou
     cmnRbacACR
     containerAppsEnv
     subnetDelegationAca
+    ...(resourceExists.miACA ? [] : [miForAca])
+    ...(resourceExists.bing ? [] : [bing])
+    ...(resourceExists.aiHub ? [] : [aiHub])
+    ...(resourceExists.aiServices ? [] : [aiServices])
+    ...(resourceExists.keyvault ? [] : [kv1])
+    ...(useCommonACR? [cmnRbacACR] : [])
+    ...(!useCommonACR? [acr] : [])
+    
   ] 
 }
 module webContainerApp '../modules/containerappWeb.bicep' = if(!resourceExists.containerAppA && serviceSettingDeployContainerApps) {
@@ -2491,21 +2592,23 @@ module webContainerApp '../modules/containerappWeb.bicep' = if(!resourceExists.c
     location: location
     tags: projecttags
     name: containerAppWName
-    apiEndpoint: acaApi.outputs.SERVICE_ACA_URI
+    apiEndpoint: acaApi.outputs.SERVICE_ACA_URI // TODO: MayTheForceBeWithYou - as var and REF.
     allowedOrigins: allowedOrigins
-    containerAppsEnvironmentName: resourceExists.containerAppsEnv? containerAppsEnvName: containerAppsEnv.outputs.environmentName
-    containerAppsEnvironmentId:resourceExists.containerAppsEnv? containerAppsEnvREF.id: containerAppsEnv.outputs.environmentId
-    containerRegistryName: useCommonACR? acrCommon2.outputs.containerRegistryName:resourceExists.acrProject? acrProjectName: acr.outputs.containerRegistryName
-    identityId: resourceExists.miACA? miACAREF.properties.clientId: miForAca.outputs.managedIdentityClientId
-    identityName:resourceExists.miACA? miACAREF.name: miForAca.outputs.managedIdentityName
+    containerAppsEnvironmentName: var_aca_env_name
+    containerAppsEnvironmentId: var_aca_env_id
+    containerRegistryName: var_acr_cmn_or_prj
+    identityId: var_miAca_PrincipalId
+    identityName: miACAName
     appWorkloadProfileName:acaAppWorkloadProfileName
     containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
     containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
-    keyVaultUrl: resourceExists.keyvault? kvREF.properties.vaultUri: kv1.outputs.keyvaultUri
+    keyVaultUrl: var_kv1_uri
   }
   dependsOn: [
     containerAppsEnv
-    //acaApi
+    ...(resourceExists.containerAppA ? [] : [acaApi])
+    ...(resourceExists.miACA ? [] : [miForAca])
+    ...(resourceExists.keyvault ? [] : [kv1])
   ]
 }
 
@@ -2513,15 +2616,18 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!resourc
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacForContainerAppsMI${deploymentProjSpecificUniqueSuffix}'
   params:{
-    aiSearchName: resourceExists.aiSearch? safeNameAISearch: serviceSettingDeployAzureAISearch? aiSearchService.name: ''
-    appInsightsName: serviceSettingDeployAppInsightsDashboard ? appinsights.outputs.name:''
-    principalIdMI: resourceExists.miACA? miACAREF.properties.principalId: miForAca.outputs.managedIdentityPrincipalId
+    aiSearchName: var_aiSearchName
+    appInsightsName: var_app_insight_aca
+    principalIdMI: var_miAca_PrincipalId
     resourceGroupId: targetResourceGroupId
   }
   dependsOn: [
     projectResourceGroup
-    //containerAppsEnv//MAyTheForceBeWithYou
-    //acaApi
+    ...(resourceExists.containerAppsEnv ? [] : [containerAppsEnv])
+    ...(resourceExists.containerAppA ? [] : [acaApi])
+    ...(resourceExists.aiSearch ? [] : [aiSearchService])
+    ...(resourceExists.applicationInsight ? [] : [appinsights])
+    ...(resourceExists.miACA ? [] : [miForAca])
   ]
 }
 
@@ -2627,11 +2733,11 @@ module aml '../modules/machineLearning.bicep'= if(!resourceExists.aml && enableA
     alsoManagedMLStudio:enableAMLv2
     managedMLStudioName:amlName
     privateEndpointName2: enableAMLv2? 'pend-${projectName}-aml2-to-vnt-mlcmn': ''
-    saName:sacc.outputs.storageAccountName
-    saName2:enableAMLv2? resourceExists.storageAccount2001? storageAccount2001Name: sa4AIsearch.outputs.storageAccountName: ''
-    kvName:resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
-    kvName2:enableAMLv2? resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName: ''
-    acrName: useCommonACR? acrCommon2.outputs.containerRegistryName: resourceExists.acrProject? acrProjectName: acr.outputs.containerRegistryName
+    saName:var_storageAccountName2
+    saName2:var_storageAccountName2
+    kvName:var_kv1_name
+    kvName2:var_kv1_name
+    acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
     appInsightsName:applicationInsightSWC.outputs.name
   }
@@ -2655,7 +2761,7 @@ module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!resourceExi
 }
 
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
-var storageAccountId1 = !resourceExists.storageAccount1001 ? sacc.outputs.storageAccountId : resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount1001Name)
+//var storageAccountId1 = !resourceExists.storageAccount1001 ? sacc.outputs.storageAccountId : resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount1001Name)
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
@@ -2666,25 +2772,24 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
     tags: projecttags
     aifactorySuffix: aifactorySuffixRG
     applicationInsightsName: resourceExists.applicationInsight? applicationInsightName: applicationInsightSWC.outputs.name
-    acrName: useCommonACR? acrCommon2.outputs.containerRegistryName:resourceExists.acrProject? acrProjectName: acr.outputs.containerRegistryName
+    acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
     env: env
-    keyVaultName: resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
+    keyVaultName: var_kv1_name
     privateEndpointName:'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
     aifactoryProjectNumber: projectNumber
-    storageAccount: storageAccountId1
-    storageAccountName: resourceExists.storageAccount1001? storageAccount1001Name: sacc.outputs.storageAccountName
+    storageAccountName: var_storageAccountName
     subnetName: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess:enablePublicGenAIAccess
-    aiSearchName:(serviceSettingDeployAzureAISearch)? resourceExists.aiSearch? safeNameAISearch: aiSearchService.outputs.aiSearchName: ''
+    aiSearchName:var_aiSearchName
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     kindAIHub:'Hub'
-    aiServicesName:resourceExists.aiServices? aiServicesName:aiServices.outputs.name
+    aiServicesName:var_aiServicesName
     logWorkspaceName:logAnalyticsWorkspaceOpInsight.name
     logWorkspaceResoureGroupName:commonResourceGroup
     locationSuffix:locationSuffix
@@ -2697,24 +2802,15 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
   }
   dependsOn: [
     projectResourceGroup
-    //aiServices
-    //aiSearchService
+    ...(!resourceExists.aiSearch && enableAISearch ? [aiSearchService] : [])
+    ...(!resourceExists.aiServices && enableAIServices ? [aiServices] : [])
+    ...(resourceExists.storageAccount1001 ? [] : [sacc])
+    ...(resourceExists.keyvault? [] : [kv1])
+    ...(resourceExists.acrProject && !useCommonACR? [] : [acr])
+    ...(resourceExists.applicationInsight? [] : [applicationInsightSWC])
     applicationInsightSWC
     subnet_genai_ref
     subnet_aks_ref
-  ]
-}
-
-module miForPrj '../modules/mi.bicep' = if(!resourceExists.miPrj){
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'miForPrj${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: miPrjName
-    location: location
-    tags: projecttags
-  }
-  dependsOn: [
-    projectResourceGroup
   ]
 }
 
@@ -2740,9 +2836,10 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!resour
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    kv1
-    aml
+    ...(resourceExists.keyvault? [] : [kv1])
+    ...(!resourceExists.aml && enableAML? [aml] : [])
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
+    spAndMI2Array
   ]
 }
 
@@ -2759,7 +2856,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep'= if(empt
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    kv1
+    ...(resourceExists.keyvault? [] : [kv1])
     rbacReadUsersToCmnVnetBastion
   ]
 }
@@ -2773,7 +2870,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(ba
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    kv1
+    ...(resourceExists.keyvault? [] : [kv1])
     rbacReadUsersToCmnVnetBastion
   ]
 }
@@ -2787,44 +2884,60 @@ module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDepl
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
   params:{
-    storageAccountName: resourceExists.storageAccount1001? storageAccount1001REF.name: sacc.outputs.storageAccountName
-    storageAccountName2:resourceExists.storageAccount2001? storageAccount2001REF.name: sa4AIsearch.outputs.storageAccountName
-    aiSearchName:(serviceSettingDeployAzureAISearch)? resourceExists.aiSearch? safeNameAISearch: aiSearchService.outputs.aiSearchName: ''
-    openAIServicePrincipal:resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
+    storageAccountName: var_storageAccountName
+    storageAccountName2:var_storageAccountName2
+    aiSearchName: var_aiSearchName
+    openAIServicePrincipal:var_openai_pricipalId
     servicePrincipleAndMIArray: spAndMiArray
-    openAIName:resourceExists.openai? aoaiName: csAzureOpenAI.outputs.cognitiveName
+    openAIName:var_openAIName
     userObjectIds:p011_genai_team_lead_array
     useAdGroups: useAdGroups
   }
+  dependsOn: [
+    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
+    ...(!resourceExists.openai && serviceSettingDeployAzureOpenAI? [csAzureOpenAI] : [])
+    ...(resourceExists.storageAccount1001? [] : [sacc])
+    ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
+    ...(resourceExists.keyvault? [] : [kv1])
+    rbacReadUsersToCmnVnetBastion
+    spAndMI2Array // NB!
+  ]
 }
 // 6 assignments: OK
 module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!resourceExists.aiServices && enableAIServices) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac4AIServices${deploymentProjSpecificUniqueSuffix}'
   params:{
-    storageAccountName: resourceExists.storageAccount1001? storageAccount1001REF.name: sacc.outputs.storageAccountName
-    storageAccountName2:resourceExists.storageAccount2001? storageAccount2001REF.name: sa4AIsearch.outputs.storageAccountName
-    aiSearchName: (serviceSettingDeployAzureAISearch)? resourceExists.aiSearch? safeNameAISearch: aiSearchService.outputs.aiSearchName: ''
-    aiServicesPrincipalId:aiServices.outputs.aiServicesPrincipalId
-  }
-}
-
-// 5 assignments: OK
-module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!resourceExists.aiSearch && serviceSettingDeployAzureAISearch) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbac5Search${deploymentProjSpecificUniqueSuffix}'
-  params:{
-    storageAccountName: resourceExists.storageAccount1001? storageAccount1001REF.name: sacc.outputs.storageAccountName
-    storageAccountName2:resourceExists.storageAccount2001? storageAccount2001REF.name: sa4AIsearch.outputs.storageAccountName
-    aiServicesName:resourceExists.aiServices? aiServicesName: aiServices.outputs.name
-    aiSearchMIObjectId: aiSearchService.outputs.principalId
+    storageAccountName: var_storageAccountName
+    storageAccountName2:var_storageAccountName2
+    aiSearchName: var_aiSearchName
+    aiServicesPrincipalId:var_aiServices_principalId
   }
   dependsOn: [
-    rbacModuleAIServices
+    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
+    ...(!resourceExists.aiServices && enableAIServices? [aiServices] : [])
+    ...(resourceExists.storageAccount1001? [] : [sacc])
+    ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
   ]
 }
 
-module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!resourceExists.aiHub && !empty(azureMachineLearningObjectId)) {
+// 5 assignments: OK
+module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!resourceExists.aiSearch && enableAISearch) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbac5Search${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName:var_storageAccountName
+    storageAccountName2:var_storageAccountName2
+    aiServicesName:var_aiServicesName
+    aiSearchMIObjectId:var_search_pricipalId
+  }
+  dependsOn: [
+    ...(!resourceExists.aiServices && enableAIServices? [aiServices] : [])
+    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
+  ]
+}
+
+module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!resourceExists.aiHub && !empty(azureMachineLearningObjectId) && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}'
   params:{
@@ -2839,21 +2952,27 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac7UsersAIHub${deploymentProjSpecificUniqueSuffix}'
   params:{
-    storageAccountName: resourceExists.storageAccount1001? storageAccount1001REF.name: sacc.outputs.storageAccountName
-    storageAccountName2:resourceExists.storageAccount2001? storageAccount2001REF.name: sa4AIsearch.outputs.storageAccountName
-    aiSearchName: (serviceSettingDeployAzureAISearch)? resourceExists.aiSearch? safeNameAISearch: aiSearchService.outputs.aiSearchName: ''
+    storageAccountName: var_storageAccountName
+    storageAccountName2:var_storageAccountName2
+    aiSearchName: var_aiSearchName
     resourceGroupId: targetResourceGroupId
     userObjectIds: p011_genai_team_lead_array
-    aiServicesName:resourceExists.aiServices? aiServicesName: aiServices.outputs.name
-    aiHubName:resourceExists.aiHub? aiHubName: aiHub.outputs.name
-    aiHubProjectName:resourceExists.aiHubProject? aiHubProjectREF.name: aiHub.outputs.aiProjectName
+    aiServicesName:var_aiServicesName
+    aiHubName:aiHubName
+    aiHubProjectName:var_aiProjectName
     servicePrincipleAndMIArray: spAndMiArray
     useAdGroups:useAdGroups
     disableContributorAccessForUsers:disableContributorAccessForUsers
   }
   dependsOn: [
-    aiHubREF
-    aiServices
+    ...(!resourceExists.aiHub && enableAIFoundryHub? [aiHub] : [])
+    ...(!resourceExists.aiServices && enableAIServices? [aiServices] : [])
+    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
+    ...(!resourceExists.openai && serviceSettingDeployAzureOpenAI? [csAzureOpenAI] : [])
+    ...(resourceExists.storageAccount1001? [] : [sacc])
+    ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
+    ...(resourceExists.keyvault? [] : [kv1])
+    spAndMI2Array // NB!
   ]
 }
 
@@ -2864,41 +2983,59 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac8Vision${deploymentProjSpecificUniqueSuffix}'
   params:{
-    storageAccountName: sacc.outputs.storageAccountName
-    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    storageAccountName: var_storageAccountName
+    storageAccountName2:var_storageAccountName2
     aiVisionMIObjectId: csVision.outputs.principalId
     userObjectIds: p011_genai_team_lead_array
     visonServiceName: csVision.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
+  dependsOn: [
+    ...(resourceExists.storageAccount1001? [] : [sacc])
+    ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
+    ...(resourceExists.keyvault? [] : [kv1])
+    spAndMI2Array // NB!
+  ]
 }
 
 module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac9Speech${deploymentProjSpecificUniqueSuffix}'
   params:{
-    storageAccountName: sacc.outputs.storageAccountName
-    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    storageAccountName: var_storageAccountName
+    storageAccountName2:var_storageAccountName2
     aiSpeechMIObjectId: csSpeech.outputs.principalId
     userObjectIds: p011_genai_team_lead_array
     speechServiceName: csSpeech.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
+  dependsOn: [
+    ...(resourceExists.storageAccount1001? [] : [sacc])
+    ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
+    ...(resourceExists.keyvault? [] : [kv1])
+    spAndMI2Array // NB!
+  ]
 }
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence==true) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac10Docs${deploymentProjSpecificUniqueSuffix}'
   params:{
-    storageAccountName: sacc.outputs.storageAccountName
-    storageAccountName2: sa4AIsearch.outputs.storageAccountName
+    storageAccountName: var_storageAccountName
+    storageAccountName2:var_storageAccountName2
     userObjectIds: p011_genai_team_lead_array
     aiDocsIntelMIObjectId: csDocIntelligence.outputs.principalId
     docsServiceName: csDocIntelligence.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
+  dependsOn: [
+    ...(resourceExists.storageAccount1001? [] : [sacc])
+    ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
+    ...(resourceExists.keyvault? [] : [kv1])
+    spAndMI2Array // NB!
+  ]
 }
 
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group. If Bastion is in HUB, an admin need to do this manually
@@ -2915,11 +3052,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
   }
   dependsOn: [
     rbacModuleUsers
-    rbacModuleAIServices
-    vmPrivate
-    sacc
-    kv1
-    aiHub
+    spAndMI2Array // NB!
   ]
 }
 // Bastion vNet Externally (Connectvivity subscription and RG || AI Factory Common RG)
@@ -2935,11 +3068,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
   }
   dependsOn: [
     rbacModuleUsers
-    rbacModuleAIServices
-    vmPrivate
-    sacc
-    kv1
-    aiHub
+    spAndMI2Array // NB!
   ]
 }
 
@@ -2955,24 +3084,23 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
     useAdGroups:useAdGroups
   }
   dependsOn: [
-    rbacReadUsersToCmnVnetBastion
-    rbacKeyvaultCommon4Users
-    aiHub
-    acrCommon2
+    rbacModuleUsers
+    spAndMI2Array // NB!
   ]
 }
 
 var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
-resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2021-04-01' existing = {
+resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
   name: datalakeName
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
  
 }
+
 module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacLake4PrjGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
-    amlPrincipalId: resourceExists.aiHub? aiHubREF.identity.principalId: aiHub.outputs.principalId
+    amlPrincipalId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''
     datalakeName: datalakeName
@@ -2981,8 +3109,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   dependsOn: [
     cmnRbacACR
     esmlCommonLake
-    aiHub
-    logAnalyticsWorkspaceOpInsight
+    ...(!resourceExists.aiHub && enableAIFoundryHub? [aiHub] : [])
   ]
 }
 

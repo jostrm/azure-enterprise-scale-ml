@@ -16,14 +16,14 @@ param additionalPrincipalIds array
 @description('Policy name')
 param policyName string
 
-resource keyVault 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultResourceName
 }
 
 var main_principal_2_array = array(principalId)
 var all_principals = union(main_principal_2_array,additionalPrincipalIds)
 
-resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2019-09-01' = {
+resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = {
   parent:keyVault
   name:policyName
   properties: {

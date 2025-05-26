@@ -8,7 +8,6 @@ param location string
 @description('ESML dev,test or prod. If DEV then AKS cluster is provisioned with 1 agent otherwise 3')
 param env string
 @description('Specifies the storageaccount id used for the machine learning studio')
-param storageAccount string
 param storageAccountName string
 @description('Specifies the keyvault id used for the machine learning studio')
 param keyVaultName string

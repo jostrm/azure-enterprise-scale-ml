@@ -1,5 +1,6 @@
 @description(' KEYVAULT for ESML coreteam or PROJECT team')
 param keyvaultName string
+param keyvaultNameRG string
 
 // is added manually by AAD admin in project KV
 @description('secret name of App ID for service principle')
@@ -38,6 +39,11 @@ param spOIDValue string //= 'Added from ADO variable, or manually'
 
 var esml_project_dbx_token_key = 'esml-project-dbx-token'
 
+resource prjKeyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyvaultName
+  scope: resourceGroup(keyvaultNameRG)
+}
+
 // SP APP ID - from ADO Variable
 resource kvSecretDatabricksToken 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
   name: '${keyvaultName}/${esml_project_dbx_token_key}'
@@ -49,6 +55,9 @@ resource kvSecretDatabricksToken 'Microsoft.KeyVault/vaults/secrets@2019-09-01' 
       exp:expiration_date_default_2025_01_10_epoch
     }
   }
+  dependsOn: [
+    prjKeyvault
+  ]
 }
 
 // SP APP ID - from ADO Variable
@@ -62,6 +71,9 @@ resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
       exp:expiration_date_default_2025_01_10_epoch
     }
   }
+  dependsOn: [
+    prjKeyvault
+  ]
 }
 
 // SP SECRET
@@ -75,6 +87,9 @@ resource kvSecretspIDValue 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
       exp:expiration_date_default_2025_01_10_epoch
     }
   }
+  dependsOn: [
+    prjKeyvault
+  ]
 }
 
 // SP OBJECT ID - from ADO Variable
@@ -88,6 +103,9 @@ resource kvSecretspOID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
       exp:expiration_date_default_2025_01_10_epoch
     }
   }
+  dependsOn: [
+    prjKeyvault
+  ]
 }
 
 // tenant id
@@ -101,6 +119,9 @@ resource kvSecretTenatID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
       exp:expiration_date_default_2025_01_10_epoch
     }
   }
+  dependsOn: [
+    prjKeyvault
+  ]
 }
 
 // subscription id
@@ -113,22 +134,8 @@ resource kvSecretSubscriptionID 'Microsoft.KeyVault/vaults/secrets@2021-10-01' =
       enabled: true
       exp:expiration_date_default_2025_01_10_epoch
     }
-    
   }
+  dependsOn: [
+    prjKeyvault
+  ]
 }
-
-/*
-param esmlCommonLakeSaKey string = 'esml-common-lake-saKey'
-@secure()
-param esmlCommonLakeSaKeySecret string = ''
-*/
-
-/*
-resource kvSecretESMLCommonDatalakeSaKey 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
-  name: '${keyvaultName}/${esmlCommonLakeSaKey}'
-  properties: {
-    value:esmlCommonLakeSaKeySecret
-    contentType: 'ESML generated - storage account key. ESML CoreTeam admin to mount Databricks.'
-  }
-}
-*/
