@@ -32,7 +32,7 @@ param cosmosDBExists bool = false
 param functionAppExists bool = false
 param webAppExists bool = false
 param funcAppServicePlanExists bool = false
-param webbAppServicePlanExists bool = false
+param webAppServicePlanExists bool = false
 param keyvaultExists bool = false
 param miACAExists bool = false
 param miPrjExists bool = false
@@ -63,7 +63,7 @@ var resourceExists = {
   functionApp: functionAppExists
   webApp: webAppExists
   funcAppServicePlan: funcAppServicePlanExists
-  webbAppServicePlan: webbAppServicePlanExists
+  webAppServicePlan: webAppServicePlanExists
   keyvault: keyvaultExists
   miACA: miACAExists
   miPrj: miPrjExists
