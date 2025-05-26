@@ -137,6 +137,8 @@ for env in "${environments[@]}"; do
     create_or_update_variable $env "BYO_SUBNETS" "$BYO_SUBNETS"
     create_or_update_variable $env "AIFACTORY_VERSION_MAJOR" "$AIFACTORY_VERSION_MAJOR"
     create_or_update_variable $env "AIFACTORY_VERSION_MINOR" "$AIFACTORY_VERSION_MINOR"
+    create_or_update_variable $env "AIFACTORY_SALT" "$AIFACTORY_SALT"
+    create_or_update_variable $env "AIFACTORY_SALT_RANDOM" "$AIFACTORY_SALT_RANDOM"
 done
 
 # DEV variables

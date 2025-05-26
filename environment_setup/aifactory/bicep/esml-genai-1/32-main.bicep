@@ -632,10 +632,10 @@ resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-
   name: targetResourceGroup
   scope:subscription(subscriptionIdDevTestProd)
 }
-
-param aifactorySalt7char string = ''
+param aifactorySalt5char string = '' // Determenistic. 
+param aifactorySalt7char string = '' // Random
 var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
-var randomSalt = empty(aifactorySalt7char) || length(aifactorySalt7char) <= 1 ? substring(randomValue, 6, 10): aifactorySalt7char
+var randomSalt = empty(aifactorySalt7char) || length(aifactorySalt7char) <= 4 ? substring(randomValue, 6, 10): aifactorySalt7char
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // Salt: AIFactory instance/env specific
