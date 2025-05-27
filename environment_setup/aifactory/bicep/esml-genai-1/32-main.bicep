@@ -77,6 +77,8 @@ var resourceExists = {
   acrProject: acrProjectExists
   vm:vmExists
 }
+
+/*
 resource openaiREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if(resourceExists.openai || serviceSettingDeployAzureOpenAI) {
   name: aoaiName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -125,7 +127,11 @@ resource kvREF 'Microsoft.KeyVault/vaults@2023-07-01' existing = if(resourceExis
   name: keyvaultName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
+
+*/
+
 /* Random salt */
+/*
 resource miACAREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = if(resourceExists.miACA) {
   name: miACAName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -153,6 +159,7 @@ resource appInsightsREF 'Microsoft.Insights/components@2020-02-02' existing = if
   name: applicationInsightName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
+*/
 
 // Random salt END
 
