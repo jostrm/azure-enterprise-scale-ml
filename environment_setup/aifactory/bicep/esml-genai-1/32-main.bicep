@@ -998,7 +998,7 @@ var aiHubName = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv
 var aifProjectName = 'aif-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var aoaiName = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'), '-', '')
+var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'), '-', '') // AzureAISearch4prj0025kxmv
 var dashboardInsightsName = 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var applicationInsightName = 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var bingName = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
@@ -1102,7 +1102,7 @@ var var_aca_env_id = resourceExists.containerAppsEnv && serviceSettingDeployCont
 var var_storageAccountName=resourceExists.storageAccount1001? storageAccount1001Name: sacc.outputs.storageAccountName
 var var_storageAccountName2=resourceExists.storageAccount2001? storageAccount2001Name: sa4AIsearch.outputs.storageAccountName
 // empty() names: 
-var var_aiSearchName=resourceExists.aiSearch? safeNameAISearch: enableAISearch? aiSearchService.name: ''
+var var_aiSearchName=resourceExists.aiSearch? safeNameAISearch: enableAISearch? aiSearchService.outputs.aiSearchName: ''
 var var_openAIName=resourceExists.openai? aoaiName: serviceSettingDeployAzureOpenAI? csAzureOpenAI.outputs.cognitiveName: ''
 var var_aiServicesName=resourceExists.aiServices? aiServicesName: enableAIServices? aiServices.outputs.name: ''
 
@@ -2635,10 +2635,10 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!resourc
   }
   dependsOn: [
     projectResourceGroup
-    ...(resourceExists.containerAppsEnv ? [] : [containerAppsEnv])
-    ...(resourceExists.containerAppA ? [] : [acaApi])
-    ...(resourceExists.aiSearch ? [] : [aiSearchService])
-    ...(resourceExists.applicationInsight ? [] : [appinsights])
+    ...(!resourceExists.containerAppsEnv && serviceSettingDeployContainerApps? [containerAppsEnv] : [])
+    ...(!resourceExists.containerAppA && serviceSettingDeployContainerApps ? [acaApi] : [])
+    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
+    ...(!resourceExists.applicationInsight && serviceSettingDeployAppInsightsDashboard ? [appinsights] : [])
     ...(resourceExists.miACA ? [] : [miForAca])
   ]
 }
@@ -2820,7 +2820,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
     ...(resourceExists.keyvault? [] : [kv1])
     ...(resourceExists.acrProject && !useCommonACR? [] : [acr])
     ...(resourceExists.applicationInsight? [] : [applicationInsightSWC])
-    applicationInsightSWC
+    //applicationInsightSWC
     subnet_genai_ref
     subnet_aks_ref
   ]
@@ -2926,8 +2926,8 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!resourc
     aiServicesPrincipalId:var_aiServices_principalId
   }
   dependsOn: [
-    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
     ...(!resourceExists.aiServices && enableAIServices? [aiServices] : [])
+    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
     ...(resourceExists.storageAccount1001? [] : [sacc])
     ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
   ]
