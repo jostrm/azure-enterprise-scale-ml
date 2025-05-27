@@ -13,11 +13,13 @@ env:
     ENABLE_STEP: 'false' # Enable/Disable a step
     ENABLE_DEBUG_STEP: 'false' # Enable/Disable a step
     ENABLE_NETWORKING_JOB: "${{ vars.RUN_JOB1_NETWORKING }}"
-    
+        
     AIFACTORY_VERSION_MAJOR: "${{ vars.AIFACTORY_VERSION_MAJOR }}" # Minor version of the AIFactory. 1 in 1.12
     AIFACTORY_VERSION_MINOR: "${{ vars.AIFACTORY_VERSION_MINOR }}" # Minor as 21 in 1.21 
     BYO_SUBNETS: "${{ vars.BYO_SUBNETS }}" # Minor version of the AIFactory. 1 in 1.12
     NETWORK_ENV: "${{ vars.NETWORK_ENV }}" # Minor as 21 in 1.21 
+    AIFACTORY_SALT: "${{ vars.AIFACTORY_SALT }}" # random salt for the AIFactory.Determenistic salt, for datalake, storage, keyvault. Set before Datalake structure upload
+    AIFACTORY_SALT_RANDOM: "${{ vars.AIFACTORY_SALT_RANDOM }}" # random salt for the AIFactory. AIServices, ManagedIdentties. Set before UPDATING/Adding resoures
     
     # ADMIN usual culprits - verify, twice. (only configure once)
     admin_bicep_input_keyvault_subscription: "${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}" # seeding keyvault, subscription id
@@ -128,6 +130,7 @@ jobs:
         submodules: true
     - name: 01_pwsh_get_IP_for_GH_runner
       if: env.ENABLE_NETWORKING_JOB  != 'false'
+      continue-on-error: true
       run: |
         $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
         echo "runner_ip=$resp" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
@@ -139,6 +142,7 @@ jobs:
         echo "The value of runner_ip is: ${{ env.runner_ip }}"
     - name: 02_az_set_ip_to_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
+      continue-on-error: true
       uses: azure/cli@v2
       with:
         inlineScript: |
@@ -267,14 +271,69 @@ jobs:
         run: |
           sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{env.common-sp-appid-value}}' -spSecret '${{env.common-sp-secret-value}}' -useServicePrincipal -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -filePath '../../../../../aifactory/parameters/' -env '${{env.dev_test_prod}}' -locationSuffixADO '${{env.admin_locationSuffix}}' -aifactorySuffixRGADO '${{env.admin_aifactorySuffixRG}}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{env.dev_test_prod_sub_id}}' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -projectTypeADO '${{env.admin_projectType}}'"
         shell: pwsh
-      - name: Check if all key resources exist in resource group (fuzzy match for randomSalt)
+      - name: Check if Private DNS Zones exist
         uses: azure/cli@v2
         with:
           inlineScript: |
             #!/bin/bash
 
             az account set --subscription ${{ env.dev_test_prod_sub_id }}
-            
+
+            # Input parameters
+            privDnsSubscription="${{ env.dev_test_prod_sub_id }}"
+            privDnsResourceGroupName="${{ env.admin_aifactoryPrefixRG }}esml-common-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}"
+            location="${{ env.admin_location }}"
+
+            # Define key-value pairs for DNS Zones
+            declare -A dnsZones=(
+              [zoneazurecontainerapps]="privatelink.${location}.azurecontainerapps.io"
+              [zoneredis]="privatelink.redis.cache.windows.net"
+              [zonepostgres]="privatelink.postgres.database.azure.com"
+              [zonesql]="privatelink.database.windows.net"
+              [zoneMongo]="privatelink.mongo.cosmos.azure.com"
+            )
+
+            # Helper function to check if a Private DNS Zone exists
+            dns_zone_exists() {
+              local subscription="$1"
+              local resourceGroup="$2"
+              local dnsZoneName="$3"
+
+              # Run the az network private-dns zone show command and capture its output and exit status
+              local output
+              output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
+              local status=$?
+
+              # Check if the command succeeded
+              if [ $status -ne 0 ]; then
+                echo "false"
+              else
+                echo "true"
+              fi
+            }
+
+            # Check each DNS Zone
+            for key in "${!dnsZones[@]}"; do
+              dnsZoneName="${dnsZones[$key]}"
+              exists=$(dns_zone_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName")
+              echo "${key}Exists=${exists}" >> $GITHUB_ENV
+              echo "Checked DNS Zone: $dnsZoneName, Exists: $exists"
+            done
+
+            # Print variables for debugging
+            echo "Private DNS Subscription: $privDnsSubscription"
+            echo "Private DNS Resource Group: $privDnsResourceGroupName"
+            echo "Location: $location"
+
+          azcliversion: latest
+      - name: Check if resource exists
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            #!/bin/bash
+
+            az account set --subscription ${{ env.dev_test_prod_sub_id }}
+
             # Input parameters
             commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
             projectNumber="${{ env.project_number_000 }}"
@@ -282,7 +341,7 @@ jobs:
             locationSuffix="${{ env.admin_locationSuffix }}"
             envName="${{ env.dev_test_prod }}"
             aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
-            uniqueInAIFenv="${{ env.uniqueInAIFenv }}" # Set this in your env if needed
+            # uniqueInAIFenv="${{ env.uniqueInAIFenv }}" # not used in this script. fuzzy match is used instead.
             resourceSuffix="${{ env.admin_prjResourceSuffix }}"
             prjResourceSuffixNoDash="${resourceSuffix#-}"
             twoNumbers="${resourceSuffix:2:2}"
@@ -296,7 +355,22 @@ jobs:
               local rg="$1"
               local type="$2"
               local prefix="$3"
-              if az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix')]" | grep -q "$prefix"; then
+              local suffix="$4"
+
+              # Run the az resource list command and capture its output and exit status
+              local output
+              output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix')]" 2>&1)
+              local status=$?
+
+              # Check if the command succeeded
+              if [ $status -ne 0 ]; then
+                echo "Error: Failed to list resources in resource group '$rg' with type '$type'."
+                echo "Details: $output"
+                return 1
+              fi
+
+              # Check if the resource exists
+              if echo "$output" | grep -q "$prefix"; then
                 echo "true"
               else
                 echo "false"
@@ -315,62 +389,131 @@ jobs:
               fi
             }
 
-            # Resource name variables (prefixes for fuzzy, full for exact)
-            aiHubName="ai-hub-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            aifProjectName="aif-prj${projectNumber}-01-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            amlName="aml-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            safeNameAISearch="$(echo "aisearch${projectName}${locationSuffix}${envName}${uniqueInAIFenv}${resourceSuffix}" | tr '[:upper:]' '[:lower:]' | tr -d '-')"
-            dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            applicationInsightName="ain-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            aiServicesPrefix="ai-services-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}-"
-            bingName="bing-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            containerAppAName="aca-a-${projectName}${locationSuffix}${envName}${uniqueInAIFenv}${resourceSuffix:1}"
-            containerAppWName="aca-w-${projectName}${locationSuffix}${envName}${uniqueInAIFenv}${resourceSuffix}"
-            cosmosDBName="cosmos-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            functionAppName="func-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            webAppName="webapp-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            funcAppServicePlanName="func-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}-plan"
-            webbAppServicePlanName="webapp-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}-plan"
-            keyvaultName="kv-p${projectNumber}-${locationSuffix}-${envName}-${uniqueInAIFenv}${twoNumbers}"
-            miACAPrefix="mi-aca-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}"
-            miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}"
-            storageAccount1001Name="$(echo "sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${envName}" | tr -d '-')"
-            storageAccount2001Name="$(echo "sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${envName}" | tr -d '-')"
-            aifName="aif-hub-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            redisName="redis-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            sqlServerName="sql-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
-            sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}-${uniqueInAIFenv}${resourceSuffix}"
+            # Resource name variables
 
-            # Check resources (fuzzy for those with randomSalt, exact for others)
-            echo "aiHubExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName")" >> $GITHUB_ENV
-            echo "aifProjectExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName")" >> $GITHUB_ENV
-            echo "amlExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName")" >> $GITHUB_ENV
-            echo "aiSearchExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch")" >> $GITHUB_ENV
-            echo "dashboardInsightsExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName")" >> $GITHUB_ENV
-            echo "applicationInsightExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName")" >> $GITHUB_ENV
-            echo "aiServicesExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix")" >> $GITHUB_ENV
-            echo "bingExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName")" >> $GITHUB_ENV
-            echo "containerAppsEnvExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName")" >> $GITHUB_ENV
-            echo "containerAppAExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName")" >> $GITHUB_ENV
-            echo "containerAppWExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppWName")" >> $GITHUB_ENV
-            echo "cosmosDBExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDBName")" >> $GITHUB_ENV
-            echo "functionAppExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/sites" "$functionAppName")" >> $GITHUB_ENV
-            echo "webAppExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/sites" "$webAppName")" >> $GITHUB_ENV
-            echo "funcAppServicePlanExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/serverfarms" "$funcAppServicePlanName")" >> $GITHUB_ENV
-            echo "webbAppServicePlanExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName")" >> $GITHUB_ENV
-            echo "keyvaultExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName")" >> $GITHUB_ENV
-            echo "miACAExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix")" >> $GITHUB_ENV
-            echo "miPrjExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix")" >> $GITHUB_ENV
-            echo "storageAccount1001Exists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name")" >> $GITHUB_ENV
-            echo "storageAccount2001Exists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name")" >> $GITHUB_ENV
-            echo "aifExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifName")" >> $GITHUB_ENV
-            echo "redisExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName")" >> $GITHUB_ENV
-            echo "postgreSQLExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName")" >> $GITHUB_ENV
-            echo "sqlServerExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName")" >> $GITHUB_ENV
-            echo "sqlDBExists=$(resource_exists_exact "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName")" >> $GITHUB_ENV
+            suffixStandard="${resourceSuffix}"
+            suffixAIServices="${prjResourceSuffixNoDash}"
+            suffixStorage1=$(echo "1${prjResourceSuffixNoDash}${envName}" | tr -d '-')
+            suffixStorage2=$(echo "2${prjResourceSuffixNoDash}${envName}" | tr -d '-')
+            suffixAppServicePlan="${resourceSuffix}-plan"
+            suffixAcr="${env}{prjResourceSuffixNoDash}"
+            suffixKeyvault="${twoNumbers}"
+
+            aiHubName="ai-hub-${projectName}-${locationSuffix}-${envName}"
+            aifProjectName="aif-prj${projectNumber}-01-${locationSuffix}"
+            amlName="aml-${projectName}-${locationSuffix}-${envName}"
+            openaiName="aoai-${projectName}-${locationSuffix}-${env}"
+            safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
+            dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}"
+            applicationInsightName="ain-${projectName}-${locationSuffix}-${envName}"
+            aiServicesPrefix="ai-services-${projectName}-${locationSuffix}-${envName}"
+            bingName="bing-${projectName}-${locationSuffix}-${envName}"
+            containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
+            containerAppAName="aca-a-${projectName}${locationSuffix}${envName}"
+            containerAppWName="aca-w-${projectName}${locationSuffix}${envName}"
+            cosmosDBName="cosmos-${projectName}-${locationSuffix}-${envName}"
+            functionAppName="func-${projectName}-${locationSuffix}-${envName}"
+            webAppName="webapp-${projectName}-${locationSuffix}-${envName}"
+            funcAppServicePlanName="func-${projectName}-${locationSuffix}-${envName}"
+            webbAppServicePlanName="webapp-${projectName}-${locationSuffix}-${envName}"
+            keyvaultName="kv-p${projectNumber}-${locationSuffix}-${envName}"
+            miACAPrefix="mi-aca-${projectName}-${locationSuffix}-${envName}"
+            miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+            storageAccount1001Name="sa${projectName}${locationSuffix}"
+            storageAccount2001Name="sa${projectName}${locationSuffix}"
+            aifName="aif-hub-${projectName}-${locationSuffix}-${envName}"
+            redisName="redis-${projectName}-${locationSuffix}-${envName}"
+            postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}"
+            sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
+            sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}"
+            acrProjectName="acr${projectName}genai${locationSuffix}"
+            vmName="dsvm-${projectName}-${locationSuffix}-${env}"
+
+            # Check resources (fuzzy for those with randomSalt,unique, exact for others)
+            echo "aiHubExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "aifProjectExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "amlExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "openaiExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "aiSearchExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandard")" >> $GITHUB_ENV
+            echo "dashboardInsightsExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "applicationInsightExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "aiServicesExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixAIServices")" >> $GITHUB_ENV
+            echo "bingExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "containerAppsEnvExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "containerAppAExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "containerAppWExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "cosmosDBExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDBName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "functionAppExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$functionAppName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "webAppExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$webAppName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "funcAppServicePlanExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$funcAppServicePlanName" "$suffixAppServicePlan")" >> $GITHUB_ENV
+            echo "webAppServicePlanExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName" "$suffixAppServicePlan")" >> $GITHUB_ENV
+            echo "keyvaultExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName" "$suffixKeyvault")" >> $GITHUB_ENV
+            echo "miACAExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix" "$suffixStandard")" >> $GITHUB_ENV
+            echo "miPrjExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix" "$suffixStandard")" >> $GITHUB_ENV
+            echo "storageAccount1001Exists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")" >> $GITHUB_ENV
+            echo "storageAccount2001Exists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")" >> $GITHUB_ENV
+            echo "aifExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "redisExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "postgreSQLExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "sqlServerExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "sqlDBExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "acrProjectExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")" >> $GITHUB_ENV
+            echo "vmExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")" >> $GITHUB_ENV
+
+            # Print variables for debugging
+            echo "Target Resource Group: $targetResourceGroup"
+            echo "Key Vault Name: $keyvaultName"
           azcliversion: latest
+      - name: Validate Required Parameters
+        run: |
+          # List of required environment variables
+          required_vars=(
+            "env.aiHubExists"  
+            "env.aifProjectExists"
+            "env.amlExists"   
+            "env.aiSearchExists" 
+            "env.dashboardInsightsExists"  
+            "env.applicationInsightExists"  
+            "env.aiServicesExists"  
+            "env.bingExists"
+            "env.containerAppsEnvExists"  
+            "env.containerAppWExists"
+            "env.cosmosDBExists"
+            "env.functionAppExists"
+            "env.webAppExists"
+            "env.funcAppServicePlanExists"
+            "env.webAppServicePlanExists"
+            "env.keyvaultExists"
+            "env.miACAExists"
+            "env.miPrjExists"
+            "env.storageAccount1001Exists"
+            "env.storageAccount2001Exists"
+            "env.aifExists"
+            "env.redisExists"
+            "env.postgreSQLExists"
+            "env.sqlServerExists"
+            "env.sqlDBExists"
+            "env.acrProjectExists"
+            "env.vmExists"
+            "env.zoneazurecontainerappsExists"
+            "env.zoneredisExists"
+            "env.zonepostgresExists"
+            "env.zonesqlExists"
+            "env.zoneMongoExists"
+            "env.AIFACTORY_SALT_RANDOM"
+          )
+
+          # Validate each variable
+          for var in "${required_vars[@]}"; do
+            value=$(eval echo "\$$var")
+            if [ -z "$value" ]; then
+              echo "Error: Required environment variable $var is not set or empty."
+              exit 1
+            fi
+          done
+
+          echo "All required parameters are set and valid."
+        shell: bash
       - name: 05_az_bicep_deploy_genai_project
         uses: azure/cli@v2
         with:
@@ -430,10 +573,44 @@ jobs:
             --parameters aifactoryVersionMajor="${{ env.AIFACTORY_VERSION_MAJOR }}" \
             --parameters aifactoryVersionMinor="${{ env.AIFACTORY_VERSION_MINOR }}" \
             --parameters semanticSearchTier="${{ env.semanticSearchTier }}" \
+            --parameters aiHubExists="${{ env.aiHubExists }}" \
+            --parameters aifProjectExists="${{ env.aifProjectExists }}" \
+            --parameters amlExists="${{ env.amlExists }}" \
+            --parameters aiSearchExists="${{ env.aiSearchExists }}" \
+            --parameters dashboardInsightsExists="${{ env.dashboardInsightsExists }}" \
+            --parameters applicationInsightExists="${{ env.applicationInsightExists }}" \
+            --parameters aiServicesExists="${{ env.aiServicesExists }}" \
+            --parameters bingExists="${{ env.bingExists }}" \
+            --parameters containerAppsEnvExists="${{ env.containerAppsEnvExists }}" \
+            --parameters containerAppAExists="${{ env.containerAppAExists }}" \
+            --parameters containerAppWExists="${{ env.containerAppWExists }}" \
+            --parameters cosmosDBExists="${{ env.cosmosDBExists }}" \
+            --parameters functionAppExists="${{ env.functionAppExists }}" \
+            --parameters webAppExists="${{ env.webAppExists }}" \
+            --parameters funcAppServicePlanExists="${{ env.funcAppServicePlanExists }}" \
+            --parameters webAppServicePlanExists="${{ env.webAppServicePlanExists }}" \
             --parameters keyvaultExists="${{ env.keyvaultExists }}" \
-            --parameters aiSearchExists="${{ env.aiSearchExists }}"
+            --parameters miACAExists="${{ env.miACAExists }}" \
+            --parameters miPrjExists="${{ env.miPrjExists }}" \
+            --parameters storageAccount1001Exists="${{ env.storageAccount1001Exists }}" \
+            --parameters storageAccount2001Exists="${{ env.storageAccount2001Exists }}" \
+            --parameters aifExists="${{ env.aifExists }}" \
+            --parameters redisExists="${{ env.redisExists }}" \
+            --parameters postgreSQLExists="${{ env.postgreSQLExists }}" \
+            --parameters sqlServerExists="${{ env.sqlServerExists }}" \
+            --parameters sqlDBExists="${{ env.sqlDBExists }}" \
+            --parameters acrProjectExists="${{ env.acrProjectExists }}" \
+            --parameters vmExists="${{ env.vmExists }}" \
+            --parameters zoneAzurecontainerappsExists="${{ env.zoneazurecontainerappsExists }}" \
+            --parameters zoneRedisExists="${{ env.zoneredisExists }}" \
+            --parameters zonePostgresExists="${{ env.zonepostgresExists }}" \
+            --parameters zoneSqlExists="${{ env.zonesqlExists }}" \
+            --parameters zoneMongoExists="${{ env.zoneMongoExists }}" \
+            --parameters aifactorySalt7char="${{ env.AIFACTORY_SALT_RANDOM }}" \
+            --parameters enableDebugging="true"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
+        continue-on-error: true
         uses: azure/cli@v2
         with:
           inlineScript: | 
