@@ -1025,7 +1025,7 @@ var aifPrjName ='aifoundry-${projectName}-01-${locationSuffix}-${env}-${uniqueIn
 // Random salt for project specific resources
 var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
 var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
-var aiServicesName = 'aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'
+var aiServicesName = replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'), '-', '') 
 
 // Common RG
 var acrCommonName = replace('acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}','-','')
