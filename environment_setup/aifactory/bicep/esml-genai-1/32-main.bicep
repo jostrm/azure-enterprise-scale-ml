@@ -1835,14 +1835,13 @@ module addSecret '../modules/kvSecretsPrj.bicep' = if(!resourceExists.keyvault) 
   params: {
     spAppIDValue:externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) //projectServicePrincipleAppID_SeedingKeyvaultName 
     spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)  // projectServicePrincipleOID_SeedingKeyvaultName
-
     spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
     keyvaultName: var_kv1_name
     keyvaultNameRG: projectResourceGroup.name
   }
   dependsOn: [
     projectResourceGroup
-    kv1 //...(resourceExists.keyvault ? [] : [kv1])
+    kv1
   ]
 }
 
@@ -2698,7 +2697,7 @@ var processedIpRulesAzureML = [for ip in ipWhitelist_array: {
   value: contains(ip, '/') ? ip : '${ip}/32'
 }]
 
-module aml '../modules/machineLearning.bicep'= if(!resourceExists.aml && enableAML) {
+module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureML${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -2740,21 +2739,17 @@ module aml '../modules/machineLearning.bicep'= if(!resourceExists.aml && enableA
     ciVmSku_testProd: aml_ci_test_prod_sku_param
     ipRules: empty(processedIpRulesAzureML) ? [] : processedIpRulesAzureML
     ipWhitelist_array:empty(ipWhitelist_remove_ending_32)?[]:ipWhitelist_remove_ending_32
-    alsoManagedMLStudio:enableAMLv2
-    managedMLStudioName:amlName
-    privateEndpointName2: enableAMLv2? 'pend-${projectName}-aml2-to-vnt-mlcmn': ''
     saName:var_storageAccountName2
-    saName2:var_storageAccountName2
     kvName:var_kv1_name
-    kvName2:var_kv1_name
     acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
     appInsightsName:applicationInsightSWC.outputs.name
   }
   dependsOn: [
     projectResourceGroup
-    subnet_genai_ref
-    subnet_aks_ref
+    ...(resourceExists.storageAccount2001 ? [] : [sa4AIsearch])
+    ...(resourceExists.keyvault? [] : [kv1])
+    ...(resourceExists.acrProject && !useCommonACR? [] : [acr])
   ]
   
 }
@@ -2848,7 +2843,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!resour
   }
   dependsOn: [
     ...(resourceExists.keyvault? [] : [kv1])
-    ...(!resourceExists.aml && enableAML? [aml] : [])
+    ...(!resourceExists.aml && enableAML? [amlv2] : [])
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
     spAndMI2Array
   ]
@@ -3109,9 +3104,10 @@ resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing 
 
 module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacLake4PrjGenAI${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacLake4PrjAmlAndFoundry${deploymentProjSpecificUniqueSuffix}'
   params: {
-    amlPrincipalId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
+    amlPrincipalId: (!resourceExists.aml && enableAML)? amlv2.outputs.principalId: amlREF.identity.principalId
+    aiHubPrincipleId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''
     datalakeName: datalakeName
@@ -3121,6 +3117,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
     cmnRbacACR
     esmlCommonLake
     ...(!resourceExists.aiHub && enableAIFoundryHub? [aiHub] : [])
+    ...(!resourceExists.aml && enableAML? [enableAML] : [])
   ]
 }
 

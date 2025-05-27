@@ -981,16 +981,18 @@ resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
 }
 
 module addSecret '../modules/kvSecretsPrj.bicep' = {
-  name: '${keyvaultName}addSecrect2ProjectKV${projectNumber}${locationSuffix}${env}'
+  name: '${keyvaultName}addSecret2${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     spAppIDValue:externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) //projectServicePrincipleAppID_SeedingKeyvaultName 
     spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)  // projectServicePrincipleOID_SeedingKeyvaultName
-
     spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
     keyvaultName: kv1.outputs.keyvaultName
+    keyvaultNameRG: targetResourceGroup
   }
   dependsOn: [
+    projectResourceGroup
+    kv1
   ]
 }
 

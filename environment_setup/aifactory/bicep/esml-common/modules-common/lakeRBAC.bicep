@@ -1,5 +1,5 @@
-param amlPrincipalId string
-//param userPrincipalId string
+param amlPrincipalId string = ''
+param aiHubPrincipleId string = ''
 param projectTeamGroupOrUser string[] = []
 param adfPrincipalId string
 param useAdGroups bool = false
@@ -13,7 +13,7 @@ resource datalakeFromCommon 'Microsoft.Storage/storageAccounts@2021-04-01' exist
   name: datalakeName
 }
 
-resource readerAML 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
+resource readerAML 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if(!empty(amlPrincipalId)) {
   name: guid('${readerRoleDefinitionId}-reader-${amlPrincipalId}-${resourceGroup().id}')
   properties: {
     roleDefinitionId:subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleDefinitionId)
@@ -23,19 +23,17 @@ resource readerAML 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' 
   }
   scope:datalakeFromCommon
 }
-
-/*
-resource readerUser 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = {
-  name: guid('${readerRoleDefinitionId}-reader-${userPrincipalId}-${resourceGroup().id}')
+resource lakeAIFoundry 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = if(!empty(aiHubPrincipleId)) {
+  name: guid('${storageBlobDataContributor}-contributor-${aiHubPrincipleId}-${resourceGroup().id}')
   properties: {
-    roleDefinitionId: '${subscription().id}/providers/Microsoft.Authorization/roleDefinitions/${readerRoleDefinitionId}'
-    principalId: userPrincipalId
-    principalType:useAdGroups? 'Group':'User'
-    description: 'READER to USER ${userPrincipalId} for AD-user to get access to datalake: ${datalakeName}'
+    roleDefinitionId:subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributor)
+    principalId: aiHubPrincipleId
+    principalType: 'ServicePrincipal'
+    description: 'storageBlobDataContributor to Managed Identity: ${aiHubPrincipleId} for Azure AI Foundry to get access to datalake: ${datalakeName}'
   }
   scope:datalakeFromCommon
 }
-*/
+
 resource readerUserGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(projectTeamGroupOrUser)):{
   name: guid('${projectTeamGroupOrUser[i]}-reader-${readerRoleDefinitionId}-${resourceGroup().id}')
   properties: {
