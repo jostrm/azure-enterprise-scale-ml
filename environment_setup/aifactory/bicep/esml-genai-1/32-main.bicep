@@ -2751,9 +2751,8 @@ module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && ena
     projectResourceGroup
     ...(resourceExists.storageAccount2001 ? [] : [sa4AIsearch])
     ...(resourceExists.keyvault? [] : [kv1])
-    ...(resourceExists.acrProject && !useCommonACR? [] : [acr])
+    ...(!resourceExists.acrProject && !useCommonACR? [acr] : [])
   ]
-  
 }
 
 module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && enableAML) {
@@ -3137,7 +3136,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
     cmnRbacACR
     esmlCommonLake
     ...(!resourceExists.aiHub && enableAIFoundryHub? [aiHub] : [])
-    ...(!resourceExists.aml && enableAML? [enableAML] : [])
+    ...(!resourceExists.aml && enableAML? [amlv2] : [])
   ]
 }
 
