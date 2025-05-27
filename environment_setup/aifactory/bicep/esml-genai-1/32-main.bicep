@@ -13,7 +13,6 @@ param enableAISearch bool = true
 
 // Optional services, default OFF
 param enableAML bool = false
-param enableAMLv2 bool = true
 
 // Existing resources
 param aiHubExists bool = false
@@ -1073,6 +1072,7 @@ var var_webAppPrincipalId=resourceExists.webApp? webappREF.identity.principalId:
 var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
 var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
 var var_aiServices_principalId = resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId
+var var_aml_principal_id = resourceExists.aml? amlREF.identity.principalId: amlv2.outputs.principalId
 
 // Array vars
 var mi_array = array(var_miPrj_PrincipalId)
@@ -1090,6 +1090,9 @@ var var_app_insight_aca = (serviceSettingDeployAppInsightsDashboard && !resource
 var var_acr_cmn_or_prj = useCommonACR? acrCommon2.outputs.containerRegistryName
   :resourceExists.acrProject? acrProjectName
   :acr.outputs.containerRegistryName
+
+var var_aml_name = resourceExists.aml && enableAML?amlName
+  : enableAML? amlv2.outputs.amlName: ''
 
 var var_aca_env_name = resourceExists.containerAppsEnv && serviceSettingDeployContainerApps? containerAppsEnvName
   : serviceSettingDeployContainerApps? containerAppsEnv.outputs.environmentName: ''
@@ -2702,7 +2705,6 @@ module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && ena
   name: 'AzureML${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: amlName
-    enableAMLWorkspaceVersion1: !enableAMLv2
     uniqueDepl: deploymentProjSpecificUniqueSuffix
     uniqueSalt5char: uniqueInAIFenv
     projectName:projectName
@@ -2752,6 +2754,24 @@ module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && ena
     ...(resourceExists.acrProject && !useCommonACR? [] : [acr])
   ]
   
+}
+
+module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && enableAML) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbacUsersAmlVersion2${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    storageAccountName: sa4AIsearch.outputs.storageAccountName
+    resourceGroupId: targetResourceGroupId
+    userObjectIds: p011_genai_team_lead_array
+    azureMLworkspaceName:var_aml_name
+    servicePrincipleAndMIArray:spAndMiArray
+    useAdGroups:useAdGroups
+    user2Storage:true
+  }
+  dependsOn: [
+    projectResourceGroup
+    ...(!resourceExists.aml && enableAML? [amlv2] : [])
+  ]
 }
 
 module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!resourceExists.aif && serviceSettingEnableAIFoundryPreview) {
@@ -3106,7 +3126,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacLake4PrjAmlAndFoundry${deploymentProjSpecificUniqueSuffix}'
   params: {
-    amlPrincipalId: (!resourceExists.aml && enableAML)? amlv2.outputs.principalId: amlREF.identity.principalId
+    amlPrincipalId: var_aml_principal_id
     aiHubPrincipleId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''

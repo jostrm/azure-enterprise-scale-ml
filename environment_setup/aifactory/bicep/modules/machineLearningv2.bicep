@@ -77,7 +77,6 @@ param acrRGName string
 param appInsightsName string
 param ipWhitelist_array array = []
 param enablePublicAccessWithPerimeter bool = false
-param enableAMLWorkspaceVersion1 bool = true
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
 
