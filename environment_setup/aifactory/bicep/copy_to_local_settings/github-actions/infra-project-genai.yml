@@ -392,7 +392,7 @@ jobs:
             # Resource name variables
 
             suffixStandard="${resourceSuffix}"
-            suffixAIServices="${prjResourceSuffixNoDash}"
+            suffixStandardNoDash="${prjResourceSuffixNoDash}"
             suffixStorage1=$(echo "1${prjResourceSuffixNoDash}${envName}" | tr -d '-')
             suffixStorage2=$(echo "2${prjResourceSuffixNoDash}${envName}" | tr -d '-')
             suffixAppServicePlan="${resourceSuffix}-plan"
@@ -400,13 +400,13 @@ jobs:
             suffixKeyvault="${twoNumbers}"
 
             aiHubName="ai-hub-${projectName}-${locationSuffix}-${envName}"
-            aifProjectName="aif-prj${projectNumber}-01-${locationSuffix}"
+            aifProjectName="ai-prj${projectNumber}-01-${locationSuffix}-${env}"
             amlName="aml-${projectName}-${locationSuffix}-${envName}"
             openaiName="aoai-${projectName}-${locationSuffix}-${env}"
             safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
             dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}"
             applicationInsightName="ain-${projectName}-${locationSuffix}-${envName}"
-            aiServicesPrefix="ai-services-${projectName}-${locationSuffix}-${envName}"
+            aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
             bingName="bing-${projectName}-${locationSuffix}-${envName}"
             containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
             containerAppAName="aca-a-${projectName}${locationSuffix}${envName}"
@@ -434,10 +434,10 @@ jobs:
             echo "aifProjectExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")" >> $GITHUB_ENV
             echo "amlExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")" >> $GITHUB_ENV
             echo "openaiExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "aiSearchExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandard")" >> $GITHUB_ENV
+            echo "aiSearchExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")" >> $GITHUB_ENV
             echo "dashboardInsightsExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName" "$suffixStandard")" >> $GITHUB_ENV
             echo "applicationInsightExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "aiServicesExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixAIServices")" >> $GITHUB_ENV
+            echo "aiServicesExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")" >> $GITHUB_ENV
             echo "bingExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName" "$suffixStandard")" >> $GITHUB_ENV
             echo "containerAppsEnvExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")" >> $GITHUB_ENV
             echo "containerAppAExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")" >> $GITHUB_ENV
@@ -505,7 +505,10 @@ jobs:
 
           # Validate each variable
           for var in "${required_vars[@]}"; do
-            value=$(eval echo "\$$var")
+            # Remove the 'env.' prefix to get the actual environment variable name
+            var_name="${var#env.}"
+            value="${!var_name}"
+            echo "Checking variable: $var, Value: $value"
             if [ -z "$value" ]; then
               echo "Error: Required environment variable $var is not set or empty."
               exit 1

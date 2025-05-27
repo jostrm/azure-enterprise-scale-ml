@@ -22,6 +22,7 @@ param subnetName string
 param vnetResourceGroupName string
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 
+param defaultProjectName string = ''
 param centralDnsZoneByPolicyInHub bool
 param allowPublicAccessWhenBehindVnet bool=false
 param enablePublicGenAIAccess bool=false
@@ -122,7 +123,7 @@ resource amlWorkspaceSecretsReaderRole 'Microsoft.Authorization/roleDefinitions@
 var azureOpenAIConnectionName ='azureOpenAI'
 var azureAIServicesConnectionName ='azureAIServices'
 var azureAISearchConnectionName ='azureAISearch'
-var aiHubProjectName ='ai-prj${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
+//var aiHubProjectName ='ai-prj${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
 var aiProjectDiagSettingName ='aiProjectDiagnosticSetting'
 var aiHubDiagSettingName ='aiHubDiagnosticSetting'
 var epDefaultName ='ep-${aifactoryProjectNumber}-01-${locationSuffix}-${env}-${aifactorySalt}${resourceSuffix}'
@@ -338,7 +339,7 @@ resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
 
 @description('This is a container for the ai foundry project.')
 resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
-  name: aiHubProjectName
+  name: defaultProjectName
   location: location
   tags: tags
   kind: 'Project'
@@ -352,7 +353,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-pre
                             // to a resource group that only contains the project/hub.
   }
   properties: {
-    friendlyName: aiHubProjectName
+    friendlyName: defaultProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
     hbiWorkspace: false
@@ -520,7 +521,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
 
 @description('This is a container for the ai foundry project.')
 resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
-  name: aiHubProjectName
+  name: defaultProjectName
   location: location
   tags: tags
   kind: 'Project'
@@ -534,7 +535,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
                             // to a resource group that only contains the project/hub.
   }
   properties: {
-    friendlyName: aiHubProjectName
+    friendlyName: defaultProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
     v1LegacyMode: false
     hbiWorkspace: false

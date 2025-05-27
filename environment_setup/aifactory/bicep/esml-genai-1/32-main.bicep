@@ -995,7 +995,7 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
 
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var aiHubName = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifProjectName = 'aif-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifProjectName = 'ai-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var aoaiName = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'), '-', '') // AzureAISearch4prj0025kxmv
@@ -1014,20 +1014,18 @@ var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFe
 var storageAccount1001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}', '-', '')
 var storageAccount2001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}', '-', '')
 var acrProjectName = 'acr${projectName}${genaiName}${locationSuffix}${uniqueInAIFenv}${env}${prjResourceSuffixNoDash}'
-var aifName ='aif-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var redisName ='redis-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var postgreSQLName ='pg-flex-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var sqlServerName ='sql-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var sqlDBName ='sqldb-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var vmName = 'dsvm-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifName ='aifoundry-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifPrjName ='aifoundry-${projectName}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // Random salt for project specific resources
 var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
 var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
-var aiServicesName = 'ai-services-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${prjResourceSuffixNoDash}'
-//var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-//var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-//var aiServicesName = 'aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv}${prjResourceSuffixNoDash}'
+var aiServicesName = 'aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'
 
 // Common RG
 var acrCommonName = replace('acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}','-','')
@@ -2766,7 +2764,7 @@ module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!resourceExi
   name: 'AIFoundryPrevview4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aifName
-    projectName: aifProjectName
+    projectName: aifPrjName
     enablePublicAccessWithPerimeter:true
     //location: location
   }
@@ -2780,6 +2778,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
   name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
+    defaultProjectName: aifProjectName
     location: location
     tags: projecttags
     aifactorySuffix: aifactorySuffixRG
