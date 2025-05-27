@@ -969,6 +969,7 @@ var aifactoryVersion = empty(aifactoryVersionString) || !contains(aifactoryVersi
 
 //module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesIfNotExists.bicep' = if(centralDnsZoneByPolicyInHub==false && int(aifactoryVersion) < activeVersion) {
 
+/*
 @description('AIFACTORY-UPDATE-121')
 module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesIfNotExists.bicep' = if(centralDnsZoneByPolicyInHub==false ) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
@@ -986,6 +987,8 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
     commonResourceGroupRef
   ]
 }
+*/
+
 // AIFACTORY-UPDATE-121-END
 
 // ### End Create NEW Private DNS zones
