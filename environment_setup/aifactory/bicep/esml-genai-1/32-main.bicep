@@ -2761,7 +2761,7 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && e
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacUsersAmlVersion2${deploymentProjSpecificUniqueSuffix}'
   params:{
-    storageAccountName: sa4AIsearch.outputs.storageAccountName
+    storageAccountName: var_storageAccountName2
     userObjectIds: p011_genai_team_lead_array
     azureMLworkspaceName:var_aml_name
     servicePrincipleAndMIArray:spAndMiArray

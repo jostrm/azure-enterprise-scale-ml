@@ -326,7 +326,7 @@ jobs:
             echo "Location: $location"
 
           azcliversion: latest
-      - name: Check if resource exists
+      - name: 05b_Check if resource exists
         uses: azure/cli@v2
         with:
           inlineScript: |
@@ -464,7 +464,7 @@ jobs:
             echo "Target Resource Group: $targetResourceGroup"
             echo "Key Vault Name: $keyvaultName"
           azcliversion: latest
-      - name: 05b_Validate Required Parameters
+      - name: 05c_Validate Required Parameters
         run: |
           # List of required environment variables
           required_vars=(
@@ -517,7 +517,7 @@ jobs:
 
           echo "All required parameters are set and valid."
         shell: bash
-      - name: 05c_az_bicep_deploy_genai_project
+      - name: 06_az_bicep_deploy_genai_project
         uses: azure/cli@v2
         with:
           #working-directory: "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/"
@@ -609,8 +609,7 @@ jobs:
             --parameters zonePostgresExists="${{ env.zonepostgresExists }}" \
             --parameters zoneSqlExists="${{ env.zonesqlExists }}" \
             --parameters zoneMongoExists="${{ env.zoneMongoExists }}" \
-            --parameters aifactorySalt7char="${{ env.AIFACTORY_SALT_RANDOM }}" \
-            --parameters enableDebugging="true"
+            --parameters aifactorySalt7char="${{ env.AIFACTORY_SALT_RANDOM }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
         continue-on-error: true
