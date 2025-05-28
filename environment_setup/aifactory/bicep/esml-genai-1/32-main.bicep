@@ -1072,7 +1072,7 @@ var var_search_pricipalId = resourceExists.aiSearch? aiSearchREF.identity.princi
 var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
 var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
 var var_aiServices_principalId = resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId
-//var var_aml_principal_id = resourceExists.aml? amlREF.identity.principalId: amlv2.outputs.principalId
+var var_aml_principal_id = (!resourceExists.aml && enableAML)? amlv2.outputs.principalId: (enableAML && resourceExists.aml)? amlREF.identity.principalId:''
 
 // Array vars
 var mi_array = array(var_miPrj_PrincipalId)
@@ -3133,11 +3133,11 @@ resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing 
  
 }
 
-module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
+module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!resourceExists.aiHub && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: 'rbacLake4PrjAmlAndFoundry${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbacLake4PrjFoundry${deploymentProjSpecificUniqueSuffix}'
   params: {
-    amlPrincipalId: (!resourceExists.aml && enableAML)? amlv2.outputs.principalId: amlREF.identity.principalId
+    amlPrincipalId: ''//(!resourceExists.aml && enableAML)? amlv2.outputs.principalId: (enableAML)? amlREF.identity.principalId:''
     aiHubPrincipleId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''
@@ -3145,9 +3145,25 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
     useAdGroups:useAdGroups
   }
   dependsOn: [
-    cmnRbacACR
+    //cmnRbacACR
     esmlCommonLake
     ...(!resourceExists.aiHub && enableAIFoundryHub? [aiHub] : [])
+    ...(!resourceExists.aml && enableAML? [amlv2] : [])
+  ]
+}
+module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!resourceExists.aml && enableAML) {
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    amlPrincipalId: var_aml_principal_id
+    aiHubPrincipleId: ''//(!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
+    projectTeamGroupOrUser: [] // p011_genai_team_lead_array
+    adfPrincipalId: ''
+    datalakeName: datalakeName
+    useAdGroups:useAdGroups
+  }
+  dependsOn: [
+    esmlCommonLake
     ...(!resourceExists.aml && enableAML? [amlv2] : [])
   ]
 }

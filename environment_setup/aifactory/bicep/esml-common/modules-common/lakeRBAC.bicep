@@ -34,7 +34,7 @@ resource lakeAIFoundry 'Microsoft.Authorization/roleAssignments@2020-04-01-previ
   scope:datalakeFromCommon
 }
 
-resource readerUserGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(projectTeamGroupOrUser)):{
+resource readerUserGroup 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(projectTeamGroupOrUser)): if( length(projectTeamGroupOrUser)>0){
   name: guid('${projectTeamGroupOrUser[i]}-reader-${readerRoleDefinitionId}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleDefinitionId)
