@@ -10,9 +10,9 @@ The **BASELINE** deployed for an *AI Factory project* of type *GenAI* is: **AI F
 Via feature flags you can add optional services, and re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
 
 The services that can be added on top of the **BASELINE** can be seen in the image below: 
-- **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off)
-- **Front end/Backend hosting**: ContainerApps, Azure Webapp/function, AKS
-- **Data & Databases**: Azure SQL Database, PostgreSQL flebixle server, Azure cache for REDIS
+- **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
+- **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS
+- **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL flebixle server, Azure cache for Redis
 - **Integration & ELT/ETL/Streaming**: Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
 
 > [!NOTE]
@@ -138,14 +138,14 @@ These are the two 2 project types, template architectures (ESML, GenAI) that are
     - Baseline: **AI Foundry, AI Services, AI Search** (Storage, Keyvault, Monitoring, Dashboards, Private networking)
         - **AI Foundry**: It deploys Azure AI Foundry (hub and default project) into a virtual network with all dependent services connected via private endpoints (optionally Private DNS Zones centralized or standalone)
         -  **WAF AI:** It configures AI Foundry adhering to the best practices outlined in the Well Architected Framework - WAF([WAF AI - Enterprise Scale AI Factory](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas)) and pre-connects to other services and tools.
-    - Provides the ability to add additional Azure services **both during inital deployment and after**, configured to connect via isolation to enrich your AI project. (API Management, CosmosDB, Azure SQL DB)
+    - Provides the ability to add additional Azure services **both during inital deployment and after**, configured to connect via isolation to enrich your AI project.
         - You may *turn ON/OFF* services, and add them later, meaning you may start in a PoC without front end services to setup your RAG scenario, and later add ContainerApps simply by configuring 1 feature flag: **enableContainerApps=true**, and re-run the pipeline.
 
 The services that can be added on top of the **BASELINE** can be seen in the image 
-- **AI related**: AI Search, Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding,
-- **Front end/Backend hosting**: ContainerApps, Azure Webapp/function, AKS
-- **Data & Databases**: Azure SQL Database, PostgreSQL flebixle server, Azure cache for REDIS, Microsoft Onelake
-- **Integration & Data**: Azure Datafactory, Databricks, AI Gateway Hub(APIM), Microsoft Onelake
+- **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
+- **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS
+- **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL flebixle server, Azure cache for Redis
+- **Integration & ELT/ETL/Streaming**: Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
         
 
 ![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
