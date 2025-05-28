@@ -2,7 +2,9 @@
 ![Header](documentation/v2/10-19/images/header.png)
 
 Welcome to the official `Enterprise Scale AI Factory` repository.<br>
-This is a enteprise scale solution for deploying AI Foundry with related services to create End-2-End agentic scenarios, into multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. You may optionally add/remove services such as Azure Machine learning, Bing or other services  The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. It also includes templates for DataOps, MLOps and GenAIOps, compatible with the secure infra setup.
+This is a enteprise scale solution for deploying AI Foundry with related services to create End-2-End agentic scenarios, into multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. You may optionally add/remove services such as Azure Machine learning, Bing or other services. 
+
+The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. It also includes templates for DataOps, MLOps and GenAIOps, compatible with the secure infra setup.
 
 The **BASELINE** deployed for an *AI Factory project* of type *GenAI* is: **AI Foundry, AI Services, AI Search** (Storage, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access) <br>
 Via feature flags you can add optional services, and re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
@@ -10,8 +12,8 @@ Via feature flags you can add optional services, and re-run the Github action wo
 The services that can be added on top of the **BASELINE** can be seen in the image below: 
 - **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off)
 - **Front end/Backend hosting**: ContainerApps, Azure Webapp/function, AKS
-- **Data & Databases**: Azure SQL Database, PostgreSQL flebixle server, Azure cache for REDIS, Microsoft Onelake
-- **Integration & Data**: Azure Datafactory, Databricks, AI Gateway Hub(APIM), Microsoft Onelake
+- **Data & Databases**: Azure SQL Database, PostgreSQL flebixle server, Azure cache for REDIS
+- **Integration & ELT/ETL/Streaming**: Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
 
 > [!NOTE]
 > Since Well-architected framework does not recommend using the Azure Developer CLI (AZD) in production (or any other dev/preview technology such as Azure Verified Module) we removed that, to only use GA `Azure CLI and BICEP`, with orchestrator pipelines in `Github Actions`or Azure Devops pipelines.
@@ -27,10 +29,11 @@ Usage: Use it as a submodule in your own repom, and the recommendation is to pin
 >
 
 [How-to SETUP AI Factory](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
-- **Includes two setup modes: Fully private** Peered AI factory, Standalone AI Factory (VPN, IP whitelist, Bastion)
+- **Includes two setup modes:** *Fully private AI factory* or *Standalone AI Factory* (VPN, IP whitelist, Bastion, or Hybrid access)
+- **Supports both Github Actions or Azure Devops** as orchestrator to kick-off network calculation and the IaC (BICEP)
 
-[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) 
-- **When a new feature arrives (Current LTS version: 1.21)**
+[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) when a new feature arrives? 
+- [Feature roadmap & Release](#feature-roadmap--next-release-121)
 
 [Documentation](./documentation/readme.md) 
 - **How to**: CONFIGURE, DEPLOY or EXTEND project types
