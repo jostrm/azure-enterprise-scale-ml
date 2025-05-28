@@ -42,6 +42,84 @@ param containerCpuCoreCount int = 1 //0.5
 @description('Memory allocated to a single container instance, e.g., 1Gi')
 param containerMemory string = '2.0Gi' //'1.0Gi'
 
+var baseEnvVars = [
+  {
+    name: 'AZURE_LOCATION'
+    value: location
+  }
+  {
+    name: 'AZURE_RESOURCE_GROUP'
+    value: resourceGroupName
+  }
+  {
+    name: 'AZURE_SUBSCRIPTION_ID'
+    value: subscriptionId
+  }
+  {
+    name: 'AZURE_CLIENT_ID'
+    value: identityId
+  }
+  {
+    name: 'AZURE_SEARCH_ENDPOINT'
+    value: aiSearchEndpoint
+  }
+  {
+    name: 'AZUREAISEARCH__INDEX_NAME'
+    value: aiSearchIndexName
+  }
+  {
+    name: 'OPENAI_TYPE'
+    value: openAiType
+  }
+  {
+    name: 'AZURE_OPENAI_API_VERSION'
+    value: openAiApiVersion
+  }
+  {
+    name: 'AZURE_OPENAI_ENDPOINT'
+    value: openAiEndpoint
+  }
+  {
+    name: 'AZURE_OPENAI_NAME'
+    value: openAiName
+  }
+  {
+    name: 'AZURE_OPENAI_DEPLOYMENT_NAME'
+    value: openAiDeploymentName
+  }
+  {
+    name: 'AZURE_OPENAI_4_EVAL_DEPLOYMENT_NAME'
+    value: openAiEvalDeploymentName
+  }
+  {
+    name: 'AZURE_AI_PROJECT_NAME'
+    value: aiProjectName
+  }
+  {
+    name: 'AZURE_EMBEDDING_NAME'
+    value: openAiEmbeddingDeploymentName
+  }
+  {
+    name: 'appinsightsConnectionstring'
+    value: appinsightsConnectionstring
+  }
+  {
+    name: 'BING_SEARCH_ENDPOINT'
+    value: bingApiEndpoint
+  }
+  {
+    name: 'BING_SEARCH_NAME'
+    value: bingName
+  }
+]
+
+var bingSearchKeyEnvVar = !empty(bingApiKey) ? [
+  {
+    name: 'BING_SEARCH_KEY'
+    secretRef: 'bing-search-key'
+  }
+] : []
+
 module appApi './containerappUpsert.bicep' = {
   name: 'depl-${name}-1'
   params: {
@@ -66,83 +144,10 @@ module appApi './containerappUpsert.bicep' = {
     containerCpuCoreCount: containerCpuCoreCount
     containerMemory: containerMemory
     keyVaultUrl: keyVaultUrl
-    secrets: {
+    secrets: !empty(bingApiKey)?{
       'bing-search-key': bingApiKey
-    }
-    env: [
-      {
-        name: 'AZURE_LOCATION'
-        value: location
-      }
-      {
-        name: 'AZURE_RESOURCE_GROUP'
-        value: resourceGroupName
-      }
-      {
-        name: 'AZURE_SUBSCRIPTION_ID'
-        value: subscriptionId
-      }
-      {
-        name: 'AZURE_CLIENT_ID'
-        value: identityId
-      }
-      {
-        name: 'AZURE_SEARCH_ENDPOINT'
-        value: aiSearchEndpoint
-      }
-      {
-        name: 'AZUREAISEARCH__INDEX_NAME'
-        value: aiSearchIndexName
-      }
-      {
-        name: 'OPENAI_TYPE'
-        value: openAiType
-      }
-      {
-        name: 'AZURE_OPENAI_API_VERSION'
-        value: openAiApiVersion
-      }
-      {
-        name: 'AZURE_OPENAI_ENDPOINT'
-        value: openAiEndpoint
-      }
-      {
-        name: 'AZURE_OPENAI_NAME'
-        value: openAiName
-      }
-      {
-        name: 'AZURE_OPENAI_DEPLOYMENT_NAME'
-        value: openAiDeploymentName
-      }
-      {
-        name: 'AZURE_OPENAI_4_EVAL_DEPLOYMENT_NAME'
-        value: openAiEvalDeploymentName
-      }
-      {
-        name: 'AZURE_AI_PROJECT_NAME'
-        value: aiProjectName
-      }
-      {
-        name: 'AZURE_EMBEDDING_NAME'
-        value: openAiEmbeddingDeploymentName
-      }
-      {
-        name: 'appinsightsConnectionstring'
-        value: appinsightsConnectionstring
-      }
-      {
-        name: 'BING_SEARCH_ENDPOINT'
-        value: bingApiEndpoint
-      }
-      {
-        name: 'BING_SEARCH_KEY'
-        secretRef: 'bing-search-key'
-      }
-      {
-        name: 'BING_SEARCH_NAME'
-        value: bingName
-      }
-    ]
+    }:{}
+    env: concat(baseEnvVars, bingSearchKeyEnvVar)
     targetPort: targetPort
   }
 }
