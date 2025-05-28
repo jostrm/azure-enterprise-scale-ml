@@ -2,16 +2,25 @@
 ![Header](documentation/v2/10-19/images/header.png)
 
 Welcome to the official `Enterprise Scale AI Factory` repository.<br>
-This is a foundational deployment solution for deploying an AI Foundry (optionally via the new resource provider) or Azure Machine learning, with additional services tnto multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. 
+This is a enteprise scale solution for deploying AI Foundry with related services to create End-2-End agentic scenarios, into multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. You may optionally add/remove services such as Azure Machine learning, Bing or other services  The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. It also includes templates for DataOps, MLOps and GenAIOps, compatible with the secure infra setup.
+
+The **BASELINE** deployed for an *AI Factory project* of type *GenAI* is: **AI Foundry, AI Services, AI Search** (Storage, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access) <br>
+Via feature flags you can add optional services, and re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
+
+The services that can be added on top of the **BASELINE** can be seen in the image below: 
+- **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off)
+- **Front end/Backend hosting**: ContainerApps, Azure Webapp/function, AKS
+- **Data & Databases**: Azure SQL Database, PostgreSQL flebixle server, Azure cache for REDIS, Microsoft Onelake
+- **Integration & Data**: Azure Datafactory, Databricks, AI Gateway Hub(APIM), Microsoft Onelake
 
 > [!NOTE]
-> Since Well-architected framework does not recommend using the Azure Developer CLI (AZD) in production (or any other dev/preview technology such as Azure Verified Module) we removed that, to only use GA `Azure CLI and BICEP`, with `Github Actions`or Azure Devops pipelines as orchestration.
-> Also both a Managed Identity and Service principal is created for your team, to be able to automate the full GenAIOps process (via the GenAIOps template)
+> Since Well-architected framework does not recommend using the Azure Developer CLI (AZD) in production (or any other dev/preview technology such as Azure Verified Module) we removed that, to only use GA `Azure CLI and BICEP`, with orchestrator pipelines in `Github Actions`or Azure Devops pipelines.
+> Also both a Managed Identity and Service principal is created for your team, to be able to automate the full **GenAIOps process** (via the GenAIOps template)
 
 This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
 - AI ready landingzones with templates for DataOps, MLOps, GenAIOps to get an enterprise scale environment.
 
-Usage: You can fork it, or use it as a submodule in your own repo. the latter is highly recommended.
+Usage: Use it as a submodule in your own repom, and the recommendation is to pin it at RELEASE BRANCH with LTS status, such as **RELEASE_120_LTS**
 
 > [!NOTE]
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a sumobule repo.
@@ -20,15 +29,18 @@ Usage: You can fork it, or use it as a submodule in your own repo. the latter is
 [How-to SETUP AI Factory](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
 - **Includes two setup modes: Fully private** Peered AI factory, Standalone AI Factory (VPN, IP whitelist, Bastion)
 
-[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md)<br>
-- **When a new feature arrives**
+[How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) 
+- **When a new feature arrives (Current LTS version: 1.21)**
 
-[Documentation](./documentation/readme.md)
-- **Read more**: How to EXTEND project types. How templates works for DataOps, GenAIOps, MLOps. How RBAC, Persona, Networking, workflows works.
-- **Below is 2 baseline architectures to choose from**: You may *turn ON/OFF* services. Architecture 02: If you do not need any front end services (1), or database(3)
+[Documentation](./documentation/readme.md) 
+- **How to**: CONFIGURE, DEPLOY or EXTEND project types
+- **How to**: DataOps, GenAIOps, MLOps. How RBAC, Persona, Networking, workflows works**
 
 ![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
-*Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. 
+*Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
+
+<details>
+  <summary><b>This accelerator: Main purpose</b></summary>
 
 ## This accelerator: Main purpose: 
 1) `Marry multiple best practices & accelerators:` **Secure Enterprise Scale AI Landing Zones + Secure GenAIOps template**  ( since using a GenAIOps/LLMOps template based on unsecure infrastructure (no private endpoints/vNet) will not be compatible with secure infra )
@@ -46,33 +58,43 @@ Usage: You can fork it, or use it as a submodule in your own repo. the latter is
     - `Common way of working, common toolbox, a flexible one`: A toolbox with a LAMBDA architecture with tools such as: Azure Datafactory, Azure Databricks, Azure Machine Learning, Eventhubs, AKS
 5) `Enterprise scale & security & battle tested`: Used by customers and partners with MLOps since 2019 (see LINKS) to accelerate the development and delivery of AI solutions, with common tooling & marrying multiple best practices. Private networking (private endpoints), as default.
 
-## Public links for more info
+</details>
+
+## Public links - AI Factory in CAF, WAF and customer examples
 -	`AI factory - (Company: Epiroc)` - Microsoft Customer Story-Epiroc advances manufacturing innovation with AI Factory creating data heaven
     - [Microsoft Customer Story-Epiroc advances manufacturing innovation with AI Factory creating data heaven
     ](https://customers.microsoft.com/en-us/story/1653030140221000726-epiroc-manufacturing-azure-machine-learning)
 
--   `AI factory` - Technical BLOG
-    - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
-
 -	`Microsoft: AI Factory (CAF/MLOps)` documentation : Machine learning operations - Cloud Adoption Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations
 
--	`Microsoft: AI Factory (Well-architected framework)` documentation : WAF AI workload - Well-architected Framework | Microsoft Learn
+-	`Microsoft: AI Factory (Well-architected framework, AI workload)` WAF AI workload - Well-architected Framework | Microsoft Learn
     - https://learn.microsoft.com/en-us/azure/well-architected/ai/personas
-    
+
+-   `AI factory` - Technical BLOG
+    - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
+
+
+
+
+<details>
+  <summary><b>Feature Roadmap & Next Release: 1.21</b></summary>
+
 ## Feature Roadmap & Next Release: 1.21
 - **Next Release: 1.21** will include below up until 2024-05
 - **Current release 1.20** includes all Done up until 2024-04
 
-Ongoing<br>
+### 1.21 - Added<br>
+- **OnlyCreateIfNotExists & more feature flags**: Dynamically adds services, via feature flags (workaround to avoid Bicep/ARM errors for private endpoints etc)
+    - STATUS: Done (2025-05)
 - **BYOAppServiceEnv**: Deploy Azure function, Azure WebApp as usual via AIFactory, but connect to your own App services environment
-    - STATUS: Ongoing (2025-05)
+    - STATUS: Done (2025-05)
 - **PostGreSQL (flexible servers), SQL Database, Redis Cache**: Add more Database engines, optionally to choose from
-    - STATUS: Ongoing (2025-05)
+    - STATUS: Done (2025-05)
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
     - STATUS: Ongoing (2025-05)
 
-Done<br>
+### 1.20
 - **AI Gateway**: Integrate AI Gateway (AI Hub gateway, with advancede cross-charging reports) including networking, to AI Factory common area.
     - STATUS: Done (2025-04)
         - https://github.com/Azure-Samples/ai-hub-gateway-solution-accelerator/blob/main/guides/bring-your-own-network.md
@@ -94,13 +116,15 @@ Done<br>
 - **Azure ContainerApps (with Env), Bing Search, CosmosDB, Azure OpenAI standalone**: Added. All are optional with feature flags (true/false)
     - STATUS: Completed (2024-08)
 
- See [Feature list for all features](./documentation/v2/10-19/11-architecture-diagrams.md)
+ See [See Arhicteture diagrames - for all features](./documentation/v2/10-19/11-architecture-diagrams.md)
+
+</details>
 
 ## AI Factory: Enterprise Scale Landing Zones Context (VWan option)
-Currently there are 2 project types, template architectures (ESML, GenAI) that lives inside of the AIFactory landingzones. 
-- There are 3 AIFactory AI landingzones: Dev, Stage, Production, where a project is represented.
-- The AIFactory has a default scalabillity to automate the creation of ~200-300 AIFactory projects, in each environment. 
-- One project is usually assigned to a team of 1-10 people with multiple use cases, but sometimes also to run an isolated use case.
+There are **3 AIFactory AI landingzones: Dev, Stage, Production**, depiceted in the image below, where AI Factory projects are deployed.
+- **AI Factory project types**: Currently there are 2 project types, template architectures (ESML, GenAI) that lives inside of the AIFactory landingzones. 
+- **Scale**: The AIFactory has a default scalabillity to automate the creation of ~200-300 AIFactory projects, in each environment, with **AI Factory scale sets**
+    - Example: One project is usually assigned to a team of 1-10 people with 1 isolated use case, or multiple use cases.
 
 ![](./documentation/v2/10-19/images/14-eslz-full-1.png)
 
@@ -108,10 +132,18 @@ Currently there are 2 project types, template architectures (ESML, GenAI) that l
 These are the two 2 project types, template architectures (ESML, GenAI) that are automated (IaC) to be setup as AI Factory projects for a use case, team, or business unit.
 - **ESML**: Enterprise Scale Machine Learning
 - **GenAI**: Enteprise Scale GenAI
-    - Deploys AI hub and AI project into a virtual network with all dependent services connected via private endpoints (optionally Private DNS Zones centralized or standalone)
-    - Configures AI Foundry, adhering to the best practices outlined in the Well Architected Framework - WAF([WAF AI - Enterprise Scale AI Factory](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas))
-    - Provides the ability to add additional Azure services during deployment, configured to connect via isolation to enrich your AI project. (API Management, CosmosDB, Azure SQL DB)
-    - Contains an existing Azure AI Project which will provision dependent Azure resources based on the Project's established connections within AI Foundry.
+    - Baseline: **AI Foundry, AI Services, AI Search** (Storage, Keyvault, Monitoring, Dashboards, Private networking)
+        - **AI Foundry**: It deploys Azure AI Foundry (hub and default project) into a virtual network with all dependent services connected via private endpoints (optionally Private DNS Zones centralized or standalone)
+        -  **WAF AI:** It configures AI Foundry adhering to the best practices outlined in the Well Architected Framework - WAF([WAF AI - Enterprise Scale AI Factory](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas)) and pre-connects to other services and tools.
+    - Provides the ability to add additional Azure services **both during inital deployment and after**, configured to connect via isolation to enrich your AI project. (API Management, CosmosDB, Azure SQL DB)
+        - You may *turn ON/OFF* services, and add them later, meaning you may start in a PoC without front end services to setup your RAG scenario, and later add ContainerApps simply by configuring 1 feature flag: **enableContainerApps=true**, and re-run the pipeline.
+
+The services that can be added on top of the **BASELINE** can be seen in the image 
+- **AI related**: AI Search, Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding,
+- **Front end/Backend hosting**: ContainerApps, Azure Webapp/function, AKS
+- **Data & Databases**: Azure SQL Database, PostgreSQL flebixle server, Azure cache for REDIS, Microsoft Onelake
+- **Integration & Data**: Azure Datafactory, Databricks, AI Gateway Hub(APIM), Microsoft Onelake
+        
 
 ![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 
@@ -119,6 +151,10 @@ These are the two 2 project types, template architectures (ESML, GenAI) that are
 You can optionally setup the ESML project type with Microsoft Fabric, as below:
 
 ![ESML flavour](./documentation/v2/10-19/images/11-services-highlevel-esml_fabric.png)
+
+
+<details>
+  <summary><b>Documentation</b></summary>
 
 # Documentation: 
 The [Documentation](./documentation/readme.md) is organized around ROLES via Doc series. 
@@ -154,7 +190,12 @@ It is also organized via the four components of the ESML AIFactory:
 - `Enterprise "cockpit"` over ALL your projects & models. 
     - See what `state` a project are in (Dev,Test,Prod states) with `cost dashboard` per project/environment
 
-# NEWS TABLE
+</details>
+
+<details>
+  <summary><b>Feature history</b></summary>
+
+# Feature history
 
 |Date     |Category   | What   | Link   |
 |------------|-----------|--------|--------|
@@ -168,6 +209,11 @@ It is also organized via the four components of the ESML AIFactory:
 |2021-02  |ESML Pipeline templates|Azure Databricks: Training and Batch pipeline templates. 100% same support as AML pipeline templates (inner/outer loop MLOps)|-|
 |2022-08  |infra (IaC)|ADO now support yaml for ESML|-|
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
+
+</details>
+
+<details>
+  <summary><b>Background: How the accelerator started 2019</b></summary>
 
 # BACKGROUND - How the accelerator started 2019
 ESML stands for: Enterprise Scale ML. 
@@ -210,6 +256,7 @@ TRAINING & INFERENCE pipeline templates types in ESML AIFactory that accelerates
 
 ![](./esml/images/23_esml_pipeline_overview_intro.png)
 
+</details>
 
 # Contributing to ESML AIFactory?
 This repository is a push-only mirror. Ping Joakim Åström for contributions / ideas. 
