@@ -2702,6 +2702,8 @@ var processedIpRulesAzureML = [for ip in ipWhitelist_array: {
   value: contains(ip, '/') ? ip : '${ip}/32'
 }]
 
+// ERROR: "snt-prj003-aks cannot be used as it's a delegated subnet"
+// TODO: add another dedicated subnet - not borrowing the AKS subnet
 module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureMLDepl_${deploymentProjSpecificUniqueSuffix}'
