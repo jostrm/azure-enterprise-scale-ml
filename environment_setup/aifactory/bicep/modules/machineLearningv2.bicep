@@ -147,7 +147,7 @@ resource azureMLv2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     aksDev
   ]
 }
-resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'  = if(env == 'test' || env == 'prod') {
+resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'  = if(env == 'test' || env == 'prod') {
   name: name
   location: location
   kind:'Default'
@@ -205,7 +205,7 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
   params: {
     location: location
     tags: tags
-    workspaceArmId: (env=='dev')? azureMLv2.id: machineLearningStudioTestProd.id
+    workspaceArmId: (env=='dev')? azureMLv2.id: amlv2TestProd.id
     subnetId: subnetRef
     machineLearningPleName: privateEndpointName
     amlPrivateDnsZoneID: amlPrivateDnsZoneID
@@ -278,7 +278,8 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
 }
 
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(ownSSL == 'disabled' && env=='dev') {	
+//Microsoft.MachineLearningServices/workspaces/computes@2022-10-01
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='dev') {	
   name: aksName
   parent: azureMLv2
   location: location
@@ -308,9 +309,9 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   ]
 }
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(ownSSL == 'disabled' && env=='test' || env=='prod') {	
+resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='test' || env=='prod') {	
   name: aksName
-  parent: machineLearningStudioTestProd
+  parent: amlv2TestProd
   location: location
   properties: {
     computeType: 'AKS'
@@ -334,11 +335,11 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
   }
   dependsOn:[
     machineLearningPrivateEndpoint
-    machineLearningStudioTestProd
+    amlv2TestProd
   ]
 }
 //CPU Cluster
-resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(env =='dev') {
+resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(env =='dev') {
   name: 'p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
   parent: azureMLv2
   location: location
@@ -373,9 +374,9 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
     azureMLv2
   ]
 }
-resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/workspaces/computes@2022-10-01' = if(env =='test' || env =='prod') {
+resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(env =='test' || env =='prod') {
   name: 'p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
-  parent: machineLearningStudioTestProd
+  parent: amlv2TestProd
   location: location
   tags: tags
   identity: {
@@ -405,13 +406,13 @@ resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/wo
   }
   dependsOn:[
     machineLearningPrivateEndpoint
-    machineLearningStudioTestProd
+    amlv2TestProd
   ]
 }
 
-output amlId string = (env=='dev')? azureMLv2.id: machineLearningStudioTestProd.id
-output amlName string =(env=='dev')? azureMLv2.name: machineLearningStudioTestProd.name
-output principalId string = (env=='dev')?azureMLv2.identity.principalId:  machineLearningStudioTestProd.identity.principalId
+output amlId string = (env=='dev')? azureMLv2.id: amlv2TestProd.id
+output amlName string =(env=='dev')? azureMLv2.name: amlv2TestProd.name
+output principalId string = (env=='dev')?azureMLv2.identity.principalId:  amlv2TestProd.identity.principalId
 
 // ###############  AML networking - custom networking ###############
 output dnsConfig array = [

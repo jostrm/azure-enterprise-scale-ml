@@ -1669,7 +1669,6 @@ module rbacAml1 '../modules/rbacStorageAml.bicep' = {
   name: 'rbacUsersAmlClassic${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
-    resourceGroupId: targetResourceGroupId
     userObjectIds: p011_genai_team_lead_array
     azureMLworkspaceName:aml.outputs.amlName
     servicePrincipleAndMIArray:spAndMiArray
@@ -1686,7 +1685,6 @@ module rbacAml2 '../modules/rbacStorageAml.bicep' = if(alsoManagedMLStudio) {
   name: 'rbacUsersAML_AIFactory${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sacc.outputs.storageAccountName
-    resourceGroupId: targetResourceGroupId
     userObjectIds: p011_genai_team_lead_array
     azureMLworkspaceName:aml.outputs.amlManagedName
     servicePrincipleAndMIArray:spAndMiArray

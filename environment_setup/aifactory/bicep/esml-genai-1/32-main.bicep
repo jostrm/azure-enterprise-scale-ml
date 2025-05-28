@@ -1072,7 +1072,7 @@ var var_search_pricipalId = resourceExists.aiSearch? aiSearchREF.identity.princi
 var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
 var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
 var var_aiServices_principalId = resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId
-var var_aml_principal_id = resourceExists.aml? amlREF.identity.principalId: amlv2.outputs.principalId
+//var var_aml_principal_id = resourceExists.aml? amlREF.identity.principalId: amlv2.outputs.principalId
 
 // Array vars
 var mi_array = array(var_miPrj_PrincipalId)
@@ -2633,7 +2633,7 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!resourc
     aiSearchName: var_aiSearchName
     appInsightsName: var_app_insight_aca
     principalIdMI: var_miAca_PrincipalId
-    resourceGroupId: targetResourceGroupId
+    resourceGroupId: projectResourceGroup.outputs.rgId
   }
   dependsOn: [
     projectResourceGroup
@@ -2704,7 +2704,7 @@ var processedIpRulesAzureML = [for ip in ipWhitelist_array: {
 
 module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && enableAML) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AzureML${deploymentProjSpecificUniqueSuffix}'
+  name: 'AzureMLDepl_${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: amlName
     uniqueDepl: deploymentProjSpecificUniqueSuffix
@@ -2762,7 +2762,6 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && e
   name: 'rbacUsersAmlVersion2${deploymentProjSpecificUniqueSuffix}'
   params:{
     storageAccountName: sa4AIsearch.outputs.storageAccountName
-    resourceGroupId: targetResourceGroupId
     userObjectIds: p011_genai_team_lead_array
     azureMLworkspaceName:var_aml_name
     servicePrincipleAndMIArray:spAndMiArray
@@ -2906,8 +2905,6 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(ba
 // ------------------- RBAC for AI Studio (AIServices) service pricipal, to services ---------------//
 // -- DOCS: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/use-your-data-securely#create-shared-private-link --//
 
-var targetResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
-
 module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureOpenAI && !resourceExists.openai) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
@@ -2983,7 +2980,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
     aiSearchName: var_aiSearchName
-    resourceGroupId: targetResourceGroupId
+    resourceGroupId: projectResourceGroup.outputs.rgId
     userObjectIds: p011_genai_team_lead_array
     aiServicesName:var_aiServicesName
     aiHubName:aiHubName
@@ -3128,7 +3125,7 @@ module rbacLake '../esml-common/modules-common/lakeRBAC.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacLake4PrjAmlAndFoundry${deploymentProjSpecificUniqueSuffix}'
   params: {
-    amlPrincipalId: var_aml_principal_id
+    amlPrincipalId: (!resourceExists.aml && enableAML)? amlv2.outputs.principalId: amlREF.identity.principalId
     aiHubPrincipleId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''

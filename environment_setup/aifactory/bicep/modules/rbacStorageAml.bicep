@@ -2,7 +2,6 @@
 
 // Parameters for resource and principal IDs
 param storageAccountName string // Name of Azure Storage Account
-param resourceGroupId string // Resource group ID where resources are located
 param userObjectIds array // Specific user's object ID's
 param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 param azureMLworkspaceName string
