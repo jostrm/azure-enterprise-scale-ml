@@ -19,7 +19,7 @@ Via *AI Factory feature flags* you can add optional services, re-run the Github 
 The services that can be added on top of the **BASELINE** can be seen in the image below: 
 - **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
 - **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS
-- **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL flebixle server, Azure cache for Redis
+- **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL Flexible server, Azure cache for Redis
 - **Integration & ELT/ETL/Streaming**: Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
 
 [How-to SETUP AI Factory](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
@@ -87,7 +87,7 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
     - STATUS: Done (2025-05)
 - **BYOAppServiceEnv**: Deploy Azure function, Azure WebApp as usual via AIFactory, but connect to your own App services environment
     - STATUS: Done (2025-05)
-- **PostGreSQL (flexible servers), SQL Database, Redis Cache**: Add more Database engines, optionally to choose from
+- **PostgreSQL (flexible servers), SQL Database, Redis Cache**: Add more Database engines, optionally to choose from
     - STATUS: Done (2025-05)
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
     - STATUS: Ongoing (2025-05)
@@ -139,7 +139,7 @@ These are the two 2 project types, template architectures (ESML, GenAI) that are
 The services that can be added on top of the **BASELINE** can be seen in the image 
 - **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
 - **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS
-- **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL flebixle server, Azure cache for Redis
+- **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL Flexible server, Azure cache for Redis
 - **Integration & ELT/ETL/Streaming**: Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
         
 
