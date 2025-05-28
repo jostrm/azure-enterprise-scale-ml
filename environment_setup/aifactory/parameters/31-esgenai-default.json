@@ -20,9 +20,6 @@
         "enableAISearch": {
             "value": true
         },
-        "enableAML": {
-            "value": false
-        },
         "serviceSettingDeployFunction": {
             "value": false
         },
