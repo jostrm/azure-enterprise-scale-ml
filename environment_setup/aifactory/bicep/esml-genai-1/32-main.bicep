@@ -2973,16 +2973,15 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!resourceExists
   ]
 }
 
-module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
+module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!resourceExists.aiHub && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbac7UsersAIHub${deploymentProjSpecificUniqueSuffix}'
   params:{
+    aiServicesName:var_aiServicesName
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
-    aiSearchName: var_aiSearchName
     resourceGroupId: projectResourceGroup.outputs.rgId
     userObjectIds: p011_genai_team_lead_array
-    aiServicesName:var_aiServicesName
     aiHubName:aiHubName
     aiHubProjectName:var_aiProjectName
     servicePrincipleAndMIArray: spAndMiArray
@@ -2992,7 +2991,6 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
   dependsOn: [
     ...(!resourceExists.aiHub && enableAIFoundryHub? [aiHub] : [])
     ...(!resourceExists.aiServices && enableAIServices? [aiServices] : [])
-    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
     ...(!resourceExists.openai && serviceSettingDeployAzureOpenAI? [csAzureOpenAI] : [])
     ...(resourceExists.storageAccount1001? [] : [sacc])
     ...(resourceExists.storageAccount2001? [] : [sa4AIsearch])
@@ -3000,7 +2998,21 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = {
     spAndMI2Array // NB!
   ]
 }
-
+module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!resourceExists.aiSearch && enableAISearch) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'rbac7UsersAIHub${deploymentProjSpecificUniqueSuffix}'
+  params:{
+    aiSearchName: var_aiSearchName
+    userObjectIds: p011_genai_team_lead_array
+    servicePrincipleAndMIArray: spAndMiArray
+    useAdGroups:useAdGroups
+  }
+  dependsOn: [
+    ...(!resourceExists.aiSearch && enableAISearch? [aiSearchService] : [])
+    ...(resourceExists.keyvault? [] : [kv1])
+    spAndMI2Array // NB!
+  ]
+}
 
 // #### OPTIONAL ####
 
