@@ -37,7 +37,7 @@ Usage: Use it as a submodule in your own repom, and the recommendation is to pin
 
 [Documentation](./documentation/readme.md) 
 - **How to**: CONFIGURE, DEPLOY or EXTEND project types
-- **How to**: DataOps, GenAIOps, MLOps. How RBAC, Persona, Networking, workflows works**
+- **How to**: DataOps, GenAIOps, MLOps. RBAC & Personas, Networking, Workflows, Architecture diagrams.
 
 ![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 *Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
