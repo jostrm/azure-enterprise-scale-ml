@@ -110,7 +110,7 @@ resource webappREF 'Microsoft.Web/sites@2022-09-01' existing = if(resourceExists
 }
 // FunctionApp
 resource functionREF 'Microsoft.Web/sites@2022-09-01' existing = if(resourceExists.functionApp) {
-  name: webAppName
+  name: functionAppName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
@@ -1068,7 +1068,7 @@ module miForPrj '../modules/mi.bicep' = if(!resourceExists.miPrj){
 var var_miPrj_PrincipalId = resourceExists.miPrj? miPrjREF.properties.principalId: miForPrj.outputs.managedIdentityPrincipalId
 var var_miAca_PrincipalId = resourceExists.miACA? miACAREF.properties.principalId: miForAca.outputs.managedIdentityPrincipalId
 var var_search_pricipalId = resourceExists.aiSearch? aiSearchREF.identity.principalId: aiSearchService.outputs.principalId
-var var_webAppPrincipalId=resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId
+//var var_webAppPrincipalId=resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId
 var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
 var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
 var var_aiServices_principalId = resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId
@@ -2261,7 +2261,7 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!resourceEx
   ]
 }
   // In your main deployment file
-module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!resourceExists.functionApp || !resourceExists.webApp) &&(serviceSettingDeployWebApp || serviceSettingDeployFunction)) {
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!resourceExists.functionApp && !resourceExists.webApp) &&(serviceSettingDeployWebApp || serviceSettingDeployFunction)) {
   name: 'subnetDelegationServerFarm1${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -2349,7 +2349,7 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
   dependsOn: [
     projectResourceGroup
     sacc
-    subnetDelegationServerFarm
+    ...((!resourceExists.webApp ||!resourceExists.functionApp) ? [subnetDelegationServerFarm] : [])
     ...((!resourceExists.aiHub && enableAIFoundryHub) ? [aiHub] : [])
     ...((!resourceExists.aiServices && enableAIServices) ? [aiServices] : [])
     ...((!resourceExists.aiSearch && enableAISearch) ? [aiSearchService] : [])
@@ -2379,7 +2379,7 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!resourceExists.webAp
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
     aiSearchName: var_aiSearchName
-    webAppPrincipalId:var_webAppPrincipalId
+    webAppPrincipalId:resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId//var_webAppPrincipalId
     openAIName: var_openAIName
     aiServicesName:var_aiServicesName
   }
@@ -2439,9 +2439,11 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
   dependsOn: [
     projectResourceGroup
     sacc
-    aiServices
-    aiHub
-    subnetDelegationServerFarm
+    ...((!resourceExists.webApp ||!resourceExists.functionApp) ? [subnetDelegationServerFarm] : [])
+    ...((!resourceExists.aiHub && enableAIFoundryHub) ? [aiHub] : [])
+    ...((!resourceExists.aiServices && enableAIServices) ? [aiServices] : [])
+    ...((!resourceExists.aiSearch && enableAISearch) ? [aiSearchService] : [])
+    ...((!resourceExists.openai && serviceSettingDeployAzureOpenAI) ? [csAzureOpenAI] : [])
   ]
 }
 
@@ -2769,7 +2771,8 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && e
   }
   dependsOn: [
     projectResourceGroup
-    ...(!resourceExists.aml && enableAML? [amlv2] : [])
+    amlv2
+    //...(!resourceExists.aml && enableAML? [amlv2] : [])
   ]
 }
 
