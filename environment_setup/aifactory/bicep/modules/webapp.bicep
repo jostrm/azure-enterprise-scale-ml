@@ -30,7 +30,7 @@ param allowedOrigins array = [
 param applicationInsightsName string
 param logAnalyticsWorkspaceName string
 param logAnalyticsWorkspaceRG string
-param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java', 'dotnet'
+param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
 param pythonVersion string = '3.11' // Used if runtime is 'python'
 param subnetIntegrationName string  // Name of the subnet for VNet integration
 param hostNameSslStates array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
@@ -77,7 +77,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   tags: tags
   sku: sku
   properties: {
-    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes
+    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwuise Windows (dotnet, java)
 
   }
 }
@@ -120,7 +120,8 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
   kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'app,linux' : 'app'
   identity: identity
   properties: {
-    serverFarmId: byoACEv3? byoAceAppServicePlanRID: appServicePlan.id
+    //serverFarmId: byoACEv3? byoAceAppServicePlanRID: appServicePlan.id
+    serverFarmId: appServicePlan.id
     httpsOnly: true
     hostingEnvironmentProfile: !empty(byoAceFullResourceId) ? {
       id: byoAceFullResourceId

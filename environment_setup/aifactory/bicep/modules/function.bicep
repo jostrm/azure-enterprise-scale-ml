@@ -83,7 +83,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   tags: tags
   sku: sku
   properties: {
-    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux
+    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwuise Windows (dotnet, java)
   }
 }
 
@@ -126,7 +126,8 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
   kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'functionapp,linux' : 'functionapp'
   identity: identity
   properties: {
-    serverFarmId: byoACEv3? byoAceAppServicePlanRID: appServicePlan.id
+    //serverFarmId: byoACEv3? byoAceAppServicePlanRID: appServicePlan.id
+    serverFarmId: appServicePlan.id
     httpsOnly: true
     hostingEnvironmentProfile: !empty(byoAceFullResourceId) ? {
       id: byoAceFullResourceId
