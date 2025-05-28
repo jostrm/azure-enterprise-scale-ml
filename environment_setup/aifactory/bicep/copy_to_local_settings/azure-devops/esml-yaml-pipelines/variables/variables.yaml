@@ -9,9 +9,9 @@ variables:
   admin_bicep_kv_fw: "kv-seeding-sdc-001" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
   admin_bicep_kv_fw_rg: "rg-seeding-sdc-001" # Resource Group name for seeding Keyvault
 
-  # UPDATE AIFactory (Long Term Support branches): If you want to upgrade the AIFactory Long Term Support branches. E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
-  aifactoryVersionMajor: 1
-  aifactoryVersionMinor: 20 # 2025-05-23: 120_LTS
+  # UPDATE AIFactory: If you want to upgrade the AIFactory (Long Term Support branches exists). E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
+  aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
+  aifactory_version_minor: "20" # # 2025-05-23: 120_LTS
 
   project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)
@@ -53,6 +53,13 @@ variables:
 
   # OPTIONAL - GROUPS mapped to PERSONAS (one-to-one, e.g. if 2 groups then 2 personas)
   use_ad_groups: "false" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
+  
+  ##### POST SETUP of a PROJECT - UPDATE THIS
+  # aifactory_salt_random: Needed for updating an AIFACTORY project (add service etc)
+  aifactory_salt_random: "<10>" # 10 characters. Look at the "User created Mnaged Identity". It is a unique random value. This '19-2858-4a' in that: 'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
+  # aifactory_salt: Needed to setup DATALAKE for ESML projects
+  aifactory_salt: "<5>" # 5 characters. This 'abcde' in that: 'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001' A deteministic unique value
+  ##### POST SETUP ####
 
   # ENTRA ID SECURITY GROUPS - Object ID's (Create a new set of AD groups per project team. 001,002, etc)
   # Tip of naming: Build a prefix based on [AIFactory prefix, suffix, locationSuffix and project number]) and add a persona unique suffix "p001" that easily maps to the AI Factory persona prefixes.

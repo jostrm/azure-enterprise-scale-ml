@@ -646,10 +646,10 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 }
 
 
-param aifactorySalt5char string = '' // Determenistic. 
-param aifactorySalt7char string = '' // Random
+param aifactorySalt5char string = '' // Deterministic
+param aifactorySalt10char string = '' // Random
 var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
-var randomSalt = empty(aifactorySalt7char) || length(aifactorySalt7char) <= 4 ? substring(randomValue, 6, 10): aifactorySalt7char
+var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 4 ? substring(randomValue, 6, 10): aifactorySalt10char
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // Salt: AIFactory instance/env specific
@@ -3001,7 +3001,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!resourceExists.a
 }
 module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!resourceExists.aiSearch && enableAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'rbac7UsersAIHub${deploymentProjSpecificUniqueSuffix}'
+  name: 'rbac7Users2AISearch${deploymentProjSpecificUniqueSuffix}'
   params:{
     aiSearchName: var_aiSearchName
     userObjectIds: p011_genai_team_lead_array

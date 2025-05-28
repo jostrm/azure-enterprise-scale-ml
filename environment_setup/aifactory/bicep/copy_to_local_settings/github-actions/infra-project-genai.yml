@@ -609,7 +609,7 @@ jobs:
             --parameters zonePostgresExists="${{ env.zonepostgresExists }}" \
             --parameters zoneSqlExists="${{ env.zonesqlExists }}" \
             --parameters zoneMongoExists="${{ env.zoneMongoExists }}" \
-            --parameters aifactorySalt7char="${{ env.AIFACTORY_SALT_RANDOM }}"
+            --parameters aifactorySalt10char="${{ env.AIFACTORY_SALT_RANDOM }}"
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
         continue-on-error: true
