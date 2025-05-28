@@ -10,11 +10,11 @@ This `Enterprise Scale AI Factory` repo is a plug and play solution that automat
 The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. It also includes templates for DataOps, MLOps and GenAIOps, compatible with the secure infra setup.
 
 > [!NOTE]
-> Since *Well-architected Framework* does not recommend using the Azure Developer CLI (AZD) for production purposes (or other dev/preview technology such as Azure Verified Module) we removed that - to only use GA `Azure CLI`with orchestrator pipelines in `Github Actions`or Azure Devops pipelines.
+> Since *Well-architected Framework* does not recommend using the Azure Developer CLI (`AZD`) for production purposes (or other dev/preview technology such as Azure Verified Module(`AVM`), we removed those, to only use GA `Azure CLI` with orchestrator pipelines in `Github Actions`or `Azure Devops pipelines`.
 > Also both a Managed Identity and Service principal is created for your team, to be able to automate the full **GenAIOps process** (via the GenAIOps template)
 
-The **BASELINE** deployed for an *AI Factory project* of type *GenAI* is: **AI Foundry, AI Services, AI Search** (Storage, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access) <br>
-Via feature flags you can add optional services, and re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
+The *AI Factory project* of type *GenAI* has a baseline or the services: **AI Foundry, AI Services, AI Search** + 2 Storage accounts, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access. <br>
+Via *AI Factory feature flags* you can add optional services, re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
 
 The services that can be added on top of the **BASELINE** can be seen in the image below: 
 - **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
@@ -29,8 +29,6 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 [How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) when a new feature arrives? 
 
 [Documentation](./documentation/readme.md) 
-- **How to**: CONFIGURE, DEPLOY or EXTEND project types
-- **How to**: DataOps, GenAIOps, MLOps. RBAC & Personas, Networking, Workflows, Architecture diagrams.
 
 ![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 *Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
