@@ -833,7 +833,7 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.registry.name
     id: privateLinksDnsZones.registry.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.registryregion.name
