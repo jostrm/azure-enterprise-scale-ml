@@ -4,7 +4,14 @@
 Welcome to the official `Enterprise Scale AI Factory` repository.<br>
 This is a enteprise scale solution for deploying AI Foundry with related services to create End-2-End agentic scenarios, into multiple isolated environments (Dev,Stage,Prod) with private networking in Azure. You may optionally add/remove services such as Azure Machine learning, Bing or other services. 
 
+This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
+- AI ready landingzones with templates for DataOps, MLOps, GenAIOps to get an enterprise scale environment.
+
 The deployed features follow [Microsoft's Well-Architected Framework WAF](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) to establish an isolated infrastructure intended to assist in moving from a Proof of Concept state to a production-ready application. It also includes templates for DataOps, MLOps and GenAIOps, compatible with the secure infra setup.
+
+> [!NOTE]
+> Since *Well-architected Framework* does not recommend using the Azure Developer CLI (AZD) for production purposes (or other dev/preview technology such as Azure Verified Module) we removed that - to only use GA `Azure CLI`with orchestrator pipelines in `Github Actions`or Azure Devops pipelines.
+> Also both a Managed Identity and Service principal is created for your team, to be able to automate the full **GenAIOps process** (via the GenAIOps template)
 
 The **BASELINE** deployed for an *AI Factory project* of type *GenAI* is: **AI Foundry, AI Services, AI Search** (Storage, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access) <br>
 Via feature flags you can add optional services, and re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
@@ -14,19 +21,6 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 - **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS
 - **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL flebixle server, Azure cache for Redis
 - **Integration & ELT/ETL/Streaming**: Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
-
-> [!NOTE]
-> Since Well-architected framework does not recommend using the Azure Developer CLI (AZD) in production (or any other dev/preview technology such as Azure Verified Module) we removed that, to only use GA `Azure CLI and BICEP`, with orchestrator pipelines in `Github Actions`or Azure Devops pipelines.
-> Also both a Managed Identity and Service principal is created for your team, to be able to automate the full **GenAIOps process** (via the GenAIOps template)
-
-This `Enterprise Scale AI Factory` repo is a plug and play solution that automates the provisioning, deployment, and management of AI projects on Azure with a template way of working.
-- AI ready landingzones with templates for DataOps, MLOps, GenAIOps to get an enterprise scale environment.
-
-Usage: Use it as a submodule in your own repom, and the recommendation is to pin it at RELEASE BRANCH with LTS status, such as **RELEASE_120_LTS**
-
-> [!NOTE]
-> **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a sumobule repo.
->
 
 [How-to SETUP AI Factory](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
 - **Includes two setup modes:** *Fully private AI factory* or *Standalone AI Factory* (VPN, IP whitelist, Bastion, or Hybrid access)
@@ -41,6 +35,10 @@ Usage: Use it as a submodule in your own repom, and the recommendation is to pin
 
 ![AI Factory project types](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 *Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
+
+> [!TIP]
+> **Tip**: Use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a sumobule repo.
+>
 
 <details>
   <summary><b>This accelerator: Main purpose</b></summary>
