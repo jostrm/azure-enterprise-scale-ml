@@ -27,7 +27,6 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 - **Supports both Github Actions or Azure Devops** as orchestrator to kick-off network calculation and the IaC (BICEP)
 
 [How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) when a new feature arrives? 
-- [Feature roadmap & Release](#feature-roadmap--next-release-121)
 
 [Documentation](./documentation/readme.md) 
 - **How to**: CONFIGURE, DEPLOY or EXTEND project types
