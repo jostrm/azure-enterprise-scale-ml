@@ -808,27 +808,27 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.blob.name
     id: privateLinksDnsZones.blob.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.file.name
     id: privateLinksDnsZones.file.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.dfs.name
     id: privateLinksDnsZones.dfs.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.queue.name
     id: privateLinksDnsZones.queue.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.table.name
     id: privateLinksDnsZones.table.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.registry.name
@@ -838,93 +838,93 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.registryregion.name
     id: privateLinksDnsZones.registryregion.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.vault.name
     id: privateLinksDnsZones.vault.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.amlworkspace.name
     id: privateLinksDnsZones.amlworkspace.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.notebooks.name
     id: privateLinksDnsZones.notebooks.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.dataFactory.name
     id: privateLinksDnsZones.dataFactory.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.portal.name
     id: privateLinksDnsZones.portal.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.openai.name
     id: privateLinksDnsZones.openai.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.searchService.name
     id: privateLinksDnsZones.searchService.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.azurewebapps.name
     id: privateLinksDnsZones.azurewebapps.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.cosmosdbnosql.name
     id: privateLinksDnsZones.cosmosdbnosql.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.cognitiveservices.name
     id: privateLinksDnsZones.cognitiveservices.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.azuredatabricks.name
     id: privateLinksDnsZones.azuredatabricks.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.namespace.name
     id: privateLinksDnsZones.namespace.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.azureeventgrid.name
     id: privateLinksDnsZones.azureeventgrid.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.azuremonitor.name
     id: privateLinksDnsZones.azuremonitor.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.azuremonitoroms.name
     id: privateLinksDnsZones.azuremonitoroms.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.azuremonitorods.name
     id: privateLinksDnsZones.azuremonitorods.id
-    exists: false
+    exists: true
   }
   {
     name: privateLinksDnsZones.azuremonitoragentsvc.name
     id: privateLinksDnsZones.azuremonitoragentsvc.id
-    exists: false
-  }
+    exists: true
+  } // 2025-04-01: Added above in Common
   {
     name: privateLinksDnsZones.azurecontainerapps.name
     id: privateLinksDnsZones.azurecontainerapps.id
@@ -949,7 +949,7 @@ var privateLinksDnsZonesArray = [
     name: privateLinksDnsZones.cosmosdbmongo.name
     id: privateLinksDnsZones.cosmosdbmongo.id
     exists: zoneMongoExists
-  }
+  } // 2025-05-30: Added above in Common
 ]
 
 output privateLinksDnsZones object = privateLinksDnsZones

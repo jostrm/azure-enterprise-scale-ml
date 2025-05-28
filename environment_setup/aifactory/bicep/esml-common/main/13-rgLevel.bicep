@@ -278,6 +278,23 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.${location}.azurecontainerapps.io'
     name:'privatelink.${location}.azurecontainerapps.io'
   }
+  redis: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.redis.cache.windows.net'
+    name:'privatelink.redis.cache.windows.net'
+  }
+  postgres: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com'
+    name:'privatelink.postgres.database.azure.com'
+  }
+  sql: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net'
+    #disable-next-line no-hardcoded-env-urls
+    name:'privatelink.database.windows.net'
+  }
+  cosmosdbmongo: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.mongo.cosmos.azure.com'
+    name:'privatelink.mongo.cosmos.azure.com'
+  }
 }
 
 // 20250211 NEW: [privatelink.services.ai.azure.com]
@@ -391,6 +408,22 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.azurecontainerapps.name
     id: privateLinksDnsZones.azurecontainerapps.id
+  }
+  {
+    name: privateLinksDnsZones.redis.name
+    id: privateLinksDnsZones.redis.id
+  }
+  {
+    name: privateLinksDnsZones.postgres.name
+    id: privateLinksDnsZones.postgres.id
+  }
+  {
+    name: privateLinksDnsZones.sql.name
+    id: privateLinksDnsZones.sql.id
+  }
+  {
+    name: privateLinksDnsZones.cosmosdbmongo.name
+    id: privateLinksDnsZones.cosmosdbmongo.id
   }
 ]
 
