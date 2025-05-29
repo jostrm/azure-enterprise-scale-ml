@@ -46,7 +46,7 @@ var storageFileDataContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var cognitiveServicesOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // SP, User, Search, AIHub, AIProject -> AI services, OpenAI
 var cognitiveServicesOpenAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442' // All.  except: Access quota, create new Azure OpenAI, regenerate key under EP, content filter, add data source "on your data"
 
-var cognitiveServicesContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442' // All, except: Access quota | Make inference API call with Microsoft Entra ID
+var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68' // All, except: Access quota | Make inference API call with Microsoft Entra ID
 var cognitiveServicesUsagesReaderId = 'bba48692-92b0-4667-a9ad-c31c7b334ac2' // Only Access quota (Minimal permission to view Cognitive Services usages)
 
 // SDK API auth
