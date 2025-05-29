@@ -2427,10 +2427,6 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
         name: 'AZURE_SEARCH_ENDPOINT'
         value: var_aisearch_endpoint
       }
-      {
-        name: 'WEBSITE_VNET_ROUTE_ALL'
-        value: '1'
-      }
     ]
     runtime: functionRuntime // Choose based on your needs: 'node', 'dotnet', 'java', 'python'
     pythonVersion: functionPyVersion // Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12 (if available)

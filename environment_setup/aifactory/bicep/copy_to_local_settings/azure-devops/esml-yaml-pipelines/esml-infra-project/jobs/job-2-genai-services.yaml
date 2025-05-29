@@ -55,9 +55,260 @@ steps:
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
     arguments: '-spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -useServicePrincipal -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)"'
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
-
 - task: AzureCLI@2
-  displayName: '05_az_bicep_deploy_genai_project'
+  displayName: '05a_Check if Private DNS Zones exist'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      # Input parameters
+      privDnsSubscription="$(dev_test_prod_sub_id)"
+      privDnsResourceGroupName="$(admin_aifactoryPrefixRG)esml-common-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      location="$(admin_location)"
+
+      # Define key-value pairs for DNS Zones
+      declare -A dnsZones=(
+        [zoneazurecontainerapps]="privatelink.${location}.azurecontainerapps.io"
+        [zoneredis]="privatelink.redis.cache.windows.net"
+        [zonepostgres]="privatelink.postgres.database.azure.com"
+        [zonesql]="privatelink.database.windows.net"
+        [zoneMongo]="privatelink.mongo.cosmos.azure.com"
+      )
+
+      # Helper function to check if a Private DNS Zone exists
+      dns_zone_exists() {
+        local subscription="$1"
+        local resourceGroup="$2"
+        local dnsZoneName="$3"
+
+        # Run the az network private-dns zone show command and capture its output and exit status
+        local output
+        output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
+        local status=$?
+
+        # Check if the command succeeded
+        if [ $status -ne 0 ]; then
+          echo "false"
+        else
+          echo "true"
+        fi
+      }
+
+      # Check each DNS Zone
+      for key in "${!dnsZones[@]}"; do
+        dnsZoneName="${dnsZones[$key]}"
+        exists=$(dns_zone_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName")
+        echo "##vso[task.setvariable variable=${key}Exists]${exists}"
+        echo "Checked DNS Zone: $dnsZoneName, Exists: $exists"
+      done
+
+      # Print variables for debugging
+      echo "Private DNS Subscription: $privDnsSubscription"
+      echo "Private DNS Resource Group: $privDnsResourceGroupName"
+      echo "Location: $location"
+- task: AzureCLI@2
+  displayName: '05b_Check if resource exists'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      # Input parameters
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      # uniqueInAIFenv="$(uniqueInAIFenv)" # not used in this script. fuzzy match is used instead.
+      resourceSuffix="$(admin_prjResourceSuffix)"
+      prjResourceSuffixNoDash="${resourceSuffix#-}"
+      twoNumbers="${resourceSuffix:2:2}"
+
+      # Construct resource group name
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}esml-${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}-rg"
+
+      # Helper function for fuzzy resource existence check
+      resource_exists_fuzzy() {
+        local rg="$1"
+        local type="$2"
+        local prefix="$3"
+        local suffix="$4"
+
+        # Run the az resource list command and capture its output and exit status
+        local output
+        output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix')]" 2>&1)
+        local status=$?
+
+        # Check if the command succeeded
+        if [ $status -ne 0 ]; then
+          echo "Error: Failed to list resources in resource group '$rg' with type '$type'."
+          echo "Details: $output"
+          return 1
+        fi
+
+        # Check if the resource exists
+        if echo "$output" | grep -q "$prefix"; then
+          echo "true"
+        else
+          echo "false"
+        fi
+      }
+
+      # Helper function for exact resource existence check
+      resource_exists_exact() {
+        local rg="$1"
+        local type="$2"
+        local name="$3"
+        if az resource show --resource-group "$rg" --name "$name" --resource-type "$type" &> /dev/null; then
+          echo "true"
+        else
+          echo "false"
+        fi
+      }
+
+      # Resource name variables
+      suffixStandard="${resourceSuffix}"
+      suffixStandardNoDash="${prjResourceSuffixNoDash}"
+      suffixStorage1=$(echo "1${prjResourceSuffixNoDash}${envName}" | tr -d '-')
+      suffixStorage2=$(echo "2${prjResourceSuffixNoDash}${envName}" | tr -d '-')
+      suffixAppServicePlan="${resourceSuffix}-plan"
+      suffixAcr="${prjResourceSuffixNoDash}"
+      suffixKeyvault="${twoNumbers}"
+
+      aiHubName="ai-hub-${projectName}-${locationSuffix}-${envName}"
+      aifProjectName="ai-prj${projectNumber}-01-${locationSuffix}-${envName}"
+      amlName="aml-${projectName}-${locationSuffix}-${envName}"
+      openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
+      safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
+      dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}"
+      applicationInsightName="ain-${projectName}-${locationSuffix}-${envName}"
+      aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
+      bingName="bing-${projectName}-${locationSuffix}-${envName}"
+      containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
+      containerAppAName="aca-a-${projectName}${locationSuffix}${envName}"
+      containerAppWName="aca-w-${projectName}${locationSuffix}${envName}"
+      cosmosDBName="cosmos-${projectName}-${locationSuffix}-${envName}"
+      functionAppName="func-${projectName}-${locationSuffix}-${envName}"
+      webAppName="webapp-${projectName}-${locationSuffix}-${envName}"
+      funcAppServicePlanName="func-${projectName}-${locationSuffix}-${envName}"
+      webbAppServicePlanName="webapp-${projectName}-${locationSuffix}-${envName}"
+      keyvaultName="kv-p${projectNumber}-${locationSuffix}-${envName}"
+      miACAPrefix="mi-aca-${projectName}-${locationSuffix}-${envName}"
+      miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+      storageAccount1001Name="sa${projectName}${locationSuffix}"
+      storageAccount2001Name="sa${projectName}${locationSuffix}"
+      aifName="aif-hub-${projectName}-${locationSuffix}-${envName}"
+      redisName="redis-${projectName}-${locationSuffix}-${envName}"
+      postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}"
+      sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
+      sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}"
+      acrProjectName="acr${projectName}genai${locationSuffix}"
+      vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
+
+      # Check resources (fuzzy for those with randomSalt,unique, exact for others)
+      echo "##vso[task.setvariable variable=aiHubExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aifProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=amlExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=openaiExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aiSearchExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")"
+      echo "##vso[task.setvariable variable=dashboardInsightsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=applicationInsightExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aiServicesExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")"
+      echo "##vso[task.setvariable variable=bingExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=containerAppsEnvExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=containerAppAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=containerAppWExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=cosmosDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDBName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=functionAppExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$functionAppName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=webAppExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$webAppName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=funcAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$funcAppServicePlanName" "$suffixAppServicePlan")"
+      echo "##vso[task.setvariable variable=webAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName" "$suffixAppServicePlan")"
+      echo "##vso[task.setvariable variable=keyvaultExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName" "$suffixKeyvault")"
+      echo "##vso[task.setvariable variable=miACAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=miPrjExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=storageAccount1001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
+      echo "##vso[task.setvariable variable=storageAccount2001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")"
+      echo "##vso[task.setvariable variable=aifExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=redisExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=postgreSQLExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=sqlServerExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
+      echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
+
+      # Print variables for debugging
+      echo "Target Resource Group: $targetResourceGroup"
+      echo "Key Vault Name: $keyvaultName"
+- task: AzureCLI@2
+  displayName: '05c_Validate Required Parameters'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      # List of required variables with their Azure DevOps variable references
+      declare -A required_vars=(
+        ["aiHubExists"]="$(aiHubExists)"
+        ["aifProjectExists"]="$(aifProjectExists)"
+        ["amlExists"]="$(amlExists)"
+        ["aiSearchExists"]="$(aiSearchExists)"
+        ["dashboardInsightsExists"]="$(dashboardInsightsExists)"
+        ["applicationInsightExists"]="$(applicationInsightExists)"
+        ["aiServicesExists"]="$(aiServicesExists)"
+        ["bingExists"]="$(bingExists)"
+        ["containerAppsEnvExists"]="$(containerAppsEnvExists)"
+        ["containerAppWExists"]="$(containerAppWExists)"
+        ["cosmosDBExists"]="$(cosmosDBExists)"
+        ["functionAppExists"]="$(functionAppExists)"
+        ["webAppExists"]="$(webAppExists)"
+        ["funcAppServicePlanExists"]="$(funcAppServicePlanExists)"
+        ["webAppServicePlanExists"]="$(webAppServicePlanExists)"
+        ["keyvaultExists"]="$(keyvaultExists)"
+        ["miACAExists"]="$(miACAExists)"
+        ["miPrjExists"]="$(miPrjExists)"
+        ["storageAccount1001Exists"]="$(storageAccount1001Exists)"
+        ["storageAccount2001Exists"]="$(storageAccount2001Exists)"
+        ["aifExists"]="$(aifExists)"
+        ["redisExists"]="$(redisExists)"
+        ["postgreSQLExists"]="$(postgreSQLExists)"
+        ["sqlServerExists"]="$(sqlServerExists)"
+        ["sqlDBExists"]="$(sqlDBExists)"
+        ["acrProjectExists"]="$(acrProjectExists)"
+        ["vmExists"]="$(vmExists)"
+        ["zoneazurecontainerappsExists"]="$(zoneazurecontainerappsExists)"
+        ["zoneredisExists"]="$(zoneredisExists)"
+        ["zonepostgresExists"]="$(zonepostgresExists)"
+        ["zonesqlExists"]="$(zonesqlExists)"
+        ["zoneMongoExists"]="$(zoneMongoExists)"
+        ["aifactory_salt_random"]="$(aifactory_salt_random)"
+      )
+
+      # Validate each variable
+      for var_name in "${!required_vars[@]}"; do
+        value="${required_vars[$var_name]}"
+        echo "Checking variable: $var_name, Value: $value"
+        if [ -z "$value" ] || [ "$value" = "\$(${var_name})" ]; then
+          echo "Error: Required variable $var_name is not set or empty."
+          exit 1
+        fi
+      done
+
+      echo "All required parameters are set and valid."
+- task: AzureCLI@2
+  displayName: '06_az_bicep_deploy_genai_project'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -115,11 +366,45 @@ steps:
      --parameters BYO_subnets="$(BYO_subnets)" \
      --parameters network_env="$(network_env)" \
      --parameters aifactoryVersionMajor="$(aifactory_version_major)" \
-     --parameters aifactoryVersionMinor="$(aifactory_version_minor)"
+     --parameters aifactoryVersionMinor="$(aifactory_version_minor)" \
+     --parameters zoneAzurecontainerappsExists="$(zoneazurecontainerappsExists)" \
+     --parameters zoneRedisExists="$(zoneredisExists)" \
+     --parameters zonePostgresExists="$(zonepostgresExists)" \
+     --parameters zoneSqlExists="$(zonesqlExists)" \
+     --parameters zoneMongoExists="$(zoneMongoExists)" \
+     --parameters aiHubExists="$(aiHubExists)" \
+     --parameters aifProjectExists="$(aifProjectExists)" \
+     --parameters amlExists="$(amlExists)" \
+     --parameters aiSearchExists="$(aiSearchExists)" \
+     --parameters dashboardInsightsExists="$(dashboardInsightsExists)" \
+     --parameters applicationInsightExists="$(applicationInsightExists)" \
+     --parameters aiServicesExists="$(aiServicesExists)" \
+     --parameters bingExists="$(bingExists)" \
+     --parameters containerAppsEnvExists="$(containerAppsEnvExists)" \
+     --parameters containerAppAExists="$(containerAppAExists)" \
+     --parameters containerAppWExists="$(containerAppWExists)" \
+     --parameters cosmosDBExists="$(cosmosDBExists)" \
+     --parameters functionAppExists="$(functionAppExists)" \
+     --parameters webAppExists="$(webAppExists)" \
+     --parameters funcAppServicePlanExists="$(funcAppServicePlanExists)" \
+     --parameters webAppServicePlanExists="$(webAppServicePlanExists)" \
+     --parameters keyvaultExists="$(keyvaultExists)" \
+     --parameters miACAExists="$(miACAExists)" \
+     --parameters miPrjExists="$(miPrjExists)" \
+     --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
+     --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
+     --parameters aifExists="$(aifExists)" \
+     --parameters redisExists="$(redisExists)" \
+     --parameters postgreSQLExists="$(postgreSQLExists)" \
+     --parameters sqlServerExists="$(sqlServerExists)" \
+     --parameters sqlDBExists="$(sqlDBExists)" \
+     --parameters acrProjectExists="$(acrProjectExists)" \
+     --parameters vmExists="$(vmExists)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@1
-  displayName: '06_az_remove_ip_from_seeding_keyvault_FW_whitelist'
+  displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptLocation: inlineScript
