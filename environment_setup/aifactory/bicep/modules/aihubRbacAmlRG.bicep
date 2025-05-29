@@ -25,12 +25,12 @@ resource acrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // AI Hub on RG level
 @description('AI Hub: azureAIAdministrator:')
 resource azureAIAdministratorAiHub 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(aiHubName)) {
-  name: guid(aiHub.id, azureAIAdministrator, aiHubPrincipalId)
+  name: guid(resourceGroup().id, azureAIAdministrator, aiHubPrincipalId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
     principalId: aiHubPrincipalId
     principalType: 'ServicePrincipal'
-    description:'044 azureAIAdministrator role to AI Hub for : ${aiHub.name}'
+    description:'azureAIAdministrator role to AI Hub for : ${aiHub.name}'
   }
   scope:resourceGroup()
 }
