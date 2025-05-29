@@ -21,13 +21,14 @@ var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d' // EP, App service or
 var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // User -> RG
 var roleBasedAccessControlAdministratorRG = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'
 
+var aiUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d' // User to RG level, to all underlying resources (aiservices, AIF_v2_agents)
 // ############## RG LEVEL END
 
 // Azure ML (AI Hub, AIProject)
 var azureMLDataScientistRoleId = 'f6c7c914-8db3-469d-8ca1-694a8f32e121' // SP, user -> AI Hub, AI Project (RG)
 var azureAIDeveloperRoleId = '64702f94-c441-49e6-a78b-ef80e0188fee'  // SP, user -> AI Hub, AI Project -> AIServices
 var azureAIInferenceDeploymentOperatorRoleId = '3afb7f49-54cb-416e-8c09-6dc049efa503'  // User -> AI project
-var azureAIAdministrator = 'b78c5d69-af96-48a3-bf8d-a8b4d589de94' // AI Project (to all underlying resources)
+var azureAIAdministrator = 'b78c5d69-af96-48a3-bf8d-a8b4d589de94' // Users -> AI Project (to all underlying resources)
 
 // AzureML: Managed Online Endpoints & User & SP
 var azureMachineLearningWorkspaceConnectionSecretsReaderRoleId = 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'  // SP, user, EP -> AI Hub, AI Project (RG)
@@ -80,7 +81,7 @@ resource aiDeveloperOnAIServicesFromAIProject 'Microsoft.Authorization/roleAssig
   }
   scope:existingAiServicesResource
 }
-// Needed for Agents in AI Hud project, END
+// Needed for Agents in AI Hub project, END
 
 // 002
 @description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
@@ -314,8 +315,60 @@ resource aiDevOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01'
   scope:existingAIHubProject
 }]
 
+// 2025-05-25 - cognitiveServicesContributorRoleId on AI FOUNDRY_v2 (AI Services)
+
+@description('AI Services: Azure Cognitive services contributor')
+resource cogServiceContribOnAIProjectUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'cognitiveServicesContributorRoleId role to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name}'
+  }
+  scope:existingAiServicesResource
+}]
+@description('AI Services: Azure Cognitive services contributor')
+resource cogServiceContribOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'cognitiveServicesContributorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAiServicesResource.name}'
+  }
+  scope:existingAiServicesResource
+}]
+
+// end
+
 // ----------------RG LEVEL---------------------//
 
+// 2025-03-25 - Azure AI User
+@description('RG:AI Project: AzureAIInferenceDeploymentOperator:Can perform all actions required to create a resource deployment within a resource group. ')
+resource aiUserUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(resourceGroupId, aiUserRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', aiUserRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'Azure AI User role to USER with OID  ${userObjectIds[i]} for RG level'
+  }
+  scope:resourceGroup()
+}]
+
+resource aiUserSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(resourceGroupId, aiUserRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', aiUserRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'Azure AI User to project service principal OID:${servicePrincipleAndMIArray[i]} to RG level'
+  }
+  scope:resourceGroup()
+}]
+
+// 2024-> 
 @description('RG:AI Project: AzureAIInferenceDeploymentOperator:Can perform all actions required to create a resource deployment within a resource group. ')
 resource cogServicesUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
   name: guid(resourceGroupId, cognitiveServicesUserRoleId, userObjectIds[i])

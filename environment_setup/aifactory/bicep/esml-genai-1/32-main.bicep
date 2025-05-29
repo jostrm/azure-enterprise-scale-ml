@@ -2964,6 +2964,8 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!resourceExists
   name: 'rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}'
   params:{
     azureMachineLearningObjectId: azureMachineLearningObjectId
+    aiHubName: aiHubName
+    aiHubPrincipalId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
   }
   dependsOn: [
     aiHub
