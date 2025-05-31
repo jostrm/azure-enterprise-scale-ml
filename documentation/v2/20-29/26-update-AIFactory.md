@@ -17,7 +17,7 @@ git submodule update --init --recursive --remote
 Then choose if you want to 
 **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
 ```
-git submodule foreach 'git checkout "release/v1.2.0" && git pull origin "release/v1.2.0"'
+git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
 ```
 
 **Option B)**

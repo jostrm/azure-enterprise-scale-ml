@@ -13,7 +13,18 @@
     ```
     git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
     ```
+    Then choose A or B:
+    
+    **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
+    ```
+    git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
+    ```
 
+    **Option B)**
+    To get latest features/fixes, unstable, set at `MAIN branch`: 
+    ``` 
+    git submodule foreach 'git checkout main && git pull origin main'
+    ```
     This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
     
 1) Run the start script `./azure-enterprise-scale-ml/00-start.sh`,  this will create some bootstrap-scripts at your repo root.
