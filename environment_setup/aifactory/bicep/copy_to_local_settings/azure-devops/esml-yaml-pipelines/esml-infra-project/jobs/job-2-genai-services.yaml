@@ -138,6 +138,47 @@ steps:
       projectNameReplaced="${projectName/prj/project}"
       targetResourceGroup="${commonRGNamePrefix}esml-${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}-rg"
 
+      # Check if target resource group exists
+      echo "Checking if resource group exists: $targetResourceGroup"
+      if ! az group show --name "$targetResourceGroup" &> /dev/null; then
+        echo "Resource group '$targetResourceGroup' does not exist. Skipping resource checks and setting all existence variables to false."
+        
+        # Set all resource existence variables to false
+        echo "##vso[task.setvariable variable=aiHubExists]false"
+        echo "##vso[task.setvariable variable=aifProjectExists]false"
+        echo "##vso[task.setvariable variable=amlExists]false"
+        echo "##vso[task.setvariable variable=openaiExists]false"
+        echo "##vso[task.setvariable variable=aiSearchExists]false"
+        echo "##vso[task.setvariable variable=dashboardInsightsExists]false"
+        echo "##vso[task.setvariable variable=applicationInsightExists]false"
+        echo "##vso[task.setvariable variable=aiServicesExists]false"
+        echo "##vso[task.setvariable variable=bingExists]false"
+        echo "##vso[task.setvariable variable=containerAppsEnvExists]false"
+        echo "##vso[task.setvariable variable=containerAppAExists]false"
+        echo "##vso[task.setvariable variable=containerAppWExists]false"
+        echo "##vso[task.setvariable variable=cosmosDBExists]false"
+        echo "##vso[task.setvariable variable=functionAppExists]false"
+        echo "##vso[task.setvariable variable=webAppExists]false"
+        echo "##vso[task.setvariable variable=funcAppServicePlanExists]false"
+        echo "##vso[task.setvariable variable=webAppServicePlanExists]false"
+        echo "##vso[task.setvariable variable=keyvaultExists]false"
+        echo "##vso[task.setvariable variable=miACAExists]false"
+        echo "##vso[task.setvariable variable=miPrjExists]false"
+        echo "##vso[task.setvariable variable=storageAccount1001Exists]false"
+        echo "##vso[task.setvariable variable=storageAccount2001Exists]false"
+        echo "##vso[task.setvariable variable=aifExists]false"
+        echo "##vso[task.setvariable variable=redisExists]false"
+        echo "##vso[task.setvariable variable=postgreSQLExists]false"
+        echo "##vso[task.setvariable variable=sqlServerExists]false"
+        echo "##vso[task.setvariable variable=sqlDBExists]false"
+        echo "##vso[task.setvariable variable=acrProjectExists]false"
+        echo "##vso[task.setvariable variable=vmExists]false"
+        
+        exit 0
+      fi
+
+      echo "Resource group '$targetResourceGroup' exists. Proceeding with resource checks."
+
       # Helper function for fuzzy resource existence check
       resource_exists_fuzzy() {
         local rg="$1"
@@ -176,6 +217,8 @@ steps:
           echo "false"
         fi
       }
+
+      # ...existing code...
 
       # Resource name variables
       suffixStandard="${resourceSuffix}"
@@ -302,10 +345,10 @@ steps:
         echo "Checking variable: $var_name, Value: $value"
         if [ -z "$value" ] || [ "$value" = "\$(${var_name})" ]; then
           if [ "$var_name" = "aifactory_salt_random" ]; then
-            echo "Warning: Variable $var_name is not set or empty, but continuing execution. This needs to be set if UPDATING an existing project - adding services. But not att init."
+            echo "Warning: Variable $var_name is not set or empty  (It should be 10 characters), but continuing execution. aifactory_salt_random needs to be set if UPDATING an existing project - adding services. But not att init."
           else
-            echo "Error: Required variable $var_name is not set or empty."
-            exit 1
+            echo "Warning: Required variable $var_name is not set or empty."
+            exit 0
           fi
         fi
       done

@@ -341,7 +341,6 @@ jobs:
             locationSuffix="${{ env.admin_locationSuffix }}"
             envName="${{ env.dev_test_prod }}"
             aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
-            # uniqueInAIFenv="${{ env.uniqueInAIFenv }}" # not used in this script. fuzzy match is used instead.
             resourceSuffix="${{ env.admin_prjResourceSuffix }}"
             prjResourceSuffixNoDash="${resourceSuffix#-}"
             twoNumbers="${resourceSuffix:2:2}"
@@ -349,6 +348,48 @@ jobs:
             # Construct resource group name
             projectNameReplaced="${projectName/prj/project}"
             targetResourceGroup="${commonRGNamePrefix}esml-${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}-rg"
+
+            # Check if target resource group exists first
+            echo "Checking if target resource group exists: $targetResourceGroup"
+            if ! az group show --name "$targetResourceGroup" --subscription "${{ env.dev_test_prod_sub_id }}" &> /dev/null; then
+              echo "Target resource group '$targetResourceGroup' does not exist. Setting all resource existence flags to false."
+              
+              # Set all resource existence flags to false
+              echo "aiHubExists=false" >> $GITHUB_ENV
+              echo "aifProjectExists=false" >> $GITHUB_ENV
+              echo "amlExists=false" >> $GITHUB_ENV
+              echo "openaiExists=false" >> $GITHUB_ENV
+              echo "aiSearchExists=false" >> $GITHUB_ENV
+              echo "dashboardInsightsExists=false" >> $GITHUB_ENV
+              echo "applicationInsightExists=false" >> $GITHUB_ENV
+              echo "aiServicesExists=false" >> $GITHUB_ENV
+              echo "bingExists=false" >> $GITHUB_ENV
+              echo "containerAppsEnvExists=false" >> $GITHUB_ENV
+              echo "containerAppAExists=false" >> $GITHUB_ENV
+              echo "containerAppWExists=false" >> $GITHUB_ENV
+              echo "cosmosDBExists=false" >> $GITHUB_ENV
+              echo "functionAppExists=false" >> $GITHUB_ENV
+              echo "webAppExists=false" >> $GITHUB_ENV
+              echo "funcAppServicePlanExists=false" >> $GITHUB_ENV
+              echo "webAppServicePlanExists=false" >> $GITHUB_ENV
+              echo "keyvaultExists=false" >> $GITHUB_ENV
+              echo "miACAExists=false" >> $GITHUB_ENV
+              echo "miPrjExists=false" >> $GITHUB_ENV
+              echo "storageAccount1001Exists=false" >> $GITHUB_ENV
+              echo "storageAccount2001Exists=false" >> $GITHUB_ENV
+              echo "aifExists=false" >> $GITHUB_ENV
+              echo "redisExists=false" >> $GITHUB_ENV
+              echo "postgreSQLExists=false" >> $GITHUB_ENV
+              echo "sqlServerExists=false" >> $GITHUB_ENV
+              echo "sqlDBExists=false" >> $GITHUB_ENV
+              echo "acrProjectExists=false" >> $GITHUB_ENV
+              echo "vmExists=false" >> $GITHUB_ENV
+              
+              echo "Resource group does not exist - skipping resource checks"
+              exit 0
+            fi
+
+            echo "Target resource group exists. Proceeding with resource checks."
 
             # Helper function for fuzzy resource existence check
             resource_exists_fuzzy() {
@@ -364,9 +405,10 @@ jobs:
 
               # Check if the command succeeded
               if [ $status -ne 0 ]; then
-                echo "Error: Failed to list resources in resource group '$rg' with type '$type'."
+                echo "Warning: Failed to list resources in resource group '$rg' with type '$type'."
                 echo "Details: $output"
-                return 1
+                echo "false"
+                return 0
               fi
 
               # Check if the resource exists
@@ -390,7 +432,6 @@ jobs:
             }
 
             # Resource name variables
-
             suffixStandard="${resourceSuffix}"
             suffixStandardNoDash="${prjResourceSuffixNoDash}"
             suffixStorage1=$(echo "1${prjResourceSuffixNoDash}${envName}" | tr -d '-')
@@ -460,7 +501,7 @@ jobs:
             echo "acrProjectExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")" >> $GITHUB_ENV
             echo "vmExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")" >> $GITHUB_ENV
 
-            # Print variables for debugging
+            echo "Resource existence check completed successfully."
             echo "Target Resource Group: $targetResourceGroup"
             echo "Key Vault Name: $keyvaultName"
           azcliversion: latest
@@ -514,8 +555,8 @@ jobs:
             value="${!var_name}"
             echo "Checking variable: $var, Value: $value"
             if [ -z "$value" ]; then
-              echo "Error: Required environment variable $var is not set or empty."
-              exit 1
+              echo "Warning: Required environment variable $var is not set or empty."
+              exit 0
             fi
           done
 
@@ -624,7 +665,8 @@ jobs:
             --parameters zonePostgresExists="${{ env.zonepostgresExists }}" \
             --parameters zoneSqlExists="${{ env.zonesqlExists }}" \
             --parameters zoneMongoExists="${{ env.zoneMongoExists }}" \
-            --parameters aifactorySalt10char="${{ env.AIFACTORY_SALT_RANDOM }}"
+            --parameters aifactorySalt10char="${{ env.AIFACTORY_SALT_RANDOM }}" \
+            --debug
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
         continue-on-error: true

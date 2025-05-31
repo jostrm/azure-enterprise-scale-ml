@@ -4,8 +4,6 @@ trigger:
       - release/project*
 variables:
 - template: ../variables/variables.yaml
-- name: runNetworkingVar
-  value: true
 
 stages:
 - stage: Dev_ESML_Project
