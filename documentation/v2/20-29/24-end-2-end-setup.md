@@ -8,18 +8,10 @@
 [Prerequisites](../10-19/12-prerequisites-setup.md)
 
 ## Setup options: 
-- Option A) [Setup AIFactory - Infra Automation (AzureDevops YAML + BICEP)](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
+- Option A - Azure Devops) [Setup AIFactory - Infra Automation (AzureDevops YAML + BICEP)](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
     - [Azure Devops - YAML](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
-    - Deprecated 2025-03: [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
-        - No new features will be added for this option. Use YAML option instead.
-- Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
+- Option B - Github) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
     - [Github Actions](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
-- *Option C) [Setup AIFactory - Infra Automation (GithubActions+Terraform)](../10-19/13-setup-aifactory-gha.md)
-    - TODO: Joakim
-
-### Very detailed setup info with screenshots (Azure Devops classic)
-
-[Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
 
 ## Result: 
 This is what you will get:
@@ -120,3 +112,10 @@ https://`webapp-prj003-your-web-app-name-001`.azurewebsites.net/.auth/login/aad/
 
 ### Networking (WebApp)
 - You can choose to run the WebApp within the subnet: `snet-esml-cmn-001-scoring` 
+
+# Deprecated setup
+- Deprecated 2025-03: [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
+    - No new features will be added for this option. Use YAML option instead.
+    - Very detailed setup info with screenshots (Azure Devops classic)
+        - [Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
+
