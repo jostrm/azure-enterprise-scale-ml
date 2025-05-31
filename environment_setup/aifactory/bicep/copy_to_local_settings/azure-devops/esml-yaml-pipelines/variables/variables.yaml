@@ -55,9 +55,10 @@ variables:
   use_ad_groups: "false" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
   
   ##### POST SETUP of a PROJECT - UPDATE THIS
-  # aifactory_salt_random: Needed for updating an AIFACTORY project (add service etc)
-  aifactory_salt_random: "<10>" # 10 characters. Look at the "User created Mnaged Identity". It is a unique random value. This '19-2858-4a' in that: 'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
-  # aifactory_salt: Needed to setup DATALAKE for ESML projects
+  runNetworkingVar: "true" # true, when creating a new project. set to false if you want to UPDATE or ADD services to a project. 
+  # aifactory_salt_random: Needed for UPDATE a project (add service etc)
+  aifactory_salt_random: "<10>" # "fc-d2ad-4e" # 10 characters. Look at the "User created Mnaged Identity". It is a unique random value. This '19-2858-4a' in that: 'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
+  # aifactory_salt: Needed to setup DATALAKE folder structure and RBAC/ACL access, for ESML projects
   aifactory_salt: "<5>" # 5 characters. This 'abcde' in that: 'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001' A deteministic unique value
   ##### POST SETUP ####
 

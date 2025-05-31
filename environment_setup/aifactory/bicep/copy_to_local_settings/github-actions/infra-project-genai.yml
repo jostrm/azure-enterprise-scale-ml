@@ -500,6 +500,10 @@ jobs:
             "env.zonepostgresExists"
             "env.zonesqlExists"
             "env.zoneMongoExists"
+          )
+
+          # List of environment variables that should only generate warnings
+          warning_vars=(
             "env.AIFACTORY_SALT_RANDOM"
           )
 
@@ -512,6 +516,17 @@ jobs:
             if [ -z "$value" ]; then
               echo "Error: Required environment variable $var is not set or empty."
               exit 1
+            fi
+          done
+
+          # Check warning variables (don't exit on failure)
+          for var in "${warning_vars[@]}"; do
+            # Remove the 'env.' prefix to get the actual environment variable name
+            var_name="${var#env.}"
+            value="${!var_name}"
+            echo "Checking variable: $var, Value: $value"
+            if [ -z "$value" ] || [ ${#value} -lt 4 ]; then
+              echo "Warning: Environment variable $var is not set, empty, or less than 4 characters (It should be 10 excact). AIFACTORY_SALT_RANDOM is fine to be empty, if you init a project, But needed if UPDATING a project/adding services"
             fi
           done
 

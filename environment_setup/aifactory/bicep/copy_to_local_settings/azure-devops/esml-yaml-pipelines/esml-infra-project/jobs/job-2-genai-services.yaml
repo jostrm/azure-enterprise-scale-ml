@@ -301,8 +301,12 @@ steps:
         value="${required_vars[$var_name]}"
         echo "Checking variable: $var_name, Value: $value"
         if [ -z "$value" ] || [ "$value" = "\$(${var_name})" ]; then
-          echo "Error: Required variable $var_name is not set or empty."
-          exit 1
+          if [ "$var_name" = "aifactory_salt_random" ]; then
+            echo "Warning: Variable $var_name is not set or empty, but continuing execution. This needs to be set if UPDATING an existing project - adding services. But not att init."
+          else
+            echo "Error: Required variable $var_name is not set or empty."
+            exit 1
+          fi
         fi
       done
 
