@@ -1,5 +1,5 @@
 variables:
-  # CHANGE ONCE: AI Factory - Globals
+  # ONCE: AI Factory - Globals
   admin_location: "swedencentral"
   admin_locationSuffix: "sdc"
   admin_semanticSearchTier: "disabled" # "free", "standard", "disabled" (For Sweden Central and regions not supporting SemanticSearch for AI Search, this needs to be "disabled")
@@ -8,11 +8,6 @@ variables:
   admin_bicep_input_keyvault_subscription: "" # seeding keuvyalt, subscription id
   admin_bicep_kv_fw: "kv-seeding-sdc-001" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
   admin_bicep_kv_fw_rg: "rg-seeding-sdc-001" # Resource Group name for seeding Keyvault
-
-  # UPDATE AIFactory: If you want to upgrade the AIFactory (Long Term Support branches exists). E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
-  aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
-  aifactory_version_minor: "20" # # 2025-05-23: 120_LTS
-
   project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
@@ -24,6 +19,13 @@ variables:
   dev_service_connection: "" # Name of service connection for DEV Azure subscription
   test_service_connection: "" # Name of service connection TEST Azure subscription
   prod_service_connection: "" # Name of service connection PROD Azure subscription
+  dev_seeding_kv_service_connection: "" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
+  test_seeding_kv_service_connection: "" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
+  prod_seeding_kv_service_connection: "" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
+  useCommonACR: true # Use common Azure Container Registry (save cost 20-30%), insted of each project having its own ACR for Azure ML workspace, Container Apps, AI foundry Hub, etc
+  use_ad_groups: "true" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
+
+  # ONCE / PER AIFactory scale sets
   dev_sub_id: "" # SubscriptionID dev
   test_sub_id: "" # SubscriptionID test
   prod_sub_id: "" # SubscriptionID prod
@@ -31,38 +33,34 @@ variables:
   test_cidr_range: "12" # will replace XX in the template: 10.XX.0.0/16
   prod_cidr_range: "13" # will replace XX in the template: 10.XX.0.0/16
 
-  # Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
-  BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
-  network_env_dev: "" # Example: "dev-" Default is empty string. Set to empty if  BYO_subnets: "false"
-  network_env_stage: "" # Example: "stage-"
-  network_env_prod: "" # # Example: "prod-"
-
-  dev_seeding_kv_service_connection: "" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
-  test_seeding_kv_service_connection: "" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
-  prod_seeding_kv_service_connection: "" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
-
+  # SOMETIMES...UPDATE AIFactory: If you want to upgrade the AIFactory (Long Term Support branches). E.g. if you go from submodule 'release/v1.20' to 'release/v1.21' your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
+  aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
+  aifactory_version_minor: "20" # 2025-05-23: 120_LTS = release/v.1.20
+  
   # FOR EACH PROJECT: AI Factory - Projects (ESML, ESGenAI, ESAgentic): Change for each new project
-  admin_projectType: "esml" # What project type to deploy? [esml,genai-1,genai-2]
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
   project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. 124.56.78.0/24 is an example of a range
-  technical_admins_ad_object_id: ""
+  technical_admins_ad_object_id: "" # EntraID Object id of either AD groups or individual users (use_ad_groups=true/false), in a commas separated list, without space. 
+  # Optional: For readability
   technical_admins_email: "joakim, batman" # Email adresses, names, or some sort id ID, in a commas separated list, mapping to above ObjectID list
 
-  # COST optimization, impacts every project
-  useCommonACR: true # Use common Azure Container Registry (save cost), insted of each project having its own.
-
-  # OPTIONAL - GROUPS mapped to PERSONAS (one-to-one, e.g. if 2 groups then 2 personas)
-  use_ad_groups: "false" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
-  
-  ##### POST SETUP of a PROJECT - UPDATE THIS
+  ############################## POST SETUP of a PROJECT - UPDATE THIS
   runNetworkingVar: "true" # true, when creating a new project. set to false if you want to UPDATE or ADD services to a project. 
   # aifactory_salt_random: Needed for UPDATE a project (add service etc)
   aifactory_salt_random: "<10>" # "fc-d2ad-4e" # 10 characters. Look at the "User created Mnaged Identity". It is a unique random value. This '19-2858-4a' in that: 'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
   # aifactory_salt: Needed to setup DATALAKE folder structure and RBAC/ACL access, for ESML projects
   aifactory_salt: "<5>" # 5 characters. This 'abcde' in that: 'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001' A deteministic unique value
-  ##### POST SETUP ####
+  # POST SETUP-END
 
-  # ENTRA ID SECURITY GROUPS - Object ID's (Create a new set of AD groups per project team. 001,002, etc)
+  ################################ OPTIONAL - START ################################
+    
+  # OPTIONAL - Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
+  BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
+  network_env_dev: "" # Example: "dev-" Default is empty string. Set to empty if  BYO_subnets: "false"
+  network_env_stage: "" # Example: "stage-"
+  network_env_prod: "" # # Example: "prod-"
+
+  # OPTIONAL - ENTRA ID SECURITY GROUPS - Object ID's (Create a new set of AD groups per project team. 001,002, etc)
   # Tip of naming: Build a prefix based on [AIFactory prefix, suffix, locationSuffix and project number]) and add a persona unique suffix "p001" that easily maps to the AI Factory persona prefixes.
   groups_project_members_esml: "<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>" #[GH-Secret] 3 groups of users. All except p001 group can be empty groups. ObjectID for Entra ID security groups in a commas separated list, without space
   groups_project_members_genai_1: "<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>" #[GH-Secret] 5 groups. All except p011 can be empty groups. ObjectID for Entra ID security groups in a commas separated list, without space
@@ -73,32 +71,16 @@ variables:
   personas_project_genai_1: "p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops" # 6 Personas where 5 contain users. The 6th is an SP. mapped to groups_project_members_genai_1 & PROJECT_TYPE=genai-1
   personas_core_team: "p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops" # 4 Personas, whereof first 3 contains useres. The 4th is a service principal. These personas are mapped to group_coreteam_members
 
-   # See PARAMETER folder instead. 31-esgenai-default.json
-
-  # admin_enablePublicGenAIAccess: true # Enable public access to GenAI UI, such as Azure AI Foundry/Studio and Azure Machine Learning Studio. It sill uses private link to access the services.
-  # optional_serviceSettingDeployAIDocIntelligence: false # Deploy AI Doc Intelligence
-  # optional_serviceSettingDeployAzureAIVision: false # Deploy Azure AI Vision
-  # optional_serviceSettingDeployAzureSpeech: false # Deploy Azure Speech
-  # optional_serviceSettingDeployAzureAppService: false # Deploy Azure App Service and a WebApp
-  # optional_serviceSettingDeployAzureFunction: false # Deploy Azure App Service and a WebApp
-  # optional_serviceSettingDeployAzureContainerApps: false # Deploy Azure ContainerApps
-  # optional_serviceSettingDeployAzureCosmosDB: false # Deploy Azure CosmosDB
-
-   # See PARAMETER folder instead. END
-
   # OPTIONAL - ESML specific  (Azure ML Compute & Performance. Override if you'd like different SKU's for different environments, or other AKS settings/version)
   admin_aks_gpu_sku_dev_override: "Standard_B4ms"
   admin_aks_gpu_sku_test_prod_override: "Standard_DS13-2_v2"
   admin_aks_nodes_dev_override: 1
   admin_aks_nodes_testProd_override: 3
   admin_aks_version_override: "1.30.3" # AKS version
-
   admin_aml_cluster_maxNodes_dev_override: 3
   admin_aml_cluster_maxNodes_testProd_override: 5
-
   admin_aml_cluster_sku_dev_override: "Standard_DS3_v2"
   admin_aml_cluster_sku_testProd_override: "Standard_D13_v2"
-  
   admin_aml_computeInstance_dev_sku_override: "Standard_DS11_v2" 
   admin_aml_computeInstance_testProd_sku_override: "Standard_ND96amsr_A100_v4" # AML compute instance SKU for test/prod
 
