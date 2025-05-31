@@ -13,9 +13,19 @@ You may use `VS Code` on the GIT tab, and just "Pull" the submodule `azure-enter
 ```
 git submodule update --init --recursive --remote
 ```
+
+Then choose if you want to 
+**Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
+```
+git submodule foreach 'git checkout "release/v1.2.0" && git pull origin "release/v1.2.0"'
+```
+
+**Option B)**
+To get latest features/fixes, unstable, set at `MAIN branch`: 
 ``` 
 git submodule foreach 'git checkout main && git pull origin main'
 ```
+
 
 **Finished!**
 
@@ -34,6 +44,9 @@ The below files will be updated via `bash` scripts:
     - Github Actions Workflows: located `aifactory/esml-infa/github-actions`
     - `.env` located at your root
     - `parameter files (.json)` (sometimes / rare cases) located `aifactory/parameters`
+
+<details>
+  <summary><b>Azure Devops: How-To</b></summary>
 
 ##  A) Azure Devops: How-To
 
@@ -88,6 +101,11 @@ The below files will be updated via `bash` scripts:
 
 **Finished!**
 
+</details>
+
+<details>
+  <summary><b>Github Actions: How-To</b></summary>
+
 ##  B) Github Actions: How-To
 
 1) UPDATE the submodule to your repo (to get the updates) 
@@ -141,3 +159,4 @@ network_env_prod: "" # # Example: "prod-"
     ```
 
 **Finished!**
+</details>

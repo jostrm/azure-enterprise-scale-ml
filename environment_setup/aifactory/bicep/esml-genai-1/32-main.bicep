@@ -12,7 +12,7 @@ param enableAIFoundryHub bool = true
 param enableAISearch bool = true
 
 // Optional services, default OFF
-param enableAML bool = false
+param enableAzureMachineLearning bool = false
 
 // Existing resources
 param aiHubExists bool = false
@@ -1071,7 +1071,7 @@ var var_search_pricipalId = resourceExists.aiSearch? aiSearchREF.identity.princi
 var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
 var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
 var var_aiServices_principalId = resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId
-var var_aml_principal_id = (!resourceExists.aml && enableAML)? amlv2.outputs.principalId: (enableAML && resourceExists.aml)? amlREF.identity.principalId:''
+var var_aml_principal_id = (!resourceExists.aml && enableAzureMachineLearning)? amlv2.outputs.principalId: (enableAzureMachineLearning && resourceExists.aml)? amlREF.identity.principalId:''
 
 // Array vars
 var mi_array = array(var_miPrj_PrincipalId)
@@ -1090,8 +1090,8 @@ var var_acr_cmn_or_prj = useCommonACR? acrCommon2.outputs.containerRegistryName
   :resourceExists.acrProject? acrProjectName
   :acr.outputs.containerRegistryName
 
-var var_aml_name = resourceExists.aml && enableAML?amlName
-  : enableAML? amlv2.outputs.amlName: ''
+var var_aml_name = resourceExists.aml && enableAzureMachineLearning?amlName
+  : enableAzureMachineLearning? amlv2.outputs.amlName: ''
 
 var var_aca_env_name = resourceExists.containerAppsEnv && serviceSettingDeployContainerApps? containerAppsEnvName
   : serviceSettingDeployContainerApps? containerAppsEnv.outputs.environmentName: ''
@@ -2699,7 +2699,7 @@ var processedIpRulesAzureML = [for ip in ipWhitelist_array: {
 
 // ERROR: "snt-prj003-aks cannot be used as it's a delegated subnet"
 // TODO: add another dedicated subnet - not borrowing the AKS subnet
-module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && enableAML) {
+module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'AzureMLDepl_${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -2754,7 +2754,7 @@ module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && ena
   ]
 }
 
-module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && enableAML) {
+module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacUsersAmlVersion2${deploymentProjSpecificUniqueSuffix}'
   params:{
@@ -2848,7 +2848,7 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
   }
 }
 
-module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!resourceExists.aml && enableAML)  {
+module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!resourceExists.aml && enableAzureMachineLearning)  {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -2861,7 +2861,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!resour
   }
   dependsOn: [
     ...(resourceExists.keyvault? [] : [kv1])
-    ...(!resourceExists.aml && enableAML? [amlv2] : [])
+    ...(!resourceExists.aml && enableAzureMachineLearning? [amlv2] : [])
     logAnalyticsWorkspaceOpInsight // aml success, optherwise this needs to be removed manually if aml fails..and rerun
     spAndMI2Array
   ]
@@ -3147,10 +3147,10 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!re
     //cmnRbacACR
     esmlCommonLake
     ...(!resourceExists.aiHub && enableAIFoundryHub? [aiHub] : [])
-    ...(!resourceExists.aml && enableAML? [amlv2] : [])
+    ...(!resourceExists.aml && enableAzureMachineLearning? [amlv2] : [])
   ]
 }
-module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!resourceExists.aml && enableAML) {
+module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!resourceExists.aml && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -3163,7 +3163,7 @@ module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!resource
   }
   dependsOn: [
     esmlCommonLake
-    ...(!resourceExists.aml && enableAML? [amlv2] : [])
+    ...(!resourceExists.aml && enableAzureMachineLearning? [amlv2] : [])
   ]
 }
 

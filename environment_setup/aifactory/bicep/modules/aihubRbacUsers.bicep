@@ -12,6 +12,8 @@ param useAdGroups bool = false // Use AD groups for role assignments
 param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 param disableContributorAccessForUsers bool = false // Disable contributor access for users
 
+param idempotency string = utcNow() // '' // Idempotency variable to ensure unique role assignment names
+
 // ############## RG level ##############
 
 // Container Registry (EP, WebApp, Azure Function)

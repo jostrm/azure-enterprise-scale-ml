@@ -16,6 +16,19 @@ Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline
     ```
     git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
     ```
+    
+    Then choose A or B:
+    
+    **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
+    ```
+    git submodule foreach 'git checkout "release/v1.2.0" && git pull origin "release/v1.2.0"'
+    ```
+
+    **Option B)**
+    To get latest features/fixes, unstable, set at `MAIN branch`: 
+    ``` 
+    git submodule foreach 'git checkout main && git pull origin main'
+    ```
 
     This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
 
