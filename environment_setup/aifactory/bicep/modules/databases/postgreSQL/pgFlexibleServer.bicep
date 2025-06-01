@@ -213,7 +213,7 @@ resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if
         properties: {
           privateLinkServiceId: flexibleServers_mypgfrelx001_name_resource.id
           groupIds: [
-            'flexibleServers'
+            'postgresqlServer'
           ]
           privateLinkServiceConnectionState: {
             status: 'Approved'
