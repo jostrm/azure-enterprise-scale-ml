@@ -2108,7 +2108,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!resourceExists.p
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkPostgreSQL${deploymentProjSpecificUniqueSuffix}'
   params: {
-    dnsConfig: cosmosdb.outputs.dnsConfig
+    dnsConfig: postgreSQL.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
