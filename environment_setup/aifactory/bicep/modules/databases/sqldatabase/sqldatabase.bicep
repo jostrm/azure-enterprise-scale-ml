@@ -193,6 +193,7 @@ resource pendSQLServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(crea
 
 output connectionStringKey string = connectionStringKey
 output databaseName string = sqlServer::database.name
+output serverName string = sqlServer.name
 
 output dnsConfig array = [
   {

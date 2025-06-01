@@ -2193,6 +2193,35 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!reso
   ]
 }
 
+module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!resourceExists.sqlDB && serviceSettingDeploySQLDatabase) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'SqlServerRbac4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    sqlServerName: sqlServer.outputs.serverName
+    useAdGroups: useAdGroups
+    usersOrAdGroupArray: p011_genai_team_lead_array
+    servicePrincipleAndMIArray: spAndMiArray
+    
+  }
+  dependsOn: [
+    sqlServer
+    spAndMI2Array
+  ]
+}
+
+module privateDnsSql '../modules/privateDns.bicep' = if(!resourceExists.sqlDB && !centralDnsZoneByPolicyInHub && serviceSettingDeploySQLDatabase && !enablePublicAccessWithPerimeter){
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'privateDnsLinkSqlServer${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: sqlServer.outputs.dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    createPrivateDnsZones
+    projectResourceGroup
+  ]
+}
+
 // DATABASES - END
 
 module appinsights '../modules/appinsights.bicep' = if(!resourceExists.applicationInsight && serviceSettingDeployAppInsightsDashboard) {

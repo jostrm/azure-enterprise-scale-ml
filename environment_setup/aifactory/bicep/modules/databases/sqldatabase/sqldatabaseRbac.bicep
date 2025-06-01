@@ -2,7 +2,6 @@ metadata description = 'Creates role assignments for Azure SQL Server and SQL Da
 param usersOrAdGroupArray array
 param servicePrincipleAndMIArray array
 param sqlServerName string
-param resourceGroupName string
 param useAdGroups bool
 
 // Azure SQL built-in roles
