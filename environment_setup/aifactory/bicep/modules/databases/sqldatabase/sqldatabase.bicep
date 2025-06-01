@@ -9,7 +9,7 @@ param vnetResourceGroupName string
 param createPrivateEndpoint bool
 param skuObject object
 param version string = '12.0' // SQL Server version, default is 12.0
-param minimalTlsVersion string = '1.2' // Minimal TLS version, default is 1.2
+param minimalTlsVersion string = '1.3' // Minimal TLS version, default is 1.2
 
 param appUser string = 'aifactory-user'
 param sqlAdmin string = 'aifactory-admin'
