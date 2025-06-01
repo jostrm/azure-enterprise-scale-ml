@@ -97,7 +97,7 @@ resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/f
     }
     replicationRole: 'Primary'
   }
-  resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: {
+  resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: if(!createPrivateEndpoint){
     name: 'allow-single-${replace(ip, '.', '')}'
     properties: {
       startIpAddress: ip
@@ -119,7 +119,7 @@ resource flexibleServers_mypgfrelx001_name_postgres 'Microsoft.DBforPostgreSQL/f
   ]
 }
 
-resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview'  = if (allowAllIPsFirewall) {
+resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview'  = if (allowAllIPsFirewall &&!createPrivateEndpoint) {
   parent: flexibleServers_mypgfrelx001_name_resource
   name: 'AllowAll_2025-5-23_18-6-32'
   properties: {
@@ -131,7 +131,7 @@ resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft
   ]
 }
 
-resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWithinAzureIps_2025_5_23_18_8_9 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = if (allowAzureIPsFirewall) {
+resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWithinAzureIps_2025_5_23_18_8_9 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = if (allowAzureIPsFirewall &&!createPrivateEndpoint) {
   parent: flexibleServers_mypgfrelx001_name_resource
   name: 'AllowAllAzureServicesAndResourcesWithinAzureIps_2025-5-23_18-8-9'
   properties: {
@@ -142,53 +142,6 @@ resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWith
     flexibleServers_mypgfrelx001_name_resource
   ]
 }
-/*
-resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
- location: location
-  tags: tags
-  name: name
-  identity: identity
-  sku: sku
-  properties: {
-    version: version
-    administratorLogin: administratorLogin
-    administratorLoginPassword: loginPwd
-    storage: storage
-    highAvailability: {
-      mode: 'Disabled'
-    }
-  }
-
-  resource database 'databases' = [for name in databaseNames:{
-    name: name
-  }]
-
-  resource firewall_all 'firewallRules' = if (allowAllIPsFirewall) {
-    name: 'allow-all-IPs'
-    properties: {
-      startIpAddress: '0.0.0.0'
-      endIpAddress: '255.255.255.255'
-    }
-  }
-
-  resource firewall_azure 'firewallRules' = if (allowAzureIPsFirewall) {
-    name: 'allow-all-azure-internal-IPs'
-    properties: {
-      startIpAddress: '0.0.0.0'
-      endIpAddress: '0.0.0.0'
-    }
-  }
-
-  resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: {
-    name: 'allow-single-${replace(ip, '.', '')}'
-    properties: {
-      startIpAddress: ip
-      endIpAddress: ip
-    }
-  }]
-}
-
-*/
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName

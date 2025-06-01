@@ -71,7 +71,7 @@ resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
   }
   }
 
-  resource firewallAll 'firewallRules' = if(allowAllIPsFirewall) {
+  resource firewallAll 'firewallRules' = if(allowAllIPsFirewall && !createPrivateEndpoint) {
     name: 'sql-all-fw-rule' // Consider a more generic name if it's truly for all IPs
     properties: {
       // Allow all clients
@@ -81,14 +81,14 @@ resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
       endIpAddress: '255.255.255.254'
     }
   }
-  resource firewallAzureServices 'firewallRules' = if(allowAzureIPsFirewall) { // Changed condition to use allowAzureIPsFirewall
+  resource firewallAzureServices 'firewallRules' = if(allowAzureIPsFirewall&& !createPrivateEndpoint){ // Changed condition to use allowAzureIPsFirewall
     name: 'sql-allow-azure-services-fw-rule' // Renamed for clarity
     properties: {
       startIpAddress: '0.0.0.0'
       endIpAddress: '0.0.0.0'
     }
   }
-  resource firewallSingle 'firewallRules' = [for ip in allowedSingleIPs: {
+  resource firewallSingle 'firewallRules' = [for ip in allowedSingleIPs: if(!createPrivateEndpoint) {
     name: 'sql-allow-single-${replace(ip, '.', '')}'
     properties: {
       startIpAddress: ip
@@ -104,7 +104,7 @@ resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
     }
   }]
   // Add a virtual network rule if a subnet ID is provided
-  resource serverVNetRule 'virtualNetworkRules' = if (!empty(subnetNamePend)) {
+  resource serverVNetRule 'virtualNetworkRules' = if (!empty(subnetNamePend) && !createPrivateEndpoint) {
     name: 'vnetrule-${last(split(subnetPend.id, '/'))}' // Auto-generate a name
     properties: {
       virtualNetworkSubnetId: subnetPend.id
