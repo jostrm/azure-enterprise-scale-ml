@@ -2101,6 +2101,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
   dependsOn: [
     postgreSQL
     spAndMI2Array
+    ...((!resourceExists.postgreSQL && serviceSettingDeployPostgreSQL) ? [postgreSQL] : [])
   ]
 }
 
@@ -2115,6 +2116,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!resourceExists.p
     createPrivateDnsZones
     projectResourceGroup
     ...((!resourceExists.postgreSQL && serviceSettingDeployPostgreSQL) ? [postgreSQL] : [])
+    ...((!resourceExists.postgreSQL && serviceSettingDeployPostgreSQL) ? [postgreSQLRbac] : [])
   ]
 }
 
