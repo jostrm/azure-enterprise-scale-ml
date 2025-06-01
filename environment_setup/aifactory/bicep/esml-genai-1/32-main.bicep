@@ -2116,7 +2116,6 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!resourceExists.p
     createPrivateDnsZones
     projectResourceGroup
     ...((!resourceExists.postgreSQL && serviceSettingDeployPostgreSQL) ? [postgreSQL] : [])
-    ...((!resourceExists.postgreSQL && serviceSettingDeployPostgreSQL) ? [postgreSQLRbac] : [])
   ]
 }
 
@@ -2201,7 +2200,7 @@ module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!re
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
-    
+
   }
   dependsOn: [
     sqlServer
