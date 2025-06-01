@@ -165,7 +165,7 @@ resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' exist
   parent: vnet
 }
 
-resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
+resource pendSQLServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
   name: 'pend-sqlServer-SQLDatabaseIn-${serverName}'
   location: location
   properties: {
@@ -196,7 +196,7 @@ output databaseName string = sqlServer::database.name
 
 output dnsConfig array = [
   {
-    name: createPrivateEndpoint? sqlServer.name: ''
+    name: createPrivateEndpoint? pendSQLServer.name: ''
     type: 'sql'
     id:createPrivateEndpoint? sqlServer.id: ''
   }

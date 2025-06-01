@@ -232,6 +232,6 @@ output dnsConfig array = [
   {
     name: (createPrivateEndpoint && !byoACEv3)? privateEndpoint.name : ''
     type: 'azurewebapps'
-    id: (createPrivateEndpoint && !byoACEv3)? privateEndpoint.id : ''
+    id: (createPrivateEndpoint && !byoACEv3)? functionApp.id : ''
   }
 ]

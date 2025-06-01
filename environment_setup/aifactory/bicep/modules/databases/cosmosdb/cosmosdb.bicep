@@ -232,7 +232,7 @@ output dnsConfig array = [
   {
     name: createPrivateEndpoint? pendCosmos.name: ''
     type: kind == 'GlobalDocumentDB'? 'cosmosdbnosql':kind == 'MongoDB'? 'cosmosdbmongo': 'cosmosdbcassandra'
-    id:createPrivateEndpoint? pendCosmos.id: ''
+    id:createPrivateEndpoint? cosmos.id: ''
   }
 ]
 

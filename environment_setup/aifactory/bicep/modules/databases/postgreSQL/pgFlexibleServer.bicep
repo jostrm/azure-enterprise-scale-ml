@@ -60,7 +60,7 @@ var loginPwd = empty(administratorLoginPassword)? '${uppercaseLetter}${lowercase
 var defaultDbName = 'aifdb' // Default database name
 var dbNameToUse = !empty(databaseNames) ? first(databaseNames) : defaultDbName
 
-resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/flexibleServers@2024-11-01-preview' = {
+resource postgreSQLFlex 'Microsoft.DBforPostgreSQL/flexibleServers@2024-11-01-preview' = {
   name: name
   location: location //'Sweden Central'
   sku: sku
@@ -108,38 +108,38 @@ resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/f
 }
 
 resource flexibleServers_mypgfrelx001_name_postgres 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-11-01-preview' = {
-  parent: flexibleServers_mypgfrelx001_name_resource
+  parent: postgreSQLFlex
   name: dbNameToUse
   properties: {
     charset: 'UTF8'
     collation: 'en_US.utf8'
   }
   dependsOn: [
-    flexibleServers_mypgfrelx001_name_resource
+    postgreSQLFlex
   ]
 }
 
 resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview'  = if (allowAllIPsFirewall &&!createPrivateEndpoint) {
-  parent: flexibleServers_mypgfrelx001_name_resource
+  parent: postgreSQLFlex
   name: 'AllowAll_2025-5-23_18-6-32'
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '255.255.255.255'
   }
   dependsOn: [
-    flexibleServers_mypgfrelx001_name_resource
+    postgreSQLFlex
   ]
 }
 
 resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWithinAzureIps_2025_5_23_18_8_9 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = if (allowAzureIPsFirewall &&!createPrivateEndpoint) {
-  parent: flexibleServers_mypgfrelx001_name_resource
+  parent: postgreSQLFlex
   name: 'AllowAllAzureServicesAndResourcesWithinAzureIps_2025-5-23_18-8-9'
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
   }
   dependsOn: [
-    flexibleServers_mypgfrelx001_name_resource
+    postgreSQLFlex
   ]
 }
 
@@ -164,7 +164,7 @@ resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if
       {
         name: 'pend-postgreSQLFlexibleServer-${name}'
         properties: {
-          privateLinkServiceId: flexibleServers_mypgfrelx001_name_resource.id
+          privateLinkServiceId: postgreSQLFlex.id
           groupIds: [
             'postgresqlServer'
           ]
@@ -187,7 +187,7 @@ resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07
   parent: keyVault
   name: connectionStringKey
   properties: {
-    value: 'Server=${flexibleServers_mypgfrelx001_name_resource.properties.fullyQualifiedDomainName};Database=${dbNameToUse};Port=5432;User Id=${administratorLogin};Password=${loginPwd};Ssl Mode=Require;'
+    value: 'Server=${postgreSQLFlex.properties.fullyQualifiedDomainName};Database=${dbNameToUse};Port=5432;User Id=${administratorLogin};Password=${loginPwd};Ssl Mode=Require;'
     contentType: 'text/plain'
     attributes: {
       enabled: true
@@ -195,12 +195,12 @@ resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07
   }
 }
 
-output POSTGRES_DOMAIN_NAME string = flexibleServers_mypgfrelx001_name_resource.properties.fullyQualifiedDomainName
-output name string = flexibleServers_mypgfrelx001_name_resource.name
+output POSTGRES_DOMAIN_NAME string = postgreSQLFlex.properties.fullyQualifiedDomainName
+output name string = postgreSQLFlex.name
 output dnsConfig array = [
   {
-    name: createPrivateEndpoint? flexibleServers_mypgfrelx001_name_resource.name: ''
+    name: createPrivateEndpoint? pendPostgresServer.name: ''
     type: 'postgres'
-    id: createPrivateEndpoint? flexibleServers_mypgfrelx001_name_resource.id: ''
+    id: createPrivateEndpoint? postgreSQLFlex.id: ''
   }
 ]

@@ -127,7 +127,7 @@ output dnsConfig array = [
   {
     name: createPrivateEndpoint? pendAca.name: ''
     type: 'azurecontainerapps'
-    id:createPrivateEndpoint? pendAca.id: ''
+    id:createPrivateEndpoint? containerAppsEnvironment.id: ''
   }
 ]
 

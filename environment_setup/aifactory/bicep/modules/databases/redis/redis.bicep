@@ -266,7 +266,7 @@ output location string = redisCache.location
 output redisConnectionStringSecretName string = redisConnectionStringSecret.name
 output dnsConfig array = [
   {
-    name: createPrivateEndpoint? redisCache.name: ''
+    name: createPrivateEndpoint? pendRedis.name: ''
     type: 'redis'
     id:createPrivateEndpoint? redisCache.id: ''
   }
