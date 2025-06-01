@@ -601,7 +601,7 @@ var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
-var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : union(ipWhitelist_array_1,[]) // remove dups
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null' || length(IPwhiteList) < 5) ? [] : union(ipWhitelist_array_1,[]) // remove dups
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
 var p011_genai_team_lead_array = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : union(technicalAdminsObjectID_array,[])
