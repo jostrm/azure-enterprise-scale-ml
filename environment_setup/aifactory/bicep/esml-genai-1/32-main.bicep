@@ -2114,6 +2114,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!resourceExists.p
   dependsOn: [
     createPrivateDnsZones
     projectResourceGroup
+    ...((!resourceExists.postgreSQL && serviceSettingDeployPostgreSQL) ? [postgreSQL] : [])
   ]
 }
 
