@@ -253,22 +253,24 @@ param serviceSettingDeployProjectVM bool = false
 
 // Databases:PostGreSQL
 param serviceSettingDeployPostgreSQL bool = false
-param postgreSQLSKU_Name string = 'Standard_B1ms' // Basic tier with 1 vCore
+param postgreSQLHighAvailability object = {
+  mode: 'Disabled' // Default to Disabled, can be overridden
+}
+param postgresAvailabilityZone string = '1' // Default to zone 1, can be overridden
+param postgreSQLSKU_Name string = 'Standard_B2s' // Basic tier with 1 vCore
 param postgreSQLSKU_Tier string = 'Burstable'     // Burstable tier
-param postgreSQLSKU_Family string = 'Gen5'        // Generation 5 hardware
-param postgreSQLSKU_Capacity int = 1           // 1 vCore
 var postgreSQLSKU = {
-  name: postgreSQLSKU_Name 
-  tier: postgreSQLSKU_Tier
-  family: postgreSQLSKU_Family
-  capacity: postgreSQLSKU_Capacity
+    name: postgreSQLSKU_Name
+    tier: postgreSQLSKU_Tier
 }
 param postgreSQLStorage_Size int = 32 // 32 GB of storage
 param postgreSQLStorage_Iops int = 120 // Input/output operations per second
-param postgreSQLStorage_AutoGrow bool = true // Enable auto-grow for storage
-var postgreSQLStorage = {
+param postgreSQLStorage_Tier string = 'P4' // Input/output operations per second
+param postgreSQLStorage_AutoGrow string = 'Disabled' // Enable auto-grow for storage
+var postgreSQLStorage ={
+  iops: postgreSQLStorage_Iops
+  tier: postgreSQLStorage_Tier
   storageSizeGB: postgreSQLStorage_Size
-  iops: postgreSQLStorage_Iops         
   autoGrow: postgreSQLStorage_AutoGrow
 }
 param postgreSQLVersion string = '16' // PostgreSQL version
@@ -2078,6 +2080,8 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
     version: postgreSQLVersion
     tenantId: tenantId
     useAdGroups: useAdGroups
+    highAvailability: postgreSQLHighAvailability
+    availabilityZone:postgresAvailabilityZone
   }
   dependsOn: [
     projectResourceGroup

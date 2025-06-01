@@ -2,9 +2,17 @@ metadata description = 'Creates an Azure Database for PostgreSQL - Flexible Serv
 param name string
 param location string
 param tags object
-param sku object 
-param storage object
-param version string
+param sku object = {
+    name: 'Standard_B2s'
+    tier: 'Burstable'
+}
+param storage object = {
+      iops: 120
+      tier: 'P4'
+      storageSizeGB: 32
+      autoGrow: 'Disabled'
+}
+param version string = '16' // PostgreSQL version, default is 16
 param administratorLogin string = 'aifactoryadmin'
 param resourceExists bool = false
 param useAdGroups bool = false // If true, the principalType will be set to 'Group' for role assignments
@@ -13,7 +21,7 @@ param useAdGroups bool = false // If true, the principalType will be set to 'Gro
 param administratorLoginPassword string = ''
 param databaseNames array = ['aifdb']
 param allowAzureIPsFirewall bool = false
-param allowAllIPsFirewall bool = true
+param allowAllIPsFirewall bool = false
 param allowedSingleIPs array = []
 param tenantId string
 param vnetName string
@@ -26,6 +34,10 @@ param keyvaultName string
 param connectionStringKey string = 'aifactory-proj-postgresqlflex-con-string'
 param systemAssignedIdentity bool = false // Enables system assigned managed identity on the resource
 param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the resource.
+param highAvailability object = {
+  mode: 'Disabled' // Default to Disabled, can be overridden
+}
+param availabilityZone string = '1' // Default to zone 1, can be overridden
 
 var identityType = systemAssignedIdentity 
   ? (!empty(userAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned') 
@@ -51,20 +63,12 @@ var dbNameToUse = !empty(databaseNames) ? first(databaseNames) : defaultDbName
 resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/flexibleServers@2024-11-01-preview' = {
   name: name
   location: location //'Sweden Central'
-  sku: {
-    name: 'Standard_B2s'
-    tier: 'Burstable'
-  }
+  sku: sku
   properties: {
     replica: {
       role: 'Primary'
     }
-    storage: {
-      iops: 120
-      tier: 'P4'
-      storageSizeGB: 32
-      autoGrow: 'Disabled'
-    }
+    storage: storage
     network: {
       publicNetworkAccess: createPrivateEndpoint? 'Disabled': 'Enabled'
     }
@@ -76,7 +80,7 @@ resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/f
       passwordAuth: 'Enabled'
       tenantId: tenantId
     }
-    version: '16'
+    version: version
     administratorLogin: administratorLogin
     administratorLoginPassword: loginPwd
     availabilityZone: '1'
@@ -84,9 +88,7 @@ resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/f
       backupRetentionDays: 7
       geoRedundantBackup: 'Disabled'
     }
-    highAvailability: {
-      mode: 'Disabled'
-    }
+    highAvailability: highAvailability
     maintenanceWindow: {
       customWindow: 'Disabled'
       dayOfWeek: 0
@@ -95,27 +97,16 @@ resource flexibleServers_mypgfrelx001_name_resource 'Microsoft.DBforPostgreSQL/f
     }
     replicationRole: 'Primary'
   }
+  resource firewall_single 'firewallRules' = [for ip in allowedSingleIPs: {
+    name: 'allow-single-${replace(ip, '.', '')}'
+    properties: {
+      startIpAddress: ip
+      endIpAddress: ip
+    }
+  }]
+
 }
-/*
-{
-  code: 'AadAuthOperationCannotBePerformedWhenServerIsNotAccessible'
-  message: 'Server \'pg-flex-prj003-sdc-dev-zltme-001\' is not in an accessible state to perform a Microsoft Entra authentication principal operation. Make sure that the server is in an accessible before executing any Microsoft Entra authentication principal operation.'
-}
-*/
-/*
-resource flexibleServers_mypgfrelx001_name_4dd75919_56b3_4e7e_a265_dc96f9cd4a58 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-11-01-preview' = {
-  parent: flexibleServers_mypgfrelx001_name_resource
-  name: '4dd75919-56b3-4e7e-a265-dc96f9cd4a58'
-  properties: {
-    principalType: useAdGroups?'Group': 'User'
-    principalName: entraIdPrincipleAdmin
-    tenantId: tenantId
-  }
-  dependsOn: [
-    flexibleServers_mypgfrelx001_name_resource
-  ]
-}
-*/
+
 resource flexibleServers_mypgfrelx001_name_postgres 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-11-01-preview' = {
   parent: flexibleServers_mypgfrelx001_name_resource
   name: dbNameToUse
@@ -128,7 +119,7 @@ resource flexibleServers_mypgfrelx001_name_postgres 'Microsoft.DBforPostgreSQL/f
   ]
 }
 
-resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = {
+resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview'  = if (allowAllIPsFirewall) {
   parent: flexibleServers_mypgfrelx001_name_resource
   name: 'AllowAll_2025-5-23_18-6-32'
   properties: {
@@ -140,7 +131,7 @@ resource flexibleServers_mypgfrelx001_name_AllowAll_2025_5_23_18_6_32 'Microsoft
   ]
 }
 
-resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWithinAzureIps_2025_5_23_18_8_9 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = {
+resource flexibleServers_mypgfrelx001_name_AllowAllAzureServicesAndResourcesWithinAzureIps_2025_5_23_18_8_9 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-11-01-preview' = if (allowAzureIPsFirewall) {
   parent: flexibleServers_mypgfrelx001_name_resource
   name: 'AllowAllAzureServicesAndResourcesWithinAzureIps_2025-5-23_18-8-9'
   properties: {

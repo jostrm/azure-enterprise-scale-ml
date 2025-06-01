@@ -8,6 +8,8 @@ param subnetNamePend string
 param vnetResourceGroupName string
 param createPrivateEndpoint bool
 param skuObject object
+param version string = '12.0' // SQL Server version, default is 12.0
+param minimalTlsVersion string = '1.2' // Minimal TLS version, default is 1.2
 
 param appUser string = 'aifactory-user'
 param sqlAdmin string = 'aifactory-admin'
@@ -18,6 +20,12 @@ param connectionStringKey string = 'aifactory-proj-sqldb-con-string'
 param sqlAdminPassword string = ''
 @secure()
 param appUserPassword string = ''
+
+@description('An array of IP firewall rules to apply. Example: [ { "name": "AllowAzureServices", "startIpAddress": "0.0.0.0", "endIpAddress": "0.0.0.0" }, { "name": "AllowMyDevIP", "startIpAddress": "YOUR_IP", "endIpAddress": "YOUR_IP" } ]')
+param sqlServerAllowedIpRules array = []
+param allowAzureIPsFirewall bool = !createPrivateEndpoint
+param allowAllIPsFirewall bool = false
+param allowedSingleIPs array = []
 
 var connectionString = 'Server=${sqlServer.properties.fullyQualifiedDomainName}; Database=${sqlServer::database.name}; User=${appUser}'
 var seed = uniqueString(resourceGroup().id, subscription().subscriptionId, deployment().name)
@@ -30,7 +38,7 @@ var randomSpecialChar2 = substring(specialChar, length(seed) % length(specialCha
 var adminPwd = empty(sqlAdminPassword)? '${uppercaseLetter}${lowercaseLetter}${randomSpecialChar}${numbers}${guid(deployment().name)}': sqlAdminPassword
 var userPwd = empty(appUserPassword)? '${uppercaseLetter}${lowercaseLetter}${randomSpecialChar2}${numbers}${guid(deployment().name)}': appUserPassword
 
-resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
+resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
   name: serverName
   location: location
   tags: tags
@@ -38,9 +46,10 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
     type: 'SystemAssigned'
   }
   properties: {
-    version: '12.0'
-    minimalTlsVersion: '1.2'
-    publicNetworkAccess: 'Enabled'
+    version: version
+    minimalTlsVersion: minimalTlsVersion
+    publicNetworkAccess: createPrivateEndpoint? 'Disabled': 'Enabled'
+    restrictOutboundNetworkAccess: createPrivateEndpoint? 'Enabled':'Disabled'
     administratorLogin: sqlAdmin
     administratorLoginPassword: adminPwd
   }
@@ -62,73 +71,49 @@ resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' = {
   }
   }
 
-  resource firewall 'firewallRules' = {
-    name: 'Azure Services'
+  resource firewallAll 'firewallRules' = if(allowAllIPsFirewall) {
+    name: 'sql-all-fw-rule' // Consider a more generic name if it's truly for all IPs
     properties: {
       // Allow all clients
       // Note: range [0.0.0.0-0.0.0.0] means "allow all Azure-hosted clients only".
       // This is not sufficient, because we also want to allow direct access from developer machine, for debugging purposes.
-      startIpAddress: '0.0.0.1'
+      startIpAddress: '0.0.0.1' // This allows almost all IPs, but not Azure Services specifically by this rule.
       endIpAddress: '255.255.255.254'
     }
   }
-}
-
-/*
-resource sqlDeploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
-  name: '${serverName}-deployment-script'
-  location: location
-  kind: 'AzureCLI'
-  properties: {
-    azCliVersion: '2.37.0'
-    retentionInterval: 'PT1H' // Retain the script resource for 1 hour after it ends running
-    timeout: 'PT5M' // Five minutes
-    cleanupPreference: 'OnSuccess'
-    environmentVariables: [
-      {
-        name: 'APPUSERNAME'
-        value: appUser
-      }
-      {
-        name: 'APPUSERPASSWORD'
-        secureValue: userPwd
-      }
-      {
-        name: 'DBNAME'
-        value: databaseName
-      }
-      {
-        name: 'DBSERVER'
-        value: sqlServer.properties.fullyQualifiedDomainName
-      }
-      {
-        name: 'SQLCMDPASSWORD'
-        secureValue: sqlAdminPassword
-      }
-      {
-        name: 'SQLADMIN'
-        value: sqlAdmin
-      }
-    ]
-
-    scriptContent: '''
-wget https://github.com/microsoft/go-sqlcmd/releases/download/v0.8.1/sqlcmd-v0.8.1-linux-x64.tar.bz2
-tar x -f sqlcmd-v0.8.1-linux-x64.tar.bz2 -C .
-
-cat <<SCRIPT_END > ./initDb.sql
-drop user if exists ${APPUSERNAME}
-go
-create user ${APPUSERNAME} with password = '${APPUSERPASSWORD}'
-go
-alter role db_owner add member ${APPUSERNAME}
-go
-SCRIPT_END
-
-./sqlcmd -S ${DBSERVER} -d ${DBNAME} -U ${SQLADMIN} -i ./initDb.sql
-    '''
+  resource firewallAzureServices 'firewallRules' = if(allowAzureIPsFirewall) { // Changed condition to use allowAzureIPsFirewall
+    name: 'sql-allow-azure-services-fw-rule' // Renamed for clarity
+    properties: {
+      startIpAddress: '0.0.0.0'
+      endIpAddress: '0.0.0.0'
+    }
+  }
+  resource firewallSingle 'firewallRules' = [for ip in allowedSingleIPs: {
+    name: 'sql-allow-single-${replace(ip, '.', '')}'
+    properties: {
+      startIpAddress: ip
+      endIpAddress: ip
+    }
+  }]
+  // Specific IP firewall rules based on the parameter
+  resource serverIpFirewallRules 'firewallRules' = [for ipRule in sqlServerAllowedIpRules: {
+    name: ipRule.name
+    properties: {
+      startIpAddress: ipRule.startIpAddress
+      endIpAddress: ipRule.endIpAddress
+    }
+  }]
+  // Add a virtual network rule if a subnet ID is provided
+  resource serverVNetRule 'virtualNetworkRules' = if (!empty(subnetNamePend)) {
+    name: 'vnetrule-${last(split(subnetPend.id, '/'))}' // Auto-generate a name
+    properties: {
+      virtualNetworkSubnetId: subnetPend.id
+      // Set to true if the VNet service endpoint for Microsoft.Sql might not be configured on the subnet yet.
+      // If false (default) and the service endpoint is missing, the rule creation might fail.
+      ignoreMissingVnetServiceEndpoint: true
+    }
   }
 }
-*/
 
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyvaultName
