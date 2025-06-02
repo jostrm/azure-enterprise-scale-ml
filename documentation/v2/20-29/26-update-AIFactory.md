@@ -32,20 +32,14 @@ git submodule foreach 'git checkout main && git pull origin main'
 When a new feature is added, which impacts the varables and pipeline. Features sucha as BYOVnet, Subnets, Personas. 
 If such feature is added, the below "pipelines & variables", may need to be updated. 
 
-The below files will be updated via `bash` scripts:
-
-- Option A) Azure Devops: 
-    - `Pipeline templates (.yaml)` located `aifactory/esml-infa/azure-devops`
-    - `Variables.yaml` located `aifactory/esml-infa/azure-devops/variables`
-    - `parameter files (.json)` (sometimes / rare cases) located `aifactory/parameters`
-
-- Option B) Github Actions
-    - Github Actions Workflows: located `aifactory/esml-infa/github-actions`
-    - `.env` located at your root
-    - `parameter files (.json)` (sometimes / rare cases) located `aifactory/parameters`
-
 <details>
   <summary><b>Azure Devops: How-To</b></summary>
+
+The below files will be updated via `bash` scripts:
+- `Pipeline templates (.yaml)` located `aifactory/esml-infa/azure-devops`
+- `Variables.yaml` located `aifactory/esml-infa/azure-devops/variables`
+- `parameter files (.json)` (sometimes / rare cases) located `aifactory/parameters`
+
 
 ##  A) Azure Devops: How-To
 
@@ -104,6 +98,12 @@ The below files will be updated via `bash` scripts:
 
 <details>
   <summary><b>Github Actions: How-To</b></summary>
+
+The below files will be updated via `bash` scripts:
+- Github Actions Workflows: located `aifactory/esml-infa/github-actions`
+- `.env` located at your root
+- `parameter files (.json)` (sometimes / rare cases) located `aifactory/parameters`
+
 
 ##  B) Github Actions: How-To
 
