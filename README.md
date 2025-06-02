@@ -77,7 +77,7 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 - **Next Release: 1.21** will include below up until 2024-05
 - **Current release 1.20** includes all Done up until 2024-04
 
-### 1.21 <br>
+### [Release 1.21](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_120) <br>
 - **OnlyCreateIfNotExists & more feature flags**: Dynamically adds services, via feature flags (workaround to avoid Bicep/ARM errors for private endpoints etc)
     - STATUS: Done (2025-05)
 - **BYOAppServiceEnv**: Deploy Azure function, Azure WebApp as usual via AIFactory, but connect to your own App services environment
