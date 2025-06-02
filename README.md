@@ -73,12 +73,6 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 -   `AI factory` - Technical BLOG
     - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
 
-
-
-
-<details>
-  <summary><b>Feature Roadmap & Next Release: 1.21</b></summary>
-
 ## Feature Roadmap & Next Release: 1.21
 - **Next Release: 1.21** will include below up until 2024-05
 - **Current release 1.20** includes all Done up until 2024-04
@@ -95,6 +89,9 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
     - STATUS: Ongoing (2025-05)
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
     - STATUS: Ongoing (2025-05)
+
+<details>
+  <summary><b>Earlier fetures: Release: 1.20</b></summary>
 
 ### 1.20
 - **AI Gateway**: Integrate AI Gateway (AI Hub gateway, with advancede cross-charging reports) including networking, to AI Factory common area.
