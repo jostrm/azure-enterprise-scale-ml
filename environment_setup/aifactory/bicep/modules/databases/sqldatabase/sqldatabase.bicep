@@ -64,10 +64,8 @@ resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
     location: location
     sku: !empty(skuObject) ? {
     name: skuObject.name // Ensure 'name' is provided in skuObject
-    family: skuObject.family // Optional: Add other properties if needed
-    size: skuObject.size // Optional: Add other properties if needed
-    tier: skuObject.tier // Optional: Add other properties if needed
-    capacity: skuObject.capacity // Optional: Add other properties if applicable
+    tier: skuObject.tier 
+    capacity: skuObject.capacity
   } : {
     name: defaultSku.name // Default SKU name
     tier: defaultSku.tier // Default tier
