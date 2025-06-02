@@ -82,13 +82,16 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 - **Next Release: 1.21** will include below up until 2024-05
 - **Current release 1.20** includes all Done up until 2024-04
 
-### 1.21 - Added<br>
+### 1.21 <br>
 - **OnlyCreateIfNotExists & more feature flags**: Dynamically adds services, via feature flags (workaround to avoid Bicep/ARM errors for private endpoints etc)
     - STATUS: Done (2025-05)
 - **BYOAppServiceEnv**: Deploy Azure function, Azure WebApp as usual via AIFactory, but connect to your own App services environment
     - STATUS: Done (2025-05)
 - **PostgreSQL (flexible servers), SQL Database, Redis Cache**: Add more Database engines, optionally to choose from
     - STATUS: Done (2025-05)
+- **Azure MCP server - in AIFactory common**: To be able to register AI foundry agents, and other agents in your AI Factory, we integrate Azure MCP Server.
+    - [Link Azure MCP Server](https://learn.microsoft.com/en-us/azure/developer/ai/intro-agents-mcp)
+    - STATUS: Ongoing (2025-05)
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
     - STATUS: Ongoing (2025-05)
 
