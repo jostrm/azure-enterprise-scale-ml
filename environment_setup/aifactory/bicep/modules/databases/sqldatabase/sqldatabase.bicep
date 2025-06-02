@@ -37,6 +37,11 @@ var randomSpecialChar = substring(specialChar, length(seed) % length(specialChar
 var randomSpecialChar2 = substring(specialChar, length(seed) % length(specialChar), 1)
 var adminPwd = empty(sqlAdminPassword)? '${uppercaseLetter}${lowercaseLetter}${randomSpecialChar}${numbers}${guid(deployment().name)}': sqlAdminPassword
 var userPwd = empty(appUserPassword)? '${uppercaseLetter}${lowercaseLetter}${randomSpecialChar2}${numbers}${guid(deployment().name)}': appUserPassword
+var defaultSku = {
+  name: 'S0' // Default SKU name
+  tier: 'Standard' // Default tier
+  capacity: 10 // Default capacity
+}
 
 resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
   name: serverName
@@ -64,10 +69,9 @@ resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
     tier: skuObject.tier // Optional: Add other properties if needed
     capacity: skuObject.capacity // Optional: Add other properties if applicable
   } : {
-    name: 'Basic' // Default SKU name
-    tier: 'Basic' // Default tier
-    capacity: 5 // Default capacity
-    //family: 'Gen5' // Default family
+    name: defaultSku.name // Default SKU name
+    tier: defaultSku.tier // Default tier
+    capacity: defaultSku.capacity // Default capacity
   }
   }
 

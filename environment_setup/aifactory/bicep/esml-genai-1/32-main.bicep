@@ -286,26 +286,26 @@ param redisSKU string = 'Standard' // 'Basic' 'Standard' 'Premium'
 
 // Databases:SQL Database
 param serviceSettingDeploySQLDatabase bool = false
-param sqlServerSKU string = 'Standard'
-param sqlServerCapacity int = 10
-param sqlServerTier string = 'Standard'
-param sqlServerFamily string = 'Gen5'
-param sqlServerStorageSize int = 32
-var sqlServerSKUObject = ''
-/*
-var sqlServerSKUObject = {
-  name: sqlServerSKU
-  family: sqlServerFamily
-  size: sqlServerStorageSize
-  tier: sqlServerTier
-  capacity: sqlServerCapacity
+param sqlServerSKU_DTU string = 'S0'
+param sqlServerTier_DTU string = 'Standard'
+param sqlServerCapacity_DTU int = 10
+var sqlServerSKUObject_DTU = {
+  name: sqlServerSKU_DTU
+  tier: sqlServerTier_DTU
+  capacity: sqlServerCapacity_DTU
 }
-      name: skuObject.name // Ensure 'name' is provided in skuObject
-    family: skuObject.family // Optional: Add other properties if needed
-    size: skuObject.size // Optional: Add other properties if needed
-    tier: skuObject.tier // Optional: Add other properties if needed
-    capacity: skuObject.capacity // Optional: Add other properties if applicable
-*/
+
+param sqlServerSKUName_vCore_Prefix string = 'GP' // Example: GP for GeneralPurpose, BC for BusinessCritical
+param sqlServerFamily_vCore string = 'Gen5'     // Example: Gen5
+param sqlServerTier_vCore string = 'GeneralPurpose'
+param sqlServerCapacity_vCore int = 4
+var sqlServerSKUObject_vCore = {
+  name: '${sqlServerSKUName_vCore_Prefix}_${sqlServerFamily_vCore}_${sqlServerCapacity_vCore}' // Constructs 'GP_Gen5_4'
+  tier: sqlServerTier_vCore
+  family: sqlServerFamily_vCore
+  capacity: sqlServerCapacity_vCore
+}
+
 
 // Databases:CosmosDB
 param serviceSettingDeployCosmosDB bool = false
@@ -2179,7 +2179,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!reso
     databaseName: sqlDBName
     location: location
     tags: projecttags
-    skuObject: empty(sqlServerSKUObject)?{}:sqlServerSKUObject
+    skuObject: empty(sqlServerSKUObject_DTU)?{}:sqlServerSKUObject_DTU
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
