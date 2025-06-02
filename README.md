@@ -91,9 +91,9 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
     - STATUS: Ongoing (2025-05)
 
 <details>
-  <summary><b>Earlier fetures: Release: 1.20</b></summary>
+  <summary><b>Earlier features & Releases: 1.20</b></summary>
 
-### 1.20
+### [Release 1.20](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_120)
 - **AI Gateway**: Integrate AI Gateway (AI Hub gateway, with advancede cross-charging reports) including networking, to AI Factory common area.
     - STATUS: Done (2025-04)
         - https://github.com/Azure-Samples/ai-hub-gateway-solution-accelerator/blob/main/guides/bring-your-own-network.md
