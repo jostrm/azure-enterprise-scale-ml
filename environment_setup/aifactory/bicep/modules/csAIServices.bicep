@@ -24,6 +24,7 @@ param acrNameDummy string = ''
 param keyvaultName string
 param publicNetworkAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
+
 /*
 @allowed([
   '1106-Preview'
@@ -32,8 +33,18 @@ param enablePublicAccessWithPerimeter bool = false
   'turbo-2024-04-0'
 ])
 */
+param deployModel_text_embedding_ada_002 bool = false // text-embedding-ada-002
+param deployModel_text_embedding_3_small bool = true // text-embedding-3-small
+param deployModel_gpt_4o_mini bool = true // gpt-4o-mini
+param default_embedding_capacity int = 25
+param default_gpt_capacity int = 40
+param default_model_sku string = 'Standard'
 
-param modelGPT4Version string // If your region doesn't support this version, please change it.
+param deployModel_gpt_4 bool = false // GPT-4
+param modelGPT4Name string = ''
+param modelGPT4Version string = ''// If your region doesn't support this version, please change it.
+param modelGPT4SKUName string = 'Standard'
+param modelGPT4SKUCapacity int = 30
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
@@ -75,36 +86,77 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
 }
 
-/*
-resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (!empty(modelGPT4Version)) {
-  name: 'gpt-4'
+resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (deployModel_gpt_4 && !empty(modelGPT4Version) && !empty(modelGPT4Name)) {
+  name: modelGPT4Name
   parent: aiServices
   sku: {
-    name: 'Standard'
-    capacity: 25
+    name: modelGPT4SKUName
+    capacity: modelGPT4SKUCapacity
   }
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-4'
+      name: modelGPT4Name
       version:modelGPT4Version 
     }
-    raiPolicyName: 'Microsoft.Default'
+    raiPolicyName: 'Microsoft.DefaultV2'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable' // 'NoAutoUpgrade'
+  }
+  dependsOn: [
+    aiServices
+    ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
+    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
+    ...(deployModel_gpt_4o_mini ? [gpt4omini] : [])
+  ]
+}
+
+resource gpt4omini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_gpt_4o_mini) {
+  name: 'gpt-4o-mini'
+  parent: aiServices
+  sku: {
+    name: default_model_sku
+    capacity: default_gpt_capacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-4o-mini'
+    }
+    raiPolicyName: 'Microsoft.DefaultV2'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+  dependsOn: [
+    aiServices
+    ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
+    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
+  ]
+}
+
+resource textEmbedding3Small 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_text_embedding_3_small) {
+  name: 'text-embedding-3-small'
+  parent: aiServices
+  sku: {
+    name: default_model_sku
+    capacity: default_embedding_capacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-3-small'
+    }
+    raiPolicyName: 'Microsoft.DefaultV2'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
   dependsOn: [
     aiServices
   ]
 }
-
-*/
-
-resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_text_embedding_ada_002) {
   name: 'text-embedding-ada-002'
   parent: aiServices
   sku: {
-    name: 'Standard'
-    capacity: 25
+    name: default_model_sku
+    capacity: default_embedding_capacity
   }
   properties: {
     model: {
@@ -112,11 +164,12 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
       name: 'text-embedding-ada-002'
       version:'2'
     }
-    raiPolicyName: 'Microsoft.Default'
+    raiPolicyName: 'Microsoft.DefaultV2'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
   dependsOn: [
     aiServices
+    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
   ]
 }
 

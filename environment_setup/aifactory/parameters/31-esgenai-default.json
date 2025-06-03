@@ -68,8 +68,32 @@
         "aiSearchEnableSharedPrivateLink":{ 
             "value": false
         },
+        "deployModel_gpt_4": {
+            "value": false
+        },
+        "modelGPT4Name": {
+            "value": ""
+        },
         "modelGPT4Version": {
             "value": ""
+        },
+        "deployModel_text_embedding_ada_002": {
+            "value": false
+        },
+        "deployModel_text_embedding_3_small": {
+            "value": true
+        },
+        "default_embedding_capacity": {
+            "value": 25
+        },
+        "deployModel_gpt_4o_mini": {
+            "value": true
+        },
+        "default_gpt_capacity": {
+            "value": 40
+        },
+        "default_model_sku": {
+            "value": "Standard"
         }
     }
 }
