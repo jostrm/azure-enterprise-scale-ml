@@ -341,8 +341,35 @@ param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
 
 param serviceSettingDeployFunction bool = false
+@allowed([
+  'dotnet'
+  'node'
+  'python'
+  'java'
+])
 param functionRuntime string = 'python' //'node', 'dotnet', 'java', 'python'
-param functionPyVersion string = '3.11'
+@allowed([
+  '3.7'
+  '3.8'
+  '3.9'
+  '3.10'
+  '3.11'
+  '3.12'
+  // Node.js versions
+  '18-lts'
+  '20-lts'
+  // Java LTS versions
+  '8'
+  '11'
+  '17'
+  '21'
+  // .NET versions
+  'v4.8'
+  'v6.0'
+  'v7.0'
+  'v8.0'
+])
+param functionVersion string = '3.11'
 param functionSKU object = {
   name: 'EP1' // Private endpoint support
   tier: 'ElasticPremium'
@@ -352,7 +379,34 @@ param functionSKU object = {
 
 @description('Service setting:Deploy Azure WebApp')
 param serviceSettingDeployWebApp bool = false
+@allowed([
+  'dotnet'
+  'node'
+  'python'
+  'java'
+])
 param webAppRuntime string = 'python'  // Set to 'python' for Python apps
+@allowed([
+  '3.7'
+  '3.8'
+  '3.9'
+  '3.10'
+  '3.11'
+  '3.12'
+  // Node.js versions
+  '18-lts'
+  '20-lts'
+  // Java LTS versions
+  '8'
+  '11'
+  '17'
+  '21'
+  // .NET versions
+  'v4.8'
+  'v6.0'
+  'v7.0'
+  'v8.0'
+])
 param webAppRuntimeVersion string = '3.11'  // Specify the Python version
 @description('Optional. Site redundancy mode.')
 @allowed([
@@ -2380,7 +2434,7 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
     byoACEv3: byoACEv3
     byoAceFullResourceId: byoAceFullResourceId
     byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
-    pythonVersion: webAppRuntimeVersion // Specify the Python version
+    runtimeVersion: webAppRuntimeVersion // Specify the Python version
     ipRules: ipWhitelist_array
     appSettings: [
       {
@@ -2485,7 +2539,7 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
       }
     ]
     runtime: functionRuntime // Choose based on your needs: 'node', 'dotnet', 'java', 'python'
-    pythonVersion: functionPyVersion // Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12 (if available)
+    runtimeVersion: functionVersion // Supported versions: 3.8, 3.9, 3.10, 3.11, 3.12 (if available)
   }
   dependsOn: [
     projectResourceGroup

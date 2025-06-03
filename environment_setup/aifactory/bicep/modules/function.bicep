@@ -32,8 +32,35 @@ param allowedOrigins array = [
 param applicationInsightsName string = ''
 param logAnalyticsWorkspaceName string = ''
 param logAnalyticsWorkspaceRG string = ''
-param runtime string = 'python'  // Options: 'node', 'dotnet', 'java', 'python'
-param pythonVersion string = '3.11' // Used if runtime is 'python'
+@allowed([
+  'dotnet'
+  'node'
+  'python'
+  'java'
+])
+param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
+@allowed([
+  '3.7'
+  '3.8'
+  '3.9'
+  '3.10'
+  '3.11'
+  '3.12'
+  // Node.js versions
+  '18-lts'
+  '20-lts'
+  // Java LTS versions
+  '8'
+  '11'
+  '17'
+  '21'
+  // .NET versions
+  'v4.8'
+  'v6.0'
+  'v7.0'
+  'v8.0'
+])
+param runtimeVersion string = '3.11' // Used if runtime is 'python'
 param subnetIntegrationName string
 param hostNameSslStates array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
 param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
@@ -140,7 +167,8 @@ resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
         allowedOrigins: allowedOrigins
       }
       ipSecurityRestrictions: enablePublicAccessWithPerimeter || byoACEv3? [] : concat(formattedIpRules, [denyAllRule])
-      linuxFxVersion: runtime == 'python' ? 'PYTHON|${pythonVersion}' : runtime == 'node' ? 'NODE|18-lts' : runtime == 'java' ? 'JAVA|17' : ''
+      linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}-java${runtimeVersion}' : ''
+      netFrameworkVersion: runtime == 'dotnet' ? runtimeVersion : null
       appSettings: concat([
         {
           name: 'AzureWebJobsStorage'

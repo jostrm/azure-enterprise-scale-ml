@@ -30,8 +30,35 @@ param allowedOrigins array = [
 param applicationInsightsName string
 param logAnalyticsWorkspaceName string
 param logAnalyticsWorkspaceRG string
+@allowed([
+  'dotnet'
+  'node'
+  'python'
+  'java'
+])
 param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
-param pythonVersion string = '3.11' // Used if runtime is 'python'
+@allowed([
+  '3.7'
+  '3.8'
+  '3.9'
+  '3.10'
+  '3.11'
+  '3.12'
+  // Node.js versions
+  '18-lts'
+  '20-lts'
+  // Java LTS versions
+  '8'
+  '11'
+  '17'
+  '21'
+  // .NET versions
+  'v4.8'
+  'v6.0'
+  'v7.0'
+  'v8.0'
+])
+param runtimeVersion string = '3.11' // Used if runtime is 'python'
 param subnetIntegrationName string  // Name of the subnet for VNet integration
 param hostNameSslStates array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
 param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
@@ -135,8 +162,8 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
       }
       ipSecurityRestrictions: enablePublicAccessWithPerimeter || byoACEv3? [] : concat(formattedIpRules, [denyAllRule])
       // Set the appropriate runtime stack
-      linuxFxVersion: runtime == 'python' ? 'PYTHON|${pythonVersion}' : runtime == 'node' ? 'NODE|18-lts' : runtime == 'java' ? 'JAVA|17-java17' : ''
-      netFrameworkVersion: runtime == 'dotnet' ? 'v7.0' : null // Only set netFrameworkVersion for Windows/.NET apps
+      linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}-java${runtimeVersion}' : ''
+      netFrameworkVersion: runtime == 'dotnet' ? runtimeVersion : null
       appSettings: concat(appSettings, !empty(applicationInsightsName) ? [
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
