@@ -34,7 +34,8 @@ param enablePublicAccessWithPerimeter bool = false
 ])
 */
 param deployModel_text_embedding_ada_002 bool = false // text-embedding-ada-002
-param deployModel_text_embedding_3_small bool = true // text-embedding-3-small
+param deployModel_text_embedding_3_small bool = false // text-embedding-3-small
+param deployModel_text_embedding_3_large bool = true // text-embedding-3-large
 param deployModel_gpt_4o_mini bool = true // gpt-4o-mini
 param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
@@ -86,52 +87,6 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
 }
 
-resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (deployModel_gpt_4 && !empty(modelGPT4Version) && !empty(modelGPT4Name)) {
-  name: modelGPT4Name
-  parent: aiServices
-  sku: {
-    name: modelGPT4SKUName
-    capacity: modelGPT4SKUCapacity
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: modelGPT4Name
-      version:modelGPT4Version 
-    }
-    raiPolicyName: 'Microsoft.DefaultV2'
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable' // 'NoAutoUpgrade'
-  }
-  dependsOn: [
-    aiServices
-    ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
-    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
-    ...(deployModel_gpt_4o_mini ? [gpt4omini] : [])
-  ]
-}
-
-resource gpt4omini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_gpt_4o_mini) {
-  name: 'gpt-4o-mini'
-  parent: aiServices
-  sku: {
-    name: default_model_sku
-    capacity: default_gpt_capacity
-  }
-  properties: {
-    model: {
-      format: 'OpenAI'
-      name: 'gpt-4o-mini'
-    }
-    raiPolicyName: 'Microsoft.DefaultV2'
-    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
-  }
-  dependsOn: [
-    aiServices
-    ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
-    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
-  ]
-}
-
 resource textEmbedding3Small 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_text_embedding_3_small) {
   name: 'text-embedding-3-small'
   parent: aiServices
@@ -170,6 +125,74 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
   dependsOn: [
     aiServices
     ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
+  ]
+}
+resource gpt4omini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_gpt_4o_mini) {
+  name: 'gpt-4o-mini'
+  parent: aiServices
+  sku: {
+    name: default_model_sku
+    capacity: default_gpt_capacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-4o-mini'
+    }
+    raiPolicyName: 'Microsoft.DefaultV2'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+  dependsOn: [
+    aiServices
+    ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
+    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
+  ]
+}
+resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (deployModel_gpt_4 && !empty(modelGPT4Version) && !empty(modelGPT4Name)) {
+  name: modelGPT4Name
+  parent: aiServices
+  sku: {
+    name: modelGPT4SKUName
+    capacity: modelGPT4SKUCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: modelGPT4Name
+      version:modelGPT4Version 
+    }
+    raiPolicyName: 'Microsoft.DefaultV2'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable' // 'NoAutoUpgrade'
+  }
+  dependsOn: [
+    aiServices
+    ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
+    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
+    ...(deployModel_gpt_4o_mini ? [gpt4omini] : [])
+  ]
+}
+
+resource embedding3large 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_text_embedding_3_large) {
+  name: 'text-embedding-3-large'
+  parent: aiServices
+  sku: {
+    name: default_model_sku
+    capacity: default_embedding_capacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-3-large'
+    }
+    raiPolicyName: 'Microsoft.DefaultV2'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+  dependsOn: [
+    aiServices
+    ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
+    ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
+    ...(deployModel_gpt_4o_mini ? [gpt4omini] : [])
+    ...(deployModel_gpt_4 ? [gpt4modelOpenAI] : [])
   ]
 }
 
