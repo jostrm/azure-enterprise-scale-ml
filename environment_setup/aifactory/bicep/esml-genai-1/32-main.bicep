@@ -7,11 +7,11 @@ var activeVersion = 121
 param useAdGroups bool = false
 
 // Model settings
-param deployModel_text_embedding_3_large bool = true // text-embedding-3-large
+param deployModel_text_embedding_3_large bool = false // text-embedding-3-large
 param deployModel_text_embedding_3_small bool = false // text-embedding-3-small Standard dose not exists in Sweden Central, and other regions
 param deployModel_text_embedding_ada_002 bool = false // text-embedding-ada-002
 param default_embedding_capacity int = 25
-param deployModel_gpt_4o_mini bool = true // gpt-4o-mini
+param deployModel_gpt_4o_mini bool = false // gpt-4o-mini
 param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'
 
@@ -1418,7 +1418,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!resourceExists.aiService
     deployModel_gpt_4:deployModel_gpt_4
     modelGPT4Name:modelGPT4Name
     deployModel_gpt_4o_mini:deployModel_gpt_4o_mini // gpt-4o-mini
-    deployModel_text_embedding_3_small:deployModel_text_embedding_3_small // text-embedding-3-large
+    deployModel_text_embedding_3_small:deployModel_text_embedding_3_small // text-embedding-3-small
     deployModel_text_embedding_3_large:deployModel_text_embedding_3_large // text-embedding-3-large
     deployModel_text_embedding_ada_002:deployModel_text_embedding_ada_002 // text-embedding-ada-002
     default_embedding_capacity: default_embedding_capacity

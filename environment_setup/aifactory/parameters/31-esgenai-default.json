@@ -81,7 +81,7 @@
             "value": false
         },
         "deployModel_text_embedding_3_large": {
-            "value": true
+            "value": false
         },
         "deployModel_text_embedding_3_small": {
             "value": false
@@ -90,7 +90,7 @@
             "value": 25
         },
         "deployModel_gpt_4o_mini": {
-            "value": true
+            "value": false
         },
         "default_gpt_capacity": {
             "value": 40

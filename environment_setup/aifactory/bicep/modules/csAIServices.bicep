@@ -35,8 +35,8 @@ param enablePublicAccessWithPerimeter bool = false
 */
 param deployModel_text_embedding_ada_002 bool = false // text-embedding-ada-002
 param deployModel_text_embedding_3_small bool = false // text-embedding-3-small
-param deployModel_text_embedding_3_large bool = true // text-embedding-3-large
-param deployModel_gpt_4o_mini bool = true // gpt-4o-mini
+param deployModel_text_embedding_3_large bool = false // text-embedding-3-large
+param deployModel_gpt_4o_mini bool = false // gpt-4o-mini
 param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'

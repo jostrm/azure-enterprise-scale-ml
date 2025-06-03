@@ -77,7 +77,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   tags: tags
   sku: sku
   properties: {
-    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwuise Windows (dotnet, java)
+    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwise Windows (dotnet, java)
 
   }
 }
