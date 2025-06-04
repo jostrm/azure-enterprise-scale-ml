@@ -169,6 +169,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       containers: [
         {
           image: !empty(imageName) ? imageName : 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          //image: !empty(imageName) ? imageName : '${containerRegistryName}.${containerRegistryHostSuffix}/containerapps-default:latest'
           name: containerName
           env: env
           resources: {
