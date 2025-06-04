@@ -57,6 +57,12 @@ param identityType string = 'None'
 
 @description('The name of the container image')
 param imageName string = ''
+@allowed([
+  'ms'
+  'dockerhub'
+  'private'
+])
+param imageRegistryType string = 'ms'
 
 @description('Specifies if Ingress is enabled for the container app')
 param ingressEnabled bool = true
@@ -157,7 +163,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
         //keyVaultUrl: '${keyVaultUrl}secrets/aifactory-proj-${secret.key}'
       }]
       service: !empty(serviceType) ? { type: serviceType } : null
-      registries: usePrivateRegistry ? [
+      registries: usePrivateRegistry && imageRegistryType == 'private' ? [
         {
           server: '${containerRegistryName}.${containerRegistryHostSuffix}'
           identity: userIdentity.id
@@ -168,8 +174,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
       serviceBinds: !empty(serviceBinds) ? serviceBinds : null
       containers: [
         {
-          image: !empty(imageName) ? imageName : 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-          //image: !empty(imageName) ? imageName : '${containerRegistryName}.${containerRegistryHostSuffix}/containerapps-default:latest'
+          image: !empty(imageName) ? (imageRegistryType == 'private' ? '${containerRegistryName}.${containerRegistryHostSuffix}/${imageName}' : imageName) : 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
           name: containerName
           env: env
           resources: {

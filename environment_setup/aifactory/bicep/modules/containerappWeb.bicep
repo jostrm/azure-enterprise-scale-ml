@@ -16,6 +16,13 @@ param containerCpuCoreCount int = 1 //0.5
 param containerMemory string = '2.0Gi' //'1.0Gi'
 param keyVaultUrl string = ''
 param allowedOrigins array = []
+param imageName string = ''
+@allowed([
+  'ms'
+  'dockerhub'
+  'private'
+])
+param imageRegistryType string = 'ms'
 
 module app './containerappUpsert.bicep' = {
   name: 'depl-${name}-${deployment().name}'
@@ -44,6 +51,8 @@ module app './containerappUpsert.bicep' = {
       }
     ]
     targetPort: targetPort
+    imageName: imageName
+    imageRegistryType: imageRegistryType
   }
 }
 

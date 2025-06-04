@@ -327,9 +327,28 @@ param cosmosMinimalTlsVersion string = 'Tls12' //<-docs error -> 'Tls1_2'
 
 // Databases
 
-// Apps
+// containerApps
 param serviceSettingDeployContainerApps bool = false
-param acaImageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param aca_a_mcr_microsoft_com string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param aca_a_docker_io_image string = '' // 'docker.io/library/nginx:alpine'  -> Docker Hub
+param aca_a_aifactory_common_acr_image string = '' // 'containerapps-default:latest'
+// Variable to determine the image registry type
+var imageRegistryTypeA = !empty(aca_a_mcr_microsoft_com) && contains(aca_a_mcr_microsoft_com, 'mcr.microsoft.com') 
+  ? 'ms' 
+  : !empty(aca_a_docker_io_image) && contains(aca_a_docker_io_image, 'docker.io') 
+    ? 'dockerhub' 
+    : 'private'
+
+param aca_w_mcr_microsoft_com string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param aca_w_docker_io_image string = '' // 'docker.io/library/nginx:alpine'  -> Docker Hub
+param aca_w_aifactory_common_acr_image string = '' // '${containerRegistryName}.${containerRegistryHostSuffix}/containerapps-default:latest'
+// Variable to determine the image registry type
+var imageRegistryTypeW = !empty(aca_w_mcr_microsoft_com) && contains(aca_w_mcr_microsoft_com, 'mcr.microsoft.com') 
+  ? 'ms' 
+  : !empty(aca_w_docker_io_image) && contains(aca_w_docker_io_image, 'docker.io') 
+    ? 'dockerhub' 
+    : 'private'
+
 param acaCustomDomainsArray array = []
 param acaAppWorkloadProfileName string = '' // 'Consumption' 
 param containerCpuCoreCount int = 1 // 0.5, 1.0, 2.0, 4.0, 8.0
@@ -2689,6 +2708,9 @@ module acaApi '../modules/containerappApi.bicep' = if(!resourceExists.containerA
     containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
     containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
     keyVaultUrl: var_kv1_uri
+    imageName: !empty(aca_a_mcr_microsoft_com) ? aca_a_mcr_microsoft_com 
+    :!empty(aca_a_docker_io_image)? aca_a_docker_io_image: aca_a_aifactory_common_acr_image
+    imageRegistryType: imageRegistryTypeA // 'ms' 'dockerhub', 'private'
   }
   dependsOn: [
     cmnRbacACR
@@ -2704,7 +2726,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!resourceExists.containerA
     
   ] 
 }
-module webContainerApp '../modules/containerappWeb.bicep' = if(!resourceExists.containerAppA && serviceSettingDeployContainerApps) {
+module acaWebApp '../modules/containerappWeb.bicep' = if(!resourceExists.containerAppA && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name:'aca-w-${deploymentProjSpecificUniqueSuffix}-depl' 
   params: {
@@ -2722,6 +2744,9 @@ module webContainerApp '../modules/containerappWeb.bicep' = if(!resourceExists.c
     containerCpuCoreCount: containerCpuCoreCount // 0.5, 1.0, 2.0, 4.0, 8.0
     containerMemory: containerMemory // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
     keyVaultUrl: var_kv1_uri
+    imageName: !empty(aca_w_mcr_microsoft_com) ? aca_w_mcr_microsoft_com 
+    :!empty(aca_w_docker_io_image)? aca_w_docker_io_image: aca_w_aifactory_common_acr_image
+    imageRegistryType: imageRegistryTypeW // 'ms' 'dockerhub', 'private'
   }
   dependsOn: [
     containerAppsEnv

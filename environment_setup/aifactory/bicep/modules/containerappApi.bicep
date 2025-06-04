@@ -32,6 +32,13 @@ param subnetNamePend string = ''
 param subnetAcaDedicatedName string = ''
 param appWorkloadProfileName string = ''
 param keyVaultUrl string = ''
+param imageName string = ''
+@allowed([
+  'ms'
+  'dockerhub'
+  'private'
+])
+param imageRegistryType string = 'ms'
 
 @secure()
 param bingApiKey string
@@ -144,6 +151,8 @@ module appApi './containerappUpsert.bicep' = {
     containerCpuCoreCount: containerCpuCoreCount
     containerMemory: containerMemory
     keyVaultUrl: keyVaultUrl
+    imageName: imageName
+    imageRegistryType: imageRegistryType
     secrets: !empty(bingApiKey)?{
       'bing-search-key': bingApiKey
     }:{}

@@ -72,6 +72,12 @@ param serviceBinds array = []
 param targetPort int = 80
 param allowedOrigins array
 param imageName string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+@allowed([
+  'ms'
+  'dockerhub'
+  'private'
+])
+param imageRegistryType string = 'ms'
 param customDomains array = []
 param ipSecurityRestrictions array = []
 param enablePublicGenAIAccess bool = false
@@ -125,6 +131,7 @@ module appUpsert 'containerapp.bicep' = {
     external: external
     env: env
     imageName: imageName
+    imageRegistryType: imageRegistryType
     targetPort: targetPort
     serviceBinds: serviceBinds
     customDomains: customDomains
