@@ -1744,7 +1744,7 @@ module acrCommon2 '../modules/containerRegistry.bicep' = if (useCommonACR == tru
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: acrCommon.tags
     location:acrCommon.location
-    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
+    enablePublicAccessWithPerimeter:acrCommon.properties.publicNetworkAccess == 'Enabled' ? true : enablePublicAccessWithPerimeter
   }
 
   dependsOn: [
