@@ -1,12 +1,13 @@
-# Use a base image you've already pulled locally
 FROM alpine:latest
 
-# Copy your files
-COPY index.html /index.html
+# Install a simple web server
+RUN apk add --no-cache lighttpd
 
-# Dont Expose port 80 or any other port
-# If you want to expose a port, uncomment the line below
+# Copy your files (make sure index.html exists in build context)
+COPY index.html /var/www/localhost/htdocs/
+
+# Expose port 80
 # EXPOSE 80
 
-# Use a command that exists in alpine
-CMD ["cat", "/index.html"]
+# Start the web server
+CMD ["lighttpd", "-D", "-f", "/etc/lighttpd/lighttpd.conf"]
