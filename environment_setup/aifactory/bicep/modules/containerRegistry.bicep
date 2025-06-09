@@ -23,7 +23,7 @@ param vnetResourceGroupName string
 param enablePublicAccessWithPerimeter bool = false
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
-var policyOn = 'enabled' // 'disabled'
+var policyOn = 'disabled' // 'enabled' // 'disabled'
 var containerRegistryNameCleaned = replace(containerRegistryName, '-', '')
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
