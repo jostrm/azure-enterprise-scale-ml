@@ -2708,8 +2708,8 @@ module acaApi '../modules/containerappApi.bicep' = if(!resourceExists.containerA
   }
   dependsOn: [
     cmnRbacACR
-    containerAppsEnv
-    subnetDelegationAca
+    ...(resourceExists.containerAppsEnv ? [] : [containerAppsEnv])
+    ...(resourceExists.containerAppsEnv ? [] : [subnetDelegationAca])
     ...(resourceExists.miACA ? [] : [miForAca])
     ...(resourceExists.bing ? [] : [bing])
     ...(resourceExists.aiHub ? [] : [aiHub])
@@ -2720,7 +2720,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!resourceExists.containerA
     
   ] 
 }
-module acaWebApp '../modules/containerappWeb.bicep' = if(!resourceExists.containerAppA && serviceSettingDeployContainerApps) {
+module acaWebApp '../modules/containerappWeb.bicep' = if(!resourceExists.containerAppW && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name:'aca-w-${deploymentProjSpecificUniqueSuffix}-depl' 
   params: {
@@ -2742,7 +2742,9 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!resourceExists.contain
     imageRegistryType: !empty(aca_w_registry_image)? imageRegistryTypeW: 'ms' // 'ms' 'dockerhub', 'private'
   }
   dependsOn: [
-    containerAppsEnv
+    cmnRbacACR
+    ...(resourceExists.containerAppsEnv ? [] : [containerAppsEnv])
+    ...(resourceExists.containerAppsEnv ? [] : [subnetDelegationAca])
     ...(resourceExists.containerAppA ? [] : [acaApi])
     ...(resourceExists.miACA ? [] : [miForAca])
     ...(resourceExists.keyvault ? [] : [kv1])
