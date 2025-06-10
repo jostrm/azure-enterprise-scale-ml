@@ -2260,7 +2260,7 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!resourceExists.r
 
 // SQL DATABASE
 
-module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!resourceExists.sqlDB && serviceSettingDeploySQLDatabase) {
+module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!resourceExists.sqlServer && serviceSettingDeploySQLDatabase) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'SqlServer4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -2281,7 +2281,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!reso
   ]
 }
 
-module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!resourceExists.sqlDB && serviceSettingDeploySQLDatabase) {
+module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!resourceExists.sqlServer && serviceSettingDeploySQLDatabase) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'SqlServerRbac4${deploymentProjSpecificUniqueSuffix}'
   params: {
