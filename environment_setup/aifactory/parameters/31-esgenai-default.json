@@ -38,6 +38,21 @@
         "webAppRuntimeVersion": {
             "value": "3.11"
         },
+        "aceSkuWorkers": {
+            "value": 1
+        },
+         "aceSkuWorkerSize": {
+            "value": 6
+        },
+         "aceSkuWorkerSizeId": {
+            "value": "6"
+        },
+         "aceSku": {
+            "value": "IsolatedV2"
+        },
+        "aceSkuCode": {
+            "value": "I1V2"
+        },
         "serviceSettingDeployContainerApps": {
             "value": false
         },

@@ -104,16 +104,18 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing 
 }
 
 // Create App Service Plan
-resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
+resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = {
   name: servicePlanName
   location: location
   tags: tags
   sku: sku
   properties: {
-    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwuise Windows (dotnet, java)
+    reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwise Windows (dotnet, java)
+    hostingEnvironmentProfile: byoACEv3 && !empty(byoAceFullResourceId)? {
+      id: byoAceFullResourceId
+    } : null
   }
 }
-
 var formattedIpRules = [for (ip, i) in ipRules: {
   // Ensure IP addresses are properly formatted with CIDR notation
   ipAddress: contains(ip, 'ipAddress') 
@@ -144,9 +146,8 @@ var identity = identityType != 'None' ? {
   userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
 } : null
 
-
 // Create Function App
-resource functionApp 'Microsoft.Web/sites@2022-09-01' = {
+resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
   name: name
   location: location
   tags: tags

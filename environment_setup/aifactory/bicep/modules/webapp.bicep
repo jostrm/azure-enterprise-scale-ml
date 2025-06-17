@@ -79,6 +79,7 @@ param byoAceAppServicePlanRID string = '' // Full resource ID, default is empty.
 
 // Use provided name or create one based on WebApp name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
+var byoACE3Intenal = !empty(byoAceFullResourceId)
 
 // Get references to resources
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!empty(applicationInsightsName)) {
@@ -98,14 +99,16 @@ resource integrationSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01
 
 // Create App Service Plan
 // TODO: Linux or Windows
-resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
+resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = {
   name: servicePlanName
   location: location
   tags: tags
   sku: sku
   properties: {
     reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwise Windows (dotnet, java)
-
+    hostingEnvironmentProfile: byoACEv3 && !empty(byoAceFullResourceId)? {
+      id: byoAceFullResourceId
+    } : null
   }
 }
 
@@ -140,7 +143,7 @@ var identity = identityType != 'None' ? {
 } : null
 
 // Create Web App
-resource webApp 'Microsoft.Web/sites@2022-09-01' = {
+resource webApp 'Microsoft.Web/sites@2024-11-01' = {
   name: name
   location: location
   tags: tags
@@ -150,7 +153,7 @@ resource webApp 'Microsoft.Web/sites@2022-09-01' = {
     //serverFarmId: byoACEv3? byoAceAppServicePlanRID: appServicePlan.id
     serverFarmId: appServicePlan.id
     httpsOnly: true
-    hostingEnvironmentProfile: !empty(byoAceFullResourceId) ? {
+    hostingEnvironmentProfile: !empty(byoAceFullResourceId) && byoACEv3 ? {
       id: byoAceFullResourceId
     } : null
     virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoACEv3 ? any(null) : integrationSubnet.id
