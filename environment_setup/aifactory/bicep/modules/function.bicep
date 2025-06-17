@@ -147,21 +147,27 @@ var identity = identityType != 'None' ? {
   userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
 } : null
 
+// Reference existing ASE App Service Plan if provided
+resource existingAppServicePlan 'Microsoft.Web/serverfarms@2024-11-01' existing = if (!empty(byoAseAppServicePlanRID)) {
+  name: last(split(byoAseAppServicePlanRID, '/'))
+  scope: resourceGroup(split(byoAseAppServicePlanRID, '/')[2], split(byoAseAppServicePlanRID, '/')[4])
+}
+
 // Create Function App
 resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
   name: name
   location: location
-  tags: tags // functionapp,linux,container,azurecontainerapps
-  kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'functionapp,linux' : 'functionapp'
+  tags: tags // functionapp,linux,container,azurecontainerapps  (https://github.com/Azure/app-service-linux-docs/blob/master/Things_You_Should_Know/kind_property.md#app-service-resource-kind-reference)
+  kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'functionapp,linux' : 'functionapp' // "Linux Consumption Function" app or "Function Code App"(.net)
   identity: identity
   properties: {
-    //serverFarmId: byoASEv3? byoAseAppServicePlanRID: appServicePlan.id
-    serverFarmId: appServicePlan.id
+    serverFarmId: !empty(byoAseAppServicePlanRID) ? existingAppServicePlan.id : appServicePlan.id
     httpsOnly: true
     hostingEnvironmentProfile: !empty(byoAseFullResourceId) ? {
       id: byoAseFullResourceId
     } : null
-    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? any(null) : integrationSubnet.id
+    // VNet integration not needed for ASEv3 as it's already in a subnet
+    virtualNetworkSubnetId: byoASEv3 ? null : (enablePublicAccessWithPerimeter ? null : integrationSubnet.id)
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       alwaysOn: alwaysOn
@@ -172,54 +178,50 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
       linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}-java${runtimeVersion}' : ''
       netFrameworkVersion: runtime == 'dotnet' ? runtimeVersion : null // DOCKER|mcr.microsoft.com/azure-functions/dotnet8-quickstart-demo:1.0
       appSettings: concat([
-        {
-          name: 'AzureWebJobsStorage'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
-        }
-        {
-          name: 'FUNCTIONS_EXTENSION_VERSION'
-          value: '~4'
-        }
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: runtime
-        }
-      ], 
-      // Only add content settings for non-Python runtimes
-      runtime != 'python' ? [
-        {
-          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: toLower(name)
-        }
-      ] : [],
-      // Add Python-specific app settings
-      runtime == 'python' ? [
-        {
-          name: 'ENABLE_ORYX_BUILD'
-          value: 'true'
-        }
-        {
-          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: 'true'
-        }
-      ] : [],
-      [
-        {
-          name: 'WEBSITE_VNET_ROUTE_ALL'
-          value: '1'
-        }
-      ],
-      appSettings, 
-      !empty(applicationInsightsName) ? [
-        {
-          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: appInsights.properties.ConnectionString
-        }
-      ] : [])
+          {
+            name: 'AzureWebJobsStorage'
+            value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
+          }
+          {
+            name: 'FUNCTIONS_EXTENSION_VERSION'
+            value: '~4'
+          }
+          {
+            name: 'FUNCTIONS_WORKER_RUNTIME'
+            value: runtime
+          }
+          {
+            name: 'WEBSITE_VNET_ROUTE_ALL'
+            value: '1'
+          }
+        ], 
+        runtime != 'python' ? [
+          {
+            name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
+            value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
+          }
+          {
+            name: 'WEBSITE_CONTENTSHARE'
+            value: toLower(name)
+          }
+        ] : [],
+        runtime == 'python' ? [
+          {
+            name: 'ENABLE_ORYX_BUILD'
+            value: 'true'
+          }
+          {
+            name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+            value: 'true'
+          }
+        ] : [],
+        appSettings,
+        !empty(applicationInsightsName) ? [
+          {
+            name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+            value: appInsights.properties.ConnectionString
+          }
+        ] : [])
     }
     hostNameSslStates: hostNameSslStates
     redundancyMode: redundancyMode

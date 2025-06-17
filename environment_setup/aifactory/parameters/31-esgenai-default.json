@@ -39,10 +39,7 @@
             "value": "3.11"
         },
         "aceSkuWorkers": {
-            "value": "1"
-        },
-         "aceSkuWorkerSize": {
-            "value": "6"
+            "value": 1
         },
          "aceSkuWorkerSizeId": {
             "value": "6"

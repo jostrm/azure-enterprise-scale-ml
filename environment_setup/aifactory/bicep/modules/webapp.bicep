@@ -143,16 +143,21 @@ var identity = identityType != 'None' ? {
   userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
 } : null
 
+// Reference existing ASE App Service Plan if provided
+resource existingAppServicePlan 'Microsoft.Web/serverfarms@2024-11-01' existing = if (!empty(byoAseAppServicePlanRID)) {
+  name: last(split(byoAseAppServicePlanRID, '/'))
+  scope: resourceGroup(split(byoAseAppServicePlanRID, '/')[2], split(byoAseAppServicePlanRID, '/')[4])
+}
+
 // Create Web App
 resource webApp 'Microsoft.Web/sites@2024-11-01' = {
   name: name
   location: location
   tags: tags
-  kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'app,linux' : 'app'
+  kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'app,linux' : 'app' // Linux Web app OR Windows Web app
   identity: identity
   properties: {
-    //serverFarmId: byoASEv3? byoAseAppServicePlanRID: appServicePlan.id
-    serverFarmId: appServicePlan.id
+    serverFarmId: !empty(byoAseAppServicePlanRID) ? byoAseAppServicePlanRID : appServicePlan.id
     httpsOnly: true
     hostingEnvironmentProfile: !empty(byoAseFullResourceId) && byoASEv3 ? {
       id: byoAseFullResourceId

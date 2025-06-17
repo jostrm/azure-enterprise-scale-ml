@@ -435,16 +435,23 @@ param byoASEv3 bool = false // Optional, default is false. Set to true if you wa
 param byoAseFullResourceId string = '' // Full resource ID of App Service Environment
 param byoAseAppServicePlanResourceId string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
 
-param aceSkuWorkers string = '1' // Number of workers for ASE v3
-param aceSkuWorkerSize string = '6' // Worker size for ASE v3, e.g. 6 for I1V2
+param aceSkuWorkers int = 1 // Number of workers for ASE v3
 param aceSkuWorkerSizeId string = '6' // Worker size for ASE v3, e.g. 6 for I1V2
 param aceSku string = 'IsolatedV2' // I family for ASE v3
+@allowed([
+  'I1V2'  // Isolated v2 for ASEv3
+  'I2V2'
+  'I3V2'
+  'I4V2'
+  'I5V2'
+  'I6V2'
+])
 param aceSkuCode string = 'I1V2' // I family for ASE v3
 param webappSKUAce object = {
   name:aceSkuCode         // e.g., 'I1V2'
   tier:aceSku             // e.g., 'IsolatedV2'
   size:aceSkuWorkerSizeId // e.g., '6'
-  capacity:aceSkuWorkers  // e.g., 1
+  capacity:aceSkuWorkers  // e.g., '1'
 }
 
 param webappSKU object = {
