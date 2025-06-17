@@ -72,6 +72,7 @@ param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the
   'None'
 ])
 param redundancyMode string = 'None'
+param alwaysOn bool = true // Optional, default is true. Set to false if you want to disable Always On for the Function App.
 param byoASEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
 param byoAseFullResourceId string = '' // Full resource ID of App Service Environment
 param byoAseAppServicePlanRID string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
@@ -159,7 +160,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
     virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? any(null) : integrationSubnet.id
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
-      alwaysOn: true
+      alwaysOn: alwaysOn
       cors: {
         allowedOrigins: allowedOrigins
       }

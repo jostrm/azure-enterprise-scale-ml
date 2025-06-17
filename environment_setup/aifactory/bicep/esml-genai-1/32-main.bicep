@@ -452,6 +452,8 @@ param webappSKU object = {
   tier: 'Standard'
   capacity: 1
 }
+param webappAlwaysOn bool = true // Optional, default is true. Set to false if you want to disable Always On for the Web App.
+param functionAlwaysOn bool = true // Optional, default is true. Set to false if you want to disable Always On for the Web App.
 @description('Service setting: Deploy Content Safety for project')
 param serviceSettingDeployContentSafety bool = false
 @description('Service setting: Deploy Azure OpenAI for project')
@@ -2446,6 +2448,7 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
     location: location
     tags: projecttags
     sku: byoASEv3?webappSKUAce: webappSKU
+    alwaysOn:webappAlwaysOn
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
@@ -2535,6 +2538,7 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
     location: location
     tags: projecttags
     sku: byoASEv3? webappSKUAce: functionSKU
+    alwaysOn: functionAlwaysOn
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
