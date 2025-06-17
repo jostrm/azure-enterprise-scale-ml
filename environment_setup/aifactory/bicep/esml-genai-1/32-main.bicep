@@ -1169,7 +1169,7 @@ module miForPrj '../modules/mi.bicep' = if(!resourceExists.miPrj){
 // VARS - only fetch .outputs once!
 var var_miPrj_PrincipalId = resourceExists.miPrj? miPrjREF.properties.principalId: miForPrj.outputs.managedIdentityPrincipalId
 var var_miAca_PrincipalId = resourceExists.miACA? miACAREF.properties.principalId: miForAca.outputs.managedIdentityPrincipalId
-var var_search_pricipalId = resourceExists.aiSearch? aiSearchREF.identity.principalId: aiSearchService.outputs.principalId
+var var_search_pricipalId = enableAISearch? resourceExists.aiSearch? aiSearchREF.identity.principalId: aiSearchService.outputs.principalId:''
 //var var_webAppPrincipalId=resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId
 var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
 var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
@@ -1633,7 +1633,7 @@ module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!resourceExi
 
 // Storage for Azure AI Search
 
-module sa4AIsearch '../modules/storageAccount.bicep' = if(!resourceExists.storageAccount2001 && enableAISearch){
+module sa4AIsearch '../modules/storageAccount.bicep' = if(!resourceExists.storageAccount2001){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'GenAISAAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
