@@ -217,7 +217,9 @@ resource cosmosConnectionString 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =
   parent: keyVault
   name: connectionStringKey
   properties: {
-    value: cosmos.listConnectionStrings().connectionStrings[0].connectionString
+    value: kind == 'MongoDB' 
+      ? cosmos.listConnectionStrings().connectionStrings[0].connectionString
+      : 'AccountEndpoint=${cosmos.properties.documentEndpoint};AccountKey=${cosmos.listKeys().primaryMasterKey};'
     contentType: 'text/plain'
     attributes: {
       enabled: true
