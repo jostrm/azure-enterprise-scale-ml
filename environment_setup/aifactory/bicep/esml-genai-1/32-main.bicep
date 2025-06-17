@@ -431,12 +431,12 @@ param webAppRuntimeVersion string = '3.11'  // Specify the Python version
   'None'
 ])
 param appRedundancyMode string = 'None'
-param byoACEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
-param byoAceFullResourceId string = '' // Full resource ID of App Service Environment
-param byoAceAppServicePlanResourceId string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+param byoASEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+param byoAseFullResourceId string = '' // Full resource ID of App Service Environment
+param byoAseAppServicePlanResourceId string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
 
-param aceSkuWorkers int = 1 // Number of workers for ASE v3
-param aceSkuWorkerSize int = 6 // Worker size for ASE v3, e.g. 6 for I1V2
+param aceSkuWorkers string = '1' // Number of workers for ASE v3
+param aceSkuWorkerSize string = '6' // Worker size for ASE v3, e.g. 6 for I1V2
 param aceSkuWorkerSizeId string = '6' // Worker size for ASE v3, e.g. 6 for I1V2
 param aceSku string = 'IsolatedV2' // I family for ASE v3
 param aceSkuCode string = 'I1V2' // I family for ASE v3
@@ -2445,7 +2445,7 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
     name: webAppName
     location: location
     tags: projecttags
-    sku: byoACEv3?webappSKUAce: webappSKU
+    sku: byoASEv3?webappSKUAce: webappSKU
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
@@ -2457,9 +2457,9 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
     logAnalyticsWorkspaceRG: commonResourceGroup
     runtime: webAppRuntime  // Set to 'python' for Python apps
     redundancyMode: appRedundancyMode
-    byoACEv3: byoACEv3
-    byoAceFullResourceId: byoAceFullResourceId
-    byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
+    byoASEv3: byoASEv3
+    byoAseFullResourceId: byoAseFullResourceId
+    byoAseAppServicePlanRID: byoAseAppServicePlanResourceId
     runtimeVersion: webAppRuntimeVersion // Specify the Python version
     ipRules: ipWhitelist_array
     appSettings: [
@@ -2534,7 +2534,7 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
     name: functionAppName
     location: location
     tags: projecttags
-    sku: byoACEv3? webappSKUAce: functionSKU
+    sku: byoASEv3? webappSKUAce: functionSKU
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
@@ -2546,9 +2546,9 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
     logAnalyticsWorkspaceName: laWorkspaceName
     logAnalyticsWorkspaceRG: commonResourceGroup
     redundancyMode: appRedundancyMode
-    byoACEv3: byoACEv3
-    byoAceFullResourceId: byoAceFullResourceId
-    byoAceAppServicePlanRID: byoAceAppServicePlanResourceId
+    byoASEv3: byoASEv3
+    byoAseFullResourceId: byoAseFullResourceId
+    byoAseAppServicePlanRID: byoAseAppServicePlanResourceId
     ipRules:ipWhitelist_array
     appSettings: [
       {

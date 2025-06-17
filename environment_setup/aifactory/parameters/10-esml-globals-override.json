@@ -53,13 +53,13 @@
         "subnetProjDatabricksPrivate": {
             "value": ""
         },
-        "byoACEv3": {
+        "byoASEv3": {
             "value": false
         },
-        "byoAceFullResourceId": {
+        "byoAseFullResourceId": {
             "value": ""
         },
-        "byoAceAppServicePlanResourceId": {
+        "byoAseAppServicePlanResourceId": {
             "value": ""
         }
     }

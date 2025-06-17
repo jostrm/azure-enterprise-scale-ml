@@ -72,14 +72,14 @@ param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the
   'None'
 ])
 param redundancyMode string = 'None'
-param byoACEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
-param byoAceFullResourceId string = '' // Full resource ID of App Service Environment
-param byoAceAppServicePlanRID string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+param byoASEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+param byoAseFullResourceId string = '' // Full resource ID of App Service Environment
+param byoAseAppServicePlanRID string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
 //Note: No explicit VNet integration needed: ACEv3 is already deployed into its own subnet, so you don't need to specify virtualNetworkSubnetId separately.
 
 // Use provided name or create one based on WebApp name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
-var byoACE3Intenal = !empty(byoAceFullResourceId)
+var byoACE3Intenal = !empty(byoAseFullResourceId)
 
 // Get references to resources
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!empty(applicationInsightsName)) {
@@ -106,8 +106,8 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = {
   sku: sku
   properties: {
     reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwise Windows (dotnet, java)
-    hostingEnvironmentProfile: byoACEv3 && !empty(byoAceFullResourceId)? {
-      id: byoAceFullResourceId
+    hostingEnvironmentProfile: byoASEv3 && !empty(byoAseFullResourceId)? {
+      id: byoAseFullResourceId
     } : null
   }
 }
@@ -150,20 +150,20 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
   kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'app,linux' : 'app'
   identity: identity
   properties: {
-    //serverFarmId: byoACEv3? byoAceAppServicePlanRID: appServicePlan.id
+    //serverFarmId: byoASEv3? byoAseAppServicePlanRID: appServicePlan.id
     serverFarmId: appServicePlan.id
     httpsOnly: true
-    hostingEnvironmentProfile: !empty(byoAceFullResourceId) && byoACEv3 ? {
-      id: byoAceFullResourceId
+    hostingEnvironmentProfile: !empty(byoAseFullResourceId) && byoASEv3 ? {
+      id: byoAseFullResourceId
     } : null
-    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoACEv3 ? any(null) : integrationSubnet.id
-    publicNetworkAccess: byoACEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
+    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? any(null) : integrationSubnet.id
+    publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       alwaysOn: true
       cors: {
         allowedOrigins: allowedOrigins
       }
-      ipSecurityRestrictions: enablePublicAccessWithPerimeter || byoACEv3? [] : concat(formattedIpRules, [denyAllRule])
+      ipSecurityRestrictions: enablePublicAccessWithPerimeter || byoASEv3? [] : concat(formattedIpRules, [denyAllRule])
       // Set the appropriate runtime stack
       linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}-java${runtimeVersion}' : ''
       netFrameworkVersion: runtime == 'dotnet' ? runtimeVersion : null
@@ -184,7 +184,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
 }
 
 // Create private endpoint
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(createPrivateEndpoint && !byoACEv3) {
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(createPrivateEndpoint && !byoASEv3) {
   name: 'p-${name}-webapp'
   location: location
   tags: tags
@@ -217,8 +217,8 @@ output defaultHostname string = webApp.properties.defaultHostName
 output principalId string = webApp.identity.principalId
 output dnsConfig array = [
   {
-    name: (createPrivateEndpoint && !byoACEv3)? privateEndpoint.name: ''
+    name: (createPrivateEndpoint && !byoASEv3)? privateEndpoint.name: ''
     type: 'azurewebapps'
-    id:(createPrivateEndpoint && !byoACEv3)? webApp.id: ''
+    id:(createPrivateEndpoint && !byoASEv3)? webApp.id: ''
   }
 ]
