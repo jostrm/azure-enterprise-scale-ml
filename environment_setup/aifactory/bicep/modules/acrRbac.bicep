@@ -6,7 +6,7 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-08-01-preview' existin
   name: acrName
 }
 
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!empty(aiHubName)) {
   name: aiHubName
   scope: resourceGroup(aiHubRgName)
 }
@@ -25,7 +25,7 @@ resource containerRegistryPushRole 'Microsoft.Authorization/roleDefinitions@2022
 
 
 @description('Assign AML Workspace\'s ID: AcrPush to workload\'s container registry.')
-resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiHubName)) {
   name: guid(acr.id, aiHub.name, containerRegistryPushRole.id,acrName)
   properties: {
     roleDefinitionId: containerRegistryPushRole.id
@@ -35,7 +35,7 @@ resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssign
 }
 
 @description('Assign AML Workspace\'s Managed Online Endpoint: AcrPull to workload\'s container registry.')
-resource computeInstanceContainerRegistryPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource computeInstanceContainerRegistryPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'= if (!empty(aiHubName)) {
   name: guid(acr.id, aiHub.name, containerRegistryPullRole.id,acrName)
   properties: {
     roleDefinitionId: containerRegistryPullRole.id

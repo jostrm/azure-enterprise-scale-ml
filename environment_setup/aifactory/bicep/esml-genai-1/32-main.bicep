@@ -1173,7 +1173,7 @@ var var_search_pricipalId = resourceExists.aiSearch? aiSearchREF.identity.princi
 //var var_webAppPrincipalId=resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId
 var var_functionPrincipalId=resourceExists.functionApp? functionREF.identity.principalId: function.outputs.principalId
 var var_openai_pricipalId = resourceExists.openai? openaiREF.identity.principalId: csAzureOpenAI.outputs.principalId
-var var_aiServices_principalId = resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId
+var var_aiServices_principalId = enableAIServices? resourceExists.aiServices? aiServicesREF.identity.principalId: aiServices.outputs.aiServicesPrincipalId:''
 var var_aml_principal_id = (!resourceExists.aml && enableAzureMachineLearning)? amlv2.outputs.principalId: (enableAzureMachineLearning && resourceExists.aml)? amlREF.identity.principalId:''
 
 // Array vars
@@ -1616,11 +1616,11 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!resourceExists.aiSearc
   ]
 }
 
-module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!resourceExists.aiSearch && centralDnsZoneByPolicyInHub==false && enableAISearch==true){
+module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!resourceExists.aiSearch && !centralDnsZoneByPolicyInHub && enableAISearch){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'priDZoneSA1${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
-    dnsConfig: aiSearchService.outputs.dnsConfig
+    dnsConfig: enableAISearch? aiSearchService.outputs.dnsConfig:[]
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2991,12 +2991,12 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
   ]
 }
 
-module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false) {
+module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false && enableAIFoundryHub) {
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
   params: {
     acrName: resourceExists.acrProject? acrProjectName:acr.outputs.containerRegistryName
-    aiHubName: resourceExists.aiHub? aiHubName:aiHub.outputs.name
+    aiHubName: enableAIFoundryHub? (resourceExists.aiHub? aiHubName:aiHub.outputs.name): ''
     aiHubRgName: targetResourceGroup
   }
 }
