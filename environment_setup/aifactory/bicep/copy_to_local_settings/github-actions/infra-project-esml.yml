@@ -166,7 +166,8 @@ jobs:
           --parameters projectNumber="${{ env.project_number_000 }}" \
           --parameters location="${{ env.admin_location}}" \
           --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
-          --parameters useCommonACR="${{ env.useCommonACR }}"
+          --parameters useCommonACR="${{ env.useCommonACR }}" \
+          --debug
         azcliversion: latest
     - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
@@ -347,7 +348,8 @@ jobs:
             --parameters BYO_subnets="${{ env.BYO_SUBNETS }}" \
             --parameters network_env="${{ env.NETWORK_ENV }}" \
             --parameters aifactoryVersionMajor="${{ env.AIFACTORY_VERSION_MAJOR }}" \
-            --parameters aifactoryVersionMinor="${{ env.AIFACTORY_VERSION_MINOR }}"
+            --parameters aifactoryVersionMinor="${{ env.AIFACTORY_VERSION_MINOR }}" \
+            --debug
           azcliversion: latest
       - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
         uses: azure/cli@v2

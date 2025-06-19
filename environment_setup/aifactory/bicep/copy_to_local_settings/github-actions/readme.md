@@ -6,14 +6,35 @@
 
 ## Note: see [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
-0) Add the submodule to your repo (to get the bootstrap files)
+### Prerequisite setup tools:  on your laptop (for both option A) Azure Devops and B) Github):
+- **Git Bash**: https://git-scm.com/downloads e.g. GNU bash, version 5.2.37 or above
+    - **Purpose**: The install script runs in bash terminal (Git bash)
+    - **Note Mac/Linux**: It has been seen that Ubuntu bash (sames that comes with Mac OS), additional libraries will be needed to be installed
+    - **Version**: 5.2.37
+    ```bash
+    bash --version
+    ```` 
+### Prerequisite setup tools: on your laptop (for Option B - Github)
+- **Github CLI**: https://cli.github.com/
+    - **Purpose**: The .env file will push those values as Github secretc and variables, and create Github environments Dev, Stage, Production
+    - **Version**: 2.71.0 or above
+    ```bash
+        gh --version
+    ```` 
+## START
 
-    Run from your repo root location:
+1) Add or Update the submodule to your repo (to get the bootstrap files)
 
+    ADD, if you are the first developer to checkin the code. Run from your repo root location:
     ```
     git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
     ```
-    Then choose A or B:
+    UPDATE, if you are not the 1st developer to checkin the code to your repo, e.g. if you cloned the repo.
+    ```bash
+    git submodule update --init --recursive --remote
+    ```
+
+    Then in both cases (ADD or UPDATE) choose A or B, where we recommend Option A:
     
     **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
     ```
@@ -27,18 +48,18 @@
     ```
     This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
     
-1) Run the start script `./azure-enterprise-scale-ml/00-start.sh`,  this will create some bootstrap-scripts at your repo root.
+2) Run the start script `./azure-enterprise-scale-ml/00-start.sh`,  this will create some bootstrap-scripts at your repo root.
 
     ```
    bash ./azure-enterprise-scale-ml/00-start.sh
     ```
-2) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for GHA workflows, and parameters.
+3) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for GHA workflows, and parameters.
     ```
    bash ./01-aif-copy-aifactory-templates.sh
     ```
-3) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
+4) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
     - Note: Is is under the `aifactory` folder, you will configure your [base parameters](../../../../aifactory/parameters/) and other variables.
-4) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
+5) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
     - Note: If you want to refresh the pipeline templates, but not overwrite the .env file, you may run `03-GH-bootstrap-files-no-env-overwrite.sh`
      ```
    bash ./02-GH-bootstrap-files.sh
@@ -48,9 +69,9 @@ OUTPUT: The file structure should now look something like below:
 
 ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-byorepo.png)
 
-## Continue with steps:5-9:
+## Continue with steps:6-10:
 
-5) Authenticate to Github CLI, with a user that is Administrator (Can create Environemnts, variables, secrets, Github Action workflows)
+6) Authenticate to Github CLI, with a user that is Administrator (Can create Environemnts, variables, secrets, Github Action workflows)
    ```sh
     gh auth login
    ```
@@ -76,9 +97,10 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
 
 -->
 
-6) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
-7) Edit the [.env] variables at your root. (These will override some of the base parameters)
-8) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
+7) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
+8) Edit the [.env] variables at your root. (These will override some of the base parameters)
+9) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
+    - NB! The below will use Github CLI (gh), if the command does not work, plese see PREREQUISITES.
     ```
    bash ./10-GH-create-or-update-github-variables.sh
     ```
@@ -97,7 +119,7 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
     - OUTPUT: The environment in Github should now look something like below (~21 variables in each environment: Dev,Stage, Prod)
     - ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-env-vars.png)
 
-9) Run the Github action workflows, start with `infra-aifactory-common.yaml` then you can run `infra-project-genai.yaml` or `infra-project-esml.yaml`
+10) Run the Github action workflows, start with `infra-aifactory-common.yaml` then you can run `infra-project-genai.yaml` or `infra-project-esml.yaml`
 
 ## Workflow: AIFactory Common 
 Start with setting up a common AIFactory environment, example, the DEV environment

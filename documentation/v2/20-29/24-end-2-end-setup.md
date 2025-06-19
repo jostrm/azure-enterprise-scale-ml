@@ -5,7 +5,23 @@
 > [Enterprise Scale AIFactory - Template repo using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
 
 ## Prerequisites
-[Prerequisites](../10-19/12-prerequisites-setup.md)
+[Prerequisites](../10-19/12-prerequisites-setup.md) for Azure and Azure Devops/Github
+
+### Prerequisite setup tools:  on your laptop (for both option A) Azure Devops and B) Github):
+- **Git Bash**: https://git-scm.com/downloads e.g. GNU bash, version 5.2.37 or above
+    - **Purpose**: The install script runs in bash terminal (Git bash)
+    - **Note Mac/Linux**: It has been seen that Ubuntu bash (sames that comes with Mac OS), additional libraries will be needed to be installed
+    - **Version**: 5.2.37
+    ```bash
+    bash --version
+    ```` 
+### Prerequisite setup tools: on your laptop (for Option B - Github)
+- **Github CLI**: https://cli.github.com/
+    - **Purpose**: The .env file will push those values as Github secretc and variables, and create Github environments Dev, Stage, Production
+    - **Version**: 2.71.0 or above
+        ```bash
+           gh --version
+        ```` 
 
 ## Setup options: 
 - Option A - Azure Devops) [Setup AIFactory - Infra Automation (AzureDevops YAML + BICEP)](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
@@ -78,6 +94,41 @@ For `Bring your own vNet`, e.g. NOT using the *AI Factory common resource group*
         },
         "vnetNameFull_param": {
             "value": "vnet-name-inside-of-resourcegroup"
+        },
+```
+## Config: BYOAppServiceEnvironment (ASE v3)
+For `Bring your own App Service Environment v3`
+
+[Docs-link: 10-esml-globals-override.json](../../../environment_setup/aifactory/parameters/10-esml-globals-override.json)  | [Local-repo-link](../../../../aifactory/parameters/10-esml-globals-override.json)
+
+```json
+        "byoASEv3": {
+            "value": true
+        },
+        "byoAseFullResourceId": {
+            "value": "/subscriptions/FullResourceID..../myAceV3inSameRegionAsAIFactory"
+        },
+        "byoAseAppServicePlanResourceId": {
+            "value": "/subscriptions/FullResourceID....only set if you dont want the AI Factory to create AppServicePlans.../myExistingAppServicePlan"
+        }
+```
+And set the PARAMETERS for the Ace specific allowed SKU's,  before deploying a GENAI project as below: 
+
+[Docs-link: 10-esml-globals-override.json](../../../environment_setup/aifactory/parameters/31-esgenai-default.json)  | [Local-repo-link](../../../../aifactory/parameters/31-esgenai-default.json)
+
+```json
+
+        "aseSku": {
+            "value": "IsolatedV2"
+        },
+        "aseSkuCode": {
+            "value": "I1V2"
+        },
+        "aseSkuWorkers": {
+            "value": 1
+        },
+        "aseSkuWorkerSizeId": {
+            "value": "6"
         },
 ```
 

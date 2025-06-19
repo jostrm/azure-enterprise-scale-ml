@@ -60,19 +60,6 @@ env:
     # OPTIONAL - GENAI specific
     azure_machinelearning_sp_oid: "${{ vars.TENANT_AZUREML_OID }}" # Azure Machine Learning service principle Object ID. In Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
 
-    # See PARAMETER folder instead. 31-esgenai-default.json
-
-    # admin_enablePublicGenAIAccess: false # Enable public access to GenAI
-    # optional_serviceSettingDeployAIDocIntelligence: false # Deploy AI Doc Intelligence
-    # optional_serviceSettingDeployAzureAIVision: false # Deploy Azure AI Vision
-    # optional_serviceSettingDeployAzureSpeech: false # Deploy Azure Speech
-    # optional_serviceSettingDeployAzureAppService: false # Deploy Azure App Service and a WebApp
-    # optional_serviceSettingDeployAzureFunction: false # Deploy Azure App Service and a WebApp
-    # optional_serviceSettingDeployAzureContainerApps: false # Deploy Azure ContainerApps
-    # optional_serviceSettingDeployAzureCosmosDB: false # Deploy Azure CosmosDB
-
-    # See PARAMETER folder instead, END
-
     # OPTIONAL - ESML specific https://learn.microsoft.com/en-us/azure/virtual-machines/ncads-h100-v5
     admin_aks_gpu_sku_dev_override: "Standard_B4ms" # GPU train: [Standard_NC24rs_v3,Standard_ND96amsr_A100_v4] GPU Inference [Standard_NC40ads_H100_v5,Standard_NC80adis_H100_v5]. CPU["Standard_B4ms"]
     admin_aks_gpu_sku_test_prod_override: Standard_DS13-2_v2 # AKS GPU SKU for test/prod

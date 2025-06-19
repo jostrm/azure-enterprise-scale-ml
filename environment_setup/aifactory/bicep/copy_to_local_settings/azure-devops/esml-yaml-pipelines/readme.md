@@ -5,19 +5,28 @@ Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline
 
 [prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
->[!IMPORTANT]
-> If this link works: [base parameters](../../../../aifactory/parameters/) you should not do thes steps 1-3 (you already have copied templates files locally)
->
+### Prerequisite setup tools:  on your laptop (for both option A) Azure Devops and B) Github):
+- **Git Bash**: https://git-scm.com/downloads e.g. GNU bash, version 5.2.37 or above
+    - **Purpose:** The install script runs in bash terminal (Git bash)
+    - **Note Mac/Linux**: It has been seen that Ubuntu bash (sames that comes with Mac OS), additional libraries will be needed to be installed
+    - **Version:** 5.2.37
+    ```bash
+    bash --version
+    ```` 
+## START
 
-0) Add the submodule to your repo (to get the bootstrap files)
+1) Add or Update the submodule to your repo (to get the bootstrap files)
 
-    Run from your repo root location:
-
+    ADD, if you are the first developer to checkin the code. Run from your repo root location:
     ```
     git submodule add https://github.com/jostrm/azure-enterprise-scale-ml
     ```
-    
-    Then choose A or B:
+    UPDATE, if you are not the 1st developer to checkin the code to your repo, e.g. if you cloned the repo.
+    ```bash
+    git submodule update --init --recursive --remote
+    ```
+
+    Then in both caess, choose A or B, where we recommend Option A
     
     **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
     ```
@@ -32,16 +41,16 @@ Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline
 
     This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
 
-1) Run the start script `./azure-enterprise-scale-ml/00-start.sh`,  this will create some bootstrap-scripts at your repo root.
+2) Run the start script `./azure-enterprise-scale-ml/00-start.sh`,  this will create some bootstrap-scripts at your repo root.
 
     ```
    bash ./azure-enterprise-scale-ml/00-start.sh
     ```
-2) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for Azure Devops Build pipelines, variables and a `parameter`folder.
+3) Run the file created at your root called: `01-aif-copy-aifactory-templates.sh`, this will create a folder at your root called `aifactory-templates` with templates for Azure Devops Build pipelines, variables and a `parameter`folder.
     ```
    bash ./01-aif-copy-aifactory-templates.sh
     ```
-3) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
+4) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
     - Note: Is is under the `aifactory` folder, you will configure your [base parameters](../../../../aifactory/parameters/) and other variables.
 
 >[!TIP]
@@ -51,19 +60,19 @@ The file structure should now look something like below. The underlined folder i
 
 ![](../../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-ADO-byorepo.png)
 
-## Steps 4-7
+## Steps 5-8
 
 >[!NOTE]
 > If you want to learn how to configure the AI Factory in `standalone mode` versus `Hub-connected centralized private DNS zones` with `BYOVnet`- [ setup starting page](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md)
 >
 
-4) Configure the 12 [base parameters](../../../../aifactory/parameters/) 
-5) Configure the [variables.yaml](./variables/variables.yaml), that will overwrite some of the base parameters.
-6) Run pipeline: AIFactory Common
+5) Configure the 12 [base parameters](../../../../aifactory/parameters/) 
+6) Configure the [variables.yaml](./variables/variables.yaml), that will overwrite some of the base parameters.
+7) Run pipeline: AIFactory Common
 - Start with setting up a common AIFactory environment, example, the DEV environment. Go to Pipelines Import the .yaml file
     - [infra-aifactory-common.yaml](./esml-infra-common/infra-aifactory-common.yaml)
 
-7) Run pipeline for an AIFactory project: 
+8) Run pipeline for an AIFactory project: 
 - Then you can import and run the pipelines to setup 1-M projects. There are 2 AIFactory project types supported as of now: 
     - [infra-project-genai.yaml](./esml-infra-project/infra-project-genai.yaml)
     - [infra-project-esml.yaml](./esml-infra-project/infra-project-esml.yaml)

@@ -76,7 +76,8 @@ steps:
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters location="$(admin_location)" \
-     --parameters locationSuffix="$(admin_locationSuffix)"
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --debug
      
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

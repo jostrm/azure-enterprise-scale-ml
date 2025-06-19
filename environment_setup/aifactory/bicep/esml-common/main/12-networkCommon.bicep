@@ -113,7 +113,8 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
   ]
 }
 
-var ipWhitelist_array = empty(IPwhiteList) ? [] : array(split(replace(IPwhiteList, '\\s+', ''), ','))
+var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
+var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null' || length(IPwhiteList) < 5) ? [] : union(ipWhitelist_array_1,[]) // remove dups
 
 module nsgBastion '../modules-common/nsgBastion.bicep' = if(empty(ipWhitelist_array)==false){
   name: 'nsg-${common_bastion_subnet_name}-depl${uniqueDetermenistic}'

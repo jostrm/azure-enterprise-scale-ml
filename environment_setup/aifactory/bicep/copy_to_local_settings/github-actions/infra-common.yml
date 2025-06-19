@@ -61,7 +61,8 @@ jobs:
             --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
             --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
             --parameters useAdGroups="${{ env.use_groups }}" \
-            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+            --debug
           azcliversion: latest
       - name: 02_az_bicep_private_networking
         uses: azure/cli@v2
@@ -84,7 +85,8 @@ jobs:
             --parameters cidr_range="${{ env.cidr_range }}" \
             --parameters aifactorySuffixRG="${{ env.aifactorySuffixRG }}" \
             --parameters commonResourceSuffix="${{ env.aiResourceSuffix }}" \
-            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
+            --debug
           azcliversion: latest
       - name: 03_az_bicep_deploy_resources
         uses: azure/cli@v2
@@ -117,5 +119,6 @@ jobs:
             --parameters inputKeyvaultResourcegroup="${{ env.admin_input_keyvault_rg }}" \
             --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
             --parameters inputKeyvault="${{ env.admin_input_keyvault_name }}" \
-            --parameters tenantId="${{ env.tenantId }}"
+            --parameters tenantId="${{ env.tenantId }}" \
+            --debug
           azcliversion: latest
