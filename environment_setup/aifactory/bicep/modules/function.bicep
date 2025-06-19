@@ -62,7 +62,7 @@ param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
 ])
 param runtimeVersion string = '3.11' // Used if runtime is 'python'
 param subnetIntegrationName string
-param hostNameSslStates array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
+param hostNameSslStatesIn array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
 param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
 param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the resource.
 @description('Optional. Site redundancy mode.')
@@ -79,6 +79,29 @@ param byoASEv3 bool = false // Optional, default is false. Set to true if you wa
 param byoAseFullResourceId string = '' // Full resource ID of App Service Environment
 param byoAseAppServicePlanRID string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
 //Note: No explicit VNet integration needed: ACEv3 is already deployed into its own subnet, so you don't need to specify virtualNetworkSubnetId separately.
+
+var aseName = last(split(byoAseFullResourceId, '/')) // Split the resource ID by '/' and take the last segment
+
+var hostNameSslStatesDefault= !empty(hostNameSslStatesIn) ? hostNameSslStatesIn : [
+  {
+    name: '${name}.azurewebsites.net'
+    hostType: 'Standard'
+    sslState: 'Disabled'
+  }
+]
+
+var hostNameSslStates = byoASEv3 ? [
+  {
+    name: '${name}.${aseName}.appserviceenvironment.net'
+    sslState: 'Disabled'
+    hostType: 'Standard'
+  }
+  {
+    name: '${name}.scm.${aseName}.appserviceenvironment.net'
+    sslState: 'Disabled'
+    hostType: 'Repository'
+  }
+] : hostNameSslStatesDefault
 
 // Use provided name or create one based on Function name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
@@ -110,6 +133,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = {
   location: location
   tags: tags
   sku: sku
+  kind: runtime == 'node' || runtime == 'python' || runtime == 'java' ? 'linux' : 'windows' // Linux Web app OR Windows Web app
   properties: {
     reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwise Windows (dotnet, java)
     hostingEnvironmentProfile: byoASEv3 && !empty(byoAseFullResourceId)? {
@@ -161,6 +185,10 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
   kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'functionapp,linux' : 'functionapp' // "Linux Consumption Function" app or "Function Code App"(.net)
   identity: identity
   properties: {
+    enabled: true // aca
+    scmSiteAlsoStopped: false // Set to true if you want to stop the SCM site
+    keyVaultReferenceIdentity: systemAssignedIdentity ? 'SystemAssigned' : 'None'
+    storageAccountRequired:false // Set to false if you don't want to require a storage account
     serverFarmId: !empty(byoAseAppServicePlanRID) ? existingAppServicePlan.id : appServicePlan.id
     httpsOnly: true
     hostingEnvironmentProfile: !empty(byoAseFullResourceId) ? {
@@ -170,7 +198,10 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
     virtualNetworkSubnetId: byoASEv3 ? null : (enablePublicAccessWithPerimeter ? null : integrationSubnet.id)
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
-      alwaysOn: alwaysOn
+      numberOfWorkers: 1 // aca: Set to 1 for Consumption plan, or adjust as needed for Premium/Elastic plans
+      functionAppScaleLimit:0 // aca
+      minimumElasticInstanceCount:0 // aca
+      alwaysOn: alwaysOn // aca
       cors: {
         allowedOrigins: allowedOrigins
       }

@@ -446,6 +446,7 @@ param aseSku string = 'IsolatedV2' // I family for ASE v3
   'I5V2'
   'I6V2'
 ])
+
 param aseSkuCode string = 'I1V2' // I family for ASE v3
 param webappSKUAce object = {
   name:aseSkuCode         // e.g., 'I1V2'
@@ -453,6 +454,16 @@ param webappSKUAce object = {
   //size:aseSkuWorkerSizeId // e.g., '6'
   //capacity:aseSkuWorkers  // e.g., '1'
 }
+
+/*
+param webappSKUAce object = {
+  name: 'I1v2'
+  tier: 'IsolatedV2'
+  size: 'I1v2'
+  family: 'Iv2'
+  capacity: 1
+}
+*/
 
 param webappSKU object = {
   name: 'S1'

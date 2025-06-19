@@ -60,7 +60,7 @@ param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
 ])
 param runtimeVersion string = '3.11' // Used if runtime is 'python'
 param subnetIntegrationName string  // Name of the subnet for VNet integration
-param hostNameSslStates array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
+param hostNameSslStatesIn array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
 param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
 param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the resource.
 @description('Optional. Site redundancy mode.')
@@ -81,6 +81,29 @@ param byoAseAppServicePlanRID string = '' // Full resource ID, default is empty.
 // Use provided name or create one based on WebApp name
 var servicePlanName = !empty(appServicePlanName) ? appServicePlanName : '${name}-plan'
 var byoACE3Intenal = !empty(byoAseFullResourceId)
+var aseName = last(split(byoAseFullResourceId, '/')) // Split the resource ID by '/' and take the last segment
+
+var hostNameSslStatesDefault= !empty(hostNameSslStatesIn) ? hostNameSslStatesIn : [
+  {
+    name: '${name}.azurewebsites.net'
+    hostType: 'Standard'
+    sslState: 'Disabled'
+  }
+]
+
+var hostNameSslStates = byoASEv3 ? [
+  {
+    name: '${name}.${aseName}.appserviceenvironment.net'
+    sslState: 'Disabled'
+    hostType: 'Standard'
+  }
+  {
+    name: '${name}.scm.${aseName}.appserviceenvironment.net'
+    sslState: 'Disabled'
+    hostType: 'Repository'
+  }
+] : hostNameSslStatesDefault
+
 
 // Get references to resources
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!empty(applicationInsightsName)) {
@@ -104,13 +127,21 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = {
   name: servicePlanName
   location: location
   tags: tags
-  sku: sku
+  sku: {
+    name: 'I1v2'
+    tier: 'IsolatedV2'
+    size: 'I1v2'
+    family: 'Iv2'
+    capacity: 1
+  }
+  kind: runtime == 'node' || runtime == 'python' || runtime == 'java' ? 'linux' : 'windows' // Linux Web app OR Windows Web app
   properties: {
     reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwise Windows (dotnet, java)
     hostingEnvironmentProfile: byoASEv3 && !empty(byoAseFullResourceId)? {
       id: byoAseFullResourceId
     } : null
   }
+  
 }
 
 var formattedIpRules = [for (ip, i) in ipRules: {
