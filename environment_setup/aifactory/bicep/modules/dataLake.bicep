@@ -138,6 +138,7 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   location: location
   properties:{
     allowBlobPublicAccess: false
+    publicNetworkAccess:'Disabled'
     accessTier: 'Hot'
     isHnsEnabled: true // DATALAKE
     //allowCrossTenantReplication: true  // Not supported if DATALAKE

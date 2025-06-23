@@ -198,9 +198,6 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
     virtualNetworkSubnetId: byoASEv3 ? null : (enablePublicAccessWithPerimeter ? null : integrationSubnet.id)
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
-      numberOfWorkers: 1 // aca: Set to 1 for Consumption plan, or adjust as needed for Premium/Elastic plans
-      functionAppScaleLimit:0 // aca
-      minimumElasticInstanceCount:0 // aca
       alwaysOn: alwaysOn // aca
       cors: {
         allowedOrigins: allowedOrigins
