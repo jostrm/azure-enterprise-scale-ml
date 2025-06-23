@@ -211,6 +211,10 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
             value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
           }
           {
+            name: 'WEBSITE_CONTENTOVERVNET'
+            value: '1'
+          }
+          {
             name: 'FUNCTIONS_EXTENSION_VERSION'
             value: '~4'
           }
