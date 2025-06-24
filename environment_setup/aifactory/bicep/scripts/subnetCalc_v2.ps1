@@ -197,17 +197,24 @@ function New-SubnetScheme {
     param (
         [Parameter(Mandatory = $true)]$map,
         [Parameter(Mandatory = $true)]$startIp,
-        [Parameter(Mandatory = $true)]$possibleValuesMap
+        [Parameter(Mandatory = $true)]$possibleValuesMap,
+        [Parameter(Mandatory = $false)][int]$maxRetries = 10
     )
     # Sort by subnet size descending (largest first)
     $sortedSubnetMap = $map.GetEnumerator() | Sort-Object -Property Value -Descending
     $allocatedIps = @()
     $result = @{}
     $startIpVnet = ($startIp -split '\.')[0..1] -join '.' # More robust vNet prefix
+    $retryCount = @{}
 
     for ($index = 0; $index -lt $sortedSubnetMap.Count; $index++) {
         $currentKey = $sortedSubnetMap[$index].Key
         $currentValue = $sortedSubnetMap[$index].Value
+
+        # Initialize retry counter for this subnet if not exists
+        if (-not $retryCount.ContainsKey($currentKey)) {
+            $retryCount[$currentKey] = 0
+        }
 
         # If value is just a subnet mask (e.g., '24'), calculate CIDR
         if ($currentValue -match '^\d{1,2}$') {
@@ -218,7 +225,16 @@ function New-SubnetScheme {
                 $result[$currentKey] = "$startIp/$currentValue"
                 $allocatedIps += $startIp
                 $startIp = Find-NextIpAddress $subnet.BroadcastAddress.IPAddressToString
+                # Reset retry counter on success
+                $retryCount[$currentKey] = 0
             } else {
+                $retryCount[$currentKey]++
+                
+                if ($retryCount[$currentKey] -gt $maxRetries) {
+                    Write-Host "Warning: Maximum retry attempts ($maxRetries) reached for subnet $currentKey. Skipping to next subnet."
+                    continue
+                }
+                
                 $startIp = Find-NextIpAddress $subnet.BroadcastAddress.IPAddressToString
                 $currentVnet = ($startIp -split '\.')[0..1] -join '.'
                 Write-Host "Start vNet $startIpVnet"
