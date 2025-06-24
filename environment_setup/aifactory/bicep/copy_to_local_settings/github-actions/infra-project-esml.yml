@@ -221,6 +221,17 @@ jobs:
         with:
           inlineScript: | 
             az account set --subscription ${{ env.admin_bicep_input_keyvault_subscription }}
+            
+            echo "Setting Key Vault network access to 'selected networks'..."
+            az keyvault update --name ${{ env.admin_bicep_kv_fw }} \
+              --resource-group ${{ env.admin_bicep_kv_fw_rg }} \
+              --default-action Deny \
+              --public-network-access Enabled
+            
+            # Wait for network configuration to propagate
+            echo "Waiting for network configuration to propagate..."
+            sleep 15
+
             az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
           azcliversion: latest
       - name: 03_az_download_seeding_keyvault

@@ -38,6 +38,11 @@ steps:
     scriptLocation: 'inlineScript'
     inlineScript: | 
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
+     
+     az keyvault update --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --public-network-access Enabled --default-action Deny
+     echo "Waiting for network rules to propagate..."
+     sleep 10
+     
      az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
 - task: AzureKeyVault@2
   displayName: '03_az_download_seeding_keyvault'

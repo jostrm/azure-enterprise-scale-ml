@@ -60,6 +60,19 @@ env:
     # OPTIONAL - GENAI specific
     azure_machinelearning_sp_oid: "${{ vars.TENANT_AZUREML_OID }}" # Azure Machine Learning service principle Object ID. In Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
 
+    # See PARAMETER folder instead. 31-esgenai-default.json
+
+    # admin_enablePublicGenAIAccess: false # Enable public access to GenAI
+    # optional_serviceSettingDeployAIDocIntelligence: false # Deploy AI Doc Intelligence
+    # optional_serviceSettingDeployAzureAIVision: false # Deploy Azure AI Vision
+    # optional_serviceSettingDeployAzureSpeech: false # Deploy Azure Speech
+    # optional_serviceSettingDeployAzureAppService: false # Deploy Azure App Service and a WebApp
+    # optional_serviceSettingDeployAzureFunction: false # Deploy Azure App Service and a WebApp
+    # optional_serviceSettingDeployAzureContainerApps: false # Deploy Azure ContainerApps
+    # optional_serviceSettingDeployAzureCosmosDB: false # Deploy Azure CosmosDB
+
+    # See PARAMETER folder instead, END
+
     # OPTIONAL - ESML specific https://learn.microsoft.com/en-us/azure/virtual-machines/ncads-h100-v5
     admin_aks_gpu_sku_dev_override: "Standard_B4ms" # GPU train: [Standard_NC24rs_v3,Standard_ND96amsr_A100_v4] GPU Inference [Standard_NC40ads_H100_v5,Standard_NC80adis_H100_v5]. CPU["Standard_B4ms"]
     admin_aks_gpu_sku_test_prod_override: Standard_DS13-2_v2 # AKS GPU SKU for test/prod
@@ -188,7 +201,8 @@ jobs:
           --parameters projectNumber="${{ env.project_number_000 }}" \
           --parameters location="${{ env.admin_location}}" \
           --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
-          --parameters useCommonACR="${{ env.useCommonACR }}"
+          --parameters useCommonACR="${{ env.useCommonACR }}" \
+          --debug
         azcliversion: latest
     - name: 06_az_remove_ip_from_seeding_keyvault_FW_whitelist
       if: env.ENABLE_NETWORKING_JOB  != 'false'
@@ -242,6 +256,17 @@ jobs:
         with:
           inlineScript: |
             az account set --subscription ${{ env.admin_bicep_input_keyvault_subscription }}
+            
+            echo "Setting Key Vault network access to 'selected networks'..."
+            az keyvault update --name ${{ env.admin_bicep_kv_fw }} \
+              --resource-group ${{ env.admin_bicep_kv_fw_rg }} \
+              --default-action Deny \
+              --public-network-access Enabled
+            
+            # Wait for network configuration to propagate
+            echo "Waiting for network configuration to propagate..."
+            sleep 15
+
             az keyvault network-rule add --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
           azcliversion: latest
       - name: 03_az_download_seeding_keyvault
@@ -258,6 +283,148 @@ jobs:
         run: |
           sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1 -spObjId '${{env.common-sp-appid-value}}' -spSecret '${{env.common-sp-secret-value}}' -useServicePrincipal -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' -filePath '../../../../../aifactory/parameters/' -env '${{env.dev_test_prod}}' -locationSuffixADO '${{env.admin_locationSuffix}}' -aifactorySuffixRGADO '${{env.admin_aifactorySuffixRG}}' -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' -projectNumber '${{ env.project_number_000 }}' -subscriptionId '${{env.dev_test_prod_sub_id}}' -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' -projectTypeADO '${{env.admin_projectType}}'"
         shell: pwsh
+      - name: 05_Import_or_Build default image offline, to private registry (ACR) if not exists
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            #!/bin/bash
+            
+            # Configuration flags
+            use_public_image=true  # Set to true to use public image instead of building
+            mcr_ms_hello='mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+            
+            # Create registry name from variables
+            registryNameOrg="acrcommon${{ env.AIFACTORY_SALT }}${{ env.admin_locationSuffix }}${{ env.admin_commonResourceSuffix }}${{ env.dev_test_prod }}"
+            registryName=$(echo "${registryNameOrg}" | tr -d '-')
+            echo "Registry name: $registryName"
+            
+            # Set registry name for cleanup task
+            echo "acr_registry_name=$registryName" >> $GITHUB_ENV
+
+            # Check if image already exists first (before any network configuration)
+            echo "Checking if image containerapps-default:latest already exists in registry..."
+            if az acr repository show --name $registryName --image containerapps-default:latest &> /dev/null; then
+              echo "✅  Image containerapps-default:latest already exists in registry $registryName"
+              echo "Skipping image creation and network configuration."
+              exit 0
+            fi
+            
+            echo "❌  Image does not exist, proceeding with creation..."
+
+            # Configure ACR for selective network access
+            echo "Configuring ACR for selective network access"
+            az acr update --name $registryName --public-network-enabled true --default-action Deny
+
+            # Wait for network rules to propagate
+            echo "Waiting for network rules to propagate..."
+            sleep 30
+            
+            # Get current IP addresses
+            echo "Getting current IP addresses right before ACR operations..."
+            CURRENT_IP1=$(curl -s http://ipinfo.io/ip 2>/dev/null || echo "")
+            CURRENT_IP2=$(curl -s https://api.ipify.org 2>/dev/null || echo "")
+            CURRENT_IP3=$(curl -s https://checkip.amazonaws.com 2>/dev/null || echo "")
+            CURRENT_IP4=$(curl -s https://icanhazip.com 2>/dev/null || echo "")
+            
+            echo "Current IPs detected: $CURRENT_IP1, $CURRENT_IP2, $CURRENT_IP3, $CURRENT_IP4"
+            
+            # Store IPs that we actually add for cleanup - using GitHub environment variables
+            ADDED_IPS_LIST=""
+            
+            # Add broader IP ranges for GitHub Actions agents
+            echo "Adding GitHub Actions service IP ranges (more permissive approach)"
+            
+            PRIMARY_IP=$(curl -s http://ipinfo.io/ip 2>/dev/null)
+            if [ -n "$PRIMARY_IP" ]; then
+              IP_BASE_16=$(echo $PRIMARY_IP | cut -d'.' -f1-2)
+              BROAD_RANGE_16="${IP_BASE_16}.0.0/16"
+              echo "Adding very broad IP range: $BROAD_RANGE_16"
+              az acr network-rule add --name $registryName --ip-address "$BROAD_RANGE_16" || true
+              ADDED_IPS_LIST="$ADDED_IPS_LIST,$BROAD_RANGE_16"
+              
+              IP_BASE_24=$(echo $PRIMARY_IP | cut -d'.' -f1-3)
+              BROAD_RANGE_24="${IP_BASE_24}.0/24"
+              echo "Adding broad IP range: $BROAD_RANGE_24"
+              az acr network-rule add --name $registryName --ip-address "$BROAD_RANGE_24" || true
+              ADDED_IPS_LIST="$ADDED_IPS_LIST,$BROAD_RANGE_24"
+            fi
+            
+            # Add common GitHub Actions IP ranges (updated for GitHub's documented ranges)
+            GITHUB_ACTIONS_RANGES=(
+              "13.107.6.0/24"
+              "13.107.9.0/24"
+              "13.107.42.0/24"
+              "13.107.43.0/24"
+              "104.208.0.0/16"
+              "52.0.0.0/8"
+              "13.0.0.0/8"
+              "140.82.112.0/20"
+              "185.199.108.0/22"
+              "192.30.252.0/22"
+            )
+            
+            for range in "${GITHUB_ACTIONS_RANGES[@]}"; do
+              echo "Adding GitHub Actions IP range: $range"
+              az acr network-rule add --name $registryName --ip-address "$range" || true
+              ADDED_IPS_LIST="$ADDED_IPS_LIST,$range"
+            done
+            
+            # Add individual detected IPs as backup
+            CURRENT_IPS=("$CURRENT_IP1" "$CURRENT_IP2" "$CURRENT_IP3" "$CURRENT_IP4")
+            for current_ip in "${CURRENT_IPS[@]}"; do
+              if [ -n "$current_ip" ]; then
+                echo "Adding detected IP: $current_ip"
+                az acr network-rule add --name $registryName --ip-address "$current_ip" || true
+                ADDED_IPS_LIST="$ADDED_IPS_LIST,$current_ip"
+              fi
+            done
+            
+            # Store the list of added IPs for cleanup (remove leading comma)
+            ADDED_IPS_LIST=$(echo "$ADDED_IPS_LIST" | sed 's/^,//')
+            echo "acr_added_ips=$ADDED_IPS_LIST" >> $GITHUB_ENV
+            echo "Stored IPs for cleanup: $ADDED_IPS_LIST"
+            
+            # Wait for network rules to propagate
+            echo "Waiting for network rules to propagate..."
+            sleep 30
+            
+            # Create the image (since we already confirmed it doesn't exist)
+            echo "Creating new image..."
+            
+            if [ "$use_public_image" = true ]; then
+              echo "Using public image: $mcr_ms_hello"
+              timestamp=$(date +%Y%m%d-%H%M%S)
+              
+              echo "Importing public image to ACR with latest tag..."
+              az acr import --name $registryName \
+                            --source $mcr_ms_hello \
+                            --image containerapps-default:latest \
+                            --force
+              
+              echo "Importing public image to ACR with timestamp tag..."
+              az acr import --name $registryName \
+                            --source $mcr_ms_hello \
+                            --image containerapps-default:$timestamp \
+                            --force
+              
+              echo "Public image imported to ACR successfully!"
+            else
+              echo "Building custom image using ACR build..."
+              az acr build --registry $registryName \
+                          --image containerapps-default:latest \
+                          --file azure-enterprise-scale-ml/environment_setup/aifactory/dockerfiles/acaDefault/Dockerfile \
+                          azure-enterprise-scale-ml/environment_setup/aifactory/dockerfiles/acaDefault/
+            fi
+
+            # Verify image was created successfully
+            sleep 30
+            if az acr repository show --name $registryName --image containerapps-default:latest &> /dev/null; then
+              echo "Image exists. Verified."
+            else
+              echo "Tried to verify Image, but it does NOT exist"
+              exit 1
+            fi
+          azcliversion: latest
       - name: 05a_Check if Private DNS Zones exist
         uses: azure/cli@v2
         with:
@@ -457,6 +624,7 @@ jobs:
             acrProjectName="acr${projectName}genai${locationSuffix}"
             vmName="dsvm-${projectName}-${locationSuffix}-${env}"
 
+
             # Check resources (fuzzy for those with randomSalt,unique, exact for others)
             echo "aiHubExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")" >> $GITHUB_ENV
             echo "aifProjectExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")" >> $GITHUB_ENV
@@ -484,7 +652,7 @@ jobs:
             echo "redisExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName" "$suffixStandard")" >> $GITHUB_ENV
             echo "postgreSQLExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")" >> $GITHUB_ENV
             echo "sqlServerExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "sqlDBExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "$suffixStandard")" >> $GITHUB_ENV
+            echo "sqlDBExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "*")" >> $GITHUB_ENV
             echo "acrProjectExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")" >> $GITHUB_ENV
             echo "vmExists=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")" >> $GITHUB_ENV
 
@@ -506,6 +674,7 @@ jobs:
             "env.bingExists"
             "env.containerAppsEnvExists"  
             "env.containerAppWExists"
+            "env.containerAppAExists"
             "env.cosmosDBExists"
             "env.functionAppExists"
             "env.webAppExists"
@@ -554,7 +723,7 @@ jobs:
             value="${!var_name}"
             echo "Checking variable: $var, Value: $value"
             if [ -z "$value" ] || [ ${#value} -lt 4 ]; then
-              echo "Warning: Environment variable $var is not set, empty, or less than 4 characters (It should be 10 excact). AIFACTORY_SALT_RANDOM is fine to be empty, if you init a project, But needed if UPDATING a project/adding services"
+              echo "Warning: Environment variable $var is not set, empty, or less than 4 characters (It should be 10). AIFACTORY_SALT_RANDOM is fine to be empty, if you init a project, But needed if UPDATING a project/adding services"
             fi
           done
 
@@ -664,3 +833,36 @@ jobs:
             az keyvault network-rule remove --resource-group ${{ env.admin_bicep_kv_fw_rg }} --name ${{ env.admin_bicep_kv_fw }} --ip-address $runner_ip
           azcliversion: latest
         if: always()
+      - name: 07_az_remove_ips_from_ACR_FW_whitelist
+        uses: azure/cli@v2
+        if: always()
+        with:
+          inlineScript: |
+            #!/bin/bash
+            
+            # Get the registry name and IPs from previous task
+            registryName="${{ env.acr_registry_name }}"
+            added_ips_string="${{ env.acr_added_ips }}"
+            
+            echo "Registry name: $registryName"
+            echo "IPs to remove: $added_ips_string"
+            
+            # Check if we have IPs to remove
+            if [ -n "$added_ips_string" ] && [ "$added_ips_string" != "" ]; then
+              echo "Cleaning up: Removing IPs and ranges that were added during ACR operations"
+              
+              # Convert comma-separated string to array
+              IFS=',' read -ra ADDED_IPS <<< "$added_ips_string"
+              
+              for ip in "${ADDED_IPS[@]}"; do
+                if [ -n "$ip" ]; then
+                  echo "Removing IP/range from ACR whitelist: $ip"
+                  az acr network-rule remove --name "$registryName" --ip-address "$ip" || echo "Failed to remove $ip or it was already removed"
+                fi
+              done
+              
+              echo "ACR firewall cleanup completed."
+            else
+              echo "No IPs to remove from ACR firewall."
+            fi
+          azcliversion: latest
