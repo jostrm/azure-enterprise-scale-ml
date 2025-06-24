@@ -2509,7 +2509,7 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
   ]
 }
 
-module privateDnsWebapp '../modules/privateDns.bicep' = if(!resourceExists.webApp && !centralDnsZoneByPolicyInHub && serviceSettingDeployWebApp && !enablePublicAccessWithPerimeter){
+module privateDnsWebapp '../modules/privateDns.bicep' = if(!resourceExists.webApp && !centralDnsZoneByPolicyInHub && serviceSettingDeployWebApp && !enablePublicAccessWithPerimeter && !byoASEv3){
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -2597,7 +2597,7 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
 }
 
 // Add DNS zone configuration for the Azure Function private endpoint
-module privateDnsFunction '../modules/privateDns.bicep' = if(!resourceExists.functionApp && !centralDnsZoneByPolicyInHub && serviceSettingDeployFunction && !enablePublicAccessWithPerimeter) {
+module privateDnsFunction '../modules/privateDns.bicep' = if(!resourceExists.functionApp && !centralDnsZoneByPolicyInHub && serviceSettingDeployFunction && !enablePublicAccessWithPerimeter && !byoASEv3) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
   params: {
