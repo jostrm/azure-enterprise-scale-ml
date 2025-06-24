@@ -227,7 +227,8 @@ function New-SubnetScheme {
                     Write-Host "Error! Full vNet, cannot Find-NextIpAddress. Create new vNet or increase existing vNet - $startIpVnet"
                     break
                 }
-                # Do not increment $index here, try again with new $startIp
+                # Decrement $index to retry the same subnet with the new IP address
+                $index--
                 continue
             }
         } else {
