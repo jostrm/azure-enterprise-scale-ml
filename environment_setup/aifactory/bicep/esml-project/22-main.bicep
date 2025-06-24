@@ -27,7 +27,6 @@ param vmSKU array = [
   'Standard_D4s_v3'
   'standard_D2as_v5'
 ]
-
 @description('Allow Azure ML Studio UI or not. Dataplane is always private, private endpoint - Azure backbone ')
 param AMLStudioUIPrivate bool = true
 @description('Databricks with PRIVATE endpoint or with SERVICE endpoint. Either way controlplane is on Azure backbone network ')
@@ -47,6 +46,12 @@ param aksSubnetId string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
+@allowed([
+  'loadBalancer'
+  'userDefinedRouting'
+  'none'
+])
+param aksOutboundType string = 'loadBalancer' // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
 
 @description('Common default subnet')
 param common_subnet_name string
@@ -1186,6 +1191,7 @@ module aml '../modules/machineLearning.bicep'= if(enableAML) {
     aksVmSku_testProd: aks_test_prod_sku_param
     aksNodes_dev:aks_dev_nodes_param
     aksNodes_testProd:aks_test_prod_nodes_param
+    aksOutboundType:aksOutboundType
     kubernetesVersionAndOrchestrator:aks_version_param
     amlComputeDefaultVmSize_dev: aml_cluster_dev_sku_param
     amlComputeDefaultVmSize_testProd: aml_cluster_test_prod_sku_param

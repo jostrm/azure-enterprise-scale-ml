@@ -520,6 +520,13 @@ param aml_cluster_dev_sku_override string = '' // Override: AML Compute Custer -
 param aml_cluster_test_prod_sku_override string = ''
 param aml_cluster_dev_nodes_override int = -1
 param aml_cluster_test_prod_nodes_override int = -1
+@allowed([
+  'loadBalancer'
+  'userDefinedRouting'
+  'none'
+])
+param aksOutboundType string = 'loadBalancer' // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
+
 // Networking - AML
 
 @description('Paramenter file dynamicNetworkParams.json contains this. Specifies the id of the AKS subnet that should be used by new AKS instance')

@@ -19,6 +19,11 @@ param enableRbac bool = true
 param disableLocalAccounts bool = false
 @description('Specifies if AzureRbac accounts in kubernetes permission model should be enabled or not. 2022-11 needs to be false, since Azure ML')
 param enableAzureRbac bool = false
+@allowed([
+  'loadBalancer'
+  'userDefinedRouting'
+  'none'
+])
 param outboundType string = 'loadBalancer' // 'userDefinedRouting' + Azure firewall on subnet if you want private IP: https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
 
 @description('Specifies agent pool profile settings in a array with hashmaps format')

@@ -25,6 +25,12 @@ param aksSubnetName string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
+@allowed([
+  'loadBalancer'
+  'userDefinedRouting'
+  'none'
+])
+param aksOutboundType string = 'loadBalancer' // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
 
 @description('AKS own SSL on private cluster. MS auto SSL is not possible since private cluster')
 param ownSSL string = 'disabled' //enabled
@@ -311,6 +317,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev') {
     location: location
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table    // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns'
+    outboundType: aksOutboundType // 'loadBalancer', 'userDefinedRouting', 'none'
     enableRbac: true
     nodeResourceGroup: nodeResourceGroupName // 'esml-${replace(projectName, 'prj', 'project')}-aksnode-${env}-rg'
     aksDnsServiceIP:aksDnsServiceIP
@@ -326,7 +333,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev') {
         vnetSubnetID: aksSubnetId
         type: 'VirtualMachineScaleSets'
         maxPods: 30 //110  total maxPods(maxPods per node * node count), the total maxPods(10 * 1) should be larger than 30.
-        orchestratorVersion: kubernetesVersionAndOrchestrator // in Westeurope '1.21.2'  is not allowed/supported
+        orchestratorVersion: kubernetesVersionAndOrchestrator
         osDiskSizeGB: 128
       }
     ]
@@ -339,6 +346,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
     tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
     location: location
+    outboundType: aksOutboundType // 'loadBalancer', 'userDefinedRouting', 'none'
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table  1.22.6 and 1.23.3(preview) // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns' // 'aks-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
     enableRbac: true
@@ -356,7 +364,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
         vnetSubnetID: aksSubnetId
         type: 'VirtualMachineScaleSets'
         maxPods: 30 // maxPods: 110
-        orchestratorVersion: kubernetesVersionAndOrchestrator // in Westeurope '1.21.2'  is not allowed/supported
+        orchestratorVersion: kubernetesVersionAndOrchestrator
       }
     ]
   }
