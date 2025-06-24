@@ -109,6 +109,9 @@ param subnetProjACA string = ''
 param DOCS_byovnet_example string = ''
 param DOCS_byosnet_common_example string = ''
 param DOCS_byosnet_project_example string = ''
+param byoASEv3 bool = false
+param byoAseFullResourceId string = ''
+param byoAseAppServicePlanResourceId string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002

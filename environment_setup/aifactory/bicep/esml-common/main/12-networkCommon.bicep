@@ -64,6 +64,9 @@ param deployAIGatewayNetworking bool = false // If true, deploys the AI Gateway 
 param deployOnlyAIGatewayNetworking bool = false
 param ai_gateway_apim_cidr string = ''
 param ai_gateway_app_cidr string = ''
+param byoASEv3 bool = false
+param byoAseFullResourceId string = ''
+param byoAseAppServicePlanResourceId string = ''
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
