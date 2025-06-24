@@ -2412,7 +2412,7 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!resourceEx
   ]
 }
   // In your main deployment file
-module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!resourceExists.functionApp && !resourceExists.webApp) &&(serviceSettingDeployWebApp || serviceSettingDeployFunction)) {
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!resourceExists.functionApp && !resourceExists.webApp) &&(serviceSettingDeployWebApp || serviceSettingDeployFunction) && !byoASEv3) {
   name: 'subnetDelegationServerFarm1${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -2501,7 +2501,7 @@ module webapp '../modules/webapp.bicep' = if(!resourceExists.webApp && serviceSe
   dependsOn: [
     projectResourceGroup
     sacc
-    ...((!resourceExists.webApp ||!resourceExists.functionApp) ? [subnetDelegationServerFarm] : [])
+    ...(((!resourceExists.webApp ||!resourceExists.functionApp) && !byoASEv3) ? [subnetDelegationServerFarm] : [])
     ...((!resourceExists.aiHub && enableAIFoundryHub) ? [aiHub] : [])
     ...((!resourceExists.aiServices && enableAIServices) ? [aiServices] : [])
     ...((!resourceExists.aiSearch && enableAISearch) ? [aiSearchService] : [])
@@ -2588,11 +2588,12 @@ module function '../modules/function.bicep' = if(!resourceExists.functionApp && 
   dependsOn: [
     projectResourceGroup
     sacc
-    ...((!resourceExists.webApp ||!resourceExists.functionApp) ? [subnetDelegationServerFarm] : [])
+    ...(((!resourceExists.webApp ||!resourceExists.functionApp) && !byoASEv3) ? [subnetDelegationServerFarm] : [])
     ...((!resourceExists.aiHub && enableAIFoundryHub) ? [aiHub] : [])
     ...((!resourceExists.aiServices && enableAIServices) ? [aiServices] : [])
     ...((!resourceExists.aiSearch && enableAISearch) ? [aiSearchService] : [])
     ...((!resourceExists.openai && serviceSettingDeployAzureOpenAI) ? [csAzureOpenAI] : [])
+    ...((!resourceExists.webApp && serviceSettingDeployWebApp) ? [webapp] : [])
   ]
 }
 
