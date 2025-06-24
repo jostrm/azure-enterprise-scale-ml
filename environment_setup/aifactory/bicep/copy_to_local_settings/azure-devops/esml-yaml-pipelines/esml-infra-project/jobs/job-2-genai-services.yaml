@@ -23,14 +23,28 @@ steps:
   displayName: '01_pwsh_get_IP_for_ADO_agent'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
-      Write-Host $resp
-      Write-Host "##vso[task.setvariable variable=admin_ip_fw]$resp"
-      $ipAddr = $resp
-      Write-Host ipAddr is: $admin_ip_fw
+      # Get primary IP
+      PRIMARY_IP=$(curl -s http://ipinfo.io/ip)
+      echo "Primary IP: $PRIMARY_IP"
+      echo "##vso[task.setvariable variable=admin_ip_fw]$PRIMARY_IP"
+      
+      # Get all possible IPs that might be used
+      echo "All network interfaces:"
+      ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1
+      
+      # Try alternative IP detection services
+      ALT_IP1=$(curl -s https://api.ipify.org)
+      ALT_IP2=$(curl -s https://checkip.amazonaws.com)
+      
+      echo "Alternative IP 1: $ALT_IP1"
+      echo "Alternative IP 2: $ALT_IP2"
+      
+      # Set variables for all IPs
+      echo "##vso[task.setvariable variable=admin_ip_fw_alt1]$ALT_IP1"
+      echo "##vso[task.setvariable variable=admin_ip_fw_alt2]$ALT_IP2"
 
 - task: AzureCLI@2
   displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
@@ -39,6 +53,9 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: | 
+     az keyvault update --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --default-
+     echo "Waiting for network rules to propagate..."
+     sleep 10
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
      az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
 - task: AzureKeyVault@2
@@ -55,6 +72,179 @@ steps:
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
     arguments: '-spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -useServicePrincipal -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)"'
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
+- task: AzureCLI@2
+  displayName: '05_Build default image offline, to private registry (ACR) if not exists'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      # Configuration flags
+      use_public_image=true  # Set to true to use public image instead of building image
+      mcr_ms_hello='mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+      
+      # Create registry name from variables
+      registryNameOrg="acrcommon$(aifactory_salt)$(admin_locationSuffix)$(admin_commonResourceSuffix)$(dev_test_prod)"
+      registryName=$(echo "${registryNameOrg}" | tr -d '-')
+      echo "Registry name: $registryName"
+      
+      # Set registry name for cleanup task
+      echo "##vso[task.setvariable variable=acr_registry_name]$registryName"
+
+      # Check if image already exists first
+      echo "Checking if image containerapps-default:latest already exists in ACR..."
+      if az acr repository show --name $registryName --image containerapps-default:latest &> /dev/null; then
+        echo "✅ Image containerapps-default:latest already exists in ACR. Skipping all build operations."
+        echo "##vso[task.setvariable variable=acr_added_ips]"  # Set empty for cleanup
+        exit 0
+      else
+        echo "❌ Image containerapps-default:latest does not exist. Proceeding with ACR setup and image creation..."
+      fi
+
+      # Configure ACR for selective network access
+      echo "Configuring ACR for selective network access"
+      az acr update --name $registryName --public-network-enabled true --default-action Deny
+
+      # Wait for network rules to propagate
+      echo "Waiting for network rules to propagate..."
+      sleep 30
+      
+      # Get current IP addresses
+      echo "Getting current IP addresses right before ACR operations..."
+      CURRENT_IP1=$(curl -s http://ipinfo.io/ip 2>/dev/null || echo "")
+      CURRENT_IP2=$(curl -s https://api.ipify.org 2>/dev/null || echo "")
+      CURRENT_IP3=$(curl -s https://checkip.amazonaws.com 2>/dev/null || echo "")
+      CURRENT_IP4=$(curl -s https://icanhazip.com 2>/dev/null || echo "")
+      
+      echo "Current IPs detected: $CURRENT_IP1, $CURRENT_IP2, $CURRENT_IP3, $CURRENT_IP4"
+      
+      # Store IPs that we actually add for cleanup - using pipeline variables
+      ADDED_IPS_LIST=""
+      SUCCESSFULLY_ADDED_IPS=""
+      
+      # Helper function to add IP with duplicate check
+      add_ip_to_acr() {
+        local ip="$1"
+        local description="$2"
+        
+        echo "Adding $description: $ip"
+        
+        # Try to add the IP and capture both output and exit code
+        local result
+        result=$(az acr network-rule add --name $registryName --ip-address "$ip" 2>&1)
+        local exit_code=$?
+        
+        if [ $exit_code -eq 0 ]; then
+          echo "Successfully added: $ip"
+          SUCCESSFULLY_ADDED_IPS="$SUCCESSFULLY_ADDED_IPS,$ip"
+          return 0
+        elif echo "$result" | grep -q "duplicate"; then
+          echo "IP $ip already exists in ACR rules (duplicate) - skipping"
+          return 0
+        else
+          echo "Failed to add $ip: $result"
+          return 1
+        fi
+      }
+      
+      # Add broader IP ranges for Azure DevOps agents
+      echo "Adding Azure DevOps service IP ranges (more permissive approach)"
+      
+      PRIMARY_IP=$(curl -s http://ipinfo.io/ip 2>/dev/null)
+      if [ -n "$PRIMARY_IP" ]; then
+        IP_BASE_16=$(echo $PRIMARY_IP | cut -d'.' -f1-2)
+        BROAD_RANGE_16="${IP_BASE_16}.0.0/16"
+        add_ip_to_acr "$BROAD_RANGE_16" "very broad IP range"
+        
+        IP_BASE_24=$(echo $PRIMARY_IP | cut -d'.' -f1-3)
+        BROAD_RANGE_24="${IP_BASE_24}.0/24"
+        add_ip_to_acr "$BROAD_RANGE_24" "broad IP range"
+      fi
+      
+      # Add common Azure DevOps IP ranges
+      AZURE_DEVOPS_RANGES=(
+        "13.107.6.0/24"
+        "13.107.9.0/24"
+        "13.107.42.0/24"
+        "13.107.43.0/24"
+        "104.208.0.0/16"
+        "52.0.0.0/8"
+        "13.0.0.0/8"
+        "150.171.22.0/24"
+        "150.171.23.0/24"
+        "150.171.73.0/24"
+        "150.171.74.0/24"
+        "150.171.75.0/24"
+        "150.171.76.0/24"
+      )
+      
+      for range in "${AZURE_DEVOPS_RANGES[@]}"; do
+        add_ip_to_acr "$range" "Azure DevOps IP range"
+      done
+      
+      # Add individual detected IPs as backup (with duplicate detection)
+      CURRENT_IPS=("$CURRENT_IP1" "$CURRENT_IP2" "$CURRENT_IP3" "$CURRENT_IP4")
+      PROCESSED_IPS=()
+      
+      for current_ip in "${CURRENT_IPS[@]}"; do
+        if [ -n "$current_ip" ]; then
+          # Check if we've already processed this IP
+          if [[ " ${PROCESSED_IPS[@]} " =~ " ${current_ip} " ]]; then
+            echo "IP $current_ip already processed - skipping duplicate"
+            continue
+          fi
+          
+          add_ip_to_acr "$current_ip" "detected IP"
+          PROCESSED_IPS+=("$current_ip")
+        fi
+      done
+      
+      # Store only the successfully added IPs for cleanup (remove leading comma)
+      SUCCESSFULLY_ADDED_IPS=$(echo "$SUCCESSFULLY_ADDED_IPS" | sed 's/^,//')
+      echo "##vso[task.setvariable variable=acr_added_ips]$SUCCESSFULLY_ADDED_IPS"
+      echo "Successfully added IPs for cleanup: $SUCCESSFULLY_ADDED_IPS"
+      
+      # Wait for network rules to propagate
+      echo "Waiting for network rules to propagate..."
+      sleep 30
+      
+      # Create the image (we already checked it doesn't exist)
+      echo "Creating new image containerapps-default:latest..."
+      
+      if [ "$use_public_image" = true ]; then
+        echo "Using public image: $mcr_ms_hello"
+        timestamp=$(date +%Y%m%d-%H%M%S)
+        
+        echo "Importing public image to ACR with latest tag..."
+        az acr import --name $registryName \
+                      --source $mcr_ms_hello \
+                      --image containerapps-default:latest \
+                      --force
+        
+        echo "Importing public image to ACR with timestamp tag..."
+        az acr import --name $registryName \
+                      --source $mcr_ms_hello \
+                      --image containerapps-default:$timestamp \
+                      --force
+        
+        echo "Public image imported to ACR successfully!"
+      else
+        echo "Building custom image using ACR build..."
+        az acr build --registry $registryName \
+                     --image containerapps-default:latest \
+                     --file azure-enterprise-scale-ml/environment_setup/aifactory/dockerfiles/acaDefault/Dockerfile \
+                     azure-enterprise-scale-ml/environment_setup/aifactory/dockerfiles/acaDefault/
+      fi
+
+      # Verify image was created successfully
+      sleep 30
+      if az acr repository show --name $registryName --image containerapps-default:latest &> /dev/null; then
+        echo "✅ Image created and verified successfully."
+      else
+        echo "❌ Failed to create/verify image"
+        exit 1
+      fi
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: '05a_Check if Private DNS Zones exist'
   inputs:
@@ -129,7 +319,7 @@ steps:
       locationSuffix="$(admin_locationSuffix)"
       envName="$(dev_test_prod)"
       aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      # uniqueInAIFenv="$(uniqueInAIFenv)" # not used in this script. fuzzy match is used instead.
+      # uniqueInAIFenv="$(aifactory_salt)" # not used in this script. fuzzy match is used instead.
       resourceSuffix="$(admin_prjResourceSuffix)"
       prjResourceSuffixNoDash="${resourceSuffix#-}"
       twoNumbers="${resourceSuffix:2:2}"
@@ -286,7 +476,7 @@ steps:
       echo "##vso[task.setvariable variable=redisExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=postgreSQLExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=sqlServerExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "*")"
       echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
       echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
 
@@ -447,15 +637,50 @@ steps:
      --parameters sqlDBExists="$(sqlDBExists)" \
      --parameters acrProjectExists="$(acrProjectExists)" \
      --parameters vmExists="$(vmExists)" \
-     --parameters aifactorySalt10char="$(aifactory_salt_random)"
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
-- task: AzureCLI@1
+- task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptLocation: inlineScript
+    scriptType: bash
     inlineScript: | 
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
      az keyvault network-rule remove --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
+  condition: always()
+- task: AzureCLI@2
+  displayName: '08_az_remove_ips_from_ACR_FW_whitelist'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      # Get the registry name and IPs from previous task
+      registryName="$(acr_registry_name)"
+      added_ips_string="$(acr_added_ips)"
+
+      echo "Registry name: $registryName"
+      echo "IPs to remove: $added_ips_string"
+
+      # Check if we have IPs to remove
+      if [ -n "$added_ips_string" ]; then
+        echo "Cleaning up: Removing IPs and ranges that were added during ACR operations"
+
+        # Convert comma-separated string to array
+        IFS=',' read -ra ADDED_IPS <<< "$added_ips_string"
+
+        for ip in "${ADDED_IPS[@]}"; do
+          if [ -n "$ip" ]; then
+            echo "Removing IP/range from ACR whitelist: $ip"
+            az acr network-rule remove --name "$registryName" --ip-address "$ip" || echo "Failed to remove $ip or it was already removed"
+          fi
+        done
+
+        echo "ACR firewall cleanup completed."
+      else
+        echo "No IPs to remove from ACR"
+      fi
   condition: always()

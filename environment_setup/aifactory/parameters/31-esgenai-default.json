@@ -42,13 +42,10 @@
             "value": "IsolatedV2"
         },
         "aseSkuCode": {
-            "value": "I1V2"
+            "value": "I1v2"
         },
         "aseSkuWorkers": {
             "value": 1
-        },
-        "aseSkuWorkerSizeId": {
-            "value": "6"
         },
         "serviceSettingDeployContainerApps": {
             "value": false
