@@ -13,6 +13,13 @@ Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline
     ```bash
     bash --version
     ```` 
+
+### Prerequisite: GIT enable long paths
+
+```
+git config --system core.longpaths true
+```
+
 ## START
 
 1) Add or Update the submodule to your repo (to get the bootstrap files)
