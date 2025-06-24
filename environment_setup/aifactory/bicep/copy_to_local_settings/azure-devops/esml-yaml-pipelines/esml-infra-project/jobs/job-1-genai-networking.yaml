@@ -81,10 +81,11 @@ steps:
      
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
-- task: AzureCLI@1
+- task: AzureCLI@2
   displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
     scriptLocation: 'inlineScript'
     inlineScript: | 
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
