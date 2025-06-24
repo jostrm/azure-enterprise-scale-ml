@@ -92,6 +92,16 @@ function Import-Dependencies {
             Import-Module Az.Network
             Import-Module Subnet
         }
+        "subnetCalc_v2.ps1" { 
+            Write-Verbose "Installing dependencies for $callingScriptName"
+            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Subnet -MinimumVersion $subnetVersion -Scope AllUsers -Force -AllowClobber
+            Import-Module Az.Resources
+            Import-Module Az.Accounts
+            Import-Module Az.Network
+            Import-Module Subnet
+        }
         Default {
             Write-Error "Sorry, could not match caller name with any switch conditions..."
         }
