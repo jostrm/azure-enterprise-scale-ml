@@ -189,6 +189,10 @@ param subnetProjAKS string = ''
 param subnetProjACA string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
+param byoASEv3 bool = false // Optional, default is false. Set to true if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+param byoAseFullResourceId string = '' // Full resource ID of App Service Environment
+param byoAseAppServicePlanResourceId string = '' // Full resource ID, default is empty. Set to the App Service Plan ID if you want to deploy ASE v3 instead of Multitenant App Service Plan.
+
 param randomValue string = newGuid()
 
 var vnetNameFull = vnetNameFull_param != '' ?  replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'

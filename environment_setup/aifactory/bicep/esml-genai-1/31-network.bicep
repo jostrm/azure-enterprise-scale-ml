@@ -52,6 +52,9 @@ param subnetProjACA string = ''
 param DOCS_byovnet_example string = ''
 param DOCS_byosnet_common_example string = ''
 param DOCS_byosnet_project_example string = ''
+param byoASEv3 bool = false
+param byoAseFullResourceId string = ''
+param byoAseAppServicePlanResourceId string = ''
 
 // To get TAGS from file: 10-esml-globals-1.json
 param tags object
