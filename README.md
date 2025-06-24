@@ -84,8 +84,7 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
     - STATUS: Done (2025-05)
 - **PostgreSQL (flexible servers), SQL Database, Redis Cache**: Add more Database engines, optionally to choose from
     - STATUS: Done (2025-05)
-- **Azure MCP server - in AIFactory common**: To be able to register AI foundry agents, and other agents in your AI Factory, we integrate Azure MCP Server.
-    - [Link Azure MCP Server](https://learn.microsoft.com/en-us/azure/developer/ai/intro-agents-mcp)
+- **MCP server - in AIFactory common**: To be able to register tools for AI foundry agents, and other agents in your AI Factory, an MCP Server is in progress.
     - STATUS: Ongoing (2025-05)
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
     - STATUS: Ongoing (2025-05)

@@ -50,8 +50,8 @@ The below files will be updated via `bash` scripts:
     ```bash
     git submodule update --init --recursive --remote
     ```
-    ``` 
-    git submodule foreach 'git checkout main && git pull origin main'
+    ```
+    git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
     ```
 
 2) Run the START script - to ensure you have the latest bootstrap scripts. 
@@ -113,9 +113,10 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
     ```bash
     git submodule update --init --recursive --remote
     ```
-    ``` 
-    git submodule foreach 'git checkout main && git pull origin main'
     ```
+    git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
+    ```
+
 2) Run the START script - to ensure you have the latest bootstrap scripts. 
     - friendly, will never overwrite anything exist .sh files at root
     
