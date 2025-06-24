@@ -6,22 +6,22 @@
 			"value": "10.XX.0.0/16"
 		},
         "common_subnet_cidr": {
-			"value": "10.XX.0.0/20"
+			"value": "10.XX.0.0/22"
 		},
         "common_subnet_scoring_cidr": {
-			"value": "10.XX.16.0/20"
+			"value": "10.XX.4.0/23"
 		},
         "common_pbi_subnet_name": {
 			"value": "snet-esml-cmn-pbi-001"
 		},
         "common_pbi_subnet_cidr": {
-			"value": "10.XX.32.0/24"
+			"value": "10.XX.6.0/26"
 		},
         "common_bastion_subnet_name": {
 			"value": "AzureBastionSubnet"
 		},
         "common_bastion_subnet_cidr": {
-			"value": "10.XX.33.0/26"
+			"value": "10.XX.6.64/27"
 		},
 		"deployAIGatewayNetworking": {
 			"value": false
@@ -30,10 +30,10 @@
 			"value": false
 		},
 		"ai_gateway_app_cidr": {
-			"value": "10.XX.33.64/27"
+			"value": "10.XX.6.96/27"
 		},
 		"ai_gateway_apim_cidr": {
-			"value": "10.XX.36.0/22"
+			"value": "10.XX.6.128/22"
 		}
     }
 }
