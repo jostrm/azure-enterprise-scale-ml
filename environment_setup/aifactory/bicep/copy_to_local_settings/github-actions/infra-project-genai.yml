@@ -289,6 +289,8 @@ jobs:
           inlineScript: |
             #!/bin/bash
             
+            az account set --subscription ${{ env.dev_test_prod_sub_id }}
+            
             # Configuration flags
             use_public_image=true  # Set to true to use public image instead of building
             mcr_ms_hello='mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'

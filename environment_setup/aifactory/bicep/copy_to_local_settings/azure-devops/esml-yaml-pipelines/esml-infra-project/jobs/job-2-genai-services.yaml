@@ -81,6 +81,9 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
       # Configuration flags
       use_public_image=true  # Set to true to use public image instead of building image
       mcr_ms_hello='mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
