@@ -294,7 +294,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         $requiredSubnets = [PsObject]@{
             dbxPubSubnetCidr  = '26' # 23-26
             dbxPrivSubnetCidr = '26' # 23-26
-            aksSubnetCidr     = '27' # 26-27 Azure CNI, Kubenet
+            aksSubnetCidr     = '26' # 26-27 Azure CNI, Kubenet
         }
     }
     else 
@@ -306,14 +306,14 @@ if ($(Get-AzContext).Subscription -ne "") {
             $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '26' # 23-26
                 dbxPrivSubnetCidr = '26' # 23-26
-                aksSubnetCidr     = '27' # 26-27 Azure CNI, Kubenet
+                aksSubnetCidr     = '26' # 26-27 Azure CNI, Kubenet
             }
         }
         elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
             write-host "projectTypeADO=genai-1"
             $requiredSubnets = [PsObject]@{
                 genaiSubnetCidr  = '25'
-                aksSubnetCidr     = '27' # 26-27 Azure CNI, Kubenet
+                aksSubnetCidr     = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 acaSubnetCidr     = '25' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
             }
         }
@@ -322,7 +322,7 @@ if ($(Get-AzContext).Subscription -ne "") {
             $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '26' # 23-26
                 dbxPrivSubnetCidr = '26' # 23-26
-                aksSubnetCidr     = '27' # 26-27 Azure CNI, Kubenet
+                aksSubnetCidr     = '26' # 26-27 Azure CNI, Kubenet
             }
         }
     }
