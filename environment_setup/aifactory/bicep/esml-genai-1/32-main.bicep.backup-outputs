@@ -1309,22 +1309,6 @@ var var_csDocIntelligence_name = csDocIntelligence.outputs.name
 #disable-next-line BCP318
 var var_aiHub_name = enableAIFoundryHub? (resourceExists.aiHub? aiHubName:aiHub.outputs.name): ''
 
-// Additional output vars for modules
-#disable-next-line BCP318
-var var_webapp_principalId = resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId
-#disable-next-line BCP318
-var var_acaApi_SERVICE_ACA_URI = acaApi.outputs.SERVICE_ACA_URI
-#disable-next-line BCP318
-var var_projectResourceGroup_rgId = projectResourceGroup.outputs.rgId
-
-// Principal ID vars for cognitive services
-#disable-next-line BCP318
-var var_csVision_principalId = csVision.outputs.principalId
-#disable-next-line BCP318
-var var_csSpeech_principalId = csSpeech.outputs.principalId
-#disable-next-line BCP318
-var var_csDocIntelligence_principalId = csDocIntelligence.outputs.principalId
-
 // End of vars
 
 module spAndMI2Array '../modules/spAndMiArray.bicep' = {
@@ -1518,7 +1502,7 @@ module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
   name: 'privateDnsLinkSpeech${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_csSpeech_dnsConfig
+    dnsConfig: csSpeech.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -1564,7 +1548,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
   name: 'privateDnsDocInt${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_csDocIntelligence_dnsConfig
+    dnsConfig: csDocIntelligence.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -1670,7 +1654,7 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!resourceExists.
   name: 'privDnsZoneLAOAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_csAzureOpenAI_dnsConfig
+    dnsConfig: csAzureOpenAI.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -1722,7 +1706,7 @@ module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!resourceExi
   name: 'priDZoneSA1${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_aiSearchService_dnsConfig
+    dnsConfig: enableAISearch? aiSearchService.outputs.dnsConfig:[]
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -1813,7 +1797,7 @@ module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(!resourceExists
   name: 'priDZoneSA2${genaiName}${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_sa4AIsearch_dnsConfig
+    dnsConfig: sa4AIsearch.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -1955,7 +1939,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(!resourceExists.stor
   name: 'priDZoneSA3${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_sacc_dnsConfig
+    dnsConfig: sacc.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2000,7 +1984,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(!resourceExists.key
   name: 'priDnZoneKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_kv1_dnsConfig
+    dnsConfig: kv1.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2156,7 +2140,7 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(!resourceE
   name: 'priDnsZACR${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_acr_dnsConfig
+    dnsConfig: acr.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2268,7 +2252,7 @@ module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!resou
   name: 'cosmosRbac${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    cosmosName: var_cosmosdb_name
+    cosmosName: cosmosdb.outputs.name
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
   }
@@ -2283,7 +2267,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!resourceExists.cosmo
   name: 'privateDnsLinkCosmos${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_cosmosdb_dnsConfig
+    dnsConfig: cosmosdb.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2324,7 +2308,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
   name: 'PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    postgreSqlServerName: var_postgreSQL_name
+    postgreSqlServerName: postgreSQL.outputs.name
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
@@ -2342,7 +2326,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!resourceExists.p
   name: 'privateDnsLinkPostgreSQL${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_postgreSQL_dnsConfig
+    dnsConfig: postgreSQL.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2379,7 +2363,7 @@ module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!resourc
   name: 'RedisCacheRbac4${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    redisName: var_redisCache_name
+    redisName: redisCache.outputs.name
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
@@ -2395,7 +2379,7 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!resourceExists.r
   name: 'privateDnsLinkRedisCache${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_redisCache_dnsConfig
+    dnsConfig: redisCache.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2432,7 +2416,7 @@ module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!re
   name: 'SqlServerRbac4${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    sqlServerName: var_sqlServer_serverName
+    sqlServerName: sqlServer.outputs.serverName
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
@@ -2449,7 +2433,7 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!resourceExists.sqlDB &&
   name: 'privateDnsLinkSqlServer${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_sqlServer_dnsConfig
+    dnsConfig: sqlServer.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2497,7 +2481,7 @@ module miRbac '../modules/miRbac.bicep'  = if(!resourceExists.miACA && useCommon
   name: 'miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    containerRegistryName: var_acrCommon2_containerRegistryName
+    containerRegistryName: acrCommon2.outputs.containerRegistryName
     principalId: var_miAca_PrincipalId
   }
   dependsOn: [
@@ -2511,7 +2495,7 @@ module miRbacProj '../modules/miRbac.bicep'  = if(!resourceExists.miACA && !useC
   name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    containerRegistryName: var_acr_containerRegistryName
+    containerRegistryName: acr.outputs.containerRegistryName
     principalId: var_miAca_PrincipalId
   }
   dependsOn: [
@@ -2526,7 +2510,7 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!resourceEx
   name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_containerAppsEnv_dnsConfig
+    dnsConfig: containerAppsEnv.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2637,7 +2621,7 @@ module privateDnsWebapp '../modules/privateDns.bicep' = if(!resourceExists.webAp
   name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_webapp_dnsConfig
+    dnsConfig: webapp.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
 
   }
@@ -2656,7 +2640,7 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!resourceExists.webAp
     storageAccountName2:var_storageAccountName2
     aiSearchName: var_aiSearchName
     #disable-next-line BCP318
-    webAppPrincipalId: var_webapp_principalId //var_webAppPrincipalId
+    webAppPrincipalId:resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId//var_webAppPrincipalId
     openAIName: var_openAIName
     aiServicesName:var_aiServicesName
   }
@@ -2728,7 +2712,7 @@ module privateDnsFunction '../modules/privateDns.bicep' = if(!resourceExists.fun
   name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    dnsConfig: var_function_dnsConfig
+    dnsConfig: function.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
@@ -2885,7 +2869,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!resourceExists.contain
     tags: projecttags
     name: containerAppWName
     #disable-next-line BCP318
-    apiEndpoint: var_acaApi_SERVICE_ACA_URI // TODO: MayTheForceBeWithYou - as var and REF.
+    apiEndpoint: acaApi.outputs.SERVICE_ACA_URI // TODO: MayTheForceBeWithYou - as var and REF.
     allowedOrigins: allowedOrigins
     containerAppsEnvironmentName: var_aca_env_name
     containerAppsEnvironmentId: var_aca_env_id
@@ -2917,7 +2901,7 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!resourc
     appInsightsName: var_app_insight_aca
     principalIdMI: var_miAca_PrincipalId
     #disable-next-line BCP318
-    resourceGroupId: var_projectResourceGroup_rgId
+    resourceGroupId: projectResourceGroup.outputs.rgId
   }
   dependsOn: [
     projectResourceGroup
@@ -3034,7 +3018,7 @@ module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && ena
     acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
     #disable-next-line BCP318
-    appInsightsName: var_applicationInsightSWC_name
+    appInsightsName:applicationInsightSWC.outputs.name
   }
   dependsOn: [
     projectResourceGroup
@@ -3086,7 +3070,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
     tags: projecttags
     aifactorySuffix: aifactorySuffixRG
     #disable-next-line BCP318
-    applicationInsightsName: resourceExists.applicationInsight? applicationInsightName: var_applicationInsightSWC_name
+    applicationInsightsName: resourceExists.applicationInsight? applicationInsightName: applicationInsightSWC.outputs.name
     acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
     env: env
@@ -3134,9 +3118,9 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
   name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
   params: {
     #disable-next-line BCP318
-    acrName: resourceExists.acrProject? acrProjectName: var_acr_containerRegistryName
+    acrName: resourceExists.acrProject? acrProjectName:acr.outputs.containerRegistryName
     #disable-next-line BCP318
-    aiHubName: var_aiHub_name
+    aiHubName: enableAIFoundryHub? (resourceExists.aiHub? aiHubName:aiHub.outputs.name): ''
     aiHubRgName: targetResourceGroup
   }
 }
@@ -3148,7 +3132,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!resour
     amlName:amlName
     servicePrincipleAndMIArray: spAndMiArray
     #disable-next-line BCP318
-    adfSP: var_miPrj_PrincipalId
+    adfSP:resourceExists.miPrj? miPrjREF.properties.principalId: miForPrj.outputs.managedIdentityPrincipalId
     projectADuser:technicalContactId
     additionalUserIds: p011_genai_team_lead_array
     useAdGroups: useAdGroups
@@ -3275,7 +3259,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!resourceExists.a
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
     #disable-next-line BCP318
-    resourceGroupId: var_projectResourceGroup_rgId
+    resourceGroupId: projectResourceGroup.outputs.rgId
     userObjectIds: p011_genai_team_lead_array
     aiHubName:aiHubName
     aiHubProjectName:var_aiProjectName
@@ -3318,10 +3302,10 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
     #disable-next-line BCP318
-    aiVisionMIObjectId: var_csVision_principalId
+    aiVisionMIObjectId: csVision.outputs.principalId
     userObjectIds: p011_genai_team_lead_array
     #disable-next-line BCP318
-    visonServiceName: var_csVision_name
+    visonServiceName: csVision.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
@@ -3340,10 +3324,10 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
     #disable-next-line BCP318
-    aiSpeechMIObjectId: var_csSpeech_principalId
+    aiSpeechMIObjectId: csSpeech.outputs.principalId
     userObjectIds: p011_genai_team_lead_array
     #disable-next-line BCP318
-    speechServiceName: var_csSpeech_name
+    speechServiceName: csSpeech.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
@@ -3362,9 +3346,9 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
     storageAccountName2:var_storageAccountName2
     userObjectIds: p011_genai_team_lead_array
     #disable-next-line BCP318
-    aiDocsIntelMIObjectId: var_csDocIntelligence_principalId
+    aiDocsIntelMIObjectId: csDocIntelligence.outputs.principalId
     #disable-next-line BCP318
-    docsServiceName: var_csDocIntelligence_name
+    docsServiceName: csDocIntelligence.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
