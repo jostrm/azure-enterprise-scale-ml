@@ -58,9 +58,9 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01'
         sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
       }
     }
-    #disable-next-line use-secure-value-for-secure-inputs
+    #disable-next-line use-secure-value-for-secure-inputs BCP318
     daprAIInstrumentationKey: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.InstrumentationKey : ''
-    #disable-next-line use-secure-value-for-secure-inputs
+    #disable-next-line use-secure-value-for-secure-inputs BCP318
     daprAIConnectionString: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.ConnectionString : ''
     workloadProfiles: [
       {

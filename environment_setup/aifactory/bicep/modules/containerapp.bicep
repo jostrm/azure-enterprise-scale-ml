@@ -193,6 +193,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
 
 
 output defaultDomain string = containerAppsEnvironment.properties.defaultDomain
+#disable-next-line BCP318
 output identityPrincipalId string = normalizedIdentityType == 'None' ? '' : (empty(identityName) ? app.identity.principalId : userIdentity.properties.principalId)
 output imageName string = imageName
 output name string = app.name

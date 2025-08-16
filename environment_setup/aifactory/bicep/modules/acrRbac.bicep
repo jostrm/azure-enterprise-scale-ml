@@ -30,6 +30,7 @@ resource containerRegistryPushRoleAssignment 'Microsoft.Authorization/roleAssign
   properties: {
     roleDefinitionId: containerRegistryPushRole.id
     principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
     principalId: aiHub.identity.principalId
   }
 }
@@ -40,6 +41,7 @@ resource computeInstanceContainerRegistryPullRoleAssignment 'Microsoft.Authoriza
   properties: {
     roleDefinitionId: containerRegistryPullRole.id
     principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
     principalId: aiHub.identity.principalId
   }
 }

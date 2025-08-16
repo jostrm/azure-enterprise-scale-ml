@@ -1,4 +1,4 @@
-﻿targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
+targetScope = 'subscription' // We dont know PROJECT RG yet. This is what we are to create.
 
 @description('UPDATE AIFactory (Long Term Support branches): If you want to upgrade the AIFactory Long Term Support branches. E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)')
 param aifactoryVersionMajor int = 1
@@ -100,10 +100,10 @@ resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-previ
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
-//resource aiHubProjectREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if(resourceExists.aiHubProject) { 
-//  name: aifProjectName
-//  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-//}
+resource aiHubProjectREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if(resourceExists.aiHubProject) { 
+  name: aifProjectName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
 
 resource aiSearchREF 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if(resourceExists.aiSearch) { 
   name: safeNameAISearch
@@ -156,14 +156,14 @@ resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existin
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
-//resource storageAccount1001REF 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if(resourceExists.storageAccount1001) {
-//  name: storageAccount1001Name
-//  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-//}
-//resource storageAccount2001REF 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if(resourceExists.storageAccount2001) {
-//  name: storageAccount2001Name
-//  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-//}
+resource storageAccount1001REF 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if(resourceExists.storageAccount1001) {
+  name: storageAccount1001Name
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+resource storageAccount2001REF 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if(resourceExists.storageAccount2001) {
+  name: storageAccount2001Name
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
 
 resource appInsightsREF 'Microsoft.Insights/components@2020-02-02' existing = if(resourceExists.applicationInsight) {
   name: applicationInsightName
@@ -767,7 +767,6 @@ var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // Salt: AIFactory instance/env specific
-#disable-next-line BCP318
 var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 
 // Networking - Private DNS: Centralized or Standalone
@@ -781,7 +780,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 }
 
 // Get the CIDR address prefixes from the vNet's properties
-#disable-next-line BCP318
 var vnetAddressPrefixes = vnet.properties.addressSpace.addressPrefixes
 // If you want just the first CIDR (most common case)
 var vnetCidr = vnetAddressPrefixes[0]
@@ -1261,7 +1259,6 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = {
     ...(resourceExists.miPrj ? [] : [miForPrj])
   ]
 }
-#disable-next-line BCP318
 var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
 
 module debug './00-debug.bicep' = if(enableDebugging){
@@ -1333,7 +1330,6 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
@@ -1379,7 +1375,6 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
@@ -1423,7 +1418,6 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
@@ -1468,7 +1462,6 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess? true: enablePublicNetworkAccessForCognitive
     vnetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
@@ -1517,7 +1510,6 @@ module aiServices '../modules/csAIServices.bicep' = if(!resourceExists.aiService
     //acrNameDummy: useCommonACR? acrCommon2.name:acr.name // Workaround for conditional "dependsOn"
     publicNetworkAccess: enablePublicGenAIAccess
     vnetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
     ]
     ipRules: empty(processedIpRulesAIServices)?[]:processedIpRulesAIServices
@@ -1559,7 +1551,6 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!resourceExists.openai && 
     sku: csOpenAISKU
     vnetName: vnetNameFull
     subnetName: genaiSubnetName
-    #disable-next-line BCP318
     keyvaultName: var_kv1_name //resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultName
     modelGPT4Version:modelGPT4Version
     aiSearchPrincipalId: var_search_pricipalId
@@ -1568,9 +1559,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!resourceExists.openai && 
     publicNetworkAccess: enablePublicGenAIAccess
     disableLocalAuth:disableLocalAuth
     vnetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
-      #disable-next-line BCP318
       subnet_aks_ref.id
     ]
     ipRules: [for ip in ipWhitelist_array: {
@@ -1688,9 +1677,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!resourceExists.storag
       }
     ]
     vnetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
-      #disable-next-line BCP318
       subnet_aks_ref.id
     ]
     corsRules: [
@@ -1828,9 +1815,7 @@ module sacc '../modules/storageAccount.bicep' = if(!resourceExists.storageAccoun
       }
     ]
     vnetRules: [ // Require  ServiceEndpoints for Microsoft.Storage on the subnets
-      #disable-next-line BCP318
       subnet_genai_ref.id 
-      #disable-next-line BCP318
       subnet_aks_ref.id
     ]
     ipRules: empty(processedIpRulesSa)? []: processedIpRulesSa
@@ -1904,9 +1889,7 @@ module kv1 '../modules/keyVault.bicep' = if(!resourceExists.keyvault) {
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
-      #disable-next-line BCP318
       subnet_genai_ref.id 
-      #disable-next-line BCP318
       subnet_aks_ref.id
     ]
     accessPolicies: [] 
@@ -2121,9 +2104,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!resourceExi
     createPrivateEndpoint: enablePublicAccessWithPerimeter?false:true
     keyvaultName: var_kv1_name
     vNetRules: [
-      #disable-next-line BCP318
       subnet_genai_ref.id
-      #disable-next-line BCP318
       subnet_aks_ref.id
     ]
     kind: cosmosKind
@@ -2318,7 +2299,6 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!resourceExists.r
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkRedisCache${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     dnsConfig: redisCache.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -2355,7 +2335,6 @@ module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!re
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'SqlServerRbac4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     sqlServerName: sqlServer.outputs.serverName
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
@@ -2372,7 +2351,6 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!resourceExists.sqlDB &&
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkSqlServer${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     dnsConfig: sqlServer.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -2420,7 +2398,6 @@ module miRbac '../modules/miRbac.bicep'  = if(!resourceExists.miACA && useCommon
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     containerRegistryName: acrCommon2.outputs.containerRegistryName
     principalId: var_miAca_PrincipalId
   }
@@ -2434,7 +2411,6 @@ module miRbacProj '../modules/miRbac.bicep'  = if(!resourceExists.miACA && !useC
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     containerRegistryName: acr.outputs.containerRegistryName
     principalId: var_miAca_PrincipalId
   }
@@ -2449,7 +2425,6 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!resourceEx
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     dnsConfig: containerAppsEnv.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -2560,7 +2535,6 @@ module privateDnsWebapp '../modules/privateDns.bicep' = if(!resourceExists.webAp
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     dnsConfig: webapp.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
 
@@ -2579,7 +2553,6 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!resourceExists.webAp
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
     aiSearchName: var_aiSearchName
-    #disable-next-line BCP318
     webAppPrincipalId:resourceExists.webApp? webappREF.identity.principalId: webapp.outputs.principalId//var_webAppPrincipalId
     openAIName: var_openAIName
     aiServicesName:var_aiServicesName
@@ -2651,7 +2624,6 @@ module privateDnsFunction '../modules/privateDns.bicep' = if(!resourceExists.fun
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     dnsConfig: function.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -2808,7 +2780,6 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!resourceExists.contain
     location: location
     tags: projecttags
     name: containerAppWName
-    #disable-next-line BCP318
     apiEndpoint: acaApi.outputs.SERVICE_ACA_URI // TODO: MayTheForceBeWithYou - as var and REF.
     allowedOrigins: allowedOrigins
     containerAppsEnvironmentName: var_aca_env_name
@@ -2840,7 +2811,6 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!resourc
     aiSearchName: var_aiSearchName
     appInsightsName: var_app_insight_aca
     principalIdMI: var_miAca_PrincipalId
-    #disable-next-line BCP318
     resourceGroupId: projectResourceGroup.outputs.rgId
   }
   dependsOn: [
@@ -2957,7 +2927,6 @@ module amlv2 '../modules/machineLearningv2.bicep'= if(!resourceExists.aml && ena
     kvName:var_kv1_name
     acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
-    #disable-next-line BCP318
     appInsightsName:applicationInsightSWC.outputs.name
   }
   dependsOn: [
@@ -3009,7 +2978,6 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!resourceExists.aiHub 
     location: location
     tags: projecttags
     aifactorySuffix: aifactorySuffixRG
-    #disable-next-line BCP318
     applicationInsightsName: resourceExists.applicationInsight? applicationInsightName: applicationInsightSWC.outputs.name
     acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR? commonResourceGroup: targetResourceGroup
@@ -3057,9 +3025,7 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
   scope:resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     acrName: resourceExists.acrProject? acrProjectName:acr.outputs.containerRegistryName
-    #disable-next-line BCP318
     aiHubName: enableAIFoundryHub? (resourceExists.aiHub? aiHubName:aiHub.outputs.name): ''
     aiHubRgName: targetResourceGroup
   }
@@ -3071,7 +3037,6 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!resour
   params: {
     amlName:amlName
     servicePrincipleAndMIArray: spAndMiArray
-    #disable-next-line BCP318
     adfSP:resourceExists.miPrj? miPrjREF.properties.principalId: miForPrj.outputs.managedIdentityPrincipalId
     projectADuser:technicalContactId
     additionalUserIds: p011_genai_team_lead_array
@@ -3183,7 +3148,6 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!resourceExists
   params:{
     azureMachineLearningObjectId: azureMachineLearningObjectId
     aiHubName: aiHubName
-    #disable-next-line BCP318
     aiHubPrincipalId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
   }
   dependsOn: [
@@ -3198,7 +3162,6 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!resourceExists.a
     aiServicesName:var_aiServicesName
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
-    #disable-next-line BCP318
     resourceGroupId: projectResourceGroup.outputs.rgId
     userObjectIds: p011_genai_team_lead_array
     aiHubName:aiHubName
@@ -3241,10 +3204,8 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
   params:{
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
-    #disable-next-line BCP318
     aiVisionMIObjectId: csVision.outputs.principalId
     userObjectIds: p011_genai_team_lead_array
-    #disable-next-line BCP318
     visonServiceName: csVision.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
@@ -3263,10 +3224,8 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
   params:{
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
-    #disable-next-line BCP318
     aiSpeechMIObjectId: csSpeech.outputs.principalId
     userObjectIds: p011_genai_team_lead_array
-    #disable-next-line BCP318
     speechServiceName: csSpeech.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
@@ -3285,9 +3244,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
     storageAccountName: var_storageAccountName
     storageAccountName2:var_storageAccountName2
     userObjectIds: p011_genai_team_lead_array
-    #disable-next-line BCP318
     aiDocsIntelMIObjectId: csDocIntelligence.outputs.principalId
-    #disable-next-line BCP318
     docsServiceName: csDocIntelligence.outputs.name
     useAdGroups:useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
@@ -3362,9 +3319,7 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!re
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: 'rbacLake4PrjFoundry${deploymentProjSpecificUniqueSuffix}'
   params: {
-    #disable-next-line BCP318
     amlPrincipalId: ''//(!resourceExists.aml && enableAML)? amlv2.outputs.principalId: (enableAML)? amlREF.identity.principalId:''
-    #disable-next-line BCP318
     aiHubPrincipleId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''
@@ -3383,7 +3338,6 @@ module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!resource
   name: 'rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlPrincipalId: var_aml_principal_id
-    #disable-next-line BCP318
     aiHubPrincipleId: ''//(!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
     projectTeamGroupOrUser: [] // p011_genai_team_lead_array
     adfPrincipalId: ''

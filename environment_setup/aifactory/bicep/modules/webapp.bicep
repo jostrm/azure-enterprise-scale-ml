@@ -207,6 +207,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
       appSettings: concat(appSettings, !empty(applicationInsightsName) ? [
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          #disable-next-line BCP318
           value: (!empty(applicationInsightsName))? appInsights.properties.ConnectionString: ''
         }
         {

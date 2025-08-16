@@ -287,6 +287,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    #disable-next-line BCP318
     resourceId: ((env =='dev') ? aksDev.outputs.aksId : aksTestProd.outputs.aksId)  
     properties: {
       agentCount:  ((env =='dev') ? 1 :  3)
@@ -317,6 +318,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    #disable-next-line BCP318
     resourceId: ((env =='dev') ? aksDev.outputs.aksId : aksTestProd.outputs.aksId)  
     properties: {
       agentCount:  ((env =='dev') ? 1 :  3)
@@ -412,6 +414,7 @@ resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/wo
 
 output amlId string = (env=='dev')? azureMLv2.id: amlv2TestProd.id
 output amlName string =(env=='dev')? azureMLv2.name: amlv2TestProd.name
+#disable-next-line BCP318
 output principalId string = (env=='dev')?azureMLv2.identity.principalId:  amlv2TestProd.identity.principalId
 
 // ###############  AML networking - custom networking ###############

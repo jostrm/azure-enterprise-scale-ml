@@ -27,7 +27,7 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   location: location
   kind: 'AzurePowerShell'
   properties: {
-    azPowerShellVersion: '3.0'
+    azPowerShellVersion: '11.0'
     // Pass the parameters as environment variables instead of trying to interpolate them in the script
     environmentVariables: [
       {

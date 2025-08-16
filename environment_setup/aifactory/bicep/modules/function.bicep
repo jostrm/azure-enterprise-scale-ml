@@ -251,6 +251,7 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
         !empty(applicationInsightsName) ? [
           {
             name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+            #disable-next-line BCP318
             value: appInsights.properties.ConnectionString
           }
         ] : [])

@@ -570,6 +570,7 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
   properties: {
     roleDefinitionId: amlWorkspaceSecretsReaderRole.id
     principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
     principalId: aiProject::endpoint.identity.principalId
   }
 }
@@ -581,6 +582,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
   properties: {
     roleDefinitionId: cognitiveServicesOpenAiUserRole.id
     principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
     principalId: aiProject::endpoint.identity.principalId
   }
 }
@@ -632,6 +634,7 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
   parent: keyVault
   name: 'aifactory-proj-ep-default-api-key'
   properties: {
+    #disable-next-line BCP422
     value: aiProject::endpoint.listKeys().primaryKey // This key is technically already in Key Vault, but it's name is not something that is easy to reference.
     contentType: 'text/plain'
     attributes: {
@@ -700,6 +703,7 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment2 'Microsoft.Authori
   properties: {
     roleDefinitionId: amlWorkspaceSecretsReaderRole.id
     principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
     principalId: aiProject2::endpoint2.identity.principalId
   }
 }
@@ -711,6 +715,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment2 'Microsoft.Authorizat
   properties: {
     roleDefinitionId: cognitiveServicesOpenAiUserRole.id
     principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
     principalId: aiProject2::endpoint2.identity.principalId
   }
 }
@@ -762,6 +767,7 @@ resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023
   parent: keyVault
   name: 'aifactory-proj-ep-default2-api-key'
   properties: {
+    #disable-next-line BCP422
     value: aiProject2::endpoint2.listKeys().primaryKey // This key is technically already in Key Vault, but it's name is not something that is easy to reference.
     contentType: 'text/plain'
     attributes: {
@@ -823,6 +829,8 @@ resource privateEndpointDns2 'Microsoft.Network/privateEndpoints/privateDnsZoneG
 
 output id string = (enablePublicAccessWithPerimeter==false)? aiHub.id:aiHub2.id
 output name string =(enablePublicAccessWithPerimeter==false)? aiHub.name:aiHub2.name
+#disable-next-line BCP318
 output principalId string = (enablePublicAccessWithPerimeter==false)?aiHub.identity.principalId:aiHub2.identity.principalId
+#disable-next-line BCP318
 output projectPrincipalId string = (enablePublicAccessWithPerimeter==false)? aiProject.identity.principalId:aiProject2.identity.principalId
 output aiProjectName string = (enablePublicAccessWithPerimeter==false)? aiProject.name: aiProject2.name

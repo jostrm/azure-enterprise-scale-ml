@@ -194,8 +194,10 @@ resource cognitiveServicesOpenAIContributorAISearch 'Microsoft.Authorization/rol
   name: guid(existingOpenAIResource.id, cognitiveServicesOpenAIContributorRoleId, existingAiSearch.id)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
+    #disable-next-line BCP318
     principalId: existingAiSearch.identity.principalId
     principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
     description:'cognitiveServicesOpenAIContributorRoleId to project service principal OID:${existingAiSearch.identity.principalId} to ${existingAiSearch.name}'
   }
   scope:existingOpenAIResource

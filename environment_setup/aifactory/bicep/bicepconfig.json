@@ -24,6 +24,9 @@
                 },
                 "use-safe-access": {
                     "level": "off"
+                },
+                "use-stable-resource-identifiers": {
+                    "level": "off"
                 }
             }
         }
