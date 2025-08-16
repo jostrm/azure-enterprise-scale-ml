@@ -38,6 +38,11 @@ param highAvailability object = {
   mode: 'Disabled' // Default to Disabled, can be overridden
 }
 param availabilityZone string = '1' // Default to zone 1, can be overridden
+param useCMK bool = false // If true, enables customer managed key for encryption
+@description('The key vault key ID for customer managed key encryption. Required when useCMK is true.')
+param keyVaultKeyId string = ''
+@description('The user assigned identity ID for customer managed key encryption. Required when useCMK is true.')
+param cmkUserAssignedIdentityId string = ''
 
 var identityType = systemAssignedIdentity 
   ? (!empty(userAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned') 
@@ -72,7 +77,11 @@ resource postgreSQLFlex 'Microsoft.DBforPostgreSQL/flexibleServers@2024-11-01-pr
     network: {
       publicNetworkAccess: createPrivateEndpoint? 'Disabled': 'Enabled'
     }
-    dataEncryption: {
+    dataEncryption: useCMK ? {
+      type: 'AzureKeyVault'
+      primaryKeyURI: keyVaultKeyId
+      primaryUserAssignedIdentityId: cmkUserAssignedIdentityId
+    } : {
       type: 'SystemManaged'
     }
     authConfig: {
@@ -192,6 +201,26 @@ resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07
     attributes: {
       enabled: true
     }
+  }
+}
+
+var keyVaultPermissions = {
+  secrets: [ 
+    'get'
+    'wrap key'
+    'unwrap key'
+  ]
+}
+
+resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = if(useCMK)  {
+  parent:keyVault
+  name:'add'
+  properties: {
+    accessPolicies: [{
+      objectId: postgreSQLFlex.identity.principalId
+      permissions: keyVaultPermissions
+      tenantId: subscription().tenantId
+    }]
   }
 }
 

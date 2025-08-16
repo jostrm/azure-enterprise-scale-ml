@@ -123,7 +123,7 @@ resource integrationSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01
 
 // Create App Service Plan
 // TODO: Linux or Windows
-resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = {
+resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = if (empty(byoAseAppServicePlanRID)) {
   name: servicePlanName
   location: location
   tags: tags
@@ -175,7 +175,7 @@ var identity = identityType != 'None' ? {
 } : null
 
 // Reference existing ASE App Service Plan if provided
-resource existingAppServicePlan 'Microsoft.Web/serverfarms@2024-11-01' existing = if (!empty(byoAseAppServicePlanRID)) {
+resource existingAppServicePlan 'Microsoft.Web/serverfarms@2024-11-01' existing = if (!empty(byoAseAppServicePlanRID) && byoASEv3) {
   name: last(split(byoAseAppServicePlanRID, '/'))
   scope: resourceGroup(split(byoAseAppServicePlanRID, '/')[2], split(byoAseAppServicePlanRID, '/')[4])
 }
@@ -188,7 +188,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
   kind: runtime == 'node' || runtime == 'python' || runtime == 'java'? 'app,linux' : 'app' // Linux Web app OR Windows Web app
   identity: identity
   properties: {
-    serverFarmId: !empty(byoAseAppServicePlanRID) ? byoAseAppServicePlanRID : appServicePlan.id
+    serverFarmId: !empty(byoAseAppServicePlanRID) && byoASEv3? existingAppServicePlan.id : appServicePlan.id
     httpsOnly: true
     hostingEnvironmentProfile: !empty(byoAseFullResourceId) && byoASEv3 ? {
       id: byoAseFullResourceId

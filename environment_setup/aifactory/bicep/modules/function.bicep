@@ -128,7 +128,7 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing 
 }
 
 // Create App Service Plan
-resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = {
+resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = if (empty(byoAseAppServicePlanRID)) {
   name: servicePlanName
   location: location
   tags: tags

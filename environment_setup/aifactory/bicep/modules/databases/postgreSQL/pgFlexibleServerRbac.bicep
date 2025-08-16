@@ -1,6 +1,7 @@
 metadata description = 'Creates role assignments for PostgreSQL Flexible Server.'
 param usersOrAdGroupArray array
 param servicePrincipleAndMIArray array
+param adminNames array = []
 param postgreSqlServerName string
 param useAdGroups bool
 param resourceCreatedNow bool = false
@@ -31,3 +32,14 @@ resource spPostgreSqlRoleAssignment 'Microsoft.Authorization/roleAssignments@202
     principalType: 'ServicePrincipal'
   }
 }]
+
+resource pgAdmins 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2025-01-01-preview' = [for admin in adminNames: if(!empty(adminNames)) {
+  name: guid(postgreSqlServer.id, contributorRoleId, admin)
+  parent: postgreSqlServer
+  properties: {
+    principalName: admin
+    principalType: useAdGroups ? 'Group' : 'User'
+    tenantId: subscription().tenantId
+  }
+}]
+

@@ -268,6 +268,7 @@ param serviceSettingDeployPostgreSQL bool = false
 param postgreSQLHighAvailability object = {
   mode: 'Disabled' // Default to Disabled, can be overridden
 }
+param postgresEnableCustomerManagedKey bool = false
 param postgresAvailabilityZone string = '1' // Default to zone 1, can be overridden
 param postgreSQLSKU_Name string = 'Standard_B2s' // Basic tier with 1 vCore
 param postgreSQLSKU_Tier string = 'Burstable'     // Burstable tier
@@ -2199,6 +2200,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
     useAdGroups: useAdGroups
     highAvailability: postgreSQLHighAvailability
     availabilityZone:postgresAvailabilityZone
+    useCMK: postgresEnableCustomerManagedKey
   }
   dependsOn: [
     projectResourceGroup
@@ -2214,6 +2216,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
+    adminNames:p011_genai_team_lead_email_array
   }
   dependsOn: [
     postgreSQL

@@ -76,6 +76,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
 - task: AzureCLI@2
   displayName: '05_Build default image offline, to private registry (ACR) if not exists'
+  condition: eq(variables['serviceSettingDeployContainerApps'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
