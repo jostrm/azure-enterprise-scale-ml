@@ -676,7 +676,7 @@ param subnetProjACA string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
 param enableDebugging bool = false
-param randomValue string = newGuid()
+param randomValue string ='' //newGuid()
 
 // Parameters to variables
 var vnetNameFull = vnetNameFull_param != '' ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
@@ -760,7 +760,10 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 param aifactorySalt5char string = '' // Deterministic
 param aifactorySalt10char string = '' // Random
 var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
-var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 6, 10): aifactorySalt10char
+var randomGuid = sys.newGuid()
+var randomValueUsed = empty(randomValue)? randomGuid : randomValue
+
+var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValueUsed, 6, 10): aifactorySalt10char
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // Salt: AIFactory instance/env specific
