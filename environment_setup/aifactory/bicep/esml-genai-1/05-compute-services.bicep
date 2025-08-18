@@ -62,10 +62,9 @@ param centralDnsZoneByPolicyInHub bool = false
 // Required resource references
 param vnetNameFull string
 param vnetResourceGroupName string
-param defaultSubnet string = 'snet-common'
-param genaiSubnetName string = 'snet-genai'
-param aksSubnetName string = 'aks-prj005'
-param acaSubnetName string = 'aca-prj005'
+param genaiSubnetId string
+param aksSubnetId string
+param acaSubnetId string = ''
 param targetResourceGroup string
 param commonResourceGroup string
 
@@ -158,6 +157,17 @@ var projectName = 'prj${projectNumber}'
 var cmnName = 'cmn'
 var genaiName = 'genai'
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
+
+// ============================================================================
+// COMPUTED VARIABLES - Networking subnets
+// ============================================================================
+var segments = split(genaiSubnetId, '/')
+var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
+var defaultSubnet = genaiSubnetName
+var segmentsAKS = split(aksSubnetId, '/')
+var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
+var segmentsACA = split(acaSubnetId, '/')
+var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
 
 // Resource names
 var webAppName = 'app-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'

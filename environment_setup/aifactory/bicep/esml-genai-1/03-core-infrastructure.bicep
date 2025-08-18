@@ -58,8 +58,9 @@ param centralDnsZoneByPolicyInHub bool = false
 // Required resource references
 param vnetNameFull string
 param vnetResourceGroupName string
-param defaultSubnet string = 'snet-common'
-param genaiSubnetName string = 'snet-genai'
+param genaiSubnetId string
+param aksSubnetId string
+param acaSubnetId string = ''
 param targetResourceGroup string
 param commonResourceGroup string
 
@@ -115,6 +116,17 @@ var cmnName = 'cmn'
 var genaiName = 'genai'
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
 
+// ============================================================================
+// COMPUTED VARIABLES - Networking subnets
+// ============================================================================
+var segments = split(genaiSubnetId, '/')
+var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
+var defaultSubnet = genaiSubnetName
+var segmentsAKS = split(aksSubnetId, '/')
+var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
+var segmentsACA = split(acaSubnetId, '/')
+var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
+
 // Resource names
 var keyvaultName = 'kv-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 var var_kv1_name = keyvaultName
@@ -152,7 +164,7 @@ resource subnet_genai 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' exi
 
 resource subnet_aks 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   parent: vnet
-  name: 'aks-${projectName}'
+  name: aksSubnetName
 }
 
 var subnet_genai_ref = {

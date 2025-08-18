@@ -56,12 +56,11 @@ param centralDnsZoneByPolicyInHub bool = false
 param AMLStudioUIPrivate bool = true
 param allowPublicAccessWhenBehindVnet bool = false
 
-// Required resource references
+// networking - subnets
 param vnetNameFull string
 param vnetResourceGroupName string
-param defaultSubnet string = 'snet-common'
-param genaiSubnetName string = 'snet-genai'
-param aksSubnetName string = 'aks-prj005'
+param genaiSubnetId string
+param aksSubnetId string
 param targetResourceGroup string
 param commonResourceGroup string
 
@@ -75,7 +74,6 @@ param aiSearchName string
 param aiServicesName string
 
 // AKS Configuration
-param aksSubnetId string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
@@ -129,6 +127,15 @@ var cmnName = 'cmn'
 var genaiName = 'genai'
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
 
+// ============================================================================
+// COMPUTED VARIABLES - Networking subnets
+// ============================================================================
+var segments = split(genaiSubnetId, '/')
+var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
+var defaultSubnet = genaiSubnetName
+var segmentsAKS = split(aksSubnetId, '/')
+var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
+
 // Resource names
 var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 var aiHubName = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
@@ -158,10 +165,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   scope: resourceGroup(subscription().subscriptionId, vnetResourceGroupName)
   name: vnetNameFull
 }
-
-// AKS subnet name extraction
-var segmentsAKS = split(aksSubnetId, '/')
-var aksSubnetNameExtracted = segmentsAKS[length(segmentsAKS) - 1]
 
 // Common ACR name
 var acrCommonName = replace('acr${cmnName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
@@ -259,7 +262,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     skuTier: 'basic'
     env: env
     aksSubnetId: aksSubnetId
-    aksSubnetName: aksSubnetNameExtracted
+    aksSubnetName: aksSubnetName
     aksDnsServiceIP: aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
     tags: projecttags

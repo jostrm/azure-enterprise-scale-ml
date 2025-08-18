@@ -68,6 +68,11 @@ param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param network_env string = ''
 
+@description('Subnets from subnet calculator: dynamicNetworkParams.json')
+param genaiSubnetId string
+param aksSubnetId string
+param acaSubnetId string = ''
+
 @description('Private DNS configuration')
 param centralDnsZoneByPolicyInHub bool = false
 param privateDnsAndVnetLinkAllGlobalLocation bool = false
@@ -153,6 +158,16 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
   scope: resourceGroup(vnetResourceGroupName)
 }
+// ============================================================================
+// COMPUTED VARIABLES - Networking subnets
+// ============================================================================
+var segments = split(genaiSubnetId, '/')
+var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
+var defaultSubnet = genaiSubnetName
+var segmentsAKS = split(aksSubnetId, '/')
+var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
+var segmentsACA = split(acaSubnetId, '/')
+var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
 
 // ============================================================================
 // COMPUTED VARIABLES - Private DNS
