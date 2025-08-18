@@ -598,7 +598,7 @@ steps:
      --parameters zoneMongoExists="$(zoneMongoExists)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --debug
-
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '62-cognitive-services'
   inputs:
@@ -641,7 +641,7 @@ steps:
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
      --debug
-
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '63-core-infrastructure'
   inputs:
@@ -687,7 +687,7 @@ steps:
      --parameters vmExists="$(vmExists)" \
      --parameters bingExists="$(bingExists)" \
      --debug
-
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '64-databases'
   inputs:
@@ -727,7 +727,7 @@ steps:
      --parameters postgreSQLExists="$(postgreSQLExists)" \
      --parameters sqlServerExists="$(sqlServerExists)" \
      --debug
-
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '65-compute-services'
   inputs:
@@ -773,7 +773,7 @@ steps:
      --parameters datafactoryExists="$(datafactoryExists)" \
      --parameters miACAExists="$(miACAExists)" \
      --debug
-
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '66-ml-platform'
   inputs:
@@ -813,7 +813,7 @@ steps:
      --parameters aifProjectExists="$(aifProjectExists)" \
      --parameters aksExists="$(aksExists)" \
      --debug
-
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '67-rbac-security'
   inputs:
@@ -866,7 +866,7 @@ steps:
      --parameters spn_ado_RootTennantId="$(spn_ado_RootTennantId)" \
      --parameters spn_ado_RootAppId="$(spn_ado_RootAppId)" \
      --debug
-
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   inputs:
