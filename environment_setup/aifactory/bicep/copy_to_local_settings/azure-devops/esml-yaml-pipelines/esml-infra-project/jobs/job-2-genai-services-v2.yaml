@@ -586,7 +586,6 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
-     --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters keyvaultExists="$(keyvaultExists)" \
@@ -597,6 +596,7 @@ steps:
      --parameters zoneSqlExists="$(zonesqlExists)" \
      --parameters zoneMongoExists="$(zoneMongoExists)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters aifactorySalt5char="$(aifactory_salt5char)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

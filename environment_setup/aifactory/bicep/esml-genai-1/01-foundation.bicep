@@ -45,6 +45,11 @@ param miACAExists bool = false
 param miPrjExists bool = false
 param keyvaultExists bool = false
 param storageAccount1001Exists bool = false
+param zoneAzurecontainerappsExists bool = false
+param zonePostgresExists bool = false
+param zoneSqlExists bool = false
+param zoneMongoExists bool = false
+param zoneRedisExists bool = false
 
 var resourceExists = {
   miACA: miACAExists
@@ -332,6 +337,7 @@ var privateLinksDnsZones = {
   }
 }
 
+
 var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.blob.name
@@ -452,9 +458,33 @@ var privateLinksDnsZonesArray = [
     name: privateLinksDnsZones.azuremonitoragentsvc.name
     id: privateLinksDnsZones.azuremonitoragentsvc.id
     exists: true
+  } // 2025-04-01: Added above in Common
+  {
+    name: privateLinksDnsZones.azurecontainerapps.name
+    id: privateLinksDnsZones.azurecontainerapps.id
+    exists: zoneAzurecontainerappsExists
   }
+  {
+    name: privateLinksDnsZones.redis.name
+    id: privateLinksDnsZones.redis.id
+    exists: zoneRedisExists
+  }
+  {
+    name: privateLinksDnsZones.postgres.name
+    id: privateLinksDnsZones.postgres.id
+    exists: zonePostgresExists
+  }
+  {
+    name: privateLinksDnsZones.sql.name
+    id: privateLinksDnsZones.sql.id
+    exists: zoneSqlExists
+  }
+  {
+    name: privateLinksDnsZones.cosmosdbmongo.name
+    id: privateLinksDnsZones.cosmosdbmongo.id
+    exists: zoneMongoExists
+  } // 2025-05-30: Added above in Common
 ]
-
 // ============================================================================
 // EXISTING RESOURCES
 // ============================================================================
