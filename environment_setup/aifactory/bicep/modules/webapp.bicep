@@ -7,6 +7,16 @@ param sku object = {
   tier: 'Standard'
   capacity: 1
 }
+/*
+param skuByoAse object = {
+    name: 'I1v2'
+    tier: 'IsolatedV2'
+    size: 'I1v2'
+    family: 'Iv2'
+    capacity: 1
+}
+*/
+
 param appSettings array = []
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
@@ -127,13 +137,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2024-11-01' = if (empty(byoAs
   name: servicePlanName
   location: location
   tags: tags
-  sku: {
-    name: 'I1v2'
-    tier: 'IsolatedV2'
-    size: 'I1v2'
-    family: 'Iv2'
-    capacity: 1
-  }
+  sku: sku
   kind: runtime == 'node' || runtime == 'python' || runtime == 'java' ? 'linux' : 'windows' // Linux Web app OR Windows Web app
   properties: {
     reserved: runtime == 'node' || runtime == 'python' // Set to true for Linux runtimes, otherwise Windows (dotnet, java)
@@ -193,7 +197,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
     hostingEnvironmentProfile: !empty(byoAseFullResourceId) && byoASEv3 ? {
       id: byoAseFullResourceId
     } : null
-    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? any(null) : integrationSubnet.id
+    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? null : integrationSubnet.id
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       alwaysOn: alwaysOn
@@ -202,7 +206,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
       }
       ipSecurityRestrictions: enablePublicAccessWithPerimeter || byoASEv3? [] : concat(formattedIpRules, [denyAllRule])
       // Set the appropriate runtime stack
-      linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}-java${runtimeVersion}' : ''
+      linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}' : ''
       netFrameworkVersion: runtime == 'dotnet' ? runtimeVersion : null
       appSettings: concat(appSettings, !empty(applicationInsightsName) ? [
         {

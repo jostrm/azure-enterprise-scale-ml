@@ -1,0 +1,883 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "4336884539619241777"
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the name of the new machine learning studio resources"
+      }
+    },
+    "aifactorySuffix": {
+      "type": "string"
+    },
+    "aifactoryProjectNumber": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the computer pool name"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the location where the new machine learning studio resource should be deployed"
+      }
+    },
+    "env": {
+      "type": "string",
+      "metadata": {
+        "description": "ESML dev,test or prod. If DEV then AKS cluster is provisioned with 1 agent otherwise 3"
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the storageaccount id used for the machine learning studio"
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the keyvault id used for the machine learning studio"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "metadata": {
+        "description": "Specifies the tags that should be applied to machine learning studio resources"
+      }
+    },
+    "privateEndpointName": {
+      "type": "string",
+      "metadata": {
+        "description": "(Required) Specifies the private endpoint name"
+      }
+    },
+    "vnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "(Required) Specifies the virtual network id associated with private endpoint"
+      }
+    },
+    "subnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "(Required) Specifies the subnet name that will be associated with the private endpoint"
+      }
+    },
+    "vnetResourceGroupName": {
+      "type": "string"
+    },
+    "defaultProjectName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead."
+      }
+    },
+    "centralDnsZoneByPolicyInHub": {
+      "type": "bool"
+    },
+    "allowPublicAccessWhenBehindVnet": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enablePublicGenAIAccess": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "enablePublicAccessWithPerimeter": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "createPrivateEndpoint": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "aiSearchName": {
+      "type": "string"
+    },
+    "aifactorySalt": {
+      "type": "string"
+    },
+    "privateLinksDnsZones": {
+      "type": "object"
+    },
+    "kindAIHub": {
+      "type": "string",
+      "defaultValue": "Hub",
+      "allowedValues": [
+        "Hub"
+      ]
+    },
+    "ipRules": {
+      "type": "array",
+      "defaultValue": []
+    },
+    "aiServicesName": {
+      "type": "string"
+    },
+    "logWorkspaceName": {
+      "type": "string"
+    },
+    "logWorkspaceResoureGroupName": {
+      "type": "string"
+    },
+    "locationSuffix": {
+      "type": "string"
+    },
+    "resourceSuffix": {
+      "type": "string"
+    },
+    "applicationInsightsName": {
+      "type": "string"
+    },
+    "ipWhitelist_array": {
+      "type": "array",
+      "defaultValue": []
+    },
+    "acrName": {
+      "type": "string"
+    },
+    "acrRGName": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "aiFactoryNumber": "[substring(parameters('aifactorySuffix'), 1, 3)]",
+    "privateDnsZoneName": {
+      "azureusgovernment": "privatelink.api.ml.azure.us",
+      "azurechinacloud": "privatelink.api.ml.azure.cn",
+      "azurecloud": "privatelink.api.azureml.ms"
+    },
+    "privateDnsZoneNameNotebooks": {
+      "azureusgovernment": "privatelink.notebooks.usgovcloudapi.net",
+      "azurechinacloud": "privatelink.notebooks.chinacloudapi.cn",
+      "azurecloud": "privatelink.notebooks.azure.net"
+    },
+    "azureOpenAIConnectionName": "azureOpenAI",
+    "azureAIServicesConnectionName": "azureAIServices",
+    "azureAISearchConnectionName": "azureAISearch",
+    "aiProjectDiagSettingName": "aiProjectDiagnosticSetting",
+    "aiHubDiagSettingName": "aiHubDiagnosticSetting",
+    "epDefaultName": "[format('ep-{0}-01-{1}-{2}-{3}{4}', parameters('aifactoryProjectNumber'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySalt'), parameters('resourceSuffix'))]",
+    "epDefaultName2": "[format('ep-{0}-1-{1}-{2}-{3}{4}', parameters('aifactoryProjectNumber'), parameters('locationSuffix'), parameters('env'), parameters('aifactorySalt'), parameters('resourceSuffix'))]"
+  },
+  "resources": [
+    {
+      "condition": "[and(parameters('enablePublicAccessWithPerimeter'), equals(parameters('enablePublicAccessWithPerimeter'), true()))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/connections",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), variables('azureOpenAIConnectionName'))]",
+      "properties": {
+        "authType": "AAD",
+        "category": "AzureOpenAI",
+        "isSharedToAll": true,
+        "useWorkspaceManagedIdentity": true,
+        "peRequirement": "Required",
+        "peStatus": "Active",
+        "sharedUserList": [],
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName'))]"
+        },
+        "target": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), '2024-10-01').endpoint]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(parameters('enablePublicAccessWithPerimeter'), equals(parameters('enablePublicAccessWithPerimeter'), true()))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/connections",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), variables('azureAIServicesConnectionName'))]",
+      "properties": {
+        "authType": "AAD",
+        "category": "AIServices",
+        "isSharedToAll": true,
+        "useWorkspaceManagedIdentity": true,
+        "peRequirement": "Required",
+        "peStatus": "Active",
+        "sharedUserList": [],
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName'))]"
+        },
+        "target": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), '2024-10-01').endpoint]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(parameters('enablePublicAccessWithPerimeter'), and(not(empty(parameters('aiSearchName'))), equals(parameters('enablePublicAccessWithPerimeter'), true())))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/connections",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), variables('azureAISearchConnectionName'))]",
+      "properties": {
+        "authType": "AAD",
+        "category": "CognitiveSearch",
+        "isSharedToAll": true,
+        "useWorkspaceManagedIdentity": true,
+        "peRequirement": "Required",
+        "peStatus": "Active",
+        "target": "[format('https://{0}.search.windows.net/', parameters('aiSearchName'))]",
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.Search/searchServices', parameters('aiSearchName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(equals(parameters('enablePublicAccessWithPerimeter'), true()), equals(parameters('enablePublicAccessWithPerimeter'), true()))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/onlineEndpoints",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('defaultProjectName'), variables('epDefaultName2'))]",
+      "location": "[parameters('location')]",
+      "kind": "Managed",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "description": "This is the default inference endpoint for the AI Factory project, prompt flow deployment. Called by the UI hosted in Web Apps.",
+        "authMode": "Key",
+        "publicNetworkAccess": "Enabled"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName'))]"
+      ]
+    },
+    {
+      "condition": "[and(equals(parameters('enablePublicAccessWithPerimeter'), false()), equals(parameters('enablePublicAccessWithPerimeter'), false()))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/connections",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), variables('azureOpenAIConnectionName'))]",
+      "properties": {
+        "authType": "AAD",
+        "category": "AzureOpenAI",
+        "isSharedToAll": true,
+        "useWorkspaceManagedIdentity": true,
+        "peRequirement": "[if(parameters('enablePublicGenAIAccess'), 'NotRequired', 'Required')]",
+        "peStatus": "[if(parameters('enablePublicGenAIAccess'), 'NotApplicable', 'Active')]",
+        "sharedUserList": [],
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName'))]"
+        },
+        "target": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), '2024-10-01').endpoint]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(equals(parameters('enablePublicAccessWithPerimeter'), false()), equals(parameters('enablePublicAccessWithPerimeter'), false()))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/connections",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), variables('azureAIServicesConnectionName'))]",
+      "properties": {
+        "authType": "AAD",
+        "category": "AIServices",
+        "isSharedToAll": true,
+        "useWorkspaceManagedIdentity": true,
+        "peRequirement": "[if(parameters('enablePublicGenAIAccess'), 'NotRequired', 'Required')]",
+        "peStatus": "[if(parameters('enablePublicGenAIAccess'), 'NotApplicable', 'Active')]",
+        "sharedUserList": [],
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName'))]"
+        },
+        "target": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), '2024-10-01').endpoint]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(equals(parameters('enablePublicAccessWithPerimeter'), false()), and(not(empty(parameters('aiSearchName'))), equals(parameters('enablePublicAccessWithPerimeter'), false())))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/connections",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('name'), variables('azureAISearchConnectionName'))]",
+      "properties": {
+        "authType": "AAD",
+        "category": "CognitiveSearch",
+        "isSharedToAll": true,
+        "useWorkspaceManagedIdentity": true,
+        "peRequirement": "[if(parameters('enablePublicGenAIAccess'), 'NotRequired', 'Required')]",
+        "target": "[format('https://{0}.search.windows.net/', parameters('aiSearchName'))]",
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[resourceId('Microsoft.Search/searchServices', parameters('aiSearchName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(equals(parameters('enablePublicAccessWithPerimeter'), false()), equals(parameters('enablePublicAccessWithPerimeter'), false()))]",
+      "type": "Microsoft.MachineLearningServices/workspaces/onlineEndpoints",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[format('{0}/{1}', parameters('defaultProjectName'), variables('epDefaultName'))]",
+      "location": "[parameters('location')]",
+      "kind": "Managed",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "description": "This is the default inference endpoint for the AI Factory project, prompt flow deployment. Called by the UI hosted in Web Apps.",
+        "authMode": "Key",
+        "publicNetworkAccess": "[if(parameters('enablePublicGenAIAccess'), 'Enabled', 'Disabled')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName'))]"
+      ]
+    },
+    {
+      "condition": "[parameters('enablePublicAccessWithPerimeter')]",
+      "type": "Microsoft.MachineLearningServices/workspaces",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[parameters('name')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "tags": "[parameters('tags')]",
+      "kind": "[parameters('kindAIHub')]",
+      "properties": {
+        "allowRoleAssignmentOnRG": true,
+        "friendlyName": "[format('{0}-{1}-{2}', parameters('name'), parameters('env'), variables('aiFactoryNumber'))]",
+        "description": "AI Hub with optional enablePublicAccessWithPerimeter. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals",
+        "applicationInsights": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+        "storageAccount": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+        "containerRegistry": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('acrRGName')), 'Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "keyVault": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+        "systemDatastoresAuthMode": "identity",
+        "hbiWorkspace": false,
+        "provisionNetworkNow": true,
+        "enableDataIsolation": "[if(parameters('enablePublicAccessWithPerimeter'), false(), true())]",
+        "publicNetworkAccess": "Enabled",
+        "allowPublicAccessWhenBehindVnet": "[if(parameters('enablePublicAccessWithPerimeter'), true(), parameters('allowPublicAccessWhenBehindVnet'))]",
+        "managedNetwork": {
+          "firewallSku": "Basic",
+          "isolationMode": "AllowInternetOutbound",
+          "enableNetworkMonitor": false,
+          "outboundRules": "[union(createObject('OpenAI', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), 'subresourceTarget', 'account', 'sparkEnabled', false(), 'sparkStatus', 'Active'), 'status', 'Active'), 'SaBlob', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'subresourceTarget', 'blob', 'sparkEnabled', true(), 'sparkStatus', 'Active'), 'status', 'Active'), 'SaFile', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), 'subresourceTarget', 'file', 'sparkEnabled', true(), 'sparkStatus', 'Active'), 'status', 'Active')), if(not(empty(parameters('aiSearchName'))), createObject('search', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Search/searchServices', parameters('aiSearchName')), 'subresourceTarget', 'searchService', 'sparkEnabled', false(), 'sparkStatus', 'Inactive'))), createObject()))]"
+        }
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('name'))]",
+      "name": "[variables('aiHubDiagSettingName')]",
+      "properties": {
+        "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ],
+      "metadata": {
+        "description": "Azure Diagnostics: Azure AI Foundry hub - allLogs"
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), true())]",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('name'))]",
+      "name": "[variables('aiHubDiagSettingName')]",
+      "properties": {
+        "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ],
+      "metadata": {
+        "description": "Azure Diagnostics: Azure AI Foundry hub 2 - allLogs"
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), true())]",
+      "type": "Microsoft.MachineLearningServices/workspaces",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[parameters('defaultProjectName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "kind": "Project",
+      "sku": {
+        "name": "Basic",
+        "tier": "Basic"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "friendlyName": "[parameters('defaultProjectName')]",
+        "description": "[format('Project for AI Factory project{0} in {1} environment in {2}', parameters('aifactoryProjectNumber'), parameters('env'), parameters('location'))]",
+        "v1LegacyMode": false,
+        "hbiWorkspace": false,
+        "hubResourceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]",
+        "publicNetworkAccess": "[if(parameters('enablePublicGenAIAccess'), 'Enabled', 'Disabled')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ],
+      "metadata": {
+        "description": "This is a container for the ai foundry project."
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.MachineLearningServices/workspaces",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[parameters('name')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "tags": "[parameters('tags')]",
+      "kind": "[parameters('kindAIHub')]",
+      "properties": {
+        "allowRoleAssignmentOnRG": true,
+        "friendlyName": "[format('{0}-{1}-{2}', parameters('name'), parameters('env'), variables('aiFactoryNumber'))]",
+        "description": "AI Foundry hub requires an underlying Azure ML workspace. If using Azure Container Apps for UX and API. Create 2 deployments of your preffered GPT models GPT-4o, called gpt ,gpt-evals",
+        "applicationInsights": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+        "storageAccount": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+        "containerRegistry": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('acrRGName')), 'Microsoft.ContainerRegistry/registries', parameters('acrName'))]",
+        "keyVault": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+        "systemDatastoresAuthMode": "identity",
+        "hbiWorkspace": false,
+        "provisionNetworkNow": true,
+        "enableDataIsolation": false,
+        "v1LegacyMode": false,
+        "publicNetworkAccess": "[if(parameters('enablePublicGenAIAccess'), 'Enabled', 'Disabled')]",
+        "allowPublicAccessWhenBehindVnet": "[parameters('allowPublicAccessWhenBehindVnet')]",
+        "ipAllowlist": "[if(parameters('allowPublicAccessWhenBehindVnet'), parameters('ipWhitelist_array'), null())]",
+        "networkAcls": "[if(parameters('allowPublicAccessWhenBehindVnet'), createObject('defaultAction', 'Deny', 'ipRules', parameters('ipRules')), null())]",
+        "managedNetwork": {
+          "firewallSku": "Basic",
+          "isolationMode": "AllowInternetOutbound",
+          "enableNetworkMonitor": false,
+          "outboundRules": "[union(if(not(empty(parameters('aiSearchName'))), createObject('search', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.Search/searchServices', parameters('aiSearchName')), 'subresourceTarget', 'searchService', 'sparkEnabled', false(), 'sparkStatus', 'Inactive'))), createObject()), createObject('OpenAI', createObject('type', 'PrivateEndpoint', 'destination', createObject('serviceResourceId', resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), 'subresourceTarget', 'account', 'sparkEnabled', false(), 'sparkStatus', 'Active'), 'status', 'Active')))]"
+        }
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.MachineLearningServices/workspaces",
+      "apiVersion": "2024-10-01-preview",
+      "name": "[parameters('defaultProjectName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "kind": "Project",
+      "sku": {
+        "name": "Basic",
+        "tier": "Basic"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "friendlyName": "[parameters('defaultProjectName')]",
+        "description": "[format('Project for AI Factory project{0} in {1} environment in {2}', parameters('aifactoryProjectNumber'), parameters('env'), parameters('location'))]",
+        "v1LegacyMode": false,
+        "hbiWorkspace": false,
+        "publicNetworkAccess": "[if(parameters('enablePublicGenAIAccess'), 'Enabled', 'Disabled')]",
+        "hubResourceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ],
+      "metadata": {
+        "description": "This is a container for the ai foundry project."
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+      "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5')]",
+        "principalType": "ServicePrincipal",
+        "principalId": "[reference(resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName')), '2024-10-01-preview', 'full').identity.principalId]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName'))]",
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName'))]"
+      ],
+      "metadata": {
+        "description": "Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint."
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('aiServicesName'))]",
+      "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')]",
+        "principalType": "ServicePrincipal",
+        "principalId": "[reference(resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName')), '2024-10-01-preview', 'full').identity.principalId]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName'))]"
+      ],
+      "metadata": {
+        "description": "Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint."
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+      "name": "[variables('aiProjectDiagSettingName')]",
+      "properties": {
+        "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName'))]"
+      ],
+      "metadata": {
+        "description": "Azure Diagnostics: AI Foundry chat project - allLogs"
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}/onlineEndpoints/{1}', parameters('defaultProjectName'), variables('epDefaultName'))]",
+      "name": "chatProjectOnlineEndpointDiagSettingsDefault",
+      "properties": {
+        "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName'))]"
+      ],
+      "metadata": {
+        "description": "Azure Diagnostics: AI Foundry chat project online endpoint - allLogs"
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'aifactory-proj-ep-default-api-key')]",
+      "properties": {
+        "value": "[listKeys(resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName')), '2024-10-01-preview').primaryKey]",
+        "contentType": "text/plain",
+        "attributes": {
+          "enabled": true
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName'))]"
+      ],
+      "metadata": {
+        "description": "Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app."
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), false())]",
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[parameters('privateEndpointName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "customNetworkInterfaceName": "[format('pend-nic-aihub-{0}', parameters('name'))]",
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('privateEndpointName')]",
+            "properties": {
+              "groupIds": [
+                "amlworkspace"
+              ],
+              "privateLinkServiceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]",
+              "privateLinkServiceConnectionState": {
+                "status": "Approved",
+                "description": "Auto-Approved",
+                "actionsRequired": "None"
+              }
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(equals(parameters('centralDnsZoneByPolicyInHub'), false()), equals(parameters('enablePublicAccessWithPerimeter'), false()))]",
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', parameters('privateEndpointName'), format('{0}DnsZone', parameters('privateEndpointName')))]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "[variables('privateDnsZoneName')[environment().name]]",
+            "properties": {
+              "privateDnsZoneId": "[parameters('privateLinksDnsZones').amlworkspace.id]"
+            }
+          },
+          {
+            "name": "[variables('privateDnsZoneNameNotebooks')[environment().name]]",
+            "properties": {
+              "privateDnsZoneId": "[parameters('privateLinksDnsZones').notebooks.id]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', parameters('privateEndpointName'))]"
+      ]
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), true())]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+      "name": "[guid(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5')]",
+        "principalType": "ServicePrincipal",
+        "principalId": "[reference(resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2')), '2024-10-01-preview', 'full').identity.principalId]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName'))]",
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2'))]"
+      ],
+      "metadata": {
+        "description": "Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint."
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), true())]",
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.CognitiveServices/accounts/{0}', parameters('aiServicesName'))]",
+      "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('aiServicesName')), resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2')), subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')]",
+        "principalType": "ServicePrincipal",
+        "principalId": "[reference(resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2')), '2024-10-01-preview', 'full').identity.principalId]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2'))]"
+      ],
+      "metadata": {
+        "description": "Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint."
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), true())]",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('defaultProjectName'))]",
+      "name": "[variables('aiProjectDiagSettingName')]",
+      "properties": {
+        "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName'))]"
+      ],
+      "metadata": {
+        "description": "Azure Diagnostics: AI Foundry chat project - allLogs"
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), true())]",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}/onlineEndpoints/{1}', parameters('defaultProjectName'), variables('epDefaultName2'))]",
+      "name": "chatProjectOnlineEndpointDiagSettingsDefault2",
+      "properties": {
+        "workspaceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('logWorkspaceResoureGroupName')), 'Microsoft.OperationalInsights/workspaces', parameters('logWorkspaceName'))]",
+        "logs": [
+          {
+            "categoryGroup": "allLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2'))]"
+      ],
+      "metadata": {
+        "description": "Azure Diagnostics: AI Foundry chat project online endpoint - allLogs"
+      }
+    },
+    {
+      "condition": "[equals(parameters('enablePublicAccessWithPerimeter'), true())]",
+      "type": "Microsoft.KeyVault/vaults/secrets",
+      "apiVersion": "2023-07-01",
+      "name": "[format('{0}/{1}', parameters('keyVaultName'), 'aifactory-proj-ep-default2-api-key')]",
+      "properties": {
+        "value": "[listKeys(resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2')), '2024-10-01-preview').primaryKey]",
+        "contentType": "text/plain",
+        "attributes": {
+          "enabled": true
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces/onlineEndpoints', parameters('defaultProjectName'), variables('epDefaultName2'))]"
+      ],
+      "metadata": {
+        "description": "Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app."
+      }
+    },
+    {
+      "condition": "[and(parameters('enablePublicAccessWithPerimeter'), parameters('createPrivateEndpoint'))]",
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}-2', parameters('privateEndpointName'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "customNetworkInterfaceName": "[format('pend-nic-aihub-{0}', parameters('name'))]",
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('privateEndpointName')]",
+            "properties": {
+              "groupIds": [
+                "amlworkspace"
+              ],
+              "privateLinkServiceId": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]",
+              "privateLinkServiceConnectionState": {
+                "status": "Approved",
+                "description": "Auto-Approved",
+                "actionsRequired": "None"
+              }
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name'))]"
+      ]
+    },
+    {
+      "condition": "[and(and(not(parameters('centralDnsZoneByPolicyInHub')), parameters('enablePublicAccessWithPerimeter')), parameters('createPrivateEndpoint'))]",
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', format('{0}-2', parameters('privateEndpointName')), format('{0}DnsZone', format('{0}-2', parameters('privateEndpointName'))))]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "[variables('privateDnsZoneName')[environment().name]]",
+            "properties": {
+              "privateDnsZoneId": "[parameters('privateLinksDnsZones').amlworkspace.id]"
+            }
+          },
+          {
+            "name": "[variables('privateDnsZoneNameNotebooks')[environment().name]]",
+            "properties": {
+              "privateDnsZoneId": "[parameters('privateLinksDnsZones').notebooks.id]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-2', parameters('privateEndpointName')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "id": {
+      "type": "string",
+      "value": "[if(equals(parameters('enablePublicAccessWithPerimeter'), false()), resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name')), resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name')))]"
+    },
+    "name": {
+      "type": "string",
+      "value": "[if(equals(parameters('enablePublicAccessWithPerimeter'), false()), parameters('name'), parameters('name'))]"
+    },
+    "principalId": {
+      "type": "string",
+      "value": "[if(equals(parameters('enablePublicAccessWithPerimeter'), false()), reference(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name')), '2024-10-01-preview', 'full').identity.principalId, reference(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('name')), '2024-10-01-preview', 'full').identity.principalId)]"
+    },
+    "projectPrincipalId": {
+      "type": "string",
+      "value": "[if(equals(parameters('enablePublicAccessWithPerimeter'), false()), reference(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), '2024-10-01-preview', 'full').identity.principalId, reference(resourceId('Microsoft.MachineLearningServices/workspaces', parameters('defaultProjectName')), '2024-10-01-preview', 'full').identity.principalId)]"
+    },
+    "aiProjectName": {
+      "type": "string",
+      "value": "[if(equals(parameters('enablePublicAccessWithPerimeter'), false()), parameters('defaultProjectName'), parameters('defaultProjectName'))]"
+    }
+  }
+}

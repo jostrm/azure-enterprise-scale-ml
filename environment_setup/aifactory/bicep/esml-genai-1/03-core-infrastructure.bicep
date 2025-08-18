@@ -1,0 +1,483 @@
+targetScope = 'subscription'
+
+// ================================================================
+// CORE INFRASTRUCTURE DEPLOYMENT - Phase 2 Implementation
+// This file deploys core infrastructure components including:
+// - Storage Accounts (for AI/ML workloads)
+// - Key Vault
+// - Container Registry
+// - Application Insights
+// - Private Virtual Machine
+// - Bing Search (if enabled)
+// ================================================================
+
+// ============== PARAMETERS ==============
+@description('Environment: dev, test, prod')
+@allowed(['dev', 'test', 'prod'])
+param env string
+
+@description('Project number (e.g., "005")')
+param projectNumber string
+
+@description('Location for all resources')
+param location string
+
+@description('Location suffix (e.g., "weu", "swc")')
+param locationSuffix string
+
+@description('Common resource suffix (e.g., "-001")')
+param commonResourceSuffix string
+
+@description('Project-specific resource suffix')
+param resourceSuffix string
+
+@description('Tenant ID')
+param tenantId string
+
+// Resource exists flags from Azure DevOps
+param keyvaultExists bool = false
+param storageAccount1001Exists bool = false
+param storageAccount2001Exists bool = false
+param acrProjectExists bool = false
+param applicationInsightExists bool = false
+param vmExists bool = false
+param bingExists bool = false
+
+// Enable flags from parameter files
+@description('Enable Bing Search deployment')
+param serviceSettingDeployBingSearch bool = false
+
+@description('Enable private VM deployment')
+param serviceSettingDeployProjectVM bool = false
+
+// Security and networking
+param enablePublicGenAIAccess bool = false
+param enablePublicAccessWithPerimeter bool = false
+param centralDnsZoneByPolicyInHub bool = false
+
+// Required resource references
+param vnetNameFull string
+param vnetResourceGroupName string
+param defaultSubnet string = 'snet-common'
+param genaiSubnetName string = 'snet-genai'
+param targetResourceGroup string
+param commonResourceGroup string
+
+// Key Vault specific
+param keyvaultSoftDeleteDays int = 90
+param keyvaultEnablePurgeProtection bool = true
+
+// VM specific
+param vmSKUSelectedArrayIndex int = 2
+param vmSKU array = [
+  'Standard_E2s_v3'
+  'Standard_D4s_v3'
+  'standard_D2as_v5'
+]
+param adminUsername string
+param adminPassword string
+param hybridBenefit bool = false
+
+// Container Registry
+param useCommonACR bool = true
+
+// Bing Search
+param bingSearchSKU string = 'S1'
+
+// Tags
+param projecttags object = {}
+
+// IP Rules
+param IPwhiteList string = ''
+
+// Dependencies and naming
+param aifactorySuffixRG string
+param commonRGNamePrefix string
+param uniqueInAIFenv string = ''
+param prjResourceSuffixNoDash string = ''
+param restore bool = true
+
+// Technical contact for access policies
+param technicalContactId string = ''
+
+// Seeding Key Vault parameters
+param inputKeyvault string
+param inputKeyvaultResourcegroup string
+param inputKeyvaultSubscription string
+param projectServicePrincipleOID_SeedingKeyvaultName string
+param projectServicePrincipleAppID_SeedingKeyvaultName string
+param projectServicePrincipleSecret_SeedingKeyvaultName string
+
+// ============== VARIABLES ==============
+var subscriptionIdDevTestProd = subscription().subscriptionId
+var projectName = 'prj${projectNumber}'
+var cmnName = 'cmn'
+var genaiName = 'genai'
+var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
+
+// Resource names
+var keyvaultName = 'kv-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var var_kv1_name = keyvaultName
+var storageAccount1001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}', '-', '')
+var storageAccount2001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}', '-', '')
+var acrProjectName = replace('acr${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
+var acrCommonName = replace('acr${cmnName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
+var applicationInsightName = 'appi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var vmName = 'vm-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var bingName = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var laWorkspaceName = 'law-${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${commonResourceSuffix}'
+var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+
+// IP Rules processing
+var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
+var processedIpRulesKv = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: trim(ip)
+}]
+var processedIpRulesSa = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: trim(ip)
+}]
+
+// Network references using proper resource references
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  scope: resourceGroup(subscription().subscriptionId, vnetResourceGroupName)
+  name: vnetNameFull
+}
+
+resource subnet_genai 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  parent: vnet
+  name: genaiSubnetName
+}
+
+resource subnet_aks 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
+  parent: vnet
+  name: 'aks-${projectName}'
+}
+
+var subnet_genai_ref = {
+  id: subnet_genai.id
+}
+var subnet_aks_ref = {
+  id: subnet_aks.id
+}
+
+// Access policies for project principals
+var var_all_principals = [] // Simplified - technical admins would be passed as array
+var p011_genai_team_lead_array = [] // Simplified - team leads would be passed as array
+
+// Target resource group reference
+resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: targetResourceGroup
+  location: location
+}
+
+// ============== STORAGE ACCOUNTS ==============
+
+// Main storage account for ML/AI workloads
+module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: storageAccount1001Name
+    skuName: 'Standard_LRS'
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetName: defaultSubnet
+    location: location
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
+    filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
+    queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
+    tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}ml'
+    tags: projecttags
+    containers: [
+      {
+        name: 'default'
+      }
+    ]
+    files: [
+      {
+        name: 'default'
+      }
+    ]
+    vnetRules: [
+      subnet_genai_ref.id
+      subnet_aks_ref.id
+    ]
+    ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
+    corsRules: [
+      {
+        allowedOrigins: [
+          'https://mlworkspace.azure.ai'
+          'https://ml.azure.com'
+          'https://*.ml.azure.com'
+          'https://ai.azure.com'
+          'https://*.ai.azure.com'
+          'https://mlworkspacecanary.azure.ai'
+          'https://mlworkspace.azureml-test.net'
+          'https://42.${location}.instances.azureml.ms'
+          'https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.${location}.api.azureml.ms'
+          'https://*.instances.azureml.ms'
+          'https://*.azureml.ms'
+        ]
+        allowedMethods: [
+          'GET'
+          'HEAD'
+          'POST'
+          'PUT'
+          'DELETE'
+          'OPTIONS'
+          'PATCH'
+        ]
+        maxAgeInSeconds: 2520
+        exposedHeaders: [
+          '*'
+        ]
+        allowedHeaders: [
+          '*'
+        ]
+      }
+    ]
+  }
+  dependsOn: [
+    resourceExists_struct
+  ]
+}
+
+// ============== KEY VAULT ==============
+
+module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyvaultName: keyvaultName
+    location: location
+    tags: projecttags
+    enablePurgeProtection: keyvaultEnablePurgeProtection
+    soft_delete_days: keyvaultSoftDeleteDays
+    tenantIdentity: tenantId
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
+    keyvaultNetworkPolicySubnets: [
+      subnet_genai_ref.id
+      subnet_aks_ref.id
+    ]
+    accessPolicies: []
+    ipRules: empty(processedIpRulesKv) ? [] : processedIpRulesKv
+  }
+  dependsOn: [
+    resourceExists_struct
+  ]
+}
+
+// ============== CONTAINER REGISTRY ==============
+
+// Project-specific container registry (if not using common ACR)
+module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && useCommonACR == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acrProjectName
+    skuName: 'Premium'
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetName: defaultSubnet
+    privateEndpointName: 'pend-${projectName}${locationSuffix}-containerreg-to-vnt-mlcmn'
+    tags: projecttags
+    location: location
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+  }
+  dependsOn: [
+    resourceExists_struct
+  ]
+}
+
+// Common container registry reference (if using common ACR)
+// Reference maintained for infrastructure awareness but not directly used in current deployment
+// TODO: Add common ACR integration logic if needed for cross-project container sharing
+
+// ============== APPLICATION INSIGHTS ==============
+
+module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep' = if(!applicationInsightExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: applicationInsightName
+    logWorkspaceName: laWorkspaceName
+    logWorkspaceNameRG: commonResourceGroup
+    tags: projecttags
+    location: location
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+  }
+  dependsOn: [
+    resourceExists_struct
+  ]
+}
+
+// ============== VIRTUAL MACHINE ==============
+
+module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serviceSettingDeployProjectVM == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privVM4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    adminUsername: adminUsername
+    adminPassword: adminPassword
+    hybridBenefit: hybridBenefit
+    vmSize: vmSKU[vmSKUSelectedArrayIndex]
+    location: location
+    vmName: vmName
+    subnetName: defaultSubnet
+    vnetId: vnet.id
+    tags: projecttags
+    keyvaultName: var_kv1_name
+  }
+  dependsOn: [
+    resourceExists_struct
+    kv1
+  ]
+}
+
+// ============== BING SEARCH ==============
+
+module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBingSearch == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'BingSearch4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: bingName
+    location: 'global'
+    sku: bingSearchSKU
+    tags: projecttags
+  }
+  dependsOn: [
+    resourceExists_struct
+  ]
+}
+
+// ============== KEY VAULT SEEDING ==============
+
+// External key vault for seeding secrets
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+}
+
+// Copy secrets from external key vault to project key vault
+module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists) {
+  name: '${keyvaultName}S2P${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    spAppIDValue: externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName)
+    spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
+    keyvaultName: var_kv1_name
+    keyvaultNameRG: targetResourceGroup
+  }
+  dependsOn: [
+    resourceExists_struct
+    kv1
+  ]
+}
+
+// ============== ACCESS POLICIES ==============
+
+// Access policy definitions
+var secretGetListSet = {
+  secrets: [
+    'get'
+    'list'
+    'set'
+  ]
+}
+var secretGetList = {
+  secrets: [
+    'get'
+    'list'
+  ]
+}
+var secretGet = {
+  secrets: [
+    'get'
+  ]
+}
+
+// Project key vault access policy for technical contact
+module kvPrjAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = if(!keyvaultExists && !empty(technicalContactId)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '${keyvaultName}AP${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultPermissions: secretGetListSet
+    keyVaultResourceName: var_kv1_name
+    policyName: 'add'
+    principalId: technicalContactId
+    additionalPrincipalIds: var_all_principals
+  }
+  dependsOn: [
+    addSecret
+    kv1
+  ]
+}
+
+// Common key vault reference
+resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: kvNameCommon
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
+
+// Common key vault access policy for technical contact
+module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!empty(technicalContactId)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  name: '${kvNameCommon}GL${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultPermissions: secretGetList
+    keyVaultResourceName: kvNameCommon
+    policyName: 'add'
+    principalId: technicalContactId
+    additionalPrincipalIds: p011_genai_team_lead_array
+  }
+  dependsOn: [
+    commonKv
+  ]
+}
+
+// Service principal access to common key vault
+module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  name: 'spGetList${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultPermissions: secretGet
+    keyVaultResourceName: commonKv.name
+    policyName: 'add'
+    principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    additionalPrincipalIds: []
+  }
+  dependsOn: [
+    commonKv
+  ]
+}
+
+// ============== OUTPUTS - Simplified ==============
+// Note: Outputs simplified to avoid conditional module reference issues
+// Resource information should be retrieved through Azure CLI queries after deployment
+
+@description('Key Vault deployment status')
+output keyVaultDeployed bool = !keyvaultExists
+
+@description('Storage Account 1001 deployment status')
+output storageAccount1001Deployed bool = !storageAccount1001Exists
+
+@description('Container Registry deployment status')
+output containerRegistryDeployed bool = (!acrProjectExists && useCommonACR == false)
+
+@description('Application Insights deployment status')
+output applicationInsightsDeployed bool = !applicationInsightExists
+
+@description('Virtual Machine deployment status')
+output virtualMachineDeployed bool = (!vmExists && serviceSettingDeployProjectVM)
+
+@description('Bing Search deployment status')
+output bingSearchDeployed bool = (!bingExists && serviceSettingDeployBingSearch)

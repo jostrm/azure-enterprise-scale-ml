@@ -1207,9 +1207,15 @@ var var_kv1_name = resourceExists.keyvault? keyvaultName: kv1.outputs.keyvaultNa
 #disable-next-line BCP318
 var var_kv1_uri = resourceExists.keyvault? kvREF.properties.vaultUri: kv1.outputs.keyvaultUri
 #disable-next-line BCP318
-var var_app_insight_aca = (serviceSettingDeployAppInsightsDashboard && !resourceExists.applicationInsight) ? appinsights.outputs.name : serviceSettingDeployAppInsightsDashboard? applicationInsightName: applicationInsightSWC.outputs.name
+var var_appinsights_name = appinsights.outputs.name
 #disable-next-line BCP318
-var var_acr_cmn_or_prj = useCommonACR? acrCommon2.outputs.containerRegistryName :resourceExists.acrProject? acrProjectName :acr.outputs.containerRegistryName
+var var_applicationInsightSWC_name_output = applicationInsightSWC.outputs.name
+var var_app_insight_aca = (serviceSettingDeployAppInsightsDashboard && !resourceExists.applicationInsight) ? var_appinsights_name : serviceSettingDeployAppInsightsDashboard? applicationInsightName: var_applicationInsightSWC_name_output
+#disable-next-line BCP318
+var var_acrCommon2_containerRegistryName_output = acrCommon2.outputs.containerRegistryName
+#disable-next-line BCP318
+var var_acr_containerRegistryName_output = acr.outputs.containerRegistryName
+var var_acr_cmn_or_prj = useCommonACR? var_acrCommon2_containerRegistryName_output :resourceExists.acrProject? acrProjectName : var_acr_containerRegistryName_output
 #disable-next-line BCP318
 var var_aml_name = resourceExists.aml && enableAzureMachineLearning?amlName : enableAzureMachineLearning? amlv2.outputs.amlName: ''
 #disable-next-line BCP318
@@ -1324,6 +1330,10 @@ var var_csVision_principalId = csVision.outputs.principalId
 var var_csSpeech_principalId = csSpeech.outputs.principalId
 #disable-next-line BCP318
 var var_csDocIntelligence_principalId = csDocIntelligence.outputs.principalId
+
+// aiHub output vars - CRITICAL: These were causing the "response already consumed" error
+#disable-next-line BCP318
+var var_aiHub_principalId = (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
 
 // End of vars
 
@@ -3260,7 +3270,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep'= if (!resourceExists
     azureMachineLearningObjectId: azureMachineLearningObjectId
     aiHubName: aiHubName
     #disable-next-line BCP318
-    aiHubPrincipalId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
+    aiHubPrincipalId: var_aiHub_principalId
   }
   dependsOn: [
     aiHub
@@ -3441,7 +3451,7 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!re
     #disable-next-line BCP318
     amlPrincipalId: ''//(!resourceExists.aml && enableAML)? amlv2.outputs.principalId: (enableAML)? amlREF.identity.principalId:''
     #disable-next-line BCP318
-    aiHubPrincipleId: (!resourceExists.aiHub && enableAIFoundryHub)? aiHub.outputs.principalId: aiHubREF.identity.principalId
+    aiHubPrincipleId: var_aiHub_principalId
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''
     datalakeName: datalakeName

@@ -252,7 +252,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
         ApiType: 'Azure'
         ResourceId: aiServices.id
       }
-      target: aiServices.properties.endpoints['OpenAI Language Model Instance API']
+      target: aiServices.properties.endpoint
     }
   }
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter==true) {
@@ -276,7 +276,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
   }
 
   resource searchConnection2 'connections' =
-  if (!empty(azureAISearchConnectionName) && enablePublicAccessWithPerimeter==true) {
+  if (!empty(aiSearchName) && enablePublicAccessWithPerimeter==true) {
     name: azureAISearchConnectionName
     properties: {
       authType: 'AAD'
@@ -426,38 +426,34 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
     } : null
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode:'AllowInternetOutBound' // enablePublicGenAIAccess? 'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
+      isolationMode:'AllowInternetOutbound' // enablePublicGenAIAccess? 'AllowInternetOutbound': 'AllowOnlyApprovedOutbound'
       #disable-next-line BCP037
       enableNetworkMonitor:false
-      outboundRules: {
-        search: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiSearch.id
-            subresourceTarget: 'searchService'
-            sparkEnabled: false
-            sparkStatus: 'Inactive'
+      outboundRules: union(
+        !empty(aiSearchName) ? {
+          search: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: aiSearch.id
+              subresourceTarget: 'searchService'
+              sparkEnabled: false
+              sparkStatus: 'Inactive'
+            }
+          } 
+        } : {},
+        {
+          OpenAI: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: aiServices.id
+              subresourceTarget: 'account'
+              sparkEnabled: false
+              sparkStatus: 'Active'
+            }
+            status: 'Active'
           }
-        } 
-        /* // Only \"PrivateEndpoint\" outbound rules can be specified when managed network isolation mode is \"AllowInternetOutbound\"
-        wikipedia: {
-          type: 'FQDN'
-          destination: 'en.wikipedia.org'
-          category: 'UserDefined'
-          status: 'Active'
         }
-        */
-        OpenAI: {
-          type: 'PrivateEndpoint'
-          destination: {
-            serviceResourceId: aiServices.id
-            subresourceTarget: 'account'
-            sparkEnabled: false
-            sparkStatus: 'Active'
-          }
-          status: 'Active'
-        }
-      }
+      )
     }
 
   }
@@ -476,7 +472,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
         ApiType: 'Azure'
         ResourceId: aiServices.id
       }
-      target: aiServices.properties.endpoints['OpenAI Language Model Instance API']
+      target: aiServices.properties.endpoint
     }
   }
   resource aiServicesConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
@@ -498,7 +494,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
   }
 
   resource searchConnection 'connections' =
-  if (!empty(azureAISearchConnectionName) && enablePublicAccessWithPerimeter==false) {
+  if (!empty(aiSearchName) && enablePublicAccessWithPerimeter==false) {
     name: azureAISearchConnectionName
     properties: {
       authType: 'AAD'
@@ -778,7 +774,7 @@ resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023
 
 // privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
 resource pendAIHub2 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePublicAccessWithPerimeter && createPrivateEndpoint) {
-  name: privateEndpointName
+  name: '${privateEndpointName}-2'
   location: location
   tags: tags
   properties: {
