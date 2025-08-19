@@ -485,7 +485,7 @@ module debug './00-debug.bicep' = if (enableDebugging) {
 }
 
 // VM Admin Login Permissions (if storage already exists)
-module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (resourceExists.storageAccount1001) {
+module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resourceExists.storageAccount1001) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: 'VMAdminLogin4${deploymentProjSpecificUniqueSuffix}'
   params: {
