@@ -28,9 +28,6 @@ param locationSuffix string
 @description('Common resource suffix (e.g., "-001")')
 param commonResourceSuffix string
 
-@description('Tenant ID')
-param tenantId string
-
 // AI Factory naming
 param aifactorySuffixRG string
 @description('Project-specific resource suffix')
@@ -47,37 +44,6 @@ param genaiSubnetId string = ''
 param aksSubnetId string = ''
 param acaSubnetId string = ''
 // param targetResourceGroup string = '' // Already defined below
-
-// ============================================================================
-// FROM JSON files
-// ============================================================================
-
-param kvNameFromCOMMON_param string = ''
-param DOCS_byovnet_example string = ''
-param DOCS_byosnet_common_example string = ''
-param DOCS_byosnet_project_example string = ''
-param BYO_subnets bool = false
-// Dynamic subnet parameters - START
-param subnetCommon string = ''
-param subnetCommonScoring string = ''
-param subnetCommonPowerbiGw string = ''
-param subnetProjGenAI string = ''
-param subnetProjAKS string = ''
-param subnetProjACA string = ''
-param subnetProjDatabricksPublic string = ''
-param subnetProjDatabricksPrivate string = ''
-// END
-param databricksOID string = 'not set in genai-1'
-param databricksPrivate bool = false
-param AMLStudioUIPrivate bool = false
-//param datalakeName_param string = ''
-//param commonLakeNamePrefixMax8chars string
-param lakeContainerName string
-param hybridBenefit bool
-
-// ============================================================================
-// END - FROM JSON files
-// ============================================================================
 
 // Resource group naming
 param commonRGNamePrefix string = ''
@@ -234,7 +200,7 @@ param commonLakeNamePrefixMax8chars string
 param useCommonACR bool = true
 
 // Tags
-param projecttags object = {}
+param tagsProject object = {}
 
 // ============== VARIABLES ==============
 // var subscriptionIdDevTestProd = subscription().subscriptionId // Now a parameter

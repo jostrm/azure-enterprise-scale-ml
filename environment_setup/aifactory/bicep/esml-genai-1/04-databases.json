@@ -1,11 +1,12 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
   "contentVersion": "1.0.0.0",
   "metadata": {
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "13811876078597091518"
+      "templateHash": "13189002485360660067"
     }
   },
   "parameters": {
@@ -67,12 +68,6 @@
       "type": "string",
       "metadata": {
         "description": "Project-specific resource suffix"
-      }
-    },
-    "tenantId": {
-      "type": "string",
-      "metadata": {
-        "description": "Tenant ID"
       }
     },
     "cosmosDBExists": {
@@ -167,10 +162,6 @@
     "commonRGNamePrefix": {
       "type": "string"
     },
-    "uniqueInAIFenv": {
-      "type": "string",
-      "defaultValue": ""
-    },
     "prjResourceSuffixNoDash": {
       "type": "string",
       "defaultValue": ""
@@ -235,48 +226,99 @@
     },
     "inputKeyvaultSubscription": {
       "type": "string"
+    },
+    "projectServicePrincipleOID_SeedingKeyvaultName": {
+      "type": "string"
+    },
+    "projectServicePrincipleAppID_SeedingKeyvaultName": {
+      "type": "string"
+    },
+    "projectServicePrincipleSecret_SeedingKeyvaultName": {
+      "type": "string"
+    },
+    "aifactorySalt10char": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "randomValue": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Random value for deployment uniqueness"
+      }
+    },
+    "privDnsResourceGroupName": {
+      "type": "string"
+    },
+    "privDnsSubscription": {
+      "type": "string"
     }
   },
   "variables": {
     "subscriptionIdDevTestProd": "[subscription().subscriptionId]",
-    "projectName": "[format('prj{0}', parameters('projectNumber'))]",
-    "deploymentProjSpecificUniqueSuffix": "[format('{0}{1}{2}', variables('projectName'), parameters('env'), parameters('uniqueInAIFenv'))]",
-    "twoNumbers": "[substring(parameters('resourceSuffix'), 2, 2)]",
-    "segments": "[split(parameters('genaiSubnetId'), '/')]",
-    "genaiSubnetName": "[variables('segments')[sub(length(variables('segments')), 1)]]",
-    "defaultSubnet": "[variables('genaiSubnetName')]",
-    "segmentsAKS": "[split(parameters('aksSubnetId'), '/')]",
-    "aksSubnetName": "[variables('segmentsAKS')[sub(length(variables('segmentsAKS')), 1)]]",
-    "segmentsACA": "[split(parameters('acaSubnetId'), '/')]",
-    "acaSubnetName": "[variables('segmentsACA')[sub(length(variables('segmentsACA')), 1)]]",
+    "deploymentProjSpecificUniqueSuffix": "[format('{0}{1}{2}', parameters('projectNumber'), parameters('env'), parameters('targetResourceGroup'))]",
     "ipWhitelist_array": "[if(not(empty(parameters('IPwhiteList'))), split(parameters('IPwhiteList'), ','), createArray())]",
     "subnet_genai_ref": {
-      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), variables('genaiSubnetName'))]"
+      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference('namingConvention').outputs.genaiSubnetName.value)]"
     },
     "subnet_aks_ref": {
-      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), variables('aksSubnetName'))]"
+      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference('namingConvention').outputs.aksSubnetName.value)]"
     },
     "sqlServerSKUObject_DTU": {
       "name": "[parameters('sqlServerSKU_DTU')]",
       "tier": "[parameters('sqlServerTier_DTU')]",
       "capacity": "[parameters('sqlServerCapacity_DTU')]"
-    },
-    "privateLinksDnsZones": [],
-    "p011_genai_team_lead_array": [],
-    "p011_genai_team_lead_email_array": [],
-    "spAndMiArray": []
+    }
   },
-  "resources": [
-    {
+  "resources": {
+    "vnet": {
+      "existing": true,
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2024-05-01",
+      "subscriptionId": "[subscription().subscriptionId]",
+      "resourceGroup": "[parameters('vnetResourceGroupName')]",
+      "name": "[parameters('vnetNameFull')]"
+    },
+    "subnet_genai": {
+      "existing": true,
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "subscriptionId": "[subscription().subscriptionId]",
+      "resourceGroup": "[parameters('vnetResourceGroupName')]",
+      "name": "[format('{0}/{1}', parameters('vnetNameFull'), reference('namingConvention').outputs.genaiSubnetName.value)]",
+      "dependsOn": [
+        "namingConvention"
+      ]
+    },
+    "subnet_aks": {
+      "existing": true,
+      "type": "Microsoft.Network/virtualNetworks/subnets",
+      "apiVersion": "2024-05-01",
+      "subscriptionId": "[subscription().subscriptionId]",
+      "resourceGroup": "[parameters('vnetResourceGroupName')]",
+      "name": "[format('{0}/{1}', parameters('vnetNameFull'), reference('namingConvention').outputs.aksSubnetName.value)]",
+      "dependsOn": [
+        "namingConvention"
+      ]
+    },
+    "externalKv": {
+      "existing": true,
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "subscriptionId": "[parameters('inputKeyvaultSubscription')]",
+      "resourceGroup": "[parameters('inputKeyvaultResourcegroup')]",
+      "name": "[parameters('inputKeyvault')]"
+    },
+    "resourceExists_struct": {
       "type": "Microsoft.Resources/resourceGroups",
       "apiVersion": "2021-04-01",
       "name": "[parameters('targetResourceGroup')]",
       "location": "[parameters('location')]"
     },
-    {
+    "namingConvention": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
+      "name": "[guid('naming-convention-04-databases', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))]",
       "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
@@ -300,17 +342,32 @@
           "resourceSuffix": {
             "value": "[parameters('resourceSuffix')]"
           },
-          "randomSalt": {
-            "value": "[substring(uniqueString(subscription().subscriptionId, parameters('targetResourceGroup')), 0, 5)]"
+          "randomValue": {
+            "value": "[parameters('randomValue')]"
+          },
+          "aifactorySalt10char": {
+            "value": "[parameters('aifactorySalt10char')]"
           },
           "aifactorySuffixRG": {
             "value": "[parameters('aifactorySuffixRG')]"
           },
-          "uniqueInAIFenv": {
-            "value": "[parameters('uniqueInAIFenv')]"
-          },
           "commonRGNamePrefix": {
             "value": "[parameters('commonRGNamePrefix')]"
+          },
+          "commonResourceGroupName": {
+            "value": "[parameters('commonResourceGroup')]"
+          },
+          "subscriptionIdDevTestProd": {
+            "value": "[variables('subscriptionIdDevTestProd')]"
+          },
+          "acaSubnetId": {
+            "value": "[parameters('acaSubnetId')]"
+          },
+          "aksSubnetId": {
+            "value": "[parameters('aksSubnetId')]"
+          },
+          "genaiSubnetId": {
+            "value": "[parameters('genaiSubnetId')]"
           }
         },
         "template": {
@@ -320,7 +377,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.37.4.10188",
-              "templateHash": "12625160494595296240"
+              "templateHash": "11269673137520673052"
             }
           },
           "parameters": {
@@ -359,22 +416,19 @@
                 "description": "Project-specific resource suffix"
               }
             },
-            "randomSalt": {
+            "aifactorySalt10char": {
               "type": "string",
               "metadata": {
                 "description": "Random salt for unique naming"
               }
             },
+            "randomValue": {
+              "type": "string"
+            },
             "aifactorySuffixRG": {
               "type": "string",
               "metadata": {
                 "description": "AI Factory suffix for resource groups"
-              }
-            },
-            "uniqueInAIFenv": {
-              "type": "string",
-              "metadata": {
-                "description": "Unique string for AI Factory environment"
               }
             },
             "commonRGNamePrefix": {
@@ -383,6 +437,35 @@
               "metadata": {
                 "description": "Common resource group name prefix"
               }
+            },
+            "technicalAdminsObjectID": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins OID list"
+              }
+            },
+            "technicalAdminsEmail": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins EMAIL list"
+              }
+            },
+            "commonResourceGroupName": {
+              "type": "string"
+            },
+            "subscriptionIdDevTestProd": {
+              "type": "string"
+            },
+            "genaiSubnetId": {
+              "type": "string"
+            },
+            "aksSubnetId": {
+              "type": "string"
+            },
+            "acaSubnetId": {
+              "type": "string"
             }
           },
           "variables": {
@@ -391,42 +474,71 @@
             "genaiName": "genai",
             "prjResourceSuffixNoDash": "[replace(parameters('resourceSuffix'), '-', '')]",
             "twoNumbers": "[substring(parameters('resourceSuffix'), 2, 2)]",
-            "aiHubName": "[format('ai-hub-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "aifProjectName": "[format('ai-prj{0}-01-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "aoaiName": "[format('aoai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "amlName": "[format('aml-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "safeNameAISearch": "[replace(toLower(format('aisearch{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))), '-', '')]",
-            "aiServicesName": "[replace(toLower(format('aiservices{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', '')]",
-            "dashboardInsightsName": "[format('AIFactory{0}-{1}-insights-{2}-{3}{4}', parameters('aifactorySuffixRG'), variables('projectName'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "applicationInsightName": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "bingName": "[format('bing-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "containerAppsEnvName": "[format('aca-env-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "containerAppAName": "[format('aca-a-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "containerAppWName": "[format('aca-w-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "cosmosDBName": "[format('cosmos-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "redisName": "[format('redis-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "postgreSQLName": "[format('pg-flex-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "sqlServerName": "[format('sql-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "sqlDBName": "[format('sqldb-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "functionAppName": "[format('func-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "webAppName": "[format('webapp-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "funcAppServicePlanName": "[format('func-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "webbAppServicePlanName": "[format('webapp-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "vmName": "[format('dsvm-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "aifName": "[format('aifoundry-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "aifPrjName": "[format('aifoundry-{0}-01-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('resourceSuffix'))]",
-            "keyvaultName": "[format('kv-p{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), variables('twoNumbers'))]",
-            "storageAccount1001Name": "[replace(format('sa{0}{1}{2}1{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
-            "storageAccount2001Name": "[replace(format('sa{0}{1}{2}2{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
-            "acrProjectName": "[format('acr{0}{1}{2}{3}{4}{5}', variables('projectName'), variables('genaiName'), parameters('locationSuffix'), parameters('uniqueInAIFenv'), parameters('env'), variables('prjResourceSuffixNoDash'))]",
-            "acrCommonName": "[replace(format('acrcommon{0}{1}{2}{3}', parameters('uniqueInAIFenv'), parameters('locationSuffix'), parameters('commonResourceSuffix'), parameters('env')), '-', '')]",
-            "miACAName": "[format('mi-aca-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('randomSalt'), parameters('resourceSuffix'))]",
-            "miPrjName": "[format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('randomSalt'), parameters('resourceSuffix'))]",
-            "laWorkspaceName": "[format('la-{0}-{1}-{2}-{3}{4}', variables('cmnName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-            "aiProjectName": "[format('ai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]"
+            "technicalAdminsObjectID_array": "[array(split(replace(parameters('technicalAdminsObjectID'), '\\s+', ''), ','))]",
+            "p011_genai_team_lead_array": "[if(empty(parameters('technicalAdminsObjectID')), createArray(), union(variables('technicalAdminsObjectID_array'), createArray()))]",
+            "technicalAdminsEmail_array": "[array(split(parameters('technicalAdminsEmail'), ','))]",
+            "p011_genai_team_lead_email_array": "[if(empty(parameters('technicalAdminsEmail')), createArray(), variables('technicalAdminsEmail_array'))]",
+            "randomSalt": "[if(or(empty(parameters('aifactorySalt10char')), lessOrEquals(length(parameters('aifactorySalt10char')), 5)), substring(parameters('randomValue'), 6, 10), parameters('aifactorySalt10char'))]",
+            "uniqueInAIFenv": "[substring(uniqueString(subscriptionResourceId(parameters('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', parameters('commonResourceGroupName'))), 0, 5)]",
+            "aiHubName": "[format('ai-hub-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifProjectName": "[format('ai-prj{0}-01-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aoaiName": "[format('aoai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "amlName": "[format('aml-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "safeNameAISearch": "[replace(toLower(format('aisearch{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))), '-', '')]",
+            "aiServicesName": "[replace(toLower(format('aiservices{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', '')]",
+            "dashboardInsightsName": "[format('AIFactory{0}-{1}-insights-{2}-{3}{4}', parameters('aifactorySuffixRG'), variables('projectName'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "applicationInsightName": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "bingName": "[format('bing-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppsEnvName": "[format('aca-env-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppAName": "[format('aca-a-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppWName": "[format('aca-w-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "cosmosDBName": "[format('cosmos-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "redisName": "[format('redis-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "postgreSQLName": "[format('pg-flex-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlServerName": "[format('sql-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlDBName": "[format('sqldb-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "functionAppName": "[format('func-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webAppName": "[format('webapp-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "funcAppServicePlanName": "[format('func-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webbAppServicePlanName": "[format('webapp-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "vmName": "[format('dsvm-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifName": "[format('aifoundry-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifPrjName": "[format('aifoundry-{0}-01-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "keyvaultName": "[format('kv-p{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('twoNumbers'))]",
+            "storageAccount1001Name": "[replace(format('sa{0}{1}{2}1{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "storageAccount2001Name": "[replace(format('sa{0}{1}{2}2{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "acrProjectName": "[format('acr{0}{1}{2}{3}{4}{5}', variables('projectName'), variables('genaiName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), parameters('env'), variables('prjResourceSuffixNoDash'))]",
+            "acrCommonName": "[replace(format('acrcommon{0}{1}{2}{3}', variables('uniqueInAIFenv'), parameters('locationSuffix'), parameters('commonResourceSuffix'), parameters('env')), '-', '')]",
+            "miACAName": "[format('mi-aca-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
+            "miPrjName": "[format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
+            "laWorkspaceName": "[format('la-{0}-{1}-{2}-{3}{4}', variables('cmnName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "aiProjectName": "[format('ai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "segments": "[split(parameters('genaiSubnetId'), '/')]",
+            "genaiSubnetName": "[variables('segments')[sub(length(variables('segments')), 1)]]",
+            "defaultSubnet": "[variables('genaiSubnetName')]",
+            "segmentsAKS": "[split(parameters('aksSubnetId'), '/')]",
+            "aksSubnetName": "[variables('segmentsAKS')[sub(length(variables('segmentsAKS')), 1)]]",
+            "segmentsACA": "[split(parameters('acaSubnetId'), '/')]",
+            "acaSubnetName": "[variables('segmentsACA')[sub(length(variables('segmentsACA')), 1)]]"
           },
           "resources": [],
           "outputs": {
+            "genaiSubnetName": {
+              "type": "string",
+              "value": "[variables('genaiSubnetName')]"
+            },
+            "aksSubnetName": {
+              "type": "string",
+              "value": "[variables('aksSubnetName')]"
+            },
+            "acaSubnetName": {
+              "type": "string",
+              "value": "[variables('acaSubnetName')]"
+            },
+            "defaultSubnet": {
+              "type": "string",
+              "value": "[variables('defaultSubnet')]"
+            },
             "aiHubName": {
               "type": "string",
               "value": "[variables('aiHubName')]"
@@ -578,12 +690,343 @@
             "twoNumbers": {
               "type": "string",
               "value": "[variables('twoNumbers')]"
+            },
+            "p011_genai_team_lead_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_array')]"
+            },
+            "p011_genai_team_lead_email_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_email_array')]"
+            },
+            "uniqueInAIFenv": {
+              "type": "string",
+              "value": "[variables('uniqueInAIFenv')]"
+            },
+            "randomSalt": {
+              "type": "string",
+              "value": "[variables('randomSalt')]"
             }
           }
         }
       }
     },
-    {
+    "CmnZones": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('CmnZones-{0}', uniqueString('CmnZones', deployment().name))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[parameters('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "privDnsResourceGroupName": {
+            "value": "[parameters('privDnsResourceGroupName')]"
+          },
+          "privDnsSubscription": {
+            "value": "[parameters('privDnsSubscription')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "7543933933254553506"
+            }
+          },
+          "parameters": {
+            "privDnsSubscription": {
+              "type": "string"
+            },
+            "privDnsResourceGroupName": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "privateDnsZoneName": {
+              "azureusgovernment": "privatelink.api.ml.azure.us",
+              "azurechinacloud": "privatelink.api.ml.azure.cn",
+              "azurecloud": "privatelink.api.azureml.ms"
+            },
+            "privateAznbDnsZoneName": {
+              "azureusgovernment": "privatelink.notebooks.usgovcloudapi.net",
+              "azurechinacloud": "privatelink.notebooks.chinacloudapi.cn",
+              "azurecloud": "privatelink.notebooks.azure.net"
+            },
+            "privateLinksDnsZones": {
+              "blob": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.blob.{0}', environment().suffixes.storage)]"
+              },
+              "file": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.file.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.file.{0}', environment().suffixes.storage)]"
+              },
+              "dfs": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.dfs.{0}', environment().suffixes.storage)]"
+              },
+              "queue": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.queue.{0}', environment().suffixes.storage)]"
+              },
+              "table": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.table.{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), environment().suffixes.storage)]",
+                "name": "[format('privatelink.table.{0}', environment().suffixes.storage)]"
+              },
+              "registry": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.azurecr.io"
+              },
+              "registryregion": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/{2}.data.privatelink.azurecr.io', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), parameters('location'))]",
+                "name": "[format('{0}.data.privatelink.azurecr.io', parameters('location'))]"
+              },
+              "vault": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.vaultcore.azure.net"
+              },
+              "amlworkspace": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), variables('privateDnsZoneName')[toLower(environment().name)])]",
+                "name": "[variables('privateDnsZoneName')[toLower(environment().name)]]"
+              },
+              "notebooks": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/{2}', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), variables('privateAznbDnsZoneName')[toLower(environment().name)])]",
+                "name": "[variables('privateAznbDnsZoneName')[toLower(environment().name)]]"
+              },
+              "dataFactory": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.datafactory.azure.net"
+              },
+              "portal": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.adf.azure.com"
+              },
+              "openai": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.openai.azure.com"
+              },
+              "searchService": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.search.windows.net"
+              },
+              "azurewebapps": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.azurewebsites.net"
+              },
+              "cosmosdbnosql": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.documents.azure.com"
+              },
+              "cognitiveservices": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.cognitiveservices.azure.com"
+              },
+              "azuredatabricks": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.azuredatabricks.net"
+              },
+              "namespace": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.servicebus.windows.net"
+              },
+              "azureeventgrid": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.eventgrid.azure.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.eventgrid.azure.net"
+              },
+              "azuremonitor": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.monitor.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.monitor.azure.com"
+              },
+              "azuremonitoroms": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.oms.opinsights.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.oms.opinsights.azure.com"
+              },
+              "azuremonitorods": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.ods.opinsights.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.ods.opinsights.azure.com"
+              },
+              "azuremonitoragentsvc": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.agentsvc.azure-automation.net"
+              },
+              "azurecontainerapps": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.{2}.azurecontainerapps.io', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'), parameters('location'))]",
+                "name": "[format('privatelink.{0}.azurecontainerapps.io', parameters('location'))]"
+              },
+              "redis": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.redis.cache.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.redis.cache.windows.net"
+              },
+              "postgres": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.postgres.database.azure.com"
+              },
+              "sql": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.database.windows.net"
+              },
+              "cosmosdbmongo": {
+                "id": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.Network/privateDnsZones/privatelink.mongo.cosmos.azure.com', parameters('privDnsSubscription'), parameters('privDnsResourceGroupName'))]",
+                "name": "privatelink.mongo.cosmos.azure.com"
+              }
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "privateLinksDnsZones": {
+              "type": "object",
+              "value": "[variables('privateLinksDnsZones')]"
+            }
+          }
+        }
+      }
+    },
+    "getProjectMIPrincipalId": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('getProjectMIPrincipalId-{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[parameters('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "managedIdentityName": {
+            "value": "[reference('namingConvention').outputs.miPrjName.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "1018302119329499090"
+            }
+          },
+          "parameters": {
+            "managedIdentityName": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed Identity name"
+              }
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal ID of the managed identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName')), '2024-11-30').principalId]"
+            },
+            "clientId": {
+              "type": "string",
+              "metadata": {
+                "description": "Client ID of the managed identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName')), '2024-11-30').clientId]"
+            },
+            "resourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the managed identity"
+              },
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Managed identity name"
+              },
+              "value": "[parameters('managedIdentityName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "namingConvention"
+      ]
+    },
+    "spAndMI2Array": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('spAndMI2Array-{0}', uniqueString('spAndMI2Array', deployment().name))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[parameters('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "managedIdentityOID": {
+            "value": "[reference('getProjectMIPrincipalId').outputs.principalId.value]"
+          },
+          "servicePrincipleOIDFromSecret": {
+            "reference": {
+              "keyVault": {
+                "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('inputKeyvaultSubscription'), parameters('inputKeyvaultResourcegroup')), 'Microsoft.KeyVault/vaults', parameters('inputKeyvault'))]"
+              },
+              "secretName": "[parameters('projectServicePrincipleOID_SeedingKeyvaultName')]"
+            }
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "4489054275663592001"
+            }
+          },
+          "parameters": {
+            "servicePrincipleOIDFromSecret": {
+              "type": "securestring"
+            },
+            "managedIdentityOID": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "toArray": [
+              "[parameters('servicePrincipleOIDFromSecret')]",
+              "[parameters('managedIdentityOID')]"
+            ]
+          },
+          "resources": [],
+          "outputs": {
+            "spAndMiArray": {
+              "type": "array",
+              "value": "[variables('toArray')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "getProjectMIPrincipalId"
+      ]
+    },
+    "cosmosdb": {
       "condition": "[and(not(parameters('cosmosDBExists')), parameters('serviceSettingDeployCosmosDB'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -597,7 +1040,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cosmosDBName.value]"
+            "value": "[reference('namingConvention').outputs.cosmosDBName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -610,7 +1053,7 @@
             "value": "[parameters('cosmosTotalThroughputLimit')]"
           },
           "subnetNamePend": {
-            "value": "[variables('defaultSubnet')]"
+            "value": "[reference('namingConvention').outputs.defaultSubnet.value]"
           },
           "vnetName": {
             "value": "[parameters('vnetNameFull')]"
@@ -623,7 +1066,7 @@
           },
           "createPrivateEndpoint": "[if(parameters('enablePublicAccessWithPerimeter'), createObject('value', false()), createObject('value', true()))]",
           "keyvaultName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference('namingConvention').outputs.keyvaultName.value]"
           },
           "vNetRules": {
             "value": [
@@ -1032,11 +1475,11 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
+        "namingConvention",
+        "resourceExists_struct"
       ]
     },
-    {
+    "cosmosdbRbac": {
       "condition": "[and(not(parameters('cosmosDBExists')), parameters('serviceSettingDeployCosmosDB'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -1050,13 +1493,13 @@
         "mode": "Incremental",
         "parameters": {
           "cosmosName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cosmosDBName.value]"
+            "value": "[reference('namingConvention').outputs.cosmosDBName.value]"
           },
           "usersOrAdGroupArray": {
-            "value": "[variables('p011_genai_team_lead_array')]"
+            "value": "[reference('namingConvention').outputs.p011_genai_team_lead_array.value]"
           },
           "servicePrincipleAndMIArray": {
-            "value": "[variables('spAndMiArray')]"
+            "value": "[reference('spAndMI2Array').outputs.spAndMiArray.value]"
           }
         },
         "template": {
@@ -1122,11 +1565,12 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('CosmosDB4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "cosmosdb",
+        "namingConvention",
+        "spAndMI2Array"
       ]
     },
-    {
+    "privateDnsCosmos": {
       "condition": "[and(and(and(not(parameters('cosmosDBExists')), not(parameters('centralDnsZoneByPolicyInHub'))), parameters('serviceSettingDeployCosmosDB')), not(parameters('enablePublicAccessWithPerimeter')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -1142,17 +1586,17 @@
           "dnsConfig": {
             "value": [
               {
-                "name": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cosmosDBName.value]",
+                "name": "[reference('namingConvention').outputs.cosmosDBName.value]",
                 "type": "Microsoft.DocumentDB/databaseAccounts",
                 "groupIds": [
                   "Sql"
                 ],
-                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.DocumentDB/databaseAccounts/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cosmosDBName.value)]"
+                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.DocumentDB/databaseAccounts/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference('namingConvention').outputs.cosmosDBName.value)]"
               }
             ]
           },
           "privateLinksDnsZones": {
-            "value": {}
+            "value": "[reference('CmnZones').outputs.privateLinksDnsZones.value]"
           }
         },
         "template": {
@@ -1201,12 +1645,13 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('CosmosDB4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
+        "CmnZones",
+        "cosmosdb",
+        "namingConvention",
+        "resourceExists_struct"
       ]
     },
-    {
+    "postgreSQL": {
       "condition": "[and(not(parameters('postgreSQLExists')), parameters('serviceSettingDeployPostgreSQL'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -1220,7 +1665,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.postgreSQLName.value]"
+            "value": "[reference('namingConvention').outputs.postgreSQLName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -1235,10 +1680,10 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetNamePend": {
-            "value": "[variables('defaultSubnet')]"
+            "value": "[reference('namingConvention').outputs.defaultSubnet.value]"
           },
           "keyvaultName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference('namingConvention').outputs.keyvaultName.value]"
           },
           "createPrivateEndpoint": "[if(parameters('enablePublicAccessWithPerimeter'), createObject('value', false()), createObject('value', true()))]",
           "sku": {
@@ -1251,7 +1696,7 @@
             "value": "[parameters('postgreSQLVersion')]"
           },
           "tenantId": {
-            "value": "[parameters('tenantId')]"
+            "value": "[tenant().tenantId]"
           },
           "useAdGroups": {
             "value": "[parameters('useAdGroups')]"
@@ -1612,11 +2057,11 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
+        "namingConvention",
+        "resourceExists_struct"
       ]
     },
-    {
+    "postgreSQLRbac": {
       "condition": "[and(not(parameters('postgreSQLExists')), parameters('serviceSettingDeployPostgreSQL'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -1630,19 +2075,19 @@
         "mode": "Incremental",
         "parameters": {
           "postgreSqlServerName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.postgreSQLName.value]"
+            "value": "[reference('namingConvention').outputs.postgreSQLName.value]"
           },
           "useAdGroups": {
             "value": "[parameters('useAdGroups')]"
           },
           "usersOrAdGroupArray": {
-            "value": "[variables('p011_genai_team_lead_array')]"
+            "value": "[reference('namingConvention').outputs.p011_genai_team_lead_array.value]"
           },
           "servicePrincipleAndMIArray": {
-            "value": "[variables('spAndMiArray')]"
+            "value": "[reference('spAndMI2Array').outputs.spAndMiArray.value]"
           },
           "adminNames": {
-            "value": "[variables('p011_genai_team_lead_email_array')]"
+            "value": "[reference('namingConvention').outputs.p011_genai_team_lead_email_array.value]"
           }
         },
         "template": {
@@ -1733,11 +2178,12 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('PostgreSQL4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "namingConvention",
+        "postgreSQL",
+        "spAndMI2Array"
       ]
     },
-    {
+    "privateDnsPostGreSQL": {
       "condition": "[and(and(and(not(parameters('postgreSQLExists')), not(parameters('centralDnsZoneByPolicyInHub'))), parameters('serviceSettingDeployPostgreSQL')), not(parameters('enablePublicAccessWithPerimeter')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -1753,17 +2199,17 @@
           "dnsConfig": {
             "value": [
               {
-                "name": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.postgreSQLName.value]",
+                "name": "[reference('namingConvention').outputs.postgreSQLName.value]",
                 "type": "Microsoft.DBforPostgreSQL/flexibleServers",
                 "groupIds": [
                   "postgresqlServer"
                 ],
-                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.DBforPostgreSQL/flexibleServers/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.postgreSQLName.value)]"
+                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.DBforPostgreSQL/flexibleServers/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference('namingConvention').outputs.postgreSQLName.value)]"
               }
             ]
           },
           "privateLinksDnsZones": {
-            "value": {}
+            "value": "[reference('CmnZones').outputs.privateLinksDnsZones.value]"
           }
         },
         "template": {
@@ -1812,12 +2258,13 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('PostgreSQL4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
+        "CmnZones",
+        "namingConvention",
+        "postgreSQL",
+        "resourceExists_struct"
       ]
     },
-    {
+    "redisCache": {
       "condition": "[and(not(parameters('redisExists')), parameters('serviceSettingDeployRedisCache'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -1831,7 +2278,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.redisName.value]"
+            "value": "[reference('namingConvention').outputs.redisName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -1843,7 +2290,7 @@
             "value": "[parameters('redisSKU')]"
           },
           "subnetNamePend": {
-            "value": "[variables('defaultSubnet')]"
+            "value": "[reference('namingConvention').outputs.defaultSubnet.value]"
           },
           "vnetName": {
             "value": "[parameters('vnetNameFull')]"
@@ -1852,7 +2299,7 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "keyvaultName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference('namingConvention').outputs.keyvaultName.value]"
           },
           "createPrivateEndpoint": "[if(parameters('enablePublicAccessWithPerimeter'), createObject('value', false()), createObject('value', true()))]"
         },
@@ -2263,11 +2710,11 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
+        "namingConvention",
+        "resourceExists_struct"
       ]
     },
-    {
+    "redisCacheRbac": {
       "condition": "[and(not(parameters('redisExists')), parameters('serviceSettingDeployRedisCache'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -2281,16 +2728,16 @@
         "mode": "Incremental",
         "parameters": {
           "redisName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.redisName.value]"
+            "value": "[reference('namingConvention').outputs.redisName.value]"
           },
           "useAdGroups": {
             "value": "[parameters('useAdGroups')]"
           },
           "usersOrAdGroupArray": {
-            "value": "[variables('p011_genai_team_lead_array')]"
+            "value": "[reference('namingConvention').outputs.p011_genai_team_lead_array.value]"
           },
           "servicePrincipleAndMIArray": {
-            "value": "[variables('spAndMiArray')]"
+            "value": "[reference('spAndMI2Array').outputs.spAndMiArray.value]"
           }
         },
         "template": {
@@ -2430,11 +2877,12 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('RedisCache4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "namingConvention",
+        "redisCache",
+        "spAndMI2Array"
       ]
     },
-    {
+    "privateDnsRedisCache": {
       "condition": "[and(and(and(not(parameters('redisExists')), not(parameters('centralDnsZoneByPolicyInHub'))), parameters('serviceSettingDeployRedisCache')), not(parameters('enablePublicAccessWithPerimeter')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -2450,17 +2898,17 @@
           "dnsConfig": {
             "value": [
               {
-                "name": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.redisName.value]",
+                "name": "[reference('namingConvention').outputs.redisName.value]",
                 "type": "Microsoft.Cache/redis",
                 "groupIds": [
                   "redisCache"
                 ],
-                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Cache/redis/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.redisName.value)]"
+                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Cache/redis/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference('namingConvention').outputs.redisName.value)]"
               }
             ]
           },
           "privateLinksDnsZones": {
-            "value": {}
+            "value": "[reference('CmnZones').outputs.privateLinksDnsZones.value]"
           }
         },
         "template": {
@@ -2509,12 +2957,13 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('RedisCache4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
+        "CmnZones",
+        "namingConvention",
+        "redisCache",
+        "resourceExists_struct"
       ]
     },
-    {
+    "sqlServer": {
       "condition": "[and(not(parameters('sqlServerExists')), parameters('serviceSettingDeploySQLDatabase'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -2528,10 +2977,10 @@
         "mode": "Incremental",
         "parameters": {
           "serverName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.sqlServerName.value]"
+            "value": "[reference('namingConvention').outputs.sqlServerName.value]"
           },
           "databaseName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.sqlDBName.value]"
+            "value": "[reference('namingConvention').outputs.sqlDBName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -2541,7 +2990,7 @@
           },
           "skuObject": "[if(empty(variables('sqlServerSKUObject_DTU')), createObject('value', createObject()), createObject('value', variables('sqlServerSKUObject_DTU')))]",
           "subnetNamePend": {
-            "value": "[variables('defaultSubnet')]"
+            "value": "[reference('namingConvention').outputs.defaultSubnet.value]"
           },
           "vnetName": {
             "value": "[parameters('vnetNameFull')]"
@@ -2550,7 +2999,7 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "keyvaultName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference('namingConvention').outputs.keyvaultName.value]"
           },
           "createPrivateEndpoint": "[if(parameters('enablePublicAccessWithPerimeter'), createObject('value', false()), createObject('value', true()))]"
         },
@@ -2861,11 +3310,11 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
+        "namingConvention",
+        "resourceExists_struct"
       ]
     },
-    {
+    "sqlRbac": {
       "condition": "[and(not(parameters('sqlServerExists')), parameters('serviceSettingDeploySQLDatabase'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -2879,16 +3328,16 @@
         "mode": "Incremental",
         "parameters": {
           "sqlServerName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.sqlServerName.value]"
+            "value": "[reference('namingConvention').outputs.sqlServerName.value]"
           },
           "useAdGroups": {
             "value": "[parameters('useAdGroups')]"
           },
           "usersOrAdGroupArray": {
-            "value": "[variables('p011_genai_team_lead_array')]"
+            "value": "[reference('namingConvention').outputs.p011_genai_team_lead_array.value]"
           },
           "servicePrincipleAndMIArray": {
-            "value": "[variables('spAndMiArray')]"
+            "value": "[reference('spAndMI2Array').outputs.spAndMiArray.value]"
           }
         },
         "template": {
@@ -2969,11 +3418,12 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('SqlServer4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "namingConvention",
+        "spAndMI2Array",
+        "sqlServer"
       ]
     },
-    {
+    "privateDnsSql": {
       "condition": "[and(and(and(not(parameters('sqlServerExists')), not(parameters('centralDnsZoneByPolicyInHub'))), parameters('serviceSettingDeploySQLDatabase')), not(parameters('enablePublicAccessWithPerimeter')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
@@ -2989,17 +3439,17 @@
           "dnsConfig": {
             "value": [
               {
-                "name": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.sqlServerName.value]",
+                "name": "[reference('namingConvention').outputs.sqlServerName.value]",
                 "type": "Microsoft.Sql/servers",
                 "groupIds": [
                   "sqlServer"
                 ],
-                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Sql/servers/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.sqlServerName.value)]"
+                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Sql/servers/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference('namingConvention').outputs.sqlServerName.value)]"
               }
             ]
           },
           "privateLinksDnsZones": {
-            "value": {}
+            "value": "[reference('CmnZones').outputs.privateLinksDnsZones.value]"
           }
         },
         "template": {
@@ -3048,12 +3498,13 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('SqlServer4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "CmnZones",
+        "namingConvention",
+        "resourceExists_struct",
+        "sqlServer"
       ]
     }
-  ],
+  },
   "outputs": {
     "cosmosDBDeployed": {
       "type": "bool",

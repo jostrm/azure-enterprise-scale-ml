@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "11337721472372583495"
+      "templateHash": "8316237977746841134"
     }
   },
   "parameters": {
@@ -56,12 +56,6 @@
       "type": "string",
       "metadata": {
         "description": "Project-specific resource suffix"
-      }
-    },
-    "tenantId": {
-      "type": "string",
-      "metadata": {
-        "description": "Tenant ID"
       }
     },
     "amlExists": {

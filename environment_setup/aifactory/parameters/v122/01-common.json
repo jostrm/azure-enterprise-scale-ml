@@ -1,0 +1,32 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tags": {
+            "value": {
+                "Application Name": "Enterprise Scale AIFactory",
+                "BA ID": "Department Y",
+                "BCIO": "Spiderman",
+                "Business Area": "NA",
+                "Cost Center": "654321",
+                "Resource Managed By":"Stan Leee",
+                "TechnicalContact": "greengoblin@marvel.universe_",
+                "Project": "Marvel upgrade",     
+                "Description": "Enterprise Scale AI Factory"
+            }
+        },
+        "tagsProject": {
+            "value": {
+                "Application Name": "Enterprise AIFactory on Azure",
+                "BA ID": "Project X",
+                "BCIO": "Robin",
+                "Business Area": "NA",
+                "Cost Center": "123456",
+                "Resource Managed By":"The Riddler",
+                "TechnicalContact": "batman@gothamcity.dc_",
+                "Project": "Batcave upgrade",     
+                "Description": "Enterprise AIFactory"
+            }
+        }
+    }
+}

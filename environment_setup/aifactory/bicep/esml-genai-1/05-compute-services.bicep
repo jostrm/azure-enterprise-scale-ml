@@ -60,9 +60,6 @@ param commonResourceSuffix string
 @description('Project-specific resource suffix')
 param resourceSuffix string
 
-@description('Tenant ID')
-param tenantId string
-
 // Resource exists flags from Azure DevOps
 param containerAppsEnvExists bool = false
 param containerAppAExists bool = false
@@ -139,7 +136,7 @@ param appRedundancyMode string = 'None'
 param openAiApiVersion string = '2024-06-01'
 
 // Tags
-param projecttags object = {}
+param tagsProject object = {}
 
 // IP Rules
 param IPwhiteList string = ''
@@ -162,32 +159,6 @@ param useCommonACR bool = true
 // Common names for referencing other resources
 param laWorkspaceName string
 param keyvaultName string
-
-// ============================================================================
-// FROM JSON files
-// ============================================================================
-param datalakeName_param string = ''
-param kvNameFromCOMMON_param string = ''
-param DOCS_byovnet_example string = ''
-param DOCS_byosnet_common_example string = ''
-param DOCS_byosnet_project_example string = ''
-param BYO_subnets bool = false
-// Dynamic subnet parameters - START
-param subnetCommon string = ''
-param subnetCommonScoring string = ''
-param subnetCommonPowerbiGw string = ''
-param subnetProjGenAI string = ''
-param subnetProjAKS string = ''
-param subnetProjACA string = ''
-param subnetProjDatabricksPublic string = ''
-param subnetProjDatabricksPrivate string = ''
-// END
-param databricksOID string = 'not set in genai-1'
-param databricksPrivate bool = false
-param AMLStudioUIPrivate bool = false
-param commonLakeNamePrefixMax8chars string
-param lakeContainerName string
-param hybridBenefit bool
 
 // ============================================================================
 // END - FROM JSON files
@@ -361,7 +332,7 @@ module miForAca '../modules/mi.bicep' = if(!miACAExists) {
   params: {
     name: miACAName
     location: location
-    tags: projecttags
+    tags: tagsProject
   }
   dependsOn: [
     resourceExists_struct
@@ -446,7 +417,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDepl
   params: {
     name: webAppName
     location: location
-    tags: projecttags
+    tags: tagsProject
     sku: byoASEv3 ? webappSKUAce : webappSKU
     alwaysOn: webappAlwaysOn
     vnetName: vnetNameFull
@@ -528,7 +499,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && serviceSe
   params: {
     name: functionAppName
     location: location
-    tags: projecttags
+    tags: tagsProject
     sku: byoASEv3 ? webappSKUAce : functionSKU
     alwaysOn: functionAlwaysOn
     vnetName: vnetNameFull
@@ -608,7 +579,7 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
   params: {
     name: containerAppsEnvName
     location: location
-    tags: projecttags
+    tags: tagsProject
     logAnalyticsWorkspaceName: laWorkspaceName
     logAnalyticsWorkspaceRG: commonResourceGroup
     applicationInsightsName: applicationInsightName
@@ -654,7 +625,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
   params: {
     name: containerAppAName
     location: location
-    tags: projecttags
+    tags: tagsProject
     ipSecurityRestrictions: enablePublicGenAIAccess ? ipSecurityRestrictions : []
     allowedOrigins: allowedOrigins
     enablePublicGenAIAccess: enablePublicGenAIAccess
@@ -705,7 +676,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
   name: 'aca-w-${deploymentProjSpecificUniqueSuffix}-depl'
   params: {
     location: location
-    tags: projecttags
+    tags: tagsProject
     name: containerAppWName
     apiEndpoint: 'https://${containerAppAName}.${var_containerAppApiDomain}' // Using computed domain variable
     allowedOrigins: allowedOrigins

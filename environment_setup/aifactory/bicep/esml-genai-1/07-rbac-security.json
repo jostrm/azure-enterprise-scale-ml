@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "146380522523870449"
+      "templateHash": "9375369286965093466"
     }
   },
   "parameters": {
@@ -42,12 +42,6 @@
       "type": "string",
       "metadata": {
         "description": "Common resource suffix (e.g., \"-001\")"
-      }
-    },
-    "tenantId": {
-      "type": "string",
-      "metadata": {
-        "description": "Tenant ID"
       }
     },
     "aifactorySuffixRG": {

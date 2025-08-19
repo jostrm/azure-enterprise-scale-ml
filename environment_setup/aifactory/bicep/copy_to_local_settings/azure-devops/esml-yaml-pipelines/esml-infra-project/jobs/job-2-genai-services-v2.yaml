@@ -579,16 +579,9 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\01-foundation.bicep" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-1.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-3-12_13.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-5-13_23.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-override.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\21-22-esml-prj-parameters.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\23-esml-prj-rbac-parameters.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\31-esgenai-default.json" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
+     --parameters useAdGroups="$(use_ad_groups)" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -599,6 +592,17 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters vnetNameBase="$(vnetNameBase)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroupBase)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters network_env="$(network_env_$(dev_test_prod))" \
+     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters privateDnsAndVnetLinkAllGlobalLocation="false" \
+     --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
+     --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
+     --parameters technicalContactId="$(technical_admins_ad_object_id)" \
+     --parameters technicalContactEmail="$(technical_admins_email)" \
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters keyvaultExists="$(keyvaultExists)" \
@@ -609,12 +613,10 @@ steps:
      --parameters zoneSqlExists="$(zonesqlExists)" \
      --parameters zoneMongoExists="$(zoneMongoExists)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
-     --parameters projectServicePrincipleAppID_SeedingKeyvaultName="$(project_service_principal_AppID_seeding_kv_name)" \
-     --parameters projectServicePrincipleSecret_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
-     --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters enableDebugging="false" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters randomValue="$(deployment_random_value)" \
      --debug
@@ -632,20 +634,10 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\02-cognitive-services.bicep" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-1.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-3-12_13.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-5-13_23.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-override.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\21-22-esml-prj-parameters.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\23-esml-prj-rbac-parameters.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\31-esgenai-default.json" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
-     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
-     --parameters technicalAdminsEmail="$(technical_admins_email)" \
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
@@ -656,12 +648,12 @@ steps:
      --parameters openaiExists="$(openaiExists)" \
      --parameters aiSearchExists="$(aiSearchExists)" \
      --parameters aiServicesExists="$(aiServicesExists)" \
-     --parameters bingExists="$(bingExists)" \
      --parameters keyvaultExists="$(keyvaultExists)" \
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -678,20 +670,10 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\03-core-infrastructure.bicep" \
      --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-1.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-3-12_13.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-5-13_23.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-override.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\21-22-esml-prj-parameters.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\23-esml-prj-rbac-parameters.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\31-esgenai-default.json" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
-     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
-     --parameters technicalAdminsEmail="$(technical_admins_email)" \
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
@@ -714,6 +696,7 @@ steps:
      --parameters bingExists="$(bingExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -729,20 +712,10 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\04-databases.bicep" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-1.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-3-12_13.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-5-13_23.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-override.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\21-22-esml-prj-parameters.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\23-esml-prj-rbac-parameters.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\31-esgenai-default.json" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
-     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
-     --parameters technicalAdminsEmail="$(technical_admins_email)" \
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
@@ -755,6 +728,7 @@ steps:
      --parameters postgreSQLExists="$(postgreSQLExists)" \
      --parameters sqlServerExists="$(sqlServerExists)" \
      --parameters randomValue="$(deployment_random_value)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -770,16 +744,8 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\05-compute-services.bicep" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-1.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-3-12_13.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-5-13_23.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-override.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\21-22-esml-prj-parameters.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\23-esml-prj-rbac-parameters.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\31-esgenai-default.json" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -798,10 +764,9 @@ steps:
      --parameters webAppExists="$(webAppExists)" \
      --parameters funcAppServicePlanExists="$(funcAppServicePlanExists)" \
      --parameters webAppServicePlanExists="$(webAppServicePlanExists)" \
-     --parameters databricksExists="$(databricksExists)" \
-     --parameters datafactoryExists="$(datafactoryExists)" \
      --parameters miACAExists="$(miACAExists)" \
      --parameters randomValue="$(deployment_random_value)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -817,16 +782,8 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\06-ml-platform.bicep" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-1.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-3-12_13.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-5-13_23.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-override.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\21-22-esml-prj-parameters.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\23-esml-prj-rbac-parameters.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\31-esgenai-default.json" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -843,6 +800,7 @@ steps:
      --parameters aifProjectExists="$(aifProjectExists)" \
      --parameters aksExists="$(aksExists)" \
      --parameters randomValue="$(deployment_random_value)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -858,16 +816,8 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\07-rbac-security.bicep" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-1.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-2-12_13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-3-12_13.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-4-13_21_22.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-5-13_23.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\10-esml-globals-override.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\21-22-esml-prj-parameters.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\23-esml-prj-rbac-parameters.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\31-esgenai-default.json" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -878,10 +828,10 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
-     --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters azureMachineLearningObjectId="$(azure_machinelearning_sp_oid)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters randomValue="$(deployment_random_value)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

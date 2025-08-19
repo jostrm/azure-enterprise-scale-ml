@@ -29,6 +29,15 @@ param csSpeechSKU string = 'S0'
 param csDocIntelligenceSKU string = 'S0'
 param storageAccountSkuName string = 'Standard_LRS'
 
+// ============================================================================
+// PARAMETERS - Core Configuration
+// ============================================================================
+
+@description('AI Factory version information')
+param aifactoryVersionMajor int = 1
+param aifactoryVersionMinor int = 22
+var activeVersion = 122
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -48,9 +57,6 @@ param commonResourceSuffix string
 
 @description('Project-specific resource suffix')
 param resourceSuffix string
-
-@description('Tenant ID')
-param tenantId string
 
 @description('Random value for deployment uniqueness')
 param randomValue string = ''
@@ -114,7 +120,7 @@ param serviceSettingOverrideRegionAzureAIVision string = ''
 param serviceSettingOverrideRegionAzureAIVisionShort string = ''
 
 // Tags
-param projecttags object = {}
+param tagsProject object = {}
 
 // IP Rules
 param IPwhiteList string = ''
@@ -130,29 +136,6 @@ param privDnsSubscription string
 // ============================================================================
 // FROM JSON files
 // ============================================================================
-param datalakeName_param string = ''
-param kvNameFromCOMMON_param string = ''
-param DOCS_byovnet_example string = ''
-param DOCS_byosnet_common_example string = ''
-param DOCS_byosnet_project_example string = ''
-param BYO_subnets bool = false
-// Dynamic subnet parameters - START
-param subnetCommon string = ''
-param subnetCommonScoring string = ''
-param subnetCommonPowerbiGw string = ''
-param subnetProjGenAI string = ''
-param subnetProjAKS string = ''
-param subnetProjACA string = ''
-param subnetProjDatabricksPublic string = ''
-param subnetProjDatabricksPrivate string = ''
-// END
-param databricksOID string = 'not set in genai-1'
-param databricksPrivate bool = false
-param AMLStudioUIPrivate bool = false
-param commonLakeNamePrefixMax8chars string
-param lakeContainerName string
-param hybridBenefit bool
-
 // ============================================================================
 // END - FROM JSON files
 // ============================================================================
@@ -403,7 +386,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
-    tags: projecttags
+    tags: tagsProject
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
     containers: [
       {
@@ -471,7 +454,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
-    tags: projecttags
+    tags: tagsProject
     semanticSearchTier: semanticSearchTier
     publicNetworkAccess: enablePublicGenAIAccess
     skuName: aiSearchSKUName
@@ -493,7 +476,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
   params: {
     location: location
     sku: csAIservicesSKU
-    tags: projecttags
+    tags: tagsProject
     vnetResourceGroupName: vnetResourceGroupName
     cognitiveName: aiServicesName
     pendCogSerName: 'p-${projectName}-aiservices-${genaiName}'
@@ -544,7 +527,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
     cognitiveName: aoaiName
-    tags: projecttags
+    tags: tagsProject
     laWorkspaceName: laWorkspaceName
     restore: restore
     location: location

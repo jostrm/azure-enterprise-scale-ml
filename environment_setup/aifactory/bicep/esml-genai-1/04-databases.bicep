@@ -43,9 +43,6 @@ param commonResourceSuffix string
 @description('Project-specific resource suffix')
 param resourceSuffix string
 
-@description('Tenant ID')
-param tenantId string
-
 // Resource exists flags from Azure DevOps
 param cosmosDBExists bool = false
 param postgreSQLExists bool = false
@@ -80,7 +77,7 @@ param targetResourceGroup string
 param commonResourceGroup string
 
 // Tags
-param projecttags object = {}
+param tagsProject object = {}
 
 // IP Rules
 param IPwhiteList string = ''
@@ -129,31 +126,6 @@ param aifactorySalt10char string = ''
 param randomValue string = ''
 param privDnsResourceGroupName string
 param privDnsSubscription string
-// ============================================================================
-// FROM JSON files
-// ============================================================================
-param datalakeName_param string = ''
-param kvNameFromCOMMON_param string = ''
-param DOCS_byovnet_example string = ''
-param DOCS_byosnet_common_example string = ''
-param DOCS_byosnet_project_example string = ''
-param BYO_subnets bool = false
-// Dynamic subnet parameters - START
-param subnetCommon string = ''
-param subnetCommonScoring string = ''
-param subnetCommonPowerbiGw string = ''
-param subnetProjGenAI string = ''
-param subnetProjAKS string = ''
-param subnetProjACA string = ''
-param subnetProjDatabricksPublic string = ''
-param subnetProjDatabricksPrivate string = ''
-// END
-param databricksOID string = 'not set in genai-1'
-param databricksPrivate bool = false
-param AMLStudioUIPrivate bool = false
-param commonLakeNamePrefixMax8chars string
-param lakeContainerName string
-param hybridBenefit bool
 
 // ============================================================================
 // END - FROM JSON files
@@ -351,7 +323,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
     ]
     kind: cosmosKind
     minimalTlsVersion: cosmosMinimalTlsVersion
-    tags: projecttags
+    tags: tagsProject
     corsRules: [
       {
         allowedOrigins: [
@@ -443,7 +415,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
   params: {
     name: postgreSQLName
     location: location
-    tags: projecttags
+    tags: tagsProject
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
@@ -452,7 +424,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
     sku: postgreSQLSKU
     storage: postgreSQLStorage
     version: postgreSQLVersion
-    tenantId: tenantId
+    tenantId: tenant().tenantId
     useAdGroups: useAdGroups
     highAvailability: postgreSQLHighAvailability
     availabilityZone: postgresAvailabilityZone
@@ -499,7 +471,7 @@ module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && 
   params: {
     name: redisName
     location: location
-    tags: projecttags
+    tags: tagsProject
     skuName: redisSKU
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
@@ -548,7 +520,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlS
     serverName: sqlServerName
     databaseName: sqlDBName
     location: location
-    tags: projecttags
+    tags: tagsProject
     skuObject: empty(sqlServerSKUObject_DTU) ? {} : sqlServerSKUObject_DTU
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull

@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "5036883309827666950"
+      "templateHash": "4333458853078501371"
     }
   },
   "parameters": {
@@ -104,12 +104,6 @@
       "type": "string",
       "metadata": {
         "description": "Project-specific resource suffix"
-      }
-    },
-    "tenantId": {
-      "type": "string",
-      "metadata": {
-        "description": "Tenant ID"
       }
     },
     "randomValue": {
@@ -3412,6 +3406,80 @@
         "sa4AIsearch"
       ]
     },
+    "getAISearchInfo": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('getAISearchInfo-{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[parameters('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "aiSearchName": {
+            "value": "[reference('namingConvention').outputs.safeNameAISearch.value]"
+          },
+          "aiSearchExists": {
+            "value": "[parameters('aiSearchExists')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "4132537862794185216"
+            }
+          },
+          "parameters": {
+            "aiSearchName": {
+              "type": "string",
+              "metadata": {
+                "description": "AI Search service name"
+              }
+            },
+            "aiSearchExists": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Check if AI Search exists"
+              }
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal ID of AI Search service (empty if service does not exist)"
+              },
+              "value": "[if(parameters('aiSearchExists'), reference(resourceId('Microsoft.Search/searchServices', parameters('aiSearchName')), '2024-06-01-preview', 'Full').identity.principalId, '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "AI Search service name"
+              },
+              "value": "[parameters('aiSearchName')]"
+            },
+            "exists": {
+              "type": "bool",
+              "metadata": {
+                "description": "AI Search exists flag"
+              },
+              "value": "[parameters('aiSearchExists')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "namingConvention"
+      ]
+    },
     "csAzureOpenAI": {
       "condition": "[and(not(parameters('openaiExists')), parameters('serviceSettingDeployAzureOpenAI'))]",
       "type": "Microsoft.Resources/deployments",
@@ -3462,7 +3530,7 @@
             "value": "[parameters('modelGPT4Version')]"
           },
           "aiSearchPrincipalId": {
-            "value": ""
+            "value": "[reference('getAISearchInfo').outputs.principalId.value]"
           },
           "kind": {
             "value": "[variables('kindAOpenAI')]"
@@ -3741,6 +3809,7 @@
         }
       },
       "dependsOn": [
+        "getAISearchInfo",
         "namingConvention",
         "resourceExists_struct",
         "sa4AIsearch"

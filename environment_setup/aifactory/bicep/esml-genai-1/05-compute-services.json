@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "11881294733734483061"
+      "templateHash": "10114889606761805938"
     }
   },
   "parameters": {
@@ -78,12 +78,6 @@
       "type": "string",
       "metadata": {
         "description": "Project-specific resource suffix"
-      }
-    },
-    "tenantId": {
-      "type": "string",
-      "metadata": {
-        "description": "Tenant ID"
       }
     },
     "containerAppsEnvExists": {

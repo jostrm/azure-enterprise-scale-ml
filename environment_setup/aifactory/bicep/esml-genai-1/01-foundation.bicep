@@ -13,8 +13,8 @@ targetScope = 'subscription'
 
 @description('AI Factory version information')
 param aifactoryVersionMajor int = 1
-param aifactoryVersionMinor int = 20
-var activeVersion = 121
+param aifactoryVersionMinor int = 22
+var activeVersion = 122
 
 @description('Use Azure AD Groups for RBAC')
 param useAdGroups bool = false
@@ -40,7 +40,7 @@ param projectNumber string
 // PARAMETERS - Resource Existence Flags
 // ============================================================================
 
-@description('Existing resource flags')
+@description('Existing flags')
 param miACAExists bool = false
 param miPrjExists bool = false
 param keyvaultExists bool = false
@@ -68,7 +68,7 @@ param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param network_env string = ''
 
-@description('Subnets from subnet calculator: dynamicNetworkParams.json')
+@description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string = ''
@@ -102,13 +102,8 @@ param technicalContactEmail string = ''
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
 
-@description('Tenant configuration')
-param tenantId string
-
 @description('Service Principal configuration')
 param projectServicePrincipleOID_SeedingKeyvaultName string
-param projectServicePrincipleSecret_SeedingKeyvaultName string
-param projectServicePrincipleAppID_SeedingKeyvaultName string
 
 @description('Keyvault seeding configuration')
 param inputKeyvault string
@@ -116,7 +111,15 @@ param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
 
 // ============================================================================
-// PARAMETERS - Debugging
+// PARAMETERS - Tags
+// ============================================================================
+
+@description('Resource tags')
+param tags object
+param tagsProject object
+
+// ============================================================================
+// PARAMETERS - Debugging & Random Values
 // ============================================================================
 
 @description('Enable debugging output')
@@ -127,45 +130,6 @@ param randomValue string = ''
 
 @description('Salt values for random naming')
 param aifactorySalt10char string = ''
-
-// ============================================================================
-// PARAMETERS - Tags
-// ============================================================================
-
-@description('Resource tags')
-param tags object
-param projecttags object
-
-
-// ============================================================================
-// FROM JSON files
-// ============================================================================
-param datalakeName_param string = ''
-param kvNameFromCOMMON_param string = ''
-param DOCS_byovnet_example string = ''
-param DOCS_byosnet_common_example string = ''
-param DOCS_byosnet_project_example string = ''
-param BYO_subnets bool = false
-// Dynamic subnet parameters - START
-param subnetCommon string = ''
-param subnetCommonScoring string = ''
-param subnetCommonPowerbiGw string = ''
-param subnetProjGenAI string = ''
-param subnetProjAKS string = ''
-param subnetProjACA string = ''
-param subnetProjDatabricksPublic string = ''
-param subnetProjDatabricksPrivate string = ''
-// END
-param databricksOID string = 'not set in genai-1'
-param databricksPrivate bool = false
-param AMLStudioUIPrivate bool = false
-param commonLakeNamePrefixMax8chars string
-param lakeContainerName string
-param hybridBenefit bool
-
-// ============================================================================
-// END - FROM JSON files
-// ============================================================================
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
@@ -444,7 +408,7 @@ module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   params: {
     rgName: targetResourceGroup
     location: location
-    tags: projecttags
+    tags: tagsProject
   }
 }
 
@@ -455,7 +419,7 @@ module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
   params: {
     name: miPrjName
     location: location
-    tags: projecttags
+    tags: tagsProject
   }
   dependsOn: [
     projectResourceGroup
@@ -469,7 +433,7 @@ module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
   params: {
     name: miACAName
     location: location
-    tags: projecttags
+    tags: tagsProject
   }
   dependsOn: [
     projectResourceGroup

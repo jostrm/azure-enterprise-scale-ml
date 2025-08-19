@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "7355502423947697879"
+      "templateHash": "2833768026571564661"
     }
   },
   "parameters": {
@@ -60,12 +60,6 @@
       "type": "string",
       "metadata": {
         "description": "Project-specific resource suffix"
-      }
-    },
-    "tenantId": {
-      "type": "string",
-      "metadata": {
-        "description": "Tenant ID"
       }
     },
     "keyvaultExists": {
@@ -253,10 +247,10 @@
     "deploymentProjSpecificUniqueSuffix": "[format('{0}{1}{2}', parameters('projectNumber'), parameters('env'), parameters('targetResourceGroup'))]",
     "ipWhitelist_array": "[if(not(empty(parameters('IPwhiteList'))), split(parameters('IPwhiteList'), ','), createArray())]",
     "subnet_genai_ref": {
-      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiSubnetName.value)]"
+      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiSubnetName.value)]"
     },
     "subnet_aks_ref": {
-      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.aksSubnetName.value)]"
+      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.aksSubnetName.value)]"
     },
     "secretGetListSet": {
       "secrets": [
@@ -287,7 +281,7 @@
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))]",
+      "name": "[guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))]",
       "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
@@ -693,7 +687,7 @@
         "mode": "Incremental",
         "parameters": {
           "managedIdentityName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.miPrjName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.miPrjName.value]"
           }
         },
         "template": {
@@ -748,7 +742,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
     },
     {
@@ -764,7 +758,7 @@
         "mode": "Incremental",
         "parameters": {
           "managedIdentityName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.miACAName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.miACAName.value]"
           }
         },
         "template": {
@@ -819,7 +813,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
     },
     {
@@ -836,7 +830,7 @@
         "mode": "Incremental",
         "parameters": {
           "storageAccountName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.storageAccount1001Name.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.storageAccount1001Name.value]"
           },
           "skuName": {
             "value": "[parameters('storageAccountSkuName')]"
@@ -848,7 +842,7 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -860,16 +854,16 @@
             "value": "[parameters('enablePublicAccessWithPerimeter')]"
           },
           "blobPrivateEndpointName": {
-            "value": "[format('p-sa-{0}{1}{2}-blob-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
+            "value": "[format('p-sa-{0}{1}{2}-blob-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
           },
           "filePrivateEndpointName": {
-            "value": "[format('p-sa-{0}{1}{2}-file-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
+            "value": "[format('p-sa-{0}{1}{2}-file-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
           },
           "queuePrivateEndpointName": {
-            "value": "[format('p-sa-{0}{1}{2}-queue-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
+            "value": "[format('p-sa-{0}{1}{2}-queue-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
           },
           "tablePrivateEndpointName": {
-            "value": "[format('p-sa-{0}{1}{2}-table-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
+            "value": "[format('p-sa-{0}{1}{2}-table-{3}ml', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'), parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.genaiName.value)]"
           },
           "tags": {
             "value": "[parameters('projecttags')]"
@@ -1451,7 +1445,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -1469,7 +1463,7 @@
         "mode": "Incremental",
         "parameters": {
           "keyvaultName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -1484,7 +1478,7 @@
             "value": "[parameters('keyvaultSoftDeleteDays')]"
           },
           "tenantIdentity": {
-            "value": "[parameters('tenantId')]"
+            "value": "[tenant().tenantId]"
           },
           "enablePublicAccessWithPerimeter": {
             "value": "[parameters('enablePublicAccessWithPerimeter')]"
@@ -1496,10 +1490,10 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "privateEndpointName": {
-            "value": "[format('pend-{0}-kv1-to-vnt-mlcmn', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value)]"
+            "value": "[format('pend-{0}-kv1-to-vnt-mlcmn', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value)]"
           },
           "keyvaultNetworkPolicySubnets": {
             "value": [
@@ -1706,7 +1700,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -1724,7 +1718,7 @@
         "mode": "Incremental",
         "parameters": {
           "containerRegistryName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.acrProjectName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.acrProjectName.value]"
           },
           "skuName": {
             "value": "[parameters('containerRegistrySkuName')]"
@@ -1736,10 +1730,10 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "privateEndpointName": {
-            "value": "[format('pend-{0}{1}-containerreg-to-vnt-mlcmn', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'))]"
+            "value": "[format('pend-{0}{1}-containerreg-to-vnt-mlcmn', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.projectName.value, parameters('locationSuffix'))]"
           },
           "tags": {
             "value": "[parameters('projecttags')]"
@@ -1906,7 +1900,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -1924,10 +1918,10 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.applicationInsightName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.applicationInsightName.value]"
           },
           "logWorkspaceName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.laWorkspaceName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.laWorkspaceName.value]"
           },
           "logWorkspaceNameRG": {
             "value": "[parameters('commonResourceGroup')]"
@@ -2009,7 +2003,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -2042,10 +2036,10 @@
             "value": "[parameters('location')]"
           },
           "vmName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.vmName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.vmName.value]"
           },
           "subnetName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "vnetId": {
             "value": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks', parameters('vnetNameFull'))]"
@@ -2054,7 +2048,7 @@
             "value": "[parameters('projecttags')]"
           },
           "keyvaultName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
           }
         },
         "template": {
@@ -2327,7 +2321,7 @@
       },
       "dependsOn": [
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('AMGenAILKeyV4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -2345,7 +2339,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.bingName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.bingName.value]"
           },
           "location": {
             "value": "global"
@@ -2414,7 +2408,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -2456,7 +2450,7 @@
             }
           },
           "keyvaultName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
           },
           "keyvaultNameRG": {
             "value": "[parameters('targetResourceGroup')]"
@@ -2644,7 +2638,7 @@
       },
       "dependsOn": [
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('AMGenAILKeyV4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -2665,7 +2659,7 @@
             "value": "[variables('secretGetListSet')]"
           },
           "keyVaultResourceName": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.keyvaultName.value]"
           },
           "policyName": {
             "value": "add"
@@ -2674,7 +2668,7 @@
             "value": "[parameters('technicalContactId')]"
           },
           "additionalPrincipalIds": {
-            "value": "[union(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.p011_genai_team_lead_array.value, array(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('getProjectMIPrincipalId-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.principalId.value), array(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('getACAMIPrincipalId-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.principalId.value))]"
+            "value": "[union(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.p011_genai_team_lead_array.value, array(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('getProjectMIPrincipalId-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.principalId.value), array(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('getACAMIPrincipalId-{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.principalId.value))]"
           }
         },
         "template": {
@@ -2755,7 +2749,7 @@
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('getACAMIPrincipalId-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('getProjectMIPrincipalId-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('AMGenAILKeyV4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
     },
     {
@@ -2775,7 +2769,7 @@
             "value": "[variables('secretGetList')]"
           },
           "keyVaultResourceName": {
-            "value": "[format('kv-{0}{1}-{2}{3}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cmnName.value, parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.uniqueInAIFenv.value, parameters('commonResourceSuffix'))]"
+            "value": "[format('kv-{0}{1}-{2}{3}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cmnName.value, parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.uniqueInAIFenv.value, parameters('commonResourceSuffix'))]"
           },
           "policyName": {
             "value": "add"
@@ -2784,7 +2778,7 @@
             "value": "[parameters('technicalContactId')]"
           },
           "additionalPrincipalIds": {
-            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.p011_genai_team_lead_array.value]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.p011_genai_team_lead_array.value]"
           }
         },
         "template": {
@@ -2861,7 +2855,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
     },
     {
@@ -2880,7 +2874,7 @@
             "value": "[variables('secretGet')]"
           },
           "keyVaultResourceName": {
-            "value": "[format('kv-{0}{1}-{2}{3}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cmnName.value, parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.uniqueInAIFenv.value, parameters('commonResourceSuffix'))]"
+            "value": "[format('kv-{0}{1}-{2}{3}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.cmnName.value, parameters('env'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.uniqueInAIFenv.value, parameters('commonResourceSuffix'))]"
           },
           "policyName": {
             "value": "add"
@@ -2971,7 +2965,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-02-cog-services', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-03-core-infra', parameters('vnetResourceGroupName'), variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
     }
   ],

@@ -91,3 +91,105 @@ variables:
 #### DO NOT TOUCH ####
   admin_ip_fw: "" # Leave this. Will be set by pipeline
   
+  
+# v1.22 updates: Moved base parameters .json vars to this YAML
+  vnetNameBase: "vnt-esmlcmn"
+  vnetResourceGroupBase: "esml-common"
+  common_subnet_name: "snet-esml-cmn-001"
+  commonLakeNamePrefixMax8chars: "mrvel"
+  lakeContainerName: "lake3"
+  adminUsername: "esmladmin"
+  centralDnsZoneByPolicyInHub: "false"
+  privDnsSubscription_param: ""
+  privDnsResourceGroup_param: "platform-connectivity"
+  tenantId: ""
+  databricksOID: ""
+  databricksPrivate: "false"
+  AMLStudioUIPrivate: "true"
+  inputCommonSPIDKey: "esml-common-sp-id"
+  inputCommonSPSecretKey: "esml-common-sp-secret"
+  commonServicePrincipleOIDKey: "esml-common-sp-oid"
+
+  # ============================================================================
+  # Networking modes
+  #  [false, false, false ] = private UI with private backend. No public IP
+  #  [true, true, false ]  = public UI for IP whitelisted devices, with private backend
+  #  [true, true, true ]   = public UI with private backend
+  # ============================================================================
+  enablePublicGenAIAccess: "false"
+  allowPublicAccessWhenBehindVnet: "false"
+  enablePublicAccessWithPerimeter: "false"
+
+  # ============================================================================
+  # Enable / Disable services
+  # ============================================================================
+
+  #  VM's
+  addBastionHost: "true"
+  enableAdminVM: "false"
+  serviceSettingDeployProjectVM: "false"
+
+  # PaaS: 
+  enableAIServices: "false"
+  enableAIFoundryHub: "false"
+  enableAISearch: "false"
+  enableAzureMachineLearning: "false"
+  serviceSettingDeployFunction: "true"
+  functionRuntime: "dotnet"
+  functionVersion: "v7.0"
+  serviceSettingDeployWebApp: "true"
+  webAppRuntime: "python"
+  webAppRuntimeVersion: "3.11"
+  aseSku: "IsolatedV2"
+  aseSkuCode: "I1v2"
+  aseSkuWorkers: 1
+  serviceSettingDeployContainerApps: "false"
+  serviceSettingDeployAppInsightsDashboard: "false"
+  aca_a_registry_image: "containerapps-default:latest"
+  aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  serviceSettingDeployBingSearch: "false"
+  serviceSettingDeployCosmosDB: "false"
+  serviceSettingDeployAzureOpenAI: "false"
+  serviceSettingDeployAzureAIVision: "false"
+  serviceSettingDeployAzureSpeech: "false"
+  serviceSettingDeployAIDocIntelligence: "false"
+  disableContributorAccessForUsers: "false"
+  serviceSettingDeployPostgreSQL: "false"
+  serviceSettingDeployRedisCache: "false"
+  serviceSettingDeploySQLDatabase: "false"
+  aiSearchEnableSharedPrivateLink_DOCS: "SharedPrivateLinks for Azure AI Search requires SKU standard2 or higher, you many need to apply for that. Alternative: In Azure Portal, AISearch, click Allow Azure services checkbox and do not created SharedPrivateLinks"
+  aiSearchEnableSharedPrivateLink: "false"
+  deployModel_gpt_4: "false"
+  modelGPT4Name: ""
+  modelGPT4Version: ""
+  deployModel_text_embedding_ada_002: "false"
+  deployModel_text_embedding_3_large: "false"
+  deployModel_text_embedding_3_small: "false"
+  default_embedding_capacity: 25
+  deployModel_gpt_4o_mini: "false"
+  default_gpt_capacity: 40
+  default_model_sku: "Standard"
+
+  # ============================================================================
+  # BYO Overrides: Override AI Factory vanilla - BYOvNet, BYOsnet, BYOAse 
+  # ============================================================================
+  DOCS_byovnet_example: "esml-common-eus2-<network_env>001-rg"
+  vnetResourceGroup_param: ""
+  vnetNameFull_param: ""
+  commonResourceGroup_param: ""
+  datalakeName_param: ""
+  kvNameFromCOMMON_param: ""
+  useCommonACR_override: "true"
+  DOCS_byosnet_common_example: "acme-<network_env>common-eus2-subnet"
+  subnetCommon: ""
+  subnetCommonScoring: ""
+  subnetCommonPowerbiGw: ""
+  DOCS_byosnet_project_example: "acme-<network_env>prj<xxx>-genai-eus2-subnet"
+  subnetProjGenAI: ""
+  subnetProjAKS: ""
+  subnetProjACA: ""
+  subnetProjDatabricksPublic: ""
+  subnetProjDatabricksPrivate: ""
+  byoASEv3: "true"
+  byoAseFullResourceId: ""
+  byoAseAppServicePlanResourceId: ""

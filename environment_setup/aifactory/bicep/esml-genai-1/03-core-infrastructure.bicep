@@ -38,9 +38,6 @@ param commonResourceSuffix string
 @description('Project-specific resource suffix')
 param resourceSuffix string
 
-@description('Tenant ID')
-param tenantId string
-
 // Resource exists flags from Azure DevOps
 param keyvaultExists bool = false
 param storageAccount1001Exists bool = false
@@ -90,7 +87,7 @@ param hybridBenefit bool = false
 param useCommonACR bool = true
 
 // Tags
-param projecttags object = {}
+param tagsProject object = {}
 
 // IP Rules
 param IPwhiteList string = ''
@@ -113,31 +110,6 @@ param projectServicePrincipleSecret_SeedingKeyvaultName string
 param aifactorySalt10char string = ''
 @description('Random value for deployment uniqueness')
 param randomValue string = ''
-// ============================================================================
-// FROM JSON files
-// ============================================================================
-param datalakeName_param string = ''
-param kvNameFromCOMMON_param string = ''
-param DOCS_byovnet_example string = ''
-param DOCS_byosnet_common_example string = ''
-param DOCS_byosnet_project_example string = ''
-param BYO_subnets bool = false
-// Dynamic subnet parameters - START
-param subnetCommon string = ''
-param subnetCommonScoring string = ''
-param subnetCommonPowerbiGw string = ''
-param subnetProjGenAI string = ''
-param subnetProjAKS string = ''
-param subnetProjACA string = ''
-param subnetProjDatabricksPublic string = ''
-param subnetProjDatabricksPrivate string = ''
-// END
-param databricksOID string = 'not set in genai-1'
-param databricksPrivate bool = false
-param AMLStudioUIPrivate bool = false
-param commonLakeNamePrefixMax8chars string
-param lakeContainerName string
-//param hybridBenefit bool
 
 // ============================================================================
 // END - FROM JSON files
@@ -281,7 +253,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
     queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
     tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}ml'
-    tags: projecttags
+    tags: tagsProject
     containers: [
       {
         name: 'default'
@@ -344,10 +316,10 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
   params: {
     keyvaultName: keyvaultName
     location: location
-    tags: projecttags
+    tags: tagsProject
     enablePurgeProtection: keyvaultEnablePurgeProtection
     soft_delete_days: keyvaultSoftDeleteDays
-    tenantIdentity: tenantId
+    tenantIdentity: tenant().tenantId
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -378,7 +350,7 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && useCo
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}${locationSuffix}-containerreg-to-vnt-mlcmn'
-    tags: projecttags
+    tags: tagsProject
     location: location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
@@ -400,7 +372,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep' = if(!
     name: applicationInsightName
     logWorkspaceName: laWorkspaceName
     logWorkspaceNameRG: commonResourceGroup
-    tags: projecttags
+    tags: tagsProject
     location: location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
@@ -423,7 +395,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serv
     vmName: vmName
     subnetName: defaultSubnet
     vnetId: vnet.id
-    tags: projecttags
+    tags: tagsProject
     keyvaultName: keyvaultName
   }
   dependsOn: [
@@ -441,7 +413,7 @@ module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBing
     name: bingName
     location: 'global'
     sku: bingSearchSKU
-    tags: projecttags
+    tags: tagsProject
   }
   dependsOn: [
     resourceExists_struct

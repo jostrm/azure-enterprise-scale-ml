@@ -37,9 +37,6 @@ param commonResourceSuffix string
 @description('Project-specific resource suffix')
 param resourceSuffix string
 
-@description('Tenant ID')
-param tenantId string
-
 // Resource exists flags from Azure DevOps
 param amlExists bool = false
 param aiHubExists bool = false
@@ -105,7 +102,7 @@ param aml_cluster_dev_nodes_override int = -1
 param aml_cluster_test_prod_nodes_override int = -1
 
 // Tags
-param projecttags object = {}
+param tagsProject object = {}
 
 // IP Rules
 param IPwhiteList string = ''
@@ -130,32 +127,6 @@ param technicalContactId string = ''
 param p011_genai_team_lead_array array = []
 param spAndMiArray array = []
 param useAdGroups bool = false
-
-// ============================================================================
-// FROM JSON files
-// ============================================================================
-param datalakeName_param string = ''
-param kvNameFromCOMMON_param string = ''
-param DOCS_byovnet_example string = ''
-param DOCS_byosnet_common_example string = ''
-param DOCS_byosnet_project_example string = ''
-param BYO_subnets bool = false
-// Dynamic subnet parameters - START
-param subnetCommon string = ''
-param subnetCommonScoring string = ''
-param subnetCommonPowerbiGw string = ''
-param subnetProjGenAI string = ''
-param subnetProjAKS string = ''
-param subnetProjACA string = ''
-param subnetProjDatabricksPublic string = ''
-param subnetProjDatabricksPrivate string = ''
-// END
-param databricksOID string = 'not set in genai-1'
-param databricksPrivate bool = false
-//param AMLStudioUIPrivate bool = false
-param commonLakeNamePrefixMax8chars string
-param lakeContainerName string
-param hybridBenefit bool
 
 // ============================================================================
 // END - FROM JSON files
@@ -348,7 +319,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     aksSubnetName: aksSubnetName
     aksDnsServiceIP: aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
-    tags: projecttags
+    tags: tagsProject
     vnetId: vnet.id
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-aml-to-vnt-mlcmn'
@@ -423,7 +394,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     name: aiHubName
     defaultProjectName: aifProjectName
     location: location
-    tags: projecttags
+    tags: tagsProject
     aifactorySuffix: aifactorySuffixRG
     applicationInsightsName: applicationInsightName
     acrName: var_acr_cmn_or_prj
