@@ -131,17 +131,24 @@ param randomValue string = ''
 @description('Salt values for random naming')
 param aifactorySalt10char string = ''
 
+// ============================================================================
+// PARAMETERS - Meta. Maybe not needed? jostrm
+// ============================================================================
+// Metadata &  Dummy parameters, since same json parameterfile has more parameters than this bicep file
+@description('Meta. Needed to calculate subnet: subnetCalc and genDynamicNetworkParamFile')
+param vnetResourceGroupBase string // Meta
+
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
 
 // ============================================================================
 // COMPUTED VARIABLES - Networking
 // ============================================================================
 
-var vnetNameFull = vnetNameFull_param != '' ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
-var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
+var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
 
 // Network references - using proper resource references
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
@@ -153,8 +160,8 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 // COMPUTED VARIABLES - Private DNS
 // ============================================================================
 
-var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = (privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
+var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
@@ -212,6 +219,7 @@ var acaSubnetName = namingConvention.outputs.acaSubnetName
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'GetPrivDnsZ-${privDnsSubscription}'
   params: {
     location: location
     privDnsResourceGroupName: privDnsResourceGroupName
