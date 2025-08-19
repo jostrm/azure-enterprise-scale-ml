@@ -28,11 +28,136 @@ param locationSuffix string
 @description('Common resource suffix (e.g., "-001")')
 param commonResourceSuffix string
 
+@description('Tenant ID')
+param tenantId string
+
+// AI Factory naming
+param aifactorySuffixRG string
 @description('Project-specific resource suffix')
 param resourceSuffix string
 
-@description('Tenant ID')
-param tenantId string
+// Required parameters for naming convention module
+param aifactorySalt10char string = ''
+param randomValue string = ''
+param technicalAdminsObjectID string = ''
+param technicalAdminsEmail string = ''
+param commonResourceGroupName string = ''
+param subscriptionIdDevTestProd string
+param genaiSubnetId string = ''
+param aksSubnetId string = ''
+param acaSubnetId string = ''
+// param targetResourceGroup string = '' // Already defined below
+
+// ============================================================================
+// FROM JSON files
+// ============================================================================
+
+param kvNameFromCOMMON_param string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
+param BYO_subnets bool = false
+// Dynamic subnet parameters - START
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjACA string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+// END
+param databricksOID string = 'not set in genai-1'
+param databricksPrivate bool = false
+param AMLStudioUIPrivate bool = false
+//param datalakeName_param string = ''
+//param commonLakeNamePrefixMax8chars string
+param lakeContainerName string
+param hybridBenefit bool
+
+// ============================================================================
+// END - FROM JSON files
+// ============================================================================
+
+// Resource group naming
+param commonRGNamePrefix string = ''
+
+var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
+var cmnName = 'cmn'
+var genaiName = 'genai'
+var projectName = 'prj${projectNumber}'
+
+// ============================================================================
+// AI Factory - naming convention (imported from shared module)
+// ============================================================================
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+  name: 'naming-convention-${projectName}-${env}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    projectNumber: projectNumber
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    resourceSuffix: resourceSuffix
+    aifactorySalt10char: aifactorySalt10char
+    randomValue: randomValue
+    aifactorySuffixRG: aifactorySuffixRG
+    commonRGNamePrefix: commonRGNamePrefix
+    technicalAdminsObjectID: technicalAdminsObjectID
+    technicalAdminsEmail: technicalAdminsEmail
+    commonResourceGroupName: commonResourceGroupName
+    subscriptionIdDevTestProd: subscriptionIdDevTestProd
+    genaiSubnetId: genaiSubnetId
+    aksSubnetId: aksSubnetId
+    acaSubnetId: acaSubnetId
+  }
+}
+
+// Import all resource names from shared naming convention
+var twoNumbers = namingConvention.outputs.twoNumbers
+var aiHubName = namingConvention.outputs.aiHubName
+var aifProjectName = namingConvention.outputs.aifProjectName
+var aoaiName = namingConvention.outputs.aoaiName
+var amlName = namingConvention.outputs.amlName
+var safeNameAISearch = namingConvention.outputs.safeNameAISearch
+var dashboardInsightsName = namingConvention.outputs.dashboardInsightsName
+var applicationInsightName = namingConvention.outputs.applicationInsightName
+var bingName = namingConvention.outputs.bingName
+var containerAppsEnvName = namingConvention.outputs.containerAppsEnvName
+var containerAppAName = namingConvention.outputs.containerAppAName
+var containerAppWName = namingConvention.outputs.containerAppWName
+var cosmosDBName = namingConvention.outputs.cosmosDBName
+var functionAppName = namingConvention.outputs.functionAppName
+var webAppName = namingConvention.outputs.webAppName
+var funcAppServicePlanName = namingConvention.outputs.funcAppServicePlanName
+var webbAppServicePlanName = namingConvention.outputs.webbAppServicePlanName
+var keyvaultName = namingConvention.outputs.keyvaultName
+var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
+var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var acrProjectName = namingConvention.outputs.acrProjectName
+var redisName = namingConvention.outputs.redisName
+var postgreSQLName = namingConvention.outputs.postgreSQLName
+var sqlServerName = namingConvention.outputs.sqlServerName
+var sqlDBName = namingConvention.outputs.sqlDBName
+var vmName = namingConvention.outputs.vmName
+var aifName = namingConvention.outputs.aifName
+var aifPrjName = namingConvention.outputs.aifPrjName
+var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
+
+// Computed variables from naming convention
+var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}'
+var aiServicesName = namingConvention.outputs.aiServicesName
+var acrCommonName = namingConvention.outputs.acrCommonName
+var laWorkspaceName = namingConvention.outputs.laWorkspaceName
+var aiProjectName = namingConvention.outputs.aiProjectName
+
+// ============== COMPUTED VARIABLES FOR PRINCIPAL IDs ==============
+// Note: Setting to empty strings as resources may not be created yet in this RBAC phase
+// These would need to be populated from module outputs from earlier phases if needed
+var var_amlPrincipalId = '' // AML Principal ID - would be populated from AML module outputs
+var var_aiHubPrincipalId = '' // AI Hub Principal ID - would be populated from AI Hub module outputs
 
 // Resource exists flags from Azure DevOps
 param amlExists bool = false
@@ -40,6 +165,11 @@ param aiHubExists bool = false
 param aiServicesExists bool = false
 param aiSearchExists bool = false
 param openaiExists bool = false
+
+// ============================================================================
+// Resource definitions
+// ============================================================================
+
 
 // Enable flags from parameter files
 @description('Enable Azure Machine Learning deployment')
@@ -80,16 +210,8 @@ param vnetResourceGroupName string
 param targetResourceGroup string
 param commonResourceGroup string
 
-// Resource names for dependencies
-param storageAccount1001Name string
-param storageAccount2001Name string
-param keyvaultName string
-param acrName string
 param aiSearchName string
-param aiServicesName string
 param openAIName string
-param amlName string
-param aiHubName string
 
 // Service Principal IDs and User Groups
 param technicalContactId string = ''
@@ -102,11 +224,11 @@ param azureMachineLearningObjectId string = ''
 
 // Data Lake parameters
 param datalakeName_param string = ''
-param commonLakeNamePrefixMax8chars string = 'datalake'
+param commonLakeNamePrefixMax8chars string
 
-// Dependencies and naming
-param uniqueInAIFenv string = ''
-param deploymentProjSpecificUniqueSuffix string = ''
+// Dependencies and naming (now from naming convention)
+// param uniqueInAIFenv string = '' // Now from naming convention
+// param deploymentProjSpecificUniqueSuffix string = '' // Now computed from naming convention
 
 // Common ACR usage
 param useCommonACR bool = true
@@ -115,12 +237,7 @@ param useCommonACR bool = true
 param projecttags object = {}
 
 // ============== VARIABLES ==============
-var subscriptionIdDevTestProd = subscription().subscriptionId
-var projectName = 'prj${projectNumber}'
-var cmnName = 'cmn'
-
-// Resource names with proper formatting
-var aiProjectName = 'ai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// var subscriptionIdDevTestProd = subscription().subscriptionId // Now a parameter
 
 // Network and resource group references
 var projectResourceGroup_rgId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
@@ -394,8 +511,8 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!ai
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: 'rbacLake4PrjFoundry${deploymentProjSpecificUniqueSuffix}'
   params: {
-    amlPrincipalId: '' // Simplified for compilation - will be replaced with actual AML principal
-    aiHubPrincipleId: 'placeholder-aihub-principal' // Will be replaced with actual AI Hub principal
+    amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
+    aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
     projectTeamGroupOrUser: p011_genai_team_lead_array
     adfPrincipalId: ''
     datalakeName: datalakeName
@@ -412,8 +529,8 @@ module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExist
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: 'rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}'
   params: {
-    amlPrincipalId: 'placeholder-aml-principal' // Will be replaced with actual AML principal
-    aiHubPrincipleId: '' // Simplified for compilation
+    amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
+    aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
     projectTeamGroupOrUser: [] // Empty array to avoid duplicate permissions
     adfPrincipalId: ''
     datalakeName: datalakeName

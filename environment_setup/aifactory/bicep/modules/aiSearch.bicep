@@ -90,7 +90,6 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
   identity: {
     type: 'SystemAssigned'
   }
-  
   properties: {
     authOptions: {
       aadOrApiKey: {

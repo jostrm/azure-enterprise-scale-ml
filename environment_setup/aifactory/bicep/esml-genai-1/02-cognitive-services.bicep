@@ -12,6 +12,23 @@ targetScope = 'subscription'
 // - AI Search
 // ================================================================
 
+// ============================================================================
+// SKU for services
+// ============================================================================
+@allowed(['disabled', 'free', 'standard'])
+param semanticSearchTier string = 'free'
+@allowed(['S0', 'S1', 'standard', 'standard2'])
+param aiSearchSKUName string = 'standard'
+param aiSearchReplicaCount int = 1
+param aiSearchPartitionCount int = 1
+param csAIservicesSKU string = 'S0'
+param csOpenAISKU string = 'S0'
+param csContentSafetySKU string = 'S0'
+param csVisionSKU string = 'S1'
+param csSpeechSKU string = 'S0'
+param csDocIntelligenceSKU string = 'S0'
+param storageAccountSkuName string = 'Standard_LRS'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -34,6 +51,9 @@ param resourceSuffix string
 
 @description('Tenant ID')
 param tenantId string
+
+@description('Random value for deployment uniqueness')
+param randomValue string = ''
 
 // Resource exists flags from Azure DevOps
 param aiServicesExists bool = false
@@ -84,21 +104,10 @@ param aksSubnetId string
 param acaSubnetId string = ''
 param targetResourceGroup string
 param commonResourceGroup string
+param aifactorySalt10char string = ''
 
-// AI Search specific
-@allowed(['disabled', 'free', 'standard'])
-param semanticSearchTier string = 'free'
-@allowed(['S0', 'S1', 'standard', 'standard2'])
-param aiSearchSKUName string = 'standard'
+// AI Search specific settings
 param aiSearchEnableSharedPrivateLink bool = false
-
-// Service SKUs
-param csAIservicesSKU string = 'S0'
-param csOpenAISKU string = 'S0'
-param csContentSafetySKU string = 'S0'
-param csVisionSKU string = 'S1'
-param csSpeechSKU string = 'S0'
-param csDocIntelligenceSKU string = 'S0'
 
 // Override regions
 param serviceSettingOverrideRegionAzureAIVision string = ''
@@ -113,35 +122,106 @@ param IPwhiteList string = ''
 // Dependencies and naming
 param aifactorySuffixRG string
 param commonRGNamePrefix string
-param uniqueInAIFenv string = ''
-param prjResourceSuffixNoDash string = ''
 param keyvaultSoftDeleteDays int = 90
 param restore bool = true
+param privDnsResourceGroupName string
+param privDnsSubscription string
+
+// ============================================================================
+// FROM JSON files
+// ============================================================================
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
+param BYO_subnets bool = false
+// Dynamic subnet parameters - START
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjACA string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+// END
+param databricksOID string = 'not set in genai-1'
+param databricksPrivate bool = false
+param AMLStudioUIPrivate bool = false
+param commonLakeNamePrefixMax8chars string
+param lakeContainerName string
+param hybridBenefit bool
+
+// ============================================================================
+// END - FROM JSON files
+// ============================================================================
+
+module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    location: location
+    privDnsResourceGroupName: privDnsResourceGroupName
+    privDnsSubscription: privDnsSubscription
+  }
+}
+var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
+
+
+// ============== EXISTING RESOURCES ==============
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: commonResourceGroup
+  scope:subscription(subscriptionIdDevTestProd)
+}
 
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
-var projectName = 'prj${projectNumber}'
-var genaiName = 'genai'
-var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
+var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
 
 // ============================================================================
-// COMPUTED VARIABLES - Networking subnets
+// AI Factory - naming convention (imported from shared module)
 // ============================================================================
-var segments = split(genaiSubnetId, '/')
-var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName
-var segmentsAKS = split(aksSubnetId, '/')
-var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
-var segmentsACA = split(acaSubnetId, '/')
-var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+  name: guid('naming-convention-02-cog-services',commonResourceGroupRef.id,deploymentProjSpecificUniqueSuffix)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    projectNumber: projectNumber
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    resourceSuffix: resourceSuffix
+    randomValue:randomValue
+    aifactorySalt10char:aifactorySalt10char
+    aifactorySuffixRG: aifactorySuffixRG
+    commonRGNamePrefix: commonRGNamePrefix
+    commonResourceGroupName: commonResourceGroup
+    subscriptionIdDevTestProd:subscriptionIdDevTestProd
+    acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+  }
+}
 
-// Resource names
-var aiServicesName = 'aiservices-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var aoaiName = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var safeNameAISearch = replace('aisearch-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}', '-', '')
-var storageAccount2001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}', '-', '')
-var var_kv1_name = 'kv-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var laWorkspaceName = 'law-${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${commonResourceSuffix}'
+var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
+var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
+var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+var randomSalt = namingConvention.outputs.randomSalt
+var defaultSubnet = namingConvention.outputs.defaultSubnet
+var aksSubnetName = namingConvention.outputs.aksSubnetName
+var acaSubnetName = namingConvention.outputs.acaSubnetName
+var genaiSubnetName = namingConvention.outputs.genaiSubnetName
+var projectName = namingConvention.outputs.projectName
+var genaiName = namingConvention.outputs.genaiName
+
+// Use naming convention outputs
+var aoaiName = namingConvention.outputs.aoaiName
+var safeNameAISearch = namingConvention.outputs.safeNameAISearch
+var aiServicesName = namingConvention.outputs.aiServicesName
+var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var keyvaultName = namingConvention.outputs.keyvaultName
+var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -224,7 +304,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     csSKU: csVisionSKU
     location: (!empty(serviceSettingOverrideRegionAzureAIVision)) ? serviceSettingOverrideRegionAzureAIVision : location
     restore: restore
-    keyvaultName: var_kv1_name
+    keyvaultName: keyvaultName
     vnetResourceGroupName: vnetResourceGroupName
     name: (!empty(serviceSettingOverrideRegionAzureAIVisionShort)) ? 'vision-${projectName}-${serviceSettingOverrideRegionAzureAIVisionShort}-${env}-${uniqueInAIFenv}${commonResourceSuffix}' : 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'ComputerVision'
@@ -254,7 +334,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
     csSKU: csSpeechSKU
     location: location
     restore: restore
-    keyvaultName: var_kv1_name
+    keyvaultName: keyvaultName
     vnetResourceGroupName: vnetResourceGroupName
     name: 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'SpeechServices'
@@ -284,7 +364,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
     csSKU: csDocIntelligenceSKU
     location: location
     restore: restore
-    keyvaultName: var_kv1_name
+    keyvaultName: keyvaultName
     vnetResourceGroupName: vnetResourceGroupName
     name: 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
     kind: 'FormRecognizer'
@@ -312,7 +392,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
   name: 'GenAISAAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount2001Name
-    skuName: 'Standard_LRS'
+    skuName: storageAccountSkuName
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
@@ -385,8 +465,8 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
   params: {
     aiSearchName: safeNameAISearch
     location: location
-    replicaCount: 1
-    partitionCount: 1
+    replicaCount: aiSearchReplicaCount
+    partitionCount: aiSearchPartitionCount
     privateEndpointName: 'p-${projectName}-aisearch-${genaiName}'
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -420,7 +500,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     restore: restore
     subnetName: defaultSubnet
     vnetName: vnetNameFull
-    keyvaultName: var_kv1_name
+    keyvaultName: keyvaultName
     modelGPT4Version: modelGPT4Version
     kind: kindAIServices
     publicNetworkAccess: enablePublicGenAIAccess
@@ -429,7 +509,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     ]
     ipRules: empty(processedIpRulesAIServices) ? [] : processedIpRulesAIServices
     disableLocalAuth: disableLocalAuth
-    privateLinksDnsZones: {}
+    privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     deployModel_gpt_4: deployModel_gpt_4
@@ -448,7 +528,17 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
   ]
 }
 
-// Azure OpenAI - Simplified without conditional reference
+// Get AI Search principal ID - always called but with conditional logic inside
+module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
+  name: 'getAISearchInfo-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    aiSearchName: safeNameAISearch
+    aiSearchExists: aiSearchExists
+  }
+}
+
+// Azure OpenAI - with conditional AI Search principal ID
 module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSettingDeployAzureOpenAI) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
@@ -463,9 +553,9 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
     sku: csOpenAISKU
     vnetName: vnetNameFull
     subnetName: genaiSubnetName
-    keyvaultName: var_kv1_name
+    keyvaultName: keyvaultName
     modelGPT4Version: modelGPT4Version
-    aiSearchPrincipalId: ''  // Simplified - remove conditional reference
+    aiSearchPrincipalId: getAISearchInfo.outputs.principalId
     kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
     publicNetworkAccess: enablePublicGenAIAccess

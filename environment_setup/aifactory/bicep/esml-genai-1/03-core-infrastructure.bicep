@@ -11,6 +11,13 @@ targetScope = 'subscription'
 // - Bing Search (if enabled)
 // ================================================================
 
+// ============================================================================
+// SKU for services
+// ============================================================================
+param storageAccountSkuName string = 'Standard_LRS'
+param containerRegistrySkuName string = 'Premium'
+param bingSearchSKU string = 'S1'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -82,9 +89,6 @@ param hybridBenefit bool = false
 // Container Registry
 param useCommonACR bool = true
 
-// Bing Search
-param bingSearchSKU string = 'S1'
-
 // Tags
 param projecttags object = {}
 
@@ -94,8 +98,6 @@ param IPwhiteList string = ''
 // Dependencies and naming
 param aifactorySuffixRG string
 param commonRGNamePrefix string
-param uniqueInAIFenv string = ''
-param prjResourceSuffixNoDash string = ''
 param restore bool = true
 
 // Technical contact for access policies
@@ -108,37 +110,91 @@ param inputKeyvaultSubscription string
 param projectServicePrincipleOID_SeedingKeyvaultName string
 param projectServicePrincipleAppID_SeedingKeyvaultName string
 param projectServicePrincipleSecret_SeedingKeyvaultName string
+param aifactorySalt10char string = ''
+@description('Random value for deployment uniqueness')
+param randomValue string = ''
+// ============================================================================
+// FROM JSON files
+// ============================================================================
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
+param BYO_subnets bool = false
+// Dynamic subnet parameters - START
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjACA string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+// END
+param databricksOID string = 'not set in genai-1'
+param databricksPrivate bool = false
+param AMLStudioUIPrivate bool = false
+param commonLakeNamePrefixMax8chars string
+param lakeContainerName string
+//param hybridBenefit bool
+
+// ============================================================================
+// END - FROM JSON files
+// ============================================================================
 
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
-var projectName = 'prj${projectNumber}'
-var cmnName = 'cmn'
-var genaiName = 'genai'
-var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
+var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
 
 // ============================================================================
-// COMPUTED VARIABLES - Networking subnets
+// AI Factory - naming convention (imported from shared module)
 // ============================================================================
-var segments = split(genaiSubnetId, '/')
-var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName
-var segmentsAKS = split(aksSubnetId, '/')
-var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
-var segmentsACA = split(acaSubnetId, '/')
-var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+  name: guid('naming-convention-03-core-infra',vnetResourceGroupName,deploymentProjSpecificUniqueSuffix)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    projectNumber: projectNumber
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    resourceSuffix: resourceSuffix
+    randomValue:randomValue
+    aifactorySalt10char:aifactorySalt10char
+    aifactorySuffixRG: aifactorySuffixRG
+    commonRGNamePrefix: commonRGNamePrefix
+    commonResourceGroupName: commonResourceGroup
+    subscriptionIdDevTestProd:subscriptionIdDevTestProd
+    acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+  }
+}
 
-// Resource names
-var keyvaultName = 'kv-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var var_kv1_name = keyvaultName
-var storageAccount1001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}', '-', '')
-var storageAccount2001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}2${prjResourceSuffixNoDash}${env}', '-', '')
-var acrProjectName = replace('acr${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
-var acrCommonName = replace('acr${cmnName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
-var applicationInsightName = 'appi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var vmName = 'vm-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var bingName = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var laWorkspaceName = 'law-${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${commonResourceSuffix}'
-var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
+var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
+var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+var randomSalt = namingConvention.outputs.randomSalt
+var defaultSubnet = namingConvention.outputs.defaultSubnet
+var aksSubnetName = namingConvention.outputs.aksSubnetName
+var acaSubnetName = namingConvention.outputs.acaSubnetName
+var genaiSubnetName = namingConvention.outputs.genaiSubnetName
+var projectName = namingConvention.outputs.projectName
+var genaiName = namingConvention.outputs.genaiName
+
+// Import specific names needed for core infrastructure deployment
+var keyvaultName = namingConvention.outputs.keyvaultName
+var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
+var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var acrProjectName = namingConvention.outputs.acrProjectName
+var acrCommonName = namingConvention.outputs.acrCommonName
+var applicationInsightName = namingConvention.outputs.applicationInsightName
+var vmName = namingConvention.outputs.vmName
+var bingName = namingConvention.outputs.bingName
+var laWorkspaceName = namingConvention.outputs.laWorkspaceName
+var kvNameCommon = 'kv-${namingConvention.outputs.cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -174,9 +230,31 @@ var subnet_aks_ref = {
   id: subnet_aks.id
 }
 
-// Access policies for project principals
-var var_all_principals = [] // Simplified - technical admins would be passed as array
-var p011_genai_team_lead_array = [] // Simplified - team leads would be passed as array
+// Get managed identity principal IDs using helper modules
+module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: 'getProjectMIPrincipalId-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miPrjName
+  }
+}
+
+// Assumes the principals exists.
+module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: 'getACAMIPrincipalId-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miACAName
+  }
+}
+
+// Array vars - use principal IDs from helper modules
+var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
+var var_miAca_PrincipalId = getACAMIPrincipalId.outputs.principalId
+
+var mi_array = array(var_miPrj_PrincipalId)
+var mi_array2 = array(var_miAca_PrincipalId)
+var var_all_principals = union(p011_genai_team_lead_array, mi_array, mi_array2)
 
 // Target resource group reference
 resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -192,7 +270,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
-    skuName: 'Standard_LRS'
+    skuName: storageAccountSkuName
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
@@ -295,7 +373,7 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && useCo
   name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
   params: {
     containerRegistryName: acrProjectName
-    skuName: 'Premium'
+    skuName: containerRegistrySkuName
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
@@ -346,7 +424,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serv
     subnetName: defaultSubnet
     vnetId: vnet.id
     tags: projecttags
-    keyvaultName: var_kv1_name
+    keyvaultName: keyvaultName
   }
   dependsOn: [
     resourceExists_struct
@@ -380,13 +458,13 @@ resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 
 // Copy secrets from external key vault to project key vault
 module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists) {
-  name: '${keyvaultName}S2P${deploymentProjSpecificUniqueSuffix}'
+  name: 'kvSecretsS2P${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     spAppIDValue: externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName)
     spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
-    keyvaultName: var_kv1_name
+    keyvaultName: keyvaultName
     keyvaultNameRG: targetResourceGroup
   }
   dependsOn: [
@@ -420,10 +498,10 @@ var secretGet = {
 // Project key vault access policy for technical contact
 module kvPrjAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = if(!keyvaultExists && !empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '${keyvaultName}AP${deploymentProjSpecificUniqueSuffix}'
+  name: 'kvSecretsAP${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetListSet
-    keyVaultResourceName: var_kv1_name
+    keyVaultResourceName: keyvaultName
     policyName: 'add'
     principalId: technicalContactId
     additionalPrincipalIds: var_all_principals
@@ -443,7 +521,7 @@ resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 // Common key vault access policy for technical contact
 module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '${kvNameCommon}GL${deploymentProjSpecificUniqueSuffix}'
+  name: 'kvSecretsGL${deploymentProjSpecificUniqueSuffix}'
   params: {
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommon

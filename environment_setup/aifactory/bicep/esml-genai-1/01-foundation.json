@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "11940659891285311149"
+      "templateHash": "4794209173183562578"
     }
   },
   "parameters": {
@@ -75,6 +75,26 @@
       "type": "bool",
       "defaultValue": false
     },
+    "zoneAzurecontainerappsExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "zonePostgresExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "zoneSqlExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "zoneMongoExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "zoneRedisExists": {
+      "type": "bool",
+      "defaultValue": false
+    },
     "vnetNameBase": {
       "type": "string",
       "metadata": {
@@ -90,6 +110,19 @@
       "defaultValue": ""
     },
     "network_env": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "genaiSubnetId": {
+      "type": "string",
+      "metadata": {
+        "description": "Subnets from subnet calculator: dynamicNetworkParams.json"
+      }
+    },
+    "aksSubnetId": {
+      "type": "string"
+    },
+    "acaSubnetId": {
       "type": "string",
       "defaultValue": ""
     },
@@ -147,11 +180,11 @@
     },
     "technicalAdminsObjectID": {
       "type": "string",
-      "defaultValue": "null"
+      "defaultValue": ""
     },
     "technicalAdminsEmail": {
       "type": "string",
-      "defaultValue": "null"
+      "defaultValue": ""
     },
     "tenantId": {
       "type": "string",
@@ -197,16 +230,12 @@
         "description": "Random value for unique naming"
       }
     },
-    "aifactorySalt5char": {
+    "aifactorySalt10char": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Salt values for deterministic naming"
+        "description": "Salt values for random naming"
       }
-    },
-    "aifactorySalt10char": {
-      "type": "string",
-      "defaultValue": ""
     },
     "tags": {
       "type": "object",
@@ -234,18 +263,8 @@
     "vnetResourceGroupName": "[if(not(equals(parameters('vnetResourceGroup_param'), '')), replace(parameters('vnetResourceGroup_param'), '<network_env>', parameters('network_env')), variables('commonResourceGroup'))]",
     "privDnsResourceGroupName": "[if(and(not(equals(parameters('privDnsResourceGroup_param'), '')), parameters('centralDnsZoneByPolicyInHub')), parameters('privDnsResourceGroup_param'), variables('vnetResourceGroupName'))]",
     "privDnsSubscription": "[if(and(not(equals(parameters('privDnsSubscription_param'), '')), parameters('centralDnsZoneByPolicyInHub')), parameters('privDnsSubscription_param'), variables('subscriptionIdDevTestProd'))]",
-    "technicalAdminsObjectID_array": "[array(split(replace(parameters('technicalAdminsObjectID'), '\\s+', ''), ','))]",
-    "p011_genai_team_lead_array": "[if(or(empty(parameters('technicalAdminsObjectID')), equals(parameters('technicalAdminsObjectID'), 'null')), createArray(), union(variables('technicalAdminsObjectID_array'), createArray()))]",
-    "technicalAdminsEmail_array": "[array(split(parameters('technicalAdminsEmail'), ','))]",
-    "p011_genai_team_lead_email_array": "[if(or(empty(parameters('technicalAdminsEmail')), equals(parameters('technicalAdminsEmail'), 'null')), createArray(), variables('technicalAdminsEmail_array'))]",
-    "randomGuid": "[newGuid()]",
-    "randomValueUsed": "[if(empty(parameters('randomValue')), variables('randomGuid'), parameters('randomValue'))]",
-    "randomSalt": "[if(or(empty(parameters('aifactorySalt10char')), lessOrEquals(length(parameters('aifactorySalt10char')), 5)), substring(variables('randomValueUsed'), 6, 10), parameters('aifactorySalt10char'))]",
     "projectSalt": "[substring(uniqueString(subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup'))), 0, 5)]",
     "deploymentProjSpecificUniqueSuffix": "[format('{0}{1}', variables('projectName'), variables('projectSalt'))]",
-    "uniqueInAIFenv": "[substring(uniqueString(subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup'))), 0, 5)]",
-    "miACAName": "[format('mi-aca-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
-    "miPrjName": "[format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
     "privateDnsZoneName": {
       "azureusgovernment": "privatelink.api.ml.azure.us",
       "azurechinacloud": "privatelink.api.ml.azure.cn",
@@ -494,15 +513,442 @@
         "name": "[variables('privateLinksDnsZones').azuremonitoragentsvc.name]",
         "id": "[variables('privateLinksDnsZones').azuremonitoragentsvc.id]",
         "exists": true
+      },
+      {
+        "name": "[variables('privateLinksDnsZones').azurecontainerapps.name]",
+        "id": "[variables('privateLinksDnsZones').azurecontainerapps.id]",
+        "exists": "[parameters('zoneAzurecontainerappsExists')]"
+      },
+      {
+        "name": "[variables('privateLinksDnsZones').redis.name]",
+        "id": "[variables('privateLinksDnsZones').redis.id]",
+        "exists": "[parameters('zoneRedisExists')]"
+      },
+      {
+        "name": "[variables('privateLinksDnsZones').postgres.name]",
+        "id": "[variables('privateLinksDnsZones').postgres.id]",
+        "exists": "[parameters('zonePostgresExists')]"
+      },
+      {
+        "name": "[variables('privateLinksDnsZones').sql.name]",
+        "id": "[variables('privateLinksDnsZones').sql.id]",
+        "exists": "[parameters('zoneSqlExists')]"
+      },
+      {
+        "name": "[variables('privateLinksDnsZones').cosmosdbmongo.name]",
+        "id": "[variables('privateLinksDnsZones').cosmosdbmongo.id]",
+        "exists": "[parameters('zoneMongoExists')]"
       }
     ]
   },
   "resources": [
     {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))]",
+      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[variables('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "projectNumber": {
+            "value": "[parameters('projectNumber')]"
+          },
+          "locationSuffix": {
+            "value": "[parameters('locationSuffix')]"
+          },
+          "commonResourceSuffix": {
+            "value": "[parameters('commonResourceSuffix')]"
+          },
+          "resourceSuffix": {
+            "value": "[parameters('resourceSuffix')]"
+          },
+          "randomValue": {
+            "value": "[parameters('randomValue')]"
+          },
+          "aifactorySalt10char": {
+            "value": "[parameters('aifactorySalt10char')]"
+          },
+          "aifactorySuffixRG": {
+            "value": "[parameters('aifactorySuffixRG')]"
+          },
+          "commonRGNamePrefix": {
+            "value": "[parameters('commonRGNamePrefix')]"
+          },
+          "commonResourceGroupName": {
+            "value": "[variables('commonResourceGroup')]"
+          },
+          "subscriptionIdDevTestProd": {
+            "value": "[variables('subscriptionIdDevTestProd')]"
+          },
+          "technicalAdminsEmail": {
+            "value": "[parameters('technicalAdminsEmail')]"
+          },
+          "technicalAdminsObjectID": {
+            "value": "[parameters('technicalAdminsObjectID')]"
+          },
+          "acaSubnetId": {
+            "value": "[parameters('acaSubnetId')]"
+          },
+          "aksSubnetId": {
+            "value": "[parameters('aksSubnetId')]"
+          },
+          "genaiSubnetId": {
+            "value": "[parameters('genaiSubnetId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "11269673137520673052"
+            }
+          },
+          "parameters": {
+            "env": {
+              "type": "string",
+              "allowedValues": [
+                "dev",
+                "test",
+                "prod"
+              ],
+              "metadata": {
+                "description": "Environment: dev, test, prod"
+              }
+            },
+            "projectNumber": {
+              "type": "string",
+              "metadata": {
+                "description": "Project number (e.g., \"005\")"
+              }
+            },
+            "locationSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Location suffix (e.g., \"weu\", \"swc\")"
+              }
+            },
+            "commonResourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Common resource suffix (e.g., \"-001\")"
+              }
+            },
+            "resourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Project-specific resource suffix"
+              }
+            },
+            "aifactorySalt10char": {
+              "type": "string",
+              "metadata": {
+                "description": "Random salt for unique naming"
+              }
+            },
+            "randomValue": {
+              "type": "string"
+            },
+            "aifactorySuffixRG": {
+              "type": "string",
+              "metadata": {
+                "description": "AI Factory suffix for resource groups"
+              }
+            },
+            "commonRGNamePrefix": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Common resource group name prefix"
+              }
+            },
+            "technicalAdminsObjectID": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins OID list"
+              }
+            },
+            "technicalAdminsEmail": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins EMAIL list"
+              }
+            },
+            "commonResourceGroupName": {
+              "type": "string"
+            },
+            "subscriptionIdDevTestProd": {
+              "type": "string"
+            },
+            "genaiSubnetId": {
+              "type": "string"
+            },
+            "aksSubnetId": {
+              "type": "string"
+            },
+            "acaSubnetId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "projectName": "[format('prj{0}', parameters('projectNumber'))]",
+            "cmnName": "cmn",
+            "genaiName": "genai",
+            "prjResourceSuffixNoDash": "[replace(parameters('resourceSuffix'), '-', '')]",
+            "twoNumbers": "[substring(parameters('resourceSuffix'), 2, 2)]",
+            "technicalAdminsObjectID_array": "[array(split(replace(parameters('technicalAdminsObjectID'), '\\s+', ''), ','))]",
+            "p011_genai_team_lead_array": "[if(empty(parameters('technicalAdminsObjectID')), createArray(), union(variables('technicalAdminsObjectID_array'), createArray()))]",
+            "technicalAdminsEmail_array": "[array(split(parameters('technicalAdminsEmail'), ','))]",
+            "p011_genai_team_lead_email_array": "[if(empty(parameters('technicalAdminsEmail')), createArray(), variables('technicalAdminsEmail_array'))]",
+            "randomSalt": "[if(or(empty(parameters('aifactorySalt10char')), lessOrEquals(length(parameters('aifactorySalt10char')), 5)), substring(parameters('randomValue'), 6, 10), parameters('aifactorySalt10char'))]",
+            "uniqueInAIFenv": "[substring(uniqueString(subscriptionResourceId(parameters('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', parameters('commonResourceGroupName'))), 0, 5)]",
+            "aiHubName": "[format('ai-hub-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifProjectName": "[format('ai-prj{0}-01-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aoaiName": "[format('aoai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "amlName": "[format('aml-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "safeNameAISearch": "[replace(toLower(format('aisearch{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))), '-', '')]",
+            "aiServicesName": "[replace(toLower(format('aiservices{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', '')]",
+            "dashboardInsightsName": "[format('AIFactory{0}-{1}-insights-{2}-{3}{4}', parameters('aifactorySuffixRG'), variables('projectName'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "applicationInsightName": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "bingName": "[format('bing-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppsEnvName": "[format('aca-env-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppAName": "[format('aca-a-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppWName": "[format('aca-w-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "cosmosDBName": "[format('cosmos-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "redisName": "[format('redis-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "postgreSQLName": "[format('pg-flex-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlServerName": "[format('sql-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlDBName": "[format('sqldb-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "functionAppName": "[format('func-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webAppName": "[format('webapp-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "funcAppServicePlanName": "[format('func-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webbAppServicePlanName": "[format('webapp-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "vmName": "[format('dsvm-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifName": "[format('aifoundry-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifPrjName": "[format('aifoundry-{0}-01-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "keyvaultName": "[format('kv-p{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('twoNumbers'))]",
+            "storageAccount1001Name": "[replace(format('sa{0}{1}{2}1{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "storageAccount2001Name": "[replace(format('sa{0}{1}{2}2{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "acrProjectName": "[format('acr{0}{1}{2}{3}{4}{5}', variables('projectName'), variables('genaiName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), parameters('env'), variables('prjResourceSuffixNoDash'))]",
+            "acrCommonName": "[replace(format('acrcommon{0}{1}{2}{3}', variables('uniqueInAIFenv'), parameters('locationSuffix'), parameters('commonResourceSuffix'), parameters('env')), '-', '')]",
+            "miACAName": "[format('mi-aca-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
+            "miPrjName": "[format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
+            "laWorkspaceName": "[format('la-{0}-{1}-{2}-{3}{4}', variables('cmnName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "aiProjectName": "[format('ai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "segments": "[split(parameters('genaiSubnetId'), '/')]",
+            "genaiSubnetName": "[variables('segments')[sub(length(variables('segments')), 1)]]",
+            "defaultSubnet": "[variables('genaiSubnetName')]",
+            "segmentsAKS": "[split(parameters('aksSubnetId'), '/')]",
+            "aksSubnetName": "[variables('segmentsAKS')[sub(length(variables('segmentsAKS')), 1)]]",
+            "segmentsACA": "[split(parameters('acaSubnetId'), '/')]",
+            "acaSubnetName": "[variables('segmentsACA')[sub(length(variables('segmentsACA')), 1)]]"
+          },
+          "resources": [],
+          "outputs": {
+            "genaiSubnetName": {
+              "type": "string",
+              "value": "[variables('genaiSubnetName')]"
+            },
+            "aksSubnetName": {
+              "type": "string",
+              "value": "[variables('aksSubnetName')]"
+            },
+            "acaSubnetName": {
+              "type": "string",
+              "value": "[variables('acaSubnetName')]"
+            },
+            "defaultSubnet": {
+              "type": "string",
+              "value": "[variables('defaultSubnet')]"
+            },
+            "aiHubName": {
+              "type": "string",
+              "value": "[variables('aiHubName')]"
+            },
+            "aifProjectName": {
+              "type": "string",
+              "value": "[variables('aifProjectName')]"
+            },
+            "aoaiName": {
+              "type": "string",
+              "value": "[variables('aoaiName')]"
+            },
+            "amlName": {
+              "type": "string",
+              "value": "[variables('amlName')]"
+            },
+            "safeNameAISearch": {
+              "type": "string",
+              "value": "[variables('safeNameAISearch')]"
+            },
+            "aiServicesName": {
+              "type": "string",
+              "value": "[variables('aiServicesName')]"
+            },
+            "dashboardInsightsName": {
+              "type": "string",
+              "value": "[variables('dashboardInsightsName')]"
+            },
+            "applicationInsightName": {
+              "type": "string",
+              "value": "[variables('applicationInsightName')]"
+            },
+            "bingName": {
+              "type": "string",
+              "value": "[variables('bingName')]"
+            },
+            "containerAppsEnvName": {
+              "type": "string",
+              "value": "[variables('containerAppsEnvName')]"
+            },
+            "containerAppAName": {
+              "type": "string",
+              "value": "[variables('containerAppAName')]"
+            },
+            "containerAppWName": {
+              "type": "string",
+              "value": "[variables('containerAppWName')]"
+            },
+            "cosmosDBName": {
+              "type": "string",
+              "value": "[variables('cosmosDBName')]"
+            },
+            "redisName": {
+              "type": "string",
+              "value": "[variables('redisName')]"
+            },
+            "postgreSQLName": {
+              "type": "string",
+              "value": "[variables('postgreSQLName')]"
+            },
+            "sqlServerName": {
+              "type": "string",
+              "value": "[variables('sqlServerName')]"
+            },
+            "sqlDBName": {
+              "type": "string",
+              "value": "[variables('sqlDBName')]"
+            },
+            "functionAppName": {
+              "type": "string",
+              "value": "[variables('functionAppName')]"
+            },
+            "webAppName": {
+              "type": "string",
+              "value": "[variables('webAppName')]"
+            },
+            "funcAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('funcAppServicePlanName')]"
+            },
+            "webbAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('webbAppServicePlanName')]"
+            },
+            "vmName": {
+              "type": "string",
+              "value": "[variables('vmName')]"
+            },
+            "aifName": {
+              "type": "string",
+              "value": "[variables('aifName')]"
+            },
+            "aifPrjName": {
+              "type": "string",
+              "value": "[variables('aifPrjName')]"
+            },
+            "keyvaultName": {
+              "type": "string",
+              "value": "[variables('keyvaultName')]"
+            },
+            "storageAccount1001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount1001Name')]"
+            },
+            "storageAccount2001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount2001Name')]"
+            },
+            "acrProjectName": {
+              "type": "string",
+              "value": "[variables('acrProjectName')]"
+            },
+            "acrCommonName": {
+              "type": "string",
+              "value": "[variables('acrCommonName')]"
+            },
+            "miACAName": {
+              "type": "string",
+              "value": "[variables('miACAName')]"
+            },
+            "miPrjName": {
+              "type": "string",
+              "value": "[variables('miPrjName')]"
+            },
+            "laWorkspaceName": {
+              "type": "string",
+              "value": "[variables('laWorkspaceName')]"
+            },
+            "aiProjectName": {
+              "type": "string",
+              "value": "[variables('aiProjectName')]"
+            },
+            "projectName": {
+              "type": "string",
+              "value": "[variables('projectName')]"
+            },
+            "cmnName": {
+              "type": "string",
+              "value": "[variables('cmnName')]"
+            },
+            "genaiName": {
+              "type": "string",
+              "value": "[variables('genaiName')]"
+            },
+            "prjResourceSuffixNoDash": {
+              "type": "string",
+              "value": "[variables('prjResourceSuffixNoDash')]"
+            },
+            "twoNumbers": {
+              "type": "string",
+              "value": "[variables('twoNumbers')]"
+            },
+            "p011_genai_team_lead_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_array')]"
+            },
+            "p011_genai_team_lead_email_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_email_array')]"
+            },
+            "uniqueInAIFenv": {
+              "type": "string",
+              "value": "[variables('uniqueInAIFenv')]"
+            },
+            "randomSalt": {
+              "type": "string",
+              "value": "[variables('randomSalt')]"
+            }
+          }
+        }
+      }
+    },
+    {
       "condition": "[equals(parameters('centralDnsZoneByPolicyInHub'), false())]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[format('createNewPrivateDnsZones{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
+      "name": "[guid('createNewPrivateDnsZones', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd'))]",
       "subscriptionId": "[variables('privDnsSubscription')]",
       "resourceGroup": "[variables('privDnsResourceGroupName')]",
       "properties": {
@@ -614,7 +1060,7 @@
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[format('prjRG{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
+      "name": "[guid('prjRG', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd'))]",
       "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
       "location": "[deployment().location]",
       "properties": {
@@ -676,7 +1122,7 @@
       "condition": "[not(variables('resourceExists').miPrj)]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[format('miForPrj{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
+      "name": "[guid('miForPrj', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd'))]",
       "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
       "resourceGroup": "[variables('targetResourceGroup')]",
       "properties": {
@@ -686,7 +1132,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('miPrjName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.miPrjName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -759,7 +1205,8 @@
         }
       },
       "dependsOn": [
-        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('prjRG{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup'))))]",
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', guid('prjRG', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd')))]"
       ]
     },
     {
@@ -776,7 +1223,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('miACAName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.miACAName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -849,7 +1296,8 @@
         }
       },
       "dependsOn": [
-        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('prjRG{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup'))))]",
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', guid('prjRG', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd')))]"
       ]
     },
     {
@@ -910,8 +1358,8 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForPrj{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('prjRG{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('miForPrj', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd')))]",
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', guid('prjRG', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd')))]"
       ]
     },
     {
@@ -1250,7 +1698,7 @@
         }
       },
       "dependsOn": [
-        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('prjRG{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', guid('prjRG', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd')))]"
       ]
     },
     {
@@ -1273,10 +1721,10 @@
             "value": "[parameters('technicalContactEmail')]"
           },
           "additionalUserEmails": {
-            "value": "[variables('p011_genai_team_lead_email_array')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.p011_genai_team_lead_email_array.value]"
           },
           "additionalUserIds": {
-            "value": "[variables('p011_genai_team_lead_array')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.p011_genai_team_lead_array.value]"
           },
           "useAdGroups": {
             "value": "[parameters('useAdGroups')]"
@@ -1364,7 +1812,8 @@
         }
       },
       "dependsOn": [
-        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', format('prjRG{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup'))))]",
+        "[subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/deployments', guid('prjRG', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('commonResourceGroup')), variables('subscriptionIdDevTestProd')))]"
       ]
     }
   ],
@@ -1377,8 +1826,8 @@
       "value": {
         "projectResourceGroupName": "[variables('targetResourceGroup')]",
         "commonResourceGroupName": "[variables('commonResourceGroup')]",
-        "miProjectName": "[variables('miPrjName')]",
-        "miACAName": "[variables('miACAName')]",
+        "miProjectName": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.miPrjName.value]",
+        "miACAName": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.miACAName.value]",
         "spAndMiArrayOutput": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', format('spAndMI2Array{0}', variables('deploymentProjSpecificUniqueSuffix'))), '2022-09-01').outputs.spAndMiArray.value]",
         "vnetId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks', variables('vnetNameFull'))]",
         "vnetName": "[variables('vnetNameFull')]",
@@ -1386,8 +1835,8 @@
         "privateLinksDnsZones": "[variables('privateLinksDnsZones')]",
         "privDnsResourceGroupName": "[variables('privDnsResourceGroupName')]",
         "privDnsSubscription": "[variables('privDnsSubscription')]",
-        "uniqueInAIFenv": "[variables('uniqueInAIFenv')]",
-        "randomSalt": "[variables('randomSalt')]",
+        "uniqueInAIFenv": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.uniqueInAIFenv.value]",
+        "randomSalt": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', guid('naming-convention-01-foundation', subscriptionResourceId(variables('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', variables('targetResourceGroup')))), '2022-09-01').outputs.randomSalt.value]",
         "deploymentSuffix": "[variables('deploymentProjSpecificUniqueSuffix')]"
       }
     },

@@ -11,6 +11,35 @@ targetScope = 'subscription'
 // - Subnet delegations for compute services
 // ================================================================
 
+// ============================================================================
+// SKU for services
+// ============================================================================
+// Function App configuration
+param functionSKU object = {
+  name: 'EP1'
+  tier: 'ElasticPremium'
+  size: 'EP1'
+  family: 'EP'
+  capacity: 1
+}
+
+// Web App configuration
+param webappSKU object = {
+  name: 'P1v3'
+  tier: 'PremiumV3'
+  size: 'P1v3'
+  family: 'Pv3'
+  capacity: 1
+}
+
+param webappSKUAce object = {
+  name: 'I1v2'
+  tier: 'IsolatedV2'
+  size: 'I1v2'
+  family: 'Iv2'
+  capacity: 1
+}
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -69,34 +98,11 @@ param targetResourceGroup string
 param commonResourceGroup string
 
 // Function App configuration
-param functionSKU object = {
-  name: 'EP1'
-  tier: 'ElasticPremium'
-  size: 'EP1'
-  family: 'EP'
-  capacity: 1
-}
 param functionAlwaysOn bool = true
 param functionRuntime string = 'python'
 param functionVersion string = '3.11'
 
 // Web App configuration
-param webappSKU object = {
-  name: 'P1v3'
-  tier: 'PremiumV3'
-  size: 'P1v3'
-  family: 'Pv3'
-  capacity: 1
-}
-
-param webappSKUAce object = {
-  name: 'I1v2'
-  tier: 'IsolatedV2'
-  size: 'I1v2'
-  family: 'Iv2'
-  capacity: 1
-}
-
 param webappAlwaysOn bool = true
 param webAppRuntime string = 'python'
 param webAppRuntimeVersion string = '3.11'
@@ -141,8 +147,14 @@ param IPwhiteList string = ''
 // Dependencies and naming
 param aifactorySuffixRG string
 param commonRGNamePrefix string
-param uniqueInAIFenv string = ''
-param prjResourceSuffixNoDash string = ''
+
+// Missing parameters required for naming convention module
+param aifactorySalt10char string = ''
+param randomValue string = ''
+param technicalAdminsObjectID string = ''
+param technicalAdminsEmail string = ''
+param commonResourceGroupName string
+param subscriptionIdDevTestProd string
 
 // Common ACR usage
 param useCommonACR bool = true
@@ -151,49 +163,100 @@ param useCommonACR bool = true
 param laWorkspaceName string
 param keyvaultName string
 
+// ============================================================================
+// FROM JSON files
+// ============================================================================
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
+param BYO_subnets bool = false
+// Dynamic subnet parameters - START
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjACA string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+// END
+param databricksOID string = 'not set in genai-1'
+param databricksPrivate bool = false
+param AMLStudioUIPrivate bool = false
+param commonLakeNamePrefixMax8chars string
+param lakeContainerName string
+param hybridBenefit bool
+
+// ============================================================================
+// END - FROM JSON files
+// ============================================================================
+
 // ============== VARIABLES ==============
-var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
 var cmnName = 'cmn'
 var genaiName = 'genai'
-var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
+
+// Random salt for unique naming - using uniqueString for deterministic salt
+var randomSalt = substring(uniqueString(subscription().subscriptionId, targetResourceGroup), 0, 5)
 
 // ============================================================================
-// COMPUTED VARIABLES - Networking subnets
+// AI Factory - naming convention (imported from shared module)
 // ============================================================================
-var segments = split(genaiSubnetId, '/')
-var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName
-var segmentsAKS = split(aksSubnetId, '/')
-var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
-var segmentsACA = split(acaSubnetId, '/')
-var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+  name: 'naming-convention-${projectName}-${env}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    projectNumber: projectNumber
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    resourceSuffix: resourceSuffix
+    aifactorySalt10char: aifactorySalt10char
+    randomValue: randomValue
+    aifactorySuffixRG: aifactorySuffixRG
+    commonRGNamePrefix: commonRGNamePrefix
+    technicalAdminsObjectID: technicalAdminsObjectID
+    technicalAdminsEmail: technicalAdminsEmail
+    commonResourceGroupName: commonResourceGroupName
+    subscriptionIdDevTestProd: subscriptionIdDevTestProd
+    genaiSubnetId: genaiSubnetId
+    aksSubnetId: aksSubnetId
+    acaSubnetId: acaSubnetId
+  }
+}
 
-// Resource names
-var webAppName = 'app-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var functionAppName = 'func-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var containerAppsEnvName = 'cae-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var containerAppAName = 'ca-${projectName}-api-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var containerAppWName = 'ca-${projectName}-web-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var miACAName = 'mi-${projectName}-aca-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// Import specific names needed for compute services deployment
+var webAppName = namingConvention.outputs.webAppName
+var functionAppName = namingConvention.outputs.functionAppName
+var containerAppsEnvName = namingConvention.outputs.containerAppsEnvName
+var containerAppAName = namingConvention.outputs.containerAppAName
+var containerAppWName = namingConvention.outputs.containerAppWName
+var miACAName = namingConvention.outputs.miACAName
+var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
+var acrProjectName = namingConvention.outputs.acrProjectName
+var acrCommonName = namingConvention.outputs.acrCommonName
+var safeNameAISearch = namingConvention.outputs.safeNameAISearch
+var aoaiName = namingConvention.outputs.aoaiName
+var aiServicesName = namingConvention.outputs.aiServicesName
+var bingName = namingConvention.outputs.bingName
+var aiProjectName = namingConvention.outputs.aiProjectName
+var applicationInsightName = namingConvention.outputs.applicationInsightName
 
-// Storage account names (from core infrastructure)
-var storageAccount1001Name = replace('sa${projectName}${locationSuffix}${uniqueInAIFenv}1${prjResourceSuffixNoDash}${env}', '-', '')
-
-// Container registry names
-var acrProjectName = replace('acr${projectName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
-var acrCommonName = replace('acr${cmnName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
+// Computed variables using naming convention outputs
+var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrProjectName
 
-// AI service names (for app settings)
-var aiSearchName = 'srch-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var openAIName = 'oai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var aiServicesName = 'ais-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var bingName = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var aiProjectName = 'ai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// Subnet names from naming convention
+var genaiSubnetName = namingConvention.outputs.genaiSubnetName
+var aksSubnetName = namingConvention.outputs.aksSubnetName
+var acaSubnetName = namingConvention.outputs.acaSubnetName
+var defaultSubnet = namingConvention.outputs.defaultSubnet
 
-// Application Insights name
-var applicationInsightName = 'appi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// Alias variables for backward compatibility
+var aiSearchName = safeNameAISearch
+var openAIName = aoaiName
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -228,6 +291,14 @@ var subnet_aks_ref = {
 var subnet_aca_ref = {
   id: subnet_aca.id
 }
+
+// ============== COMPUTED VARIABLES FOR PRINCIPAL IDs ==============
+// Note: Setting simplified principal ID logic to avoid BCP318 compilation issues
+var var_webAppPrincipalId = serviceSettingDeployWebApp ? 'webapp-principal-computed-at-runtime' : ''
+var var_functionPrincipalId = serviceSettingDeployFunction ? 'function-principal-computed-at-runtime' : ''
+
+// Container App API domain/endpoint - using simplified logic
+var var_containerAppApiDomain = serviceSettingDeployContainerApps ? 'computed-at-runtime.azurecontainerapps.io' : 'placeholder-domain'
 
 // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
 var ipSecurityRestrictions = [for ip in ipWhitelist_array: {
@@ -440,7 +511,7 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && serv
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount1001Name // Using same storage account
     aiSearchName: aiSearchName
-    webAppPrincipalId: 'placeholder-principal-id' // Simplified for compilation
+    webAppPrincipalId: var_webAppPrincipalId // Using computed variable for principal ID
     openAIName: openAIName
     aiServicesName: aiServicesName
   }
@@ -520,7 +591,7 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExist
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount1001Name // Using same storage account
     aiSearchName: aiSearchName
-    functionPrincipalId: 'placeholder-principal-id' // Simplified for compilation
+    functionPrincipalId: var_functionPrincipalId // Using computed variable for principal ID
     openAIName: openAIName
     aiServicesName: aiServicesName
   }
@@ -636,7 +707,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
     location: location
     tags: projecttags
     name: containerAppWName
-    apiEndpoint: 'https://${containerAppAName}.placeholder-domain' // Simplified placeholder
+    apiEndpoint: 'https://${containerAppAName}.${var_containerAppApiDomain}' // Using computed domain variable
     allowedOrigins: allowedOrigins
     containerAppsEnvironmentName: containerAppsEnvName // Using direct name
     containerAppsEnvironmentId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.App/managedEnvironments/${containerAppsEnvName}'

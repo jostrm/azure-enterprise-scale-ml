@@ -9,6 +9,20 @@ targetScope = 'subscription'
 // - SQL Server and Database
 // ================================================================
 
+// ============================================================================
+// SKU for services
+// ============================================================================
+// PostgreSQL
+param postgreSQLSKU object = {
+  name: 'Standard_B1ms'
+  tier: 'Burstable'
+}
+// Redis
+param redisSKU string = 'Standard'
+// SQL Server
+param sqlServerSKU_DTU string = 'S0'
+param sqlServerTier_DTU string = 'Standard'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -74,7 +88,6 @@ param IPwhiteList string = ''
 // Dependencies and naming
 param aifactorySuffixRG string
 param commonRGNamePrefix string
-param uniqueInAIFenv string = ''
 param prjResourceSuffixNoDash string = ''
 
 // Database-specific parameters
@@ -85,10 +98,6 @@ param cosmosKind string = 'MongoDB'
 param cosmosMinimalTlsVersion string = 'Tls12'
 
 // PostgreSQL
-param postgreSQLSKU object = {
-  name: 'Standard_B1ms'
-  tier: 'Burstable'
-}
 param postgreSQLStorage object = {
   storageSizeGB: 32
 }
@@ -99,12 +108,9 @@ param postgreSQLHighAvailability object = {
 param postgresAvailabilityZone string = ''
 param postgresEnableCustomerManagedKey bool = false
 
-// Redis
-param redisSKU string = 'Standard'
+// Redis - other Redis parameters would go here if needed
 
 // SQL Server
-param sqlServerSKU_DTU string = 'S0'
-param sqlServerTier_DTU string = 'Standard'
 param sqlServerCapacity_DTU int = 10
 
 // Access control
@@ -115,30 +121,92 @@ param technicalContactId string = ''
 param inputKeyvault string
 param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
+param projectServicePrincipleOID_SeedingKeyvaultName string
+param projectServicePrincipleAppID_SeedingKeyvaultName string
+param projectServicePrincipleSecret_SeedingKeyvaultName string
+param aifactorySalt10char string = ''
+@description('Random value for deployment uniqueness')
+param randomValue string = ''
+param privDnsResourceGroupName string
+param privDnsSubscription string
+// ============================================================================
+// FROM JSON files
+// ============================================================================
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
+param BYO_subnets bool = false
+// Dynamic subnet parameters - START
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjACA string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+// END
+param databricksOID string = 'not set in genai-1'
+param databricksPrivate bool = false
+param AMLStudioUIPrivate bool = false
+param commonLakeNamePrefixMax8chars string
+param lakeContainerName string
+param hybridBenefit bool
+
+// ============================================================================
+// END - FROM JSON files
+// ============================================================================
 
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
-var projectName = 'prj${projectNumber}'
-var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
+var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
 
 // ============================================================================
-// COMPUTED VARIABLES - Networking subnets
+// AI Factory - naming convention (imported from shared module)
 // ============================================================================
-var segments = split(genaiSubnetId, '/')
-var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName
-var segmentsAKS = split(aksSubnetId, '/')
-var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
-var segmentsACA = split(acaSubnetId, '/')
-var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+  name: guid('naming-convention-04-databases',vnetResourceGroupName,deploymentProjSpecificUniqueSuffix)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    projectNumber: projectNumber
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    resourceSuffix: resourceSuffix
+    randomValue:randomValue
+    aifactorySalt10char:aifactorySalt10char
+    aifactorySuffixRG: aifactorySuffixRG
+    commonRGNamePrefix: commonRGNamePrefix
+    commonResourceGroupName: commonResourceGroup
+    subscriptionIdDevTestProd:subscriptionIdDevTestProd
+    acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+  }
+}
 
-// Resource names
-var cosmosDBName = 'cosmos-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var postgreSQLName = 'psql-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var redisName = 'redis-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var sqlServerName = 'sql-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var sqlDBName = 'sqldb-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var keyvaultName = 'kv-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
+var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
+var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+var randomSalt = namingConvention.outputs.randomSalt
+var defaultSubnet = namingConvention.outputs.defaultSubnet
+var aksSubnetName = namingConvention.outputs.aksSubnetName
+var acaSubnetName = namingConvention.outputs.acaSubnetName
+var genaiSubnetName = namingConvention.outputs.genaiSubnetName
+var projectName = namingConvention.outputs.projectName
+var genaiName = namingConvention.outputs.genaiName
+
+// Import specific names needed for database deployment
+var cosmosDBName = namingConvention.outputs.cosmosDBName
+var postgreSQLName = namingConvention.outputs.postgreSQLName
+var redisName = namingConvention.outputs.redisName
+var sqlServerName = namingConvention.outputs.sqlServerName
+var sqlDBName = namingConvention.outputs.sqlDBName
+var keyvaultName = namingConvention.outputs.keyvaultName
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -173,15 +241,48 @@ var sqlServerSKUObject_DTU = {
   capacity: sqlServerCapacity_DTU
 }
 
-// DNS configurations for private endpoints
-var privateLinksDnsZones = [
-  // Will be populated by private DNS zone module
-]
+
+module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    location: location
+    privDnsResourceGroupName: privDnsResourceGroupName
+    privDnsSubscription: privDnsSubscription
+  }
+}
+var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
+
+// Assumes the principals exists.
+module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: 'getProjectMIPrincipalId-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miPrjName
+  }
+}
+
+// Array vars - use principal IDs from helper modules
+var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
+
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+}
+
 
 // Access policies for principals
-var p011_genai_team_lead_array = [] // Simplified - team leads would be passed as array
-var p011_genai_team_lead_email_array = [] // Email addresses for admin assignment
-var spAndMiArray = [] // Service principals and managed identities
+module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    managedIdentityOID: var_miPrj_PrincipalId
+    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+      getProjectMIPrincipalId
+  ]
+}
+#disable-next-line BCP318
+var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
 
 // DNS configurations for private endpoints (simplified)
 var var_cosmosdb_dnsConfig = [
@@ -326,7 +427,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !c
   name: 'privateDnsLinkCosmos${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_cosmosdb_dnsConfig
-    privateLinksDnsZones: {}
+    privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
     resourceExists_struct
@@ -382,7 +483,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists
   name: 'privateDnsLinkPostgreSQL${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_postgreSQL_dnsConfig
-    privateLinksDnsZones: {}
+    privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
     resourceExists_struct
@@ -430,7 +531,7 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !
   name: 'privateDnsLinkRedisCache${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_redisCache_dnsConfig
-    privateLinksDnsZones: {}
+    privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
     resourceExists_struct
@@ -479,7 +580,7 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !cen
   name: 'privateDnsLinkSqlServer${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_sqlServer_dnsConfig
-    privateLinksDnsZones: {}
+    privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
     resourceExists_struct

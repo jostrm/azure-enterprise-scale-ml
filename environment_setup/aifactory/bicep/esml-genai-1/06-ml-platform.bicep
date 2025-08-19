@@ -10,6 +10,13 @@ targetScope = 'subscription'
 // - RBAC and permissions for ML platform
 // ================================================================
 
+// ============================================================================
+// SKU for services
+// ============================================================================
+// Azure ML Workspace SKUs
+param mlWorkspaceSkuName string = 'basic'
+param mlWorkspaceSkuTier string = 'basic'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -61,6 +68,7 @@ param vnetNameFull string
 param vnetResourceGroupName string
 param genaiSubnetId string
 param aksSubnetId string
+param acaSubnetId string
 param targetResourceGroup string
 param commonResourceGroup string
 
@@ -69,7 +77,7 @@ param storageAccount1001Name string
 param storageAccount2001Name string
 param keyvaultName string
 param applicationInsightName string
-param acrName string
+// param acrName string // Now from naming convention
 param aiSearchName string
 param aiServicesName string
 
@@ -105,8 +113,14 @@ param IPwhiteList string = ''
 // Dependencies and naming
 param aifactorySuffixRG string
 param commonRGNamePrefix string
-param uniqueInAIFenv string = ''
-param prjResourceSuffixNoDash string = ''
+
+// Missing parameters required for naming convention module
+param aifactorySalt10char string = ''
+param randomValue string = ''
+param technicalAdminsObjectID string = ''
+param technicalAdminsEmail string = ''
+param commonResourceGroupName string
+param subscriptionIdDevTestProd string
 
 // Common ACR usage
 param useCommonACR bool = true
@@ -117,34 +131,103 @@ param p011_genai_team_lead_array array = []
 param spAndMiArray array = []
 param useAdGroups bool = false
 
+// ============================================================================
+// FROM JSON files
+// ============================================================================
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
+param BYO_subnets bool = false
+// Dynamic subnet parameters - START
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjACA string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+// END
+param databricksOID string = 'not set in genai-1'
+param databricksPrivate bool = false
+//param AMLStudioUIPrivate bool = false
+param commonLakeNamePrefixMax8chars string
+param lakeContainerName string
+param hybridBenefit bool
+
+// ============================================================================
+// END - FROM JSON files
+// ============================================================================
+
 // Log Analytics Workspace name
 param laWorkspaceName string
 
 // ============== VARIABLES ==============
-var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
-var cmnName = 'cmn'
+// var cmnName = 'cmn' // Now from naming convention
 var genaiName = 'genai'
-var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${uniqueInAIFenv}'
+
+// Random salt for unique naming - using uniqueString for deterministic salt
+var randomSalt = substring(uniqueString(subscription().subscriptionId, targetResourceGroup), 0, 5)
+var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 
 // ============================================================================
 // COMPUTED VARIABLES - Networking subnets
 // ============================================================================
 var segments = split(genaiSubnetId, '/')
-var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
+var vnetName = segments[length(segments) - 3] // Get the vnet name
 var defaultSubnet = genaiSubnetName
-var segmentsAKS = split(aksSubnetId, '/')
-var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
 
-// Resource names
-var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var aiHubName = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var aifName = 'aif-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var aifProjectName = 'ai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var aksClusterName = 'aks-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// ============================================================================
+// AI Factory - naming convention (imported from shared module)
+// ============================================================================
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+  name: 'naming-convention-${projectName}-${env}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    projectNumber: projectNumber
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    resourceSuffix: resourceSuffix
+    aifactorySalt10char: aifactorySalt10char
+    randomValue: randomValue
+    aifactorySuffixRG: aifactorySuffixRG
+    commonRGNamePrefix: commonRGNamePrefix
+    technicalAdminsObjectID: technicalAdminsObjectID
+    technicalAdminsEmail: technicalAdminsEmail
+    commonResourceGroupName: commonResourceGroupName
+    subscriptionIdDevTestProd: subscriptionIdDevTestProd
+    genaiSubnetId: genaiSubnetId
+    aksSubnetId: aksSubnetId
+    acaSubnetId: acaSubnetId
+  }
+}
+
+// Import specific names needed for ML platform deployment
+var amlName = namingConvention.outputs.amlName
+var aiHubName = namingConvention.outputs.aiHubName
+var aifName = namingConvention.outputs.aifName
+var aifProjectName = namingConvention.outputs.aifPrjName
+var aksClusterName = 'aks-${namingConvention.outputs.projectName}-${locationSuffix}-${env}-${namingConvention.outputs.uniqueInAIFenv}${resourceSuffix}'
+var acrProjectName = namingConvention.outputs.acrProjectName
+var acrCommonName = namingConvention.outputs.acrCommonName
+var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrName
+
+// Subnet names from naming convention
+var genaiSubnetName = namingConvention.outputs.genaiSubnetName
+var aksSubnetName = namingConvention.outputs.aksSubnetName
+
+// Get computed variables from naming convention
+var cmnName = namingConvention.outputs.cmnName
+var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+var prjResourceSuffixNoDash = namingConvention.outputs.prjResourceSuffixNoDash
+var acrName = namingConvention.outputs.acrProjectName
 
 // Short names for internal use
-var aiHubNameShort = 'ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var aiHubNameShort = 'ai-hub-${namingConvention.outputs.projectName}-${locationSuffix}-${env}${resourceSuffix}'
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -166,9 +249,9 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
 }
 
-// Common ACR name
-var acrCommonName = replace('acr${cmnName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
-var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrName
+// Common ACR name (removed duplicate - using naming convention output)
+// var acrCommonName = replace('acr${cmnName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
+// var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrName
 
 // Private DNS zones (simplified structure)
 var privateLinksDnsZones = {
@@ -252,14 +335,14 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   params: {
     name: amlName
     uniqueDepl: deploymentProjSpecificUniqueSuffix
-    uniqueSalt5char: uniqueInAIFenv
+    uniqueSalt5char: namingConvention.outputs.uniqueInAIFenv
     projectName: projectName
     projectNumber: projectNumber
     location: location
     locationSuffix: locationSuffix
     aifactorySuffix: aifactorySuffixRG
-    skuName: 'basic'
-    skuTier: 'basic'
+    skuName: mlWorkspaceSkuName
+    skuTier: mlWorkspaceSkuTier
     env: env
     aksSubnetId: aksSubnetId
     aksSubnetName: aksSubnetName
@@ -335,7 +418,7 @@ module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!aifProjectE
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '${aiHubNameShort}${deploymentProjSpecificUniqueSuffix}'
+  name: 'aiHubModule${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
     defaultProjectName: aifProjectName
@@ -365,7 +448,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     logWorkspaceResoureGroupName: commonResourceGroup
     locationSuffix: locationSuffix
     resourceSuffix: resourceSuffix
-    aifactorySalt: uniqueInAIFenv
+    aifactorySalt: namingConvention.outputs.uniqueInAIFenv
     ipRules: empty(processedIpRulesAIHub) ? [] : processedIpRulesAIHub
     ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32
   }
@@ -398,7 +481,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!amlExi
   params: {
     amlName: amlName
     servicePrincipleAndMIArray: spAndMiArray
-    adfSP: 'placeholder-principal-id' // Simplified for compilation
+    adfSP: '' // ADF Service Principal - empty if not using ADF integration
     projectADuser: technicalContactId
     additionalUserIds: p011_genai_team_lead_array
     useAdGroups: useAdGroups

@@ -5,10 +5,40 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "13438671871103294236"
+      "templateHash": "11881294733734483061"
     }
   },
   "parameters": {
+    "functionSKU": {
+      "type": "object",
+      "defaultValue": {
+        "name": "EP1",
+        "tier": "ElasticPremium",
+        "size": "EP1",
+        "family": "EP",
+        "capacity": 1
+      }
+    },
+    "webappSKU": {
+      "type": "object",
+      "defaultValue": {
+        "name": "P1v3",
+        "tier": "PremiumV3",
+        "size": "P1v3",
+        "family": "Pv3",
+        "capacity": 1
+      }
+    },
+    "webappSKUAce": {
+      "type": "object",
+      "defaultValue": {
+        "name": "I1v2",
+        "tier": "IsolatedV2",
+        "size": "I1v2",
+        "family": "Iv2",
+        "capacity": 1
+      }
+    },
     "env": {
       "type": "string",
       "allowedValues": [
@@ -127,37 +157,21 @@
     "vnetResourceGroupName": {
       "type": "string"
     },
-    "defaultSubnet": {
-      "type": "string",
-      "defaultValue": "snet-common"
+    "genaiSubnetId": {
+      "type": "string"
     },
-    "genaiSubnetName": {
-      "type": "string",
-      "defaultValue": "snet-genai"
+    "aksSubnetId": {
+      "type": "string"
     },
-    "aksSubnetName": {
+    "acaSubnetId": {
       "type": "string",
-      "defaultValue": "aks-prj005"
-    },
-    "acaSubnetName": {
-      "type": "string",
-      "defaultValue": "aca-prj005"
+      "defaultValue": ""
     },
     "targetResourceGroup": {
       "type": "string"
     },
     "commonResourceGroup": {
       "type": "string"
-    },
-    "functionSKU": {
-      "type": "object",
-      "defaultValue": {
-        "name": "EP1",
-        "tier": "ElasticPremium",
-        "size": "EP1",
-        "family": "EP",
-        "capacity": 1
-      }
     },
     "functionAlwaysOn": {
       "type": "bool",
@@ -170,26 +184,6 @@
     "functionVersion": {
       "type": "string",
       "defaultValue": "3.11"
-    },
-    "webappSKU": {
-      "type": "object",
-      "defaultValue": {
-        "name": "P1v3",
-        "tier": "PremiumV3",
-        "size": "P1v3",
-        "family": "Pv3",
-        "capacity": 1
-      }
-    },
-    "webappSKUAce": {
-      "type": "object",
-      "defaultValue": {
-        "name": "I1v2",
-        "tier": "IsolatedV2",
-        "size": "I1v2",
-        "family": "Iv2",
-        "capacity": 1
-      }
     },
     "webappAlwaysOn": {
       "type": "bool",
@@ -293,13 +287,27 @@
     "commonRGNamePrefix": {
       "type": "string"
     },
-    "uniqueInAIFenv": {
+    "aifactorySalt10char": {
       "type": "string",
       "defaultValue": ""
     },
-    "prjResourceSuffixNoDash": {
+    "randomValue": {
       "type": "string",
       "defaultValue": ""
+    },
+    "technicalAdminsObjectID": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "technicalAdminsEmail": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "commonResourceGroupName": {
+      "type": "string"
+    },
+    "subscriptionIdDevTestProd": {
+      "type": "string"
     },
     "useCommonACR": {
       "type": "bool",
@@ -324,37 +332,24 @@
         }
       }
     ],
-    "subscriptionIdDevTestProd": "[subscription().subscriptionId]",
     "projectName": "[format('prj{0}', parameters('projectNumber'))]",
     "cmnName": "cmn",
     "genaiName": "genai",
-    "deploymentProjSpecificUniqueSuffix": "[format('{0}{1}{2}', variables('projectName'), parameters('env'), parameters('uniqueInAIFenv'))]",
-    "webAppName": "[format('app-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "functionAppName": "[format('func-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "containerAppsEnvName": "[format('cae-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "containerAppAName": "[format('ca-{0}-api-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "containerAppWName": "[format('ca-{0}-web-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "miACAName": "[format('mi-{0}-aca-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "storageAccount1001Name": "[replace(format('sa{0}{1}{2}1{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('uniqueInAIFenv'), parameters('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
-    "acrProjectName": "[replace(format('acr{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('uniqueInAIFenv'), parameters('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
-    "acrCommonName": "[replace(format('acr{0}{1}{2}{3}{4}', variables('cmnName'), parameters('locationSuffix'), parameters('uniqueInAIFenv'), parameters('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
-    "var_acr_cmn_or_prj": "[if(parameters('useCommonACR'), variables('acrCommonName'), variables('acrProjectName'))]",
-    "aiSearchName": "[format('srch-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "openAIName": "[format('oai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "aiServicesName": "[format('ais-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "bingName": "[format('bing-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "aiProjectName": "[format('ai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
-    "applicationInsightName": "[format('appi-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), parameters('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+    "randomSalt": "[substring(uniqueString(subscription().subscriptionId, parameters('targetResourceGroup')), 0, 5)]",
+    "deploymentProjSpecificUniqueSuffix": "[format('{0}{1}{2}', variables('projectName'), parameters('env'), variables('randomSalt'))]",
     "ipWhitelist_array": "[if(not(empty(parameters('IPwhiteList'))), split(parameters('IPwhiteList'), ','), createArray())]",
     "subnet_genai_ref": {
-      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('genaiSubnetName'))]"
+      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.genaiSubnetName.value)]"
     },
     "subnet_aks_ref": {
-      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('aksSubnetName'))]"
+      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aksSubnetName.value)]"
     },
     "subnet_aca_ref": {
-      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), parameters('acaSubnetName'))]"
+      "id": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetNameFull'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acaSubnetName.value)]"
     },
+    "var_webAppPrincipalId": "[if(parameters('serviceSettingDeployWebApp'), 'webapp-principal-computed-at-runtime', '')]",
+    "var_functionPrincipalId": "[if(parameters('serviceSettingDeployFunction'), 'function-principal-computed-at-runtime', '')]",
+    "var_containerAppApiDomain": "[if(parameters('serviceSettingDeployContainerApps'), 'computed-at-runtime.azurecontainerapps.io', 'placeholder-domain')]",
     "allowedOrigins": [
       "https://portal.azure.com",
       "https://ms.portal.azure.com",
@@ -365,38 +360,7 @@
       "https://mlworkspace.azureml-test.net",
       "[format('https://42.{0}.instances.azureml.ms', parameters('location'))]",
       "[format('https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.{0}.api.azureml.ms', parameters('location'))]"
-    ],
-    "var_webapp_dnsConfig": [
-      {
-        "name": "[variables('webAppName')]",
-        "type": "Microsoft.Web/sites",
-        "groupIds": [
-          "sites"
-        ],
-        "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Web/sites/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), variables('webAppName'))]"
-      }
-    ],
-    "var_function_dnsConfig": [
-      {
-        "name": "[variables('functionAppName')]",
-        "type": "Microsoft.Web/sites",
-        "groupIds": [
-          "sites"
-        ],
-        "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Web/sites/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), variables('functionAppName'))]"
-      }
-    ],
-    "var_containerAppsEnv_dnsConfig": [
-      {
-        "name": "[variables('containerAppsEnvName')]",
-        "type": "Microsoft.App/managedEnvironments",
-        "groupIds": [
-          "managedEnvironments"
-        ],
-        "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.App/managedEnvironments/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), variables('containerAppsEnvName'))]"
-      }
-    ],
-    "miPrincipalId": "[if(parameters('miACAExists'), 'existing-mi-principal-id', format('{0}/resourceGroups/{1}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), variables('miACAName')))]"
+    ]
   },
   "resources": [
     {
@@ -406,11 +370,413 @@
       "location": "[parameters('location')]"
     },
     {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "[format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+      "resourceGroup": "[parameters('targetResourceGroup')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "env": {
+            "value": "[parameters('env')]"
+          },
+          "projectNumber": {
+            "value": "[parameters('projectNumber')]"
+          },
+          "locationSuffix": {
+            "value": "[parameters('locationSuffix')]"
+          },
+          "commonResourceSuffix": {
+            "value": "[parameters('commonResourceSuffix')]"
+          },
+          "resourceSuffix": {
+            "value": "[parameters('resourceSuffix')]"
+          },
+          "aifactorySalt10char": {
+            "value": "[parameters('aifactorySalt10char')]"
+          },
+          "randomValue": {
+            "value": "[parameters('randomValue')]"
+          },
+          "aifactorySuffixRG": {
+            "value": "[parameters('aifactorySuffixRG')]"
+          },
+          "commonRGNamePrefix": {
+            "value": "[parameters('commonRGNamePrefix')]"
+          },
+          "technicalAdminsObjectID": {
+            "value": "[parameters('technicalAdminsObjectID')]"
+          },
+          "technicalAdminsEmail": {
+            "value": "[parameters('technicalAdminsEmail')]"
+          },
+          "commonResourceGroupName": {
+            "value": "[parameters('commonResourceGroupName')]"
+          },
+          "subscriptionIdDevTestProd": {
+            "value": "[parameters('subscriptionIdDevTestProd')]"
+          },
+          "genaiSubnetId": {
+            "value": "[parameters('genaiSubnetId')]"
+          },
+          "aksSubnetId": {
+            "value": "[parameters('aksSubnetId')]"
+          },
+          "acaSubnetId": {
+            "value": "[parameters('acaSubnetId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.37.4.10188",
+              "templateHash": "11269673137520673052"
+            }
+          },
+          "parameters": {
+            "env": {
+              "type": "string",
+              "allowedValues": [
+                "dev",
+                "test",
+                "prod"
+              ],
+              "metadata": {
+                "description": "Environment: dev, test, prod"
+              }
+            },
+            "projectNumber": {
+              "type": "string",
+              "metadata": {
+                "description": "Project number (e.g., \"005\")"
+              }
+            },
+            "locationSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Location suffix (e.g., \"weu\", \"swc\")"
+              }
+            },
+            "commonResourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Common resource suffix (e.g., \"-001\")"
+              }
+            },
+            "resourceSuffix": {
+              "type": "string",
+              "metadata": {
+                "description": "Project-specific resource suffix"
+              }
+            },
+            "aifactorySalt10char": {
+              "type": "string",
+              "metadata": {
+                "description": "Random salt for unique naming"
+              }
+            },
+            "randomValue": {
+              "type": "string"
+            },
+            "aifactorySuffixRG": {
+              "type": "string",
+              "metadata": {
+                "description": "AI Factory suffix for resource groups"
+              }
+            },
+            "commonRGNamePrefix": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Common resource group name prefix"
+              }
+            },
+            "technicalAdminsObjectID": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins OID list"
+              }
+            },
+            "technicalAdminsEmail": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "User Admins EMAIL list"
+              }
+            },
+            "commonResourceGroupName": {
+              "type": "string"
+            },
+            "subscriptionIdDevTestProd": {
+              "type": "string"
+            },
+            "genaiSubnetId": {
+              "type": "string"
+            },
+            "aksSubnetId": {
+              "type": "string"
+            },
+            "acaSubnetId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "projectName": "[format('prj{0}', parameters('projectNumber'))]",
+            "cmnName": "cmn",
+            "genaiName": "genai",
+            "prjResourceSuffixNoDash": "[replace(parameters('resourceSuffix'), '-', '')]",
+            "twoNumbers": "[substring(parameters('resourceSuffix'), 2, 2)]",
+            "technicalAdminsObjectID_array": "[array(split(replace(parameters('technicalAdminsObjectID'), '\\s+', ''), ','))]",
+            "p011_genai_team_lead_array": "[if(empty(parameters('technicalAdminsObjectID')), createArray(), union(variables('technicalAdminsObjectID_array'), createArray()))]",
+            "technicalAdminsEmail_array": "[array(split(parameters('technicalAdminsEmail'), ','))]",
+            "p011_genai_team_lead_email_array": "[if(empty(parameters('technicalAdminsEmail')), createArray(), variables('technicalAdminsEmail_array'))]",
+            "randomSalt": "[if(or(empty(parameters('aifactorySalt10char')), lessOrEquals(length(parameters('aifactorySalt10char')), 5)), substring(parameters('randomValue'), 6, 10), parameters('aifactorySalt10char'))]",
+            "uniqueInAIFenv": "[substring(uniqueString(subscriptionResourceId(parameters('subscriptionIdDevTestProd'), 'Microsoft.Resources/resourceGroups', parameters('commonResourceGroupName'))), 0, 5)]",
+            "aiHubName": "[format('ai-hub-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifProjectName": "[format('ai-prj{0}-01-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aoaiName": "[format('aoai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "amlName": "[format('aml-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "safeNameAISearch": "[replace(toLower(format('aisearch{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))), '-', '')]",
+            "aiServicesName": "[replace(toLower(format('aiservices{0}{1}{2}{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), variables('prjResourceSuffixNoDash'))), '-', '')]",
+            "dashboardInsightsName": "[format('AIFactory{0}-{1}-insights-{2}-{3}{4}', parameters('aifactorySuffixRG'), variables('projectName'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "applicationInsightName": "[format('ain-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "bingName": "[format('bing-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppsEnvName": "[format('aca-env-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppAName": "[format('aca-a-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "containerAppWName": "[format('aca-w-{0}{1}{2}{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "cosmosDBName": "[format('cosmos-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "redisName": "[format('redis-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "postgreSQLName": "[format('pg-flex-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlServerName": "[format('sql-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "sqlDBName": "[format('sqldb-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "functionAppName": "[format('func-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webAppName": "[format('webapp-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "funcAppServicePlanName": "[format('func-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "webbAppServicePlanName": "[format('webapp-{0}-{1}-{2}-{3}{4}-plan', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "vmName": "[format('dsvm-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifName": "[format('aifoundry-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "aifPrjName": "[format('aifoundry-{0}-01-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('resourceSuffix'))]",
+            "keyvaultName": "[format('kv-p{0}-{1}-{2}-{3}{4}', parameters('projectNumber'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('twoNumbers'))]",
+            "storageAccount1001Name": "[replace(format('sa{0}{1}{2}1{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "storageAccount2001Name": "[replace(format('sa{0}{1}{2}2{3}{4}', variables('projectName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), variables('prjResourceSuffixNoDash'), parameters('env')), '-', '')]",
+            "acrProjectName": "[format('acr{0}{1}{2}{3}{4}{5}', variables('projectName'), variables('genaiName'), parameters('locationSuffix'), variables('uniqueInAIFenv'), parameters('env'), variables('prjResourceSuffixNoDash'))]",
+            "acrCommonName": "[replace(format('acrcommon{0}{1}{2}{3}', variables('uniqueInAIFenv'), parameters('locationSuffix'), parameters('commonResourceSuffix'), parameters('env')), '-', '')]",
+            "miACAName": "[format('mi-aca-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
+            "miPrjName": "[format('mi-{0}-{1}-{2}-{3}{4}{5}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), variables('randomSalt'), parameters('resourceSuffix'))]",
+            "laWorkspaceName": "[format('la-{0}-{1}-{2}-{3}{4}', variables('cmnName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "aiProjectName": "[format('ai-{0}-{1}-{2}-{3}{4}', variables('projectName'), parameters('locationSuffix'), parameters('env'), variables('uniqueInAIFenv'), parameters('commonResourceSuffix'))]",
+            "segments": "[split(parameters('genaiSubnetId'), '/')]",
+            "genaiSubnetName": "[variables('segments')[sub(length(variables('segments')), 1)]]",
+            "defaultSubnet": "[variables('genaiSubnetName')]",
+            "segmentsAKS": "[split(parameters('aksSubnetId'), '/')]",
+            "aksSubnetName": "[variables('segmentsAKS')[sub(length(variables('segmentsAKS')), 1)]]",
+            "segmentsACA": "[split(parameters('acaSubnetId'), '/')]",
+            "acaSubnetName": "[variables('segmentsACA')[sub(length(variables('segmentsACA')), 1)]]"
+          },
+          "resources": [],
+          "outputs": {
+            "genaiSubnetName": {
+              "type": "string",
+              "value": "[variables('genaiSubnetName')]"
+            },
+            "aksSubnetName": {
+              "type": "string",
+              "value": "[variables('aksSubnetName')]"
+            },
+            "acaSubnetName": {
+              "type": "string",
+              "value": "[variables('acaSubnetName')]"
+            },
+            "defaultSubnet": {
+              "type": "string",
+              "value": "[variables('defaultSubnet')]"
+            },
+            "aiHubName": {
+              "type": "string",
+              "value": "[variables('aiHubName')]"
+            },
+            "aifProjectName": {
+              "type": "string",
+              "value": "[variables('aifProjectName')]"
+            },
+            "aoaiName": {
+              "type": "string",
+              "value": "[variables('aoaiName')]"
+            },
+            "amlName": {
+              "type": "string",
+              "value": "[variables('amlName')]"
+            },
+            "safeNameAISearch": {
+              "type": "string",
+              "value": "[variables('safeNameAISearch')]"
+            },
+            "aiServicesName": {
+              "type": "string",
+              "value": "[variables('aiServicesName')]"
+            },
+            "dashboardInsightsName": {
+              "type": "string",
+              "value": "[variables('dashboardInsightsName')]"
+            },
+            "applicationInsightName": {
+              "type": "string",
+              "value": "[variables('applicationInsightName')]"
+            },
+            "bingName": {
+              "type": "string",
+              "value": "[variables('bingName')]"
+            },
+            "containerAppsEnvName": {
+              "type": "string",
+              "value": "[variables('containerAppsEnvName')]"
+            },
+            "containerAppAName": {
+              "type": "string",
+              "value": "[variables('containerAppAName')]"
+            },
+            "containerAppWName": {
+              "type": "string",
+              "value": "[variables('containerAppWName')]"
+            },
+            "cosmosDBName": {
+              "type": "string",
+              "value": "[variables('cosmosDBName')]"
+            },
+            "redisName": {
+              "type": "string",
+              "value": "[variables('redisName')]"
+            },
+            "postgreSQLName": {
+              "type": "string",
+              "value": "[variables('postgreSQLName')]"
+            },
+            "sqlServerName": {
+              "type": "string",
+              "value": "[variables('sqlServerName')]"
+            },
+            "sqlDBName": {
+              "type": "string",
+              "value": "[variables('sqlDBName')]"
+            },
+            "functionAppName": {
+              "type": "string",
+              "value": "[variables('functionAppName')]"
+            },
+            "webAppName": {
+              "type": "string",
+              "value": "[variables('webAppName')]"
+            },
+            "funcAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('funcAppServicePlanName')]"
+            },
+            "webbAppServicePlanName": {
+              "type": "string",
+              "value": "[variables('webbAppServicePlanName')]"
+            },
+            "vmName": {
+              "type": "string",
+              "value": "[variables('vmName')]"
+            },
+            "aifName": {
+              "type": "string",
+              "value": "[variables('aifName')]"
+            },
+            "aifPrjName": {
+              "type": "string",
+              "value": "[variables('aifPrjName')]"
+            },
+            "keyvaultName": {
+              "type": "string",
+              "value": "[variables('keyvaultName')]"
+            },
+            "storageAccount1001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount1001Name')]"
+            },
+            "storageAccount2001Name": {
+              "type": "string",
+              "value": "[variables('storageAccount2001Name')]"
+            },
+            "acrProjectName": {
+              "type": "string",
+              "value": "[variables('acrProjectName')]"
+            },
+            "acrCommonName": {
+              "type": "string",
+              "value": "[variables('acrCommonName')]"
+            },
+            "miACAName": {
+              "type": "string",
+              "value": "[variables('miACAName')]"
+            },
+            "miPrjName": {
+              "type": "string",
+              "value": "[variables('miPrjName')]"
+            },
+            "laWorkspaceName": {
+              "type": "string",
+              "value": "[variables('laWorkspaceName')]"
+            },
+            "aiProjectName": {
+              "type": "string",
+              "value": "[variables('aiProjectName')]"
+            },
+            "projectName": {
+              "type": "string",
+              "value": "[variables('projectName')]"
+            },
+            "cmnName": {
+              "type": "string",
+              "value": "[variables('cmnName')]"
+            },
+            "genaiName": {
+              "type": "string",
+              "value": "[variables('genaiName')]"
+            },
+            "prjResourceSuffixNoDash": {
+              "type": "string",
+              "value": "[variables('prjResourceSuffixNoDash')]"
+            },
+            "twoNumbers": {
+              "type": "string",
+              "value": "[variables('twoNumbers')]"
+            },
+            "p011_genai_team_lead_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_array')]"
+            },
+            "p011_genai_team_lead_email_array": {
+              "type": "array",
+              "value": "[variables('p011_genai_team_lead_email_array')]"
+            },
+            "uniqueInAIFenv": {
+              "type": "string",
+              "value": "[variables('uniqueInAIFenv')]"
+            },
+            "randomSalt": {
+              "type": "string",
+              "value": "[variables('randomSalt')]"
+            }
+          }
+        }
+      }
+    },
+    {
       "condition": "[not(parameters('miACAExists'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -419,7 +785,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('miACAName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -492,6 +858,7 @@
         }
       },
       "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -500,7 +867,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('miRbacCmn-{0}-{1}', deployment().name, variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('commonResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -509,11 +876,9 @@
         "mode": "Incremental",
         "parameters": {
           "containerRegistryName": {
-            "value": "[variables('acrCommonName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acrCommonName.value]"
           },
-          "principalId": {
-            "value": "[variables('miPrincipalId')]"
-          }
+          "principalId": "[if(parameters('miACAExists'), createObject('value', 'existing-mi-principal-id'), createObject('value', format('{0}/resourceGroups/{1}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value)))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -553,7 +918,8 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]"
       ]
     },
     {
@@ -561,7 +927,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('miRbacProj-{0}-{1}', deployment().name, variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -570,11 +936,9 @@
         "mode": "Incremental",
         "parameters": {
           "containerRegistryName": {
-            "value": "[variables('acrProjectName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acrProjectName.value]"
           },
-          "principalId": {
-            "value": "[variables('miPrincipalId')]"
-          }
+          "principalId": "[if(parameters('miACAExists'), createObject('value', 'existing-mi-principal-id'), createObject('value', format('{0}/resourceGroups/{1}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value)))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -614,7 +978,8 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]"
       ]
     },
     {
@@ -633,7 +998,7 @@
             "value": "[parameters('vnetNameFull')]"
           },
           "subnetName": {
-            "value": "[parameters('aksSubnetName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aksSubnetName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -796,7 +1161,10 @@
             }
           }
         }
-      }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]"
+      ]
     },
     {
       "condition": "[and(not(parameters('containerAppsEnvExists')), parameters('serviceSettingDeployContainerApps'))]",
@@ -814,7 +1182,7 @@
             "value": "[parameters('vnetNameFull')]"
           },
           "subnetName": {
-            "value": "[parameters('acaSubnetName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acaSubnetName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -977,14 +1345,17 @@
             }
           }
         }
-      }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]"
+      ]
     },
     {
       "condition": "[and(not(parameters('webAppExists')), parameters('serviceSettingDeployWebApp'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('WebApp4{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -993,7 +1364,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('webAppName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.webAppName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -1012,10 +1383,10 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetNamePend": {
-            "value": "[parameters('defaultSubnet')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "subnetIntegrationName": {
-            "value": "[parameters('aksSubnetName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aksSubnetName.value]"
           },
           "enablePublicGenAIAccess": {
             "value": "[parameters('enablePublicGenAIAccess')]"
@@ -1024,7 +1395,7 @@
             "value": "[parameters('enablePublicAccessWithPerimeter')]"
           },
           "applicationInsightsName": {
-            "value": "[variables('applicationInsightName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.applicationInsightName.value]"
           },
           "logAnalyticsWorkspaceName": {
             "value": "[parameters('laWorkspaceName')]"
@@ -1057,15 +1428,15 @@
             "value": [
               {
                 "name": "AZURE_OPENAI_ENDPOINT",
-                "value": "[format('https://{0}.openai.azure.com/', variables('openAIName'))]"
+                "value": "[format('https://{0}.openai.azure.com/', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aoaiName.value)]"
               },
               {
                 "name": "AZURE_AISERVICES_ENDPOINT",
-                "value": "[format('https://{0}.cognitiveservices.azure.com/', variables('aiServicesName'))]"
+                "value": "[format('https://{0}.cognitiveservices.azure.com/', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aiServicesName.value)]"
               },
               {
                 "name": "AZURE_SEARCH_ENDPOINT",
-                "value": "[format('https://{0}.search.windows.net', variables('aiSearchName'))]"
+                "value": "[format('https://{0}.search.windows.net', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.safeNameAISearch.value)]"
               },
               {
                 "name": "WEBSITE_VNET_ROUTE_ALL",
@@ -1081,7 +1452,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.37.4.10188",
-              "templateHash": "10403214579499127158"
+              "templateHash": "11451709101962211358"
             }
           },
           "parameters": {
@@ -1274,13 +1645,7 @@
               "name": "[variables('servicePlanName')]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
-              "sku": {
-                "name": "I1v2",
-                "tier": "IsolatedV2",
-                "size": "I1v2",
-                "family": "Iv2",
-                "capacity": 1
-              },
+              "sku": "[parameters('sku')]",
               "kind": "[if(or(or(equals(parameters('runtime'), 'node'), equals(parameters('runtime'), 'python')), equals(parameters('runtime'), 'java')), 'linux', 'windows')]",
               "properties": {
                 "reserved": "[or(equals(parameters('runtime'), 'node'), equals(parameters('runtime'), 'python'))]",
@@ -1307,7 +1672,7 @@
                     "allowedOrigins": "[parameters('allowedOrigins')]"
                   },
                   "ipSecurityRestrictions": "[if(or(parameters('enablePublicAccessWithPerimeter'), parameters('byoASEv3')), createArray(), concat(variables('formattedIpRules'), createArray(variables('denyAllRule'))))]",
-                  "linuxFxVersion": "[if(equals(parameters('runtime'), 'python'), format('PYTHON|{0}', parameters('runtimeVersion')), if(equals(parameters('runtime'), 'node'), format('NODE|{0}', parameters('runtimeVersion')), if(equals(parameters('runtime'), 'java'), format('JAVA|{0}-java{1}', parameters('runtimeVersion'), parameters('runtimeVersion')), '')))]",
+                  "linuxFxVersion": "[if(equals(parameters('runtime'), 'python'), format('PYTHON|{0}', parameters('runtimeVersion')), if(equals(parameters('runtime'), 'node'), format('NODE|{0}', parameters('runtimeVersion')), if(equals(parameters('runtime'), 'java'), format('JAVA|{0}', parameters('runtimeVersion')), '')))]",
                   "netFrameworkVersion": "[if(equals(parameters('runtime'), 'dotnet'), parameters('runtimeVersion'), null())]",
                   "appSettings": "[concat(parameters('appSettings'), if(not(empty(parameters('applicationInsightsName'))), createArray(createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', if(not(empty(parameters('applicationInsightsName'))), reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString, '')), createObject('name', 'ApplicationInsightsAgent_EXTENSION_VERSION', 'value', '~2')), createArray()))]"
                 },
@@ -1382,6 +1747,7 @@
         }
       },
       "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('subnetDelegationServerFarm1{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
@@ -1391,7 +1757,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('privateDnsLinkWebApp{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1400,7 +1766,16 @@
         "mode": "Incremental",
         "parameters": {
           "dnsConfig": {
-            "value": "[variables('var_webapp_dnsConfig')]"
+            "value": [
+              {
+                "name": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.webAppName.value]",
+                "type": "Microsoft.Web/sites",
+                "groupIds": [
+                  "sites"
+                ],
+                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Web/sites/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.webAppName.value)]"
+              }
+            ]
           },
           "privateLinksDnsZones": {
             "value": {}
@@ -1452,8 +1827,9 @@
         }
       },
       "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('WebApp4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('WebApp4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
     },
     {
@@ -1461,7 +1837,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('rbacForWebApp{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1470,22 +1846,22 @@
         "mode": "Incremental",
         "parameters": {
           "storageAccountName": {
-            "value": "[variables('storageAccount1001Name')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.storageAccount1001Name.value]"
           },
           "storageAccountName2": {
-            "value": "[variables('storageAccount1001Name')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.storageAccount1001Name.value]"
           },
           "aiSearchName": {
-            "value": "[variables('aiSearchName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.safeNameAISearch.value]"
           },
           "webAppPrincipalId": {
-            "value": "placeholder-principal-id"
+            "value": "[variables('var_webAppPrincipalId')]"
           },
           "openAIName": {
-            "value": "[variables('openAIName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aoaiName.value]"
           },
           "aiServicesName": {
-            "value": "[variables('aiServicesName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aiServicesName.value]"
           }
         },
         "template": {
@@ -1596,7 +1972,8 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('WebApp4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('WebApp4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
     },
     {
@@ -1604,7 +1981,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('Function4{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1613,7 +1990,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('functionAppName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.functionAppName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -1632,13 +2009,13 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetNamePend": {
-            "value": "[parameters('defaultSubnet')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "subnetIntegrationName": {
-            "value": "[parameters('aksSubnetName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aksSubnetName.value]"
           },
           "storageAccountName": {
-            "value": "[variables('storageAccount1001Name')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.storageAccount1001Name.value]"
           },
           "enablePublicGenAIAccess": {
             "value": "[parameters('enablePublicGenAIAccess')]"
@@ -1647,7 +2024,7 @@
             "value": "[parameters('enablePublicAccessWithPerimeter')]"
           },
           "applicationInsightsName": {
-            "value": "[variables('applicationInsightName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.applicationInsightName.value]"
           },
           "logAnalyticsWorkspaceName": {
             "value": "[parameters('laWorkspaceName')]"
@@ -1674,15 +2051,15 @@
             "value": [
               {
                 "name": "AZURE_OPENAI_ENDPOINT",
-                "value": "[format('https://{0}.openai.azure.com/', variables('openAIName'))]"
+                "value": "[format('https://{0}.openai.azure.com/', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aoaiName.value)]"
               },
               {
                 "name": "AZURE_AISERVICES_ENDPOINT",
-                "value": "[format('https://{0}.cognitiveservices.azure.com/', variables('aiServicesName'))]"
+                "value": "[format('https://{0}.cognitiveservices.azure.com/', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aiServicesName.value)]"
               },
               {
                 "name": "AZURE_SEARCH_ENDPOINT",
-                "value": "[format('https://{0}.search.windows.net', variables('aiSearchName'))]"
+                "value": "[format('https://{0}.search.windows.net', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.safeNameAISearch.value)]"
               }
             ]
           },
@@ -2005,6 +2382,7 @@
         }
       },
       "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('subnetDelegationServerFarm1{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
@@ -2014,7 +2392,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('privateDnsLinkFunction{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -2023,7 +2401,16 @@
         "mode": "Incremental",
         "parameters": {
           "dnsConfig": {
-            "value": "[variables('var_function_dnsConfig')]"
+            "value": [
+              {
+                "name": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.functionAppName.value]",
+                "type": "Microsoft.Web/sites",
+                "groupIds": [
+                  "sites"
+                ],
+                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.Web/sites/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.functionAppName.value)]"
+              }
+            ]
           },
           "privateLinksDnsZones": {
             "value": {}
@@ -2075,7 +2462,8 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('Function4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('Function4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -2084,7 +2472,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('rbacForFunction{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -2093,22 +2481,22 @@
         "mode": "Incremental",
         "parameters": {
           "storageAccountName": {
-            "value": "[variables('storageAccount1001Name')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.storageAccount1001Name.value]"
           },
           "storageAccountName2": {
-            "value": "[variables('storageAccount1001Name')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.storageAccount1001Name.value]"
           },
           "aiSearchName": {
-            "value": "[variables('aiSearchName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.safeNameAISearch.value]"
           },
           "functionPrincipalId": {
-            "value": "placeholder-principal-id"
+            "value": "[variables('var_functionPrincipalId')]"
           },
           "openAIName": {
-            "value": "[variables('openAIName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aoaiName.value]"
           },
           "aiServicesName": {
-            "value": "[variables('aiServicesName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aiServicesName.value]"
           }
         },
         "template": {
@@ -2221,7 +2609,8 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('Function4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('Function4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]"
       ]
     },
     {
@@ -2229,7 +2618,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -2238,7 +2627,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('containerAppsEnvName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppsEnvName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -2253,7 +2642,7 @@
             "value": "[parameters('commonResourceGroup')]"
           },
           "applicationInsightsName": {
-            "value": "[variables('applicationInsightName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.applicationInsightName.value]"
           },
           "enablePublicGenAIAccess": {
             "value": "[parameters('enablePublicGenAIAccess')]"
@@ -2268,10 +2657,10 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetNamePend": {
-            "value": "[parameters('defaultSubnet')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "subnetAcaDedicatedName": {
-            "value": "[parameters('acaSubnetName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acaSubnetName.value]"
           },
           "wlMinCountServerless": {
             "value": "[parameters('wlMinCountServerless')]"
@@ -2646,9 +3035,10 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('commonResourceGroup')), 'Microsoft.Resources/deployments', format('miRbacCmn-{0}-{1}', deployment().name, variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miRbacProj-{0}-{1}', deployment().name, variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('commonResourceGroup')), 'Microsoft.Resources/deployments', format('miRbacCmn-{0}-{1}', deployment().name, variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miRbacProj-{0}-{1}', deployment().name, variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('vnetResourceGroupName')), 'Microsoft.Resources/deployments', format('subnetDelegationAcaEnv{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
       ]
@@ -2658,7 +3048,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('privateDnsLinkACAEnv{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -2667,7 +3057,16 @@
         "mode": "Incremental",
         "parameters": {
           "dnsConfig": {
-            "value": "[variables('var_containerAppsEnv_dnsConfig')]"
+            "value": [
+              {
+                "name": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppsEnvName.value]",
+                "type": "Microsoft.App/managedEnvironments",
+                "groupIds": [
+                  "managedEnvironments"
+                ],
+                "resourceId": "[format('{0}/resourceGroups/{1}/providers/Microsoft.App/managedEnvironments/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppsEnvName.value)]"
+              }
+            ]
           },
           "privateLinksDnsZones": {
             "value": {}
@@ -2719,7 +3118,8 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     },
@@ -2728,7 +3128,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('aca-a-{0}-depl', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -2737,7 +3137,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('containerAppAName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppAName.value]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -2762,10 +3162,10 @@
             "value": "[parameters('vnetResourceGroupName')]"
           },
           "subnetNamePend": {
-            "value": "[parameters('defaultSubnet')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.defaultSubnet.value]"
           },
           "subnetAcaDedicatedName": {
-            "value": "[parameters('acaSubnetName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acaSubnetName.value]"
           },
           "customDomains": {
             "value": "[parameters('acaCustomDomainsArray')]"
@@ -2773,20 +3173,16 @@
           "resourceGroupName": {
             "value": "[parameters('targetResourceGroup')]"
           },
-          "identityId": {
-            "value": "[variables('miPrincipalId')]"
-          },
+          "identityId": "[if(parameters('miACAExists'), createObject('value', 'existing-mi-principal-id'), createObject('value', format('{0}/resourceGroups/{1}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value)))]",
           "identityName": {
-            "value": "[variables('miACAName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value]"
           },
-          "containerRegistryName": {
-            "value": "[variables('var_acr_cmn_or_prj')]"
-          },
+          "containerRegistryName": "[if(parameters('useCommonACR'), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acrCommonName.value), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acrProjectName.value))]",
           "containerAppsEnvironmentName": {
-            "value": "[variables('containerAppsEnvName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppsEnvName.value]"
           },
           "containerAppsEnvironmentId": {
-            "value": "[format('{0}/resourceGroups/{1}/providers/Microsoft.App/managedEnvironments/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), variables('containerAppsEnvName'))]"
+            "value": "[format('{0}/resourceGroups/{1}/providers/Microsoft.App/managedEnvironments/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppsEnvName.value)]"
           },
           "openAiDeploymentName": {
             "value": "gpt"
@@ -2798,10 +3194,10 @@
             "value": "text-embedding-ada-002"
           },
           "openAiEndpoint": {
-            "value": "[format('https://{0}.cognitiveservices.azure.com/', variables('aiServicesName'))]"
+            "value": "[format('https://{0}.cognitiveservices.azure.com/', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aiServicesName.value)]"
           },
           "openAiName": {
-            "value": "[variables('aiServicesName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aiServicesName.value]"
           },
           "openAiType": {
             "value": "azure"
@@ -2810,16 +3206,16 @@
             "value": "[parameters('openAiApiVersion')]"
           },
           "aiSearchEndpoint": {
-            "value": "[format('https://{0}.search.windows.net', variables('aiSearchName'))]"
+            "value": "[format('https://{0}.search.windows.net', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.safeNameAISearch.value)]"
           },
           "aiSearchIndexName": {
             "value": "[format('index-{0}-{1}', variables('projectName'), parameters('resourceSuffix'))]"
           },
           "appinsightsConnectionstring": {
-            "value": "[format('InstrumentationKey={0}', variables('applicationInsightName'))]"
+            "value": "[format('InstrumentationKey={0}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.applicationInsightName.value)]"
           },
           "bingName": {
-            "value": "[variables('bingName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.bingName.value]"
           },
           "bingApiEndpoint": {
             "value": "https://api.bing.microsoft.com/v7.0/search"
@@ -2828,10 +3224,10 @@
             "value": "placeholder-key"
           },
           "aiProjectName": {
-            "value": "[variables('aiProjectName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.aiProjectName.value]"
           },
           "subscriptionId": {
-            "value": "[variables('subscriptionIdDevTestProd')]"
+            "value": "[parameters('subscriptionIdDevTestProd')]"
           },
           "appWorkloadProfileName": {
             "value": "[parameters('acaAppWorkloadProfileName')]"
@@ -3916,8 +4312,9 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]"
       ]
     },
     {
@@ -3925,7 +4322,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('aca-w-{0}-depl', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -3940,28 +4337,24 @@
             "value": "[parameters('projecttags')]"
           },
           "name": {
-            "value": "[variables('containerAppWName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppWName.value]"
           },
           "apiEndpoint": {
-            "value": "[format('https://{0}.placeholder-domain', variables('containerAppAName'))]"
+            "value": "[format('https://{0}.{1}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppAName.value, variables('var_containerAppApiDomain'))]"
           },
           "allowedOrigins": {
             "value": "[variables('allowedOrigins')]"
           },
           "containerAppsEnvironmentName": {
-            "value": "[variables('containerAppsEnvName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppsEnvName.value]"
           },
           "containerAppsEnvironmentId": {
-            "value": "[format('{0}/resourceGroups/{1}/providers/Microsoft.App/managedEnvironments/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), variables('containerAppsEnvName'))]"
+            "value": "[format('{0}/resourceGroups/{1}/providers/Microsoft.App/managedEnvironments/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.containerAppsEnvName.value)]"
           },
-          "containerRegistryName": {
-            "value": "[variables('var_acr_cmn_or_prj')]"
-          },
-          "identityId": {
-            "value": "[variables('miPrincipalId')]"
-          },
+          "containerRegistryName": "[if(parameters('useCommonACR'), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acrCommonName.value), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.acrProjectName.value))]",
+          "identityId": "[if(parameters('miACAExists'), createObject('value', 'existing-mi-principal-id'), createObject('value', format('{0}/resourceGroups/{1}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value)))]",
           "identityName": {
-            "value": "[variables('miACAName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value]"
           },
           "appWorkloadProfileName": {
             "value": "[parameters('acaAppWorkloadProfileName')]"
@@ -4880,9 +5273,10 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-a-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-a-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]"
       ]
     },
     {
@@ -4890,7 +5284,7 @@
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('rbacForContainerAppsMI{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
-      "subscriptionId": "[variables('subscriptionIdDevTestProd')]",
+      "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
       "resourceGroup": "[parameters('targetResourceGroup')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -4899,14 +5293,12 @@
         "mode": "Incremental",
         "parameters": {
           "aiSearchName": {
-            "value": "[variables('aiSearchName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.safeNameAISearch.value]"
           },
           "appInsightsName": {
-            "value": "[variables('applicationInsightName')]"
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.applicationInsightName.value]"
           },
-          "principalIdMI": {
-            "value": "[variables('miPrincipalId')]"
-          },
+          "principalIdMI": "[if(parameters('miACAExists'), createObject('value', 'existing-mi-principal-id'), createObject('value', format('{0}/resourceGroups/{1}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{2}', subscription().subscriptionId, parameters('targetResourceGroup'), reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env'))), '2022-09-01').outputs.miACAName.value)))]",
           "resourceGroupId": {
             "value": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
           }
@@ -5008,9 +5400,10 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-a-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-a-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('aca-env-{0}-depl', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('miForAca4{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), parameters('targetResourceGroup')), 'Microsoft.Resources/deployments', format('naming-convention-{0}-{1}', variables('projectName'), parameters('env')))]",
         "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('targetResourceGroup'))]"
       ]
     }

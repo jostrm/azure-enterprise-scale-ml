@@ -8,6 +8,18 @@ steps:
   name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
 
 - task: AzureCLI@2
+  displayName: '00_generate_deployment_random_value'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+      # Generate a random deployment ID for this entire pipeline run
+      $randomValue = [System.Guid]::NewGuid().ToString("N").Substring(0, 10)
+      Write-Host "Generated deployment random value: $randomValue"
+      echo "##vso[task.setvariable variable=deployment_random_value]$randomValue"
+
+- task: AzureCLI@2
   displayName: '00_pwsh_print_info'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -19,6 +31,7 @@ steps:
       Write-Host "dev_test_prod is: $(dev_test_prod)"
       Write-Host "service_connection is:  ${{ parameters.serviceConnection }}"
       Write-Host "dev_service_connection is: $(dev_service_connection)"
+      Write-Host "deployment_random_value is: $(deployment_random_value)"
 - task: AzureCLI@2
   displayName: '01_pwsh_get_IP_for_ADO_agent'
   inputs:
@@ -595,8 +608,15 @@ steps:
      --parameters zonePostgresExists="$(zonepostgresExists)" \
      --parameters zoneSqlExists="$(zonesqlExists)" \
      --parameters zoneMongoExists="$(zoneMongoExists)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters projectServicePrincipleAppID_SeedingKeyvaultName="$(project_service_principal_AppID_seeding_kv_name)" \
+     --parameters projectServicePrincipleSecret_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters aifactorySalt5char="$(aifactory_salt5char)" \
+     --parameters randomValue="$(deployment_random_value)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -640,6 +660,8 @@ steps:
      --parameters keyvaultExists="$(keyvaultExists)" \
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -676,16 +698,22 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters projectServicePrincipleAppID_SeedingKeyvaultName="$(project_service_principal_AppID_seeding_kv_name)" \
+     --parameters projectServicePrincipleSecret_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
-     --parameters storageAccount1002Exists="$(storageAccount1002Exists)" \
-     --parameters storageAccount1003Exists="$(storageAccount1003Exists)" \
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
      --parameters keyvaultExists="$(keyvaultExists)" \
      --parameters applicationInsightExists="$(applicationInsightsExists)" \
      --parameters acrProjectExists="$(acrProjectExists)" \
      --parameters vmExists="$(vmExists)" \
      --parameters bingExists="$(bingExists)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -726,6 +754,7 @@ steps:
      --parameters redisExists="$(redisExists)" \
      --parameters postgreSQLExists="$(postgreSQLExists)" \
      --parameters sqlServerExists="$(sqlServerExists)" \
+     --parameters randomValue="$(deployment_random_value)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -772,6 +801,7 @@ steps:
      --parameters databricksExists="$(databricksExists)" \
      --parameters datafactoryExists="$(datafactoryExists)" \
      --parameters miACAExists="$(miACAExists)" \
+     --parameters randomValue="$(deployment_random_value)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -812,6 +842,7 @@ steps:
      --parameters amlExists="$(amlExists)" \
      --parameters aifProjectExists="$(aifProjectExists)" \
      --parameters aksExists="$(aksExists)" \
+     --parameters randomValue="$(deployment_random_value)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -849,22 +880,8 @@ steps:
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters azureMachineLearningObjectId="$(azure_machinelearning_sp_oid)" \
-     --parameters spn_aml_RootPrincipalId="$(spn_aml_RootPrincipalId)" \
-     --parameters spn_aml_RootSecret="$(spn_aml_RootSecret)" \
-     --parameters spn_aml_RootTennantId="$(spn_aml_RootTennantId)" \
-     --parameters spn_aml_RootAppId="$(spn_aml_RootAppId)" \
-     --parameters spn_dbx_RootPrincipalId="$(spn_dbx_RootPrincipalId)" \
-     --parameters spn_dbx_RootSecret="$(spn_dbx_RootSecret)" \
-     --parameters spn_dbx_RootTennantId="$(spn_dbx_RootTennantId)" \
-     --parameters spn_dbx_RootAppId="$(spn_dbx_RootAppId)" \
-     --parameters spn_kv_RootPrincipalId="$(spn_kv_RootPrincipalId)" \
-     --parameters spn_kv_RootSecret="$(spn_kv_RootSecret)" \
-     --parameters spn_kv_RootTennantId="$(spn_kv_RootTennantId)" \
-     --parameters spn_kv_RootAppId="$(spn_kv_RootAppId)" \
-     --parameters spn_ado_RootPrincipalId="$(spn_ado_RootPrincipalId)" \
-     --parameters spn_ado_RootSecret="$(spn_ado_RootSecret)" \
-     --parameters spn_ado_RootTennantId="$(spn_ado_RootTennantId)" \
-     --parameters spn_ado_RootAppId="$(spn_ado_RootAppId)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters randomValue="$(deployment_random_value)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

@@ -125,8 +125,7 @@ param enableDebugging bool = false
 @description('Random value for unique naming')
 param randomValue string = ''
 
-@description('Salt values for deterministic naming')
-param aifactorySalt5char string = ''
+@description('Salt values for random naming')
 param aifactorySalt10char string = ''
 
 // ============================================================================
@@ -137,8 +136,35 @@ param aifactorySalt10char string = ''
 param tags object
 param projecttags object
 
+
 // ============================================================================
-// COMPUTED VARIABLES - Core
+// FROM JSON files
+// ============================================================================
+param datalakeName_param string = ''
+param kvNameFromCOMMON_param string = ''
+param DOCS_byovnet_example string = ''
+param DOCS_byosnet_common_example string = ''
+param DOCS_byosnet_project_example string = ''
+param BYO_subnets bool = false
+// Dynamic subnet parameters - START
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
+param subnetCommonPowerbiGw string = ''
+param subnetProjGenAI string = ''
+param subnetProjAKS string = ''
+param subnetProjACA string = ''
+param subnetProjDatabricksPublic string = ''
+param subnetProjDatabricksPrivate string = ''
+// END
+param databricksOID string = 'not set in genai-1'
+param databricksPrivate bool = false
+param AMLStudioUIPrivate bool = false
+param commonLakeNamePrefixMax8chars string
+param lakeContainerName string
+param hybridBenefit bool
+
+// ============================================================================
+// END - FROM JSON files
 // ============================================================================
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
@@ -158,16 +184,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
   scope: resourceGroup(vnetResourceGroupName)
 }
-// ============================================================================
-// COMPUTED VARIABLES - Networking subnets
-// ============================================================================
-var segments = split(genaiSubnetId, '/')
-var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName
-var segmentsAKS = split(aksSubnetId, '/')
-var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
-var segmentsACA = split(acaSubnetId, '/')
-var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
 
 // ============================================================================
 // COMPUTED VARIABLES - Private DNS
@@ -176,24 +192,10 @@ var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment
 var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (privDnsSubscription_param != '' && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
-// ============================================================================
-// COMPUTED VARIABLES - RBAC Arrays
-// ============================================================================
-
-var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var p011_genai_team_lead_array = (empty(technicalAdminsObjectID)) ? [] : union(technicalAdminsObjectID_array,[])
-
-var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var p011_genai_team_lead_email_array = (empty(technicalAdminsEmail)) ? [] : technicalAdminsEmail_array
-
-// ============================================================================
-// COMPUTED VARIABLES - Naming & Salt
-// ============================================================================
-
-// Salt generation for unique naming
-var randomGuid = sys.newGuid()
-var randomValueUsed = empty(randomValue) ? randomGuid : randomValue
-var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValueUsed, 6, 10): aifactorySalt10char
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: commonResourceGroup
+  scope: subscription(subscriptionIdDevTestProd)
+}
 
 // Resource group references for salt generation
 resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
@@ -201,157 +203,58 @@ resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-
   scope: subscription(subscriptionIdDevTestProd)
 }
 
-resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
-  name: commonResourceGroup
-  scope: subscription(subscriptionIdDevTestProd)
-}
-
 var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
-#disable-next-line BCP318
-var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+// ============================================================================
+// AI Factory - naming convention (imported from shared module)
+// ============================================================================
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+  name: guid('naming-convention-01-foundation',targetResourceGroupRefSalt.id)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    projectNumber: projectNumber
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    resourceSuffix: resourceSuffix
+    randomValue:randomValue
+    aifactorySalt10char:aifactorySalt10char
+    aifactorySuffixRG: aifactorySuffixRG
+    commonRGNamePrefix: commonRGNamePrefix
+    commonResourceGroupName: commonResourceGroup
+    subscriptionIdDevTestProd:subscriptionIdDevTestProd
+    technicalAdminsEmail:technicalAdminsEmail
+    technicalAdminsObjectID:technicalAdminsObjectID
+    acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+  }
+}
 
-// Resource naming with salt
-var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
-var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
+var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
+var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+var randomSalt = namingConvention.outputs.randomSalt
+var defaultSubnet = namingConvention.outputs.defaultSubnet
+var aksSubnetName = namingConvention.outputs.aksSubnetName
+var acaSubnetName = namingConvention.outputs.acaSubnetName
 
 // ============================================================================
 // COMPUTED VARIABLES - Private DNS Zones
 // ============================================================================
 
-var privateDnsZoneName = {
-  azureusgovernment: 'privatelink.api.ml.azure.us'
-  azurechinacloud: 'privatelink.api.ml.azure.cn'
-  azurecloud: 'privatelink.api.azureml.ms'
-}
-
-var privateAznbDnsZoneName = {
-  azureusgovernment: 'privatelink.notebooks.usgovcloudapi.net'
-  azurechinacloud: 'privatelink.notebooks.chinacloudapi.cn'
-  azurecloud: 'privatelink.notebooks.azure.net'
-}
-
-var privateLinksDnsZones = {
-  blob: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'
-    name:'privatelink.blob.${environment().suffixes.storage}'
-  }
-  file: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.file.${environment().suffixes.storage}'
-    name:'privatelink.file.${environment().suffixes.storage}'
-  }
-  dfs: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.dfs.${environment().suffixes.storage}'
-    name:'privatelink.dfs.${environment().suffixes.storage}'
-  }
-  queue: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.queue.${environment().suffixes.storage}'
-    name:'privatelink.queue.${environment().suffixes.storage}'
-  }
-  table: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.table.${environment().suffixes.storage}'
-    name:'privatelink.table.${environment().suffixes.storage}'
-  }
-  registry: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io'
-    name:'privatelink.azurecr.io'
-  }
-  registryregion: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${location}.data.privatelink.azurecr.io'
-    name:'${location}.data.privatelink.azurecr.io'
-  }
-  vault: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
-    name:'privatelink.vaultcore.azure.net'
-  }
-  amlworkspace: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${privateDnsZoneName[toLower(environment().name)]}'
-    name: privateDnsZoneName[toLower(environment().name)]
-  }
-  notebooks: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${privateAznbDnsZoneName[toLower(environment().name)]}'
-    name: privateAznbDnsZoneName[toLower(environment().name)]
-  }
-  dataFactory: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.datafactory.azure.net'
-    name:'privatelink.datafactory.azure.net'
-  }
-  portal: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.adf.azure.com'
-    name:'privatelink.adf.azure.com'
-  }
-  openai: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com'
-    name:'privatelink.openai.azure.com'
-  }
-  searchService: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net'
-    name:'privatelink.search.windows.net'
-  }
-  azurewebapps: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azurewebsites.net'
-    name:'privatelink.azurewebsites.net'
-  }
-  cosmosdbnosql: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com'
-    name:'privatelink.documents.azure.com'
-  }
-  cognitiveservices: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com'
-    name:'privatelink.cognitiveservices.azure.com'
-  }
-  azuredatabricks: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azuredatabricks.net'
-    name:'privatelink.azuredatabricks.net'
-  }
-  namespace: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.servicebus.windows.net'
-    name:'privatelink.servicebus.windows.net'
-  }
-  azureeventgrid: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.eventgrid.azure.net'
-    name:'privatelink.eventgrid.azure.net'
-  }
-  azuremonitor: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.monitor.azure.com'
-    name:'privatelink.monitor.azure.com'
-  }
-  azuremonitoroms: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.oms.opinsights.azure.com'
-    name:'privatelink.oms.opinsights.azure.com'
-  }
-  azuremonitorods: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.ods.opinsights.azure.com'
-    name:'privatelink.ods.opinsights.azure.com'
-  }
-  azuremonitoragentsvc: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
-    name:'privatelink.agentsvc.azure-automation.net'
-  }
-  azurecontainerapps: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.${location}.azurecontainerapps.io'
-    name:'privatelink.${location}.azurecontainerapps.io'
-  }
-  redis: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.redis.cache.windows.net'
-    name:'privatelink.redis.cache.windows.net'
-  }
-  postgres: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.postgres.database.azure.com'
-    name:'privatelink.postgres.database.azure.com'
-  }
-  sql: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net'
-    #disable-next-line no-hardcoded-env-urls
-    name:'privatelink.database.windows.net'
-  }
-  cosmosdbmongo: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.mongo.cosmos.azure.com'
-    name:'privatelink.mongo.cosmos.azure.com'
+module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    location: location
+    privDnsResourceGroupName: privDnsResourceGroupName
+    privDnsSubscription: privDnsSubscription
   }
 }
-
+var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
 var privateLinksDnsZonesArray = [
   {
@@ -500,6 +403,7 @@ var privateLinksDnsZonesArray = [
     exists: zoneMongoExists
   } // 2025-05-30: Added above in Common
 ]
+
 // ============================================================================
 // EXISTING RESOURCES
 // ============================================================================
@@ -518,7 +422,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 @description('AIFACTORY-UPDATE-121: Create Private DNS Zones if not centralized')
 module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesIfNotExists.bicep' = if (centralDnsZoneByPolicyInHub == false) {
   scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-  name: 'createNewPrivateDnsZones${deploymentProjSpecificUniqueSuffix}'
+  name: guid('createNewPrivateDnsZones',commonResourceGroupRef.id, subscriptionIdDevTestProd)
   params: {
     privateLinksDnsZones: privateLinksDnsZonesArray
     privDnsSubscription: privDnsSubscription
@@ -536,7 +440,7 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
 // Project Resource Group
 module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)
-  name: 'prjRG${deploymentProjSpecificUniqueSuffix}'
+  name: guid('prjRG',commonResourceGroupRef.id, subscriptionIdDevTestProd)
   params: {
     rgName: targetResourceGroup
     location: location
@@ -547,7 +451,7 @@ module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
 // Project Managed Identity
 module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'miForPrj${deploymentProjSpecificUniqueSuffix}'
+  name: guid('miForPrj',commonResourceGroupRef.id, subscriptionIdDevTestProd)
   params: {
     name: miPrjName
     location: location

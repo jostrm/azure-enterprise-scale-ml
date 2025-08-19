@@ -762,7 +762,6 @@ param aifactorySalt10char string = '' // Random
 var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
 var randomGuid = sys.newGuid()
 var randomValueUsed = empty(randomValue)? randomGuid : randomValue
-
 var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValueUsed, 6, 10): aifactorySalt10char
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
