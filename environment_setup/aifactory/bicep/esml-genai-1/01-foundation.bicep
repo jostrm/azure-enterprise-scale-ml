@@ -136,7 +136,7 @@ param aifactorySalt10char string = ''
 // ============================================================================
 // Metadata &  Dummy parameters, since same json parameterfile has more parameters than this bicep file
 @description('Meta. Needed to calculate subnet: subnetCalc and genDynamicNetworkParamFile')
-param vnetResourceGroupBase string // Meta
+param vnetResourceGroupBase string = 'meta-subnetCalc-to-set' // Meta
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
