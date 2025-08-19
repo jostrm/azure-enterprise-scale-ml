@@ -63,8 +63,8 @@ var p011_genai_team_lead_email_array = (empty(technicalAdminsEmail)) ? [] : tech
 // COMPUTED VARIABLES - Naming & Salt
 // ============================================================================
 
-// Salt generation for unique naming
-var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 6, 10): aifactorySalt10char
+// Salt generation for unique naming '0d-bf29-48'
+var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroupName
