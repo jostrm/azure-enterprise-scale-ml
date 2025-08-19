@@ -201,6 +201,7 @@ param useCommonACR bool = true
 
 // Tags
 param tagsProject object = {}
+param tags object = {}
 
 // ============== VARIABLES ==============
 // var subscriptionIdDevTestProd = subscription().subscriptionId // Now a parameter

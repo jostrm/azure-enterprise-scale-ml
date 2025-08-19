@@ -137,6 +137,7 @@ param openAiApiVersion string = '2024-06-01'
 
 // Tags
 param tagsProject object = {}
+param tags object = {}
 
 // IP Rules
 param IPwhiteList string = ''

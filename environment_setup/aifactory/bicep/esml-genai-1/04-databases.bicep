@@ -78,6 +78,7 @@ param commonResourceGroup string
 
 // Tags
 param tagsProject object = {}
+param tags object = {}
 
 // IP Rules
 param IPwhiteList string = ''

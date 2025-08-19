@@ -103,6 +103,7 @@ param aml_cluster_test_prod_nodes_override int = -1
 
 // Tags
 param tagsProject object = {}
+param tags object = {}
 
 // IP Rules
 param IPwhiteList string = ''
