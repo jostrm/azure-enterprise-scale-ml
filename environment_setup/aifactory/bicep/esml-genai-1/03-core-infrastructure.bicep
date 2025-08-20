@@ -208,19 +208,11 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
 }
 
-resource subnet_genai 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: vnet
-  name: genaiSubnetName
-}
-
 resource subnet_aks 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   parent: vnet
   name: aksSubnetName
 }
 
-var subnet_genai_ref = {
-  id: subnet_genai.id
-}
 var subnet_aks_ref = {
   id: subnet_aks.id
 }
@@ -288,7 +280,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
       }
     ]
     vnetRules: [
-      subnet_genai_ref.id
+      genaiSubnetId
       subnet_aks_ref.id
     ]
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
@@ -349,7 +341,7 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
     subnetName: defaultSubnet
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
-      subnet_genai_ref.id
+      genaiSubnetId
       subnet_aks_ref.id
     ]
     accessPolicies: []
