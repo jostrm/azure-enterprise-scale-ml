@@ -255,6 +255,7 @@ resource subnet_aks_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' e
   name: aksSubnetName
   parent: vnet
 }
+var aksSubnetIdRef = subnet_aks_ref.id
 
 // Service kind configurations
 var kindContentSafety = 'ContentSafety'
@@ -419,7 +420,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
     ]
     vnetRules: [
       genaiSubnetId
-      subnet_aks_ref.id
+      
     ]
     corsRules: [
       {
@@ -564,7 +565,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
     disableLocalAuth: disableLocalAuth
     vnetRules: [
       genaiSubnetId
-      subnet_aks_ref.id
+      aksSubnetIdRef
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
