@@ -60,13 +60,22 @@ param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
 // Required resource references
-param vnetNameFull string
-param vnetResourceGroupName string
 param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string = ''
-param targetResourceGroup string
-param commonResourceGroup string
+
+// Networking parameters for calculation
+param vnetNameBase string
+param vnetResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param network_env string = ''
+
+// Private DNS configuration
+param privDnsSubscription_param string = ''
+param privDnsResourceGroup_param string = ''
+
+// Resource group configuration
+param commonResourceGroup_param string = ''
 
 // Key Vault specific
 param keyvaultSoftDeleteDays int = 90
@@ -118,6 +127,19 @@ param randomValue string = ''
 
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
+
+// Calculated variables
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var targetResourceGroup = '${commonRGNamePrefix}esml-${replace('prj${projectNumber}', 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
+
+// Networking calculations
+var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
+
+// Private DNS calculations
+var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
+
 var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
 
 // ============================================================================
