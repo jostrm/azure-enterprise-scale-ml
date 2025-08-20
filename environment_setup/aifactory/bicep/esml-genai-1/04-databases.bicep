@@ -204,21 +204,6 @@ var keyvaultName = namingConvention.outputs.keyvaultName
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
 
-// Network references using proper resource references
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  scope: resourceGroup(subscription().subscriptionId, vnetResourceGroupName)
-  name: vnetNameFull
-}
-
-resource subnet_aks 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: vnet
-  name: aksSubnetName
-}
-
-var subnet_aks_ref = {
-  id: subnet_aks.id
-}
-
 // SQL Server SKU object
 var sqlServerSKUObject_DTU = {
   name: sqlServerSKU_DTU
@@ -332,7 +317,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
     keyvaultName: keyvaultName
     vNetRules: [
       genaiSubnetId
-      subnet_aks_ref.id
+      aksSubnetId
     ]
     kind: cosmosKind
     minimalTlsVersion: cosmosMinimalTlsVersion

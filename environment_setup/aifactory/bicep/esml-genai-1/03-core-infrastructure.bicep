@@ -208,15 +208,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
 }
 
-resource subnet_aks 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: vnet
-  name: aksSubnetName
-}
-
-var subnet_aks_ref = {
-  id: subnet_aks.id
-}
-
 // Get managed identity principal IDs using helper modules
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
   name: 'getProjectMIPrincipalId-${deploymentProjSpecificUniqueSuffix}'
@@ -281,7 +272,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     ]
     vnetRules: [
       genaiSubnetId
-      subnet_aks_ref.id
+      aksSubnetId
     ]
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
     corsRules: [
@@ -342,7 +333,7 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
     privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
     keyvaultNetworkPolicySubnets: [
       genaiSubnetId
-      subnet_aks_ref.id
+      aksSubnetId
     ]
     accessPolicies: []
     ipRules: empty(processedIpRulesKv) ? [] : processedIpRulesKv

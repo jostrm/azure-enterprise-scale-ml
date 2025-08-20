@@ -251,12 +251,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   scope: resourceGroup(vnetResourceGroupName)
 }
 
-resource subnet_aks_ref 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  name: aksSubnetName
-  parent: vnet
-}
-var aksSubnetIdRef = subnet_aks_ref.id
-
 // Service kind configurations
 var kindContentSafety = 'ContentSafety'
 var kindAIServices = 'AIServices'
@@ -565,7 +559,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
     disableLocalAuth: disableLocalAuth
     vnetRules: [
       genaiSubnetId
-      aksSubnetIdRef
+      aksSubnetId
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
