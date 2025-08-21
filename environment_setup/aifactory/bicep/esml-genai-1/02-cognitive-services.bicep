@@ -140,7 +140,7 @@ param IPwhiteList string = ''
 param aifactorySuffixRG string
 param commonRGNamePrefix string
 param keyvaultSoftDeleteDays int = 90
-param restore bool = true
+param restore bool = false
 
 // ============================================================================
 // CALCULATED VARIABLES
