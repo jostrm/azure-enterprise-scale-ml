@@ -146,7 +146,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResource
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: guid('naming-convention-03-core-infra',vnetResourceGroupName,deploymentProjSpecificUniqueSuffix)
+  name: guid('naming-convention-03-core-infra',vnetResourceGroupName,deploymentProjSpecificUniqueSuffix) // max 64 chars
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -210,7 +210,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 
 // Get managed identity principal IDs using helper modules
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: 'getProjectMIPrincipalId-${deploymentProjSpecificUniqueSuffix}'
+  name: 'getPrMI-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
@@ -219,7 +219,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 
 // Assumes the principals exists.
 module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: 'getACAMIPrincipalId-${deploymentProjSpecificUniqueSuffix}'
+  name: 'getACAMI-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miACAName
@@ -245,7 +245,7 @@ resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' =
 // Main storage account for ML/AI workloads
 module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'AMLGenAIStorageAcc4${deploymentProjSpecificUniqueSuffix}'
+  name: 'AMLGenAIStorage1${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     skuName: storageAccountSkuName
