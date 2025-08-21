@@ -223,7 +223,7 @@ var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
 // Assumes the principals exists.
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: 'getProjectMIPrincipalId-${deploymentProjSpecificUniqueSuffix}'
+  name: 'getMI-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
