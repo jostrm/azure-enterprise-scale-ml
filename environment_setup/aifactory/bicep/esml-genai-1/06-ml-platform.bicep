@@ -121,7 +121,7 @@ param IPwhiteList string = ''
 param aifactorySuffixRG string
 param commonRGNamePrefix string
 
-// Missing parameters required for naming convention module
+// Naming convention module
 param aifactorySalt10char string = ''
 param randomValue string = ''
 param technicalAdminsObjectID string = ''
@@ -130,25 +130,23 @@ param subscriptionIdDevTestProd string
 
 // Common ACR usage
 param useCommonACR bool = true
+// Log Analytics Workspace name
+param laWorkspaceName string
 
 // Technical contact and user groups
 param technicalContactId string = ''
 param p011_genai_team_lead_array array = []
 param spAndMiArray array = []
 param useAdGroups bool = false
-
-// ============================================================================
-// END - FROM JSON files
-// ============================================================================
-
-// Log Analytics Workspace name
-param laWorkspaceName string
+param projectPrefix string = 'esml-'
+param projectSuffix string = '-rg'
 
 // ============== VARIABLES ==============
 
 // Calculated variables
+var projectName = 'prj${projectNumber}'
 var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
-var targetResourceGroup = '${commonRGNamePrefix}esml-${replace('prj${projectNumber}', 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
+var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations
 var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
@@ -157,10 +155,6 @@ var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourc
 // Private DNS calculations
 var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
-
-var projectName = 'prj${projectNumber}'
-// var cmnName = 'cmn' // Now from naming convention
-var genaiName = 'genai'
 
 // Random salt for unique naming - using uniqueString for deterministic salt
 var randomSalt = substring(uniqueString(subscription().subscriptionId, targetResourceGroup), 0, 5)
@@ -215,12 +209,11 @@ var aksSubnetName = namingConvention.outputs.aksSubnetName
 
 // Get computed variables from naming convention
 var cmnName = namingConvention.outputs.cmnName
+var genaiName = namingConvention.outputs.projectTypeGenAIName
 var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
 var prjResourceSuffixNoDash = namingConvention.outputs.prjResourceSuffixNoDash
 var acrName = namingConvention.outputs.acrProjectName
-
-// Short names for internal use
-var aiHubNameShort = 'ai-hub-${namingConvention.outputs.projectName}-${locationSuffix}-${env}${resourceSuffix}'
+var aksDefaultVersion = '1.30.3'
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -294,17 +287,17 @@ param ci_devTest_defaults array = [
 ]
 
 // Compute parameter resolution with overrides
-var aks_dev_sku_param = aks_dev_sku_override != '' ? aks_dev_sku_override : aks_dev_defaults[0]
-var aks_test_prod_sku_param = aks_test_prod_sku_override != '' ? aks_test_prod_sku_override : aks_testProd_defaults[0]
-var aks_version_param = aks_version_override != '' ? aks_version_override : '1.30.3'
+var aks_dev_sku_param = !empty(aks_dev_sku_override) ? aks_dev_sku_override : aks_dev_defaults[0]
+var aks_test_prod_sku_param = !empty(aks_test_prod_sku_override) ? aks_test_prod_sku_override : aks_testProd_defaults[0]
+var aks_version_param = !empty(aks_version_override) ? aks_version_override : aksDefaultVersion
 var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
 var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
 
-var aml_ci_dev_sku_param = aml_ci_dev_sku_override != '' ? aml_ci_dev_sku_override : ci_dev_defaults[0]
-var aml_ci_test_prod_sku_param = aml_ci_test_prod_sku_override != '' ? aml_ci_test_prod_sku_override : ci_devTest_defaults[0]
+var aml_ci_dev_sku_param = !empty(aml_ci_dev_sku_override) ? aml_ci_dev_sku_override : ci_dev_defaults[0]
+var aml_ci_test_prod_sku_param = !empty(aml_ci_test_prod_sku_override) ? aml_ci_test_prod_sku_override : ci_devTest_defaults[0]
 
-var aml_cluster_dev_sku_param = aml_cluster_dev_sku_override != '' ? aml_cluster_dev_sku_override : aml_dev_defaults[0]
-var aml_cluster_test_prod_sku_param = aml_cluster_test_prod_sku_override != '' ? aml_cluster_test_prod_sku_override : aml_testProd_defaults[1]
+var aml_cluster_dev_sku_param = !empty(aml_cluster_dev_sku_override) ? aml_cluster_dev_sku_override : aml_dev_defaults[0]
+var aml_cluster_test_prod_sku_param = !empty(aml_cluster_test_prod_sku_override) ? aml_cluster_test_prod_sku_override : aml_testProd_defaults[1]
 var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
 var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 

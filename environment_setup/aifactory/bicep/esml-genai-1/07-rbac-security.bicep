@@ -43,15 +43,11 @@ param subscriptionIdDevTestProd string
 param genaiSubnetId string = ''
 param aksSubnetId string = ''
 param acaSubnetId string = ''
-// param targetResourceGroup string = '' // Already defined below
 
 // Resource group naming
 param commonRGNamePrefix string = ''
-
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
-var cmnName = 'cmn'
-var genaiName = 'genai'
-var projectName = 'prj${projectNumber}'
+var cmnName = namingConvention.outputs.cmnName
 
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
@@ -185,12 +181,15 @@ param privDnsResourceGroup_param string = ''
 // Resource group configuration
 param commonResourceGroup_param string = ''
 
-// ============================================================================
-// CALCULATED VARIABLES
-// ============================================================================
+param projectPrefix string = 'esml-'
+param projectSuffix string = '-rg'
 
+// ============== VARIABLES ==============
+
+// Calculated variables
+var projectName = 'prj${projectNumber}'
 var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
-var targetResourceGroup = '${commonRGNamePrefix}esml-${replace('prj${projectNumber}', 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
+var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations
 var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'

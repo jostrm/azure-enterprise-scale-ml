@@ -130,6 +130,11 @@ param randomValue string = ''
 
 @description('Salt values for random naming')
 param aifactorySalt10char string = ''
+// ============================================================================
+// PARAMETERS - Naming convention or project resource group
+// ============================================================================
+param projectPrefix string = 'esml-' // mrvel-1-[esml-]project001-eus2-dev-008-rg
+param projectSuffix string = '-rg' // mrvel-1-esml-project001-eus2-dev-008[-rg]
 
 // ============================================================================
 // PARAMETERS - Meta. Maybe not needed? jostrm
@@ -141,7 +146,7 @@ param vnetResourceGroupBase string = 'meta-subnetCalc-to-set' // Meta
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
 var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
-var targetResourceGroup = '${commonRGNamePrefix}esml-${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
+var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // ============================================================================
 // COMPUTED VARIABLES - Networking
@@ -181,7 +186,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: guid('naming-convention-01-foundation',targetResourceGroupRefSalt.id)
+  name: 'naming-01-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env

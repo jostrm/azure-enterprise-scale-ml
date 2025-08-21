@@ -141,13 +141,15 @@ param aifactorySuffixRG string
 param commonRGNamePrefix string
 param keyvaultSoftDeleteDays int = 90
 param restore bool = false
+param projectPrefix string = 'esml-'
+param projectSuffix string = '-rg'
 
 // ============================================================================
 // CALCULATED VARIABLES
 // ============================================================================
-
+var projectName = 'prj${projectNumber}'
 var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
-var targetResourceGroup = '${commonRGNamePrefix}esml-${replace('prj${projectNumber}', 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
+var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations
 var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
@@ -189,8 +191,8 @@ var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResource
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: guid('naming-convention-02-cog-services',commonResourceGroupRef.id,deploymentProjSpecificUniqueSuffix)
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'naming-02-${targetResourceGroup}'
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   params: {
     env: env
     projectNumber: projectNumber
@@ -219,7 +221,6 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 var aksSubnetName = namingConvention.outputs.aksSubnetName
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
-var projectName = namingConvention.outputs.projectName
 var genaiName = namingConvention.outputs.genaiName
 
 // Use naming convention outputs

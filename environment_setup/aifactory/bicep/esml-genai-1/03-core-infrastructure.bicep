@@ -120,17 +120,16 @@ param projectServicePrincipleSecret_SeedingKeyvaultName string
 param aifactorySalt10char string = ''
 @description('Random value for deployment uniqueness')
 param randomValue string = ''
-
-// ============================================================================
-// END - FROM JSON files
-// ============================================================================
+param projectPrefix string = 'esml-'
+param projectSuffix string = '-rg'
 
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
 // Calculated variables
+var projectName = 'prj${projectNumber}'
 var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
-var targetResourceGroup = '${commonRGNamePrefix}esml-${replace('prj${projectNumber}', 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}-rg'
+var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations
 var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
@@ -146,7 +145,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResource
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: guid('naming-convention-03-core-infra',vnetResourceGroupName,deploymentProjSpecificUniqueSuffix) // max 64 chars
+  name: 'naming-03-${targetResourceGroup}' // max 64 chars
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -176,7 +175,6 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 var aksSubnetName = namingConvention.outputs.aksSubnetName
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
-var projectName = namingConvention.outputs.projectName
 var genaiName = namingConvention.outputs.genaiName
 
 // Import specific names needed for core infrastructure deployment

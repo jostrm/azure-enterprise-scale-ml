@@ -222,3 +222,5 @@ output p011_genai_team_lead_array array = p011_genai_team_lead_array
 output p011_genai_team_lead_email_array array = p011_genai_team_lead_email_array
 output uniqueInAIFenv string = uniqueInAIFenv
 output randomSalt string = randomSalt
+output projectTypeESMLName string = 'esml'
+output projectTypeGenAIName string = 'genai'
