@@ -88,7 +88,7 @@ param vmSKU array = [
   'Standard_D4s_v3'
   'standard_D2as_v5'
 ]
-param adminUsername string
+param adminUsername string ='aifactoryadmin'
 param adminPassword string
 param hybridBenefit bool = false
 
