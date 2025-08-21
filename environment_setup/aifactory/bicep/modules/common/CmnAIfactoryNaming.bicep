@@ -126,8 +126,8 @@ var acrProjectName = 'acr${projectName}${genaiName}${locationSuffix}${uniqueInAI
 var acrCommonName = replace('acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}','-','')
 
 // Managed Identities (with random salt for uniqueness)
-var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
-var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${resourceSuffix}'
+var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}-${randomSalt}${resourceSuffix}'
 
 // Common Resource Group Services
 var laWorkspaceName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
