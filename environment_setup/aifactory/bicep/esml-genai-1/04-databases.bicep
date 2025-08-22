@@ -180,17 +180,11 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
-var miACAName = namingConvention.outputs.miACAName
+//var miACAName = namingConvention.outputs.miACAName
 var miPrjName = namingConvention.outputs.miPrjName
 var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
-var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
-var randomSalt = namingConvention.outputs.randomSalt
 var defaultSubnet = namingConvention.outputs.defaultSubnet
-var aksSubnetName = namingConvention.outputs.aksSubnetName
-var acaSubnetName = namingConvention.outputs.acaSubnetName
-var genaiSubnetName = namingConvention.outputs.genaiSubnetName
-var genaiName = namingConvention.outputs.genaiName
 
 // Import specific names needed for database deployment
 var cosmosDBName = namingConvention.outputs.cosmosDBName
@@ -199,6 +193,14 @@ var redisName = namingConvention.outputs.redisName
 var sqlServerName = namingConvention.outputs.sqlServerName
 var sqlDBName = namingConvention.outputs.sqlDBName
 var keyvaultName = namingConvention.outputs.keyvaultName
+
+// Not used - do dependency
+//var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+//var randomSalt = namingConvention.outputs.randomSalt
+//var aksSubnetName = namingConvention.outputs.aksSubnetName
+//var acaSubnetName = namingConvention.outputs.acaSubnetName
+//var genaiSubnetName = namingConvention.outputs.genaiSubnetName
+//var genaiName = namingConvention.outputs.genaiName
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []

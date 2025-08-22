@@ -78,20 +78,12 @@ param privDnsResourceGroup_param string = ''
 // Resource group configuration
 param commonResourceGroup_param string = ''
 
-// Existing resource names for dependencies
-param storageAccount1001Name string
-param storageAccount2001Name string
-param keyvaultName string
-param applicationInsightName string
-// param acrName string // Now from naming convention
-param aiSearchName string
-param aiServicesName string
-
 // AKS Configuration
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
 param aksOutboundType string = 'loadBalancer'
+var aksDefaultVersion = '1.30.3'
 
 // AKS SKU overrides
 param aks_dev_sku_override string = ''
@@ -126,12 +118,10 @@ param aifactorySalt10char string = ''
 param randomValue string = ''
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
-param subscriptionIdDevTestProd string
+param subscriptionIdDevTestProd string = subscription().subscriptionId
 
 // Common ACR usage
 param useCommonACR bool = true
-// Log Analytics Workspace name
-param laWorkspaceName string
 
 // Technical contact and user groups
 param technicalContactId string = ''
@@ -193,27 +183,32 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
-// Import specific names needed for ML platform deployment
+// AML
 var amlName = namingConvention.outputs.amlName
+var laWorkspaceName = namingConvention.outputs.laWorkspaceName
+//var aksClusterName = namingConvention.outputs.aksClusterName
+
+// AI Foundry Hub
 var aiHubName = namingConvention.outputs.aiHubName
 var aifName = namingConvention.outputs.aifName
 var aifProjectName = namingConvention.outputs.aifPrjName
-var aksClusterName = 'aks-${namingConvention.outputs.projectName}-${locationSuffix}-${env}-${namingConvention.outputs.uniqueInAIFenv}${resourceSuffix}'
+var aiSearchName = namingConvention.outputs.safeNameAISearch
+var aiServicesName = namingConvention.outputs.aiServicesName
+
+// Common: AML, AI Fondry Hub
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
-var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrName
-
-// Subnet names from naming convention
+var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrProjectName
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var aksSubnetName = namingConvention.outputs.aksSubnetName
-
-// Get computed variables from naming convention
-var cmnName = namingConvention.outputs.cmnName
 var genaiName = namingConvention.outputs.projectTypeGenAIName
-var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
-var prjResourceSuffixNoDash = namingConvention.outputs.prjResourceSuffixNoDash
-var acrName = namingConvention.outputs.acrProjectName
-var aksDefaultVersion = '1.30.3'
+var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
+var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var keyvaultName = namingConvention.outputs.keyvaultName
+var applicationInsightName = namingConvention.outputs.applicationInsightName
+//var cmnName = namingConvention.outputs.cmnName
+//var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+//var prjResourceSuffixNoDash = namingConvention.outputs.prjResourceSuffixNoDash
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -234,10 +229,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   scope: resourceGroup(subscription().subscriptionId, vnetResourceGroupName)
   name: vnetNameFull
 }
-
-// Common ACR name (removed duplicate - using naming convention output)
-// var acrCommonName = replace('acr${cmnName}${locationSuffix}${uniqueInAIFenv}${prjResourceSuffixNoDash}${env}', '-', '')
-// var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrName
 
 // Private DNS zones (simplified structure)
 var privateLinksDnsZones = {
@@ -450,7 +441,7 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
   params: {
-    acrName: acrName
+    acrName: var_acr_cmn_or_prj
     aiHubName: aiHubName
     aiHubRgName: targetResourceGroup
   }

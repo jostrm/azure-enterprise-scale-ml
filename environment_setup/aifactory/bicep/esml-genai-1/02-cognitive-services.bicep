@@ -176,13 +176,6 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
-
-// ============== EXISTING RESOURCES ==============
-resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
-  name: commonResourceGroup
-  scope:subscription(subscriptionIdDevTestProd)
-}
-
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
@@ -211,25 +204,23 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
-var miACAName = namingConvention.outputs.miACAName
-var miPrjName = namingConvention.outputs.miPrjName
-var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
-var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
 var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
-var randomSalt = namingConvention.outputs.randomSalt
 var defaultSubnet = namingConvention.outputs.defaultSubnet
-var aksSubnetName = namingConvention.outputs.aksSubnetName
-var acaSubnetName = namingConvention.outputs.acaSubnetName
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var genaiName = namingConvention.outputs.genaiName
-
-// Use naming convention outputs
 var aoaiName = namingConvention.outputs.aoaiName
 var safeNameAISearch = namingConvention.outputs.safeNameAISearch
 var aiServicesName = namingConvention.outputs.aiServicesName
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
+//var miACAName = namingConvention.outputs.miACAName
+//var miPrjName = namingConvention.outputs.miPrjName
+//var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
+//var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+//var aksSubnetName = namingConvention.outputs.aksSubnetName
+//var acaSubnetName = namingConvention.outputs.acaSubnetName
+//var randomSalt = namingConvention.outputs.randomSalt
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []

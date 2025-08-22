@@ -215,6 +215,7 @@ output aiProjectName string = aiProjectName
 // Helper variables
 output projectName string = projectName
 output cmnName string = cmnName
+output kvNameCommon string = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 output genaiName string = genaiName
 output prjResourceSuffixNoDash string = prjResourceSuffixNoDash
 output twoNumbers string = twoNumbers
@@ -224,3 +225,4 @@ output uniqueInAIFenv string = uniqueInAIFenv
 output randomSalt string = randomSalt
 output projectTypeESMLName string = 'esml'
 output projectTypeGenAIName string = 'genai'
+output aksClusterName string = 'esml${projectNumber}-${locationSuffix}-${env}'

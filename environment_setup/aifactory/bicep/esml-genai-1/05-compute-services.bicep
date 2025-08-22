@@ -160,14 +160,12 @@ param aifactorySalt10char string = ''
 param randomValue string = ''
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
-param subscriptionIdDevTestProd string
+param subscriptionIdDevTestProd string = subscription().subscriptionId
 
 // Common ACR usage
 param useCommonACR bool = true
 
 // Common names for referencing other resources
-param laWorkspaceName string
-param keyvaultName string
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
 
@@ -225,12 +223,14 @@ var miACAName = namingConvention.outputs.miACAName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
-var safeNameAISearch = namingConvention.outputs.safeNameAISearch
+var aiSearchName = namingConvention.outputs.safeNameAISearch
 var aoaiName = namingConvention.outputs.aoaiName
 var aiServicesName = namingConvention.outputs.aiServicesName
 var bingName = namingConvention.outputs.bingName
 var aiProjectName = namingConvention.outputs.aiProjectName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
+var laWorkspaceName = namingConvention.outputs.laWorkspaceName
+var keyvaultName = namingConvention.outputs.keyvaultName
 
 // Computed variables using naming convention outputs
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
@@ -241,10 +241,6 @@ var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var aksSubnetName = namingConvention.outputs.aksSubnetName
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 var defaultSubnet = namingConvention.outputs.defaultSubnet
-
-// Alias variables for backward compatibility
-var aiSearchName = safeNameAISearch
-var openAIName = aoaiName
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -456,7 +452,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDepl
     appSettings: [
       {
         name: 'AZURE_OPENAI_ENDPOINT'
-        value: 'https://${openAIName}.openai.azure.com/'
+        value: 'https://${aoaiName}.openai.azure.com/'
       }
       {
         name: 'AZURE_AISERVICES_ENDPOINT'
@@ -500,7 +496,7 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && serv
     storageAccountName2: storageAccount1001Name // Using same storage account
     aiSearchName: aiSearchName
     webAppPrincipalId: var_webAppPrincipalId // Using computed variable for principal ID
-    openAIName: openAIName
+    openAIName: aoaiName
     aiServicesName: aiServicesName
   }
   dependsOn: [
@@ -537,7 +533,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && serviceSe
     appSettings: [
       {
         name: 'AZURE_OPENAI_ENDPOINT'
-        value: 'https://${openAIName}.openai.azure.com/'
+        value: 'https://${aoaiName}.openai.azure.com/'
       }
       {
         name: 'AZURE_AISERVICES_ENDPOINT'
@@ -580,7 +576,7 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExist
     storageAccountName2: storageAccount1001Name // Using same storage account
     aiSearchName: aiSearchName
     functionPrincipalId: var_functionPrincipalId // Using computed variable for principal ID
-    openAIName: openAIName
+    openAIName: aoaiName
     aiServicesName: aiServicesName
   }
   dependsOn: [

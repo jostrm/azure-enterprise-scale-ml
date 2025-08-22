@@ -4,10 +4,8 @@
 param containerRegistryName string
 
 @description('(Optional) Specifies the Azure container registry service tier name, defaults to premium because of the private endpoints association')
-@allowed([
-  'Premium'
-])
-param skuName string = 'Premium'
+@allowed(['Premium', 'Standard', 'Basic']) 
+param skuName string = 'Premium' // NB! Basic and Standard ACR SKUs don't support private endpoints.
 
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string

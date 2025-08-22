@@ -76,44 +76,43 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 }
 
 // Import all resource names from shared naming convention
-var twoNumbers = namingConvention.outputs.twoNumbers
 var aiHubName = namingConvention.outputs.aiHubName
-var aifProjectName = namingConvention.outputs.aifProjectName
-var aoaiName = namingConvention.outputs.aoaiName
-var amlName = namingConvention.outputs.amlName
-var safeNameAISearch = namingConvention.outputs.safeNameAISearch
-var dashboardInsightsName = namingConvention.outputs.dashboardInsightsName
-var applicationInsightName = namingConvention.outputs.applicationInsightName
-var bingName = namingConvention.outputs.bingName
-var containerAppsEnvName = namingConvention.outputs.containerAppsEnvName
-var containerAppAName = namingConvention.outputs.containerAppAName
-var containerAppWName = namingConvention.outputs.containerAppWName
-var cosmosDBName = namingConvention.outputs.cosmosDBName
-var functionAppName = namingConvention.outputs.functionAppName
-var webAppName = namingConvention.outputs.webAppName
-var funcAppServicePlanName = namingConvention.outputs.funcAppServicePlanName
-var webbAppServicePlanName = namingConvention.outputs.webbAppServicePlanName
-var keyvaultName = namingConvention.outputs.keyvaultName
+var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
+var aiServicesName = namingConvention.outputs.aiServicesName
+var aiProjectName = namingConvention.outputs.aiProjectName
+var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}'
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
-var acrProjectName = namingConvention.outputs.acrProjectName
-var redisName = namingConvention.outputs.redisName
-var postgreSQLName = namingConvention.outputs.postgreSQLName
-var sqlServerName = namingConvention.outputs.sqlServerName
-var sqlDBName = namingConvention.outputs.sqlDBName
-var vmName = namingConvention.outputs.vmName
-var aifName = namingConvention.outputs.aifName
-var aifPrjName = namingConvention.outputs.aifPrjName
-var miACAName = namingConvention.outputs.miACAName
-var miPrjName = namingConvention.outputs.miPrjName
 
-// Computed variables from naming convention
-var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
-var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}'
-var aiServicesName = namingConvention.outputs.aiServicesName
-var acrCommonName = namingConvention.outputs.acrCommonName
-var laWorkspaceName = namingConvention.outputs.laWorkspaceName
-var aiProjectName = namingConvention.outputs.aiProjectName
+//var twoNumbers = namingConvention.outputs.twoNumbers
+//var aifProjectName = namingConvention.outputs.aifProjectName
+//var aoaiName = namingConvention.outputs.aoaiName
+//var amlName = namingConvention.outputs.amlName
+//var safeNameAISearch = namingConvention.outputs.safeNameAISearch
+//var dashboardInsightsName = namingConvention.outputs.dashboardInsightsName
+//var applicationInsightName = namingConvention.outputs.applicationInsightName
+//var bingName = namingConvention.outputs.bingName
+//var containerAppsEnvName = namingConvention.outputs.containerAppsEnvName
+//var containerAppAName = namingConvention.outputs.containerAppAName
+//var containerAppWName = namingConvention.outputs.containerAppWName
+//var cosmosDBName = namingConvention.outputs.cosmosDBName
+//var functionAppName = namingConvention.outputs.functionAppName
+//var webAppName = namingConvention.outputs.webAppName
+//var funcAppServicePlanName = namingConvention.outputs.funcAppServicePlanName
+//var webbAppServicePlanName = namingConvention.outputs.webbAppServicePlanName
+//var keyvaultName = namingConvention.outputs.keyvaultName
+//var acrProjectName = namingConvention.outputs.acrProjectName
+//var redisName = namingConvention.outputs.redisName
+//var postgreSQLName = namingConvention.outputs.postgreSQLName
+//var sqlServerName = namingConvention.outputs.sqlServerName
+//var sqlDBName = namingConvention.outputs.sqlDBName
+//var vmName = namingConvention.outputs.vmName
+//var aifName = namingConvention.outputs.aifName
+//var aifPrjName = namingConvention.outputs.aifPrjName
+//var miACAName = namingConvention.outputs.miACAName
+//var miPrjName = namingConvention.outputs.miPrjName
+//var acrCommonName = namingConvention.outputs.acrCommonName
+//var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 
 // ============== COMPUTED VARIABLES FOR PRINCIPAL IDs ==============
 // Note: Setting to empty strings as resources may not be created yet in this RBAC phase

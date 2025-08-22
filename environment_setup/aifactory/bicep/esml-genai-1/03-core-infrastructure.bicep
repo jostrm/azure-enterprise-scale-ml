@@ -14,8 +14,10 @@ targetScope = 'subscription'
 // ============================================================================
 // SKU for services
 // ============================================================================
+@allowed(['Standard_LRS', 'Standard_GRS', 'Standard_RAGRS', 'Standard_ZRS', 'Premium_LRS', 'Premium_ZRS', 'Standard_GZRS', 'Standard_RAGZRS'])
 param storageAccountSkuName string = 'Standard_LRS'
-param containerRegistrySkuName string = 'Premium'
+@allowed(['Premium', 'Standard', 'Basic']) 
+param containerRegistrySkuName string = 'Premium' // NB! Basic and Standard ACR SKUs don't support private endpoints.
 param bingSearchSKU string = 'S1'
 
 // ============== PARAMETERS ==============
@@ -63,6 +65,8 @@ param centralDnsZoneByPolicyInHub bool = false
 param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string = ''
+param subnetCommon string = '' // Base parameter override (previous JSON)
+param common_subnet_name string // Base parameter override (previous JSON)
 
 // Networking parameters for calculation
 param vnetNameBase string
@@ -138,8 +142,8 @@ var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourc
 // Private DNS calculations
 var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
-
 var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
+var commonSubnetName = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
@@ -167,27 +171,27 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 
 var miACAName = namingConvention.outputs.miACAName
 var miPrjName = namingConvention.outputs.miPrjName
-var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
+//var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
 var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
-var randomSalt = namingConvention.outputs.randomSalt
+//var randomSalt = namingConvention.outputs.randomSalt
 var defaultSubnet = namingConvention.outputs.defaultSubnet
-var aksSubnetName = namingConvention.outputs.aksSubnetName
-var acaSubnetName = namingConvention.outputs.acaSubnetName
-var genaiSubnetName = namingConvention.outputs.genaiSubnetName
+//var aksSubnetName = namingConvention.outputs.aksSubnetName
+//var acaSubnetName = namingConvention.outputs.acaSubnetName
+//var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var genaiName = namingConvention.outputs.genaiName
 
 // Import specific names needed for core infrastructure deployment
 var keyvaultName = namingConvention.outputs.keyvaultName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
-var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+//var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var vmName = namingConvention.outputs.vmName
 var bingName = namingConvention.outputs.bingName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
-var kvNameCommon = 'kv-${namingConvention.outputs.cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var kvNameCommon = namingConvention.outputs.kvNameCommon
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -344,7 +348,7 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
 // ============== CONTAINER REGISTRY ==============
 
 // Project-specific container registry (if not using common ACR)
-module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && useCommonACR == false) {
+module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -362,7 +366,32 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && useCo
     resourceExists_struct
   ]
 }
+resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR) {
+  name: acrCommonName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
 
+// Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
+// pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
+module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR == true){
+  scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
+  name: 'AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acrCommonName
+    skuName: containerRegistrySkuName
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    subnetName: commonSubnetName // snet-esml-cmn-001
+    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
+    tags: tagsProject
+    location:location
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+  }
+
+  dependsOn: [
+    acrCommon
+  ]
+}
 // Common container registry reference (if using common ACR)
 // Reference maintained for infrastructure awareness but not directly used in current deployment
 // TODO: Add common ACR integration logic if needed for cross-project container sharing
