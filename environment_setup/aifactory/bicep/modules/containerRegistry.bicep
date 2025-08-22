@@ -64,7 +64,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-pr
         type: 'Notary'
       }
     }
-    publicNetworkAccess: !enablePublicAccessWithPerimeter? 'Disabled': 'Enabled'
+    publicNetworkAccess: enablePublicAccessWithPerimeter?'Enabled': 'Disabled'
     zoneRedundancy: 'Disabled'
   }
 }

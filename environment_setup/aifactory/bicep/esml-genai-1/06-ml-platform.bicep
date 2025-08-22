@@ -60,10 +60,10 @@ param centralDnsZoneByPolicyInHub bool = false
 param AMLStudioUIPrivate bool = true
 param allowPublicAccessWhenBehindVnet bool = false
 
-// networking - subnets
+// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string
+param acaSubnetId string = ''
 
 // Networking parameters for calculation
 param vnetNameBase string

@@ -39,7 +39,9 @@ param randomValue string = ''
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
 param commonResourceGroupName string = ''
-param subscriptionIdDevTestProd string
+param subscriptionIdDevTestProd string = subscription().subscriptionId
+
+// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
 param genaiSubnetId string = ''
 param aksSubnetId string = ''
 param acaSubnetId string = ''

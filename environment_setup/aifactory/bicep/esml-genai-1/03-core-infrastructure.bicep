@@ -61,10 +61,11 @@ param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
-// Required resource references
+// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
 param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string = ''
+// Base parameters
 param subnetCommon string = '' // Base parameter override (previous JSON)
 param common_subnet_name string // Base parameter override (previous JSON)
 
