@@ -108,11 +108,53 @@ A) If you run the AIFactory in isolated mode (for DEMO purposes) which is defaul
 B) If you run the AIFactory in production mode, peered to your HUB, which is the recommended way, you need to ensure/create the Private DNS zones manually, e.g. no automation in ESML AIFactory yet).
 - Script: [Create these Private DNS zones](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1)
 
+# How many AIFactory projects can you have per AI Factory scale set? 
+This depends on technical quota roofs on Subscription level. If you decide to have 1 AIFactory scale set (1 Subscription, 1 vNet per env) dedicated per team, there are usually the below 3 factors that will be depleted first. 
+
+Example: After ~15-20 projects you may hit the limit of depleded quota of max role assigments, hence you need to scale with subscriptions and AI Factory scale sets.
+
+> [!NOTE]
+> Below is just "ballpark numbers", e.g. rough estimation, based on projects from variuos customers since 2019:
+> We recommend to create at a new AI Factory scale set, before adding the 10th project. Even though it may scale to 20 or 40 before hitting the limit, it is good to be proactive. You may also create 3 scale sets per enviroment (dev, stage, prod) at one go, to be even more proactive.
+> 
+- 1) **Role assigments** | Max 4000 per Subscription | Estimated limit: ~20 AI Factory projects
+    - **Each project: ~75** AI Factory roles on Resource groups (~55) and assignments on the services itself(~20). On top of that a resource group inherits role assignments from scopes on MamangementGroup's, Subscription via policys, which can be everything from 34-100 roles, depending on your IT department
+    - **Estimated limit:** ~20 AI Factory projects of type GenAI. 4000 / (75+100)
+    - **Max actual limit seen:** 55 projects
+    - Note: That scenario us if enabling all 28 Services with private networking on a project typ: GenAI.
+- 2) **Model token quota (TPS)** | Depends per model. 
+    - **Each GenAI type project:** Depends on model. Note: Soft limit. Can be increased via support ticket in AI Foundry.
+    - **Estimated limit:** ~10 AI Factory projects of type GenAI, depending on if all uses the same model, which model.
+    - **Max actual limit seen:** 12 projects
+        
+- 3) **IP addresses** | Max 65,536 in a /16 vNet  | Estimated limit:~150-200 projects
+    - **Estimated limit (/16)):** ~200 projects of type GenAI, and ~178 ESML projects.
+    - **Estimated limit (/18):** ~40 GenAI & ~25 ESML projects (since max 16,384 in a /18 vNet)
+    - **Max actual limit seen:** 200 projects
+        - **Allocated across projects:** 8,384 IPs for shared services (cmn, cmn_scoring, powerbi, bastion)
+        - **Each GenAI type project:** ~192 (private endpoints, endpoint-deployments, compute instances)
+                - **Default allocation**: 192 Ips (GenAI, AKS, ContainerApps) dedicated.
+                - Per project formula (/16): (65536-8384) / 192 = **297 AI Factory projects**
+                    - genaiSubnetCidr  = '25'
+                    - aksSubnetCidr     = '26'
+                    - acaSubnetCidr     = '25'
+        - **Each ESML type project:** ~320 Ip adresses (mainly due to compute clusters, ML, DL)
+            - **Default allocation**:  320 (Databricks,AKS)
+                - Per project formula (/16): 57 152 / 320 = **178 AI Factory projects**
+                    - dbxPubSubnetCidr  = '26'
+                    - dbxPrivSubnetCidr = '26'
+                    - aksSubnetCidr     = '26'
+
+## Q: How many use cases/AI Factory projects, before new AI Factory scale set? 
+## A: We recommend to have max 10 projects per AI Factory scale set.
+
+# Networking size: ESML, to get an idea of what IPs are used for
+
 ## AIFactory vNets in its spokes: Dev, Test, Prod - address space
 
-The AIFactory have 3 vNets in its 3 spokes: Dev, Test, Prod, with a an address space of at least /18, but reccomended is /16.
-- /16 per vNet to support ~300 teams/use cases
-- /18 to support 70 teams/use cases
+The AIFactory instance for the team have 3 vNets in its 3 spokes: Dev, Test, Prod, with a an address space of at least /18, but reccomended is /16.
+- /16 per vNet to support ~100 projects/use cases
+- /18 (75% less) to support ~25 projects/use cases
 
 ### BackgroundWhy large vNets? 
 The AIFactory is designed to support more than 1 team, it default to support 20-300 teams or use cases.
@@ -124,7 +166,7 @@ This adds up per AIFactory project (with a team of 3-10 people/use cases per tea
 
 The network space needed per vNet, is hence at least /18 to support 70 teams/use cases, but we recommend /16 per vNet to support ~300 teams/use cases.
 
-#### Example workloads per team
+#### Example workloads per team and projects
 If having 8 team member in an AIFActory project, where each have member or use case have computes as below, it may add sum up to to 200 IP addresses: 
 - 5 AKS cluster 
 - 5 CPU cluster 
