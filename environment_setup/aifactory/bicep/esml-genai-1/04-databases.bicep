@@ -292,10 +292,9 @@ var var_sqlServer_dnsConfig = [
   }
 ]
 
-// Target resource group reference
-resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
-  location: location
+  scope: subscription(subscriptionIdDevTestProd)
 }
 
 // ============== COSMOS DB ==============
@@ -376,7 +375,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
     ]
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -401,7 +400,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !c
     privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     cosmosdb
   ]
 }
@@ -430,7 +429,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
     useCMK: postgresEnableCustomerManagedKey
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -457,7 +456,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists
     privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     postgreSQL
   ]
 }
@@ -479,7 +478,7 @@ module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && 
     createPrivateEndpoint: enablePublicAccessWithPerimeter ? false : true
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -505,7 +504,7 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !
     privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     redisCache
   ]
 }
@@ -528,7 +527,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlS
     createPrivateEndpoint: enablePublicAccessWithPerimeter ? false : true
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -554,7 +553,7 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !cen
     privateLinksDnsZones:privateLinksDnsZones
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     sqlServer
   ]
 }

@@ -746,10 +746,11 @@ var processedIpRulesAISearch = [for ip in ipWhitelist_array: {
 var ipWhitelist_remove_ending_32 = [for ip in ipWhitelist_array: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip]
 var ipWhitelist_remove_ending_slash_something = [for ip in ipWhitelist_array: (contains(ip, '/') ? substring(ip, 0, indexOf(ip, '/')) : ip)]
 
-// Salt: Project/env specific
-resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
+// create Project RG and use as salt for Project/env specific
+resource targetResourceGroupRG 'Microsoft.Resources/resourceGroups@2024-07-01'= {
   name: targetResourceGroup
-  scope:subscription(subscriptionIdDevTestProd)
+  location: location
+  tags: tags
 }
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
@@ -759,7 +760,7 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 
 param aifactorySalt5char string = '' // Deterministic
 param aifactorySalt10char string = '' // Random
-var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
+var projectSalt = substring(uniqueString(targetResourceGroupRG.id), 0, 5)
 var randomGuid = sys.newGuid()
 var randomValueUsed = empty(randomValue)? randomGuid : randomValue
 var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValueUsed, 6, 10): aifactorySalt10char

@@ -292,10 +292,9 @@ var aml_cluster_test_prod_sku_param = !empty(aml_cluster_test_prod_sku_override)
 var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
 var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 
-// Target resource group reference
-resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
-  location: location
+  scope: subscription(subscriptionIdDevTestProd)
 }
 
 // Log Analytics Workspace reference
@@ -354,7 +353,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     appInsightsName: applicationInsightName
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     // Dependencies handled through parameters - storage, keyvault, ACR should exist from previous phases
   ]
 }
@@ -387,7 +386,7 @@ module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!aifProjectE
     enablePublicAccessWithPerimeter: true
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -430,7 +429,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
   ]
 }

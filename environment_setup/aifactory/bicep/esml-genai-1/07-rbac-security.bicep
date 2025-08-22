@@ -238,10 +238,10 @@ var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLake
 
 // ============== EXISTING RESOURCE REFERENCES ==============
 
-// Target resource group reference
-resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+// Target resource group reference (existing from 01-foundation.bicep)
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
-  location: location
+  scope: subscription(subscriptionIdDevTestProd)
 }
 
 // Common data lake reference
@@ -263,7 +263,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     rbacReadUsersToCmnVnetBastion
   ]
 }
@@ -278,7 +278,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(ba
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     rbacReadUsersToCmnVnetBastion
   ]
 }
@@ -300,7 +300,7 @@ module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDepl
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     rbacReadUsersToCmnVnetBastion
   ]
 }
@@ -316,7 +316,7 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!aiServi
     aiServicesPrincipalId: 'placeholder-principal-id' // Will be replaced with actual service principal
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -331,7 +331,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExi
     aiSearchMIObjectId: 'placeholder-principal-id' // Will be replaced with actual managed identity
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -347,7 +347,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
     aiHubPrincipalId: 'placeholder-principal-id' // Will be replaced with actual AI Hub principal
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -368,7 +368,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && e
     disableContributorAccessForUsers: disableContributorAccessForUsers
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -383,7 +383,7 @@ module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!aiSea
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -403,7 +403,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
     servicePrincipleAndMIArray: spAndMiArray
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -421,7 +421,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
     servicePrincipleAndMIArray: spAndMiArray
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -439,7 +439,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
     servicePrincipleAndMIArray: spAndMiArray
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -457,7 +457,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -473,7 +473,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -490,7 +490,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     rbacModuleUsers
   ]
 }
@@ -511,7 +511,7 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!ai
   }
   dependsOn: [
     esmlCommonLake
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -529,7 +529,7 @@ module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExist
   }
   dependsOn: [
     esmlCommonLake
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 

@@ -173,13 +173,14 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
   scope: subscription(subscriptionIdDevTestProd)
 }
 
-// Resource group references for salt generation
-resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
+// Create Target Resource group
+resource targetResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' = {
   name: targetResourceGroup
-  scope: subscription(subscriptionIdDevTestProd)
+  location: location
+  tags: tagsProject
 }
 
-var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
+var projectSalt = substring(uniqueString(targetResourceGroupRef.id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // ============================================================================

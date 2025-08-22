@@ -237,10 +237,9 @@ var mi_array = array(var_miPrj_PrincipalId)
 var mi_array2 = array(var_miAca_PrincipalId)
 var var_all_principals = union(p011_genai_team_lead_array, mi_array, mi_array2)
 
-// Target resource group reference
-resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
-  location: location
+  scope: subscription(subscriptionIdDevTestProd)
 }
 
 // ============== STORAGE ACCOUNTS ==============
@@ -313,7 +312,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     ]
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -342,7 +341,7 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
     ipRules: empty(processedIpRulesKv) ? [] : processedIpRulesKv
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -364,7 +363,7 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useC
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR) {
@@ -411,7 +410,7 @@ module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep' = if(!
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -433,7 +432,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serv
     keyvaultName: keyvaultName
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     kv1
   ]
 }
@@ -450,7 +449,7 @@ module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBing
     tags: tagsProject
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -474,7 +473,7 @@ module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists) {
     keyvaultNameRG: targetResourceGroup
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     kv1
   ]
 }

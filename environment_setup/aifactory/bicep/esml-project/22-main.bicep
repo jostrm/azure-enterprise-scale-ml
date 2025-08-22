@@ -240,12 +240,13 @@ var p011_genai_team_lead_array = (empty(technicalAdminsObjectID) || technicalAdm
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var p011_genai_team_lead_email = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 
-// Salt: Project/env specific
-resource targetResourceGroupRefSalt 'Microsoft.Resources/resourceGroups@2020-10-01' existing = {
+// create Project RG and use as salt for Project/env specific
+resource targetResourceGroupRG 'Microsoft.Resources/resourceGroups@2024-07-01'= {
   name: targetResourceGroup
-  scope:subscription(subscriptionIdDevTestProd)
+  location: location
+  tags: tags
 }
-var projectSalt = substring(uniqueString(targetResourceGroupRefSalt.id), 0, 5)
+var projectSalt = substring(uniqueString(targetResourceGroupRG.id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // Salt: AIFactory instance/env specific

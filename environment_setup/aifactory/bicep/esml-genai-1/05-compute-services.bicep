@@ -245,37 +245,6 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
 
-// Network references using proper resource references
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  scope: resourceGroup(subscription().subscriptionId, vnetResourceGroupName)
-  name: vnetNameFull
-}
-
-resource subnet_genai 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: vnet
-  name: genaiSubnetName
-}
-
-resource subnet_aks 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: vnet
-  name: aksSubnetName
-}
-
-resource subnet_aca 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: vnet
-  name: acaSubnetName
-}
-
-var subnet_genai_ref = {
-  id: subnet_genai.id
-}
-var subnet_aks_ref = {
-  id: subnet_aks.id
-}
-var subnet_aca_ref = {
-  id: subnet_aca.id
-}
-
 // ============== COMPUTED VARIABLES FOR PRINCIPAL IDs ==============
 // Note: Setting simplified principal ID logic to avoid BCP318 compilation issues
 var var_webAppPrincipalId = serviceSettingDeployWebApp ? 'webapp-principal-computed-at-runtime' : ''
@@ -331,12 +300,10 @@ var var_containerAppsEnv_dnsConfig = [
   }
 ]
 
-// Target resource group reference
-resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
-  location: location
+  scope: subscription(subscriptionIdDevTestProd)
 }
-
 // ============== MANAGED IDENTITY FOR CONTAINER APPS ==============
 
 module miForAca '../modules/mi.bicep' = if(!miACAExists) {
@@ -348,7 +315,7 @@ module miForAca '../modules/mi.bicep' = if(!miACAExists) {
     tags: tagsProject
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
   ]
 }
 
@@ -469,7 +436,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDepl
     ]
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     subnetDelegationServerFarm
   ]
 }
@@ -482,7 +449,7 @@ module privateDnsWebapp '../modules/privateDns.bicep' = if(!webAppExists && !cen
     privateLinksDnsZones: {}
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     webapp
   ]
 }
@@ -548,7 +515,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && serviceSe
     runtimeVersion: functionVersion
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     subnetDelegationServerFarm
   ]
 }
@@ -562,7 +529,7 @@ module privateDnsFunction '../modules/privateDns.bicep' = if(!functionAppExists 
     privateLinksDnsZones: {}
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     function
   ]
 }
@@ -609,7 +576,7 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
     wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     ...(miACAExists ? [] : [miForAca])
     ...(useCommonACR && !miACAExists ? [miRbac] : [])
     ...(!useCommonACR && !miACAExists ? [miRbacProj] : [])
@@ -625,7 +592,7 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerA
     privateLinksDnsZones: {}
   }
   dependsOn: [
-    resourceExists_struct
+    existingTargetRG
     containerAppsEnv
   ]
 }
@@ -721,7 +688,7 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!miACAEx
     aiSearchName: aiSearchName
     appInsightsName: applicationInsightName
     principalIdMI: miPrincipalId // Using the variable instead of module output
-    resourceGroupId: resourceExists_struct.id
+    resourceGroupId: existingTargetRG.id
   }
   dependsOn: [
     containerAppsEnv
