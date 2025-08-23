@@ -711,7 +711,6 @@ steps:
      --parameters projectNumber="$(project_number_000)" \
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
-     --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
      --parameters vnetResourceGroupBase="$(vnetResourceGroupBase)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
@@ -1074,5 +1073,14 @@ steps:
         echo "ACR firewall cleanup completed."
       else
         echo "No IPs to remove from ACR"
+      fi
+
+      # Secure the ACR by disabling public network access
+      if [ -n "$registryName" ]; then
+        echo "Disabling public network access for ACR: $registryName"
+        az acr update --name "$registryName" --public-network-enabled false || echo "Failed to disable public access for $registryName"
+        echo "ACR public network access disabled for security."
+      else
+        echo "No registry name found - skipping public access disable"
       fi
   condition: always()
