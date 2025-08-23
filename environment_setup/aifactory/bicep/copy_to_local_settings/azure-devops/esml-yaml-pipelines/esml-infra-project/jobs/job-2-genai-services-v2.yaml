@@ -617,10 +617,10 @@ steps:
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
-     --parameters enableDebugging="false" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters enableDebugging="true" \
      --parameters DEBUG_enableAIServices="$(enableAIServices)" \
      --parameters DEBUG_enableAIFoundryHub="$(enableAIFoundryHub)" \
      --parameters DEBUG_enableAISearch="$(enableAISearch)" \
@@ -687,6 +687,8 @@ steps:
      --parameters DEBUG_deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters DEBUG_deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters DEBUG_deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -734,6 +736,8 @@ steps:
      --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
      --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
      --parameters deployModel_gpt_4="$(deployModel_gpt_4)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -778,6 +782,8 @@ steps:
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -814,6 +820,8 @@ steps:
      --parameters serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
      --parameters serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
      --parameters serviceSettingDeploySQLDatabase="$(serviceSettingDeploySQLDatabase)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -866,6 +874,8 @@ steps:
      --parameters serviceSettingDeployAppInsightsDashboard="$(serviceSettingDeployAppInsightsDashboard)" \
      --parameters aca_a_registry_image="$(aca_a_registry_image)" \
      --parameters aca_w_registry_image="$(aca_w_registry_image)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -903,6 +913,8 @@ steps:
      --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
      --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
      --parameters serviceSettingEnableAIFoundryPreview="$(serviceSettingEnableAIFoundryPreview)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -939,6 +951,8 @@ steps:
      --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
      --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
      --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
