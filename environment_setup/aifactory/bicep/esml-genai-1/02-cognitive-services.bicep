@@ -259,6 +259,28 @@ resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' e
   scope: subscription(subscriptionIdDevTestProd)
 }
 
+// ============== DNS CONFIGURATIONS ==============
+// DNS configurations for private endpoints - using dynamic outputs from modules
+#disable-next-line BCP318
+var var_csContentSafety_dnsConfig = csContentSafety.outputs.dnsConfig
+
+#disable-next-line BCP318
+var var_csVision_dnsConfig = csVision.outputs.dnsConfig
+
+#disable-next-line BCP318
+var var_csSpeech_dnsConfig = csSpeech.outputs.dnsConfig
+
+#disable-next-line BCP318
+var var_csDocIntelligence_dnsConfig = csDocIntelligence.outputs.dnsConfig
+
+#disable-next-line BCP318
+var var_csAzureOpenAI_dnsConfig = csAzureOpenAI.outputs.dnsConfig
+
+#disable-next-line BCP318
+var var_aiSearchService_dnsConfig = enableAISearch ? aiSearchService.outputs.dnsConfig : []
+
+#disable-next-line BCP318
+var var_sa4AIsearch_dnsConfig = sa4AIsearch.outputs.dnsConfig
 
 // ============== COGNITIVE SERVICES ==============
 
@@ -568,6 +590,106 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
   dependsOn: [
     resourceExists_struct
     ...(!storageAccount2001Exists ? [sa4AIsearch] : [])
+  ]
+}
+
+// ============== PRIVATE DNS MODULES ==============
+
+// Content Safety Private DNS
+module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployContentSafety == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneContentSafety${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_csContentSafety_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    resourceExists_struct
+  ]
+}
+
+// Vision Services Private DNS
+module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureAIVision == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneVision${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_csVision_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    resourceExists_struct
+  ]
+}
+
+// Speech Services Private DNS
+module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureSpeech == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneSpeech${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_csSpeech_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    resourceExists_struct
+  ]
+}
+
+// Document Intelligence Private DNS
+module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAIDocIntelligence == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneDocInt${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_csDocIntelligence_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    resourceExists_struct
+  ]
+}
+
+// Azure OpenAI Private DNS
+module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists && serviceSettingDeployAzureOpenAI && !centralDnsZoneByPolicyInHub) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneLAOAI${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_csAzureOpenAI_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    resourceExists_struct
+  ]
+}
+
+// AI Search Service Private DNS
+module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExists && !centralDnsZoneByPolicyInHub && enableAISearch) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneAISearch${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_aiSearchService_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    resourceExists_struct
+  ]
+}
+
+// Storage for AI Search Private DNS
+module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(!storageAccount2001Exists && centralDnsZoneByPolicyInHub == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneStorageGenAI${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_sa4AIsearch_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    resourceExists_struct
   ]
 }
 

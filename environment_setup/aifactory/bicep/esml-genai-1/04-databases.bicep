@@ -252,45 +252,17 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = {
       getProjectMIPrincipalId
   ]
 }
+
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
-
-// DNS configurations for private endpoints (simplified)
-var var_cosmosdb_dnsConfig = [
-  {
-    name: cosmosDBName
-    type: 'Microsoft.DocumentDB/databaseAccounts'
-    groupIds: ['Sql']
-    resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosDBName}'
-  }
-]
-
-var var_postgreSQL_dnsConfig = [
-  {
-    name: postgreSQLName
-    type: 'Microsoft.DBforPostgreSQL/flexibleServers'
-    groupIds: ['postgresqlServer']
-    resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.DBforPostgreSQL/flexibleServers/${postgreSQLName}'
-  }
-]
-
-var var_redisCache_dnsConfig = [
-  {
-    name: redisName
-    type: 'Microsoft.Cache/redis'
-    groupIds: ['redisCache']
-    resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.Cache/redis/${redisName}'
-  }
-]
-
-var var_sqlServer_dnsConfig = [
-  {
-    name: sqlServerName
-    type: 'Microsoft.Sql/servers'
-    groupIds: ['sqlServer']
-    resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.Sql/servers/${sqlServerName}'
-  }
-]
+#disable-next-line BCP318
+var var_cosmosdb_dnsConfig = cosmosdb.outputs.dnsConfig
+#disable-next-line BCP318
+var var_postgreSQL_dnsConfig = postgreSQL.outputs.dnsConfig
+#disable-next-line BCP318
+var var_redisCache_dnsConfig = redisCache.outputs.dnsConfig
+#disable-next-line BCP318
+var var_sqlServer_dnsConfig = sqlServer.outputs.dnsConfig
 
 resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup

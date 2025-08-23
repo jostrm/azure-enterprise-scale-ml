@@ -216,10 +216,6 @@ param azureMachineLearningObjectId string = ''
 param datalakeName_param string = ''
 param commonLakeNamePrefixMax8chars string
 
-// Dependencies and naming (now from naming convention)
-// param uniqueInAIFenv string = '' // Now from naming convention
-// param deploymentProjSpecificUniqueSuffix string = '' // Now computed from naming convention
-
 // Common ACR usage
 param useCommonACR bool = true
 
@@ -239,7 +235,7 @@ var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLake
 // ============== EXISTING RESOURCE REFERENCES ==============
 
 // Target resource group reference (existing from 01-foundation.bicep)
-resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }
@@ -257,7 +253,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: 'rbac1GenAIReadUsersCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
-    common_kv_name: 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    common_kv_name: namingConvention.outputs.kvNameCommon
     user_object_ids: p011_genai_team_lead_array   
     bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
     useAdGroups: useAdGroups

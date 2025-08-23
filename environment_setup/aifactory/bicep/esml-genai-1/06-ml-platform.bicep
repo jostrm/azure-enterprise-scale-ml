@@ -231,17 +231,15 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 }
 
 // Private DNS zones (simplified structure)
-var privateLinksDnsZones = {
-  amlworkspace: {
-    id: '${subscription().subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.api.azureml.ms'
-    name: 'privatelink.api.azureml.ms'
-  }
-  notebooks: {
-    id: '${subscription().subscriptionId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/privateDnsZones/privatelink.notebooks.azure.net'
-    name: 'privatelink.notebooks.azure.net'
+module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    location: location
+    privDnsResourceGroupName: privDnsResourceGroupName
+    privDnsSubscription: privDnsSubscription
   }
 }
-
+var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 // ============== AKS AND ML COMPUTE DEFAULTS ==============
 
 // AKS: Azure Kubernetes Service defaults

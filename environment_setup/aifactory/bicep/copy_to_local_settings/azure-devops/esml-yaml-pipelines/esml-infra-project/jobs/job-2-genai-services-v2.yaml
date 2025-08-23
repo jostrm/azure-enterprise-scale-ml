@@ -620,6 +620,73 @@ steps:
      --parameters enableDebugging="false" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters randomValue="$(deployment_random_value)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters DEBUG_enableAIServices="$(enableAIServices)" \
+     --parameters DEBUG_enableAIFoundryHub="$(enableAIFoundryHub)" \
+     --parameters DEBUG_enableAISearch="$(enableAISearch)" \
+     --parameters DEBUG_enableAzureMachineLearning="$(enableAzureMachineLearning)" \
+     --parameters DEBUG_serviceSettingDeployFunction="$(serviceSettingDeployFunction)" \
+     --parameters DEBUG_functionRuntime="$(functionRuntime)" \
+     --parameters DEBUG_functionVersion="$(functionVersion)" \
+     --parameters DEBUG_serviceSettingDeployWebApp="$(serviceSettingDeployWebApp)" \
+     --parameters DEBUG_webAppRuntime="$(webAppRuntime)" \
+     --parameters DEBUG_webAppRuntimeVersion="$(webAppRuntimeVersion)" \
+     --parameters DEBUG_aseSku="$(aseSku)" \
+     --parameters DEBUG_aseSkuCode="$(aseSkuCode)" \
+     --parameters DEBUG_aseSkuWorkers="$(aseSkuWorkers)" \
+     --parameters DEBUG_serviceSettingDeployContainerApps="$(serviceSettingDeployContainerApps)" \
+     --parameters DEBUG_serviceSettingDeployAppInsightsDashboard="$(serviceSettingDeployAppInsightsDashboard)" \
+     --parameters DEBUG_aca_a_registry_image="$(aca_a_registry_image)" \
+     --parameters DEBUG_aca_w_registry_image="$(aca_w_registry_image)" \
+     --parameters DEBUG_serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
+     --parameters DEBUG_serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
+     --parameters DEBUG_serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
+     --parameters DEBUG_serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
+     --parameters DEBUG_serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
+     --parameters DEBUG_serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
+     --parameters DEBUG_disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
+     --parameters DEBUG_serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
+     --parameters DEBUG_serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
+     --parameters DEBUG_serviceSettingDeploySQLDatabase="$(serviceSettingDeploySQLDatabase)" \
+     --parameters DEBUG_BYO_subnets="$(BYO_subnets)" \
+     --parameters DEBUG_network_env_dev="$(network_env_dev)" \
+     --parameters DEBUG_network_env_stage="$(network_env_stage)" \
+     --parameters DEBUG_network_env_prod="$(network_env_prod)" \
+     --parameters DEBUG_vnetResourceGroup_param="$(vnetResourceGroup_param)" \
+     --parameters DEBUG_vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters DEBUG_commonResourceGroup_param="$(commonResourceGroup_param)" \
+     --parameters DEBUG_datalakeName_param="$(datalakeName_param)" \
+     --parameters DEBUG_kvNameFromCOMMON_param="$(kvNameFromCOMMON_param)" \
+     --parameters DEBUG_useCommonACR_override="$(useCommonACR_override)" \
+     --parameters DEBUG_subnetCommon="$(subnetCommon)" \
+     --parameters DEBUG_subnetCommonScoring="$(subnetCommonScoring)" \
+     --parameters DEBUG_subnetCommonPowerbiGw="$(subnetCommonPowerbiGw)" \
+     --parameters DEBUG_subnetProjGenAI="$(subnetProjGenAI)" \
+     --parameters DEBUG_subnetProjAKS="$(subnetProjAKS)" \
+     --parameters DEBUG_subnetProjACA="$(subnetProjACA)" \
+     --parameters DEBUG_subnetProjDatabricksPublic="$(subnetProjDatabricksPublic)" \
+     --parameters DEBUG_subnetProjDatabricksPrivate="$(subnetProjDatabricksPrivate)" \
+     --parameters DEBUG_byoASEv3="$(byoASEv3)" \
+     --parameters DEBUG_byoAseFullResourceId="$(byoAseFullResourceId)" \
+     --parameters DEBUG_byoAseAppServicePlanResourceId="$(byoAseAppServicePlanResourceId)" \
+     --parameters DEBUG_enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters DEBUG_allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
+     --parameters DEBUG_enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters DEBUG_admin_aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters DEBUG_admin_commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters DEBUG_admin_prjResourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters DEBUG_aifactory_salt="$(aifactory_salt)" \
+     --parameters DEBUG_admin_projectType="$(admin_projectType)" \
+     --parameters DEBUG_project_number_000="$(project_number_000)" \
+     --parameters DEBUG_project_service_principal_AppID_seeding_kv_name="$(project_service_principal_AppID_seeding_kv_name)" \
+     --parameters DEBUG_project_service_principal_OID_seeding_kv_name="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters DEBUG_project_service_principal_Secret_seeding_kv_name="$(project_service_principal_Secret_seeding_kv_name)" \
+     --parameters DEBUG_project_IP_whitelist="$(project_IP_whitelist)" \
+     --parameters DEBUG_deployModel_gpt_4="$(deployModel_gpt_4)" \
+     --parameters DEBUG_deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
+     --parameters DEBUG_deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
+     --parameters DEBUG_deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
+     --parameters DEBUG_deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -655,6 +722,18 @@ steps:
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters enableAIServices="$(enableAIServices)" \
+     --parameters enableAISearch="$(enableAISearch)" \
+     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
+     --parameters serviceSettingDeployContentSafety="$(serviceSettingDeployContentSafety)" \
+     --parameters serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
+     --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
+     --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
+     --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
+     --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
+     --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
+     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters deployModel_gpt_4="$(deployModel_gpt_4)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -698,6 +777,7 @@ steps:
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -730,6 +810,10 @@ steps:
      --parameters sqlServerExists="$(sqlServerExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
+     --parameters serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
+     --parameters serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
+     --parameters serviceSettingDeploySQLDatabase="$(serviceSettingDeploySQLDatabase)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -766,8 +850,22 @@ steps:
      --parameters funcAppServicePlanExists="$(funcAppServicePlanExists)" \
      --parameters webAppServicePlanExists="$(webAppServicePlanExists)" \
      --parameters miACAExists="$(miACAExists)" \
+     --parameters applicationInsightExists="$(applicationInsightExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters serviceSettingDeployContainerApps="$(serviceSettingDeployContainerApps)" \
+     --parameters serviceSettingDeployFunction="$(serviceSettingDeployFunction)" \
+     --parameters serviceSettingDeployWebApp="$(serviceSettingDeployWebApp)" \
+     --parameters functionRuntime="$(functionRuntime)" \
+     --parameters functionVersion="$(functionVersion)" \
+     --parameters webAppRuntime="$(webAppRuntime)" \
+     --parameters webAppRuntimeVersion="$(webAppRuntimeVersion)" \
+     --parameters aseSku="$(aseSku)" \
+     --parameters aseSkuCode="$(aseSkuCode)" \
+     --parameters aseSkuWorkers="$(aseSkuWorkers)" \
+     --parameters serviceSettingDeployAppInsightsDashboard="$(serviceSettingDeployAppInsightsDashboard)" \
+     --parameters aca_a_registry_image="$(aca_a_registry_image)" \
+     --parameters aca_w_registry_image="$(aca_w_registry_image)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -802,6 +900,9 @@ steps:
      --parameters aksExists="$(aksExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
+     --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
+     --parameters serviceSettingEnableAIFoundryPreview="$(serviceSettingEnableAIFoundryPreview)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -833,6 +934,11 @@ steps:
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
+     --parameters serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
+     --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
+     --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
+     --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

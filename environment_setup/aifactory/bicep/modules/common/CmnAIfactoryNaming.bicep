@@ -48,6 +48,7 @@ var cmnName = 'cmn'
 var genaiName = 'genai'
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
+var resourceSuffixPlusOne = '-${padLeft(string(int(substring(resourceSuffix,1,3)) + 1), 3, '0')}'
 
 // ============================================================================
 // COMPUTED VARIABLES - RBAC Arrays
@@ -89,6 +90,7 @@ var aiServicesName = replace(toLower('aiservices${projectName}${locationSuffix}$
 // Monitoring and Insights
 var dashboardInsightsName = 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var applicationInsightName = 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var applicationInsightName2 = 'ain-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffixPlusOne}'
 
 // External Services
 var bingName = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
@@ -166,6 +168,7 @@ output aiServicesName string = aiServicesName
 // Monitoring and Insights
 output dashboardInsightsName string = dashboardInsightsName
 output applicationInsightName string = applicationInsightName
+output applicationInsightName2 string = applicationInsightName2
 
 // External Services
 output bingName string = bingName

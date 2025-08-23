@@ -14,6 +14,25 @@ targetScope = 'subscription'
 // ============================================================================
 // SKU for services
 // ============================================================================
+param aseSkuWorkers int = 1 // Number of workers for ASE v3
+param aseSku string = 'IsolatedV2' // I family for ASE v3
+@allowed([
+  'I1v2'  // Isolated v2 for ASEv3
+  'I2v2'
+  'I3v2'
+  'I4v2'
+  'I5v2'
+  'I6v2'
+])
+param aseSkuCode string = 'I1v2' // I family for ASE v3
+param webappSKUAce object = {
+  name: aseSkuCode
+  tier: aseSku
+  size: aseSkuCode
+  family: 'Iv2'
+  capacity: aseSkuWorkers
+}
+
 // Function App configuration
 param functionSKU object = {
   name: 'EP1'
@@ -29,14 +48,6 @@ param webappSKU object = {
   tier: 'PremiumV3'
   size: 'P1v3'
   family: 'Pv3'
-  capacity: 1
-}
-
-param webappSKUAce object = {
-  name: 'I1v2'
-  tier: 'IsolatedV2'
-  size: 'I1v2'
-  family: 'Iv2'
   capacity: 1
 }
 
@@ -60,7 +71,8 @@ param commonResourceSuffix string
 @description('Project-specific resource suffix')
 param resourceSuffix string
 
-// Resource exists flags from Azure DevOps
+// Exists flags from Azure Devops
+param applicationInsightExists bool = false
 param containerAppsEnvExists bool = false
 param containerAppAExists bool = false
 param containerAppWExists bool = false
@@ -69,6 +81,8 @@ param webAppExists bool = false
 param funcAppServicePlanExists bool = false
 param webAppServicePlanExists bool = false
 param miACAExists bool = false
+
+param serviceSettingDeployAppInsightsDashboard bool = true
 
 // Enable flags from parameter files
 @description('Enable Container Apps deployment')
@@ -273,37 +287,67 @@ var allowedOrigins = [
 ]
 
 // DNS configurations for private endpoints (simplified)
-var var_webapp_dnsConfig = [
-  {
-    name: webAppName
-    type: 'Microsoft.Web/sites'
-    groupIds: ['sites']
-    resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.Web/sites/${webAppName}'
-  }
-]
+// var var_webapp_dnsConfig = [
+//   {
+//     name: webAppName
+//     type: 'Microsoft.Web/sites'
+//     groupIds: ['sites']
+//     resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.Web/sites/${webAppName}'
+//   }
+// ]
 
-var var_function_dnsConfig = [
-  {
-    name: functionAppName
-    type: 'Microsoft.Web/sites'
-    groupIds: ['sites']
-    resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.Web/sites/${functionAppName}'
-  }
-]
+#disable-next-line BCP318
+var var_webapp_dnsConfig = webapp.outputs.dnsConfig
 
-var var_containerAppsEnv_dnsConfig = [
-  {
-    name: containerAppsEnvName
-    type: 'Microsoft.App/managedEnvironments'
-    groupIds: ['managedEnvironments']
-    resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.App/managedEnvironments/${containerAppsEnvName}'
-  }
-]
+// var var_containerAppsEnv_dnsConfig = [
+//   {
+//     name: containerAppsEnvName
+//     type: 'Microsoft.App/managedEnvironments'
+//     groupIds: ['managedEnvironments']
+//     resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.App/managedEnvironments/${containerAppsEnvName}'
+//   }
+// ]
+
+#disable-next-line BCP318
+var var_containerAppsEnv_dnsConfig = containerAppsEnv.outputs.dnsConfig
+
+// var var_function_dnsConfig = [
+//   {
+//     name: functionAppName
+//     type: 'Microsoft.Web/sites'
+//     groupIds: ['sites']
+//     resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.Web/sites/${functionAppName}'
+//   }
+// ]
+
+#disable-next-line BCP318
+var var_function_dnsConfig = function.outputs.dnsConfig
+
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: commonResourceGroup
+  scope: subscription(subscriptionIdDevTestProd)
+}
+resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laWorkspaceName
+  scope:commonResourceGroupRef
+}
 
 resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }
+
+// ============== Private DNS Zones ==============
+module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    location: location
+    privDnsResourceGroupName: privDnsResourceGroupName
+    privDnsSubscription: privDnsSubscription
+  }
+}
+var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
+
 // ============== MANAGED IDENTITY FOR CONTAINER APPS ==============
 
 module miForAca '../modules/mi.bicep' = if(!miACAExists) {
@@ -389,6 +433,22 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (!containerA
   }
 }
 
+// ============== App insights Dashboard with AppInsights of type WEB  ==============
+
+module appinsights '../modules/appinsights.bicep' = if(!applicationInsightExists && serviceSettingDeployAppInsightsDashboard) {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: namingConvention.outputs.applicationInsightName2
+    location: location
+    tags: tagsProject
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight.id
+    dashboardName: namingConvention.outputs.dashboardInsightsName
+  }
+  dependsOn: [
+    existingTargetRG
+  ]
+}
 // ============== AZURE WEB APP ==============
 
 module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDeployWebApp) {
@@ -446,7 +506,7 @@ module privateDnsWebapp '../modules/privateDns.bicep' = if(!webAppExists && !cen
   name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_webapp_dnsConfig
-    privateLinksDnsZones: {}
+    privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
     existingTargetRG
@@ -526,7 +586,7 @@ module privateDnsFunction '../modules/privateDns.bicep' = if(!functionAppExists 
   name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_function_dnsConfig
-    privateLinksDnsZones: {}
+    privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
     existingTargetRG
@@ -589,7 +649,7 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerA
   name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_containerAppsEnv_dnsConfig
-    privateLinksDnsZones: {}
+    privateLinksDnsZones: privateLinksDnsZones
   }
   dependsOn: [
     existingTargetRG

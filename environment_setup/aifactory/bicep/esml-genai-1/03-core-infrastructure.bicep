@@ -211,6 +211,16 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
 }
 
+module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    location: location
+    privDnsResourceGroupName: privDnsResourceGroupName
+    privDnsSubscription: privDnsSubscription
+  }
+}
+var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
+
 // Get managed identity principal IDs using helper modules
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
   name: 'getPrMI-${deploymentProjSpecificUniqueSuffix}'
@@ -241,6 +251,17 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existi
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }
+
+// ============== DNS CONFIGURATIONS ==============
+// DNS configurations for private endpoints - using dynamic outputs from modules
+#disable-next-line BCP318
+var var_sacc_dnsConfig = sacc.outputs.dnsConfig
+
+#disable-next-line BCP318
+var var_kv1_dnsConfig = kv1.outputs.dnsConfig
+
+#disable-next-line BCP318
+var var_acr_dnsConfig = acr.outputs.dnsConfig
 
 // ============== STORAGE ACCOUNTS ==============
 
@@ -398,7 +419,7 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
 
 // ============== APPLICATION INSIGHTS ==============
 
-module applicationInsightSWC '../modules/applicationInsightsRGmode.bicep' = if(!applicationInsightExists) {
+module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: 'AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -552,6 +573,50 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   }
   dependsOn: [
     commonKv
+  ]
+}
+
+// ============== PRIVATE DNS MODULES ==============
+
+// Storage Account Private DNS
+module privateDnsStorage '../modules/privateDns.bicep' = if(!storageAccount1001Exists && centralDnsZoneByPolicyInHub == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneStorage${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_sacc_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    existingTargetRG
+  ]
+}
+
+// Key Vault Private DNS
+module privateDnsKeyVault '../modules/privateDns.bicep' = if(!keyvaultExists && centralDnsZoneByPolicyInHub == false) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneKeyVault${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_kv1_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    existingTargetRG
+  ]
+}
+
+// Container Registry Private DNS
+module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(!acrProjectExists && !centralDnsZoneByPolicyInHub && !useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: 'privDnsZoneACR${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    dnsConfig: var_acr_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    CmnZones
+    existingTargetRG
   ]
 }
 
