@@ -175,18 +175,17 @@ param privDnsResourceGroup_param string = ''
 
 // Resource group configuration
 param commonResourceGroup_param string = ''
-
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
 param aiSearchName string
 param openAIName string
+// Seeding Key Vault parameters
+param inputKeyvault string
+param inputKeyvaultResourcegroup string
+param inputKeyvaultSubscription string
+param projectServicePrincipleOID_SeedingKeyvaultName string
 
-// Service Principal IDs and User Groups
-param technicalContactId string = ''
-param p011_genai_team_lead_array array = []
-param spAndMiArray array = []
 param useAdGroups bool = false
-
 // Azure ML Object ID for cross-service permissions
 param azureMachineLearningObjectId string = ''
 
@@ -221,9 +220,45 @@ var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourc
 var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscription().subscriptionId
 
+//param p011_genai_team_lead_array array = []
+//param spAndMiArray array = []
+var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID of existing AML, AIHub. Needs static name in existing
 // ============================================================================
+
+// Access policies for principals
+
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+}
+
+var miPrjName = namingConvention.outputs.miPrjName
+module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: 'getMI-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miPrjName
+  }
+}
+
+var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
+module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    managedIdentityOID: var_miPrj_PrincipalId
+    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+      getProjectMIPrincipalId
+  ]
+}
+
+#disable-next-line BCP318
+var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
+
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
   scope: subscription(subscriptionIdDevTestProd)

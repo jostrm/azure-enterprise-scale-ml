@@ -73,6 +73,10 @@ param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string = ''
 
+// Users
+param technicalAdminsObjectID string = ''
+param technicalAdminsEmail string = ''
+
 // Networking parameters for calculation
 param vnetNameBase string
 param vnetResourceGroup_param string = ''
@@ -123,7 +127,6 @@ param sqlServerCapacity_DTU int = 10
 
 // Access control
 param useAdGroups bool = false
-param technicalContactId string = ''
 
 // Seeding Key Vault parameters
 param inputKeyvault string
@@ -168,15 +171,17 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     locationSuffix: locationSuffix
     commonResourceSuffix: commonResourceSuffix
     resourceSuffix: resourceSuffix
-    randomValue:randomValue
-    aifactorySalt10char:aifactorySalt10char
+    aifactorySalt10char: aifactorySalt10char
+    randomValue: randomValue
     aifactorySuffixRG: aifactorySuffixRG
     commonRGNamePrefix: commonRGNamePrefix
+    technicalAdminsObjectID: technicalAdminsObjectID
+    technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
-    subscriptionIdDevTestProd:subscriptionIdDevTestProd
+    subscriptionIdDevTestProd: subscriptionIdDevTestProd
+    genaiSubnetId: genaiSubnetId
+    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
-    aksSubnetId:aksSubnetId
-    genaiSubnetId:genaiSubnetId
   }
 }
 

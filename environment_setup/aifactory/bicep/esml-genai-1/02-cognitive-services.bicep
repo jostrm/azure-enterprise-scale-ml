@@ -69,6 +69,10 @@ param keyvaultExists bool = false
 param storageAccount2001Exists bool = false
 param storageAccount1001Exists bool = false
 
+// Users
+param technicalAdminsObjectID string = ''
+param technicalAdminsEmail string = ''
+
 // Enable flags from parameter files
 @description('Enable AI Services deployment')
 param enableAIServices bool = true
@@ -192,15 +196,17 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     locationSuffix: locationSuffix
     commonResourceSuffix: commonResourceSuffix
     resourceSuffix: resourceSuffix
-    randomValue:randomValue
-    aifactorySalt10char:aifactorySalt10char
+    aifactorySalt10char: aifactorySalt10char
+    randomValue: randomValue
     aifactorySuffixRG: aifactorySuffixRG
     commonRGNamePrefix: commonRGNamePrefix
+    technicalAdminsObjectID: technicalAdminsObjectID
+    technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
-    subscriptionIdDevTestProd:subscriptionIdDevTestProd
+    subscriptionIdDevTestProd: subscriptionIdDevTestProd
+    genaiSubnetId: genaiSubnetId
+    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
-    aksSubnetId:aksSubnetId
-    genaiSubnetId:genaiSubnetId
   }
 }
 

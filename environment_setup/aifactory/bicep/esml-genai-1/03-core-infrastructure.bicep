@@ -69,6 +69,10 @@ param acaSubnetId string = ''
 param subnetCommon string = '' // Base parameter override (previous JSON)
 param common_subnet_name string // Base parameter override (previous JSON)
 
+// Users
+param technicalAdminsObjectID string = ''
+param technicalAdminsEmail string = ''
+
 // Networking parameters for calculation
 param vnetNameBase string
 param vnetResourceGroup_param string = ''
@@ -113,7 +117,7 @@ param commonRGNamePrefix string
 param restore bool = true
 
 // Technical contact for access policies
-param technicalContactId string = ''
+param technicalContactId string = '' // TODO-Remove, Replaced by personas
 
 // Seeding Key Vault parameters
 param inputKeyvault string
@@ -158,15 +162,17 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     locationSuffix: locationSuffix
     commonResourceSuffix: commonResourceSuffix
     resourceSuffix: resourceSuffix
-    randomValue:randomValue
-    aifactorySalt10char:aifactorySalt10char
+    aifactorySalt10char: aifactorySalt10char
+    randomValue: randomValue
     aifactorySuffixRG: aifactorySuffixRG
     commonRGNamePrefix: commonRGNamePrefix
+    technicalAdminsObjectID: technicalAdminsObjectID
+    technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
-    subscriptionIdDevTestProd:subscriptionIdDevTestProd
+    subscriptionIdDevTestProd: subscriptionIdDevTestProd
+    genaiSubnetId: genaiSubnetId
+    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
-    aksSubnetId:aksSubnetId
-    genaiSubnetId:genaiSubnetId
   }
 }
 

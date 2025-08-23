@@ -98,8 +98,8 @@ param commonResourceGroup_param string = ''
 // ============================================================================
 
 @description('Technical contact information')
-param technicalContactId string = ''
-param technicalContactEmail string = ''
+param technicalContactId string = '' // TODO-Remove, Replaced by personas
+param technicalContactEmail string = '' // TODO-Remove, Replaced by personas
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
 
