@@ -116,12 +116,6 @@ var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 //var acrCommonName = namingConvention.outputs.acrCommonName
 //var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 
-// ============== COMPUTED VARIABLES FOR PRINCIPAL IDs ==============
-// Note: Setting to empty strings as resources may not be created yet in this RBAC phase
-// These would need to be populated from module outputs from earlier phases if needed
-var var_amlPrincipalId = '' // AML Principal ID - would be populated from AML module outputs
-var var_aiHubPrincipalId = '' // AI Hub Principal ID - would be populated from AI Hub module outputs
-
 // Resource exists flags from Azure DevOps
 param amlExists bool = false
 param aiHubExists bool = false
@@ -184,22 +178,6 @@ param commonResourceGroup_param string = ''
 
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
-
-// ============== VARIABLES ==============
-
-// Calculated variables
-var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
-var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
-
-// Networking calculations
-var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
-var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
-
-// Private DNS calculations
-var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
-var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscription().subscriptionId
-
 param aiSearchName string
 param openAIName string
 
@@ -224,13 +202,110 @@ param tagsProject object = {}
 param tags object = {}
 
 // ============== VARIABLES ==============
-// var subscriptionIdDevTestProd = subscription().subscriptionId // Now a parameter
 
 // Network and resource group references
 var projectResourceGroup_rgId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
-
 // Data lake name calculation
 var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
+
+// Calculated variables
+var projectName = 'prj${projectNumber}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
+
+// Networking calculations
+var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
+
+// Private DNS calculations
+var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscription().subscriptionId
+
+// ============================================================================
+// SPECIAL - Get PRINICPAL ID of existing AML, AIHub. Needs static name in existing
+// ============================================================================
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: commonResourceGroup
+  scope: subscription(subscriptionIdDevTestProd)
+}
+#disable-next-line BCP318
+var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+
+// ============== AML Principal ID ==============
+var amlName_Static = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
+  name: amlName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_amlPrincipalId = enableAzureMachineLearning ? amlREF.identity.principalId : 'BCP318' // !amlExists && enableAzureMachineLearning 
+
+// ============== AI HUB Principal ID ==============
+var aiHubName_Static = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
+  name: aiHubName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_aiHubPrincipalId = enableAIFoundryHub ? aiHubREF.identity.principalId : 'BCP318' // !aiHubExists && enableAIFoundryHub
+
+// ============== OPENAI Principal ID ==============
+var openAIName_Static = 'openai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
+resource openAIREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: openAIName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_openAIPrincipalId = serviceSettingDeployAzureOpenAI ? openAIREF.identity.principalId : 'BCP318'
+
+// ============== AI SERVICES Principal ID ==============
+var aiServicesName_Static = 'ais-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
+resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: aiServicesName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_aiServicesPrincipalId = enableAIServices ? aiServicesREF.identity.principalId : 'BCP318'
+
+// ============== AI SEARCH Principal ID ==============
+var aiSearchName_Static = 'aisearch-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
+resource aiSearchREF 'Microsoft.Search/searchServices@2024-06-01-preview' existing = {
+  name: aiSearchName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_aiSearchPrincipalId = enableAISearch ? aiSearchREF.identity.principalId : 'BCP318'
+
+// ============== VISION SERVICES Principal ID ==============
+var visionName_Static = 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
+resource visionREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: visionName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_visionPrincipalId = serviceSettingDeployAzureAIVision ? visionREF.identity.principalId : 'BCP318'
+
+// ============== SPEECH SERVICES Principal ID ==============
+var speechName_Static = 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
+resource speechREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: speechName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_speechPrincipalId = serviceSettingDeployAzureSpeech ? speechREF.identity.principalId : 'BCP318'
+
+// ============== DOCUMENT INTELLIGENCE Principal ID ==============
+var docsName_Static = 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
+resource docsREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: docsName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_docsPrincipalId = serviceSettingDeployAIDocIntelligence ? docsREF.identity.principalId : 'BCP318'
+
+// ============================================================================
+// SPECIAL - END
+// ============================================================================
 
 // ============== EXISTING RESOURCE REFERENCES ==============
 
@@ -289,7 +364,7 @@ module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDepl
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     aiSearchName: aiSearchName
-    openAIServicePrincipal: 'placeholder-principal-id' // Will be replaced with actual service principal
+    openAIServicePrincipal: var_openAIPrincipalId // Using computed variable for OpenAI principal ID
     servicePrincipleAndMIArray: spAndMiArray
     openAIName: openAIName
     userObjectIds: p011_genai_team_lead_array
@@ -309,7 +384,7 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!aiServi
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     aiSearchName: aiSearchName
-    aiServicesPrincipalId: 'placeholder-principal-id' // Will be replaced with actual service principal
+    aiServicesPrincipalId: var_aiServicesPrincipalId // Using computed variable for AI Services principal ID
   }
   dependsOn: [
     existingTargetRG
@@ -324,7 +399,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExi
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     aiServicesName: aiServicesName
-    aiSearchMIObjectId: 'placeholder-principal-id' // Will be replaced with actual managed identity
+    aiSearchMIObjectId: var_aiSearchPrincipalId // Using computed variable for AI Search principal ID
   }
   dependsOn: [
     existingTargetRG
@@ -340,7 +415,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
   params: {
     azureMachineLearningObjectId: azureMachineLearningObjectId
     aiHubName: aiHubName
-    aiHubPrincipalId: 'placeholder-principal-id' // Will be replaced with actual AI Hub principal
+    aiHubPrincipalId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
   }
   dependsOn: [
     existingTargetRG
@@ -392,9 +467,9 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
-    aiVisionMIObjectId: 'placeholder-vision-principal' // Will be replaced with actual Vision service principal
+    aiVisionMIObjectId: var_visionPrincipalId // Using computed variable for Vision principal ID
     userObjectIds: p011_genai_team_lead_array
-    visonServiceName: 'placeholder-vision-service-name' // Will be replaced with actual Vision service name
+    visonServiceName: visionName_Static // Using computed variable for Vision service name
     useAdGroups: useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
@@ -410,9 +485,9 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
-    aiSpeechMIObjectId: 'placeholder-speech-principal' // Will be replaced with actual Speech service principal
+    aiSpeechMIObjectId: var_speechPrincipalId // Using computed variable for Speech principal ID
     userObjectIds: p011_genai_team_lead_array
-    speechServiceName: 'placeholder-speech-service-name' // Will be replaced with actual Speech service name
+    speechServiceName: speechName_Static // Using computed variable for Speech service name
     useAdGroups: useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }
@@ -429,8 +504,8 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     userObjectIds: p011_genai_team_lead_array
-    aiDocsIntelMIObjectId: 'placeholder-docs-principal' // Will be replaced with actual Document Intelligence principal
-    docsServiceName: 'placeholder-docs-service-name' // Will be replaced with actual Document Intelligence service name
+    aiDocsIntelMIObjectId: var_docsPrincipalId // Using computed variable for Document Intelligence principal ID
+    docsServiceName: docsName_Static // Using computed variable for Document Intelligence service name
     useAdGroups: useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
   }

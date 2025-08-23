@@ -657,19 +657,6 @@ module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
   ]
 }
 
-// Service Principals and Managed Identity Array
-module spAndMI2Array '../modules/spAndMiArray.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'spAndMI2Array${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    managedIdentityOID: ''  // Will be populated by dependent modules
-    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
-  }
-  dependsOn: [
-    projectResourceGroup
-    ...(resourceExists.miPrj ? [] : [miForPrj])
-  ]
-}
 
 // Debug Module (optional)
 module debug './00-debug.bicep' = if (enableDebugging) {
@@ -789,10 +776,7 @@ output foundationOutputs object = {
   // Managed Identity Information
   miProjectName: miPrjName
   miACAName: miACAName
-  
-  // Service Principal Array
-  spAndMiArrayOutput: spAndMI2Array.outputs.spAndMiArray
-  
+      
   // Networking Information
   vnetId: vnet.id
   vnetName: vnetNameFull

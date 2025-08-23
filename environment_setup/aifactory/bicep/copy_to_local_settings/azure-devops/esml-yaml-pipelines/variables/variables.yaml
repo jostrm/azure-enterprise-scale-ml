@@ -132,6 +132,7 @@ variables:
   # PaaS: 
   enableAIServices: "false"
   enableAIFoundryHub: "false"
+  enableAIFoundry2: "false"
   enableAISearch: "false"
   enableAzureMachineLearning: "false"
   serviceSettingDeployFunction: "true"

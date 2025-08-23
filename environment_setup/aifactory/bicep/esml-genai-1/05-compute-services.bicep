@@ -81,8 +81,10 @@ param webAppExists bool = false
 param funcAppServicePlanExists bool = false
 param webAppServicePlanExists bool = false
 param miACAExists bool = false
+param bingExists bool = false
 
 param serviceSettingDeployAppInsightsDashboard bool = true
+param serviceSettingDeployBingSearch bool = false
 
 // Enable flags from parameter files
 @description('Enable Container Apps deployment')
@@ -259,13 +261,17 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
 
-// ============== COMPUTED VARIABLES FOR PRINCIPAL IDs ==============
-// Note: Setting simplified principal ID logic to avoid BCP318 compilation issues
-var var_webAppPrincipalId = serviceSettingDeployWebApp ? 'webapp-principal-computed-at-runtime' : ''
-var var_functionPrincipalId = serviceSettingDeployFunction ? 'function-principal-computed-at-runtime' : ''
+// ============================================================================
+// SPECIAL - Get PRINICPAL ID, only if created in this module, else ignore.
+// ============================================================================
+#disable-next-line BCP318
+var var_webAppPrincipalId = serviceSettingDeployWebApp && !webAppExists? webapp.outputs.principalId: 'BCP318'
+#disable-next-line BCP318
+var var_functionPrincipalId= serviceSettingDeployFunction && !functionAppExists? function.outputs.principalId: 'BCP318'
 
 // Container App API domain/endpoint - using simplified logic
-var var_containerAppApiDomain = serviceSettingDeployContainerApps ? 'computed-at-runtime.azurecontainerapps.io' : 'placeholder-domain'
+#disable-next-line BCP318
+var var_containerAppApiDomain = serviceSettingDeployContainerApps && !containerAppAExists? acaApi.outputs.SERVICE_ACA_URI: 'BCP318'
 
 // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
 var ipSecurityRestrictions = [for ip in ipWhitelist_array: {
@@ -363,9 +369,17 @@ module miForAca '../modules/mi.bicep' = if(!miACAExists) {
   ]
 }
 
-// Grant ACR pull access to managed identity (critical for container apps)
-// Variables to get managed identity properties
-var miPrincipalId = miACAExists ? 'existing-mi-principal-id' : '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${miACAName}'
+// Assumes the principals exists.
+module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: 'getACAMI-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miACAName
+  }
+}
+
+// Array vars - use principal IDs from helper modules
+var miPrincipalId = getACAMIPrincipalId.outputs.principalId
 
 module miRbac '../modules/miRbac.bicep' = if(!miACAExists && useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
@@ -657,6 +671,22 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerA
   ]
 }
 
+// ============================================================================
+// SPECIAL - Get API key of existing MI. Needs static name in existing
+// ============================================================================
+#disable-next-line BCP318
+var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+#disable-next-line BCP081
+var bingName_Static = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+
+#disable-next-line BCP081
+resource bingREF 'Microsoft.Bing/accounts@2020-06-10' existing = if(serviceSettingDeployBingSearch) {
+  name: bingName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318 BCP422
+var var_bing_api_Key = serviceSettingDeployBingSearch? bingREF.listKeys().key1:'BCP318'
+
 // ============== CONTAINER APPS - API ==============
 
 module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && serviceSettingDeployContainerApps) {
@@ -693,7 +723,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
     appinsightsConnectionstring: 'InstrumentationKey=${applicationInsightName}'
     bingName: bingName
     bingApiEndpoint: 'https://api.bing.microsoft.com/v7.0/search'
-    bingApiKey: 'placeholder-key'
+    bingApiKey: var_bing_api_Key // 'placeholder-key' Simplified
     aiProjectName: aiProjectName
     subscriptionId: subscriptionIdDevTestProd
     appWorkloadProfileName: acaAppWorkloadProfileName

@@ -42,6 +42,7 @@ param amlExists bool = false
 param aiHubExists bool = false
 param aifProjectExists bool = false
 param aksExists bool = false
+param miPrjExists bool = false
 
 // Enable flags from parameter files
 @description('Enable Azure Machine Learning deployment')
@@ -50,8 +51,14 @@ param enableAzureMachineLearning bool = true
 @description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = true
 
-@description('Enable AI Foundry Preview features')
-param serviceSettingEnableAIFoundryPreview bool = false
+@description('Enable AI Foundry 2 features')
+param enableAIFoundry2 bool = false
+
+@description('Keyvault seeding configuration')
+param inputKeyvault string
+param inputKeyvaultResourcegroup string
+param inputKeyvaultSubscription string
+param projectServicePrincipleOID_SeedingKeyvaultName string
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
@@ -124,9 +131,6 @@ param subscriptionIdDevTestProd string = subscription().subscriptionId
 param useCommonACR bool = true
 
 // Technical contact and user groups
-param technicalContactId string = ''
-param p011_genai_team_lead_array array = []
-param spAndMiArray array = []
 param useAdGroups bool = false
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
@@ -206,6 +210,8 @@ var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
+var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+
 //var cmnName = namingConvention.outputs.cmnName
 //var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
 //var prjResourceSuffixNoDash = namingConvention.outputs.prjResourceSuffixNoDash
@@ -228,6 +234,11 @@ var processedIpRulesAIHub = [for ip in ipWhitelist_array: {
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   scope: resourceGroup(subscription().subscriptionId, vnetResourceGroupName)
   name: vnetNameFull
+}
+
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
 }
 
 // Private DNS zones (simplified structure)
@@ -356,6 +367,40 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   ]
 }
 
+// ============================================================================
+// SPECIAL - Get PRINICPAL ID of existing MI. Needs static name in existing
+// ============================================================================
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: commonResourceGroup
+  scope: subscription(subscriptionIdDevTestProd)
+}
+#disable-next-line BCP318
+var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+var miPrjName_Static = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${randomSalt}${resourceSuffix}'
+resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  name: miPrjName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+#disable-next-line BCP318
+var var_miPrj_PrincipalId = miPrjREF.properties.principalId
+
+module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    managedIdentityOID: var_miPrj_PrincipalId
+    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+    namingConvention
+  ]
+}
+#disable-next-line BCP318
+var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
+// ============================================================================
+// END SPECIAL
+// ============================================================================
+
+
 // RBAC for Azure ML
 module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -375,7 +420,7 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzur
 
 // ============== AI FOUNDRY BASIC (PREVIEW) ==============
 
-module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!aifProjectExists && serviceSettingEnableAIFoundryPreview) {
+module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!aifProjectExists && enableAIFoundry2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: 'AIFoundryPrevview4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -456,7 +501,7 @@ module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!amlExi
     amlName: amlName
     servicePrincipleAndMIArray: spAndMiArray
     adfSP: '' // ADF Service Principal - empty if not using ADF integration
-    projectADuser: technicalContactId
+    projectADuser: ''
     additionalUserIds: p011_genai_team_lead_array
     useAdGroups: useAdGroups
   }
@@ -477,7 +522,7 @@ output azureMLDeployed bool = (!amlExists && enableAzureMachineLearning)
 output aiFoundryHubDeployed bool = (!aiHubExists && enableAIFoundryHub)
 
 @description('AI Foundry Preview deployment status')
-output aiFoundryPreviewDeployed bool = (!aifProjectExists && serviceSettingEnableAIFoundryPreview)
+output aiFoundryPreviewDeployed bool = (!aifProjectExists && enableAIFoundry2)
 
 @description('Project-specific ACR RBAC deployment status')
 output acrRbacDeployed bool = (useCommonACR == false && enableAIFoundryHub)
