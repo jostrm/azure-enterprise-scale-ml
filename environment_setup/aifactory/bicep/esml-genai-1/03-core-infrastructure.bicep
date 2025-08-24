@@ -193,12 +193,31 @@ var keyvaultName = namingConvention.outputs.keyvaultName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 //var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
-var acrCommonName = namingConvention.outputs.acrCommonName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var vmName = namingConvention.outputs.vmName
 var bingName = namingConvention.outputs.bingName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var kvNameCommon = namingConvention.outputs.kvNameCommon
+
+// ============================================================================
+// SPECIAL -Needs static name in existing
+// ============================================================================
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: commonResourceGroup
+  scope: subscription(subscriptionIdDevTestProd)
+}
+#disable-next-line BCP318
+var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+//var acrCommonName = namingConvention.outputs.acrCommonName
+var acrCommonName_Static = replace('acrcommon${uniqueInAIFenv_Static}${locationSuffix}${commonResourceSuffix}${env}','-','')
+resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR) {
+  name: acrCommonName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
+
+// ============================================================================
+// SPECIAL - END
+// ============================================================================
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -393,10 +412,6 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useC
     existingTargetRG
   ]
 }
-resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = {
-  name: acrCommonName
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-}
 
 // Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
@@ -404,7 +419,7 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: '03-AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    containerRegistryName: acrCommonName
+    containerRegistryName: acrCommonName_Static
     skuName: containerRegistrySkuName
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName

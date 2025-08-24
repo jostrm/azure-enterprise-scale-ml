@@ -675,9 +675,9 @@ module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerA
 // SPECIAL - Get API key of existing MI. Needs static name in existing
 // ============================================================================
 #disable-next-line BCP318
-var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 #disable-next-line BCP081
-var bingName_Static = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var bingName_Static = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
 #disable-next-line BCP081
 resource bingREF 'Microsoft.Bing/accounts@2020-06-10' existing = if(serviceSettingDeployBingSearch) {
