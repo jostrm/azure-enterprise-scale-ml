@@ -393,7 +393,7 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useC
     existingTargetRG
   ]
 }
-resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR) {
+resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = {
   name: acrCommonName
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
