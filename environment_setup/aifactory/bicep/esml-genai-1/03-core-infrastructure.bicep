@@ -208,10 +208,19 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 }
 #disable-next-line BCP318
 var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
-//var acrCommonName = namingConvention.outputs.acrCommonName
+
+// ACR - Common
 var acrCommonName_Static = replace('acrcommon${uniqueInAIFenv_Static}${locationSuffix}${commonResourceSuffix}${env}','-','')
 resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR) {
   name: acrCommonName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
+
+// KV - Common
+var cmnName_Static = 'cmn'
+var kvCommonName_Static = 'kv-${cmnName_Static}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: kvCommonName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
@@ -557,12 +566,6 @@ module kvPrjAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
     addSecret
     kv1
   ]
-}
-
-// Common key vault reference
-resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: kvNameCommon
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
 // Common key vault access policy for technical contact
