@@ -218,7 +218,7 @@ resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing 
 
 // KV - Common
 var cmnName_Static = 'cmn'
-var kvCommonName_Static = 'kv-${cmnName_Static}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var kvCommonName_Static = 'kv-${cmnName_Static}${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
 resource commonKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: kvCommonName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
