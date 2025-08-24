@@ -205,7 +205,7 @@ param tags object = {}
 // Network and resource group references
 var projectResourceGroup_rgId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
 // Data lake name calculation
-var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}'
+var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv_Static}esml${replace(commonResourceSuffix,'-','')}${env}'
 
 // Calculated variables
 var projectName = 'prj${projectNumber}'
@@ -338,6 +338,12 @@ resource docsREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
 #disable-next-line BCP318
 var var_docsPrincipalId = serviceSettingDeployAIDocIntelligence ? docsREF.identity.principalId : 'BCP318'
 
+// Datalake with datalakeName based on local, static VARS such as uniqueInAIFenv_Static
+resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
+  name: datalakeName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
+
 // ============================================================================
 // SPECIAL - END
 // ============================================================================
@@ -348,12 +354,6 @@ var var_docsPrincipalId = serviceSettingDeployAIDocIntelligence ? docsREF.identi
 resource existingTargetRG 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
-}
-
-// Common data lake reference
-resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
-  name: datalakeName
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
 // ============== RBAC MODULES - KEY VAULT AND BASTION ==============

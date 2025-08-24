@@ -306,9 +306,13 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existi
   scope: subscription(subscriptionIdDevTestProd)
 }
 
-// Log Analytics Workspace reference
+// ============================================================================
+// SPECIAL -Needs static name in existing
+// ============================================================================
+var cmnName_Static = 'cmn'
+var laWorkspaceName_Static = 'la-${cmnName_Static}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
 resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-  name: laWorkspaceName
+  name: laWorkspaceName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 

@@ -333,8 +333,13 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
   name: commonResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }
+// ============================================================================
+// SPECIAL -Needs static name in existing
+// ============================================================================
+var cmnName_Static = 'cmn'
+var laWorkspaceName_Static = 'la-${cmnName_Static}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
 resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-  name: laWorkspaceName
+  name: laWorkspaceName_Static
   scope:commonResourceGroupRef
 }
 
