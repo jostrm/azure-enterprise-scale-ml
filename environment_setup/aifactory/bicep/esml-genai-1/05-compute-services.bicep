@@ -358,7 +358,7 @@ var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
 module miForAca '../modules/mi.bicep' = if(!miACAExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'miForAca4${deploymentProjSpecificUniqueSuffix}'
+  name: '05-miForAca4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: miACAName
     location: location
@@ -371,7 +371,7 @@ module miForAca '../modules/mi.bicep' = if(!miACAExists) {
 
 // Assumes the principals exists.
 module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: 'getACAMI-${deploymentProjSpecificUniqueSuffix}'
+  name: '05-getACAMI-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miACAName
@@ -383,7 +383,7 @@ var miPrincipalId = getACAMIPrincipalId.outputs.principalId
 
 module miRbac '../modules/miRbac.bicep' = if(!miACAExists && useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: 'miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: '05-miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
     containerRegistryName: acrCommonName
     principalId: miPrincipalId
@@ -395,7 +395,7 @@ module miRbac '../modules/miRbac.bicep' = if(!miACAExists && useCommonACR) {
 
 module miRbacProj '../modules/miRbac.bicep' = if(!miACAExists && !useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: '05-miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
     containerRegistryName: acrProjectName
     principalId: miPrincipalId
@@ -409,7 +409,7 @@ module miRbacProj '../modules/miRbac.bicep' = if(!miACAExists && !useCommonACR) 
 
 // Subnet delegation for Web Apps and Function Apps
 module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (serviceSettingDeployWebApp || serviceSettingDeployFunction) && !byoASEv3) {
-  name: 'subnetDelegationServerFarm1${deploymentProjSpecificUniqueSuffix}'
+  name: '05-snetDelegSF1${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(vnetResourceGroupName)
   params: {
     vnetName: vnetNameFull
@@ -429,7 +429,7 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
 
 // Subnet delegation for Container Apps
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (!containerAppsEnvExists && serviceSettingDeployContainerApps) {
-  name: 'subnetDelegationAcaEnv${deploymentProjSpecificUniqueSuffix}'
+  name: '05-snetDelegACA${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(vnetResourceGroupName)
   params: {
     vnetName: vnetNameFull
@@ -451,7 +451,7 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (!containerA
 
 module appinsights '../modules/appinsights.bicep' = if(!applicationInsightExists && serviceSettingDeployAppInsightsDashboard) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AppInsights4${deploymentProjSpecificUniqueSuffix}'
+  name: '05-AppInsights4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: namingConvention.outputs.applicationInsightName2
     location: location
@@ -467,7 +467,7 @@ module appinsights '../modules/appinsights.bicep' = if(!applicationInsightExists
 
 module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDeployWebApp) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'WebApp4${deploymentProjSpecificUniqueSuffix}'
+  name: '05-WebApp4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: webAppName
     location: location
@@ -517,7 +517,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDepl
 
 module privateDnsWebapp '../modules/privateDns.bicep' = if(!webAppExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployWebApp && !enablePublicAccessWithPerimeter && !byoASEv3) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privateDnsLinkWebApp${deploymentProjSpecificUniqueSuffix}'
+  name: '05-privDnsWeb${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_webapp_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -531,7 +531,7 @@ module privateDnsWebapp '../modules/privateDns.bicep' = if(!webAppExists && !cen
 // Add RBAC for WebApp MSI to access other resources (simplified)
 module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && serviceSettingDeployWebApp) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
+  name: '05-rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount1001Name // Using same storage account
@@ -549,7 +549,7 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && serv
 
 module function '../modules/function.bicep' = if(!functionAppExists && serviceSettingDeployFunction) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'Function4${deploymentProjSpecificUniqueSuffix}'
+  name: '05-Function4${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: functionAppName
     location: location
@@ -597,7 +597,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && serviceSe
 // Add DNS zone configuration for the Azure Function private endpoint
 module privateDnsFunction '../modules/privateDns.bicep' = if(!functionAppExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployFunction && !enablePublicAccessWithPerimeter && !byoASEv3) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privateDnsLinkFunction${deploymentProjSpecificUniqueSuffix}'
+  name: '05-privDnsFunc${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_function_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -611,7 +611,7 @@ module privateDnsFunction '../modules/privateDns.bicep' = if(!functionAppExists 
 // Add RBAC for Function App MSI to access other resources (simplified)
 module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExists && serviceSettingDeployFunction) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbacForFunction${deploymentProjSpecificUniqueSuffix}'
+  name: '05-rbacForFunction${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount1001Name // Using same storage account
@@ -629,7 +629,7 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExist
 
 module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvExists && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'aca-env-${deploymentProjSpecificUniqueSuffix}-depl'
+  name: '05-aca-env-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: containerAppsEnvName
     location: location
@@ -660,7 +660,7 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
 
 module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerAppsEnvExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployContainerApps && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privateDnsLinkACAEnv${deploymentProjSpecificUniqueSuffix}'
+  name: '05-privDnsACAEnv${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_containerAppsEnv_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -691,7 +691,7 @@ var var_bing_api_Key = serviceSettingDeployBingSearch? bingREF.listKeys().key1:'
 
 module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'aca-a-${deploymentProjSpecificUniqueSuffix}-depl'
+  name: '05-aca-a-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: containerAppAName
     location: location
@@ -743,7 +743,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
 
 module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'aca-w-${deploymentProjSpecificUniqueSuffix}-depl'
+  name: '05-aca-w-${deploymentProjSpecificUniqueSuffix}'
   params: {
     location: location
     tags: tagsProject
@@ -773,7 +773,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
 
 module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!miACAExists && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbacForContainerAppsMI${deploymentProjSpecificUniqueSuffix}'
+  name: '05rbacACAMI${deploymentProjSpecificUniqueSuffix}'
   params: {
     aiSearchName: aiSearchName
     appInsightsName: applicationInsightName

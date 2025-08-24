@@ -361,7 +361,7 @@ resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing 
 // Bastion in AIFactory COMMON RG, but with a custom name
 module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(empty(bastionResourceGroup) && addBastionHost) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: 'rbac1GenAIReadUsersCmnKV${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbac1GenAIRUsCmnKV${deploymentProjSpecificUniqueSuffix}'
   params: {
     common_kv_name: namingConvention.outputs.kvNameCommon
     user_object_ids: p011_genai_team_lead_array   
@@ -377,7 +377,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
 // Bastion Externally (Connectivity subscription and RG)
 module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(bastionResourceGroup) && !empty(bastionSubscription)) {
   scope: resourceGroup(bastionSubscription, bastionResourceGroup)
-  name: 'rbac2GenAIUsersBastionExt${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbac2GenAIUsersBas${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: p011_genai_team_lead_array
     bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
@@ -394,7 +394,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(ba
 // RBAC for OpenAI - Storage, Search, and User Access
 module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureOpenAI && !openaiExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -414,7 +414,7 @@ module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDepl
 // RBAC for AI Services - Storage and Search Integration
 module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!aiServicesExists && enableAIServices) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac4AIServices${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbac4AIServ${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -429,7 +429,7 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!aiServi
 // RBAC for AI Search - Cross-service Integration
 module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExists && enableAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac5Search${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbac5Search${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -446,7 +446,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExi
 // RBAC for AI Hub to Azure ML Resource Group
 module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists && !empty(azureMachineLearningObjectId) && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}'
   params: {
     azureMachineLearningObjectId: azureMachineLearningObjectId
     aiHubName: aiHubName
@@ -460,7 +460,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
 // RBAC for Users to AI Hub and Projects
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac7UsersAIHub${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacUsersAIHub${deploymentProjSpecificUniqueSuffix}'
   params: {
     aiServicesName: aiServicesName
     storageAccountName: storageAccount1001Name
@@ -481,7 +481,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && e
 // RBAC for Users to AI Search
 module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!aiSearchExists && enableAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac7Users2AISearch${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacAISearch${deploymentProjSpecificUniqueSuffix}'
   params: {
     aiSearchName: aiSearchName
     userObjectIds: p011_genai_team_lead_array
@@ -498,7 +498,7 @@ module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!aiSea
 // RBAC for Azure AI Vision (Optional)
 module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac8Vision${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacVision${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -516,7 +516,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
 // RBAC for Azure Speech Services (Optional)
 module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac9Speech${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacSpeech${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -534,7 +534,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
 // RBAC for AI Document Intelligence (Optional)
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbac10Docs${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacDocs${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -554,7 +554,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost && empty(bastionSubscription)) {
   scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
-  name: 'rbac12GenAIRUsersVnet${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacGenAIUsVn${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: p011_genai_team_lead_array
     vNetName: vnetNameFull
@@ -570,7 +570,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 // Bastion VNet Externally (Connectivity subscription and RG || AI Factory Common RG)
 module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost && !empty(bastionSubscription)) {
   scope: resourceGroup(bastionSubscription, bastionResourceGroup)
-  name: 'rbac13UsersVnet${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacUseVnet${deploymentProjSpecificUniqueSuffix}'
   params: {
     user_object_ids: p011_genai_team_lead_array
     vNetName: vnetNameFullBastion
@@ -588,7 +588,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
 // RBAC on ACR Push/Pull for users in Common Resource group
 module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: 'rbac14UsersToCmnACR${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacUsCmnACR${deploymentProjSpecificUniqueSuffix}'
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleAndMIArray: spAndMiArray
@@ -606,7 +606,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
 // RBAC for Data Lake - AI Foundry Integration
 module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: 'rbacLake4PrjFoundry${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacLake4Prj${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
     aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
@@ -624,7 +624,7 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!ai
 // RBAC for Data Lake - Azure ML Integration
 module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: 'rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}'
+  name: '07rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
     aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID

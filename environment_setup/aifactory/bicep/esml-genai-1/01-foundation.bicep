@@ -390,7 +390,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: 'naming-01-${targetResourceGroup}'
+  name: '01-naming${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -646,7 +646,7 @@ module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
 // Container Apps Managed Identity
 module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'miForAca${deploymentProjSpecificUniqueSuffix}'
+  name: '01-miForAca${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: miACAName
     location: location
@@ -660,7 +660,7 @@ module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
 
 // Debug Module (optional)
 module debug './00-debug.bicep' = if (enableDebugging) {
-  name: 'debug${deploymentProjSpecificUniqueSuffix}'
+  name: '01-debug${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     projectName: projectName
@@ -750,7 +750,7 @@ module debug './00-debug.bicep' = if (enableDebugging) {
 // VM Admin Login Permissions (if storage already exists)
 module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resourceExists.storageAccount1001) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'VMAdminLogin4${deploymentProjSpecificUniqueSuffix}'
+  name: '01-VMAdminLogin4${deploymentProjSpecificUniqueSuffix}'
   params: {
     userId: technicalContactId
     userEmail: technicalContactEmail

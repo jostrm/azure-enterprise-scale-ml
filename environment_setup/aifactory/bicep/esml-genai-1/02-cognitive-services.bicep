@@ -287,7 +287,7 @@ var var_sa4AIsearch_dnsConfig = sa4AIsearch.outputs.dnsConfig
 // Content Safety
 module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDeployContentSafety == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'ContentSafety4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-ContentSafety${deploymentProjSpecificUniqueSuffix}'
   params: {
     csSKU: csContentSafetySKU
     location: location
@@ -316,7 +316,7 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
 // Vision Services
 module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'Vision4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-Vision4${deploymentProjSpecificUniqueSuffix}'
   params: {
     csSKU: csVisionSKU
     location: (!empty(serviceSettingOverrideRegionAzureAIVision)) ? serviceSettingOverrideRegionAzureAIVision : location
@@ -346,7 +346,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
 // Speech Services
 module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'AISpeech4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-AISpeech4${deploymentProjSpecificUniqueSuffix}'
   params: {
     csSKU: csSpeechSKU
     location: location
@@ -376,7 +376,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
 // Document Intelligence
 module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettingDeployAIDocIntelligence == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'AIDocInt4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-AIDocInt4${deploymentProjSpecificUniqueSuffix}'
   params: {
     csSKU: csDocIntelligenceSKU
     location: location
@@ -406,7 +406,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
 // Storage for AI Search
 module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'GenAISAAcc4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-GenAISAAcc4${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount2001Name
     skuName: storageAccountSkuName
@@ -477,7 +477,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
 
 // AI Search Service
 module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enableAISearch) {
-  name: 'AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     aiSearchName: safeNameAISearch
@@ -506,7 +506,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
 // AI Services (Multi-service account)
 module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enableAIServices) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'AIServices4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-AIServices4${deploymentProjSpecificUniqueSuffix}'
   params: {
     location: location
     sku: csAIservicesSKU
@@ -547,7 +547,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
 
 // Get AI Search principal ID - always called but with conditional logic inside
 module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
-  name: 'getAISearchInfo-${deploymentProjSpecificUniqueSuffix}'
+  name: '02-getAISearchI-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     aiSearchName: safeNameAISearch
@@ -558,7 +558,7 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
 // Azure OpenAI - with conditional AI Search principal ID
 module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSettingDeployAzureOpenAI) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
+  name: '02-AzureOpenAI4${deploymentProjSpecificUniqueSuffix}'
   params: {
     cognitiveName: aoaiName
     tags: tagsProject
@@ -598,7 +598,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
 // Content Safety Private DNS
 module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployContentSafety == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privDnsCS${deploymentProjSpecificUniqueSuffix}'
+  name: '02-privDnsCS${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_csContentSafety_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -612,7 +612,7 @@ module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZone
 // Vision Services Private DNS
 module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privDnsVision${deploymentProjSpecificUniqueSuffix}'
+  name: '02-privDnsVision${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_csVision_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -626,7 +626,7 @@ module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 // Speech Services Private DNS
 module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureSpeech == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privDnsSpeech${deploymentProjSpecificUniqueSuffix}'
+  name: '02-privDnsSpeech${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_csSpeech_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -640,7 +640,7 @@ module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 // Document Intelligence Private DNS
 module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAIDocIntelligence == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privDnsDocInt${deploymentProjSpecificUniqueSuffix}'
+  name: '02-privDnsDocInt${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_csDocIntelligence_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -654,7 +654,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 // Azure OpenAI Private DNS
 module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists && serviceSettingDeployAzureOpenAI && !centralDnsZoneByPolicyInHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privDnsLAOAI${deploymentProjSpecificUniqueSuffix}'
+  name: '02-privDnsLAOAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_csAzureOpenAI_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -668,7 +668,7 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists &&
 // AI Search Service Private DNS
 module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExists && !centralDnsZoneByPolicyInHub && enableAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privDnsAISearch${deploymentProjSpecificUniqueSuffix}'
+  name: '02-privDnsAISearch${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_aiSearchService_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -682,7 +682,7 @@ module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExi
 // Storage for AI Search Private DNS
 module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(!storageAccount2001Exists && centralDnsZoneByPolicyInHub == false) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'privDnsSAGenAI${deploymentProjSpecificUniqueSuffix}'
+  name: '02-privDnsSAGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     dnsConfig: var_sa4AIsearch_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones

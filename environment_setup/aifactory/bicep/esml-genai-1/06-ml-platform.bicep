@@ -316,7 +316,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
 
 module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'AzureMLDepl_${deploymentProjSpecificUniqueSuffix}'
+  name: '06-AzureMLDepl${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: amlName
     uniqueDepl: deploymentProjSpecificUniqueSuffix
@@ -404,7 +404,7 @@ var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
 // RBAC for Azure ML
 module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbacUsersAmlVersion2${deploymentProjSpecificUniqueSuffix}'
+  name: '06-rbacUsersAmlV2${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount2001Name
     userObjectIds: p011_genai_team_lead_array
@@ -422,7 +422,7 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzur
 
 module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!aifProjectExists && enableAIFoundry2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'AIFoundryPrevview4${deploymentProjSpecificUniqueSuffix}'
+  name: '06-AIFoundryV2${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aifName
     projectName: aifProjectName
@@ -437,7 +437,7 @@ module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!aifProjectE
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'aiHubModule${deploymentProjSpecificUniqueSuffix}'
+  name: '06-aiHubModule${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aiHubName
     defaultProjectName: aifProjectName
@@ -481,7 +481,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
 
 module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
+  name: '06-rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
   params: {
     acrName: var_acr_cmn_or_prj
     aiHubName: aiHubName
@@ -496,7 +496,7 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
 
 module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
+  name: '06-rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
   params: {
     amlName: amlName
     servicePrincipleAndMIArray: spAndMiArray
