@@ -17,10 +17,10 @@ resource bing 'Microsoft.Bing/accounts@2025-05-01-preview' = {
     name: sku
   }
   properties: {
-    responsibleAiNotice: 'Acknowledged'
+    //responsibleAiNotice: 'Acknowledged'
     statisticsEnabled: false
-    restrictOutboundNetworkAccess: false
-    publicNetworkAccess: 'Enabled' // Disabled
+    //restrictOutboundNetworkAccess: false
+    //publicNetworkAccess: 'Enabled' // Disabled
   }
 }
 
