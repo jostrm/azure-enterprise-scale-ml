@@ -202,6 +202,8 @@ var kvNameCommon = namingConvention.outputs.kvNameCommon
 // ============================================================================
 // SPECIAL -Needs static name in existing
 // ============================================================================
+var bingName_Static = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
@@ -494,7 +496,7 @@ module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBing
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '03-BingSearch4${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: bingName
+    name: bingName_Static
     location: 'global'
     sku: bingSearchSKU
     tags: tagsProject
