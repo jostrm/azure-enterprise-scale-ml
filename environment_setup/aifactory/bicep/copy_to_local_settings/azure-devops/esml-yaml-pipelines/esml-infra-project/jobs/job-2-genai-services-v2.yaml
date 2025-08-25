@@ -827,7 +827,6 @@ steps:
      --parameters technicalAdminsEmail="$(technical_admins_email)" \
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
-     --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
      --parameters vnetNameFull_param="$(vnetNameFull_param)" \
@@ -840,6 +839,10 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters cosmosDBExists="$(cosmosDBExists)" \
      --parameters redisExists="$(redisExists)" \
