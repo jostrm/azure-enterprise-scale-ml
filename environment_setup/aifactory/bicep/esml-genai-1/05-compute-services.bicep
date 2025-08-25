@@ -324,13 +324,13 @@ var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
 // SPECIAL - Get PRINICPAL ID, only if created in this module, else ignore.
 // ============================================================================
 #disable-next-line BCP318
-var var_webAppPrincipalId = serviceSettingDeployWebApp && !webAppExists? webapp.outputs.principalId: 'BCP318'
+var var_webAppPrincipalId = serviceSettingDeployWebApp && !webAppExists? webapp.outputs.principalId: ''
 #disable-next-line BCP318
-var var_functionPrincipalId= serviceSettingDeployFunction && !functionAppExists? function.outputs.principalId: 'BCP318'
+var var_functionPrincipalId= serviceSettingDeployFunction && !functionAppExists? function.outputs.principalId: ''
 
 // Container App API domain/endpoint - using simplified logic
 #disable-next-line BCP318
-var var_containerAppApiDomain = serviceSettingDeployContainerApps && !containerAppAExists? acaApi.outputs.SERVICE_ACA_URI: 'BCP318'
+var var_containerAppApiDomain = serviceSettingDeployContainerApps && !containerAppAExists? acaApi.outputs.SERVICE_ACA_URI: ''
 
 // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
 var ipSecurityRestrictions = [for ip in ipWhitelist_array: {
@@ -362,7 +362,7 @@ var allowedOrigins = [
 // ]
 
 #disable-next-line BCP318
-var var_webapp_dnsConfig = webapp.outputs.dnsConfig
+var var_webapp_dnsConfig = serviceSettingDeployWebApp && !webAppExists? webapp.outputs.dnsConfig: []
 
 // var var_containerAppsEnv_dnsConfig = [
 //   {
@@ -374,7 +374,7 @@ var var_webapp_dnsConfig = webapp.outputs.dnsConfig
 // ]
 
 #disable-next-line BCP318
-var var_containerAppsEnv_dnsConfig = containerAppsEnv.outputs.dnsConfig
+var var_containerAppsEnv_dnsConfig = serviceSettingDeployContainerApps && !containerAppsEnvExists? containerAppsEnv.outputs.dnsConfig: []
 
 // var var_function_dnsConfig = [
 //   {
@@ -386,7 +386,7 @@ var var_containerAppsEnv_dnsConfig = containerAppsEnv.outputs.dnsConfig
 // ]
 
 #disable-next-line BCP318
-var var_function_dnsConfig = function.outputs.dnsConfig
+var var_function_dnsConfig = serviceSettingDeployFunction && !functionAppExists? function.outputs.dnsConfig: []
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
@@ -443,7 +443,7 @@ module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 
 // Array vars - use principal IDs from helper modules
-var miPrincipalId = getACAMIPrincipalId.outputs.principalId
+var miPrincipalId = getACAMIPrincipalId.outputs.principalId!
 
 module miRbac '../modules/miRbac.bicep' = if(!miACAExists && useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
