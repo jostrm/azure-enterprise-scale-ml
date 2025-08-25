@@ -37,16 +37,13 @@ param webappSKUAce object = {
 param functionSKU object = {
   name: 'EP1'
   tier: 'ElasticPremium'
-  size: 'EP1'
   family: 'EP'
   capacity: 1
 }
-
 // Web App configuration
 param webappSKU object = {
   name: 'P1v3'
   tier: 'PremiumV3'
-  size: 'P1v3'
   family: 'Pv3'
   capacity: 1
 }
@@ -121,13 +118,67 @@ param commonResourceGroup_param string = ''
 
 // Function App configuration
 param functionAlwaysOn bool = true
-param functionRuntime string = 'python'
+@allowed([
+  'dotnet'
+  'node'
+  'python'
+  'java'
+])
+param functionRuntime string = 'python' //'node', 'dotnet', 'java', 'python'
+@allowed([
+  '3.7'
+  '3.8'
+  '3.9'
+  '3.10'
+  '3.11'
+  '3.12'
+  // Node.js versions
+  '18-lts'
+  '20-lts'
+  // Java LTS versions
+  '8'
+  '11'
+  '17'
+  '21'
+  // .NET versions
+  'v4.8'
+  'v6.0'
+  'v7.0'
+  'v8.0'
+])
 param functionVersion string = '3.11'
 
 // Web App configuration
 param webappAlwaysOn bool = true
-param webAppRuntime string = 'python'
-param webAppRuntimeVersion string = '3.11'
+@allowed([
+  'dotnet'
+  'node'
+  'python'
+  'java'
+])
+param webAppRuntime string = 'python'  // Set to 'python' for Python apps
+@allowed([
+  '3.7'
+  '3.8'
+  '3.9'
+  '3.10'
+  '3.11'
+  '3.12'
+  // Node.js versions
+  '18-lts'
+  '20-lts'
+  // Java LTS versions
+  '8'
+  '11'
+  '17'
+  '21'
+  // .NET versions
+  'v4.8'
+  'v6.0'
+  'v7.0'
+  'v8.0'
+])
+param webAppRuntimeVersion string = '3.11'  // Specify the Python version
 
 // ASE (App Service Environment) settings
 param byoASEv3 bool = false
@@ -138,18 +189,26 @@ param byoAseAppServicePlanResourceId string = ''
 param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
 param wlMaxCount int = 100
-param wlProfileDedicatedName string = 'Dedicated'
-param wlProfileGPUConsumptionName string = 'gpu-consumption'
+param containerMemory string = '2.0Gi' // 0.5Gi, 1.0Gi, 2.0Gi, 4.0Gi, 8.0Gi
+param wlProfileDedicatedName string = 'D4' // 'D4', 'D8', 'D16', 'D32', 'D64', 'E4', 'E8'
+param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 param acaAppWorkloadProfileName string = 'consumption'
 param containerCpuCoreCount int = 1
-param containerMemory string = '1.0Gi'
 
 // Container App images
 param aca_a_registry_image string = ''
 param aca_w_registry_image string = ''
 param aca_default_image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-param imageRegistryTypeA string = 'ms'
-param imageRegistryTypeW string = 'ms'
+var imageRegistryTypeA = !empty(aca_a_registry_image) && contains(aca_a_registry_image, 'mcr.microsoft.com') 
+  ? 'ms' 
+  : !empty(aca_a_registry_image) && contains(aca_a_registry_image, 'docker.io') 
+    ? 'dockerhub' 
+    : 'private'
+var imageRegistryTypeW = !empty(aca_w_registry_image) && contains(aca_w_registry_image, 'mcr.microsoft.com') 
+  ? 'ms' 
+  : !empty(aca_w_registry_image) && contains(aca_w_registry_image, 'docker.io') 
+    ? 'dockerhub' 
+    : 'private'
 
 // Custom domains for Container Apps
 param acaCustomDomainsArray array = []

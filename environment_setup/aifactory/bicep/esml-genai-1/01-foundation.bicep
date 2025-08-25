@@ -387,6 +387,10 @@ var projectSalt = substring(uniqueString(targetResourceGroupRef.id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // ============================================================================
+// Import AI Factory naming types for type safety
+import { aifactoryNamingType } from '../modules/types/aifactoryNaming.bicep'
+
+// ============================================================================
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
@@ -412,15 +416,19 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
-var miACAName = namingConvention.outputs.miACAName
-var miPrjName = namingConvention.outputs.miPrjName
-var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
-var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
-var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
-var randomSalt = namingConvention.outputs.randomSalt
-var defaultSubnet = namingConvention.outputs.defaultSubnet
-var aksSubnetName = namingConvention.outputs.aksSubnetName
-var acaSubnetName = namingConvention.outputs.acaSubnetName
+// Type-safe naming convention outputs
+var namingOutputs aifactoryNamingType = namingConvention.outputs
+
+// Extract commonly used values with type safety
+var miACAName = namingOutputs.miACAName
+var miPrjName = namingOutputs.miPrjName
+var p011_genai_team_lead_email_array = namingOutputs.p011_genai_team_lead_email_array
+var p011_genai_team_lead_array = namingOutputs.p011_genai_team_lead_array
+var uniqueInAIFenv = namingOutputs.uniqueInAIFenv
+var randomSalt = namingOutputs.randomSalt
+var defaultSubnet = namingOutputs.defaultSubnet
+var aksSubnetName = namingOutputs.aksSubnetName
+var acaSubnetName = namingOutputs.acaSubnetName
 
 // ============================================================================
 // COMPUTED VARIABLES - Private DNS Zones
