@@ -640,7 +640,7 @@ module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
 // Project Managed Identity
 module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: guid('miForPrj',commonResourceGroupRef.id, subscriptionIdDevTestProd)
+  name: '01-miForPrj${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: miPrjName
     location: location

@@ -295,6 +295,7 @@ var containerAppsEnvName = namingConvention.outputs.containerAppsEnvName
 var containerAppAName = namingConvention.outputs.containerAppAName
 var containerAppWName = namingConvention.outputs.containerAppWName
 var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
@@ -421,19 +422,6 @@ var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
 // ============== MANAGED IDENTITY FOR CONTAINER APPS ==============
 
-module miForAca '../modules/mi.bicep' = if(!miACAExists) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '05-miForAca4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: miACAName
-    location: location
-    tags: tagsProject
-  }
-  dependsOn: [
-    existingTargetRG
-  ]
-}
-
 // Assumes the principals exists.
 module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
   name: '05-getACAMI-${deploymentProjSpecificUniqueSuffix}'
@@ -446,30 +434,51 @@ module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 // Array vars - use principal IDs from helper modules
 var miPrincipalId = getACAMIPrincipalId.outputs.principalId!
 
-module miRbac '../modules/miRbac.bicep' = if(!miACAExists && useCommonACR) {
+module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '05-miRbacCmn-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: '05-miRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
     containerRegistryName: acrCommonName
     principalId: miPrincipalId
   }
-  dependsOn: [
-    miForAca
-  ]
+
 }
 
-module miRbacProj '../modules/miRbac.bicep' = if(!miACAExists && !useCommonACR) {
+module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '05-miRbacProj-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: '05-miRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
   params: {
     containerRegistryName: acrProjectName
     principalId: miPrincipalId
   }
-  dependsOn: [
-    miForAca
-  ]
 }
 
+module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: '05-getPrjMI-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miPrjName
+  }
+}
+var miPrjPrincipalId = getACAMIPrincipalId.outputs.principalId!
+
+module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  name: '05-miPrjRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acrCommonName
+    principalId: miPrjPrincipalId
+  }
+}
+
+module miPrjRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '05-miPrjRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    containerRegistryName: acrProjectName
+    principalId: miPrjPrincipalId
+  }
+}
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
@@ -716,9 +725,8 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
   }
   dependsOn: [
     existingTargetRG
-    ...(miACAExists ? [] : [miForAca])
-    ...(useCommonACR && !miACAExists ? [miRbac] : [])
-    ...(!useCommonACR && !miACAExists ? [miRbacProj] : [])
+    ...(useCommonACR ? [miRbacCmnACR] : [])
+    ...(!useCommonACR ? [miRbacLocalACR] : [])
     subnetDelegationAca
   ]
 }
@@ -800,7 +808,8 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
   }
   dependsOn: [
     containerAppsEnv
-    ...(miACAExists ? [] : [miForAca])
+    ...(useCommonACR ? [miRbacCmnACR] : [])
+    ...(!useCommonACR ? [miRbacLocalACR] : [])
   ]
 }
 
@@ -828,15 +837,15 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
     imageRegistryType: !empty(aca_w_registry_image) ? imageRegistryTypeW : 'ms'
   }
   dependsOn: [
-    containerAppsEnv
-    acaApi
-    ...(miACAExists ? [] : [miForAca])
+    containerAppsEnv    
+    ...(useCommonACR ? [miRbacCmnACR] : [])
+    ...(!useCommonACR ? [miRbacLocalACR] : [])
   ]
 }
 
 // ============== RBAC FOR CONTAINER APPS ==============
 
-module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!miACAExists && serviceSettingDeployContainerApps) {
+module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '05rbacACAMI${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -848,7 +857,6 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (!miACAEx
   dependsOn: [
     containerAppsEnv
     acaApi
-    ...(miACAExists ? [] : [miForAca])
   ]
 }
 
