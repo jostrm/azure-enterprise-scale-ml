@@ -55,7 +55,7 @@ var cmnName = namingConvention.outputs.cmnName
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: 'naming-convention-${projectName}-${env}'
+  name: '07-naming-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env

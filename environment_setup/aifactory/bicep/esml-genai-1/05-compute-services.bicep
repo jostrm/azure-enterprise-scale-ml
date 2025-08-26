@@ -266,7 +266,7 @@ var randomSalt = substring(uniqueString(subscription().subscriptionId, targetRes
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: 'naming-05-${targetResourceGroup}'
+  name: '05-naming${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
