@@ -115,8 +115,8 @@ var webbAppServicePlanName = 'webapp-${projectName}-${locationSuffix}-${env}-${u
 var vmName = 'dsvm-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // AI Foundry
-var aifName ='aifoundry-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifPrjName ='aifoundry-${projectName}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifName ='aif-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifPrjName ='ai-${projectName}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // Storage and Keys
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'

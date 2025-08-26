@@ -30,6 +30,11 @@ param wlProfileDedicatedGPUName string = 'Dedicated-GPU-NC24-A100'
 param wlMinCountDedicatedGPU int = 1
 param wlMaxCountDedicatedGPU int = 5
 
+param zoneRedundant bool = false
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
@@ -43,6 +48,20 @@ resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' exist
   name: subnetNamePend
   parent: vnet
 }
+
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : null
 
 //  Provided subnet must have a size of at least /23 or larger.
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01' = {
@@ -63,19 +82,19 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01'
     #disable-next-line use-secure-value-for-secure-inputs BCP318
     daprAIConnectionString: daprEnabled && !empty(applicationInsightsName) ? applicationInsights.properties.ConnectionString : ''
     workloadProfiles: [
-      {
+      { 
         name: 'Consumption'
-        workloadProfileType: 'Consumption'
+        workloadProfileType: 'Consumption' //THIS IS REQUIRED TO ADD PRIVATE ENDPOINTS
       }
-      {
-        name: 'Dedicated'
-        workloadProfileType: wlProfileDedicatedName
-        minimumCount: wlMinCountDedicated
-        maximumCount: wlMaxCount
-      }
-      
-    ]
+      //{ TODO: FAILS as of 2025-07: ManagedCluster failed to provision node pools for dedicated
+//      name: 'Dedicated'
+//      workloadProfileType: wlProfileDedicatedName
+//      minimumCount: wlMinCountDedicated
+//      maximumCount: wlMaxCount
+//    }
 
+    ]
+    zoneRedundant: zoneRedundant
     vnetConfiguration: {
       infrastructureSubnetId: enablePublicAccessWithPerimeter ? null : subnet.id
       internal: enablePublicAccessWithPerimeter? false:true

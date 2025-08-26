@@ -527,7 +527,7 @@ output azureMLDeployed bool = (!amlExists && enableAzureMachineLearning)
 output aiFoundryHubDeployed bool = (!aiHubExists && enableAIFoundryHub)
 
 @description('AI Foundry Preview deployment status')
-output aiFoundryPreviewDeployed bool = (!aifProjectExists && enableAIFoundry2)
+output aiFoundryv2Deployed bool = (!aifProjectExists && enableAIFoundry2)
 
 @description('Project-specific ACR RBAC deployment status')
 output acrRbacDeployed bool = (useCommonACR == false && enableAIFoundryHub)

@@ -1,3 +1,8 @@
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: serviceConnectionSeeding
+    type: string    
 steps:
 - checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
   submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
