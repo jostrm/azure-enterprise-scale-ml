@@ -1,3 +1,9 @@
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: serviceConnectionSeeding
+    type: string
+
 steps:
 
 - checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
