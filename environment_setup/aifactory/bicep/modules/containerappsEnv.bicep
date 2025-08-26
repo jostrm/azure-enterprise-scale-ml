@@ -68,7 +68,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01'
         workloadProfileType: 'Consumption'
       }
       {
-        name: wlProfileDedicatedName
+        name: 'Dedicated'
         workloadProfileType: wlProfileDedicatedName
         minimumCount: wlMinCountDedicated
         maximumCount: wlMaxCount

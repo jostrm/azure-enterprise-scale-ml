@@ -19,7 +19,7 @@ param wlProfileDedicatedName string = 'D4' // 'D4', 'D8', 'D16', 'D32', 'D64', '
 param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
-  name: 'depl-${name}'
+  name: '05b-depl-${name}'
   params: {
     name: name
     location: location
