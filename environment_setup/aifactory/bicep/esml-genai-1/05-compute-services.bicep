@@ -409,6 +409,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existi
 
 // ============== Private DNS Zones ==============
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  name: '05-getPrivDnsZ-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     location: location

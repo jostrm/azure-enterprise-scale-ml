@@ -246,6 +246,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 
 var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
 module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+  name: '07-spAndMI2Array-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId

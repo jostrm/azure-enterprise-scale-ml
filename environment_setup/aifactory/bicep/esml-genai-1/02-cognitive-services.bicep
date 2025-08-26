@@ -172,6 +172,7 @@ var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneBy
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '02-getPrivDnsZ-${targetResourceGroup}'
   params: {
     location: location
     privDnsResourceGroupName: privDnsResourceGroupName

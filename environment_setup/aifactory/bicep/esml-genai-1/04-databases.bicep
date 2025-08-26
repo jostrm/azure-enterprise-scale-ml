@@ -217,6 +217,7 @@ var sqlServerSKUObject_DTU = {
 
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  name: '04-getPrivDnsZ-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     location: location
@@ -246,6 +247,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 
 // Access policies for principals
 module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+  name: '04-spAndMI2Array-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId

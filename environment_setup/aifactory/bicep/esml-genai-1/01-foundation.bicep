@@ -436,7 +436,7 @@ var acaSubnetName = namingOutputs.acaSubnetName
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: 'GetPrivDnsZ-${privDnsSubscription}'
+  name: '01-getPrivDnsZ-${targetResourceGroup}'
   params: {
     location: location
     privDnsResourceGroupName: privDnsResourceGroupName
@@ -668,7 +668,7 @@ module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
 
 // Debug Module (optional)
 module debug './00-debug.bicep' = if (enableDebugging) {
-  name: '01-debug${deploymentProjSpecificUniqueSuffix}'
+  name: '01-DEBUG-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     projectName: projectName

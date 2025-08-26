@@ -243,6 +243,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 
 // Private DNS zones (simplified structure)
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
+  name: '06-getPrivDnsZ-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     location: location

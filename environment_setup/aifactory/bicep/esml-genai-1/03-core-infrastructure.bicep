@@ -249,6 +249,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '03-getPrivDnsZ-${targetResourceGroup}'
   params: {
     location: location
     privDnsResourceGroupName: privDnsResourceGroupName
