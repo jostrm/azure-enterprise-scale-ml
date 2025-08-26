@@ -78,7 +78,6 @@ param centralDnsZoneByPolicyInHub bool = false
 param privateDnsAndVnetLinkAllGlobalLocation bool = false
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
-param enablePublicAccessWithPerimeter bool = false
 
 // ============================================================================
 // PARAMETERS - Resource Groups & Naming

@@ -89,6 +89,7 @@ var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var aiSearchName = namingConvention.outputs.safeNameAISearch
 var openAIName = namingConvention.outputs.aoaiName
+var aifName = aiServicesName  // Using the AI Services name for cognitive services
 
 //var twoNumbers = namingConvention.outputs.twoNumbers
 //var aifProjectName = namingConvention.outputs.aifProjectName
@@ -219,9 +220,6 @@ var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourc
 // Private DNS calculations
 var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
 var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscription().subscriptionId
-
-//param p011_genai_team_lead_array array = []
-//param spAndMiArray array = []
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
 
 // ============================================================================
@@ -245,7 +243,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 
 var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
-module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   name: '07-spAndMI2Array-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
@@ -258,7 +256,7 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = {
 }
 
 #disable-next-line BCP318
-var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
+var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
@@ -664,6 +662,33 @@ output commonResourceGroupRbacDeployed bool = useCommonACR
 
 @description('Data Lake RBAC deployment status')
 output dataLakeRbacDeployed bool = (!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning)
+
+// ============================================================================
+// COGNITIVE SERVICES & OPENAI ROLE ASSIGNMENTS
+// ============================================================================
+
+// Cognitive Services and OpenAI role definition IDs
+var cognitiveServicesContributorRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
+var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
+var openAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
+var openAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+
+// Function to assign roles to users and service principals for a cognitive services account
+@description('Function to assign roles to users and service principals for a cognitive services account')
+module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = {
+  name: '07-CSRoleAssignments-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    userObjectIds: p011_genai_team_lead_array
+    servicePrincipalIds: spAndMiArray
+    cognitiveServicesAccountName: aifName
+    cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
+    cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
+    openAIContributorRoleId: openAIContributorRoleId
+    openAIUserRoleId: openAIUserRoleId
+    useAdGroups: useAdGroups
+  }
+}
 
 @description('RBAC Security Phase 7 deployment completed successfully')
 output rbacSecurityPhaseCompleted bool = true

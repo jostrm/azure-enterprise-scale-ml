@@ -628,7 +628,6 @@ steps:
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters randomValue="$(deployment_random_value)" \
-     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enableDebugging="true" \
      --parameters DEBUG_enableAIServices="$(enableAIServices)" \
      --parameters DEBUG_enableAIFoundryHub="$(enableAIFoundryHub)" \
@@ -758,6 +757,8 @@ steps:
      --parameters deployModel_gpt_4="$(deployModel_gpt_4)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -818,6 +819,8 @@ steps:
      --parameters serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -872,6 +875,8 @@ steps:
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -938,6 +943,8 @@ steps:
      --parameters aca_w_registry_image="$(aca_w_registry_image)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -953,7 +960,7 @@ steps:
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-66-ml-platform" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-genai-1\\06-ml-platform.bicep" \
+     --template-file "esml-genai-1\\06-ai-platform.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
@@ -1007,6 +1014,9 @@ steps:
      --parameters modelGPT4Version="$(modelGPT4Version)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

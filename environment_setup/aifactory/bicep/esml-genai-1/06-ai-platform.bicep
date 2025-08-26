@@ -79,6 +79,8 @@ param deployModel_text_embedding_3_small bool = false
 @description('Whether to deploy GPT-4o-mini model')
 param deployModel_gpt_4o_mini bool = false
 
+param deployModel_gpt_4o bool = false
+
 @description('Default capacity for embedding models')
 param default_embedding_capacity int = 25
 
@@ -97,10 +99,10 @@ param projectServicePrincipleOID_SeedingKeyvaultName string
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
+param allowPublicAccessWhenBehindVnet bool = false
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 param AMLStudioUIPrivate bool = true
-param allowPublicAccessWhenBehindVnet bool = false
 
 // PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
 param genaiSubnetId string
@@ -441,7 +443,7 @@ resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' 
 #disable-next-line BCP318
 var var_miPrj_PrincipalId = miPrjREF.properties.principalId
 
-module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   name: '06-spAndMI2Array-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
@@ -453,7 +455,7 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = {
   ]
 }
 #disable-next-line BCP318
-var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
+var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 // ============================================================================
 // END SPECIAL
 // ============================================================================
@@ -512,6 +514,19 @@ var aiModels = concat(
   }] : []
 )
 
+//var privateDnsZonesResourceIds: networkIsolation ? [ 
+  //cognitiveServicesPrivateDnsZone.outputs.resourceId
+  //    openAiPrivateDnsZone.outputs.resourceId
+//    ] : []
+
+
+var aiFoundryZones = !enablePublicAccessWithPerimeter? [
+  privateLinksDnsZones.openai.id
+  privateLinksDnsZones.cognitiveservices.id
+] : []
+
+// Role assignments are now managed in 07-rbac-security.bicep
+// We use deployment scripts to update permissions if needed after deployment
 module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFoundryV2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '06-AifV2_${deploymentProjSpecificUniqueSuffix}'
@@ -540,9 +555,9 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
       }
     ]
     privateEndpointSubnetResourceId: commonSubnetPends
+    privateDnsZoneResourceIds:aiFoundryZones
+    //roleAssignments: allRoleAssignments
     //lock:
-    //privateDnsZoneResourceIds:
-    //roleAssignments:
   }
   dependsOn: [
     existingTargetRG
