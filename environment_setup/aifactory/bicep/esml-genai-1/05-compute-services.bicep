@@ -810,6 +810,8 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
     containerAppsEnv
     ...(useCommonACR ? [miRbacCmnACR] : [])
     ...(!useCommonACR ? [miRbacLocalACR] : [])
+    ...(useCommonACR ? [miPrjRbacCmnACR] : [])
+    ...(!useCommonACR ? [miPrjRbacLocalACR] : [])
   ]
 }
 
@@ -840,6 +842,8 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
     containerAppsEnv    
     ...(useCommonACR ? [miRbacCmnACR] : [])
     ...(!useCommonACR ? [miRbacLocalACR] : [])
+    ...(useCommonACR ? [miPrjRbacCmnACR] : [])
+    ...(!useCommonACR ? [miPrjRbacLocalACR] : [])
   ]
 }
 
