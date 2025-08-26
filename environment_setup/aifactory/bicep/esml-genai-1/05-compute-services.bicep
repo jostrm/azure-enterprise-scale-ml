@@ -460,7 +460,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
     managedIdentityName: miPrjName
   }
 }
-var miPrjPrincipalId = getACAMIPrincipalId.outputs.principalId!
+var miPrjPrincipalId = getProjectMIPrincipalId.outputs.principalId!
 
 module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)

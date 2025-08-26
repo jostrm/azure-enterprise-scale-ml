@@ -372,6 +372,16 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   ]
 }
 
+// ALTERNATIVE WAY - NO WARNING of BCP318
+module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: take('05-getPrjMI-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: namingConvention.outputs.miPrjName
+  }
+}
+var miPrjPrincipalId = getProjectMIPrincipalId.outputs.principalId!
+
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID of existing MI. Needs static name in existing
 // ============================================================================
@@ -381,7 +391,7 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 }
 #disable-next-line BCP318
 var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
-var miPrjName_Static = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${randomSalt}${resourceSuffix}'
+var miPrjName_Static = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${aifactorySalt10char}${resourceSuffix}'
 resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: miPrjName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
