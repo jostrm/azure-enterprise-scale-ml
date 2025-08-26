@@ -1,6 +1,9 @@
 @description('Required. The name of the AI Foundry resource.')
 param name string
 
+@description('Optional. The name of the default project. If not provided, no default project will be created.')
+param defaultProjectName string = ''
+
 @description('Required. The location for the AI Foundry resource.')
 param location string
 

@@ -11,6 +11,8 @@ targetScope = 'subscription'
 // - Common resource group access
 // ================================================================
 
+// aiSearchName, commonLakeNamePrefixMax8chars, openAIName
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -81,16 +83,16 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 var aiHubName = namingConvention.outputs.aiHubName
 var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
 var aiServicesName = namingConvention.outputs.aiServicesName
-var aiProjectName = namingConvention.outputs.aiProjectName
+var aiProjectName = namingConvention.outputs.aifPrjName
 var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}'
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var aiSearchName = namingConvention.outputs.safeNameAISearch
+var openAIName = namingConvention.outputs.aoaiName
 
 //var twoNumbers = namingConvention.outputs.twoNumbers
 //var aifProjectName = namingConvention.outputs.aifProjectName
-//var aoaiName = namingConvention.outputs.aoaiName
 //var amlName = namingConvention.outputs.amlName
-//var safeNameAISearch = namingConvention.outputs.safeNameAISearch
 //var dashboardInsightsName = namingConvention.outputs.dashboardInsightsName
 //var applicationInsightName = namingConvention.outputs.applicationInsightName
 //var bingName = namingConvention.outputs.bingName
@@ -177,8 +179,6 @@ param privDnsResourceGroup_param string = ''
 param commonResourceGroup_param string = ''
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
-param aiSearchName string
-param openAIName string
 // Seeding Key Vault parameters
 param inputKeyvault string
 param inputKeyvaultResourcegroup string

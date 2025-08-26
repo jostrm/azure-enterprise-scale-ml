@@ -151,11 +151,10 @@ az extension update -n ml
 
 */
 
-// GH example: workspaces@2024-01-01-preview
-// AIF Hub 1 working: workspaces@2024-10-01-preview with project '2025-01-01-preview' failing: 
-// TODO 1: Try "2024-10-01-preview" for project as well
+// ->2025-07 2024-10-01-preview
+// 2025-08-> 2025-07-01-preview 
 
-resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter) {
+resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: name
   location: location
   identity: {
@@ -188,6 +187,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
       isolationMode:'AllowInternetOutbound' //'Disabled' meaning no restrictions
       #disable-next-line BCP037
       enableNetworkMonitor:false
+      managedNetworkKind: 'V1' // 'V1' or 'V2'
       outboundRules:  union(
         {
           OpenAI: {
@@ -338,7 +338,7 @@ resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter==true) {
   name: defaultProjectName
   location: location
   tags: tags
@@ -384,7 +384,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-pre
 
 // ############################### Private ################ 2025-01-01-preview
 
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: name
   location: location
   identity: {
@@ -516,7 +516,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: defaultProjectName
   location: location
   tags: tags

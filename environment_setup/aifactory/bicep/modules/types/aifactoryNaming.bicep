@@ -68,7 +68,7 @@ type aifactoryNamingType = {
   laWorkspaceName: string
 
   // Additional Resources
-  aiProjectName: string
+  aif2025ProjectName: string
 
   // Helper variables
   projectName: string

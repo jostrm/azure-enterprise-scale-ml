@@ -134,8 +134,8 @@ var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${r
 // Common Resource Group Services
 var laWorkspaceName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 
-// Additional Resources
-var aiProjectName = 'ai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// AIFoundry2025
+var aif2025ProjectName = 'aif-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 
 // ============================================================================
 // COMPUTED VARIABLES - Networking subnets
@@ -212,8 +212,8 @@ output miPrjName string = miPrjName
 // Common Resource Group Services
 output laWorkspaceName string = laWorkspaceName
 
-// Additional Resources
-output aiProjectName string = aiProjectName
+// AI Foundry 2025-08->
+output aif2025ProjectName string = aif2025ProjectName
 
 // Helper variables
 output projectName string = projectName

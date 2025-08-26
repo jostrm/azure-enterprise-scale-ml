@@ -41,18 +41,53 @@ param resourceSuffix string
 param amlExists bool = false
 param aiHubExists bool = false
 param aifProjectExists bool = false
+param aiFoundryV2Exists bool = false
 param aksExists bool = false
 param miPrjExists bool = false
 
 // Enable flags from parameter files
 @description('Enable Azure Machine Learning deployment')
-param enableAzureMachineLearning bool = true
+param enableAzureMachineLearning bool = false
+param serviceSettingDeployCosmosDB bool = false
+param enableAISearch bool = false
 
 @description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = true
 
 @description('Enable AI Foundry 2 features')
-param enableAIFoundry2 bool = false
+param enableAIFoundryV2 bool = false
+
+// AI Models deployment parameters
+@description('Whether to deploy GPT-4 model')
+param deployModel_gpt_4 bool = false
+
+@description('GPT-4 model name if deploying')
+param modelGPT4Name string = 'gpt-4'
+
+@description('GPT-4 model version if deploying')
+param modelGPT4Version string = '1'
+
+@description('Whether to deploy text-embedding-ada-002 model')
+param deployModel_text_embedding_ada_002 bool = false
+
+@description('Whether to deploy text-embedding-3-large model')
+param deployModel_text_embedding_3_large bool = false
+
+@description('Whether to deploy text-embedding-3-small model')
+param deployModel_text_embedding_3_small bool = false
+
+@description('Whether to deploy GPT-4o-mini model')
+param deployModel_gpt_4o_mini bool = false
+
+@description('Default capacity for embedding models')
+param default_embedding_capacity int = 25
+
+@description('Default capacity for GPT models')
+param default_gpt_capacity int = 40
+
+@description('Default SKU for models')
+@allowed(['Standard', 'GlobalStandard'])
+param default_model_sku string = 'Standard'
 
 @description('Keyvault seeding configuration')
 param inputKeyvault string
@@ -77,6 +112,11 @@ param vnetNameBase string
 param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param network_env string = ''
+
+@description('Common default subnet')
+param common_subnet_name string // TODO - 31-network.bicep for own subnet
+param subnetCommon string = ''
+param subnetCommonScoring string = ''
 
 // Private DNS configuration
 param privDnsSubscription_param string = ''
@@ -160,6 +200,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 var segments = split(genaiSubnetId, '/')
 var vnetName = segments[length(segments) - 3] // Get the vnet name
 var defaultSubnet = genaiSubnetName
+var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
@@ -196,6 +237,7 @@ var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var aiHubName = namingConvention.outputs.aiHubName
 var aifName = namingConvention.outputs.aifName
 var aifProjectName = namingConvention.outputs.aifPrjName
+var aif2025ProjectName = namingConvention.outputs.aif2025ProjectName
 var aiSearchName = namingConvention.outputs.safeNameAISearch
 var aiServicesName = namingConvention.outputs.aiServicesName
 
@@ -400,6 +442,7 @@ resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' 
 var var_miPrj_PrincipalId = miPrjREF.properties.principalId
 
 module spAndMI2Array '../modules/spAndMiArray.bicep' = {
+  name: '06-spAndMI2Array-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
@@ -433,21 +476,94 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzur
   ]
 }
 
-// ============== AI FOUNDRY BASIC (PREVIEW) ==============
+// ============== AI FOUNDRY V2 - 2025 ==============
 
-module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!aifProjectExists && enableAIFoundry2) {
+// Dynamically build array of models to deploy based on parameters
+var aiModels = concat(
+  deployModel_gpt_4 ? [{
+    modelName: modelGPT4Name
+    version: modelGPT4Version
+    capacity: default_gpt_capacity
+    skuLocation: default_model_sku
+  }] : [],
+  deployModel_gpt_4o_mini ? [{
+    modelName: 'gpt-4o-mini'
+    version: '1'
+    capacity: default_gpt_capacity
+    skuLocation: default_model_sku
+  }] : [],
+  deployModel_text_embedding_ada_002 ? [{
+    modelName: 'text-embedding-ada-002'
+    version: '2'
+    capacity: default_embedding_capacity
+    skuLocation: default_model_sku
+  }] : [],
+  deployModel_text_embedding_3_large ? [{
+    modelName: 'text-embedding-3-large'
+    version: '1'
+    capacity: default_embedding_capacity
+    skuLocation: default_model_sku
+  }] : [],
+  deployModel_text_embedding_3_small ? [{
+    modelName: 'text-embedding-3-small'
+    version: '1'
+    capacity: default_embedding_capacity
+    skuLocation: default_model_sku
+  }] : []
+)
+
+module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFoundryV2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-AIFoundryV2${deploymentProjSpecificUniqueSuffix}'
+  name: '06-AifV2_${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aifName
-    projectName: aifProjectName
-    enablePublicAccessWithPerimeter: true
+    defaultProjectName: aif2025ProjectName
+    allowProjectManagement: true
+    location:location
+    agentSubnetResourceId: genaiSubnetId
+    enableTelemetry:false
+    tags: tagsProject
+    aiModelDeployments: [
+      for model in aiModels: {
+        name: model.modelName
+        model: {
+          name: model.modelName
+          format: 'OpenAI'
+          version: model.version
+        }
+        sku: {
+          name: model.skuLocation
+          capacity: model.capacity
+        }
+        raiPolicyName: 'Microsoft.DefaultV2'
+        versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+      }
+    ]
+    privateEndpointSubnetResourceId: commonSubnetPends
+    //lock:
+    //privateDnsZoneResourceIds:
+    //roleAssignments:
   }
   dependsOn: [
     existingTargetRG
+    // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
   ]
 }
 
+// // Add the new FDP cognitive services module
+module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFoundryV2) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '06-AifV2_Prj_${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    cosmosDBname: serviceSettingDeployCosmosDB? namingConvention.outputs.cosmosDBName : ''
+    name: aif2025ProjectName
+    location: location
+    storageName: namingConvention.outputs.storageAccount1001Name
+    #disable-next-line BCP318
+    aiFoundryV2Name: aiFoundry2025.outputs.name
+    aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
+    }
+}
 // ============== AI FOUNDRY HUB ==============
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {
@@ -537,7 +653,7 @@ output azureMLDeployed bool = (!amlExists && enableAzureMachineLearning)
 output aiFoundryHubDeployed bool = (!aiHubExists && enableAIFoundryHub)
 
 @description('AI Foundry Preview deployment status')
-output aiFoundryv2Deployed bool = (!aifProjectExists && enableAIFoundry2)
+output aiFoundryv2Deployed bool = (!aifProjectExists && enableAIFoundryV2)
 
 @description('Project-specific ACR RBAC deployment status')
 output acrRbacDeployed bool = (useCommonACR == false && enableAIFoundryHub)
