@@ -436,7 +436,7 @@ var miPrincipalId = getACAMIPrincipalId.outputs.principalId!
 
 module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '05-miRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: take('05-miRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrCommonName
     principalId: miPrincipalId
@@ -446,7 +446,7 @@ module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
 
 module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '05-miRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: take('05-miRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrProjectName
     principalId: miPrincipalId
@@ -454,7 +454,7 @@ module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR) {
 }
 
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: '05-getPrjMI-${deploymentProjSpecificUniqueSuffix}'
+  name: take('05-getPrjMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
@@ -464,7 +464,7 @@ var miPrjPrincipalId = getACAMIPrincipalId.outputs.principalId!
 
 module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '05-miPrjRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: take('05-miPrjRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrCommonName
     principalId: miPrjPrincipalId
@@ -473,7 +473,7 @@ module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
 
 module miPrjRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '05-miPrjRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}'
+  name: take('05-miPrjRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrProjectName
     principalId: miPrjPrincipalId
