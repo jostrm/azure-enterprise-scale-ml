@@ -189,7 +189,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResource
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: '02-naming${targetResourceGroup}'
+  name: '02-naming-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   params: {
     env: env
