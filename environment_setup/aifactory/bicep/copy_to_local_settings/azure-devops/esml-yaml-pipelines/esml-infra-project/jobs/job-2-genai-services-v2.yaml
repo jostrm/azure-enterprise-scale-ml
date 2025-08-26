@@ -1,21 +1,3 @@
-variables:
-  - name: debug_disable_05_build_acr_image
-    value: true  # Set to true to skip 05_Build default image offline task
-  - name: debug_disable_61_foundation
-    value: true  # Set to true to skip 61-foundation task
-  - name: debug_disable_62_cognitive_services
-    value: true  # Set to true to skip 62-cognitive-services task
-  - name: debug_disable_63_core_infrastructure
-    value: true  # Set to true to skip 63-core-infrastructure task
-  - name: debug_disable_64_databases
-    value: true  # Set to true to skip 64-databases task
-  - name: debug_disable_65_compute_services
-    value: false  # Set to true to skip 65-compute-services task
-  - name: debug_disable_66_ml_platform
-    value: false  # Set to true to skip 66-ml-platform task
-  - name: debug_disable_67_rbac_security
-    value: false  # Set to true to skip 67-rbac-security task
-
 steps:
 
 - checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
