@@ -591,7 +591,6 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\01-foundation.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
@@ -628,6 +627,8 @@ steps:
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters randomValue="$(deployment_random_value)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
      --parameters enableDebugging="true" \
      --parameters DEBUG_enableAIServices="$(enableAIServices)" \
      --parameters DEBUG_enableAIFoundryHub="$(enableAIFoundryHub)" \
@@ -714,7 +715,6 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\02-cognitive-services.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -759,6 +759,8 @@ steps:
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -777,7 +779,6 @@ steps:
      --template-file "esml-genai-1\\03-core-infrastructure.bicep" \
      --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -821,6 +822,8 @@ steps:
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -838,7 +841,6 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\04-databases.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -877,6 +879,8 @@ steps:
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -894,7 +898,6 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\05-compute-services.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -945,6 +948,8 @@ steps:
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -962,7 +967,6 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\06-ai-platform.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -1020,6 +1024,8 @@ steps:
      --parameters common_subnet_name="$(common_subnet_name)" \
      --parameters subnetCommon="$(subnetCommon)" \
      --parameters subnetCommonScoring="$(subnetCommonScoring)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1037,7 +1043,6 @@ steps:
      --location "$(admin_location)" \
      --template-file "esml-genai-1\\08-rbac-security.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
@@ -1073,6 +1078,8 @@ steps:
      --parameters commonLakeNamePrefixMax8chars="$(commonLakeNamePrefixMax8chars)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
