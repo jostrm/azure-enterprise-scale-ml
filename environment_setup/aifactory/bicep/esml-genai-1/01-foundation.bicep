@@ -409,6 +409,9 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     aksSubnetId:aksSubnetId
     genaiSubnetId:genaiSubnetId
   }
+  dependsOn: [
+    projectResourceGroup
+  ]
 }
 
 // Get naming convention outputs
@@ -437,6 +440,9 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
     privDnsResourceGroupName: privDnsResourceGroupName
     privDnsSubscription: privDnsSubscription
   }
+  dependsOn: [
+    projectResourceGroup
+  ]
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
