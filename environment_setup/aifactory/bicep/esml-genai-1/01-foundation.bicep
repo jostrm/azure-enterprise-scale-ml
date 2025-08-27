@@ -7,6 +7,9 @@
 
 targetScope = 'subscription'
 
+// Import types
+import { aifactoryNamingType } from '../modules/types/aifactoryNaming.bicep'
+
 // ============================================================================
 // PARAMETERS - Core Configuration
 // ============================================================================
@@ -414,8 +417,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   ]
 }
 
-// Get naming convention outputs
-var namingOutputs = namingConvention.outputs
+// Get naming convention outputs with type safety
+var namingOutputs = namingConvention.outputs.namingConvention
 
 // Extract commonly used values with type safety
 var miACAName = namingOutputs.miACAName

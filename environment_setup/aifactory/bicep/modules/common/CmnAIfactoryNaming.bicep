@@ -5,6 +5,9 @@
 // Import this module to ensure consistent resource naming.
 // ================================================================
 
+// Import types
+import { aifactoryNamingType } from '../types/aifactoryNaming.bicep'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -226,3 +229,82 @@ output randomSalt string = randomSalt
 output projectTypeESMLName string = 'esml'
 output projectTypeGenAIName string = 'genai'
 output aksClusterName string = 'esml${projectNumber}-${locationSuffix}-${env}'
+
+// Complete naming convention output with type safety
+output namingConvention aifactoryNamingType = {
+  // Subnets
+  genaiSubnetName: genaiSubnetName
+  aksSubnetName: aksSubnetName
+  acaSubnetName: acaSubnetName
+  defaultSubnet: defaultSubnet
+
+  // AI Foundry V1 (2023-2025)
+  aifV1HubName: aifV1HubName
+  aifV1ProjectName: aifV1ProjectName
+  // AI Foundry V2 (2025-)
+  aifV2Name: aifV2Name
+  aifV2PrjName: aifV2PrjName
+
+  aoaiName: aoaiName
+  amlName: amlName
+  safeNameAISearch: safeNameAISearch
+  aiServicesName: aiServicesName
+
+  // Monitoring and Insights
+  dashboardInsightsName: dashboardInsightsName
+  applicationInsightName: applicationInsightName
+  applicationInsightName2: applicationInsightName2
+
+  // External Services
+  bingName: bingName
+
+  // Container Apps
+  containerAppsEnvName: containerAppsEnvName
+  containerAppAName: containerAppAName
+  containerAppWName: containerAppWName
+
+  // Databases
+  cosmosDBName: cosmosDBName
+  redisName: redisName
+  postgreSQLName: postgreSQLName
+  sqlServerName: sqlServerName
+  sqlDBName: sqlDBName
+
+  // Compute Services
+  functionAppName: functionAppName
+  webAppName: webAppName
+  funcAppServicePlanName: funcAppServicePlanName
+  webbAppServicePlanName: webbAppServicePlanName
+  vmName: vmName
+
+  // Storage and Keys
+  keyvaultName: keyvaultName
+  storageAccount1001Name: storageAccount1001Name
+  storageAccount2001Name: storageAccount2001Name
+
+  // Container Registries
+  acrProjectName: acrProjectName
+  acrCommonName: acrCommonName
+
+  // Managed Identities
+  miACAName: miACAName
+  miPrjName: miPrjName
+
+  // Common Resource Group Services
+  laWorkspaceName: laWorkspaceName
+  
+  // Helper variables
+  projectName: projectName
+  cmnName: cmnName
+  kvNameCommon: 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+  genaiName: genaiName
+  prjResourceSuffixNoDash: prjResourceSuffixNoDash
+  twoNumbers: twoNumbers
+  p011_genai_team_lead_array: p011_genai_team_lead_array
+  p011_genai_team_lead_email_array: p011_genai_team_lead_email_array
+  uniqueInAIFenv: uniqueInAIFenv
+  randomSalt: randomSalt
+  projectTypeESMLName: 'esml'
+  projectTypeGenAIName: 'genai'
+  aksClusterName: 'esml${projectNumber}-${locationSuffix}-${env}'
+}
