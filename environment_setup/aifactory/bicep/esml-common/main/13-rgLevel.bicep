@@ -7,6 +7,7 @@ param inputKeyvaultSubscription string
 param inputKeyvaultResourcegroup string
 param inputCommonSPIDKey string
 param inputCommonSPSecretKey string
+param enablePublicAccessWithPerimeter bool = false
 @description('AI Factory suffix. If you have multiple instances')
 param aifactorySuffixRG string=''
 param commonResourceSuffix string
@@ -471,6 +472,7 @@ module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(!
   scope: esmlCommonResourceGroup
   name: 'privDnsCommonACR${uniqueInAIFenv}'
   params: {
+    #disable-next-line BCP318
     dnsConfig: acrCommon.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -523,6 +525,13 @@ module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking
     portalPrivateEndpointName: 'pend-${cmnName}-${env}-${uniqueInAIFenv}-adfportal-to-vnt-esmlcmn' // 64
     runtimePrivateEndpointName: 'pend-${cmnName}-${env}-${uniqueInAIFenv}-adfruntime-to-vnt-esmlcmn'
     tags: tags
+    enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
+    managedIdentities: {
+      systemAssigned: true
+      //userAssignedResourceIds: [
+      //resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
+      //]
+    }
   }
 
   dependsOn: [
@@ -639,6 +648,7 @@ module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deplo
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvNameCommon
     policyName: 'add'
+    #disable-next-line BCP422
     principalId: externalKv.getSecret(commonServicePrincipleOIDKey) // commonServicePrincipleOID
     additionalPrincipalIds:[]
   }
@@ -654,6 +664,7 @@ module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployO
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvNameCommon
     policyName: 'add'
+    #disable-next-line BCP318
     principalId: adf.outputs.principalId
     additionalPrincipalIds:[]
   }
@@ -686,8 +697,11 @@ module addSecret '../modules-common/kvSecretsCmn.bicep' = if(!deployOnlyAIGatewa
   name: '${kvNameCommonNoDash}sec${uniqueInAIFenv}'
   scope: esmlCommonResourceGroup
   params: {
+    #disable-next-line BCP422
     esmlCommonSpIDSecret: externalKv.getSecret(inputCommonSPIDKey)
+    #disable-next-line BCP422
     esmlCommonSpSecretValue:externalKv.getSecret(inputCommonSPSecretKey)
+    #disable-next-line BCP422
     esmlCommonSpOIDValue:externalKv.getSecret(commonServicePrincipleOIDKey)
     //esmlCommonSpOIDValue: commonServicePrincipleOID
     keyvaultName: kvNameCommon
@@ -751,6 +765,7 @@ module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if
     keyVaultPermissions: secretGetList
     keyVaultResourceName: kvNameCommonAdmin
     policyName: 'add'
+    #disable-next-line BCP422
     principalId: externalKv.getSecret(commonServicePrincipleOIDKey)
     additionalPrincipalIds:[]
   }
@@ -767,6 +782,7 @@ module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!
     keyVaultPermissions: secretGet
     keyVaultResourceName: kvNameCommonAdmin
     policyName: 'add'
+    #disable-next-line BCP318
     principalId: adf.outputs.principalId
     additionalPrincipalIds:[]
   }
@@ -824,6 +840,7 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM 
     subnetName: defaultSubnet
     vnetId: vnetId
     tags: tags
+    #disable-next-line BCP318
     keyvaultName: kvAdmin.outputs.keyvaultName
   }
 
@@ -837,6 +854,7 @@ module privateDnsDatalake '../../modules/privateDns.bicep' = if(!centralDnsZoneB
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneAndLinkLake2${uniqueInAIFenv}'
   params: {
+    #disable-next-line BCP318
     dnsConfig: dataLake.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -850,6 +868,7 @@ module privateDnsKeyVaultCmn '../../modules/privateDns.bicep' = if(!centralDnsZo
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneAndLinkKeyVaultCmn2${uniqueInAIFenv}'
   params: {
+    #disable-next-line BCP318
     dnsConfig: kvCmn.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -863,6 +882,7 @@ module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(!centralDns
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneKVCmnAdmin2${uniqueInAIFenv}'
   params: {
+    #disable-next-line BCP318
     dnsConfig: kvAdmin.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }
@@ -876,6 +896,7 @@ module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(!central
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneADFCmn2${uniqueInAIFenv}'
   params: {
+    #disable-next-line BCP318
     dnsConfig: adf.outputs.dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
   }

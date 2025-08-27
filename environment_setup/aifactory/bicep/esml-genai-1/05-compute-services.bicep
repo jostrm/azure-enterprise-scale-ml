@@ -729,6 +729,13 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
     wlMaxCount: wlMaxCount
     wlProfileDedicatedName: wlProfileDedicatedName
     wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
+    managedIdentities: {
+      systemAssigned: true
+      userAssignedResourceIds: concat(
+        !empty(miPrjName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+        !empty(miACAName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+      )
+    }
   }
   dependsOn: [
     existingTargetRG

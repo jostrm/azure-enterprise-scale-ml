@@ -22,6 +22,9 @@ param subnetName string
 param vnetResourceGroupName string
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
 param defaultProjectName string = ''
 param centralDnsZoneByPolicyInHub bool
 param allowPublicAccessWhenBehindVnet bool=false
@@ -154,12 +157,24 @@ az extension update -n ml
 // ->2025-07 2024-10-01-preview
 // 2025-08-> 2025-07-01-preview 
 
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : {type:'SystemAssigned'}
+
 resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: name
   location: location
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: identity
   tags: tags
   kind: kindAIHub
   properties: {
@@ -347,11 +362,10 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     name: 'Basic'
     tier: 'Basic'
   }
-  identity: {
-    type: 'SystemAssigned'  // This resource's identity is automatically assigned priviledge access to ACR, Storage, Key Vault, and Application Insights. 
-                            // Since the priveleges are granted at the project/hub level have elevated access to the resources, it is recommended to isolate these resources
-                            // to a resource group that only contains the project/hub.
-  }
+  identity:identity
+  // This resource's identity is automatically assigned priviledge access to ACR, Storage, Key Vault, and Application Insights. 
+  // Since the priveleges are granted at the project/hub level have elevated access to the resources, it is recommended to isolate these resources
+  // to a resource group that only contains the project/hub.
   properties: {
     friendlyName: defaultProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
@@ -387,9 +401,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
 resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter==false) {
   name: name
   location: location
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: identity
   tags: tags
   kind: kindAIHub
   properties: {
@@ -525,11 +537,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
     name: 'Basic'
     tier: 'Basic'
   }
-  identity: {
-    type: 'SystemAssigned'  // This resource's identity is automatically assigned priviledge access to ACR, Storage, Key Vault, and Application Insights. 
-                            // Since the priveleges are granted at the project/hub level have elevated access to the resources, it is recommended to isolate these resources
-                            // to a resource group that only contains the project/hub.
-  }
+  identity: identity
   properties: {
     friendlyName: defaultProjectName
     description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'

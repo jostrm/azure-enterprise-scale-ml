@@ -61,13 +61,14 @@ var identity = !empty(managedIdentities)
         : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
       userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
     }
-  : null
+  : {type:'SystemAssigned'}
 
 //  Provided subnet must have a size of at least /23 or larger.
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01' = {
   name: name
   location: location
   tags: tags
+  identity:identity
   properties: {
     appLogsConfiguration: {
       destination: 'log-analytics'

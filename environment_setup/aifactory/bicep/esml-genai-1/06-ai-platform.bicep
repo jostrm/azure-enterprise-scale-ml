@@ -237,6 +237,10 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
+// MI
+var miPrjName = namingConvention.outputs.miPrjName
+var miACAName = namingConvention.outputs.miACAName
+
 // AML
 var amlName = namingConvention.outputs.amlName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
@@ -379,6 +383,13 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   name: '06-AzureMLDepl${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: amlName
+    managedIdentities: {
+      systemAssigned: true
+      userAssignedResourceIds: concat(
+        !empty(miPrjName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+        !empty(miACAName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+      )
+    }
     uniqueDepl: deploymentProjSpecificUniqueSuffix
     uniqueSalt5char: namingConvention.outputs.uniqueInAIFenv
     projectName: projectName
@@ -432,7 +443,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
   name: take('05-getPrjMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
-    managedIdentityName: namingConvention.outputs.miPrjName
+    managedIdentityName: miPrjName
   }
 }
 var miPrjPrincipalId = getProjectMIPrincipalId.outputs.principalId!
@@ -598,6 +609,13 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
   name: '06-aiHubModule${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aifV1HubName
+    managedIdentities: {
+      systemAssigned: true
+      userAssignedResourceIds: concat(
+        !empty(miPrjName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+        !empty(miACAName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+      )
+    }
     defaultProjectName: aifV1ProjectName
     location: location
     tags: tagsProject

@@ -19,6 +19,10 @@ param portalPrivateEndpointName string
 @description('Specifies the name of the runtime service private endpoint')
 param runtimePrivateEndpointName string
 
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
+param enablePublicAccessWithPerimeter bool = false
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
 var groupIds = [
@@ -32,19 +36,33 @@ var groupIds = [
   }
 ]
 
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : {type:'SystemAssigned'}
+
+
 resource adf 'Microsoft.DataFactory/factories@2018-06-01' = {
   name: name
   location: location
   tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity:identity
   properties: {
     globalParameters: {}
+    publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled': 'Disabled'
   }
 }
 
-resource pendAdf 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in groupIds: {
+resource pendAdf 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in groupIds: {
   name: obj.name
   location: location
   tags: tags
@@ -53,9 +71,10 @@ resource pendAdf 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in g
       id: subnetRef
       name: subnetName
     }
+    customNetworkInterfaceName: 'pend-adf-${obj.name}'
     privateLinkServiceConnections: [
       {
-        id: 'string'
+        name: 'pend-adf-${obj.gid}'
         properties: {
           privateLinkServiceId: adf.id
           groupIds: [
@@ -67,7 +86,6 @@ resource pendAdf 'Microsoft.Network/privateEndpoints@2020-07-01' = [for obj in g
             actionsRequired: 'None'
           }
         }
-        name: 'pend-adf-${obj.gid}'
       }
     ]
   }

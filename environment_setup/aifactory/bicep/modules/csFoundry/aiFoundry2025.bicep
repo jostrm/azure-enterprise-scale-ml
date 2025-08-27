@@ -59,6 +59,7 @@ param enableTelemetry bool = true
 
 @description('Optional. Specifies the resource tags for all the resources.')
 param tags resourceInput<'Microsoft.Resources/resourceGroups@2025-04-01'>.tags = {}
+param miPrjName string?
 
 var privateDnsZoneResourceIdValues = [
   for id in privateDnsZoneResourceIds ?? []: {
@@ -77,8 +78,13 @@ module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.1' = {
     kind: 'AIServices'
     lock: lock
     allowProjectManagement: allowProjectManagement
-    managedIdentities: {
+    managedIdentities: miPrjName == null || empty(miPrjName) ? {
       systemAssigned: true
+    } : {
+      systemAssigned: true
+      userAssignedResourceIds: [
+        resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName!)
+      ]
     }
     deployments: aiModelDeployments
     customSubDomainName: name
@@ -89,6 +95,7 @@ module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.1' = {
       bypass: 'AzureServices'
     }
     // NOTE: When supplying an agent subnet, the AI Foundry Account will automatically create a capability host for the agent service.
+    // NB: Provided subnet must be of the proper address space. Please provide a subnet which has address space in the range of 172 or 192
     networkInjections: privateNetworkingEnabled && !empty(agentSubnetResourceId)
       ? {
           scenario: 'agent'

@@ -77,6 +77,10 @@ param acrRGName string
 param appInsightsName string
 param ipWhitelist_array array = []
 param enablePublicAccessWithPerimeter bool = false
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
+
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
 
@@ -95,8 +99,23 @@ resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-07-01' existin
   name: acrName
   scope: resourceGroup(acrRGName)
 }
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : {type:'SystemAssigned'}
 
-resource azureMLv2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' = if(env == 'dev') {
+// 2025-08 <- 2024-10-01-preview
+// 2025-08 -> 2025-07-01-preview
+resource azureMLv2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(env == 'dev') {
   name: name
   location: location
   kind:'Default'
@@ -104,9 +123,7 @@ resource azureMLv2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     name:'Basic'
     tier:'Basic'
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity:identity
   tags: tags
   properties: {
     allowRoleAssignmentOnRG: true
@@ -147,7 +164,7 @@ resource azureMLv2 'Microsoft.MachineLearningServices/workspaces@2024-10-01-prev
     aksDev
   ]
 }
-resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview'  = if(env == 'test' || env == 'prod') {
+resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'  = if(env == 'test' || env == 'prod') {
   name: name
   location: location
   kind:'Default'

@@ -17,6 +17,9 @@ param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
 param wlProfileDedicatedName string = 'D4' // 'D4', 'D8', 'D16', 'D32', 'D64', 'E4', 'E8'
 param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
 
 module containerAppsEnvironment 'containerappsEnv.bicep' = {
   name: '05b-depl-${name}'
@@ -39,6 +42,7 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
     wlMaxCount: wlMaxCount
     wlProfileDedicatedName: wlProfileDedicatedName
     wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
+    managedIdentities: managedIdentities
   }
 }
 
