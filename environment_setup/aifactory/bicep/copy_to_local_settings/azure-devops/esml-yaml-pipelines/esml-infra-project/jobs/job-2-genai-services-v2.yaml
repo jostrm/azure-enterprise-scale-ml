@@ -948,7 +948,7 @@ steps:
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '66-ml-platform'
+  displayName: '66-ai-platform'
   condition: and(ne(variables['debug_disable_66_ml_platform'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1017,6 +1017,7 @@ steps:
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters common_subnet_name="$(common_subnet_name)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
