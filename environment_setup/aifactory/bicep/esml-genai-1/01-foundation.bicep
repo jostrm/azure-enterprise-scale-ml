@@ -755,6 +755,7 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resour
 // OUTPUTS
 // ============================================================================
 
+/*
 @description('Foundation deployment outputs')
 output foundationOutputs object = {
   // Resource Group Information
@@ -780,6 +781,7 @@ output foundationOutputs object = {
   randomSalt: randomSalt
   deploymentSuffix: deploymentProjSpecificUniqueSuffix
 }
+*/
 
 @description('Ready for next deployment layer')
 output foundationComplete bool = true
