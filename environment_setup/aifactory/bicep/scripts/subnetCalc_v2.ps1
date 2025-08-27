@@ -5,12 +5,13 @@
 #   are specified in the $requiredSubnets PSObject.
 
 param (
-    # required parameters
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar1,
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar2,
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar3,
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar4,
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5,
+    # Optional JSON files (backwards compatibility)
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar1,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar2,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar3,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar4,
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5,
+    # Required
     [Parameter(Mandatory = $true, HelpMessage = "Where to place the parameters.json file")][string]$filePath,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory environment [dev,test,prod]")][string]$env,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory subscription id for environment [dev,test,prod]")][string]$subscriptionId,
@@ -20,12 +21,23 @@ param (
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory data center region location westeurope, swedencentral ")][string]$locationADO,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory data center region location suffix weu, swc ")][string]$locationSuffixADO,
     [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory project type:[esml,genai-1]")][string]$projectTypeADO,
-
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$commonRGNamePrefixVar,
     # optional parameters
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AI Factory COMMON RG, suffix ")][string]$commonRGNamePrefixVar,
     [Parameter(Mandatory = $false, HelpMessage = "Use service principal")][switch]$useServicePrincipal = $false,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the object id for service principal")][string]$spObjId,
-    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret
+    [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
+
+    # Optional new way - Direct inline parameters from variables.yaml (as alternative to JSON files)
+    [Parameter(Mandatory = $false, HelpMessage = "AI Factory suffix for resource groups")][string]$aifactorySuffixRG,
+    [Parameter(Mandatory = $false, HelpMessage = "Common resource group name prefix")][string]$commonRGNamePrefix,
+    [Parameter(Mandatory = $false, HelpMessage = "Location suffix")][string]$locationSuffix,
+    [Parameter(Mandatory = $false, HelpMessage = "Azure location")][string]$location,
+    [Parameter(Mandatory = $false, HelpMessage = "Common resource suffix")][string]$commonResourceSuffix,
+    [Parameter(Mandatory = $false, HelpMessage = "Virtual network name base")][string]$vnetNameBase,
+    [Parameter(Mandatory = $false, HelpMessage = "Tenant ID")][string]$tenantId,
+    [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group base")][string]$vnetResourceGroupBase,
+    [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group parameter override")][string]$vnetResourceGroup_param,
+    [Parameter(Mandatory = $false, HelpMessage = "Virtual network full name parameter override")][string]$vnetNameFull_param
 )
 
 filter ConvertTo-BinaryIP {
@@ -258,19 +270,57 @@ Import-Module -Name "./modules/pipelineFunctions.psm1"
 Import-Dependencies
 
 # This function will convert the parameters nest of the arm tempate parameters file to global variables
-$jsonParameters1 = Get-Content -Path $bicepPar1 | ConvertFrom-Json
-$jsonParameters2 = Get-Content -Path $bicepPar2 | ConvertFrom-Json
-$jsonParameters3 = Get-Content -Path $bicepPar3 | ConvertFrom-Json
-$jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
-$jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
+if ($bicepPar1 -and $bicepPar2 -and $bicepPar3 -and $bicepPar4 -and $bicepPar5) {
+    Write-Host "Loading parameters from JSON files..."
+    $jsonParameters1 = Get-Content -Path $bicepPar1 | ConvertFrom-Json
+    $jsonParameters2 = Get-Content -Path $bicepPar2 | ConvertFrom-Json
+    $jsonParameters3 = Get-Content -Path $bicepPar3 | ConvertFrom-Json
+    $jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
+    $jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
 
+    # all values that are present in parameters.json will be converted to variables
+    ConvertTo-Variables -InputObject $jsonParameters1
+    ConvertTo-Variables -InputObject $jsonParameters2
+    ConvertTo-Variables -InputObject $jsonParameters3
+    ConvertTo-Variables -InputObject $jsonParameters4
+    ConvertTo-Variables -InputObject $jsonParameters5
+}
+else {
+    Write-Host "Using inline parameters instead of JSON files..."
+    # Use inline parameters when JSON files are not provided
+}
 
-# all values that are present in parameters.json will be converted to variables
-ConvertTo-Variables -InputObject $jsonParameters1
-ConvertTo-Variables -InputObject $jsonParameters2
-ConvertTo-Variables -InputObject $jsonParameters3
-ConvertTo-Variables -InputObject $jsonParameters4
-ConvertTo-Variables -InputObject $jsonParameters5
+# Override with inline parameters if they are provided (takes precedence over JSON)
+if ($PSBoundParameters.ContainsKey('aifactorySuffixRG') -and $aifactorySuffixRG) { 
+    Write-Host "Using inline parameter: aifactorySuffixRG = $aifactorySuffixRG"
+}
+if ($PSBoundParameters.ContainsKey('commonRGNamePrefix') -and $commonRGNamePrefix) { 
+    Write-Host "Using inline parameter: commonRGNamePrefix = $commonRGNamePrefix"
+}
+if ($PSBoundParameters.ContainsKey('locationSuffix') -and $locationSuffix) { 
+    Write-Host "Using inline parameter: locationSuffix = $locationSuffix"
+}
+if ($PSBoundParameters.ContainsKey('location') -and $location) { 
+    Write-Host "Using inline parameter: location = $location"
+}
+if ($PSBoundParameters.ContainsKey('commonResourceSuffix') -and $commonResourceSuffix) { 
+    Write-Host "Using inline parameter: commonResourceSuffix = $commonResourceSuffix"
+}
+if ($PSBoundParameters.ContainsKey('vnetNameBase') -and $vnetNameBase) { 
+    Write-Host "Using inline parameter: vnetNameBase = $vnetNameBase"
+}
+if ($PSBoundParameters.ContainsKey('tenantId') -and $tenantId) { 
+    Write-Host "Using inline parameter: tenantId = $tenantId"
+}
+if ($PSBoundParameters.ContainsKey('vnetResourceGroupBase') -and $vnetResourceGroupBase) { 
+    Write-Host "Using inline parameter: vnetResourceGroupBase = $vnetResourceGroupBase"
+}
+if ($PSBoundParameters.ContainsKey('vnetResourceGroup_param') -and $vnetResourceGroup_param) { 
+    Write-Host "Using inline parameter: vnetResourceGroup_param = $vnetResourceGroup_param"
+}
+if ($PSBoundParameters.ContainsKey('vnetNameFull_param') -and $vnetNameFull_param) { 
+    Write-Host "Using inline parameter: vnetNameFull_param = $vnetNameFull_param"
+}
 
 $authSettings = @{
     useServicePrincipal = $useServicePrincipal
@@ -327,17 +377,33 @@ if ($(Get-AzContext).Subscription -ne "") {
         }
     }
 
+    # Handle variable assignments - ADO parameters take precedence, then inline parameters, then JSON parameters
     if ($null -ne $commonRGNamePrefixVar -and $commonRGNamePrefixVar -ne '') {
         $commonRGNamePrefix = $commonRGNamePrefixVar
     }
+    elseif ($PSBoundParameters.ContainsKey('commonRGNamePrefix') -and $commonRGNamePrefix) {
+        # Already set from inline parameter
+    }
+    
     if ($null -ne $locationSuffixADO -and $locationSuffixADO -ne '') {
         $locationSuffix = $locationSuffixADO
     }
+    elseif ($PSBoundParameters.ContainsKey('locationSuffix') -and $locationSuffix) {
+        # Already set from inline parameter
+    }
+    
     if ($null -ne $aifactorySuffixRGADO -and $aifactorySuffixRGADO -ne '') {
         $aifactorySuffix = $aifactorySuffixRGADO
     }
+    elseif ($PSBoundParameters.ContainsKey('aifactorySuffixRG') -and $aifactorySuffixRG) {
+        $aifactorySuffix = $aifactorySuffixRG
+    }
+    
     if ($null -ne $commonResourceSuffixADO -and $commonResourceSuffixADO -ne '') {
         $commonResourceSuffix = $commonResourceSuffixADO
+    }
+    elseif ($PSBoundParameters.ContainsKey('commonResourceSuffix') -and $commonResourceSuffix) {
+        # Already set from inline parameter
     }
 
     $vnetName = if ($null -eq $vnetNameFull_param -or $vnetNameFull_param -eq "" ) 
