@@ -1012,8 +1012,8 @@ steps:
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
      --parameters modelGPT4Name="$(modelGPT4Name)" \
      --parameters modelGPT4Version="$(modelGPT4Version)" \
-     --parameters tags="$(tags)"" \
-     --parameters tagsProject="$(tagsProject)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
@@ -1023,7 +1023,7 @@ steps:
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '67-rbac-security'
+  displayName: '68-rbac-security'
   condition: and(ne(variables['debug_disable_67_rbac_security'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1035,7 +1035,7 @@ steps:
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-67-rbac-security" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-genai-1\\07-rbac-security.bicep" \
+     --template-file "esml-genai-1\\08-rbac-security.bicep" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\v122\\01-common.json" \
      --parameters env="$(dev_test_prod)" \
@@ -1126,4 +1126,4 @@ steps:
       else
         echo "No registry name found - skipping public access disable"
       fi
-  condition: always()
+    condition: always()

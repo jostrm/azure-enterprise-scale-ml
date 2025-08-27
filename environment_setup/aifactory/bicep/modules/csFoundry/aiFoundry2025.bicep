@@ -93,7 +93,7 @@ module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.1' = {
       ? {
           scenario: 'agent'
           subnetResourceId: agentSubnetResourceId!
-          useMicrosoftManagedNetwork: false
+          useMicrosoftManagedNetwork: true
         }
       : null
     privateEndpoints: privateNetworkingEnabled
