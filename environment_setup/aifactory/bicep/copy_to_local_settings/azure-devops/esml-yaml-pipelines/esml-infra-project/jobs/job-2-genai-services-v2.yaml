@@ -1012,12 +1012,14 @@ steps:
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
      --parameters modelGPT4Name="$(modelGPT4Name)" \
      --parameters modelGPT4Version="$(modelGPT4Version)" \
-     --parameters tags='$(tags)' \
-     --parameters tagsProject='$(tagsProject)' \
+     --parameters tags="$(tags)"" \
+     --parameters tagsProject="$(tagsProject)" \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
+     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters subnetCommonScoring="$(subnetCommonScoring)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

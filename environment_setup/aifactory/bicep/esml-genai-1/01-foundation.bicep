@@ -386,10 +386,6 @@ var projectSalt = substring(uniqueString(targetResourceGroupRef.id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // ============================================================================
-// Import AI Factory naming types for type safety
-import { aifactoryNamingType } from '../modules/types/aifactoryNaming.bicep'
-
-// ============================================================================
 // AI Factory - naming convention (imported from shared module) 
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
@@ -415,8 +411,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
-// Type-safe naming convention outputs
-var namingOutputs aifactoryNamingType = namingConvention.outputs
+// Get naming convention outputs
+var namingOutputs = namingConvention.outputs
 
 // Extract commonly used values with type safety
 var miACAName = namingOutputs.miACAName
@@ -591,16 +587,6 @@ var privateLinksDnsZonesArray = [
     exists: zoneMongoExists
   } // 2025-05-30: Added above in Common
 ]
-
-// ============================================================================
-// EXISTING RESOURCES
-// ============================================================================
-
-// External KeyVault for seeding
-resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: inputKeyvault
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-}
 
 // ============================================================================
 // MODULE DEPLOYMENTS

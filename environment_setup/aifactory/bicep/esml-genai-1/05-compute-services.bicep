@@ -303,10 +303,17 @@ var aiSearchName = namingConvention.outputs.safeNameAISearch
 var aoaiName = namingConvention.outputs.aoaiName
 var aiServicesName = namingConvention.outputs.aiServicesName
 var bingName = namingConvention.outputs.bingName
-var aiProjectName = namingConvention.outputs.aifPrjName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var keyvaultName = namingConvention.outputs.keyvaultName
+
+// AI Foundry Hub
+var aifV1HubName = namingConvention.outputs.aifV1HubName
+var aifV1ProjectName = namingConvention.outputs.aifV1ProjectName
+
+// AI Foundry V2
+var aifV2ProjectName = namingConvention.outputs.aifV2Name
+var aifV2Name = namingConvention.outputs.aifV2PrjName
 
 // Computed variables using naming convention outputs
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
@@ -797,7 +804,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
     bingName: bingName
     bingApiEndpoint: 'https://api.bing.microsoft.com/v7.0/search'
     bingApiKey: var_bing_api_Key // 'placeholder-key' Simplified
-    aiProjectName: aiProjectName
+    aiProjectName: aifV1ProjectName
     subscriptionId: subscriptionIdDevTestProd
     appWorkloadProfileName: acaAppWorkloadProfileName
     containerCpuCoreCount: containerCpuCoreCount

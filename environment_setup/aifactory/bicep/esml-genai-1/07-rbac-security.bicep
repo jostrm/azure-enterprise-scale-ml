@@ -79,11 +79,12 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
-// Import all resource names from shared naming convention
-var aiHubName = namingConvention.outputs.aiHubName
+// AI Foundry V1
+var aifV1HubName = namingConvention.outputs.aifV1HubName
+var aifV1ProjectName = namingConvention.outputs.aifV1ProjectName
+
 var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
 var aiServicesName = namingConvention.outputs.aiServicesName
-var aiProjectName = namingConvention.outputs.aifPrjName
 var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}'
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
@@ -448,7 +449,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
   name: '07rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}'
   params: {
     azureMachineLearningObjectId: azureMachineLearningObjectId
-    aiHubName: aiHubName
+    aiHubName: aifV1HubName
     aiHubPrincipalId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
   }
   dependsOn: [
@@ -466,8 +467,8 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && e
     storageAccountName2: storageAccount2001Name
     resourceGroupId: projectResourceGroup_rgId
     userObjectIds: p011_genai_team_lead_array
-    aiHubName: aiHubName
-    aiHubProjectName: aiProjectName
+    aiHubName: aifV1HubName
+    aiHubProjectName: aifV1ProjectName
     servicePrincipleAndMIArray: spAndMiArray
     useAdGroups: useAdGroups
     disableContributorAccessForUsers: disableContributorAccessForUsers

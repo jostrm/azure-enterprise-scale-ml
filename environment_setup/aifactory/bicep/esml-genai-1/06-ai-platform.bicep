@@ -204,6 +204,13 @@ var vnetName = segments[length(segments) - 3] // Get the vnet name
 var defaultSubnet = genaiSubnetName
 var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
+// Get the subnet resource ID for the common subnet used for private endpoints
+resource commonSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' existing = {
+  name: '${vnetNameFull}/${commonSubnetPends}'
+  scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
+}
+var commonSubnetResourceId = commonSubnet.id
+
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
@@ -236,10 +243,14 @@ var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 //var aksClusterName = namingConvention.outputs.aksClusterName
 
 // AI Foundry Hub
-var aiHubName = namingConvention.outputs.aiHubName
-var aifName = namingConvention.outputs.aifName
-var aifProjectName = namingConvention.outputs.aifPrjName
-var aif2025ProjectName = namingConvention.outputs.aif2025ProjectName
+var aifV1HubName = namingConvention.outputs.aifV1HubName
+var aifV1ProjectName = namingConvention.outputs.aifV1ProjectName
+
+// AI Foundry V2
+var aifV2ProjectName = namingConvention.outputs.aifV2Name
+var aifV2Name = namingConvention.outputs.aifV2PrjName
+
+// AI Search
 var aiSearchName = namingConvention.outputs.safeNameAISearch
 var aiServicesName = namingConvention.outputs.aiServicesName
 
@@ -531,8 +542,8 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '06-AifV2_${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: aifName
-    defaultProjectName: aif2025ProjectName
+    name: aifV2Name
+    defaultProjectName: aifV2ProjectName
     allowProjectManagement: true
     location:location
     agentSubnetResourceId: genaiSubnetId
@@ -554,7 +565,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
         versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
       }
     ]
-    privateEndpointSubnetResourceId: commonSubnetPends
+    privateEndpointSubnetResourceId: commonSubnetResourceId
     privateDnsZoneResourceIds:aiFoundryZones
     //roleAssignments: allRoleAssignments
     //lock:
@@ -571,7 +582,7 @@ module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFo
   name: '06-AifV2_Prj_${deploymentProjSpecificUniqueSuffix}'
   params: {
     cosmosDBname: serviceSettingDeployCosmosDB? namingConvention.outputs.cosmosDBName : ''
-    name: aif2025ProjectName
+    name: aifV2ProjectName
     location: location
     storageName: namingConvention.outputs.storageAccount1001Name
     #disable-next-line BCP318
@@ -585,8 +596,8 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '06-aiHubModule${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: aiHubName
-    defaultProjectName: aifProjectName
+    name: aifV1HubName
+    defaultProjectName: aifV1ProjectName
     location: location
     tags: tagsProject
     aifactorySuffix: aifactorySuffixRG
@@ -630,7 +641,7 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
   name: '06-rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
   params: {
     acrName: var_acr_cmn_or_prj
-    aiHubName: aiHubName
+    aiHubName: aifV1HubName
     aiHubRgName: targetResourceGroup
   }
   dependsOn: [

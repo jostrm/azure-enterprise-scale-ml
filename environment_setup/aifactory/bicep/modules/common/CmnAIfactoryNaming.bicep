@@ -79,9 +79,14 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 // AI Factory - naming convention
 // ============================================================================
 
-// Core AI/ML Services
-var aiHubName = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifProjectName = 'ai-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+// AI Foundry V1
+var aifV1HubName = 'aif-V1-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifV1ProjectName = 'aif-V1-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+
+// AI Foundry V2 (2025)
+var aifV2Name ='aif-V2-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifV2PrjName ='aifprj-V2-${projectName}${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+
 var aoaiName = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'), '-', '') // AzureAISearch4prj0025kxmv
@@ -114,9 +119,6 @@ var funcAppServicePlanName = 'func-${projectName}-${locationSuffix}-${env}-${uni
 var webbAppServicePlanName = 'webapp-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}-plan'
 var vmName = 'dsvm-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
-// AI Foundry
-var aifName ='aif-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifPrjName ='ai-${projectName}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // Storage and Keys
 var keyvaultName = 'kv-p${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${twoNumbers}'
@@ -133,9 +135,6 @@ var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${r
 
 // Common Resource Group Services
 var laWorkspaceName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-
-// AIFoundry2025
-var aif2025ProjectName = 'aif-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 
 // ============================================================================
 // COMPUTED VARIABLES - Networking subnets
@@ -157,9 +156,6 @@ output aksSubnetName string = aksSubnetName
 output acaSubnetName string = acaSubnetName
 output defaultSubnet string = defaultSubnet
 
-// Core AI/ML Services
-output aiHubName string = aiHubName
-output aifProjectName string = aifProjectName
 output aoaiName string = aoaiName
 output amlName string = amlName
 output safeNameAISearch string = safeNameAISearch
@@ -192,9 +188,13 @@ output funcAppServicePlanName string = funcAppServicePlanName
 output webbAppServicePlanName string = webbAppServicePlanName
 output vmName string = vmName
 
-// AI Foundry
-output aifName string = aifName
-output aifPrjName string = aifPrjName
+// AI Foundry V1 (2023-2025) with Hub
+output aifV1HubName string = aifV1HubName
+output aifV1ProjectName string = aifV1ProjectName
+
+// AI Foundry V2
+output aifV2Name string = aifV2Name
+output aifV2PrjName string = aifV2PrjName
 
 // Storage and Keys
 output keyvaultName string = keyvaultName
@@ -211,9 +211,6 @@ output miPrjName string = miPrjName
 
 // Common Resource Group Services
 output laWorkspaceName string = laWorkspaceName
-
-// AI Foundry 2025-08->
-output aif2025ProjectName string = aif2025ProjectName
 
 // Helper variables
 output projectName string = projectName

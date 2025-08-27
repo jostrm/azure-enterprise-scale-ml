@@ -12,9 +12,13 @@ type aifactoryNamingType = {
   acaSubnetName: string
   defaultSubnet: string
 
-  // Core AI/ML Services
-  aiHubName: string
-  aifProjectName: string
+  // AI Foundry V1 (2023-2025)
+  aifV1HubName: string
+  aifV1ProjectName: string
+  // AI Foundry V2 (2025-)
+  aifV2Name: string
+  aifV2PrjName: string
+
   aoaiName: string
   amlName: string
   safeNameAISearch: string
@@ -47,10 +51,6 @@ type aifactoryNamingType = {
   webbAppServicePlanName: string
   vmName: string
 
-  // AI Foundry
-  aifName: string
-  aifPrjName: string
-
   // Storage and Keys
   keyvaultName: string
   storageAccount1001Name: string
@@ -66,10 +66,7 @@ type aifactoryNamingType = {
 
   // Common Resource Group Services
   laWorkspaceName: string
-
-  // Additional Resources
-  aif2025ProjectName: string
-
+  
   // Helper variables
   projectName: string
   cmnName: string
