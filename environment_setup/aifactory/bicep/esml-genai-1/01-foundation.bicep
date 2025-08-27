@@ -376,13 +376,13 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 }
 
 // Create Target Resource group
-resource targetResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' = {
+resource projectResourceGroup 'Microsoft.Resources/resourceGroups@2024-07-01' = {
   name: targetResourceGroup
   location: location
   tags: tagsProject
 }
 
-var projectSalt = substring(uniqueString(targetResourceGroupRef.id), 0, 5)
+var projectSalt = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 
 // ============================================================================
@@ -609,17 +609,6 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
   dependsOn: [
     commonResourceGroupRef
   ]
-}
-
-// Project Resource Group
-module projectResourceGroup '../modules/resourcegroupUnmanaged.bicep' = {
-  scope: subscription(subscriptionIdDevTestProd)
-  name: guid('prjRG',commonResourceGroupRef.id, subscriptionIdDevTestProd)
-  params: {
-    rgName: targetResourceGroup
-    location: location
-    tags: tagsProject
-  }
 }
 
 // Project Managed Identity
