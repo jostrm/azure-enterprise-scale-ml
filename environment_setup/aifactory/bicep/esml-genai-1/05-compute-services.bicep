@@ -78,8 +78,6 @@ param webAppExists bool = false
 param funcAppServicePlanExists bool = false
 param webAppServicePlanExists bool = false
 param bingExists bool = false
-param miACAExists bool = false
-param miPrjExists bool = false
 
 param serviceSettingDeployAppInsightsDashboard bool = true
 param serviceSettingDeployBingSearch bool = false
@@ -843,9 +841,6 @@ output containerAppADeployed bool = (!containerAppAExists && serviceSettingDeplo
 
 @description('Container App Web deployment status')
 output containerAppWDeployed bool = (!containerAppWExists && serviceSettingDeployContainerApps)
-
-@description('Managed Identity for Container Apps deployment status')
-output miACADeployed bool = !miACAExists
 
 @description('ACR RBAC verification status for Container Apps')
 output acrRbacVerified bool = serviceSettingDeployContainerApps
