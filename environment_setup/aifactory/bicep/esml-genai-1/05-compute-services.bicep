@@ -199,16 +199,20 @@ param containerCpuCoreCount int = 1
 param aca_a_registry_image string = ''
 param aca_w_registry_image string = ''
 param aca_default_image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-var imageRegistryTypeA = !empty(aca_a_registry_image) && contains(aca_a_registry_image, 'mcr.microsoft.com') 
-  ? 'ms' 
-  : !empty(aca_a_registry_image) && contains(aca_a_registry_image, 'docker.io') 
-    ? 'dockerhub' 
-    : 'private'
-var imageRegistryTypeW = !empty(aca_w_registry_image) && contains(aca_w_registry_image, 'mcr.microsoft.com') 
-  ? 'ms' 
-  : !empty(aca_w_registry_image) && contains(aca_w_registry_image, 'docker.io') 
-    ? 'dockerhub' 
-    : 'private'
+var imageRegistryTypeA = !empty(aca_a_registry_image) 
+  ? (contains(aca_a_registry_image, 'mcr.microsoft.com') 
+      ? 'ms' 
+      : contains(aca_a_registry_image, 'docker.io') 
+        ? 'dockerhub' 
+        : 'private')
+  : 'ms'  // Default to 'ms' when using default image
+var imageRegistryTypeW = !empty(aca_w_registry_image) 
+  ? (contains(aca_w_registry_image, 'mcr.microsoft.com') 
+      ? 'ms' 
+      : contains(aca_w_registry_image, 'docker.io') 
+        ? 'dockerhub' 
+        : 'private')
+  : 'ms'  // Default to 'ms' when using default image
 
 // Custom domains for Container Apps
 param acaCustomDomainsArray array = []
@@ -739,8 +743,7 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
   }
   dependsOn: [
     existingTargetRG
-    ...(useCommonACR ? [miRbacCmnACR] : [])
-    ...(!useCommonACR ? [miRbacLocalACR] : [])
+    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
     subnetDelegationAca
   ]
 }
@@ -822,10 +825,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
   }
   dependsOn: [
     containerAppsEnv
-    ...(useCommonACR ? [miRbacCmnACR] : [])
-    ...(!useCommonACR ? [miRbacLocalACR] : [])
-    ...(useCommonACR ? [miPrjRbacCmnACR] : [])
-    ...(!useCommonACR ? [miPrjRbacLocalACR] : [])
+    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
   ]
 }
 
@@ -854,10 +854,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
   }
   dependsOn: [
     containerAppsEnv    
-    ...(useCommonACR ? [miRbacCmnACR] : [])
-    ...(!useCommonACR ? [miRbacLocalACR] : [])
-    ...(useCommonACR ? [miPrjRbacCmnACR] : [])
-    ...(!useCommonACR ? [miPrjRbacLocalACR] : [])
+    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
   ]
 }
 
