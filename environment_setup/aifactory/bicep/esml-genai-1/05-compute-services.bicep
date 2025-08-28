@@ -77,8 +77,9 @@ param functionAppExists bool = false
 param webAppExists bool = false
 param funcAppServicePlanExists bool = false
 param webAppServicePlanExists bool = false
-param miACAExists bool = false
 param bingExists bool = false
+param miACAExists bool = false
+param miPrjExists bool = false
 
 param serviceSettingDeployAppInsightsDashboard bool = true
 param serviceSettingDeployBingSearch bool = false
@@ -443,24 +444,24 @@ module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 
 // Array vars - use principal IDs from helper modules
-var miPrincipalId = getACAMIPrincipalId.outputs.principalId!
+var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId!
 
-module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
+module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miACAExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('05-miRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrCommonName
-    principalId: miPrincipalId
+    principalId: miAcaPrincipalId
   }
 
 }
 
-module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR) {
+module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && !miACAExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-miRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrProjectName
-    principalId: miPrincipalId
+    principalId: miAcaPrincipalId
   }
 }
 
@@ -473,7 +474,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 var miPrjPrincipalId = getProjectMIPrincipalId.outputs.principalId!
 
-module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
+module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('05-miPrjRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -482,7 +483,7 @@ module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR) {
   }
 }
 
-module miPrjRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR) {
+module miPrjRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && !miPrjExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-miPrjRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -796,7 +797,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
     subnetAcaDedicatedName: acaSubnetName
     customDomains: acaCustomDomainsArray
     resourceGroupName: targetResourceGroup
-    identityId: miPrincipalId // Using the variable instead of module output
+    identityId: miAcaPrincipalId // Using the variable instead of module output
     identityName: miACAName
     containerRegistryName: var_acr_cmn_or_prj
     containerAppsEnvironmentName: containerAppsEnvName // Using direct name instead of module output
@@ -843,7 +844,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
     containerAppsEnvironmentName: containerAppsEnvName // Using direct name
     containerAppsEnvironmentId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.App/managedEnvironments/${containerAppsEnvName}'
     containerRegistryName: var_acr_cmn_or_prj
-    identityId: miPrincipalId // Using the variable instead of module output
+    identityId: miAcaPrincipalId // Using the variable instead of module output
     identityName: miACAName
     appWorkloadProfileName: acaAppWorkloadProfileName
     containerCpuCoreCount: containerCpuCoreCount
@@ -866,7 +867,7 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceS
   params: {
     aiSearchName: aiSearchName
     appInsightsName: applicationInsightName
-    principalIdMI: miPrincipalId // Using the variable instead of module output
+    principalIdMI: miAcaPrincipalId // Using the variable instead of module output
     resourceGroupId: existingTargetRG.id
   }
   dependsOn: [
