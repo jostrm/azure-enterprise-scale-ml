@@ -249,12 +249,6 @@ var kindContentSafety = 'ContentSafety'
 var kindAIServices = 'AIServices'
 var kindAOpenAI = 'OpenAI'
 
-// Target resource group reference
-//resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' = {
-//  name: targetResourceGroup
-//  location: location
-//}
-
 resource projectResourceGroupExists 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)

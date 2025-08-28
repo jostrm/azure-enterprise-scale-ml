@@ -76,16 +76,17 @@ param deployModel_text_embedding_3_large bool = false
 @description('Whether to deploy text-embedding-3-small model')
 param deployModel_text_embedding_3_small bool = false
 
-@description('Whether to deploy GPT-4o-mini model')
-param deployModel_gpt_4o_mini bool = false
-
-param deployModel_gpt_4o bool = false
-
 @description('Default capacity for embedding models')
 param default_embedding_capacity int = 25
 
 @description('Default capacity for GPT models')
 param default_gpt_capacity int = 40
+@description('Whether to deploy GPT-4o model')
+param deployModel_gpt_4o bool = false
+param default_gpt_4o_version string = '2024-08-06'
+@description('Whether to deploy GPT-4o-mini model')
+param deployModel_gpt_4o_mini bool = false
+param default_gpt_4o_mini_version string = '2024-07-18' // All models works with Bing search, except gpt-4o-mini,version: 2024-07-18 
 
 @description('Default SKU for models')
 @allowed(['Standard', 'GlobalStandard'])
@@ -512,7 +513,13 @@ var aiModels = concat(
   }] : [],
   deployModel_gpt_4o_mini ? [{
     modelName: 'gpt-4o-mini'
-    version: '1'
+    version: default_gpt_4o_mini_version
+    capacity: default_gpt_capacity
+    skuLocation: default_model_sku
+  }] : [],
+  deployModel_gpt_4o ? [{
+    modelName: 'gpt-4o'
+    version: default_gpt_4o_version
     capacity: default_gpt_capacity
     skuLocation: default_model_sku
   }] : [],
