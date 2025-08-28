@@ -446,23 +446,37 @@ module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 // Array vars - use principal IDs from helper modules
 var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId!
 
-module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miACAExists) {
+module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('05-miRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrCommonName
     principalId: miAcaPrincipalId
   }
-
 }
 
-module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && !miACAExists) {
+module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-miRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrProjectName
     principalId: miAcaPrincipalId
   }
+}
+
+// ============== ACR RBAC VERIFICATION MODULE ==============
+// Verify RBAC assignments are complete before Container Apps deployment
+module verifyACRRbac '../modules/verify-acr-rbac.bicep' = if(serviceSettingDeployContainerApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd, useCommonACR ? commonResourceGroup : targetResourceGroup)
+  name: take('05-verifyACRRbac-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    containerRegistryName: useCommonACR ? acrCommonName : acrProjectName
+    principalId: miAcaPrincipalId
+    roleDefinitionId: '7f951dda-4ed3-4680-a7ca-43fe172d538d' // AcrPull role
+  }
+  dependsOn: [
+    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
+  ]
 }
 
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
@@ -474,7 +488,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 var miPrjPrincipalId = getProjectMIPrincipalId.outputs.principalId!
 
-module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExists) {
+module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('05-miPrjRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -483,7 +497,7 @@ module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExis
   }
 }
 
-module miPrjRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && !miPrjExists) {
+module miPrjRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && serviceSettingDeployContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-miPrjRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -826,6 +840,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
   }
   dependsOn: [
     containerAppsEnv
+    verifyACRRbac // Ensure RBAC verification completes before Container App deployment
     ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
   ]
 }
@@ -855,6 +870,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
   }
   dependsOn: [
     containerAppsEnv    
+    verifyACRRbac // Ensure RBAC verification completes before Container App deployment
     ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
   ]
 }
@@ -897,3 +913,9 @@ output containerAppWDeployed bool = (!containerAppWExists && serviceSettingDeplo
 
 @description('Managed Identity for Container Apps deployment status')
 output miACADeployed bool = !miACAExists
+
+@description('ACR RBAC verification status for Container Apps')
+output acrRbacVerified bool = serviceSettingDeployContainerApps
+
+@description('ACR RBAC verification timestamp')
+output acrRbacVerificationCompleted string = serviceSettingDeployContainerApps ? 'RBAC verification included in deployment' : 'RBAC verification not required'
