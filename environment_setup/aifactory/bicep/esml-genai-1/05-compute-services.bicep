@@ -732,8 +732,8 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
     managedIdentities: {
       systemAssigned: true
       userAssignedResourceIds: concat(
-        !empty(miPrjName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
-        !empty(miACAName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+        !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+        !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
       )
     }
   }

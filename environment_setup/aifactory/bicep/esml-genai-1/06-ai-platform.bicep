@@ -387,8 +387,8 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     managedIdentities: {
       systemAssigned: true
       userAssignedResourceIds: concat(
-        !empty(miPrjName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
-        !empty(miACAName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+        !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+        !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
       )
     }
     uniqueDepl: deploymentProjSpecificUniqueSuffix
@@ -619,8 +619,8 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     managedIdentities: {
       systemAssigned: true
       userAssignedResourceIds: concat(
-        !empty(miPrjName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
-        !empty(miACAName) ? array(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+        !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+        !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
       )
     }
     defaultProjectName: aifV1ProjectName
