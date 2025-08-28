@@ -701,71 +701,8 @@ steps:
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '62-cognitive-services'
-  condition: and(ne(variables['debug_disable_62_cognitive_services'], 'true'), succeeded())
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-     az account set --subscription "$(dev_test_prod_sub_id)"
-     az deployment sub create \
-     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-62-cognitive-services" \
-     --subscription "$(dev_test_prod_sub_id)" \
-     --location "$(admin_location)" \
-     --template-file "esml-genai-1\\02-cognitive-services.bicep" \
-     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
-     --parameters env="$(dev_test_prod)" \
-     --parameters projectNumber="$(project_number_000)" \
-     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
-     --parameters technicalAdminsEmail="$(technical_admins_email)" \
-     --parameters location="$(admin_location)" \
-     --parameters locationSuffix="$(admin_locationSuffix)" \
-     --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
-     --parameters network_env="$(network_env_$(dev_test_prod))" \
-     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
-     --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
-     --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
-     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
-     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
-     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
-     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
-     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
-     --parameters IPwhiteList="$(project_IP_whitelist)" \
-     --parameters openaiExists="$(openaiExists)" \
-     --parameters aiSearchExists="$(aiSearchExists)" \
-     --parameters aiServicesExists="$(aiServicesExists)" \
-     --parameters keyvaultExists="$(keyvaultExists)" \
-     --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
-     --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
-     --parameters randomValue="$(deployment_random_value)" \
-     --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
-     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters enableAIServices="$(enableAIServices)" \
-     --parameters enableAISearch="$(enableAISearch)" \
-     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
-     --parameters serviceSettingDeployContentSafety="$(serviceSettingDeployContentSafety)" \
-     --parameters serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
-     --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
-     --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
-     --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
-     --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
-     --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
-     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
-     --parameters deployModel_gpt_4="$(deployModel_gpt_4)" \
-     --parameters tags='$(tags)' \
-     --parameters tagsProject='$(tagsProject)' \
-     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
-     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
-     --parameters projectPrefix="$(projectPrefix)" \
-     --parameters projectSuffix="$(projectSuffix)" \
-     --debug
-    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
-- task: AzureCLI@2
-  displayName: '63-core-infrastructure'
-  condition: and(ne(variables['debug_disable_63_core_infrastructure'], 'true'), succeeded())
+  displayName: '62-core-infrastructure'
+  condition: and(ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -776,7 +713,7 @@ steps:
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-63-core-infrastructure" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-genai-1\\03-core-infrastructure.bicep" \
+     --template-file "esml-genai-1\\02-core-infrastructure.bicep" \
      --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
      --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
@@ -818,6 +755,69 @@ steps:
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
+     --debug
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '63-cognitive-services'
+  condition: and(ne(variables['debug_disable_63_cognitive_services'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az account set --subscription "$(dev_test_prod_sub_id)"
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-62-cognitive-services" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-genai-1\\03-cognitive-services.bicep" \
+     --parameters @"..\\..\\..\\..\\aifactory\\parameters\\dynamicNetworkParams.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters vnetNameBase="$(vnetNameBase)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters network_env="$(network_env_$(dev_test_prod))" \
+     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
+     --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
+     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters IPwhiteList="$(project_IP_whitelist)" \
+     --parameters openaiExists="$(openaiExists)" \
+     --parameters aiSearchExists="$(aiSearchExists)" \
+     --parameters aiServicesExists="$(aiServicesExists)" \
+     --parameters keyvaultExists="$(keyvaultExists)" \
+     --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
+     --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters enableAIServices="$(enableAIServices)" \
+     --parameters enableAISearch="$(enableAISearch)" \
+     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
+     --parameters serviceSettingDeployContentSafety="$(serviceSettingDeployContentSafety)" \
+     --parameters serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
+     --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
+     --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
+     --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
+     --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
+     --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
+     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters deployModel_gpt_4="$(deployModel_gpt_4)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
