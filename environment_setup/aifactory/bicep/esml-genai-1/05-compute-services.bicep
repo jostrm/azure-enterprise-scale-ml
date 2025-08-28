@@ -432,79 +432,17 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
-// ============== MANAGED IDENTITY FOR CONTAINER APPS ==============
-
 // Assumes the principals exists.
 module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: '05-getACAMI-${deploymentProjSpecificUniqueSuffix}'
+  name: '03-getACAMI-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miACAName
   }
 }
 
-// Array vars - use principal IDs from helper modules
-var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId!
+var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId
 
-module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && serviceSettingDeployContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('05-miRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    containerRegistryName: acrCommonName
-    principalId: miAcaPrincipalId
-  }
-}
-
-module miRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && serviceSettingDeployContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-miRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    containerRegistryName: acrProjectName
-    principalId: miAcaPrincipalId
-  }
-}
-
-// ============== ACR RBAC VERIFICATION MODULE ==============
-// Verify RBAC assignments are complete before Container Apps deployment
-module verifyACRRbac '../modules/verify-acr-rbac.bicep' = if(serviceSettingDeployContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, useCommonACR ? commonResourceGroup : targetResourceGroup)
-  name: take('05-verifyACRRbac-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    containerRegistryName: useCommonACR ? acrCommonName : acrProjectName
-    principalId: miAcaPrincipalId
-    roleDefinitionId: '7f951dda-4ed3-4680-a7ca-43fe172d538d' // AcrPull role
-  }
-  dependsOn: [
-    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
-  ]
-}
-
-module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: take('05-getPrjMI-${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  params: {
-    managedIdentityName: miPrjName
-  }
-}
-var miPrjPrincipalId = getProjectMIPrincipalId.outputs.principalId!
-
-module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && serviceSettingDeployContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('05-miPrjRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    containerRegistryName: acrCommonName
-    principalId: miPrjPrincipalId
-  }
-}
-
-module miPrjRbacLocalACR '../modules/miRbac.bicep' = if(!useCommonACR && serviceSettingDeployContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-miPrjRbacLocalACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    containerRegistryName: acrProjectName
-    principalId: miPrjPrincipalId
-  }
-}
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
@@ -758,7 +696,6 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
   }
   dependsOn: [
     existingTargetRG
-    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
     subnetDelegationAca
   ]
 }
@@ -840,8 +777,6 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
   }
   dependsOn: [
     containerAppsEnv
-    verifyACRRbac // Ensure RBAC verification completes before Container App deployment
-    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
   ]
 }
 
@@ -870,8 +805,6 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
   }
   dependsOn: [
     containerAppsEnv    
-    verifyACRRbac // Ensure RBAC verification completes before Container App deployment
-    ...(useCommonACR ? [miRbacCmnACR, miPrjRbacCmnACR] : [miRbacLocalACR, miPrjRbacLocalACR])
   ]
 }
 

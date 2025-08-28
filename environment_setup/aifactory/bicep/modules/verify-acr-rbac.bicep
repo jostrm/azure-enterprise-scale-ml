@@ -132,7 +132,7 @@ resource rbacVerificationScript 'Microsoft.Resources/deploymentScripts@2023-08-0
 // ============================================================================
 
 @description('Indicates whether ACR RBAC verification was successful')
-output rbacVerified bool = rbacVerificationScript.properties.outputs.rbacVerified
+output rbacVerifiedAndExists bool = rbacVerificationScript.properties.outputs.rbacVerified
 
 @description('ACR Resource ID that was verified')
 output acrResourceId string = rbacVerificationScript.properties.outputs.acrResourceId
@@ -145,6 +145,6 @@ output verificationSummary object = {
   containerRegistryName: containerRegistryName
   principalId: principalId
   roleDefinitionId: roleDefinitionId
-  rbacVerified: rbacVerificationScript.properties.outputs.rbacVerified
+  rbacVerifiedAndExists: rbacVerificationScript.properties.outputs.rbacVerified
   timestamp: rbacVerificationScript.properties.outputs.verificationTimestamp
 }

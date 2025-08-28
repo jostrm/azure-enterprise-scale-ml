@@ -48,6 +48,8 @@ param acrProjectExists bool = false
 param applicationInsightExists bool = false
 param vmExists bool = false
 param bingExists bool = false
+param miACAExists bool = false
+param miPrjExists bool = false
 
 // Enable flags from parameter files
 @description('Enable Bing Search deployment')
@@ -480,6 +482,31 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
 // Common container registry reference (if using common ACR)  
 // Reference maintained for infrastructure awareness but not directly used in current deployment
 // TODO: Add common ACR integration logic if needed for cross-project container sharing
+
+// ============== MANAGED IDENTITY FOR CONTAINER APPS ==============
+
+// Array vars - use principal IDs from helper modules
+var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId!
+
+module miRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miACAExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  name: take('05-miRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    containerRegistryName: useCommonACR? acrCommonName_Static: acrProjectName
+    principalId: miAcaPrincipalId
+  }
+}
+
+var miPrjPrincipalId = getProjectMIPrincipalId.outputs.principalId!
+
+module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  name: take('05-miPrjRbacCmnACR-${deployment().name}-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    containerRegistryName: useCommonACR? acrCommonName_Static: acrProjectName
+    principalId: miPrjPrincipalId
+  }
+}
 
 // ============== APPLICATION INSIGHTS ==============
 
