@@ -255,9 +255,15 @@ var kindAOpenAI = 'OpenAI'
 //  location: location
 //}
 
-resource resourceExists_struct 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource projectResourceGroupExists 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
+}
+
+// Keyvault existing reference
+resource existingKeyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = if (keyvaultExists) {
+  name: keyvaultName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
 // ============== DNS CONFIGURATIONS ==============
@@ -310,7 +316,7 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -340,7 +346,8 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
+    ...(keyvaultExists ? [existingKeyvault] : [])
   ]
 }
 
@@ -370,7 +377,8 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
+    ...(keyvaultExists ? [existingKeyvault] : [])
   ]
 }
 
@@ -400,7 +408,8 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettin
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
+    ...(keyvaultExists ? [existingKeyvault] : [])
   ]
 }
 
@@ -472,7 +481,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
     ]
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -499,7 +508,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
     ...(!storageAccount2001Exists ? [sa4AIsearch] : [])
   ]
 }
@@ -541,7 +550,8 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     default_model_sku: default_model_sku
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
+    ...(keyvaultExists ? [existingKeyvault] : [])
     ...(!storageAccount2001Exists ? [sa4AIsearch] : [])
   ]
 }
@@ -589,8 +599,9 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [
-    resourceExists_struct
+    projectResourceGroupExists
     ...(!storageAccount2001Exists ? [sa4AIsearch] : [])
+    ...(keyvaultExists ? [existingKeyvault] : [])
   ]
 }
 
@@ -606,7 +617,7 @@ module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZone
   }
   dependsOn: [
     CmnZones
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -620,7 +631,7 @@ module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
   }
   dependsOn: [
     CmnZones
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -634,7 +645,7 @@ module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
   }
   dependsOn: [
     CmnZones
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -648,7 +659,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
   }
   dependsOn: [
     CmnZones
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -662,7 +673,7 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists &&
   }
   dependsOn: [
     CmnZones
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -676,7 +687,7 @@ module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExi
   }
   dependsOn: [
     CmnZones
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 
@@ -690,7 +701,7 @@ module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(!storageAccount
   }
   dependsOn: [
     CmnZones
-    resourceExists_struct
+    projectResourceGroupExists
   ]
 }
 

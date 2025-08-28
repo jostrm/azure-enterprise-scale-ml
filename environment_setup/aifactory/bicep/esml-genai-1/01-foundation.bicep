@@ -739,7 +739,7 @@ module debug './00-debug.bicep' = if (enableDebugging) {
 }
 
 // VM Admin Login Permissions (if storage already exists)
-/*
+
 module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resourceExists.storageAccount1001) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '01-VMAdminLogin4${deploymentProjSpecificUniqueSuffix}'
@@ -754,13 +754,12 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resour
     projectResourceGroup
   ]
 }
-*/
 
 // ============================================================================
 // OUTPUTS
 // ============================================================================
 
-/*
+
 @description('Foundation deployment outputs')
 output foundationOutputs object = {
   // Resource Group Information
@@ -786,7 +785,6 @@ output foundationOutputs object = {
   randomSalt: randomSalt
   deploymentSuffix: deploymentProjSpecificUniqueSuffix
 }
-*/
 
 @description('Ready for next deployment layer')
 output foundationComplete bool = true
