@@ -300,6 +300,7 @@ var containerAppWName = namingConvention.outputs.containerAppWName
 var miACAName = namingConvention.outputs.miACAName
 var miPrjName = namingConvention.outputs.miPrjName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
+var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
 var aiSearchName = namingConvention.outputs.safeNameAISearch
@@ -570,7 +571,7 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && serv
   name: '05-rbacForWebApp${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
-    storageAccountName2: storageAccount1001Name // Using same storage account
+    storageAccountName2: storageAccount2001Name // Using different storage account
     aiSearchName: aiSearchName
     webAppPrincipalId: var_webAppPrincipalId // Using computed variable for principal ID
     openAIName: aoaiName
@@ -650,7 +651,7 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExist
   name: '05-rbacForFunction${deploymentProjSpecificUniqueSuffix}'
   params: {
     storageAccountName: storageAccount1001Name
-    storageAccountName2: storageAccount1001Name // Using same storage account
+    storageAccountName2: storageAccount2001Name // Using different storage account
     aiSearchName: aiSearchName
     functionPrincipalId: var_functionPrincipalId // Using computed variable for principal ID
     openAIName: aoaiName
