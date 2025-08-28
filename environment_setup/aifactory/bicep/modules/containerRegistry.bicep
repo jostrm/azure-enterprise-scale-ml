@@ -1,11 +1,9 @@
-// Deploy keyvault with a private endpoint enabled
-
-@description('(Required) Specifies the name of the Azure container registry that will be deployed')
-param containerRegistryName string
-
 @description('(Optional) Specifies the Azure container registry service tier name, defaults to premium because of the private endpoints association')
 @allowed(['Premium', 'Standard', 'Basic']) 
 param skuName string = 'Premium' // NB! Basic and Standard ACR SKUs don't support private endpoints.
+
+@description('(Required) Specifies the name of the Azure container registry that will be deployed')
+param containerRegistryName string
 
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
 param subnetName string
@@ -19,10 +17,23 @@ param location string
 param vnetName string
 param vnetResourceGroupName string
 param enablePublicAccessWithPerimeter bool = false
+param allowPublicAccessWhenBehindVnet bool = false
+param adminUserEnabled bool = false
+param dedicatedDataPoint bool = true
+param zoneRedundancy string = 'Disabled'
+param ipRules array = []
+param existingIpRules array = []
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var policyOn = 'disabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
 var containerRegistryNameCleaned = replace(containerRegistryName, '-', '')
+
+// Combine existing IP rules with new ones
+var allIpRules = union(existingIpRules, ipRules)
+
+// Remove duplicates by creating a unique set based on the 'value' property
+var uniqueIpRulesMap = reduce(allIpRules, {}, (acc, rule) => union(acc, { '${rule.value}': rule }))
+var uniqueIpRules = map(items(uniqueIpRulesMap), item => item.value)
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -43,13 +54,12 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-pr
     name: skuName
   }
   properties: {
-    adminUserEnabled: true
+    adminUserEnabled: adminUserEnabled
     networkRuleSet: !enablePublicAccessWithPerimeter ? {
       defaultAction: 'Deny'
-      ipRules: []
+      ipRules: uniqueIpRules
     }:null
-    dataEndpointEnabled: false
-    //networkRuleBypassOptions: !enablePublicAccessWithPerimeter? 'AzureServices': null
+    dataEndpointEnabled: dedicatedDataPoint
     networkRuleBypassOptions:'AzureServices'
     policies: {
       quarantinePolicy: {
@@ -64,8 +74,8 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-pr
         type: 'Notary'
       }
     }
-    publicNetworkAccess: enablePublicAccessWithPerimeter?'Enabled': 'Disabled'
-    zoneRedundancy: 'Disabled'
+    publicNetworkAccess: enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet?'Enabled': 'Disabled'
+    zoneRedundancy: zoneRedundancy
   }
 }
 

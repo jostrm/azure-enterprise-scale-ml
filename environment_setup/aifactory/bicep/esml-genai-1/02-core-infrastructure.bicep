@@ -103,6 +103,9 @@ param hybridBenefit bool = false
 
 // Container Registry
 param useCommonACR bool = true
+param allowPublicAccessWhenBehindVnet bool = false
+param acr_adminUserEnabled bool = false
+param acr_dedicated bool = true
 
 // Tags
 param tagsProject object = {}
@@ -404,6 +407,12 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
 }
 
 // ============== CONTAINER REGISTRY ==============
+var processedIpRules = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
+
 
 // Project-specific container registry (if not using common ACR)
 module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useCommonACR) {
@@ -419,11 +428,28 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useC
     tags: tagsProject
     location: location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    ipRules: processedIpRules
+    existingIpRules: [] // Project-specific ACR has no existing rules initially
+    adminUserEnabled: acr_adminUserEnabled
+    dedicatedDataPoint:acr_dedicated
   }
   dependsOn: [
     existingTargetRG
   ]
 }
+
+// Get existing IP rules from common ACR if using common ACR
+module getExistingAcrIpRules '../modules/get-acr-ip-rules.bicep' = if (useCommonACR) {
+  name: '03-getACRIpRules-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  params: {
+    containerRegistryName: acrCommonName_Static
+  }
+}
+
+#disable-next-line BCP318
+var existingIpRules = useCommonACR ? getExistingAcrIpRules.outputs.ipRules : []
 
 // Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
@@ -440,13 +466,18 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     tags: tagsProject
     location:location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    ipRules: processedIpRules
+    existingIpRules: existingIpRules
+    adminUserEnabled: acr_adminUserEnabled
+    dedicatedDataPoint:acr_dedicated
   }
 
   dependsOn: [
     acrCommon
   ]
 }
-// Common container registry reference (if using common ACR)
+// Common container registry reference (if using common ACR)  
 // Reference maintained for infrastructure awareness but not directly used in current deployment
 // TODO: Add common ACR integration logic if needed for cross-project container sharing
 

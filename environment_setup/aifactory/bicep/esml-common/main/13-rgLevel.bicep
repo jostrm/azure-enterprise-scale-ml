@@ -1,4 +1,25 @@
-targetScope = 'subscription'  // Just to avoid sending a static RG. Instead: ESML dynamic via naming convention and parameters
+targetScope = 'subscription'
+
+@allowed(['Premium', 'Standard', 'Basic'])
+param containerRegistrySkuName string = 'Premium'
+param vmSKU array = [
+  'Standard_E2s_v3'
+  'Standard_D4s_v3'
+  'standard_D2as_v5'
+]
+
+@allowed([
+  'Standard_LRS'
+  'Standard_GRS'
+  'Standard_ZRS'
+  'Premium_LRS'
+  'Premium_ZRS'
+  'Standard_GZRS'
+  'Standard_RAGRS'
+  'Standard_RAGZRS'
+])
+@description('Specifies the SKU of the storage account')
+param skuNameStorage string = 'Standard_ZRS' // Cannot be changed after creation
 
 param privateDnsAndVnetLinkAllGlobalLocation bool=true // Microsoft only supports global Private DNS Zones as of now
 @description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
@@ -21,25 +42,6 @@ param adminUsername string
 param enableLogAnalyticsQueries bool = true
 param deployOnlyAIGatewayNetworking bool = false
 param vmSKUSelectedArrayIndex int = 0
-param vmSKU array = [
-  'Standard_E2s_v3'
-  'Standard_D4s_v3'
-  'standard_D2as_v5'
-]
-
-@allowed([
-  'Standard_LRS'
-  'Standard_GRS'
-  'Standard_ZRS'
-  'Premium_LRS'
-  'Premium_ZRS'
-  'Standard_GZRS'
-  'Standard_RAGRS'
-  'Standard_RAGZRS'
-])
-@description('Specifies the SKU of the storage account')
-param skuNameStorage string = 'Standard_ZRS' // Cannot be changed after creation
-
 @allowed([
   'dev'
   'test'
@@ -113,6 +115,9 @@ param DOCS_byosnet_project_example string = ''
 param byoASEv3 bool = false
 param byoAseFullResourceId string = ''
 param byoAseAppServicePlanResourceId string = ''
+param allowPublicAccessWhenBehindVnet bool = false
+param acr_adminUserEnabled bool = false
+param acr_dedicated bool = true
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
@@ -150,6 +155,12 @@ var commonSubnetPowerBI = (BYO_subnets)?replace(subnetCommonPowerbiGw, '<network
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null') ? [] : ipWhitelist_array_1
+
+// Process IP rules for Container Registry (add /32 if no CIDR notation provided)
+var processedIpRules = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
 var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
@@ -455,13 +466,18 @@ module acrCommon '../../modules/containerRegistry.bicep' = if(!deployOnlyAIGatew
   name: 'CommonACR4CommonRG${uniqueInAIFenv}'
   params: {
     containerRegistryName:acrCommonName
-    skuName: 'Premium'
+    skuName: containerRegistrySkuName
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: tags
     location:location
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    ipRules: processedIpRules
+    adminUserEnabled: acr_adminUserEnabled
+    dedicatedDataPoint:acr_dedicated
   }
 
   dependsOn: [
