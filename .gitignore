@@ -120,4 +120,5 @@ temp_data/
 *.parquet
 02_update_templates_QUICK.ipynb
 01_init_templates_ALL.ipynb
+debug/
 
