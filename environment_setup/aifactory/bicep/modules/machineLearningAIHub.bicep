@@ -378,6 +378,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     
   }
 
+  /*
   resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter) {
     name: epDefaultName2
     location: location
@@ -391,9 +392,8 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       authMode: 'Key' // Ideally this should be based on Microsoft Entra ID access. This sample however uses a key stored in Key Vault.
       publicNetworkAccess: 'Enabled'
     }
-
-    // Note: If you reapply this Bicep after an AI Foundry managed compute deployment has happened in this endpoint, the traffic routing reverts to 0% to all existing deployments. You'll need to set that back to 100% to your desired deployment.
   }
+  */
 }
 
 // ############################### Private or Whitelisted IPs ################ 2025-01-01-preview
@@ -546,7 +546,8 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     hubResourceId: aiHub.id
   }
-
+  
+  /*
   resource endpoint 'onlineEndpoints' = if(!enablePublicAccessWithPerimeter) {
     name: epDefaultName
     location: location
@@ -557,12 +558,10 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
       authMode: 'Key' // Ideally this should be based on Microsoft Entra ID access. This sample however uses a key stored in Key Vault.
       publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
     }
-
-    // Note: If you reapply this Bicep after an AI Foundry managed compute deployment has happened in this endpoint, the traffic routing reverts to 0% to all existing deployments. You'll need to set that back to 100% to your desired deployment.
-  }
+  }   */
 }
 
-// Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added manually
+/*
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!enablePublicAccessWithPerimeter) {
   scope: aiProject
@@ -574,7 +573,9 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
     principalId: aiProject::endpoint.identity.principalId
   }
 }
+*/
 
+/*
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!enablePublicAccessWithPerimeter) {
   scope: aiServices
@@ -586,6 +587,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
     principalId: aiProject::endpoint.identity.principalId
   }
 }
+*/
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
 resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
@@ -607,6 +609,7 @@ resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-
   }
 }
 
+/*
 @description('Azure Diagnostics: AI Foundry chat project online endpoint - allLogs')
 resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
   name: 'chatProjectOnlineEndpointDiagSettingsDefault'
@@ -625,10 +628,9 @@ resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSet
     ]
   }
 }
+*/
 
-// Production readiness change: Client applications that run from compute on Azure should use managed identities instead of
-// pre-shared keys. This sample implementation uses a pre-shared key, and should be rewritten to use the managed identity
-// provided by Azure Web Apps.
+/*
 @description('Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app.')
 resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!enablePublicAccessWithPerimeter) {
   parent: keyVault
@@ -642,17 +644,18 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
     }
   }
 }
+  */
 
 // privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
 resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
-  name: privateEndpointName
+  name: '${aiHub.name}-pend'
   location: location
   tags: tags
   properties: {
-    customNetworkInterfaceName: 'pend-nic-aihub-${aiHub.name}'
+    customNetworkInterfaceName: '${aiHub.name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: privateEndpointName
+        name: '${aiHub.name}-pend'
         properties: {
           groupIds: [
             'amlworkspace'
@@ -695,7 +698,7 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
 
 // Hub 2
 
-// Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added manually
+/*
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectSecretsReaderForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter) {
   scope: aiProject2
@@ -707,7 +710,9 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment2 'Microsoft.Authori
     principalId: aiProject2::endpoint2.identity.principalId
   }
 }
+*/
 
+/*
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
 resource projectOpenAIUserForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter) {
   scope: aiServices
@@ -719,6 +724,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment2 'Microsoft.Authorizat
     principalId: aiProject2::endpoint2.identity.principalId
   }
 }
+*/
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
 resource chatProjectDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter) {
@@ -740,6 +746,7 @@ resource chatProjectDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05
   }
 }
 
+/*
 @description('Azure Diagnostics: AI Foundry chat project online endpoint - allLogs')
 resource chatProjectOnlineEndpointDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: 'chatProjectOnlineEndpointDiagSettingsDefault2'
@@ -758,10 +765,9 @@ resource chatProjectOnlineEndpointDiagSettings2 'Microsoft.Insights/diagnosticSe
     ]
   }
 }
+*/
 
-// Production readiness change: Client applications that run from compute on Azure should use managed identities instead of
-// pre-shared keys. This sample implementation uses a pre-shared key, and should be rewritten to use the managed identity
-// provided by Azure Web Apps.
+/*
 @description('Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app.')
 resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(enablePublicAccessWithPerimeter) {
   parent: keyVault
@@ -775,17 +781,17 @@ resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023
     }
   }
 }
+*/
 
-// privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
 resource pendAIHub2 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePublicAccessWithPerimeter && createPrivateEndpoint) {
-  name: '${privateEndpointName}-2'
+  name: '${aiHub2.name}-pend' //'${privateEndpointName}-2'
   location: location
   tags: tags
   properties: {
-    customNetworkInterfaceName: 'pend-nic-aihub-${aiHub2.name}'
+    customNetworkInterfaceName: '${aiHub2.name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: privateEndpointName
+        name: '${aiHub2.name}-pend'
         properties: {
           groupIds: [
             'amlworkspace'
