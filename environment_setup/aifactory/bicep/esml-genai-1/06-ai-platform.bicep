@@ -428,7 +428,8 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
     ipRules: empty(processedIpRulesAzureML) ? [] : processedIpRulesAzureML
-    ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32
+    //ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32
+    ipWhitelist_array: empty(ipWhitelist_normalized) ? [] : ipWhitelist_normalized
     saName: storageAccount2001Name
     kvName: keyvaultName
     acrName: var_acr_cmn_or_prj
@@ -586,7 +587,9 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     locationSuffix: locationSuffix
     resourceSuffix: resourceSuffix
     aifactorySalt: namingConvention.outputs.uniqueInAIFenv
-    ipRules: empty(processedIpRulesAIHub) ? [] : processedIpRulesAIHub
+    //ipRules: empty(processedIpRulesAIHub) ? [] : processedIpRulesAIHub // OLD
+    ipRules: empty(processedIpRulesAzureML) ? [] : processedIpRulesAzureML
+    //ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32 // OLD
     ipWhitelist_array: empty(ipWhitelist_normalized) ? [] : ipWhitelist_normalized
   }
   dependsOn: [
