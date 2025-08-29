@@ -517,7 +517,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     tags: tagsProject
     vnetResourceGroupName: vnetResourceGroupName
     cognitiveName: aiServicesName
-    pendCogSerName: 'p-${projectName}-aiservices-${genaiName}'
+    pendCogSerName: 'aiservices${projectName}${env}${uniqueInAIFenv}${resourceSuffix}-pend'
     restore: restore
     subnetName: defaultSubnet
     vnetName: vnetNameFull
