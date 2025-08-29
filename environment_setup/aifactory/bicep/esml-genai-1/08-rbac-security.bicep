@@ -40,7 +40,7 @@ param aifactorySalt10char string = ''
 param randomValue string = ''
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
-param commonResourceGroupName string = ''
+param commonResourceGroupName string
 param subscriptionIdDevTestProd string = subscription().subscriptionId
 
 // PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
@@ -49,7 +49,7 @@ param aksSubnetId string = ''
 param acaSubnetId string = ''
 
 // Resource group naming
-param commonRGNamePrefix string = ''
+param commonRGNamePrefix string
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
 var cmnName = namingConvention.outputs.cmnName
 
@@ -260,7 +260,7 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
-  name: commonResourceGroup
+  name: commonResourceGroup!
   scope: subscription(subscriptionIdDevTestProd)
 }
 #disable-next-line BCP318
