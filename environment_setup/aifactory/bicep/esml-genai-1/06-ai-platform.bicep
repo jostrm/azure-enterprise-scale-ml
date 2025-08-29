@@ -279,6 +279,9 @@ var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_a
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
 var ipWhitelist_remove_ending_32 = [for ip in ipWhitelist_array: replace(ip, '/32', '')]
 
+// Normalize IP addresses: add /32 to single IPs if not present
+var ipWhitelist_normalized = [for ip in ipWhitelist_array: contains(trim(ip), '/') ? trim(ip) : '${trim(ip)}/32']
+
 var processedIpRulesAzureML = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: contains(ip, '/') ? ip : '${ip}/32'
@@ -543,7 +546,6 @@ var aiModels = concat(
 )
 
 // ============== AI FOUNDRY HUB ==============
-
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '06-aiHubModule${deploymentProjSpecificUniqueSuffix}'
@@ -585,7 +587,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     resourceSuffix: resourceSuffix
     aifactorySalt: namingConvention.outputs.uniqueInAIFenv
     ipRules: empty(processedIpRulesAIHub) ? [] : processedIpRulesAIHub
-    ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32
+    ipWhitelist_array: empty(ipWhitelist_normalized) ? [] : ipWhitelist_normalized
   }
   dependsOn: [
     existingTargetRG
