@@ -40,7 +40,6 @@ param aifactorySalt10char string = ''
 param randomValue string = ''
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
-param commonResourceGroupName string
 param subscriptionIdDevTestProd string = subscription().subscriptionId
 
 // PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
@@ -71,7 +70,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     commonRGNamePrefix: commonRGNamePrefix
     technicalAdminsObjectID: technicalAdminsObjectID
     technicalAdminsEmail: technicalAdminsEmail
-    commonResourceGroupName: commonResourceGroupName
+    commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
     genaiSubnetId: genaiSubnetId
     aksSubnetId: aksSubnetId
