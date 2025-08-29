@@ -80,7 +80,7 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
 }
 
 // To add Azure Portal. ipRules and add: nslookup on stamp2.ext.search.windows.net (Non-authorative answer)
-resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enableSharedPrivateLink == false) {
+resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(!enableSharedPrivateLink) {
   name: aiSearchName
   location: location
   tags: tags
@@ -110,13 +110,15 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enab
 
 }
 
-resource pendAISearch 'Microsoft.Network/privateEndpoints@2022-01-01' = {
+resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: privateEndpointName
   location: location
+  tags: tags
   properties: {
     subnet: {
       id: subnet.id
     }
+    customNetworkInterfaceName: '${aiSearch.name}-pend-nic'
     privateLinkServiceConnections: [
       {
         name: privateEndpointName

@@ -488,7 +488,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
     location: location
     replicaCount: aiSearchReplicaCount
     partitionCount: aiSearchPartitionCount
-    privateEndpointName: 'p-${projectName}-aisearch-${genaiName}'
+    privateEndpointName: '${safeNameAISearch}-pend'
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
