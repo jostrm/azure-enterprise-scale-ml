@@ -31,8 +31,14 @@ var containerRegistryNameCleaned = replace(containerRegistryName, '-', '')
 // Combine existing IP rules with new ones
 var allIpRules = union(existingIpRules, ipRules)
 
-// Remove duplicates by creating a unique set based on the 'value' property
-var uniqueIpRulesMap = reduce(allIpRules, {}, (acc, rule) => union(acc, { '${rule.value}': rule }))
+// Normalize IP addresses: ensure single IPs have /32 suffix for proper deduplication
+var normalizedIpRules = map(allIpRules, rule => {
+  value: contains(rule.value, '/') ? rule.value : '${rule.value}/32'
+  action: rule.action
+})
+
+// Remove duplicates by creating a unique set based on the normalized 'value' property
+var uniqueIpRulesMap = reduce(normalizedIpRules, {}, (acc, rule) => union(acc, { '${rule.value}': rule }))
 var uniqueIpRules = map(items(uniqueIpRulesMap), item => item.value)
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
