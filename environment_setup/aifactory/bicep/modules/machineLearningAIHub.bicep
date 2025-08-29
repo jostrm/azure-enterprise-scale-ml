@@ -433,7 +433,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet // true: Allows controlled public access through IP allow lists while maintaining VNet integration
     ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
     networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: enablePublicGenAIAccess ? 'Allow' : 'Deny' // When enablePublicGenAIAccess is true, defaultAction must be 'Allow'
+      defaultAction: enablePublicGenAIAccess && empty(ipRules) ? 'Allow' : 'Deny' // When enablePublicGenAIAccess is true, defaultAction must be 'Allow'
       ipRules: ipRules
     } : null
     managedNetwork: {
