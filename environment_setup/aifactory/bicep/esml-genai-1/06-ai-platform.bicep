@@ -565,7 +565,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
     allowProjectManagement: true
     location:location
     // Provided subnet must be of the proper address space. Please provide a subnet which has address space in the range of 172 or 192
-    agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment
+    agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     enableTelemetry:false
     tags: tagsProject
     aiModelDeployments: [
@@ -608,6 +608,10 @@ module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFo
     aiFoundryV2Name: aiFoundry2025.outputs.name
     aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
     }
+    dependsOn: [
+      existingTargetRG
+      aiFoundry2025
+    ]
 }
 // ============== AI FOUNDRY HUB ==============
 
