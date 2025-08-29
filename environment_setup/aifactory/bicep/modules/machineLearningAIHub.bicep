@@ -251,7 +251,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       
     }
   }
-  resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter==true) {
+  resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: azureOpenAIConnectionName
     properties: {
       authType: 'AAD'
@@ -270,7 +270,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       target: aiServices.properties.endpoint
     }
   }
-  resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter==true) {
+  resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
       authType: 'AAD'
@@ -291,7 +291,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
   }
 
   resource searchConnection2 'connections' =
-  if (!empty(aiSearchName) && enablePublicAccessWithPerimeter==true) {
+  if (!empty(aiSearchName) && enablePublicAccessWithPerimeter) {
     name: azureAISearchConnectionName
     properties: {
       authType: 'AAD'
@@ -315,7 +315,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
 }
 
 @description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
-resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter == false) {
+resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
   name: aiHubDiagSettingName
   scope: aiHub
   properties: {
@@ -334,7 +334,7 @@ resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pre
 }
 
 @description('Azure Diagnostics: Azure AI Foundry hub 2 - allLogs')
-resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter == true) {
+resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: aiHubDiagSettingName
   scope: aiHub2
   properties: {
@@ -353,7 +353,7 @@ resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: defaultProjectName
   location: location
   tags: tags
@@ -378,7 +378,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     
   }
 
-  resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==true) {
+  resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter) {
     name: epDefaultName2
     location: location
     kind: 'Managed'
@@ -396,9 +396,9 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
   }
 }
 
-// ############################### Private ################ 2025-01-01-preview
+// ############################### Private or Whitelisted IPs ################ 2025-01-01-preview
 
-resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(!enablePublicAccessWithPerimeter) {
   name: name
   location: location
   identity: identity
@@ -433,7 +433,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet // true: Allows controlled public access through IP allow lists while maintaining VNet integration
     ipAllowlist: allowPublicAccessWhenBehindVnet ? ipWhitelist_array: null
     networkAcls: allowPublicAccessWhenBehindVnet ? {
-      defaultAction: 'Deny' // Deny all, except the ipRules - that should include the ipAllowList
+      defaultAction: enablePublicGenAIAccess ? 'Allow' : 'Deny' // When enablePublicGenAIAccess is true, defaultAction must be 'Allow'
       ipRules: ipRules
     } : null
     managedNetwork: {
@@ -470,7 +470,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
 
   }
 
-  resource aoaiConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
+  resource aoaiConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: azureOpenAIConnectionName
     properties: {
       authType: 'AAD'
@@ -487,7 +487,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       target: aiServices.properties.endpoint
     }
   }
-  resource aiServicesConnection 'connections' = if(enablePublicAccessWithPerimeter==false) {
+  resource aiServicesConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
       authType: 'AAD'
@@ -506,7 +506,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
   }
 
   resource searchConnection 'connections' =
-  if (!empty(aiSearchName) && enablePublicAccessWithPerimeter==false) {
+  if (!empty(aiSearchName) && !enablePublicAccessWithPerimeter) {
     name: azureAISearchConnectionName
     properties: {
       authType: 'AAD'
@@ -528,7 +528,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
 }
 
 @description('This is a container for the ai foundry project.')
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(!enablePublicAccessWithPerimeter) {
   name: defaultProjectName
   location: location
   tags: tags
@@ -547,15 +547,11 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
     hubResourceId: aiHub.id
   }
 
-  resource endpoint 'onlineEndpoints' = if(enablePublicAccessWithPerimeter==false) {
+  resource endpoint 'onlineEndpoints' = if(!enablePublicAccessWithPerimeter) {
     name: epDefaultName
     location: location
     kind: 'Managed'
-    identity: {
-      type: 'SystemAssigned' // This resource's identity is automatically assigned AcrPull access to ACR, Storage Blob Data Contributor, and AML Metrics Writer on the project. It is also assigned two additional permissions below.
-                             // Given the permissions assigned to the identity, it is recommended only include deployments in the Azure OpenAI service that are trusted to be invoked from this endpoint.
-
-    }
+    identity: identity
     properties: {
       description: 'This is the default inference endpoint for the AI Factory project, prompt flow deployment. Called by the UI hosted in Web Apps.'
       authMode: 'Key' // Ideally this should be based on Microsoft Entra ID access. This sample however uses a key stored in Key Vault.
@@ -568,7 +564,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
 
 // Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added manually
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==false) {
+resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!enablePublicAccessWithPerimeter) {
   scope: aiProject
   name: guid(aiProject.id, aiProject::endpoint.id, amlWorkspaceSecretsReaderRole.id)
   properties: {
@@ -580,7 +576,7 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authoriz
 }
 
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==false) {
+resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!enablePublicAccessWithPerimeter) {
   scope: aiServices
   name: guid(aiServices.id, aiProject::endpoint.id, cognitiveServicesOpenAiUserRole.id)
   properties: {
@@ -592,7 +588,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorizati
 }
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
-resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
   name: aiProjectDiagSettingName
   scope: aiProject
   properties: {
@@ -612,7 +608,7 @@ resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-
 }
 
 @description('Azure Diagnostics: AI Foundry chat project online endpoint - allLogs')
-resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==false) {
+resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
   name: 'chatProjectOnlineEndpointDiagSettingsDefault'
   scope: aiProject::endpoint
   properties: {
@@ -634,7 +630,7 @@ resource chatProjectOnlineEndpointDiagSettings 'Microsoft.Insights/diagnosticSet
 // pre-shared keys. This sample implementation uses a pre-shared key, and should be rewritten to use the managed identity
 // provided by Azure Web Apps.
 @description('Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app.')
-resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(enablePublicAccessWithPerimeter==false) {
+resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!enablePublicAccessWithPerimeter) {
   parent: keyVault
   name: 'aifactory-proj-ep-default-api-key'
   properties: {
@@ -648,7 +644,7 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
 }
 
 // privateEndpointName: p-aihub-prj003sdcdevgenaiamlworkspace
-resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePublicAccessWithPerimeter==false) {
+resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
   name: privateEndpointName
   location: location
   tags: tags
@@ -676,7 +672,7 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enablePu
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false && enablePublicAccessWithPerimeter==false) {
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && !enablePublicAccessWithPerimeter) {
   name: '${pendAIHub.name}DnsZone'
   parent: pendAIHub
   properties:{
@@ -701,7 +697,7 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
 
 // Many role assignments are automatically managed by Azure for system managed identities, but the following two were needed to be added manually
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectSecretsReaderForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==true) {
+resource projectSecretsReaderForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter) {
   scope: aiProject2
   name: guid(aiProject2.id, aiProject2::endpoint2.id, amlWorkspaceSecretsReaderRole.id)
   properties: {
@@ -713,7 +709,7 @@ resource projectSecretsReaderForOnlineEndpointRoleAssignment2 'Microsoft.Authori
 }
 
 @description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectOpenAIUserForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter==true) {
+resource projectOpenAIUserForOnlineEndpointRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(enablePublicAccessWithPerimeter) {
   scope: aiServices
   name: guid(aiServices.id, aiProject2::endpoint2.id, cognitiveServicesOpenAiUserRole.id)
   properties: {
@@ -725,7 +721,7 @@ resource projectOpenAIUserForOnlineEndpointRoleAssignment2 'Microsoft.Authorizat
 }
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
-resource chatProjectDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource chatProjectDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: aiProjectDiagSettingName
   scope: aiProject2
   properties: {
@@ -745,7 +741,7 @@ resource chatProjectDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05
 }
 
 @description('Azure Diagnostics: AI Foundry chat project online endpoint - allLogs')
-resource chatProjectOnlineEndpointDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter==true) {
+resource chatProjectOnlineEndpointDiagSettings2 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter) {
   name: 'chatProjectOnlineEndpointDiagSettingsDefault2'
   scope: aiProject2::endpoint2
   properties: {
@@ -767,7 +763,7 @@ resource chatProjectOnlineEndpointDiagSettings2 'Microsoft.Insights/diagnosticSe
 // pre-shared keys. This sample implementation uses a pre-shared key, and should be rewritten to use the managed identity
 // provided by Azure Web Apps.
 @description('Key Vault Secret: The Managed Online Endpoint key to be referenced from the Chat UI app.')
-resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(enablePublicAccessWithPerimeter==true) {
+resource managedEndpointPrimaryKeyEntry2 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(enablePublicAccessWithPerimeter) {
   parent: keyVault
   name: 'aifactory-proj-ep-default2-api-key'
   properties: {
@@ -831,10 +827,10 @@ resource privateEndpointDns2 'Microsoft.Network/privateEndpoints/privateDnsZoneG
 }
 
 
-output id string = (enablePublicAccessWithPerimeter==false)? aiHub.id:aiHub2.id
-output name string =(enablePublicAccessWithPerimeter==false)? aiHub.name:aiHub2.name
+output id string = (!enablePublicAccessWithPerimeter)? aiHub.id:aiHub2.id
+output name string =(!enablePublicAccessWithPerimeter)? aiHub.name:aiHub2.name
 #disable-next-line BCP318
-output principalId string = (enablePublicAccessWithPerimeter==false)?aiHub.identity.principalId:aiHub2.identity.principalId
+output principalId string = (!enablePublicAccessWithPerimeter)?aiHub.identity.principalId:aiHub2.identity.principalId
 #disable-next-line BCP318
-output projectPrincipalId string = (enablePublicAccessWithPerimeter==false)? aiProject.identity.principalId:aiProject2.identity.principalId
-output aiProjectName string = (enablePublicAccessWithPerimeter==false)? aiProject.name: aiProject2.name
+output projectPrincipalId string = (!enablePublicAccessWithPerimeter)? aiProject.identity.principalId:aiProject2.identity.principalId
+output aiProjectName string = (!enablePublicAccessWithPerimeter)? aiProject.name: aiProject2.name

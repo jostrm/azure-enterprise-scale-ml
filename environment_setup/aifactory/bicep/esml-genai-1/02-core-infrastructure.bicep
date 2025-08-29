@@ -406,7 +406,7 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
-    privateEndpointName: 'pend-${projectName}-kv1-to-vnt-mlcmn'
+    privateEndpointName: '${keyvaultName}-pend'
     keyvaultNetworkPolicySubnets: [
       genaiSubnetId
       aksSubnetId

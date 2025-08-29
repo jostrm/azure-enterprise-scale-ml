@@ -4,7 +4,7 @@ targetScope = 'subscription'
 // ML PLATFORM DEPLOYMENT - Phase 6 Implementation
 // This file deploys ML and AI platform services including:
 // - Azure Machine Learning Workspace (v2)
-// - AI Foundry Hub and Project
+// - AI Foundry Hub and Project (pre 2025)
 // - Azure Kubernetes Service (AKS) for ML workloads
 // - Compute Instances and Clusters
 // - RBAC and permissions for ML platform
