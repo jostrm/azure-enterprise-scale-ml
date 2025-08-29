@@ -21,6 +21,10 @@ param privateEndpointName string
 
 @description('(Optional) Specifies an array of objects containing ip rules')
 param ipRules array = []
+
+@description('(Optional) Specifies an array of secrets to be created in the Key Vault')
+param secrets array = []
+
 @description('(Optional) Specifies number of days to keep keyvault if deleted. Retention: 7-30 days. ESML defaults to 7 days')
 param soft_delete_days int = 7
 @description('(Optional) Specifies number of days to keep keyvault if deleted. Retention: 7-30 days. ESML defaults to 7 days')
@@ -32,6 +36,8 @@ param enablePublicAccessWithPerimeter bool = false
 param enablePublicGenAIAccess bool = false
 param vnetName string
 param vnetResourceGroupName string
+
+
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 
@@ -78,6 +84,19 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
+// Create secrets in the Key Vault
+resource keyVaultSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = [for secret in secrets: {
+  name: secret.name
+  parent: keyVault
+  properties: {
+    value: secret.value
+    contentType: contains(secret, 'contentType') ? secret.contentType : 'text/plain'
+    attributes: contains(secret, 'attributes') ? secret.attributes : {
+      enabled: true
+    }
+  }
+}]
+
 resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   name: privateEndpointName
   location: location
@@ -109,6 +128,10 @@ resource pendKeyv 'Microsoft.Network/privateEndpoints@2023-04-01' = {
 output keyvaultId string = keyVault.id
 output keyvaultName string = keyVault.name
 output keyvaultUri string = keyVault.properties.vaultUri
+output secretsCreated array = [for (secret, i) in secrets: {
+  name: secret.name
+  resourceId: keyVaultSecrets[i].id
+}]
 output dnsConfig array = [
   {
     name: pendKeyv.name

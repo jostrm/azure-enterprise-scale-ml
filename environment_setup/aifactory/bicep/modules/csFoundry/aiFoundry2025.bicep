@@ -47,7 +47,7 @@ import { lockType } from 'br/public:avm/utl/types/avm-common-types:0.6.0'
 @description('Optional. The lock settings of AI Foundry resources.')
 param lock lockType?
 
-import { deploymentType } from 'br/public:avm/res/cognitive-services/account:0.12.0'
+import { deploymentType } from 'br/public:avm/res/cognitive-services/account:0.13.2'
 @description('Optional. Specifies the OpenAI deployments to create.')
 param aiModelDeployments deploymentType[] = []
 
@@ -68,7 +68,7 @@ var privateDnsZoneResourceIdValues = [
 ]
 var privateNetworkingEnabled = !empty(privateDnsZoneResourceIdValues) && !empty(privateEndpointSubnetResourceId)
 
-module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.1' = {
+module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.2' = {
   name: take('avm.res.cognitive-services.account.${name}', 64)
   params: {
     name: name
@@ -83,12 +83,13 @@ module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.1' = {
     } : {
       systemAssigned: true
       userAssignedResourceIds: [
-        resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName!)
+        resourceId(subscription().id, resourceGroup().name , 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName!)
       ]
     }
     deployments: aiModelDeployments
     customSubDomainName: name
-    disableLocalAuth: false
+    disableLocalAuth: true
+    restrictOutboundNetworkAccess: privateNetworkingEnabled
     publicNetworkAccess: privateNetworkingEnabled ? 'Disabled' : 'Enabled'
     networkAcls: {
       defaultAction: 'Allow'
@@ -100,7 +101,7 @@ module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.1' = {
       ? {
           scenario: 'agent'
           subnetResourceId: agentSubnetResourceId!
-          useMicrosoftManagedNetwork: true
+          useMicrosoftManagedNetwork: false
         }
       : null
     privateEndpoints: privateNetworkingEnabled

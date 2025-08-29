@@ -58,24 +58,23 @@ param enableAIFoundryHub bool = true
 param enableAIFoundryV2 bool = false
 
 // AI Models deployment parameters
-@description('Whether to deploy GPT-4 model')
-param deployModel_gpt_4 bool = false
-
-@description('GPT-4 model name if deploying')
-param modelGPT4Name string = 'gpt-4'
-
-@description('GPT-4 model version if deploying')
-param modelGPT4Version string = '1'
+@description('Whether to deploy GPT-X model')
+param deployModel_gpt_X bool = false
+@description('GPT-X model name if deploying')
+param modelGPTXName string = 'gpt-5-mini'
+@description('GPT-X model version if deploying')
+param modelGPTXVersion string = '1'
+@allowed(['Standard','DataZoneStandard','GlobalStandard'])
+param modelGPTXSku string = 'DataZoneStandard'
+@description('TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K')
+param modelGPTXCapacity int = 30
 
 @description('Whether to deploy text-embedding-ada-002 model')
 param deployModel_text_embedding_ada_002 bool = false
-
 @description('Whether to deploy text-embedding-3-large model')
 param deployModel_text_embedding_3_large bool = false
-
 @description('Whether to deploy text-embedding-3-small model')
 param deployModel_text_embedding_3_small bool = false
-
 @description('Default capacity for embedding models')
 param default_embedding_capacity int = 25
 
@@ -83,13 +82,13 @@ param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
 @description('Whether to deploy GPT-4o model')
 param deployModel_gpt_4o bool = false
-param default_gpt_4o_version string = '2024-08-06'
+param default_gpt_4o_version string = '2024-11-20' // '2024-08-06'
 @description('Whether to deploy GPT-4o-mini model')
 param deployModel_gpt_4o_mini bool = false
 param default_gpt_4o_mini_version string = '2024-07-18' // All models works with Bing search, except gpt-4o-mini,version: 2024-07-18 
 
 @description('Default SKU for models')
-@allowed(['Standard', 'GlobalStandard'])
+@allowed(['Standard','DataZoneStandard','GlobalStandard'])
 param default_model_sku string = 'Standard'
 
 @description('Keyvault seeding configuration')
@@ -505,11 +504,11 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzur
 
 // Dynamically build array of models to deploy based on parameters
 var aiModels = concat(
-  deployModel_gpt_4 ? [{
-    modelName: modelGPT4Name
-    version: modelGPT4Version
-    capacity: default_gpt_capacity
-    skuLocation: default_model_sku
+  deployModel_gpt_X ? [{
+    modelName: modelGPTXName
+    version: modelGPTXVersion
+    capacity: modelGPTXCapacity
+    skuLocation: modelGPTXSku
   }] : [],
   deployModel_gpt_4o_mini ? [{
     modelName: 'gpt-4o-mini'
@@ -543,76 +542,6 @@ var aiModels = concat(
   }] : []
 )
 
-//var privateDnsZonesResourceIds: networkIsolation ? [ 
-  //cognitiveServicesPrivateDnsZone.outputs.resourceId
-  //    openAiPrivateDnsZone.outputs.resourceId
-//    ] : []
-
-
-var aiFoundryZones = !enablePublicAccessWithPerimeter? [
-  privateLinksDnsZones.openai.id
-  privateLinksDnsZones.cognitiveservices.id
-] : []
-
-// Role assignments are now managed in 07-rbac-security.bicep
-// We use deployment scripts to update permissions if needed after deployment
-module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFoundryV2) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-AifV2_${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: aifV2Name
-    defaultProjectName: aifV2ProjectName
-    allowProjectManagement: true
-    location:location
-    // Provided subnet must be of the proper address space. Please provide a subnet which has address space in the range of 172 or 192
-    agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
-    enableTelemetry:false
-    tags: tagsProject
-    aiModelDeployments: [
-      for model in aiModels: {
-        name: model.modelName
-        model: {
-          name: model.modelName
-          format: 'OpenAI'
-          version: model.version
-        }
-        sku: {
-          name: model.skuLocation
-          capacity: model.capacity
-        }
-        raiPolicyName: 'Microsoft.DefaultV2'
-        versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
-      }
-    ]
-    privateEndpointSubnetResourceId: commonSubnetResourceId
-    privateDnsZoneResourceIds:aiFoundryZones
-    //roleAssignments: allRoleAssignments
-    //lock:
-  }
-  dependsOn: [
-    existingTargetRG
-    // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
-  ]
-}
-
-// // Add the new FDP cognitive services module
-module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFoundryV2) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-AifV2_Prj_${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    cosmosDBname: serviceSettingDeployCosmosDB? namingConvention.outputs.cosmosDBName : ''
-    name: aifV2ProjectName
-    location: location
-    storageName: namingConvention.outputs.storageAccount1001Name
-    #disable-next-line BCP318
-    aiFoundryV2Name: aiFoundry2025.outputs.name
-    aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
-    }
-    dependsOn: [
-      existingTargetRG
-      aiFoundry2025
-    ]
-}
 // ============== AI FOUNDRY HUB ==============
 
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {

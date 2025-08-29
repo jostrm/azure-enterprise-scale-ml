@@ -27,6 +27,10 @@
                 },
                 "use-stable-resource-identifiers": {
                     "level": "off"
+                },
+                "use-recent-module-versions": {
+                "level": "warning",
+                "message": "The module version is outdated. Please consider updating to the latest version."
                 }
             }
         }

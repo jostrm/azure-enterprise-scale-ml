@@ -137,6 +137,17 @@ param randomValue string = ''
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
 
+// Sample Application parameters
+@description('Enable deployment of sample applications')
+param deploySampleApp bool = false
+
+@description('Name of the authentication client secret in Key Vault')
+param authClientSecretName string = 'aifactory-sample-app-1'
+
+@description('Authentication client secret value for sample applications')
+@secure()
+param authClientSecret string = ''
+
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
@@ -402,6 +413,12 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
     ]
     accessPolicies: []
     ipRules: empty(processedIpRulesKv) ? [] : processedIpRulesKv
+    secrets: deploySampleApp ? [
+      {
+        name: authClientSecretName
+        value: authClientSecret ?? ''
+      }
+    ] : []
   }
   dependsOn: [
     existingTargetRG
