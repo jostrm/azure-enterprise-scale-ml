@@ -565,7 +565,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
     allowProjectManagement: true
     location:location
     // Provided subnet must be of the proper address space. Please provide a subnet which has address space in the range of 172 or 192
-    agentSubnetResourceId: genaiSubnetId
+    agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment
     enableTelemetry:false
     tags: tagsProject
     aiModelDeployments: [

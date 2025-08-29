@@ -83,12 +83,12 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 // ============================================================================
 
 // AI Foundry V1
-var aifV1HubName = 'aif-V1-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifV1ProjectName = 'aif-V1-prj${projectNumber}-01-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifV1HubName = 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifV1ProjectName = 'aifp-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // AI Foundry V2 (2025)
-var aifV2Name ='aif-V2-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifV2PrjName ='aifprj-V2-${projectName}${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifV2Name ='aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifV2PrjName ='aifp-V2-${projectNumber}${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 var aoaiName = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
