@@ -1,34 +1,9 @@
 // ============== TROUBLE SHOOT (RoleAssignmentExists) ==============
 // Q: Where to get Guids -> Azure Devops/Github error message. 
 // Q: Where to get input variable values -> Azure portal, deployment tab, and INPUT
-/* Remove manually all assignements on scopes: 
+/* Remove manually all assignements on scopes, rerun.
 
 existingAiServicesResource, existingAiHubResource, existingAiHubProjectResource,existingStorageAccount,existingStorageAccount2,resourceGroup
-
-*/
-
-/* PROMPT (RoleAssignmentExists)
-
-Create a script, debug-roleAssignmentExists.ps1 in powershell, to run Bicep, using the Bicep guid function. Save it at environment_setup\aifactory\bicep\debug
-Use the guid function, and detect which resource and assignment in this file tthat ends up in the deterministic guids: 
-
-6f7cd9e9-4566-5931-bd8c-bd623cfa1d77
-9795b0f7-372b-546a-b70a-aa6c5fbc29e3
-798bf0f0-433f-518d-84a5-20fcaa33083b
-
-INPUT to Guid generation. Here is the relevant input variable values: 
-
-storageAccountName:saprj001eus2qoygy1001dev
-storageAccountName2:saprj001eus2qoygy2001dev
-resourceGroupId:/subscriptions/612e830e-b795-424e-ba5d-cd0a5dadecf4/providers/Microsoft.Resources/resourceGroups/mrvel-1-project001-eus2-dev-010
-userObjectIds:["37e0899e-09bb-4d1b-b814-d3abb2c560f5"]
-aiServicesName:aiservicesprj001eus2devqoygyfddb0719b6001
-aiHubName:aif-hub-001-eus2-dev-qoygy-001
-aiHubProjectName:aifp-001-1-eus2-dev-qoygy-001
-servicePrincipleAndMIArray:["8c5e59cf-ebdd-4d63-9123-19ebc7863f8f","d48488d8-1a25-44d4-b7d5-e35120d6bb1d"]
-
-PRESENT it as a TABLE with: Bicep_Resource, GUID, scope, RoleID
-- Example: roleAssignmentCognitiveServicesOpenAISP, 6f7cd9e9-4566-5931-bd8c-bd623cfa1d77, existingAiServicesResource
 
 */
 
