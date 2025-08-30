@@ -238,8 +238,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 // AI Foundry V2 specific names
-var aifV2ProjectName = namingConvention.outputs.aifV2Name
-var aifV2Name = namingConvention.outputs.aifV2PrjName
+var aifV2Name = namingConvention.outputs.aifV2Name
+var aifV2ProjectName = namingConvention.outputs.aifV2PrjName
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
