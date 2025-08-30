@@ -241,9 +241,6 @@ var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_a
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID of existing AML, AIHub. Needs static name in existing
 // ============================================================================
-
-// Access policies for principals
-
 resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
@@ -682,33 +679,3 @@ output commonResourceGroupRbacDeployed bool = useCommonACR
 
 @description('Data Lake RBAC deployment status')
 output dataLakeRbacDeployed bool = (!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning)
-
-// ============================================================================
-// COGNITIVE SERVICES & OPENAI ROLE ASSIGNMENTS
-// ============================================================================
-
-// Cognitive Services and OpenAI role definition IDs
-var cognitiveServicesContributorRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
-var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
-var openAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
-var openAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-
-// Function to assign roles to users and service principals for a cognitive services account
-@description('Function to assign roles to users and service principals for a cognitive services account')
-module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = {
-  name: '07-CSRoleAssignments-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  params: {
-    userObjectIds: p011_genai_team_lead_array
-    servicePrincipalIds: spAndMiArray
-    cognitiveServicesAccountName: aifV2Name
-    cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
-    cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
-    openAIContributorRoleId: openAIContributorRoleId
-    openAIUserRoleId: openAIUserRoleId
-    useAdGroups: useAdGroups
-  }
-}
-
-@description('RBAC Security Phase 7 deployment completed successfully')
-output rbacSecurityPhaseCompleted bool = true

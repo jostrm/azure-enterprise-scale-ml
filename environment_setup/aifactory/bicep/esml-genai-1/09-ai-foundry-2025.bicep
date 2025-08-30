@@ -112,6 +112,12 @@ param technicalAdminsEmail string = ''
 param subscriptionIdDevTestProd string = subscription().subscriptionId
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
+// Seeding Key Vault parameters
+param inputKeyvault string
+param inputKeyvaultResourcegroup string
+param inputKeyvaultSubscription string
+param projectServicePrincipleOID_SeedingKeyvaultName string
+param useAdGroups bool = true
 
 // ============== VARIABLES ==============
 
@@ -167,6 +173,38 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     acaSubnetId: acaSubnetId
   }
 }
+
+// ============================================================================
+// SPECIAL - Get PRINICPAL ID from KV. Needs static name in existing
+// ============================================================================
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+}
+
+var miPrjName = namingConvention.outputs.miPrjName
+module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: 'getMI-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miPrjName
+  }
+}
+
+var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
+module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
+  name: '07-spAndMI2Array-${targetResourceGroup}'
+  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
+  params: {
+    managedIdentityOID: var_miPrj_PrincipalId
+    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+  }
+  dependsOn: [
+      getProjectMIPrincipalId
+  ]
+}
+#disable-next-line BCP318
+var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 // AI Foundry V2 specific names
 var aifV2ProjectName = namingConvention.outputs.aifV2Name
@@ -296,6 +334,57 @@ module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFo
     ]
 }
 
+// ============================================================================
+// COGNITIVE SERVICES & OPENAI ROLE ASSIGNMENTS
+// ============================================================================
+
+var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+
+// Cognitive Services and OpenAI role definition IDs
+var cognitiveServicesContributorRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
+var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
+var openAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
+var openAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+
+// Function to assign roles to users and service principals for a cognitive services account
+@description('Function to assign roles to users and service principals for a cognitive services account')
+module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if(enableAIFoundryV2) {
+  name: '07-CSRoleAssignments-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    userObjectIds: p011_genai_team_lead_array
+    servicePrincipalIds: spAndMiArray
+    cognitiveServicesAccountName: aifV2Name
+    cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
+    cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
+    openAIContributorRoleId: openAIContributorRoleId
+    openAIUserRoleId: openAIUserRoleId
+    useAdGroups: useAdGroups
+  }
+}
+
+@description('RBAC Security Phase 7 deployment completed successfully')
+output rbacSecurityPhaseCompleted bool = true
+
+// Create role assignments module to build the dynamic array
+module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = {
+  name: '09-roleBuilder-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    userObjectIds: p011_genai_team_lead_array
+    servicePrincipalIds: spAndMiArray
+    cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
+    cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
+    openAIUserRoleId: openAIUserRoleId
+    openAIContributorRoleId: openAIContributorRoleId
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    spAndMI2ArrayModule
+    namingConvention
+  ]
+}
+
 // AI V2.1 - Cognitive Services Module (Alternative Implementation)
 module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if (enableAIFoundryV21) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -309,6 +398,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if 
     tags: tagsProject
     customSubDomainName: aifV2Name
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : 'Disabled'
+    roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     deployments: [
       for model in aiModels: {
         name: model.modelName
@@ -327,7 +417,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if 
     ]
     privateEndpoints: !enablePublicAccessWithPerimeter ? [
       {
-        name: '${aifV2Name}-pe'
+        name: '${aifV2Name}-pend'
         subnetResourceId: commonSubnetResourceId
         privateDnsZoneResourceIds: aiFoundryZones
         service: 'account'
@@ -336,6 +426,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if 
   }
   dependsOn: [
     existingTargetRG
+    roleAssignmentsBuilder
     // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
   ]
 }
