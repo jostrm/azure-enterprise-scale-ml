@@ -6,6 +6,9 @@ param defaultProjectName string = ''
 
 @description('Required. The location for the AI Foundry resource.')
 param location string
+param allowPublicAccessWhenBehindVnet bool=false
+param enablePublicGenAIAccess bool=false
+param networkAcls object?
 
 @description('Optional. SKU of the AI Foundry / Cognitive Services account. Use \'Get-AzCognitiveServicesAccountSku\' to determine a valid combinations of \'kind\' and \'SKU\' for your Azure region.')
 @allowed([
@@ -91,10 +94,13 @@ module foundryAccount 'br/public:avm/res/cognitive-services/account:0.13.2' = {
     disableLocalAuth: true
     restrictOutboundNetworkAccess: privateNetworkingEnabled
     publicNetworkAccess: privateNetworkingEnabled ? 'Disabled' : 'Enabled'
-    networkAcls: {
-      defaultAction: 'Allow'
+    networkAcls: !empty(networkAcls ?? {})? {
+      defaultAction: networkAcls.?defaultAction
+      virtualNetworkRules: networkAcls.?virtualNetworkRules ?? []
+      ipRules: networkAcls.?ipRules ?? []
       bypass: 'AzureServices'
     }
+  : null
     // NOTE: When supplying an agent subnet, the AI Foundry Account will automatically create a capability host for the agent service.
     // NB: Provided subnet must be of the proper address space. Please provide a subnet which has address space in the range of 172 or 192
     networkInjections: privateNetworkingEnabled && !empty(agentSubnetResourceId)

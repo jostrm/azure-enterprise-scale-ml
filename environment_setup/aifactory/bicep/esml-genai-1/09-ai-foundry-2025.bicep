@@ -119,6 +119,10 @@ param inputKeyvaultSubscription string
 param projectServicePrincipleOID_SeedingKeyvaultName string
 param useAdGroups bool = true
 
+param IPwhiteList string = ''
+param enablePublicGenAIAccess bool = false
+param allowPublicAccessWhenBehindVnet bool = false
+
 // ============== VARIABLES ==============
 
 // Note: Ensure useAdGroups is set correctly based on your principal types
@@ -145,6 +149,13 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 
 // Subnet calculations
 var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
+
+var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
+var processedIpRules = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: contains(ip, '/') ? ip : '${ip}/32'
+}]
+
 
 // Get the subnet resource ID for the common subnet used for private endpoints
 resource commonSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' existing = {
@@ -193,6 +204,17 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 
 var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
+
+var miAcaName = namingConvention.outputs.miACAName
+module getAcaMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
+  name: '09-getAcaMI-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miAcaName
+  }
+}
+
+var var_miAca_PrincipalId = getAcaMIPrincipalId.outputs.principalId
 
 resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: inputKeyvault
@@ -282,6 +304,24 @@ var aiFoundryZones = !enablePublicAccessWithPerimeter? [
   privateLinksDnsZones.openai.id
   privateLinksDnsZones.cognitiveservices.id
 ] : []
+var networkAcls = {
+  defaultAction: enablePublicGenAIAccess && empty(processedIpRules) ? 'Allow' : 'Deny'
+  virtualNetworkRules: [
+    {
+      id: commonSubnetResourceId
+      ignoreMissingVnetServiceEndpoint: false
+    }
+  ]
+  ipRules: empty(processedIpRules) ? [] : processedIpRules
+}
+
+var networkAclsObject = !empty(networkAcls ?? {})
+  ? {
+      defaultAction: networkAcls.?defaultAction
+      virtualNetworkRules: networkAcls.?virtualNetworkRules ?? []
+      ipRules: networkAcls.?ipRules ?? []
+    }
+  : null
 
 // Role assignments are now managed in 07-rbac-security.bicep
 // We use deployment scripts to update permissions if needed after deployment
@@ -295,6 +335,9 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
     location:location
     // Provided subnet must be of the proper address space. Please provide a subnet which has address space in the range of 172 or 192
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    networkAcls:networkAcls
     enableTelemetry:false
     tags: tagsProject
     aiModelDeployments: [
@@ -401,7 +444,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
 // AI V2.1 - Cognitive Services Module (Alternative Implementation)
 module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-AifV2-Avm_${deploymentProjSpecificUniqueSuffix}'
+  name: '09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aifV2Name
     kind: 'AIServices'
@@ -411,7 +454,16 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     tags: tagsProject
     customSubDomainName: aifV2Name
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : 'Disabled'
+    agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
+    networkAcls: networkAclsObject
+    managedIdentities: {
+      systemAssigned: true
+      userAssignedResourceIds: concat(
+        !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+        !empty(miAcaName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miAcaName)) : []
+      )
+    }
     deployments: [
       for model in aiModels: {
         name: model.modelName
@@ -428,6 +480,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
         versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
       }
     ]
+    //privateEndpointSubnetResourceId: commonSubnetResourceId
     privateEndpoints: !enablePublicAccessWithPerimeter ? [
       {
         name: '${aifV2Name}-pend'

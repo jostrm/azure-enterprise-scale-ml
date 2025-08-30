@@ -167,6 +167,8 @@ param secretsExportConfiguration secretsExportConfigurationType?
 
 @description('Optional. Enable/Disable project management feature for AI Foundry.')
 param allowProjectManagement bool?
+@description('Optional. Resource Id of an existing subnet to use for agent connectivity. This is required when using agents with private endpoints.')
+param agentSubnetResourceId string?
 
 var enableReferencedModulesTelemetry = false
 
@@ -348,6 +350,7 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
     split(customerManagedKey.?userAssignedIdentityResourceId!, '/')[4]
   )
 }
+
 //update the cognitive service account api for the Foundry FDP updates
 resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
   name: name
@@ -366,6 +369,7 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-previ
           defaultAction: networkAcls.?defaultAction
           virtualNetworkRules: networkAcls.?virtualNetworkRules ?? []
           ipRules: networkAcls.?ipRules ?? []
+          bypass: 'AzureServices'
         }
       : null
     publicNetworkAccess: publicNetworkAccess != null
@@ -374,6 +378,13 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-previ
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties
     disableLocalAuth: disableLocalAuth
+    networkInjections: publicNetworkAccess! == false && !empty(agentSubnetResourceId)
+  ? {
+      scenario: 'agent'
+      subnetArmId: agentSubnetResourceId!
+      useMicrosoftManagedNetwork: false
+    }
+  : null
     encryption: !empty(customerManagedKey)
       ? {
           keySource: 'Microsoft.KeyVault'
