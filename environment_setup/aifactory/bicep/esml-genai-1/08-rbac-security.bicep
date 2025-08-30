@@ -9,6 +9,12 @@ targetScope = 'subscription'
 // - Storage and network access control
 // - External bastion and VNet permissions
 // - Common resource group access
+//
+// IMPORTANT NOTES FOR DEPLOYMENT:
+// 1. This template should only run AFTER resources are created
+// 2. Set resource existence flags correctly (amlExists, aiHubExists, etc.)
+// 3. If encountering RoleAssignmentExists errors, set skipExistingRoleAssignments=true
+// 4. For ResourceNotFound errors, ensure resources exist before running this template
 // ================================================================
 
 // aiSearchName, commonLakeNamePrefixMax8chars, openAIName
@@ -84,7 +90,7 @@ var aifV1ProjectName = namingConvention.outputs.aifV1ProjectName
 
 var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
 var aiServicesName = namingConvention.outputs.aiServicesName
-var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}'
+var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}-${deploymentId}'
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var aiSearchName = namingConvention.outputs.safeNameAISearch
@@ -125,6 +131,16 @@ param aiHubExists bool = false
 param aiServicesExists bool = false
 param aiSearchExists bool = false
 param openaiExists bool = false
+
+// Additional deployment control flags to prevent duplicate role assignments
+@description('Skip role assignments if they already exist (helps with re-runs)')
+param skipExistingRoleAssignments bool = true
+
+@description('Force recreation of role assignments (use with caution)')
+param forceRecreateRoleAssignments bool = false
+
+@description('Unique deployment identifier to avoid conflicts')
+param deploymentId string = utcNow('yyyyMMddHHmmss')
 
 // ============================================================================
 // Resource definitions
@@ -266,53 +282,53 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 
 // ============== AML Principal ID ==============
-var amlName_Static = 'aml-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
-resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
+var amlName_Static = 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!amlExists && enableAzureMachineLearning) {
   name: amlName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_amlPrincipalId = enableAzureMachineLearning ? amlREF.identity.principalId : 'BCP318' // !amlExists && enableAzureMachineLearning 
+var var_amlPrincipalId = (!amlExists && enableAzureMachineLearning) ? amlREF.identity.principalId : 'BCP318'
 
 // ============== AI HUB Principal ID ==============
-var aiHubName_Static = 'ai-hub-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
-resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
+var aiHubName_Static = 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!aiHubExists && enableAIFoundryHub) {
   name: aiHubName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_aiHubPrincipalId = enableAIFoundryHub ? aiHubREF.identity.principalId : 'BCP318' // !aiHubExists && enableAIFoundryHub
+var var_aiHubPrincipalId = (!aiHubExists && enableAIFoundryHub) ? aiHubREF.identity.principalId : 'BCP318'
 
 // ============== OPENAI Principal ID ==============
-var openAIName_Static = 'openai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource openAIREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+var openAIName_Static = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+resource openAIREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (!openaiExists && serviceSettingDeployAzureOpenAI) {
   name: openAIName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_openAIPrincipalId = serviceSettingDeployAzureOpenAI ? openAIREF.identity.principalId : 'BCP318'
+var var_openAIPrincipalId = (!openaiExists && serviceSettingDeployAzureOpenAI) ? openAIREF.identity.principalId : 'BCP318'
 
 // ============== AI SERVICES Principal ID ==============
-var aiServicesName_Static = 'ais-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+var aiServicesName_Static = replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomValue}${prjResourceSuffixNoDash}'), '-', '') 
+resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (!aiServicesExists && enableAIServices) {
   name: aiServicesName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_aiServicesPrincipalId = enableAIServices ? aiServicesREF.identity.principalId : 'BCP318'
+var var_aiServicesPrincipalId = (!aiServicesExists && enableAIServices) ? aiServicesREF.identity.principalId : 'BCP318'
 
 // ============== AI SEARCH Principal ID ==============
-var aiSearchName_Static = 'aisearch-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource aiSearchREF 'Microsoft.Search/searchServices@2024-06-01-preview' existing = {
+var aiSearchName_Static = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${resourceSuffix}'), '-', '')
+resource aiSearchREF 'Microsoft.Search/searchServices@2024-06-01-preview' existing = if (!aiSearchExists && enableAISearch) {
   name: aiSearchName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_aiSearchPrincipalId = enableAISearch ? aiSearchREF.identity.principalId : 'BCP318'
+var var_aiSearchPrincipalId = (!aiSearchExists && enableAISearch) ? aiSearchREF.identity.principalId : 'BCP318'
 
 // ============== VISION SERVICES Principal ID ==============
 var visionName_Static = 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource visionREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+resource visionREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (serviceSettingDeployAzureAIVision) {
   name: visionName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
@@ -321,7 +337,7 @@ var var_visionPrincipalId = serviceSettingDeployAzureAIVision ? visionREF.identi
 
 // ============== SPEECH SERVICES Principal ID ==============
 var speechName_Static = 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource speechREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+resource speechREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (serviceSettingDeployAzureSpeech) {
   name: speechName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
@@ -330,7 +346,7 @@ var var_speechPrincipalId = serviceSettingDeployAzureSpeech ? speechREF.identity
 
 // ============== DOCUMENT INTELLIGENCE Principal ID ==============
 var docsName_Static = 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource docsREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+resource docsREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (serviceSettingDeployAIDocIntelligence) {
   name: docsName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
