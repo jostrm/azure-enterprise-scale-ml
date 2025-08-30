@@ -121,6 +121,11 @@ param useAdGroups bool = true
 
 // ============== VARIABLES ==============
 
+// Note: Ensure useAdGroups is set correctly based on your principal types
+// If you're using Azure AD Groups, set useAdGroups = true
+// If you're using individual users, set useAdGroups = false
+// Mismatch will cause: UnmatchedPrincipalType error
+
 // Calculated variables
 var projectName = 'prj${projectNumber}'
 var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
@@ -180,7 +185,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 
 var miPrjName = namingConvention.outputs.miPrjName
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: 'getMI-${deploymentProjSpecificUniqueSuffix}'
+  name: '09-getMI-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
@@ -189,13 +194,19 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 
 var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
 
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+}
+
+
 // Get the Key Vault secret as a string using reference function
 module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
-  name: '07-spAndMI2Array-${targetResourceGroup}'
+  name: '09-spAndMI2Array-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
-    servicePrincipleOIDFromSecret: '@Microsoft.KeyVault(SecretUri=https://${inputKeyvault}.vault.azure.net/secrets/${projectServicePrincipleOID_SeedingKeyvaultName}/)'
+    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
   }
   dependsOn: [
       getProjectMIPrincipalId
@@ -359,6 +370,10 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
     openAIUserRoleId: openAIUserRoleId
     useAdGroups: useAdGroups
   }
+  dependsOn: [
+    spAndMI2ArrayModule
+    namingConvention
+  ]
 }
 
 @description('RBAC Security Phase 7 deployment completed successfully')
@@ -384,7 +399,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
 }
 
 // AI V2.1 - Cognitive Services Module (Alternative Implementation)
-module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if (enableAIFoundryV21) {
+module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-AifV2-Avm_${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -425,6 +440,8 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if 
   dependsOn: [
     existingTargetRG
     roleAssignmentsBuilder
+    spAndMI2ArrayModule
+    namingConvention
     // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
   ]
 }
