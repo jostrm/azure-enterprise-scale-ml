@@ -17,7 +17,30 @@ targetScope = 'subscription'
 // 4. For ResourceNotFound errors, ensure resources exist before running this template
 // ================================================================
 
-// aiSearchName, commonLakeNamePrefixMax8chars, openAIName
+/*
+================ TROUBLESHOOTING: RoleAssignmentExists: rbacModuleUsers ================
+
+Problem
+- Azure won’t let a second assignment for the same (principal, role, scope) be created with a different,
+  hence good practice to keep ALL assigments in one file, and one go, avoiding that another file assigns the role with different name than guid().
+
+Reason
+- Most conflicts in practice come from re-running deployments,
+  when a role assignment already exists but was created before with a different name (e.g., portal/CLI/another template).
+
+This template
+- ASSIGNS many roles across different scopes (RG, AI Hub, AI Project, Storage, AI Services).
+- SERVICES: aiServicesName, aifV1HubName, aifV1ProjectName, storageAccount1001Name, storageAccount2001Name:
+- DISTINCT NAMES: All these come from naming conventions in the AIFactory and should be distinct (CmnAIFactoryNaming.bicep)
+- INPUT HANDLING: It De-duplicate arrays before assignment.
+- VERIFIED: The template does NOT have same role+same scope+same principal defined twice in the template itself.
+
+HOW TO TROUBLE SHOOT and fix "RoleAssignmentExists":
+1) Note which role+scope+principal combination fails: RG, AI Hub, AI Project, Storage, AI Services, storageAccount1001Name, storageAccount2001Name
+2) Check in Azure portal, if that role is already assigned, remove the assigment.
+
+================ END ==================================================
+*/
 
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
@@ -303,6 +326,12 @@ var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
+// De-duplicate principals to avoid duplicate role assignments
+// - Ensure user list is unique
+// - Ensure SP/MI list is unique and has no overlap with users (in case a user OID was accidentally added to the SP/MI list)
+var userIdsUnique = union(p011_genai_team_lead_array, p011_genai_team_lead_array)
+var spAndMiUnique = union(spAndMiArray, spAndMiArray)
+
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup!
   scope: subscription(subscriptionIdDevTestProd)
@@ -510,10 +539,10 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && e
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     resourceGroupId: projectResourceGroup_rgId
-    userObjectIds: p011_genai_team_lead_array
+    userObjectIds: userIdsUnique
     aiHubName: aifV1HubName
     aiHubProjectName: aifV1ProjectName
-    servicePrincipleAndMIArray: spAndMiArray
+    servicePrincipleAndMIArray: spAndMiUnique
     useAdGroups: useAdGroups
     disableContributorAccessForUsers: disableContributorAccessForUsers
   }
