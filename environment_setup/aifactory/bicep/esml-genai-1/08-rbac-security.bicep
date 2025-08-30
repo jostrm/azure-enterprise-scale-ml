@@ -95,7 +95,7 @@ var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var aiSearchName = namingConvention.outputs.safeNameAISearch
 var openAIName = namingConvention.outputs.aoaiName
-var aifName = aiServicesName  // Using the AI Services name for cognitive services
+var aifV2Name = namingConvention.outputs.aifV2Name
 
 //var twoNumbers = namingConvention.outputs.twoNumbers
 //var aifProjectName = namingConvention.outputs.aifProjectName
@@ -271,6 +271,10 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   ]
 }
 
+// SPECIAL
+
+var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
+
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
@@ -309,7 +313,7 @@ resource openAIREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = 
 var var_openAIPrincipalId = (!openaiExists && serviceSettingDeployAzureOpenAI) ? openAIREF.identity.principalId : 'BCP318'
 
 // ============== AI SERVICES Principal ID ==============
-var aiServicesName_Static = replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomValue}${prjResourceSuffixNoDash}'), '-', '') 
+var aiServicesName_Static = replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomSalt}${prjResourceSuffixNoDash}'), '-', '') 
 resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (!aiServicesExists && enableAIServices) {
   name: aiServicesName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -697,7 +701,7 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   params: {
     userObjectIds: p011_genai_team_lead_array
     servicePrincipalIds: spAndMiArray
-    cognitiveServicesAccountName: aifName
+    cognitiveServicesAccountName: aifV2Name
     cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
     cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
