@@ -177,10 +177,6 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID from KV. Needs static name in existing
 // ============================================================================
-resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: inputKeyvault
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-}
 
 var miPrjName = namingConvention.outputs.miPrjName
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
@@ -192,12 +188,14 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 
 var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
+
+// Get the Key Vault secret as a string using reference function
 module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   name: '07-spAndMI2Array-${targetResourceGroup}'
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
-    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    servicePrincipleOIDFromSecret: '@Microsoft.KeyVault(SecretUri=https://${inputKeyvault}.vault.azure.net/secrets/${projectServicePrincipleOID_SeedingKeyvaultName}/)'
   }
   dependsOn: [
       getProjectMIPrincipalId
