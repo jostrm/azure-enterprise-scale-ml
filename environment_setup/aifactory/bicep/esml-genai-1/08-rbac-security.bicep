@@ -149,19 +149,19 @@ param deploymentId string = utcNow('yyyyMMddHHmmss')
 
 // Enable flags from parameter files
 @description('Enable Azure Machine Learning deployment')
-param enableAzureMachineLearning bool = true
+param enableAzureMachineLearning bool = false
 
 @description('Enable AI Foundry Hub deployment')
-param enableAIFoundryHub bool = true
+param enableAIFoundryHub bool = false
 
 @description('Enable AI Services deployment')
-param enableAIServices bool = true
+param enableAIServices bool = false
 
 @description('Enable AI Search deployment')
 param enableAISearch bool = true
 
 @description('Enable Azure OpenAI deployment')
-param serviceSettingDeployAzureOpenAI bool = true
+param serviceSettingDeployAzureOpenAI bool = false
 
 @description('Enable Azure AI Vision deployment')
 param serviceSettingDeployAzureAIVision bool = false
@@ -171,6 +171,36 @@ param serviceSettingDeployAzureSpeech bool = false
 
 @description('Enable AI Document Intelligence deployment')
 param serviceSettingDeployAIDocIntelligence bool = false
+
+@description('Enable AI Foundry V2 deployment')
+param enableAIFoundryV2 bool = false
+
+@description('Enable AI Foundry V21 deployment')
+param enableAIFoundryV21 bool = false
+
+@description('Enable Azure Function deployment')
+param serviceSettingDeployFunction bool = false
+
+@description('Enable Azure Web App deployment')
+param serviceSettingDeployWebApp bool = false
+
+@description('Enable Container Apps deployment')
+param serviceSettingDeployContainerApps bool = false
+
+@description('Enable Application Insights Dashboard deployment')
+param serviceSettingDeployAppInsightsDashboard bool = false
+
+@description('Enable Cosmos DB deployment')
+param serviceSettingDeployCosmosDB bool = false
+
+@description('Enable PostgreSQL deployment')
+param serviceSettingDeployPostgreSQL bool = false
+
+@description('Enable Redis Cache deployment')
+param serviceSettingDeployRedisCache bool = false
+
+@description('Enable SQL Database deployment')
+param serviceSettingDeploySQLDatabase bool = false
 
 // Security and networking
 param addBastionHost bool = false
