@@ -289,7 +289,7 @@ resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_amlPrincipalId = (!amlExists && enableAzureMachineLearning) ? amlREF.identity.principalId : 'BCP318'
+var var_amlPrincipalId = (!amlExists && enableAzureMachineLearning) ? amlREF.identity.principalId : ''
 
 // ============== AI HUB Principal ID ==============
 var aiHubName_Static = 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
@@ -298,7 +298,7 @@ resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-previ
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_aiHubPrincipalId = (!aiHubExists && enableAIFoundryHub) ? aiHubREF.identity.principalId : 'BCP318'
+var var_aiHubPrincipalId = (!aiHubExists && enableAIFoundryHub) ? aiHubREF.identity.principalId : ''
 
 // ============== OPENAI Principal ID ==============
 var openAIName_Static = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
@@ -307,7 +307,7 @@ resource openAIREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = 
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_openAIPrincipalId = (!openaiExists && serviceSettingDeployAzureOpenAI) ? openAIREF.identity.principalId : 'BCP318'
+var var_openAIPrincipalId = (!openaiExists && serviceSettingDeployAzureOpenAI) ? openAIREF.identity.principalId : ''
 
 // ============== AI SERVICES Principal ID ==============
 var aiServicesName_Static = replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomSalt}${prjResourceSuffixNoDash}'), '-', '') 
@@ -316,7 +316,7 @@ resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existin
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_aiServicesPrincipalId = (!aiServicesExists && enableAIServices) ? aiServicesREF.identity.principalId : 'BCP318'
+var var_aiServicesPrincipalId = (!aiServicesExists && enableAIServices) ? aiServicesREF.identity.principalId : ''
 
 // ============== AI SEARCH Principal ID ==============
 var aiSearchName_Static = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${resourceSuffix}'), '-', '')
@@ -325,7 +325,7 @@ resource aiSearchREF 'Microsoft.Search/searchServices@2024-06-01-preview' existi
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_aiSearchPrincipalId = (!aiSearchExists && enableAISearch) ? aiSearchREF.identity.principalId : 'BCP318'
+var var_aiSearchPrincipalId = (!aiSearchExists && enableAISearch) ? aiSearchREF.identity.principalId : ''
 
 // ============== VISION SERVICES Principal ID ==============
 var visionName_Static = 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
@@ -334,7 +334,7 @@ resource visionREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = 
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_visionPrincipalId = serviceSettingDeployAzureAIVision ? visionREF.identity.principalId : 'BCP318'
+var var_visionPrincipalId = serviceSettingDeployAzureAIVision ? visionREF.identity.principalId : ''
 
 // ============== SPEECH SERVICES Principal ID ==============
 var speechName_Static = 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
@@ -343,7 +343,7 @@ resource speechREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = 
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_speechPrincipalId = serviceSettingDeployAzureSpeech ? speechREF.identity.principalId : 'BCP318'
+var var_speechPrincipalId = serviceSettingDeployAzureSpeech ? speechREF.identity.principalId : ''
 
 // ============== DOCUMENT INTELLIGENCE Principal ID ==============
 var docsName_Static = 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
@@ -352,7 +352,7 @@ resource docsREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_docsPrincipalId = serviceSettingDeployAIDocIntelligence ? docsREF.identity.principalId : 'BCP318'
+var var_docsPrincipalId = serviceSettingDeployAIDocIntelligence ? docsREF.identity.principalId : ''
 
 // Datalake with datalakeName based on local, static VARS such as uniqueInAIFenv_Static
 resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {

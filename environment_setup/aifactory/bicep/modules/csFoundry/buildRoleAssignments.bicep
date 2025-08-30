@@ -2,6 +2,9 @@
 // BUILD ROLE ASSIGNMENTS MODULE
 // This module builds role assignments array for AI Foundry services
 // combining users/groups and service principals/managed identities
+// Note: Service principle/MI's have higher privilege, 
+// This follows the principle of least privilege where humans get user access
+// and automated systems get contributor access for operations.
 // ================================================================
 /*
 ┌─────────────────────────────────────────────────────────┐
@@ -22,6 +25,7 @@
 │  └─────────────────────────────────────────────────────┘
 │  📝 Adapter pattern - converts to AVM format            
 └─────────────────────────────────────────────────────────┘
+
 */
 import { roleAssignmentType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
 
