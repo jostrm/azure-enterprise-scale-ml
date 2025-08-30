@@ -153,6 +153,10 @@ param enableAzureMachineLearning bool = false
 
 @description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = false
+@description('Enable AI Foundry V2 deployment')
+param enableAIFoundryV2 bool = false
+@description('Enable AI Foundry V21 deployment')
+param enableAIFoundryV21 bool = false
 
 @description('Enable AI Services deployment')
 param enableAIServices bool = false
@@ -171,12 +175,6 @@ param serviceSettingDeployAzureSpeech bool = false
 
 @description('Enable AI Document Intelligence deployment')
 param serviceSettingDeployAIDocIntelligence bool = false
-
-@description('Enable AI Foundry V2 deployment')
-param enableAIFoundryV2 bool = false
-
-@description('Enable AI Foundry V21 deployment')
-param enableAIFoundryV21 bool = false
 
 @description('Enable Azure Function deployment')
 param serviceSettingDeployFunction bool = false

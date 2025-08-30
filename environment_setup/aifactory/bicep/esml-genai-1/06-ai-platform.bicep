@@ -49,11 +49,8 @@ param miPrjExists bool = false
 @description('Enable Azure Machine Learning deployment')
 param enableAzureMachineLearning bool = false
 param serviceSettingDeployCosmosDB bool = false
-param enableAISearch bool = false
-
 @description('Enable AI Foundry Hub deployment')
-param enableAIFoundryHub bool = true
-
+param enableAIFoundryHub bool = false
 @description('Enable AI Foundry 2 features')
 param enableAIFoundryV2 bool = false
 
