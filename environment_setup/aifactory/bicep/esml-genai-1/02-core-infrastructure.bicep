@@ -471,7 +471,7 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useC
     ipRules: processedIpRules
     existingIpRules: [] // Project-specific ACR has no existing rules initially
     adminUserEnabled: acr_adminUserEnabled
-    dedicatedDataPoint:acr_dedicated
+    dedicatedDataPoint: acr_dedicated
   }
   dependsOn: [
     existingTargetRG
@@ -503,13 +503,13 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     subnetName: commonSubnetName // snet-esml-cmn-001
     privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
     tags: tagsProject
-    location:location
+    location: location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     ipRules: processedIpRules
     existingIpRules: existingIpRules
     adminUserEnabled: acr_adminUserEnabled
-    dedicatedDataPoint:acr_dedicated
+    dedicatedDataPoint: acr_dedicated
   }
 
   dependsOn: [
