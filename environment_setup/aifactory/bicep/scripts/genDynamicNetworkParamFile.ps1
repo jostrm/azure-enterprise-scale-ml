@@ -334,4 +334,4 @@ else{
     $template = $templateEsml
 }
 $template | Out-File "$filePath/$templateName"
-Write-Verbose "Template written to $filePath/$templateName"
+write-host "Template written to $filePath/$templateName"
