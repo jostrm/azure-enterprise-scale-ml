@@ -166,13 +166,19 @@ if ($BYO_subnets_bool -eq $false) {
 
     if ([string]::IsNullOrEmpty($aksSubnetId)) {
         Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues. Please delete the 3 project subnets (snt-prj001-genai,snt-prj001-aks,snt-prj001-aca), and set runNetworkingVar=True again."
-        Write-Host "You may need to clean your project resource group first, delete all except keyvault. Then recreate the private endpoint later, manually. Example name of pend: kv-p00X-eus2-dev-qoygy01-pend"
+        Write-Host "You may need to clean your project resource group first:"
+        Write-Host "- 1) Delete all service in the resource group except keyvault."
+        Write-Host "- 2) Remove the value in the variable aifactory_salt_random in ADO variable.yaml"
+        Write-Host "- 3) recreate the private endpoint later,after deployment, manually. Example name of pend: kv-p00X-eus2-dev-qoygy01-pend."
+        Write-Host "- 4) POST deployment, add the value to variable aifactory_salt_random"
+    
 
         # A) Fail the pipeline when aksSubnetId is missing:
         # Write-Host "##vso[task.complete result=Failed;]AksSubnetId is null or empty. The AKS deployment will fail without a valid subnet ID."
         #
         # B) provide a default or dummy value to allow the template to be created
         $aksSubnetId = "MISSING_REQUIRED_SUBNET_ID"
+        exit 1
     }
 
     if($projectTypeADO.Trim().ToLower() -eq "esml"){
