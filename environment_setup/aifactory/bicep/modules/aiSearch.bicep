@@ -6,6 +6,11 @@ param tags object
 param location string
 param enableSharedPrivateLink bool
 param acrNameDummy string = ''
+
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
+
 param sharedPrivateLinks array = []
 @allowed([
   'S0' // 'Free': Invalid SKU name
@@ -34,7 +39,19 @@ param enablePublicAccessWithPerimeter bool = false
 param vnetName string
 param vnetResourceGroupName string
 
-//var subnetRef = '${vnetId}/subnets/${subnetName}'
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : {type:'SystemAssigned'}
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -53,9 +70,7 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
   sku: {
     name: 'standard2' // Neends to be standard2 or higher (You may not have quota for this. You need to apply if so)
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: formattedUserAssignedIdentities
   properties: {
     authOptions: {
       aadOrApiKey: {

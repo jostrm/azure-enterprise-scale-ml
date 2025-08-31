@@ -561,33 +561,66 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
   }   */
 }
 
-/*
-@description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectSecretsReaderForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!enablePublicAccessWithPerimeter) {
+// Built-in roles for AI Project workspace MSI permissions
+@description('Built-in Role: [AzureML Data Scientist](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles)')
+resource azureMLDataScientistRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: 'f6c7c914-8db3-469d-8ca1-694a8f32e121'
+  scope: subscription()
+}
+
+@description('Built-in Role: [AzureML Compute Operator](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles)')
+resource azureMLComputeOperatorRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: 'e503ece1-11d0-4e8e-8e2c-7a6c3bf38815'
+  scope: subscription()
+}
+
+@description('Assign the AI Project MSI the ability to manage online endpoints within its own workspace.')
+resource projectDataScientistRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!enablePublicAccessWithPerimeter) {
   scope: aiProject
-  name: guid(aiProject.id, aiProject::endpoint.id, amlWorkspaceSecretsReaderRole.id)
+  name: guid(aiProject.id, azureMLDataScientistRole.id, 'data-scientist')
+  properties: {
+    roleDefinitionId: azureMLDataScientistRole.id
+    principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
+    principalId: aiProject.identity.principalId
+  }
+}
+
+@description('Assign the AI Project MSI compute operator permissions for online endpoints.')
+resource projectComputeOperatorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!enablePublicAccessWithPerimeter) {
+  scope: aiProject
+  name: guid(aiProject.id, azureMLComputeOperatorRole.id, 'compute-operator')
+  properties: {
+    roleDefinitionId: azureMLComputeOperatorRole.id
+    principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
+    principalId: aiProject.identity.principalId
+  }
+}
+
+@description('Assign the AI Project MSI the ability to read secrets from the parent project for online endpoint operations.')
+resource projectSecretsReaderRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!enablePublicAccessWithPerimeter) {
+  scope: aiProject
+  name: guid(aiProject.id, amlWorkspaceSecretsReaderRole.id, 'secrets-reader')
   properties: {
     roleDefinitionId: amlWorkspaceSecretsReaderRole.id
     principalType: 'ServicePrincipal'
     #disable-next-line BCP318
-    principalId: aiProject::endpoint.identity.principalId
+    principalId: aiProject.identity.principalId
   }
 }
-*/
 
-/*
-@description('Assign the online endpoint the ability to invoke models in Azure OpenAI. This is needed to execute the prompt flow from the managed endpoint.')
-resource projectOpenAIUserForOnlineEndpointRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!enablePublicAccessWithPerimeter) {
+@description('Assign the AI Project MSI the ability to invoke models in Azure OpenAI.')
+resource projectOpenAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!enablePublicAccessWithPerimeter) {
   scope: aiServices
-  name: guid(aiServices.id, aiProject::endpoint.id, cognitiveServicesOpenAiUserRole.id)
+  name: guid(aiServices.id, aiProject.id, cognitiveServicesOpenAiUserRole.id, 'openai-user')
   properties: {
     roleDefinitionId: cognitiveServicesOpenAiUserRole.id
     principalType: 'ServicePrincipal'
     #disable-next-line BCP318
-    principalId: aiProject::endpoint.identity.principalId
+    principalId: aiProject.identity.principalId
   }
 }
-*/
 
 @description('Azure Diagnostics: AI Foundry chat project - allLogs')
 resource chatProjectDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
@@ -696,7 +729,55 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
   }
 }
 
-// Hub 2
+// Hub 2 - Role assignments for aiProject2
+
+@description('Assign the AI Project2 MSI the ability to manage online endpoints within its own workspace.')
+resource projectDataScientistRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(enablePublicAccessWithPerimeter) {
+  scope: aiProject2
+  name: guid(aiProject2.id, azureMLDataScientistRole.id, 'data-scientist-2')
+  properties: {
+    roleDefinitionId: azureMLDataScientistRole.id
+    principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
+    principalId: aiProject2.identity.principalId
+  }
+}
+
+@description('Assign the AI Project2 MSI compute operator permissions for online endpoints.')
+resource projectComputeOperatorRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(enablePublicAccessWithPerimeter) {
+  scope: aiProject2
+  name: guid(aiProject2.id, azureMLComputeOperatorRole.id, 'compute-operator-2')
+  properties: {
+    roleDefinitionId: azureMLComputeOperatorRole.id
+    principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
+    principalId: aiProject2.identity.principalId
+  }
+}
+
+@description('Assign the AI Project2 MSI the ability to read secrets from the parent project for online endpoint operations.')
+resource projectSecretsReaderRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(enablePublicAccessWithPerimeter) {
+  scope: aiProject2
+  name: guid(aiProject2.id, amlWorkspaceSecretsReaderRole.id, 'secrets-reader-2')
+  properties: {
+    roleDefinitionId: amlWorkspaceSecretsReaderRole.id
+    principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
+    principalId: aiProject2.identity.principalId
+  }
+}
+
+@description('Assign the AI Project2 MSI the ability to invoke models in Azure OpenAI.')
+resource projectOpenAIUserRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(enablePublicAccessWithPerimeter) {
+  scope: aiServices
+  name: guid(aiServices.id, aiProject2.id, cognitiveServicesOpenAiUserRole.id, 'openai-user-2')
+  properties: {
+    roleDefinitionId: cognitiveServicesOpenAiUserRole.id
+    principalType: 'ServicePrincipal'
+    #disable-next-line BCP318
+    principalId: aiProject2.identity.principalId
+  }
+}
 
 /*
 @description('Assign the online endpoint the ability to interact with the secrets of the parent project. This is needed to execute the prompt flow from the managed endpoint.')

@@ -472,6 +472,24 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
         ]
         maxAgeInSeconds: 86400
       }
+      {
+        allowedOrigins: [
+          '*'
+        ]
+        allowedMethods: [
+          'GET'
+          'OPTIONS'
+          'POST'
+          'PUT'
+        ]
+        maxAgeInSeconds: 200
+        exposedHeaders: [
+          '*'
+        ]
+        allowedHeaders: [
+          '*'
+        ]
+      }
     ]
   }
   dependsOn: [
@@ -480,6 +498,8 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
 }
 
 // AI Search Service
+var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
 module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enableAISearch) {
   name: '02-AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -500,6 +520,13 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
     sharedPrivateLinks: []
     ipRules: empty(processedIpRulesAISearch) ? [] : processedIpRulesAISearch
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    managedIdentities: {
+    systemAssigned: true
+    userAssignedResourceIds: concat(
+      !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
+      !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+    )
+  }
   }
   dependsOn: [
     projectResourceGroupExists

@@ -18,6 +18,9 @@ param containers array = []
 param files array = []
 param enablePublicAccessWithPerimeter bool = false
 param enablePublicGenAIAccess bool = false
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
 
 @allowed([
   'Standard_LRS'
@@ -65,6 +68,19 @@ var groupIds = [
     gid: 'table'
   }
 ]
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : {type:'SystemAssigned'}
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -80,11 +96,12 @@ var rules = [for rule in vnetRules:{
   id: rule
 }]
 
-resource sacc2 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGenAIAccess||enablePublicAccessWithPerimeter) {
+resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicGenAIAccess||enablePublicAccessWithPerimeter) {
   name: storageAccountName
   tags: tags
   location: location
   kind: 'StorageV2'
+  identity: formattedUserAssignedIdentities
   sku: {
     name: skuName
   }
@@ -164,11 +181,12 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicG
   }
   
 }
-resource sacc 'Microsoft.Storage/storageAccounts@2024-01-01' = if(enablePublicGenAIAccess == false) {
+resource sacc 'Microsoft.Storage/storageAccounts@2025-01-01' = if(!enablePublicGenAIAccess) {
   name: storageAccountName
   tags: tags
   location: location
   kind: 'StorageV2'
+  identity: formattedUserAssignedIdentities
   sku: {
     name: skuName
   }

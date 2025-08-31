@@ -73,6 +73,9 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = {
             {
               service: 'Microsoft.Storage' // Needed, IF (pend) we want to add subnet to DATALAKE (firewall), added as a "virtualNetworkRules"
             }
+            {
+              service: 'Microsoft.CognitiveServices' // Needed, For AI Foundry V2 (2025)
+            }
           ]
           networkSecurityGroup: nsgCommon.id == '' ? null : {
             id: nsgCommon.id

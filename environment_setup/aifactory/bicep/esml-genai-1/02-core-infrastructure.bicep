@@ -383,6 +383,24 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
           '*'
         ]
       }
+      {
+        allowedOrigins: [
+          '*'
+        ]
+        allowedMethods: [
+          'GET'
+          'OPTIONS'
+          'POST'
+          'PUT'
+        ]
+        maxAgeInSeconds: 200
+        exposedHeaders: [
+          '*'
+        ]
+        allowedHeaders: [
+          '*'
+        ]
+      }
     ]
   }
   dependsOn: [

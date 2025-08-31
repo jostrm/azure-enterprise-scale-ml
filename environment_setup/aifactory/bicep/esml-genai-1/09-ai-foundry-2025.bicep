@@ -166,7 +166,8 @@ resource commonSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' exi
   name: '${vnetNameFull}/${commonSubnetPends}'
   scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
 }
-var commonSubnetResourceId = commonSubnet.id
+//var commonSubnetResourceId = commonSubnet.id
+var commonSubnetResourceId = genaiSubnetId
 
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
@@ -426,6 +427,17 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
 @description('RBAC Security Phase 7 deployment completed successfully')
 output rbacSecurityPhaseCompleted bool = true
 
+// Get AI Search principal ID conditionally
+module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearch) {
+  name: '09-getAISearch-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    aiSearchName: namingConvention.outputs.safeNameAISearch
+  }
+}
+
+var aiSearchPrincipalId = enableAISearch ? getAISearchInfo!.outputs.principalId : ''
+
 // Create role assignments module to build the dynamic array
 module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = {
   name: '09-roleBuilder-${deploymentProjSpecificUniqueSuffix}'
@@ -438,6 +450,8 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
     openAIUserRoleId: openAIUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
     useAdGroups: useAdGroups
+    enableAISearch: enableAISearch
+    aiSearchPrincipalId: aiSearchPrincipalId
   }
   dependsOn: [
     spAndMI2ArrayModule
@@ -502,6 +516,46 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
   ]
 }
+
+// Sets RBAC roles: Search Service Contributor, Search Index Data Reader,Search Index Data Contributor on AI Search, for aiFoundry2025NoAvm.systemAssignedMIPrincipalId
+var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
+var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
+var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
+module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(enableAISearch && enableAIFoundryV21) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    aiSearchName: namingConvention.outputs.safeNameAISearch
+    #disable-next-line BCP318
+    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    searchServiceContributorRoleId: searchServiceContributorRoleId
+    searchIndexDataReaderRoleId: searchIndexDataReaderRoleId
+    searchIndexDataContributorRoleId: searchIndexDataContributorRoleId
+  }
+  dependsOn: [
+    aiFoundry2025NoAvm
+    namingConvention
+  ]
+}
+// Sets RBAC roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor on Azure Storage accounts, for aiFoundry2025NoAvm.systemAssignedMIPrincipalId
+var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
+module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(enableAIFoundryV21) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '09-rbacStorage-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: namingConvention.outputs.storageAccount1001Name
+    #disable-next-line BCP318
+    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
+    storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
+  }
+  dependsOn: [
+    aiFoundry2025NoAvm
+    namingConvention
+  ]
+}
+
 // ============== OUTPUTS ==============
 
 @description('AI Foundry V2 deployment status')

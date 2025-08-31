@@ -50,6 +50,10 @@ param openAIContributorRoleId string
 @description('Whether to use AD Groups')
 param useAdGroups bool
 
+param enableAISearch bool = false
+param aiSearchPrincipalId string = ''
+
+
 // Build role assignments for users/groups
 var userRoleAssignments = [
   // Cognitive Services User roles for users/groups
@@ -88,12 +92,22 @@ var spOpenAIRoleAssignments = [
   }
 ]
 
+// Build role assignments for AI Search if enabled
+var aiSearchRoleAssignments = enableAISearch && !empty(aiSearchPrincipalId) ? [
+  {
+    principalId: aiSearchPrincipalId // AI Search service principal ID
+    roleDefinitionIdOrName: cognitiveServicesContributorRoleId // Cognitive Services OpenAI Contributor
+    principalType: 'ServicePrincipal'
+  }
+] : []
+
 // Combine all role assignments
 var allRoleAssignments = concat(
   userRoleAssignments,
   userOpenAIRoleAssignments,
   spCognitiveRoleAssignments,
-  spOpenAIRoleAssignments
+  spOpenAIRoleAssignments,
+  aiSearchRoleAssignments
 )
 
 @description('Combined role assignments array')

@@ -36,7 +36,6 @@ metadata description = 'This module deploys a Cognitive Service.'
 */
 @description('Required. The name of Cognitive Services account.')
 param name string
-
 @description('Required. Kind of the Cognitive Services account. Use \'Get-AzCognitiveServicesAccountSku\' to determine a valid combinations of \'kind\' and \'SKU\' for your Azure region.')
 @allowed([
   'AIServices'
