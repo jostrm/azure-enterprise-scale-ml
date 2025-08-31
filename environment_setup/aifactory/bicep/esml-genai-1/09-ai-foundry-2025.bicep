@@ -404,10 +404,18 @@ module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFo
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
 
 // Cognitive Services and OpenAI role definition IDs
-var cognitiveServicesContributorRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
-var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
-var openAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
-var openAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68' // Cognitive Services Contributor
+var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908' // Cognitive Services User  
+var openAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442' // Cognitive Services OpenAI Contributor
+var openAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
+var azureAIDeveloperRoleId = '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer - CRITICAL for Chat with data
+
+// Additional roles for complete AI Foundry functionality
+var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User - for Agent secrets
+var keyVaultContributorRoleId = 'f25e0fa2-a7c8-4377-a976-54943a77a395' // Key Vault Contributor - for managing secrets
+var keyVaultSecretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7' // Key Vault Secrets Officer - for Agent operations
+var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor - for resource management
+var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader - for resource access
 
 // Function to assign roles to users and service principals for a cognitive services account
 @description('Function to assign roles to users and service principals for a cognitive services account')
@@ -455,6 +463,9 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
     cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
     openAIUserRoleId: openAIUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
+    azureAIDeveloperRoleId: azureAIDeveloperRoleId // Add Azure AI Developer role
+    keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId // Add Key Vault roles
+    keyVaultContributorRoleId: keyVaultContributorRoleId
     useAdGroups: useAdGroups
     enableAISearch: enableAISearch
     aiSearchPrincipalId: aiSearchPrincipalId
@@ -481,6 +492,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : (!empty(networkAclsObject) ? 'Enabled' : 'Disabled')
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: disableAgentNetworkInjection
+    defaultProjectName: aifV2ProjectName
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     networkAcls: networkAclsObject
     managedIdentities: {
@@ -540,12 +552,16 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
     searchServiceContributorRoleId: searchServiceContributorRoleId
     searchIndexDataReaderRoleId: searchIndexDataReaderRoleId
     searchIndexDataContributorRoleId: searchIndexDataContributorRoleId
+    azureAIDeveloperRoleId: azureAIDeveloperRoleId
+    userObjectIds: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
   }
   dependsOn: [
     aiFoundry2025NoAvm
     namingConvention
   ]
 }
+
 // Sets RBAC roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor on Azure Storage accounts, for aiFoundry2025NoAvm.systemAssignedMIPrincipalId
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
@@ -558,6 +574,45 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
+    azureAIDeveloperRoleId: azureAIDeveloperRoleId
+    userObjectIds: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    aiFoundry2025NoAvm
+    namingConvention
+  ]
+}
+
+// CRITICAL: Add Key Vault RBAC for Agent playground functionality
+module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundryV21) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultName: namingConvention.outputs.keyvaultName
+    #disable-next-line BCP318
+    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
+    keyVaultContributorRoleId: keyVaultContributorRoleId
+    userObjectIds: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    aiFoundry2025NoAvm
+    namingConvention
+  ]
+}
+
+// ADDITIONAL: Assign specific Key Vault roles to AI Foundry MI for project Key Vault 
+module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundryV21) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    keyVaultName: namingConvention.outputs.keyvaultName
+    #disable-next-line BCP318
+    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
+    keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }
   dependsOn: [
     aiFoundry2025NoAvm

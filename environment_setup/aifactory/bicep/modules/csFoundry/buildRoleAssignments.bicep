@@ -47,6 +47,15 @@ param openAIUserRoleId string
 @description('OpenAI Contributor role ID')
 param openAIContributorRoleId string
 
+@description('Azure AI Developer role ID - Required for Chat with Data scenarios')
+param azureAIDeveloperRoleId string
+
+@description('Key Vault Secrets User role ID - Required for Agent playground')
+param keyVaultSecretsUserRoleId string = '4633458b-17de-408a-b874-0445c86b69e6'
+
+@description('Key Vault Contributor role ID - Required for managing Agent secrets')
+param keyVaultContributorRoleId string = 'f25e0fa2-a7c8-4377-a976-54943a77a395'
+
 @description('Whether to use AD Groups')
 param useAdGroups bool
 
@@ -101,12 +110,56 @@ var aiSearchRoleAssignments = enableAISearch && !empty(aiSearchPrincipalId) ? [
   }
 ] : []
 
+// Build Azure AI Developer role assignments for users (required for Chat with Data)
+var userAzureAIDeveloperRoleAssignments = [
+  // Azure AI Developer roles for users/groups
+  for userId in userObjectIds: {
+    principalId: userId
+    roleDefinitionIdOrName: azureAIDeveloperRoleId
+    principalType: useAdGroups ? 'Group' : 'User'
+  }
+]
+
+// Build Azure AI Developer role assignments for service principals
+var spAzureAIDeveloperRoleAssignments = [
+  // Azure AI Developer roles for service principals
+  for spId in servicePrincipalIds: {
+    principalId: spId
+    roleDefinitionIdOrName: azureAIDeveloperRoleId
+    principalType: 'ServicePrincipal'
+  }
+]
+
+// Build Key Vault roles for users (required for Agent playground)
+var userKeyVaultRoleAssignments = [
+  // Key Vault Secrets User roles for users/groups
+  for userId in userObjectIds: {
+    principalId: userId
+    roleDefinitionIdOrName: keyVaultSecretsUserRoleId
+    principalType: useAdGroups ? 'Group' : 'User'
+  }
+]
+
+// Build Key Vault roles for service principals (required for Agent operations)
+var spKeyVaultRoleAssignments = [
+  // Key Vault Contributor roles for service principals
+  for spId in servicePrincipalIds: {
+    principalId: spId
+    roleDefinitionIdOrName: keyVaultContributorRoleId
+    principalType: 'ServicePrincipal'
+  }
+]
+
 // Combine all role assignments
 var allRoleAssignments = concat(
   userRoleAssignments,
   userOpenAIRoleAssignments,
+  userAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for users
+  userKeyVaultRoleAssignments, // Add Key Vault Secrets User for users
   spCognitiveRoleAssignments,
   spOpenAIRoleAssignments,
+  spAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for service principals
+  spKeyVaultRoleAssignments, // Add Key Vault Contributor for service principals
   aiSearchRoleAssignments
 )
 

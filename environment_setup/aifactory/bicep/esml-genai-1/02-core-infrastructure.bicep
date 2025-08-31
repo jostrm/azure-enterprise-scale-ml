@@ -124,6 +124,9 @@ param restore bool = true
 // Technical contact for access policies
 param technicalContactId string = '' // TODO-Remove, Replaced by personas
 
+// Principal type configuration
+param useAdGroups bool = true
+
 // Seeding Key Vault parameters
 param inputKeyvault string
 param inputKeyvaultResourcegroup string
@@ -410,7 +413,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
 
 // ============== KEY VAULT ==============
 
-module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
+module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '03-AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -429,7 +432,6 @@ module kv1 '../modules/keyVault.bicep' = if(!keyvaultExists) {
       genaiSubnetId
       aksSubnetId
     ]
-    accessPolicies: []
     ipRules: empty(processedIpRulesKv) ? [] : processedIpRulesKv
     secrets: deploySampleApp ? [
       {
@@ -625,38 +627,26 @@ module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists) {
   ]
 }
 
-// ============== ACCESS POLICIES ==============
+// ============== KEY VAULT RBAC ASSIGNMENTS ==============
 
-// Access policy definitions
-var secretGetListSet = {
-  secrets: [
-    'get'
-    'list'
-    'set'
-  ]
-}
-var secretGetList = {
-  secrets: [
-    'get'
-    'list'
-  ]
-}
-var secretGet = {
-  secrets: [
-    'get'
-  ]
-}
+// Key Vault role definitions
+var keyVaultSecretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7' // Can get, list, set secrets
+var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6' // Can get, list secrets
+var keyVaultContributorRoleId = 'f25e0fa2-a7c8-4377-a976-54943a77a395' // Management operations
 
-// Project key vault access policy for technical contact
-module kvPrjAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep' = if(!keyvaultExists && !empty(technicalContactId)) {
+// Project key vault RBAC assignments for technical contact and team
+module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultExists && !empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '03-kvSecretsAP${deploymentProjSpecificUniqueSuffix}'
+  name: '03-kvRbacPrj${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGetListSet
-    keyVaultResourceName: keyvaultName
-    policyName: 'add'
-    principalId: technicalContactId
-    additionalPrincipalIds: var_all_principals
+    keyVaultName: keyvaultName
+    userObjectIds: var_all_principals
+    servicePrincipalIds: [] // Will be handled separately
+    managedIdentityIds: [] // Will be handled separately
+    useAdGroups: useAdGroups
+    keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
+    keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
+    keyVaultContributorRoleId: keyVaultContributorRoleId
   }
   dependsOn: [
     addSecret
@@ -664,12 +654,18 @@ module kvPrjAccessPolicyTechnicalContactAll '../modules/kvCmnAccessPolicys.bicep
   ]
 }
 
+// Note: Common key vault still uses access policies (not changed per requirements)
 // Common key vault access policy for technical contact
 module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: '03-kvSecretsGL${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGetList
+    keyVaultPermissions: {
+      secrets: [
+        'get'
+        'list'
+      ]
+    }
     keyVaultResourceName: kvNameCommon
     policyName: 'add'
     principalId: technicalContactId
@@ -680,12 +676,16 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!e
   ]
 }
 
-// Service principal access to common key vault
+// Service principal access to common key vault (keeping access policy model)
 module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: '03-spGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
-    keyVaultPermissions: secretGet
+    keyVaultPermissions: {
+      secrets: [
+        'get'
+      ]
+    }
     keyVaultResourceName: commonKv.name
     policyName: 'add'
     principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)

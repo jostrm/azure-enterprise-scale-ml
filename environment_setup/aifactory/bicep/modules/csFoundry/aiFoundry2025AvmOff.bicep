@@ -166,6 +166,8 @@ param secretsExportConfiguration secretsExportConfigurationType?
 
 @description('Optional. Enable/Disable project management feature for AI Foundry.')
 param allowProjectManagement bool?
+@description('Optional. Default project name to create automatically when deploying AI Foundry.')
+param defaultProjectName string?
 @description('Optional. Resource Id of an existing subnet to use for agent connectivity. This is required when using agents with private endpoints.')
 param agentSubnetResourceId string?
 @description('Optional. Disable agent network injection even when agentSubnetResourceId is provided.')
@@ -368,6 +370,7 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-previ
   }
   properties: {
     allowProjectManagement: allowProjectManagement
+    defaultProject: defaultProjectName
     customSubDomainName: customSubDomainName
     networkAcls: !empty(networkAcls ?? {})
       ? {
