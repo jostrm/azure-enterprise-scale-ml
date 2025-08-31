@@ -510,6 +510,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
         subnetResourceId: commonSubnetResourceId
         privateDnsZoneResourceIds: aiFoundryZones
         service: 'account'
+        location: location
       }
     ] : null
   }

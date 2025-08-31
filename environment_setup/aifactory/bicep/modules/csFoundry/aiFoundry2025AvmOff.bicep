@@ -508,11 +508,7 @@ module cognitiveService_privateEndpoints 'br/public:avm/res/network/private-endp
         : null
       subnetResourceId: privateEndpoint.subnetResourceId
       enableTelemetry: enableReferencedModulesTelemetry
-      location: privateEndpoint.?location ?? reference(
-        split(privateEndpoint.subnetResourceId, '/subnets/')[0],
-        '2020-06-01',
-        'Full'
-      ).location
+      location: privateEndpoint.?location ?? location
       lock: privateEndpoint.?lock ?? lock
       privateDnsZoneGroup: privateEndpoint.?privateDnsZoneGroup
       roleAssignments: privateEndpoint.?roleAssignments
