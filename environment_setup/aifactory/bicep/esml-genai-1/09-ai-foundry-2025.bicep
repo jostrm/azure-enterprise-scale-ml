@@ -151,11 +151,15 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
-var processedIpRules = [for ip in ipWhitelist_array: {
+var processedIpRules_ensure_32 = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: contains(ip, '/') ? ip : '${ip}/32'
 }]
 
+var processedIpRules_remove32 = [for ip in ipWhitelist_array: {
+  action: 'Allow'
+  value: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip
+}]
 
 // Get the subnet resource ID for the common subnet used for private endpoints
 resource commonSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' existing = {
@@ -305,14 +309,14 @@ var aiFoundryZones = !enablePublicAccessWithPerimeter? [
   privateLinksDnsZones.cognitiveservices.id
 ] : []
 var networkAcls = {
-  defaultAction: enablePublicGenAIAccess && empty(processedIpRules) ? 'Allow' : 'Deny'
+  defaultAction: enablePublicGenAIAccess && empty(processedIpRules_remove32) ? 'Allow' : 'Deny'
   virtualNetworkRules: [
     {
       id: commonSubnetResourceId
       ignoreMissingVnetServiceEndpoint: false
     }
   ]
-  ipRules: empty(processedIpRules) ? [] : processedIpRules
+  ipRules: empty(processedIpRules_remove32) ? [] : processedIpRules_remove32
 }
 
 var networkAclsObject = !empty(networkAcls ?? {})
