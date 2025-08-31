@@ -333,5 +333,6 @@ else{
     write-host "Template for dynamicNetworkParams.json is projectType:unsupported value: '$projectTypeADO'"
     $template = $templateEsml
 }
-$template | Out-File "$filePath/$templateName"
-write-host "Template written to $filePath/$templateName"
+$outputPath = Join-Path $filePath $templateName
+$template | Out-File $outputPath
+write-host "Template written to $outputPath"
