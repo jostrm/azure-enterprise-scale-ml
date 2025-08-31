@@ -464,6 +464,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
 }
 
 // AI V2.1 - Cognitive Services Module (Alternative Implementation)
+var pendNameShort = take(aifV2Name,12)
 module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}'
@@ -505,7 +506,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     //privateEndpointSubnetResourceId: commonSubnetResourceId
     privateEndpoints: !enablePublicAccessWithPerimeter ? [
       {
-        name: '${aifV2Name}-pend'
+        name: '${pendNameShort}-pend'
         subnetResourceId: commonSubnetResourceId
         privateDnsZoneResourceIds: aiFoundryZones
         service: 'account'
