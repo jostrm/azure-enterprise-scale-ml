@@ -305,9 +305,13 @@ var aiModels = concat(
   }] : []
 )
 
+// Extract DNS zone IDs to ensure they are resolved as string literals
+var openaiDnsZoneId = privateLinksDnsZones.openai.id
+var cognitiveServicesDnsZoneId = privateLinksDnsZones.cognitiveservices.id
+
 var aiFoundryZones = !enablePublicAccessWithPerimeter? [
-  privateLinksDnsZones.openai.id
-  privateLinksDnsZones.cognitiveservices.id
+  openaiDnsZoneId
+  cognitiveServicesDnsZoneId
 ] : []
 var networkAcls = {
   defaultAction: enablePublicGenAIAccess && empty(processedIpRules_remove32) ? 'Allow' : 'Deny'
