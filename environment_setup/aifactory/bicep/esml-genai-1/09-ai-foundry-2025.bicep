@@ -58,7 +58,7 @@ param deployModel_text_embedding_ada_002 bool = false
 @description('Whether to deploy text-embedding-3-large model')
 param deployModel_text_embedding_3_large bool = false
 @description('Whether to deploy text-embedding-3-small model')
-param deployModel_text_embedding_3_small bool = false
+param deployModel_text_embedding_3_small bool = true
 @description('Default capacity for embedding models')
 param default_embedding_capacity int = 25
 
@@ -68,7 +68,7 @@ param default_gpt_capacity int = 40
 param deployModel_gpt_4o bool = false
 param default_gpt_4o_version string = '2024-11-20'
 @description('Whether to deploy GPT-4o-mini model')
-param deployModel_gpt_4o_mini bool = false
+param deployModel_gpt_4o_mini bool = true
 param default_gpt_4o_mini_version string = '2024-07-18'
 
 @description('Default SKU for models')
@@ -122,6 +122,8 @@ param useAdGroups bool = true
 param IPwhiteList string = ''
 param enablePublicGenAIAccess bool = false
 param allowPublicAccessWhenBehindVnet bool = false
+@description('Disable agent network injection even when agentSubnetResourceId is provided.')
+param disableAgentNetworkInjection bool = false
 
 // ============== VARIABLES ==============
 
@@ -476,8 +478,9 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     enableTelemetry: false
     tags: tagsProject
     customSubDomainName: aifV2Name
-    publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : 'Disabled'
+    publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : (!empty(networkAclsObject) ? 'Enabled' : 'Disabled')
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
+    disableAgentNetworkInjection: disableAgentNetworkInjection
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     networkAcls: networkAclsObject
     managedIdentities: {
@@ -503,7 +506,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
         versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
       }
     ]
-    //privateEndpointSubnetResourceId: commonSubnetResourceId
+    
     privateEndpoints: !enablePublicAccessWithPerimeter ? [
       {
         name: '${aifV2Name}-pend'
@@ -563,6 +566,9 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 }
 
 // ============== OUTPUTS ==============
+
+@description('AI Models configuration for debugging')
+output aiModelsConfiguration array = aiModels
 
 @description('AI Foundry V2 deployment status')
 output aiFoundryV2Deployed bool = enableAIFoundryV2

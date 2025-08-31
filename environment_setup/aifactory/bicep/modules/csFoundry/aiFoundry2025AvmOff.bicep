@@ -168,6 +168,8 @@ param secretsExportConfiguration secretsExportConfigurationType?
 param allowProjectManagement bool?
 @description('Optional. Resource Id of an existing subnet to use for agent connectivity. This is required when using agents with private endpoints.')
 param agentSubnetResourceId string?
+@description('Optional. Disable agent network injection even when agentSubnetResourceId is provided.')
+param disableAgentNetworkInjection bool = false
 
 var enableReferencedModulesTelemetry = false
 
@@ -350,7 +352,11 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
   )
 }
 
-//update the cognitive service account api for the Foundry FDP updates
+//
+// AIFactory-Private mode: all private
+// AIFactory-Hybrid mode: AI Foundry agents will use the injected network. Public access still works through network ACLs.
+// For DEMO purpose, at least best of both worlds: agent private network injection + public user access with restrictions (IP whitelisting)
+//
 resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
   name: name
   kind: kind
@@ -373,17 +379,15 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-previ
       : null
     publicNetworkAccess: publicNetworkAccess != null
       ? publicNetworkAccess
-      : (!empty(networkAcls) ? 'Enabled' : 'Disabled')
+      : (!empty(networkAcls ?? {}) ? 'Enabled' : 'Disabled')
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties
     disableLocalAuth: disableLocalAuth
-    networkInjections: publicNetworkAccess! == false && !empty(agentSubnetResourceId)
-  ? {
+    networkInjections: !disableAgentNetworkInjection && !empty(agentSubnetResourceId) ? {
       scenario: 'agent'
       subnetArmId: agentSubnetResourceId!
-      useMicrosoftManagedNetwork: false
-    }
-  : null
+      useMicrosoftManagedNetwork: false // false for enterprise use: e.g. you need custom routing, firewall rules, network policies, or BYOsubnets
+    } : null
     encryption: !empty(customerManagedKey)
       ? {
           keySource: 'Microsoft.KeyVault'
@@ -421,11 +425,8 @@ resource cognitiveService_deployments 'Microsoft.CognitiveServices/accounts/depl
       versionUpgradeOption: deployment.?versionUpgradeOption
     }
     sku: deployment.?sku ?? {
-      name: sku
-      capacity: sku.?capacity
-      tier: sku.?tier
-      size: sku.?size
-      family: sku.?family
+      name: 'Standard'
+      capacity: deployment.model.name == 'gpt-4o' || deployment.model.name == 'gpt-4o-mini' ? 10 : 30
     }
   }
 ]

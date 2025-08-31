@@ -89,7 +89,7 @@ var aifV1ProjectName = 'aifp-${projectNumber}-1-${locationSuffix}-${env}-${uniqu
 // AI Foundry V2 (2025):aif-V2-001-eus-dev-12345-001 = 28
 //var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // ->pend error
 //var aifV2Name = take('aifV2${projectNumber}${locationSuffix}${env}',12) // (12) aifV2001eusd -> worked!
-var aifV2Name = 'aifV2${projectNumber}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}' // // Does this work?
+var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // // Does this work?
 var aifV2PrjName ='aif-V2-prj-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}' // Does this work?
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
