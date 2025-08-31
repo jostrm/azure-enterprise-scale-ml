@@ -165,7 +165,7 @@ if ($BYO_subnets_bool -eq $false) {
     -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
 
     if ([string]::IsNullOrEmpty($aksSubnetId)) {
-        Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues."
+        Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues. Please delete Subnets, and set runNetworkingVar=True again."
         
         # A) Fail the pipeline when aksSubnetId is missing:
         # Write-Host "##vso[task.complete result=Failed;]AksSubnetId is null or empty. The AKS deployment will fail without a valid subnet ID."
