@@ -165,11 +165,12 @@ if ($BYO_subnets_bool -eq $false) {
     -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
 
     if ([string]::IsNullOrEmpty($aksSubnetId)) {
-        Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues. Please delete Subnets, and set runNetworkingVar=True again."
-        
+        Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues. Please delete the 3 project subnets (snt-prj001-genai,snt-prj001-aks,snt-prj001-aca), and set runNetworkingVar=True again."
+        Write-Host "You may need to clean your project resource group first, delete all except keyvault. Then recreate the private endpoint later, manually. Example name of pend: kv-p00X-eus2-dev-qoygy01-pend"
+
         # A) Fail the pipeline when aksSubnetId is missing:
         # Write-Host "##vso[task.complete result=Failed;]AksSubnetId is null or empty. The AKS deployment will fail without a valid subnet ID."
-        
+        #
         # B) provide a default or dummy value to allow the template to be created
         $aksSubnetId = "MISSING_REQUIRED_SUBNET_ID"
     }
