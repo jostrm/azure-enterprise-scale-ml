@@ -21,7 +21,7 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5,
     [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets, true or false string")][string]$BYO_subnets,
     [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets. <network_env> dev-, test-, prod- or other env name")][string]$network_env,
-    [Parameter(Mandatory = $false, HelpMessage = "Save generated file to Git repository (Azure DevOps or GitHub)")][bool]$saveFileInADOGitRepo = $true
+    [Parameter(Mandatory = $false, HelpMessage = "Save generated file to Git repository (Azure DevOps or GitHub)")][bool]$saveFileInADOGitRepo = $false
 )
 
 function Set-DeployedOnTag {
