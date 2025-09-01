@@ -607,19 +607,19 @@ module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBing
 // ============== KEY VAULT SEEDING ==============
 
 // External key vault for seeding secrets
-resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = if (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) {
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
 }
 
 // Copy secrets from external key vault to project key vault
-module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists) {
+module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists && !empty(inputKeyvault)) {
   name: '03-kvSecretsS2P${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
-    spAppIDValue: externalKv.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName)
-    spOIDValue: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
-    spSecretValue: externalKv.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName)
+    spAppIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) ? externalKv!.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) : ''
+    spOIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) ? externalKv!.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
+    spSecretValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) ? externalKv!.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName) : ''
     keyvaultName: keyvaultName
     keyvaultNameRG: targetResourceGroup
   }
@@ -679,7 +679,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!e
 }
 
 // Service principal access to common key vault (keeping access policy model)
-module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
+module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: '03-spGetList${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -690,7 +690,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = {
     }
     keyVaultResourceName: commonKv.name
     policyName: 'add'
-    principalId: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    principalId: externalKv!.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
     additionalPrincipalIds: []
   }
   dependsOn: [
