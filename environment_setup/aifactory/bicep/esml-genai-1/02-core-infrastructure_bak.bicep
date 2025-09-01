@@ -313,23 +313,11 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 #disable-next-line BCP318
 var var_sacc_dnsConfig = sacc.outputs.dnsConfig
 
-// ============== APPLICATION INSIGHTS ==============
+#disable-next-line BCP318
+var var_kv1_dnsConfig = kv1.outputs.dnsConfig
 
-module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' = {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: applicationInsightName
-    logWorkspaceName: laWorkspaceName
-    logWorkspaceNameRG: commonResourceGroup
-    tags: tagsProject
-    location: location
-    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-  }
-  dependsOn: [
-    existingTargetRG
-  ]
-}
+#disable-next-line BCP318
+var var_acr_dnsConfig = acr.outputs.dnsConfig
 
 // ============== STORAGE ACCOUNTS ==============
 
@@ -367,7 +355,6 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     ]
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
     corsRules: [
-      /*
       {
         allowedOrigins: [
           'https://mlworkspace.azure.ai'
@@ -398,7 +385,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
         allowedHeaders: [
           '*'
         ]
-      }*/
+      }
       {
         allowedOrigins: [
           '*'
@@ -423,14 +410,6 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     existingTargetRG
   ]
 }
-
-/*
-
-#disable-next-line BCP318
-var var_kv1_dnsConfig = kv1.outputs.dnsConfig
-
-#disable-next-line BCP318
-var var_acr_dnsConfig = acr.outputs.dnsConfig
 
 // ============== KEY VAULT ==============
 
@@ -566,6 +545,24 @@ module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExis
   }
 }
 
+// ============== APPLICATION INSIGHTS ==============
+
+module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '02-AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: applicationInsightName
+    logWorkspaceName: laWorkspaceName
+    logWorkspaceNameRG: commonResourceGroup
+    tags: tagsProject
+    location: location
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+  }
+  dependsOn: [
+    existingTargetRG
+  ]
+}
+
 // ============== VIRTUAL MACHINE ==============
 
 module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serviceSettingDeployProjectVM == true) {
@@ -590,6 +587,22 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serv
 }
 
 // ============== BING SEARCH ==============
+
+/*
+module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBingSearch == true) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '02-BingSearch4${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: bingName_Static
+    location: 'global'
+    sku: bingSearchSKU
+    tags: tagsProject
+  }
+  dependsOn: [
+    existingTargetRG
+  ]
+}
+*/
 
 // ============== KEY VAULT SEEDING ==============
 
@@ -729,7 +742,6 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(!acrProjec
   ]
 }
 
-*/
 // ============== OUTPUTS - Simplified ==============
 // Note: Outputs simplified to avoid conditional module reference issues
 // Resource information should be retrieved through Azure CLI queries after deployment
@@ -749,5 +761,5 @@ output applicationInsightsDeployed bool = !applicationInsightExists
 @description('Virtual Machine deployment status')
 output virtualMachineDeployed bool = (!vmExists && serviceSettingDeployProjectVM)
 
-//@description('Bing Search deployment status')
-//output bingSearchDeployed bool = (!bingExists && serviceSettingDeployBingSearch)
+@description('Bing Search deployment status')
+output bingSearchDeployed bool = (!bingExists && serviceSettingDeployBingSearch)
