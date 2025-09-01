@@ -732,6 +732,9 @@ module debug './00-debug.bicep' = if (enableDebugging) {
     DEBUG_deployModel_text_embedding_3_large: DEBUG_deployModel_text_embedding_3_large
     DEBUG_deployModel_text_embedding_3_small: DEBUG_deployModel_text_embedding_3_small
     DEBUG_deployModel_gpt_4o_mini: DEBUG_deployModel_gpt_4o_mini
+    DEBUG_inputKeyvault:inputKeyvault
+    DEBUG_inputKeyvaultResourcegroup: inputKeyvaultResourcegroup
+    DEBUG_inputKeyvaultSubscription: inputKeyvaultSubscription
   }
   dependsOn: [
     projectResourceGroup

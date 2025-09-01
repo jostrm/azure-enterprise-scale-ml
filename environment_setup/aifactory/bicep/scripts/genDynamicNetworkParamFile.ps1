@@ -20,7 +20,8 @@ param (
     [Parameter(Mandatory = $false, HelpMessage="Specifies the secret for service principal")][string]$spSecret,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5,
     [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets, true or false string")][string]$BYO_subnets,
-    [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets. <network_env> dev-, test-, prod- or other env name")][string]$network_env
+    [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets. <network_env> dev-, test-, prod- or other env name")][string]$network_env,
+    [Parameter(Mandatory = $false, HelpMessage = "Save generated file to Git repository (Azure DevOps or GitHub)")][bool]$saveFileInADOGitRepo = $true
 )
 
 function Set-DeployedOnTag {
@@ -64,6 +65,101 @@ function Get-AzureSubnetId {
     }
     
     return "/subscriptions/$subscriptionId/resourceGroups/$resourceGroupName/providers/Microsoft.Network/virtualNetworks/$vnetName/subnets/$subnetName"
+}
+
+function Save-FileToGitRepository {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [Parameter(Mandatory = $true)]
+        [string]$CommitMessage = "Update dynamicNetworkParams.json via pipeline"
+    )
+    
+    try {
+        # Get current working directory for Git operations
+        $currentLocation = Get-Location
+        Write-Host "Current location: $currentLocation"
+        
+        # Check if we're in a Git repository
+        $gitStatus = git status 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Not in a Git repository or Git is not available. File saved locally only."
+            return $false
+        }
+        
+        # Detect Git repository type
+        $gitRemoteUrl = git remote get-url origin 2>&1
+        $isAzureDevOps = $false
+        $isGitHub = $false
+        
+        if ($gitRemoteUrl -match "dev.azure.com|visualstudio.com") {
+            $isAzureDevOps = $true
+            Write-Host "Detected Azure DevOps repository"
+        } elseif ($gitRemoteUrl -match "github.com") {
+            $isGitHub = $true
+            Write-Host "Detected GitHub repository"
+        } else {
+            Write-Host "Detected Git repository (type unknown): $gitRemoteUrl"
+        }
+        
+        # Check if file has changes
+        $gitDiff = git diff --name-only
+        $relativePath = Resolve-Path -Path $FilePath -Relative
+        $hasChanges = $gitDiff -contains $relativePath.TrimStart('./')
+        
+        if (-not $hasChanges) {
+            # Check if file is untracked
+            $untrackedFiles = git ls-files --others --exclude-standard
+            $hasChanges = $untrackedFiles -contains $relativePath.TrimStart('./')
+        }
+        
+        if ($hasChanges -or (Test-Path $FilePath)) {
+            Write-Host "Adding file to Git: $relativePath"
+            git add $FilePath
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Committing changes with message: $CommitMessage"
+                git commit -m $CommitMessage
+                
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "Pushing changes to remote repository..."
+                    
+                    # For Azure DevOps, we might need to specify the branch
+                    $currentBranch = git branch --show-current
+                    Write-Host "Current branch: $currentBranch"
+                    
+                    git push origin $currentBranch
+                    
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "Successfully pushed changes to Git repository"
+                        if ($isAzureDevOps) {
+                            Write-Host "File available in Azure DevOps at: $gitRemoteUrl"
+                        } elseif ($isGitHub) {
+                            Write-Host "File available in GitHub at: $gitRemoteUrl"
+                        }
+                        return $true
+                    } else {
+                        Write-Warning "Failed to push changes to remote repository"
+                        return $false
+                    }
+                } else {
+                    Write-Warning "Failed to commit changes"
+                    return $false
+                }
+            } else {
+                Write-Warning "Failed to add file to Git"
+                return $false
+            }
+        } else {
+            Write-Host "No changes detected in file: $relativePath"
+            return $true
+        }
+    }
+    catch {
+        Write-Error "Error during Git operations: $($_.Exception.Message)"
+        return $false
+    }
 }
 
 Import-Module -Name "./modules/pipelineFunctions.psm1"
@@ -344,3 +440,21 @@ else{
 $outputPath = "$filePath/$templateName".Replace('\', '/')
 $template | Out-File $outputPath
 write-host "Template written to $outputPath"
+
+# Conditionally save to Git repository if requested
+if ($saveFileInADOGitRepo -eq $true) {
+    Write-Host "saveFileInADOGitRepo is enabled. Attempting to save file to Git repository..."
+    
+    $commitMessage = "Update dynamicNetworkParams.json for project $projectNumber environment $env ($(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
+    $gitSaveResult = Save-FileToGitRepository -FilePath $outputPath -CommitMessage $commitMessage
+    
+    if ($gitSaveResult) {
+        Write-Host "SUCCESS: File successfully saved to Git repository and can be verified in your repo"
+    } else {
+        Write-Warning "PARTIAL SUCCESS: File created locally at $outputPath but could not be saved to Git repository"
+        Write-Host "You can manually verify the file content and commit it to your repository"
+    }
+} else {
+    Write-Host "saveFileInADOGitRepo is disabled. File saved locally only at: $outputPath"
+    Write-Host "To enable Git repository save, set parameter -saveFileInADOGitRepo `$true"
+}

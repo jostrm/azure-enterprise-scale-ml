@@ -220,6 +220,15 @@ param DEBUG_deployModel_text_embedding_3_small bool = false
 @description('Deploy Model GPT-4o Mini')
 param DEBUG_deployModel_gpt_4o_mini bool = false
 
+@description('Input Key Vault name')
+param DEBUG_inputKeyvault string = ''
+
+@description('Input Key Vault Resource Group')
+param DEBUG_inputKeyvaultResourcegroup string = ''
+
+@description('Input Key Vault Subscription')
+param DEBUG_inputKeyvaultSubscription string = ''
+
 // Use this in a resource description or as a dummy resource to see the values
 resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
   name: 'debugScript'
@@ -578,6 +587,18 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
         name: 'DEBUG_deployModel_gpt_4o_mini'
         value: DEBUG_deployModel_gpt_4o_mini ? 'true' : 'false'
       }
+      {
+        name: 'DEBUG_inputKeyvault'
+        value: DEBUG_inputKeyvault
+      }
+      {
+        name: 'DEBUG_inputKeyvaultResourcegroup'
+        value: DEBUG_inputKeyvaultResourcegroup
+      }
+      {
+        name: 'DEBUG_inputKeyvaultSubscription'
+        value: DEBUG_inputKeyvaultSubscription
+      }
     ]
     scriptContent: '''
       Write-Host "DEBUG OUTPUT VARIABLES:"
@@ -672,6 +693,9 @@ resource dummyResource 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
       Write-Host "DEBUG_deployModel_text_embedding_3_large: $env:DEBUG_deployModel_text_embedding_3_large"
       Write-Host "DEBUG_deployModel_text_embedding_3_small: $env:DEBUG_deployModel_text_embedding_3_small"
       Write-Host "DEBUG_deployModel_gpt_4o_mini: $env:DEBUG_deployModel_gpt_4o_mini"
+      Write-Host "DEBUG_inputKeyvault: $env:DEBUG_inputKeyvault"
+      Write-Host "DEBUG_inputKeyvaultResourcegroup: $env:DEBUG_inputKeyvaultResourcegroup"
+      Write-Host "DEBUG_inputKeyvaultSubscription: $env:DEBUG_inputKeyvaultSubscription"
     '''
     retentionInterval: 'PT1H'
   }
