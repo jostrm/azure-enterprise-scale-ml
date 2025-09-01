@@ -68,6 +68,8 @@ param aiSearchExists bool = false
 param keyvaultExists bool = false
 param storageAccount2001Exists bool = false
 param storageAccount1001Exists bool = false
+param miACAExists bool = false
+param miPrjExists bool = false
 
 // Users
 param technicalAdminsObjectID string = ''
@@ -181,6 +183,23 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
+// Get managed identity principal IDs using helper modules
+module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = if (!miPrjExists) {
+  name: '03-getPrMI-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miPrjName
+  }
+}
+
+module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = if (!miACAExists) {
+  name: '03-getACAMI-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miACAName
+  }
+}
+
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
@@ -221,8 +240,8 @@ var aiServicesName = namingConvention.outputs.aiServicesName
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
-//var miACAName = namingConvention.outputs.miACAName
-//var miPrjName = namingConvention.outputs.miPrjName
+var miACAName = namingConvention.outputs.miACAName
+var miPrjName = namingConvention.outputs.miPrjName
 //var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
 //var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
 //var aksSubnetName = namingConvention.outputs.aksSubnetName
@@ -498,8 +517,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
 }
 
 // AI Search Service
-var miACAName = namingConvention.outputs.miACAName
-var miPrjName = namingConvention.outputs.miPrjName
 module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enableAISearch) {
   name: '02-AzureAISearch4${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -522,15 +539,17 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     managedIdentities: {
     systemAssigned: true
-    userAssignedResourceIds: concat(
-      !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
-      !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
+    userAssignedResourceIds: union(
+      !empty(miPrjName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : [],
+      !empty(miACAName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)] : []
     )
   }
   }
   dependsOn: [
     projectResourceGroupExists
     ...(!storageAccount2001Exists ? [sa4AIsearch] : [])
+    ...(!miPrjExists ? [getProjectMIPrincipalId] : [])
+    ...(!miACAExists ? [getACAMIPrincipalId] : [])
   ]
 }
 
