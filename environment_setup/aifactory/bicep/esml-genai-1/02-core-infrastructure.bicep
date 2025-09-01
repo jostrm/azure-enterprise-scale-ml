@@ -310,8 +310,6 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 
 // ============== DNS CONFIGURATIONS ==============
 // DNS configurations for private endpoints - using dynamic outputs from modules
-#disable-next-line BCP318
-var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: ''
 
 // ============== APPLICATION INSIGHTS ==============
 
@@ -332,6 +330,11 @@ module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' 
 }
 
 // ============== STORAGE ACCOUNTS ==============
+/*
+
+#disable-next-line BCP318
+var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: ''
+
 
 // Main storage account for ML/AI workloads
 module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
@@ -367,38 +370,6 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     ]
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
     corsRules: [
-      /*
-      {
-        allowedOrigins: [
-          'https://mlworkspace.azure.ai'
-          'https://ml.azure.com'
-          'https://*.ml.azure.com'
-          'https://ai.azure.com'
-          'https://*.ai.azure.com'
-          'https://mlworkspacecanary.azure.ai'
-          'https://mlworkspace.azureml-test.net'
-          'https://42.${location}.instances.azureml.ms'
-          'https://457c18fd-a6d7-4461-999a-be092e9d1ec0.workspace.${location}.api.azureml.ms'
-          'https://*.instances.azureml.ms'
-          'https://*.azureml.ms'
-        ]
-        allowedMethods: [
-          'GET'
-          'HEAD'
-          'POST'
-          'PUT'
-          'DELETE'
-          'OPTIONS'
-          'PATCH'
-        ]
-        maxAgeInSeconds: 2520
-        exposedHeaders: [
-          '*'
-        ]
-        allowedHeaders: [
-          '*'
-        ]
-      }*/
       {
         allowedOrigins: [
           '*'
@@ -424,8 +395,6 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   ]
 }
 
-
-/*
 
 #disable-next-line BCP318
 var var_kv1_dnsConfig = !keyvaultExists? kv1.outputs.dnsConfig: ''
