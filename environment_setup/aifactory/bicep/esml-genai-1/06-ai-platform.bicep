@@ -53,6 +53,9 @@ param serviceSettingDeployCosmosDB bool = false
 param enableAIFoundryHub bool = false
 @description('Enable AI Foundry 2 features')
 param enableAIFoundryV2 bool = false
+param serviceSettingDeployAzureOpenAI bool = false
+param enableAISearch bool = false
+param enableAIServices bool = false
 
 // AI Models deployment parameters
 @description('Whether to deploy GPT-X model')
@@ -252,8 +255,9 @@ var aifV2ProjectName = namingConvention.outputs.aifV2Name
 var aifV2Name = namingConvention.outputs.aifV2PrjName
 
 // AI Search
-var aiSearchName = namingConvention.outputs.safeNameAISearch
-var aiServicesName = namingConvention.outputs.aiServicesName
+var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+var aoaiName = serviceSettingDeployAzureOpenAI? namingConvention.outputs.aoaiName: ''
+var aiServicesName = enableAIServices? namingConvention.outputs.aiServicesName: ''
 
 // Common: AML, AI Fondry Hub
 var acrProjectName = namingConvention.outputs.acrProjectName

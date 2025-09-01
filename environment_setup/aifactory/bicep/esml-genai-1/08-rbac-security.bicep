@@ -116,10 +116,10 @@ var aiServicesName = namingConvention.outputs.aiServicesName
 var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}-${deploymentId}'
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
-var aiSearchName = namingConvention.outputs.safeNameAISearch
+var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
 var openAIName = namingConvention.outputs.aoaiName
-var aifV2Name = namingConvention.outputs.aifV2Name
 
+//var aifV2Name = namingConvention.outputs.aifV2Name
 //var twoNumbers = namingConvention.outputs.twoNumbers
 //var aifProjectName = namingConvention.outputs.aifProjectName
 //var amlName = namingConvention.outputs.amlName
@@ -185,7 +185,7 @@ param enableAIFoundryV21 bool = false
 param enableAIServices bool = false
 
 @description('Enable AI Search deployment')
-param enableAISearch bool = true
+param enableAISearch bool = false
 
 @description('Enable Azure OpenAI deployment')
 param serviceSettingDeployAzureOpenAI bool = false
@@ -253,7 +253,7 @@ param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
 param projectServicePrincipleOID_SeedingKeyvaultName string
 
-param useAdGroups bool = false
+param useAdGroups bool = true
 // Azure ML Object ID for cross-service permissions
 param azureMachineLearningObjectId string = ''
 
