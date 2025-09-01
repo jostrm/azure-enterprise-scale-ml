@@ -92,6 +92,10 @@ param serviceSettingDeployFunction bool = false
 @description('Enable Azure Web App deployment')
 param serviceSettingDeployWebApp bool = false
 
+param serviceSettingDeployAzureOpenAI bool = false
+param enableAISearch bool = false
+param enableAIServices bool = false
+
 // Security and networking
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
@@ -303,9 +307,9 @@ var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
-var aiSearchName = namingConvention.outputs.safeNameAISearch
-var aoaiName = namingConvention.outputs.aoaiName
-var aiServicesName = namingConvention.outputs.aiServicesName
+var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+var aoaiName = serviceSettingDeployAzureOpenAI? namingConvention.outputs.aoaiName: ''
+var aiServicesName = enableAIServices? namingConvention.outputs.aiServicesName: ''
 var bingName = namingConvention.outputs.bingName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
