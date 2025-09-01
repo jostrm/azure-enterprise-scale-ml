@@ -330,7 +330,6 @@ module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' 
 }
 
 // ============== STORAGE ACCOUNTS ==============
-/*
 
 #disable-next-line BCP318
 var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: ''
@@ -395,6 +394,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   ]
 }
 
+/*
 
 #disable-next-line BCP318
 var var_kv1_dnsConfig = !keyvaultExists? kv1.outputs.dnsConfig: ''
