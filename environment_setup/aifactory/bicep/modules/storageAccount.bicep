@@ -101,7 +101,7 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicG
   tags: tags
   location: location
   kind: 'StorageV2'
-  identity: formattedUserAssignedIdentities
+  identity: identity
   sku: {
     name: skuName
   }
@@ -186,7 +186,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-01-01' = if(!enablePublicG
   tags: tags
   location: location
   kind: 'StorageV2'
-  identity: formattedUserAssignedIdentities
+  identity: identity
   sku: {
     name: skuName
   }

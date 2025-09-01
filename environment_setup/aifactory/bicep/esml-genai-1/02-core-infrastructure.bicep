@@ -332,7 +332,7 @@ module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' 
 // ============== STORAGE ACCOUNTS ==============
 
 #disable-next-line BCP318
-var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: ''
+var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: []
 
 
 // Main storage account for ML/AI workloads
@@ -394,12 +394,11 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   ]
 }
 
-/*
 
 #disable-next-line BCP318
-var var_kv1_dnsConfig = !keyvaultExists? kv1.outputs.dnsConfig: ''
+var var_kv1_dnsConfig = !keyvaultExists? kv1.outputs.dnsConfig: []
 #disable-next-line BCP318
-var var_acr_dnsConfig = !acrProjectExists? acr.outputs.dnsConfig: ''
+var var_acr_dnsConfig = !acrProjectExists? acr.outputs.dnsConfig: []
 
 // ============== KEY VAULT ==============
 
@@ -698,7 +697,6 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(!acrProjec
   ]
 }
 
-*/
 // ============== OUTPUTS - Simplified ==============
 // Note: Outputs simplified to avoid conditional module reference issues
 // Resource information should be retrieved through Azure CLI queries after deployment
