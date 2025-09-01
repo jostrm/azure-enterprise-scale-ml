@@ -588,6 +588,7 @@ module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serv
 
 // ============== BING SEARCH ==============
 
+/*
 module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBingSearch == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '03-BingSearch4${deploymentProjSpecificUniqueSuffix}'
@@ -601,6 +602,7 @@ module bing '../modules/bing.bicep' = if(!bingExists && serviceSettingDeployBing
     existingTargetRG
   ]
 }
+*/
 
 // ============== KEY VAULT SEEDING ==============
 
