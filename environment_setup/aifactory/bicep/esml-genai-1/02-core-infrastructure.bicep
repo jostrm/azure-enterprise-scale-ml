@@ -311,7 +311,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 // ============== DNS CONFIGURATIONS ==============
 // DNS configurations for private endpoints - using dynamic outputs from modules
 #disable-next-line BCP318
-var var_sacc_dnsConfig = sacc.outputs.dnsConfig
+var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: ''
 
 // ============== APPLICATION INSIGHTS ==============
 
@@ -424,13 +424,13 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   ]
 }
 
+
 /*
 
 #disable-next-line BCP318
-var var_kv1_dnsConfig = kv1.outputs.dnsConfig
-
+var var_kv1_dnsConfig = !keyvaultExists? kv1.outputs.dnsConfig: ''
 #disable-next-line BCP318
-var var_acr_dnsConfig = acr.outputs.dnsConfig
+var var_acr_dnsConfig = !acrProjectExists? acr.outputs.dnsConfig: ''
 
 // ============== KEY VAULT ==============
 
