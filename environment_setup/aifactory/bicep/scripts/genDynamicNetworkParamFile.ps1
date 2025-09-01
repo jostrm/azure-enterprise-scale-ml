@@ -21,7 +21,8 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Specifies where the find the parameters file")][string]$bicepPar5,
     [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets, true or false string")][string]$BYO_subnets,
     [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets. <network_env> dev-, test-, prod- or other env name")][string]$network_env,
-    [Parameter(Mandatory = $false, HelpMessage = "Save generated file to Git repository (Azure DevOps or GitHub)")][bool]$saveFileInADOGitRepo = $false
+    [Parameter(Mandatory = $false, HelpMessage = "Save generated file to Git repository (Azure DevOps or GitHub)")][bool]$saveFileInADOGitRepo = $true,
+    [Parameter(Mandatory = $false, HelpMessage = "Parent Git repository path (if different from current location)")][string]$parentGitRepoPath = ""
 )
 
 function Set-DeployedOnTag {
@@ -73,7 +74,9 @@ function Save-FileToGitRepository {
         [Parameter(Mandatory = $true)]
         [string]$FilePath,
         [Parameter(Mandatory = $true)]
-        [string]$CommitMessage = "Update dynamicNetworkParams.json via pipeline"
+        [string]$CommitMessage,
+        [Parameter(Mandatory = $false)]
+        [string]$ParentRepoPath = ""
     )
     
     try {
@@ -81,107 +84,193 @@ function Save-FileToGitRepository {
         $currentLocation = Get-Location
         Write-Host "Current location: $currentLocation"
         
-        # Check if we're in a Git repository
-        $gitStatus = git status --porcelain 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Not in a Git repository or Git is not available. File saved locally only."
-            return $false
-        }
+        # Check if we're in a Git submodule or need to find the parent Git repository
+        $parentRepoPath = $null
         
-        # Detect Git repository type
-        $gitRemoteUrl = git remote get-url origin 2>&1
-        $isAzureDevOps = $false
-        $isGitHub = $false
-        
-        if ($gitRemoteUrl -match "dev.azure.com|visualstudio.com") {
-            $isAzureDevOps = $true
-            Write-Host "Detected Azure DevOps repository"
-        } elseif ($gitRemoteUrl -match "github.com") {
-            $isGitHub = $true
-            Write-Host "Detected GitHub repository"
+        # Use explicitly provided parent repo path first
+        if ($ParentRepoPath -and (Test-Path $ParentRepoPath)) {
+            $parentRepoPath = $ParentRepoPath
+            Write-Host "Using provided parent Git repository path: $parentRepoPath"
         } else {
-            Write-Host "Detected Git repository (type unknown): $gitRemoteUrl"
-        }
-        
-        # Get relative path for Git operations
-        $relativePath = if (Test-Path $FilePath) {
-            (Resolve-Path -Path $FilePath -Relative).TrimStart('./')
-        } else {
-            Write-Warning "File does not exist: $FilePath"
-            return $false
-        }
-        
-        # Check if file has changes or is new
-        $gitStatusOutput = git status --porcelain $FilePath 2>&1
-        $hasChanges = $gitStatusOutput -and ($gitStatusOutput.Length -gt 0)
-        
-        # If no changes, check if file exists in Git history
-        if (-not $hasChanges) {
-            $gitLsFiles = git ls-files $FilePath 2>&1
-            if (-not $gitLsFiles -or $LASTEXITCODE -ne 0) {
-                # File is not tracked, so it's new
-                $hasChanges = $true
-                Write-Host "File is new and will be added to Git"
+            # Check if we're in a Git submodule first
+            $searchPath = $currentLocation.Path
+            $foundSubmodule = $false
+            
+            # Look for .git file (indicates submodule) vs .git directory (indicates main repo)
+            if (Test-Path (Join-Path $searchPath ".git")) {
+                $gitPath = Join-Path $searchPath ".git"
+                $gitContent = Get-Content $gitPath -ErrorAction SilentlyContinue
+                
+                # If .git is a file containing "gitdir:", we're in a submodule
+                if ($gitContent -and $gitContent[0] -match "^gitdir:") {
+                    Write-Host "Detected Git submodule at: $searchPath"
+                    $foundSubmodule = $true
+                    
+                    # Search up the directory tree for the parent repository
+                    $parentPath = Split-Path $searchPath -Parent
+                    while ($parentPath -and (Split-Path $parentPath -Parent)) {
+                        $parentGitPath = Join-Path $parentPath ".git"
+                        
+                        # Look for a .git directory (not file) which indicates the main repository
+                        if ((Test-Path $parentGitPath) -and (Get-Item $parentGitPath).PSIsContainer) {
+                            $parentRepoPath = $parentPath
+                            Write-Host "Found parent Git repository at: $parentRepoPath"
+                            break
+                        }
+                        $parentPath = Split-Path $parentPath -Parent
+                    }
+                } else {
+                    # .git is a directory, we're in the main repository
+                    $parentRepoPath = $searchPath
+                    Write-Host "Found main Git repository in current directory: $parentRepoPath"
+                }
             } else {
-                Write-Host "No changes detected in file: $relativePath (file content is the same as in repository)"
-                return $true
+                # No .git found, search up the directory tree
+                while ($searchPath -and (Split-Path $searchPath -Parent)) {
+                    $parentPath = Split-Path $searchPath -Parent
+                    $parentGitPath = Join-Path $parentPath ".git"
+                    
+                    if (Test-Path $parentGitPath) {
+                        # Check if it's a directory (main repo) or file (submodule)
+                        if ((Get-Item $parentGitPath).PSIsContainer) {
+                            $parentRepoPath = $parentPath
+                            Write-Host "Found parent Git repository at: $parentRepoPath"
+                            break
+                        }
+                    }
+                    $searchPath = $parentPath
+                }
+            }
+            
+            if (-not $parentRepoPath) {
+                Write-Warning "Could not find parent Git repository. File will be saved locally only."
+                return $false
             }
         }
         
-        if ($hasChanges) {
-            Write-Host "Adding file to Git: $relativePath"
-            git add $FilePath
+        # Set working directory to parent repo if found, otherwise use current
+        $workingPath = if ($parentRepoPath) { $parentRepoPath } else { $currentLocation.Path }
+        Push-Location $workingPath
+        
+        try {
+            Write-Host "Working in Git repository at: $workingPath"
             
-            if ($LASTEXITCODE -eq 0) {
-                # Check if there's actually something to commit after staging
-                $gitDiffCached = git diff --cached --name-only
-                if (-not $gitDiffCached) {
-                    Write-Host "No changes to commit after staging (file content unchanged)"
+            # Check if we're in a Git repository
+            git status --porcelain 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Not in a Git repository or Git is not available. File saved locally only."
+                return $false
+            }
+            
+            # Detect Git repository type
+            $gitRemoteUrl = git remote get-url origin 2>&1
+            $isAzureDevOps = $false
+            $isGitHub = $false
+            
+            if ($gitRemoteUrl -match "dev.azure.com|visualstudio.com") {
+                $isAzureDevOps = $true
+                Write-Host "Detected Azure DevOps repository"
+            } elseif ($gitRemoteUrl -match "github.com") {
+                $isGitHub = $true
+                Write-Host "Detected GitHub repository"
+            } else {
+                Write-Host "Detected Git repository (type unknown): $gitRemoteUrl"
+            }
+            
+            # Get relative path for Git operations from the parent repository root
+            $relativePath = if (Test-Path $FilePath) {
+                $resolvedPath = Resolve-Path $FilePath
+                $relativeToParent = $resolvedPath.Path.Replace($workingPath, "").TrimStart('\', '/')
+                $relativeToParent = $relativeToParent.Replace('\', '/')
+                
+                # If we're working from a submodule, include the submodule path in the relative path
+                if ($workingPath -ne $currentLocation.Path) {
+                    Write-Host "File relative to parent repository root: $relativeToParent"
+                } else {
+                    Write-Host "File relative to repository root: $relativeToParent"
+                }
+                $relativeToParent
+            } else {
+                Write-Warning "File does not exist: $FilePath"
+                return $false
+            }
+            
+            # Check if file has changes or is new
+            $gitStatusOutput = git status --porcelain $relativePath 2>&1
+            $hasChanges = $gitStatusOutput -and ($gitStatusOutput.Length -gt 0)
+            
+            # If no changes, check if file exists in Git history
+            if (-not $hasChanges) {
+                $gitLsFiles = git ls-files $relativePath 2>&1
+                if (-not $gitLsFiles -or $LASTEXITCODE -ne 0) {
+                    # File is not tracked, so it's new
+                    $hasChanges = $true
+                    Write-Host "File is new and will be added to Git"
+                } else {
+                    Write-Host "No changes detected in file: $relativePath (file content is the same as in repository)"
                     return $true
                 }
-                
-                Write-Host "Committing changes with message: $CommitMessage"
-                git commit -m $CommitMessage
+            }
+            
+            if ($hasChanges) {
+                Write-Host "Adding file to Git: $relativePath"
+                git add $relativePath
                 
                 if ($LASTEXITCODE -eq 0) {
-                    Write-Host "Pushing changes to remote repository..."
+                    # Check if there's actually something to commit after staging
+                    $gitDiffCached = git diff --cached --name-only
+                    if (-not $gitDiffCached) {
+                        Write-Host "No changes to commit after staging (file content unchanged)"
+                        return $true
+                    }
                     
-                    # Get current branch
-                    $currentBranch = git branch --show-current
-                    Write-Host "Current branch: $currentBranch"
-                    
-                    # Try to push with error handling
-                    git push origin $currentBranch 2>&1
+                    Write-Host "Committing changes with message: $CommitMessage"
+                    git commit -m $CommitMessage
                     
                     if ($LASTEXITCODE -eq 0) {
-                        Write-Host "Successfully pushed changes to Git repository"
-                        if ($isAzureDevOps) {
-                            Write-Host "File available in Azure DevOps at: $gitRemoteUrl"
-                        } elseif ($isGitHub) {
-                            Write-Host "File available in GitHub at: $gitRemoteUrl"
+                        Write-Host "Pushing changes to remote repository..."
+                        
+                        # Get current branch
+                        $currentBranch = git branch --show-current
+                        Write-Host "Current branch: $currentBranch"
+                        
+                        # Try to push with error handling
+                        git push origin $currentBranch 2>&1
+                        
+                        if ($LASTEXITCODE -eq 0) {
+                            Write-Host "Successfully pushed changes to Git repository"
+                            if ($isAzureDevOps) {
+                                Write-Host "File available in Azure DevOps at: $gitRemoteUrl"
+                            } elseif ($isGitHub) {
+                                Write-Host "File available in GitHub at: $gitRemoteUrl"
+                            }
+                            Write-Host "File committed to repository at: $relativePath"
+                            return $true
+                        } else {
+                            Write-Warning "Failed to push changes to remote repository. This might be due to:"
+                            Write-Host "- Repository requiring pull requests for changes" -ForegroundColor Yellow
+                            Write-Host "- Insufficient push permissions" -ForegroundColor Yellow
+                            Write-Host "- Branch protection rules" -ForegroundColor Yellow
+                            Write-Host "Changes have been committed locally. You may need to create a pull request." -ForegroundColor Cyan
+                            return $false
                         }
-                        return $true
                     } else {
-                        Write-Warning "Failed to push changes to remote repository. This might be due to:"
-                        Write-Host "- Repository requiring pull requests for changes" -ForegroundColor Yellow
-                        Write-Host "- Insufficient push permissions" -ForegroundColor Yellow
-                        Write-Host "- Branch protection rules" -ForegroundColor Yellow
-                        Write-Host "Changes have been committed locally. You may need to create a pull request." -ForegroundColor Cyan
+                        Write-Warning "Failed to commit changes. This might be due to:"
+                        Write-Host "- Git configuration issues (user.name/user.email)" -ForegroundColor Yellow
+                        Write-Host "- Pre-commit hooks failing" -ForegroundColor Yellow
                         return $false
                     }
                 } else {
-                    Write-Warning "Failed to commit changes. This might be due to:"
-                    Write-Host "- Git configuration issues (user.name/user.email)" -ForegroundColor Yellow
-                    Write-Host "- Pre-commit hooks failing" -ForegroundColor Yellow
+                    Write-Warning "Failed to add file to Git. Check file permissions and Git status."
                     return $false
                 }
             } else {
-                Write-Warning "Failed to add file to Git. Check file permissions and Git status."
-                return $false
+                Write-Host "No changes detected in file: $relativePath"
+                return $true
             }
-        } else {
-            Write-Host "No changes detected in file: $relativePath"
-            return $true
+        }
+        finally {
+            Pop-Location
         }
     }
     catch {
@@ -479,9 +568,23 @@ if ($saveFileInADOGitRepo -eq $true) {
         
         # First, ensure we have the latest changes from remote
         Write-Host "Pulling latest changes from remote repository..."
-        git pull origin HEAD --no-rebase 2>&1 | Out-Host
         
-        $gitSaveResult = Save-FileToGitRepository -FilePath $outputPath -CommitMessage $commitMessage
+        # Use parent repo path if specified
+        if ($parentGitRepoPath -and (Test-Path $parentGitRepoPath)) {
+            Write-Host "Using specified parent Git repository path: $parentGitRepoPath"
+            Push-Location $parentGitRepoPath
+            git pull origin HEAD --no-rebase 2>&1 | Out-Host
+            Pop-Location
+        } else {
+            git pull origin HEAD --no-rebase 2>&1 | Out-Host
+        }
+        
+        # Pass parent repo path to the function if specified
+        if ($parentGitRepoPath -and (Test-Path $parentGitRepoPath)) {
+            $gitSaveResult = Save-FileToGitRepository -FilePath $outputPath -CommitMessage $commitMessage -ParentRepoPath $parentGitRepoPath
+        } else {
+            $gitSaveResult = Save-FileToGitRepository -FilePath $outputPath -CommitMessage $commitMessage
+        }
         
         if ($gitSaveResult) {
             Write-Host "SUCCESS: File successfully saved to Git repository and can be verified in your repo" -ForegroundColor Green
@@ -503,4 +606,11 @@ if ($saveFileInADOGitRepo -eq $true) {
 } else {
     Write-Host "saveFileInADOGitRepo is disabled. File saved locally only at: $outputPath"
     Write-Host "To enable Git repository save, set parameter -saveFileInADOGitRepo `$true"
+    Write-Host ""
+    Write-Host "Usage examples:" -ForegroundColor Cyan
+    Write-Host "  # Auto-detect parent repository (recommended for submodules):" -ForegroundColor Gray
+    Write-Host "  .\genDynamicNetworkParamFile.ps1 [your parameters] -saveFileInADOGitRepo `$true" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  # Specify parent repository path explicitly:" -ForegroundColor Gray
+    Write-Host "  .\genDynamicNetworkParamFile.ps1 [your parameters] -saveFileInADOGitRepo `$true -parentGitRepoPath 'C:\path\to\parent\repo'" -ForegroundColor Gray
 }
