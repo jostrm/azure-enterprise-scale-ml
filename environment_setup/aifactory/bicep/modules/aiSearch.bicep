@@ -70,7 +70,7 @@ resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview'
   sku: {
     name: 'standard2' // Neends to be standard2 or higher (You may not have quota for this. You need to apply if so)
   }
-  identity: formattedUserAssignedIdentities
+  identity: identity
   properties: {
     authOptions: {
       aadOrApiKey: {
@@ -102,9 +102,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(!ena
   sku: {
     name: skuName
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: identity
   properties: {
     authOptions: {
       aadOrApiKey: {
