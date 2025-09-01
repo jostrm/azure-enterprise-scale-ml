@@ -82,7 +82,7 @@ function Save-FileToGitRepository {
         Write-Host "Current location: $currentLocation"
         
         # Check if we're in a Git repository
-        $gitStatus = git status 2>&1
+        $gitStatus = git status --porcelain 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Not in a Git repository or Git is not available. File saved locally only."
             return $false
@@ -103,33 +103,55 @@ function Save-FileToGitRepository {
             Write-Host "Detected Git repository (type unknown): $gitRemoteUrl"
         }
         
-        # Check if file has changes
-        $gitDiff = git diff --name-only
-        $relativePath = Resolve-Path -Path $FilePath -Relative
-        $hasChanges = $gitDiff -contains $relativePath.TrimStart('./')
-        
-        if (-not $hasChanges) {
-            # Check if file is untracked
-            $untrackedFiles = git ls-files --others --exclude-standard
-            $hasChanges = $untrackedFiles -contains $relativePath.TrimStart('./')
+        # Get relative path for Git operations
+        $relativePath = if (Test-Path $FilePath) {
+            (Resolve-Path -Path $FilePath -Relative).TrimStart('./')
+        } else {
+            Write-Warning "File does not exist: $FilePath"
+            return $false
         }
         
-        if ($hasChanges -or (Test-Path $FilePath)) {
+        # Check if file has changes or is new
+        $gitStatusOutput = git status --porcelain $FilePath 2>&1
+        $hasChanges = $gitStatusOutput -and ($gitStatusOutput.Length -gt 0)
+        
+        # If no changes, check if file exists in Git history
+        if (-not $hasChanges) {
+            $gitLsFiles = git ls-files $FilePath 2>&1
+            if (-not $gitLsFiles -or $LASTEXITCODE -ne 0) {
+                # File is not tracked, so it's new
+                $hasChanges = $true
+                Write-Host "File is new and will be added to Git"
+            } else {
+                Write-Host "No changes detected in file: $relativePath (file content is the same as in repository)"
+                return $true
+            }
+        }
+        
+        if ($hasChanges) {
             Write-Host "Adding file to Git: $relativePath"
             git add $FilePath
             
             if ($LASTEXITCODE -eq 0) {
+                # Check if there's actually something to commit after staging
+                $gitDiffCached = git diff --cached --name-only
+                if (-not $gitDiffCached) {
+                    Write-Host "No changes to commit after staging (file content unchanged)"
+                    return $true
+                }
+                
                 Write-Host "Committing changes with message: $CommitMessage"
                 git commit -m $CommitMessage
                 
                 if ($LASTEXITCODE -eq 0) {
                     Write-Host "Pushing changes to remote repository..."
                     
-                    # For Azure DevOps, we might need to specify the branch
+                    # Get current branch
                     $currentBranch = git branch --show-current
                     Write-Host "Current branch: $currentBranch"
                     
-                    git push origin $currentBranch
+                    # Try to push with error handling
+                    git push origin $currentBranch 2>&1
                     
                     if ($LASTEXITCODE -eq 0) {
                         Write-Host "Successfully pushed changes to Git repository"
@@ -140,15 +162,21 @@ function Save-FileToGitRepository {
                         }
                         return $true
                     } else {
-                        Write-Warning "Failed to push changes to remote repository"
+                        Write-Warning "Failed to push changes to remote repository. This might be due to:"
+                        Write-Host "- Repository requiring pull requests for changes" -ForegroundColor Yellow
+                        Write-Host "- Insufficient push permissions" -ForegroundColor Yellow
+                        Write-Host "- Branch protection rules" -ForegroundColor Yellow
+                        Write-Host "Changes have been committed locally. You may need to create a pull request." -ForegroundColor Cyan
                         return $false
                     }
                 } else {
-                    Write-Warning "Failed to commit changes"
+                    Write-Warning "Failed to commit changes. This might be due to:"
+                    Write-Host "- Git configuration issues (user.name/user.email)" -ForegroundColor Yellow
+                    Write-Host "- Pre-commit hooks failing" -ForegroundColor Yellow
                     return $false
                 }
             } else {
-                Write-Warning "Failed to add file to Git"
+                Write-Warning "Failed to add file to Git. Check file permissions and Git status."
                 return $false
             }
         } else {
@@ -158,6 +186,7 @@ function Save-FileToGitRepository {
     }
     catch {
         Write-Error "Error during Git operations: $($_.Exception.Message)"
+        Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
         return $false
     }
 }
@@ -445,14 +474,31 @@ write-host "Template written to $outputPath"
 if ($saveFileInADOGitRepo -eq $true) {
     Write-Host "saveFileInADOGitRepo is enabled. Attempting to save file to Git repository..."
     
-    $commitMessage = "Update dynamicNetworkParams.json for project $projectNumber environment $env ($(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
-    $gitSaveResult = Save-FileToGitRepository -FilePath $outputPath -CommitMessage $commitMessage
-    
-    if ($gitSaveResult) {
-        Write-Host "SUCCESS: File successfully saved to Git repository and can be verified in your repo"
-    } else {
-        Write-Warning "PARTIAL SUCCESS: File created locally at $outputPath but could not be saved to Git repository"
-        Write-Host "You can manually verify the file content and commit it to your repository"
+    try {
+        $commitMessage = "Update dynamicNetworkParams.json for project $projectNumber environment $env ($(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))"
+        
+        # First, ensure we have the latest changes from remote
+        Write-Host "Pulling latest changes from remote repository..."
+        git pull origin HEAD --no-rebase 2>&1 | Out-Host
+        
+        $gitSaveResult = Save-FileToGitRepository -FilePath $outputPath -CommitMessage $commitMessage
+        
+        if ($gitSaveResult) {
+            Write-Host "SUCCESS: File successfully saved to Git repository and can be verified in your repo" -ForegroundColor Green
+        } else {
+            Write-Warning "PARTIAL SUCCESS: File created locally at $outputPath but could not be saved to Git repository"
+            Write-Host "You can manually verify the file content and commit it to your repository"
+            Write-Host "Common reasons for Git save failures:" -ForegroundColor Yellow
+            Write-Host "- No changes to commit (file already exists with same content)" -ForegroundColor Yellow
+            Write-Host "- Insufficient permissions to push to repository" -ForegroundColor Yellow
+            Write-Host "- Repository requires pull request workflow" -ForegroundColor Yellow
+        }
+    }
+    catch {
+        Write-Warning "Git repository save encountered an error, but this will not fail the task."
+        Write-Host "Error details: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "File has been successfully created locally at: $outputPath" -ForegroundColor Green
+        Write-Host "You can manually commit and push this file to your repository later." -ForegroundColor Cyan
     }
 } else {
     Write-Host "saveFileInADOGitRepo is disabled. File saved locally only at: $outputPath"
