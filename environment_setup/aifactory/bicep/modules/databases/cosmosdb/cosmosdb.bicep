@@ -18,6 +18,7 @@ param kind string
 param vnetName string
 param subnetNamePend string
 param vnetResourceGroupName string
+param logAnalyticsWorkspaceResourceId string
 // Container & database names
 @minValue(4000)
 @maxValue(1000000)
@@ -30,6 +31,10 @@ param connectionStringKey string = 'aifactory-proj-cosmosdb-con-string'
 param keyvaultName string
 @description('Default TTL in seconds. Set to -1 to disable or positive integer for automatic document expiration')
 param defaultTtl int = -1
+
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -50,6 +55,21 @@ var rules = [for rule in vNetRules: {
   ignoreMissingVNetServiceEndpoint: true
 }]
 
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : null)
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : null
+
 // v2 (no capacityMode): @2024-11-15
 // serverless: resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
 // serverless: 2025-05-01-preview, 2024-12-01-preview
@@ -57,6 +77,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
   name: name
   kind: kind
   location: location
+  identity: identity
   tags: tags
   properties: {
     consistencyPolicy: { defaultConsistencyLevel: 'Session' }
@@ -70,6 +91,9 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
     createMode: 'Default'
     minimalTlsVersion: minimalTlsVersion
     databaseAccountOfferType: 'Standard'
+    diagnosticLogSettings: {
+      enableFullTextQuery: 'None'
+    }
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
     apiProperties: (kind == 'MongoDB') ? { serverVersion: '4.2' } : {}

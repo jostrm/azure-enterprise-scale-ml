@@ -359,7 +359,7 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
 // AIFactory-Hybrid mode: AI Foundry agents will use the injected network. Public access still works through network ACLs.
 // For DEMO purpose, at least best of both worlds: agent private network injection + public user access with restrictions (IP whitelisting)
 //
-resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
+resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: name
   kind: kind
   identity: identity
@@ -418,7 +418,7 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-04-01-previ
 }
 
 @batchSize(1)
-resource cognitiveService_deployments 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = [
+resource cognitiveService_deployments 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = [
   for (deployment, index) in (deployments ?? []): {
     parent: cognitiveService
     name: deployment.?name ?? '${name}-deployments'

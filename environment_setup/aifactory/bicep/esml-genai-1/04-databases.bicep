@@ -196,6 +196,7 @@ var redisName = namingConvention.outputs.redisName
 var sqlServerName = namingConvention.outputs.sqlServerName
 var sqlDBName = namingConvention.outputs.sqlDBName
 var keyvaultName = namingConvention.outputs.keyvaultName
+var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 
 // Not used - do dependency
 //var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
@@ -280,6 +281,11 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '04-CosmosDB4${deploymentProjSpecificUniqueSuffix}'
   params: {
+    logAnalyticsWorkspaceResourceId: laWorkspaceName
+    managedIdentities: {
+      systemAssigned: true
+      userAssignedResourceIds: !empty(miPrjName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : []
+    }
     name: cosmosDBName
     location: location
     // Removed provisionedThroughput - using defaults from module

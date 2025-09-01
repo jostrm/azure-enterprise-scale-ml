@@ -15,6 +15,7 @@ targetScope = 'subscription'
 @allowed(['dev', 'test', 'prod'])
 param env string
 
+param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = true
 @description('Project number (e.g., "005")')
 param projectNumber string
 
@@ -341,7 +342,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
   name: '09-AifV2_${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: aifV2Name
-    defaultProjectName: '${aifV2ProjectName}-d'
+    defaultProjectName: enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d2'
     allowProjectManagement: true
     location:location
     // Provided subnet must be of the proper address space. Please provide a subnet which has address space in the range of 172 or 192
@@ -379,7 +380,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
 }
 
 // Add the new FDP cognitive services module
-module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFoundryV2) {
+module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFoundryV2 && enableAIFactoryCreatedDefaultProjectForAIFv2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-AifV2_Prj_${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -492,7 +493,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : (!empty(networkAclsObject) ? 'Enabled' : 'Disabled')
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: disableAgentNetworkInjection
-    defaultProjectName: aifV2ProjectName
+    defaultProjectName:enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d21'
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     networkAcls: networkAclsObject
     managedIdentities: {
@@ -537,6 +538,26 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
   ]
 }
+
+// Add the new FDP cognitive services module
+module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '09-AifV21_Prj_${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: aifV2ProjectName
+    location: location
+    storageName: namingConvention.outputs.storageAccount1001Name
+    #disable-next-line BCP318
+    aiFoundryV2Name: aiFoundry2025NoAvm.outputs.name
+    aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
+    cosmosDBname: serviceSettingDeployCosmosDB? namingConvention.outputs.cosmosDBName : ''
+    }
+    dependsOn: [
+      existingTargetRG
+      aiFoundry2025NoAvm
+    ]
+}
+
 
 // Sets RBAC roles: Search Service Contributor, Search Index Data Reader,Search Index Data Contributor on AI Search, for aiFoundry2025NoAvm.systemAssignedMIPrincipalId
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
