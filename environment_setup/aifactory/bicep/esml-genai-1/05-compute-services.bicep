@@ -414,7 +414,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   scope:commonResourceGroupRef
 }
 
-resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }

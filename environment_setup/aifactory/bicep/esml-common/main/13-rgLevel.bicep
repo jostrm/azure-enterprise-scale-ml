@@ -653,7 +653,7 @@ module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if
   ]
 }
 // Note: az keyvault update  --name msft-weu-dev-cmnai-kv --enabled-for-template-deployment true
-resource externalKv 'Microsoft.KeyVault/vaults@2019-09-01' existing = if(!deployOnlyAIGatewayNetworking){
+resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = if(!deployOnlyAIGatewayNetworking){
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription,inputKeyvaultResourcegroup)
 }

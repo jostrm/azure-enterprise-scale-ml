@@ -24,7 +24,7 @@ param principalType string = 'ServicePrincipal'
 param roleDescription string = ''
 
 // Reference the existing Key Vault
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyVaultName
 }
 

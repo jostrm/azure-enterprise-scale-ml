@@ -249,13 +249,13 @@ var kindContentSafety = 'ContentSafety'
 var kindAIServices = 'AIServices'
 var kindAOpenAI = 'OpenAI'
 
-resource projectResourceGroupExists 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource projectResourceGroupExists 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }
 
 // Keyvault existing reference
-resource existingKeyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = if (keyvaultExists) {
+resource existingKeyvault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (keyvaultExists) {
   name: keyvaultName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }

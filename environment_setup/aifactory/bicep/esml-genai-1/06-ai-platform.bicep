@@ -295,7 +295,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetNameFull
 }
 
-resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
 }
@@ -361,7 +361,7 @@ var aml_cluster_test_prod_sku_param = !empty(aml_cluster_test_prod_sku_override)
 var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
 var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 
-resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }

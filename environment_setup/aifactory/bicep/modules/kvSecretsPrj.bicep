@@ -39,13 +39,13 @@ param spOIDValue string //= 'Added from ADO variable, or manually'
 
 var esml_project_dbx_token_key = 'esml-project-dbx-token'
 
-resource prjKeyvault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource prjKeyvault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
   scope: resourceGroup(keyvaultNameRG)
 }
 
 // SP APP ID - from ADO Variable
-resource kvSecretDatabricksToken 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
+resource kvSecretDatabricksToken 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   name: '${keyvaultName}/${esml_project_dbx_token_key}'
   properties: {
     value:'TODO Databricks token'
@@ -61,7 +61,7 @@ resource kvSecretDatabricksToken 'Microsoft.KeyVault/vaults/secrets@2019-09-01' 
 }
 
 // SP APP ID - from ADO Variable
-resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
+resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   name: '${keyvaultName}/${spIDKey}'
   properties: {
     value:spAppIDValue
@@ -77,7 +77,7 @@ resource kvSecretspID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
 }
 
 // SP SECRET
-resource kvSecretspIDValue 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
+resource kvSecretspIDValue 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   name: '${keyvaultName}/${spSecret}'
   properties: {
     value:spSecretValue
@@ -93,7 +93,7 @@ resource kvSecretspIDValue 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
 }
 
 // SP OBJECT ID - from ADO Variable
-resource kvSecretspOID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
+resource kvSecretspOID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   name: '${keyvaultName}/${spOIDKey}'
   properties: {
     value:spOIDValue
@@ -109,7 +109,7 @@ resource kvSecretspOID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
 }
 
 // tenant id
-resource kvSecretTenatID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
+resource kvSecretTenatID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   name: '${keyvaultName}/${esmlTenantID}'
   properties: {
     value:esmlTenantIDSecret
@@ -125,7 +125,7 @@ resource kvSecretTenatID 'Microsoft.KeyVault/vaults/secrets@2019-09-01' = {
 }
 
 // subscription id
-resource kvSecretSubscriptionID 'Microsoft.KeyVault/vaults/secrets@2021-10-01' = {
+resource kvSecretSubscriptionID 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   name: '${keyvaultName}/${esmlSubscriptionID}'
   properties: {
     value:esmlSubscriptionIDSecret

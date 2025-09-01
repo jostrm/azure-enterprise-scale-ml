@@ -55,7 +55,7 @@ var rules = [for rule in keyvaultNetworkPolicySubnets: {
   ignoreMissingVnetServiceEndpoint: true
 }]
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
   name: keyvaultName
   tags: tags
   location: location

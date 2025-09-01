@@ -12,7 +12,7 @@ resource readerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-0
   name: readerRoleDefinitionId
 }
 
-resource commonKvReader 'Microsoft.KeyVault/vaults@2019-09-01' existing = {
+resource commonKvReader 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: common_kv_name
 }
 resource readerUserCommonKv 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{

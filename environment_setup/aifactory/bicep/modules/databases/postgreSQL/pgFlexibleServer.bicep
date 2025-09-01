@@ -188,11 +188,11 @@ resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if
   }
 }
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
 }
 
-resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   parent: keyVault
   name: connectionStringKey
   properties: {

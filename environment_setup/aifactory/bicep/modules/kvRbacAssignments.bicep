@@ -32,7 +32,7 @@ param keyVaultSecretsUserRoleId string = '4633458b-17de-408a-b874-0445c86b69e6'
 param keyVaultContributorRoleId string = 'f25e0fa2-a7c8-4377-a976-54943a77a395'
 
 // Reference the existing Key Vault
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyVaultName
 }
 

@@ -142,7 +142,7 @@ var identity = identityType != 'None' ? {
   userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : null
 } : null
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
 }
 
@@ -183,7 +183,7 @@ resource redisCache 'Microsoft.Cache/redis@2024-11-01' = {
 }
 
 @description('Key Vault: REDIS')
-resource redisConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource redisConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   parent: keyVault
   name: connectionStringKey
   properties: {

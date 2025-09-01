@@ -84,7 +84,7 @@ var privateDnsZones = [
 
 var nameFormatted = take(toLower(name), 24)
 
-module cognitiveService 'br/public:avm/res/cognitive-services/account:0.11.0' = {
+module cognitiveService 'br/public:avm/res/cognitive-services/account:0.13.2' = {
   name: take('cog-${kind}-${name}-deployment', 64)
   params: {
     name: nameFormatted

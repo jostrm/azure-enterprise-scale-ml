@@ -2,7 +2,7 @@ param aiHubName string
 param aiHubRgName string
 param acrName string
 
-resource acr 'Microsoft.ContainerRegistry/registries@2023-08-01-preview' existing = {
+resource acr 'Microsoft.ContainerRegistry/registries@2025-04-01' existing = {
   name: acrName
 }
 

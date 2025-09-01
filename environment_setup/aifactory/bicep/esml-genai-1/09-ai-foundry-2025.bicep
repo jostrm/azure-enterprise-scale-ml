@@ -223,7 +223,7 @@ module getAcaMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 
 var var_miAca_PrincipalId = getAcaMIPrincipalId.outputs.principalId
 
-resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
 }
@@ -260,7 +260,7 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
-resource existingTargetRG 'Microsoft.Resources/resourceGroups@2021-04-01' existing = {
+resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
 }

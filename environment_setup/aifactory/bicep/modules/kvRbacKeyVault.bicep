@@ -49,7 +49,7 @@ var rules = [for rule in keyvaultNetworkPolicySubnets: {
   ignoreMissingVnetServiceEndpoint: true
 }]
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
   name: keyvaultName
   tags: tags
   location: location
@@ -79,7 +79,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
 }
 
 // Create secrets in the Key Vault
-resource keyVaultSecrets 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = [for secret in secrets: {
+resource keyVaultSecrets 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [for secret in secrets: {
   name: secret.name
   parent: keyVault
   properties: {

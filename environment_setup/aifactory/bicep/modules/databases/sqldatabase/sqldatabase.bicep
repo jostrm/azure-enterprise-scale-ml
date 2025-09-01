@@ -117,11 +117,11 @@ resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
   }
 }
 
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
 }
 
-resource sqlAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource sqlAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   parent: keyVault
   name: 'sqlAdminPassword'
   properties: {
@@ -133,7 +133,7 @@ resource sqlAdminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' =
   }
 }
 
-resource appUserPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource appUserPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   parent: keyVault
   name: 'appUserPassword'
   properties: {
@@ -145,7 +145,7 @@ resource appUserPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = 
   }
 }
 
-resource sqlAzureConnectionStringSercret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource sqlAzureConnectionStringSercret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   parent: keyVault
   name: connectionStringKey
   properties: {

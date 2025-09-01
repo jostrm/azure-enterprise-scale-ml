@@ -292,7 +292,7 @@ var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_a
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID of existing AML, AIHub. Needs static name in existing
 // ============================================================================
-resource externalKv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
 }

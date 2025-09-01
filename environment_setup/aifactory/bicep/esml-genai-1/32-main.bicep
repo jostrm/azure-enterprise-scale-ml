@@ -1856,7 +1856,7 @@ module acr '../modules/containerRegistry.bicep' = if (!resourceExists.acrProject
     projectResourceGroup
   ]
 }
-resource acrCommon 'Microsoft.ContainerRegistry/registries@2021-09-01' existing = if (useCommonACR == true) {
+resource acrCommon 'Microsoft.ContainerRegistry/registries@2025-04-01' existing = if (useCommonACR == true) {
   name: acrCommonName
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
@@ -3070,17 +3070,6 @@ module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!resourceExists.aml && e
     amlv2
     //...(!resourceExists.aml && enableAML? [amlv2] : [])
   ]
-}
-
-module aiFoundry '../modules/csFoundry/csAIFoundryBasic.bicep' = if(!resourceExists.aif && serviceSettingEnableAIFoundryPreview) {
-  scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
-  name: 'AIFoundryPrevview4${deploymentProjSpecificUniqueSuffix}'
-  params: {
-    name: aifName
-    projectName: aifPrjName
-    enablePublicAccessWithPerimeter:true
-    //location: location
-  }
 }
 
 var aiHubNameShort ='ai-hub-${projectName}-${locationSuffix}-${env}${resourceSuffix}'
