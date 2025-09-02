@@ -15,7 +15,7 @@ targetScope = 'subscription'
 @allowed(['dev', 'test', 'prod'])
 param env string
 
-param updateAIFoundryV2 bool = false
+param updateAIFoundryV21 bool = false
 param containerAppsEnvExists bool = false
 param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = true
 @description('Project number (e.g., "005")')
@@ -457,7 +457,7 @@ module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearc
 var aiSearchPrincipalId = enableAISearch ? getAISearchInfo!.outputs.principalId : ''
 
 // Create role assignments module to build the dynamic array
-module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV2)) {
+module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   name: '09-roleBuilder-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -505,7 +505,7 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!container
 
 // AI V2.1 - Cognitive Services Module (Alternative Implementation)
 //var pendNameShort = take(replace(aifV2Name, '-', ''),12)
-module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV2)) {
+module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -567,7 +567,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
 }
 
 // Add the new FDP cognitive services module
-module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists || updateAIFoundryV2)) {
+module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-AifV21_Prj_${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -590,7 +590,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
-module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if((enableAISearch && enableAIFoundryV21) && (!aiFoundryV2Exists || updateAIFoundryV2)) {
+module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if((enableAISearch && enableAIFoundryV21) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -613,7 +613,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
 // Sets RBAC roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor on Azure Storage accounts, for aiFoundry2025NoAvm.systemAssignedMIPrincipalId
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
-module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV2)) {
+module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-rbacStorage-${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -633,7 +633,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 }
 
 // CRITICAL: Add Key Vault RBAC for Agent playground functionality
-module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV2)) {
+module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -652,7 +652,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
 }
 
 // ADDITIONAL: Assign specific Key Vault roles to AI Foundry MI for project Key Vault 
-module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV2)) {
+module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}'
   params: {
