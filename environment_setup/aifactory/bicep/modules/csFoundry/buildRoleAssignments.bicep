@@ -56,6 +56,9 @@ param keyVaultSecretsUserRoleId string = '4633458b-17de-408a-b874-0445c86b69e6'
 @description('Key Vault Contributor role ID - Required for managing Agent secrets')
 param keyVaultContributorRoleId string = 'f25e0fa2-a7c8-4377-a976-54943a77a395'
 
+@description('Storage Blob Data Reader role ID - Required for AI Search to access storage')
+param storageBlobDataReaderRoleId string = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+
 @description('Whether to use AD Groups')
 param useAdGroups bool
 
@@ -105,7 +108,22 @@ var spOpenAIRoleAssignments = [
 var aiSearchRoleAssignments = enableAISearch && !empty(aiSearchPrincipalId) ? [
   {
     principalId: aiSearchPrincipalId // AI Search service principal ID
-    roleDefinitionIdOrName: cognitiveServicesContributorRoleId // Cognitive Services OpenAI Contributor
+    roleDefinitionIdOrName: cognitiveServicesContributorRoleId // Cognitive Services Contributor (original)
+    principalType: 'ServicePrincipal'
+  }
+  {
+    principalId: aiSearchPrincipalId // AI Search service principal ID
+    roleDefinitionIdOrName: openAIContributorRoleId // Cognitive Services OpenAI Contributor
+    principalType: 'ServicePrincipal'
+  }
+  {
+    principalId: aiSearchPrincipalId // AI Search service principal ID
+    roleDefinitionIdOrName: openAIUserRoleId // Cognitive Services OpenAI User (additional role for full functionality)
+    principalType: 'ServicePrincipal'
+  }
+  {
+    principalId: aiSearchPrincipalId // AI Search service principal ID
+    roleDefinitionIdOrName: storageBlobDataReaderRoleId // Storage Blob Data Reader (required for storage access)
     principalType: 'ServicePrincipal'
   }
 ] : []

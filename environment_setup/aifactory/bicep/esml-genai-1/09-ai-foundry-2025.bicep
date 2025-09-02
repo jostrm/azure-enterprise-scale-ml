@@ -469,6 +469,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
     azureAIDeveloperRoleId: azureAIDeveloperRoleId // Add Azure AI Developer role
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId // Add Key Vault roles
     keyVaultContributorRoleId: keyVaultContributorRoleId
+    storageBlobDataReaderRoleId: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1' // Storage Blob Data Reader for AI Search
     useAdGroups: useAdGroups
     enableAISearch: enableAISearch
     aiSearchPrincipalId: aiSearchPrincipalId
