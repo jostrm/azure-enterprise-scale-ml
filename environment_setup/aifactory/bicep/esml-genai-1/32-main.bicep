@@ -2197,6 +2197,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!resourceExi
   params: {
     name: cosmosDBName
     location: location
+    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceOpInsight.id
     enablePublicGenAIAccess:enablePublicGenAIAccess
     ipRules:(empty(ipWhitelist_array) || !enablePublicGenAIAccess || enablePublicAccessWithPerimeter)? []:ipWhitelist_array
     totalThroughputLimit:cosmosTotalThroughputLimit
