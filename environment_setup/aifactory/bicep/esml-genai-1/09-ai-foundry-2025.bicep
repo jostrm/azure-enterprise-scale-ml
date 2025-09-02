@@ -15,7 +15,7 @@ targetScope = 'subscription'
 @allowed(['dev', 'test', 'prod'])
 param env string
 
-param serviceSettingDeployContainerApps bool = false
+param containerAppsEnvExists bool = false
 param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = true
 @description('Project number (e.g., "005")')
 param projectNumber string
@@ -481,7 +481,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
 
 // Subnet delegation for Container Apps
 var acaSubnetName = namingConvention.outputs.acaSubnetName
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!serviceSettingDeployContainerApps) && (enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection)) {
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists) && (enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection)) {
   name: '09-snetDelegACA${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -560,7 +560,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     roleAssignmentsBuilder
     spAndMI2ArrayModule
     namingConvention
-    // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
+    ...(!disableAgentNetworkInjection && !containerAppsEnvExists ? [subnetDelegationAca] : [])
   ]
 }
 
