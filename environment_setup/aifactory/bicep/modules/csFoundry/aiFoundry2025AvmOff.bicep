@@ -65,6 +65,12 @@ param name string
 ])
 param kind string
 
+// AI Factory private endpoint information
+param privateLinksDnsZones object = {}
+param privateEndpointSubnetRID string =''
+param createPrivateEndpointsAIFactoryWay bool = true
+param centralDnsZoneByPolicyInHub bool = false
+
 @description('Optional. SKU of the Cognitive Services account. Use \'Get-AzCognitiveServicesAccountSku\' to determine a valid combinations of \'kind\' and \'SKU\' for your Azure region.')
 @allowed([
   'C2'
@@ -478,6 +484,58 @@ resource cognitiveService_diagnosticSettings 'Microsoft.Insights/diagnosticSetti
   }
 ]
 
+
+resource pendCogServiceAIF 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpointsAIFactoryWay) {
+  name: '${cognitiveService.name}-pend' //'${privateEndpointName}-2'
+  location: location
+  tags: tags
+  properties: {
+    customNetworkInterfaceName: '${cognitiveService.name}-pend-nic'
+    privateLinkServiceConnections: [
+      {
+        name: '${cognitiveService.name}-pend'
+        properties: {
+          groupIds: [
+            'account'
+          ]
+          privateLinkServiceId: cognitiveService.id
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+    subnet: {
+      id: privateEndpointSubnetRID
+    }
+  }
+}
+
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay) {
+  name: '${pendCogServiceAIF.name}DnsZone'
+  parent: pendCogServiceAIF
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateLinksDnsZones.openai.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.openai.id //openai
+        }
+      }
+      {
+        name: privateLinksDnsZones.cognitiveservices.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.cognitiveservices.id//cognitiveservices
+        }
+      }
+    ]
+  }
+}
+/* NOTE: AIFactory way works instead of below, e.g. below cannot handle more than 1 config
+ - AVM can only hand privateEndpointSingleServiceType. import { privateEndpointSingleServiceType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+
 module cognitiveService_privateEndpoints 'br/public:avm/res/network/private-endpoint:0.11.0' = [
   for (privateEndpoint, index) in (privateEndpoints ?? []): {
     name: take('${uniqueString(deployment().name, location)}-cognitiveService-PrivateEndpoint-${index}', 64)
@@ -528,6 +586,8 @@ module cognitiveService_privateEndpoints 'br/public:avm/res/network/private-endp
     }
   }
 ]
+
+*/
 
 resource cognitiveService_roleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
   for (roleAssignment, index) in (formattedRoleAssignments ?? []): {
@@ -603,6 +663,9 @@ output exportedSecrets secretsOutputType = (secretsExportConfiguration != null)
   ? toObject(secretsExport.outputs.secretsSet, secret => last(split(secret.secretResourceId, '/')), secret => secret)
   : {}
 
+/* NOTE: AIFactory way works instead of below, e.g. bellow cannot handle more than 1 config
+- AVM can only hand privateEndpointSingleServiceType. import { privateEndpointSingleServiceType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+
 @description('The private endpoints of the congitive services account.')
 output privateEndpoints privateEndpointOutputType[] = [
   for (pe, index) in (privateEndpoints ?? []): {
@@ -613,6 +676,7 @@ output privateEndpoints privateEndpointOutputType[] = [
     networkInterfaceResourceIds: cognitiveService_privateEndpoints[index].outputs.networkInterfaceResourceIds
   }
 ]
+*/
 
 // ================ //
 // Definitions      //

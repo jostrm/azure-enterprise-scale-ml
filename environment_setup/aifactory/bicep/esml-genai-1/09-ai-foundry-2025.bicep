@@ -545,7 +545,11 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
         versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
       }
     ]
-    
+    privateEndpointSubnetRID: commonSubnetResourceId
+    privateLinksDnsZones: privateLinksDnsZones
+    createPrivateEndpointsAIFactoryWay: true
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    /*
     privateEndpoints: !enablePublicAccessWithPerimeter ? [
       {
         name: '${aifV2Name}-pend'
@@ -555,6 +559,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
         location: location
       }
     ] : null
+    */
   }
   dependsOn: [
     existingTargetRG
