@@ -334,6 +334,12 @@ var networkAcls = shouldCreateNetworkAcls ? {
   ipRules: empty(processedIpRules_remove32) ? [] : processedIpRules_remove32
 } : null
 
+var networkAclsEmpty = {
+  defaultAction: 'Deny'
+  virtualNetworkRules: []
+  ipRules: []
+}
+
 var networkAclsObject = networkAcls
 
 // Role assignments are now managed in 07-rbac-security.bicep
@@ -350,7 +356,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     enablePublicGenAIAccess: enablePublicGenAIAccess
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    networkAcls: shouldCreateNetworkAcls ? networkAclsObject : null
+    networkAcls: shouldCreateNetworkAcls ? networkAclsObject : networkAclsEmpty
     enableTelemetry:false
     tags: tagsProject
     aiModelDeployments: [
@@ -519,7 +525,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     defaultProjectName:enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d21'
     #disable-next-line BCP318
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
-    networkAcls: shouldCreateNetworkAcls ? networkAclsObject : null
+    networkAcls: shouldCreateNetworkAcls ? networkAclsObject : networkAclsEmpty
     managedIdentities: {
       systemAssigned: true
       userAssignedResourceIds: concat(
