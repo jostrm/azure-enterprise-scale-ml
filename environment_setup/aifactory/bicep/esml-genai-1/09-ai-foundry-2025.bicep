@@ -15,6 +15,7 @@ targetScope = 'subscription'
 @allowed(['dev', 'test', 'prod'])
 param env string
 
+param serviceSettingDeployContainerApps bool = false
 param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = true
 @description('Project number (e.g., "005")')
 param projectNumber string
@@ -35,6 +36,7 @@ param resourceSuffix string
 @description('Enable AI Foundry 2 features')
 param enableAIFoundryV2 bool = false
 param enableAIFoundryV21 bool = false
+param aiFoundryV2Exists bool = false
 
 @description('Enable AI Search integration')
 param enableAISearch bool = true
@@ -477,9 +479,31 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
   ]
 }
 
+// Subnet delegation for Container Apps
+var acaSubnetName = namingConvention.outputs.acaSubnetName
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!serviceSettingDeployContainerApps) && (enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection)) {
+  name: '09-snetDelegACA${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(vnetResourceGroupName)
+  params: {
+    vnetName: vnetNameFull
+    subnetName: acaSubnetName
+    location: location
+    vnetResourceGroupName: vnetResourceGroupName
+    delegations: [
+      {
+        name: 'aca-delegation'
+        properties: {
+          serviceName: 'Microsoft.App/environments'
+        }
+      }
+    ]
+  }
+}
+
+
 // AI V2.1 - Cognitive Services Module (Alternative Implementation)
 //var pendNameShort = take(replace(aifV2Name, '-', ''),12)
-module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21) {
+module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && !aiFoundryV2Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}'
   params: {

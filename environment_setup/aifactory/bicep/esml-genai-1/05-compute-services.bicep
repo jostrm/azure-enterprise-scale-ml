@@ -79,6 +79,10 @@ param funcAppServicePlanExists bool = false
 param webAppServicePlanExists bool = false
 param bingExists bool = false
 
+param aiFoundryV2Exists bool = false
+param enableAIFoundryV21 bool = false
+param disableAgentNetworkInjection bool = true
+
 param serviceSettingDeployAppInsightsDashboard bool = true
 param serviceSettingDeployBingSearch bool = false
 
@@ -469,7 +473,7 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
 }
 
 // Subnet delegation for Container Apps
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (!containerAppsEnvExists && serviceSettingDeployContainerApps) {
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists && serviceSettingDeployContainerApps) && (!aiFoundryV2Exists && !disableAgentNetworkInjection)) {
   name: '05-snetDelegACA${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(vnetResourceGroupName)
   params: {
