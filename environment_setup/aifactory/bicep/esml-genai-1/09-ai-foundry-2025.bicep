@@ -319,7 +319,11 @@ var aiFoundryZones = !enablePublicAccessWithPerimeter? [
   openaiDnsZoneId
   cognitiveServicesDnsZoneId
 ] : []
-var networkAcls = {
+
+// Only create networkAcls when there are IP rules OR when public access is explicitly enabled
+var shouldCreateNetworkAcls = !empty(processedIpRules_remove32) || enablePublicGenAIAccess || enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet
+
+var networkAcls = shouldCreateNetworkAcls ? {
   defaultAction: enablePublicGenAIAccess && empty(processedIpRules_remove32) ? 'Allow' : 'Deny'
   virtualNetworkRules: [
     {
@@ -328,15 +332,9 @@ var networkAcls = {
     }
   ]
   ipRules: empty(processedIpRules_remove32) ? [] : processedIpRules_remove32
-}
+} : null
 
-var networkAclsObject = !empty(networkAcls ?? {})
-  ? {
-      defaultAction: networkAcls.?defaultAction
-      virtualNetworkRules: networkAcls.?virtualNetworkRules ?? []
-      ipRules: networkAcls.?ipRules ?? []
-    }
-  : null
+var networkAclsObject = networkAcls
 
 // Role assignments are now managed in 07-rbac-security.bicep
 // We use deployment scripts to update permissions if needed after deployment
@@ -352,7 +350,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     enablePublicGenAIAccess: enablePublicGenAIAccess
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    networkAcls:networkAcls
+    networkAcls: networkAclsObject
     enableTelemetry:false
     tags: tagsProject
     aiModelDeployments: [
@@ -514,7 +512,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     enableTelemetry: false
     tags: tagsProject
     customSubDomainName: aifV2Name
-    publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : (!empty(networkAclsObject) ? 'Enabled' : 'Disabled')
+    publicNetworkAccess: enablePublicAccessWithPerimeter || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(processedIpRules_remove32) ? 'Enabled' : 'Disabled'
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: disableAgentNetworkInjection
     allowProjectManagement: true
