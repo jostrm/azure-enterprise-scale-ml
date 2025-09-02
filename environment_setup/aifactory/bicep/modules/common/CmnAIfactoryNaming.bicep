@@ -85,12 +85,16 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 // AI Foundry V1
 var aifV1HubName = 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var aifV1ProjectName = 'aifp-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+// TODO: var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // AI Foundry V2 (2025):aif-V2-001-eus-dev-12345-001 = 28
 //var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // ->pend error
 //var aifV2Name = take('aifV2${projectNumber}${locationSuffix}${env}',12) // (12) aifV2001eusd -> worked!
-var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // // Does this work?
-var aifV2PrjName ='aif-V2-prj-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}' // Does this work?
+
+// @2025-04-01-preview
+//var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // @2025-04-01-preview (32)
+var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${randomSalt}'), '-', ''),12) // @2025-06-01: name (12)
+var aifV2PrjName ='aif2-prj-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}' // Does this work?
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
