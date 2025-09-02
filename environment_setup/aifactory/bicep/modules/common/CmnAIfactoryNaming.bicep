@@ -84,8 +84,8 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 
 // AI Foundry V1
 var aifV1HubName = 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var aifV1ProjectName = 'aifp-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-// TODO: var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+//var aifV1ProjectName = 'aifp-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // TODO=DONE
 
 // AI Foundry V2 (2025):aif-V2-001-eus-dev-12345-001 = 28
 //var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // ->pend error
