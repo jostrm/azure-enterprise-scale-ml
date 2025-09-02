@@ -460,7 +460,10 @@ resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' 
 }
 #disable-next-line BCP318
 var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
-var miPrjName_Static = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${aifactorySalt10char}${resourceSuffix}'
+
+var randomSaltLogic = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
+var miPrjName_Static = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${randomSaltLogic}${resourceSuffix}'
+
 resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: miPrjName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
