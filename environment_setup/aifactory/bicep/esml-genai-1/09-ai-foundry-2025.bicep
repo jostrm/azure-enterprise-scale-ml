@@ -493,6 +493,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled' : (!empty(networkAclsObject) ? 'Enabled' : 'Disabled')
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: disableAgentNetworkInjection
+    allowProjectManagement: true
     defaultProjectName:enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d21'
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     networkAcls: networkAclsObject
