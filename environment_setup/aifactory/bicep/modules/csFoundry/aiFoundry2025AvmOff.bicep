@@ -386,11 +386,14 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties
     disableLocalAuth: disableLocalAuth
-    networkInjections: !disableAgentNetworkInjection && !empty(agentSubnetResourceId) ? {
-      scenario: 'agent'
-      subnetArmId: agentSubnetResourceId!
-      useMicrosoftManagedNetwork: false // false for enterprise use: e.g. you need custom routing, firewall rules, network policies, or BYOsubnets
-    } : null
+    #disable-next-line BCP036
+    networkInjections: !disableAgentNetworkInjection && !empty(agentSubnetResourceId) ? [
+      {
+        scenario: 'agent'
+        subnetArmId: agentSubnetResourceId!
+        useMicrosoftManagedNetwork: false // false for enterprise use: e.g. you need custom routing, firewall rules, network policies, or BYOsubnets
+      }
+    ] : null
     encryption: !empty(customerManagedKey)
       ? {
           keySource: 'Microsoft.KeyVault'
