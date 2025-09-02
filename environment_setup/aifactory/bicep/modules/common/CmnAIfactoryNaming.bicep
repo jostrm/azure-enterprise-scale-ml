@@ -94,7 +94,8 @@ var aifV1ProjectName = 'aifp-${projectNumber}-1-${locationSuffix}-${env}-${uniqu
 // @2025-04-01-preview
 //var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // @2025-04-01-preview (32)
 var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${randomSalt}'), '-', ''),12) // @2025-06-01: name (12)
-var aifV2PrjName ='aif2-prj-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}' // Does this work?
+//var aifV2PrjName ='aif2-prj-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}' // Does this work?
+var aifV2PrjName =take(replace(toLower('aif2p${uniqueInAIFenv}${randomSalt}'), '-', ''),12)
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'

@@ -245,9 +245,9 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
-// AI Foundry V2 specific names
-var aifV2Name = namingConvention.outputs.aifV2Name
-var aifV2ProjectName = namingConvention.outputs.aifV2PrjName
+// AI Foundry V2 specific names (12)
+var aifV2Name = namingConvention.outputs.aifV2Name // aif2qoygyc7e
+var aifV2ProjectName = namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
