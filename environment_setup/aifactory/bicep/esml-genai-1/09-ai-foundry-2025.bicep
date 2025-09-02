@@ -350,7 +350,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     enablePublicGenAIAccess: enablePublicGenAIAccess
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    networkAcls: networkAclsObject
+    networkAcls: shouldCreateNetworkAcls ? networkAclsObject : null
     enableTelemetry:false
     tags: tagsProject
     aiModelDeployments: [
@@ -519,7 +519,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     defaultProjectName:enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d21'
     #disable-next-line BCP318
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
-    networkAcls: networkAclsObject
+    networkAcls: shouldCreateNetworkAcls ? networkAclsObject : null
     managedIdentities: {
       systemAssigned: true
       userAssignedResourceIds: concat(
