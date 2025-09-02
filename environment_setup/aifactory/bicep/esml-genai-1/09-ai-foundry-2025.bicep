@@ -502,9 +502,7 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!container
   }
 }
 
-
-// AI V2.1 - Cognitive Services Module (Alternative Implementation)
-//var pendNameShort = take(replace(aifV2Name, '-', ''),12)
+// AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
 module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: '09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}'
@@ -521,6 +519,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     disableAgentNetworkInjection: disableAgentNetworkInjection
     allowProjectManagement: true
     defaultProjectName:enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d21'
+    #disable-next-line BCP318
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     networkAcls: networkAclsObject
     managedIdentities: {
