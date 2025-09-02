@@ -542,8 +542,8 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && enab
     userAssignedResourceIds: union(
       !empty(miPrjName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : [],
       !empty(miACAName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)] : []
-    )
-  }
+      )
+    }
   }
   dependsOn: [
     projectResourceGroupExists
@@ -559,6 +559,13 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
   name: '02-AIServices4${deploymentProjSpecificUniqueSuffix}'
   params: {
     location: location
+    managedIdentities: {
+    systemAssigned: true
+    userAssignedResourceIds: union(
+      !empty(miPrjName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : [],
+      !empty(miACAName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)] : []
+      )
+    }
     sku: csAIservicesSKU
     tags: tagsProject
     vnetResourceGroupName: vnetResourceGroupName

@@ -24,6 +24,9 @@ param acrNameDummy string = ''
 param keyvaultName string
 param publicNetworkAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
 
 /*
 @allowed([
@@ -48,6 +51,22 @@ param modelGPT4SKUName string = 'Standard'
 param modelGPT4SKUCapacity int = 30
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
+
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+var identity = !empty(managedIdentities)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+    }
+  : {type:'SystemAssigned'}
+
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
@@ -61,7 +80,7 @@ var rules = [for rule in vnetRules: {
   id: rule
   ignoreMissingVnetServiceEndpoint: true
 }]
-resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
+resource aiServices 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: nameCleaned
   location: location
   kind: kind
@@ -82,9 +101,7 @@ resource aiServices 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
       ipRules: ipRules
     }:null
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity:identity
 }
 
 resource textEmbedding3Small 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_text_embedding_3_small) {

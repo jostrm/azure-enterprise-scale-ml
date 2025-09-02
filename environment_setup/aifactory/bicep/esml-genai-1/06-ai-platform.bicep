@@ -11,8 +11,6 @@ targetScope = 'subscription'
 // ================================================================
 
 // ============================================================================
-// SKU for services
-// ============================================================================
 // Azure ML Workspace SKUs
 param mlWorkspaceSkuName string = 'basic'
 param mlWorkspaceSkuTier string = 'basic'
@@ -651,3 +649,9 @@ output acrRbacDeployed bool = (useCommonACR == false && enableAIFoundryHub)
 
 @description('ML Platform RBAC deployment status')
 output mlPlatformRbacDeployed bool = (!amlExists && enableAzureMachineLearning)
+
+@description('Storage Reader Role 1001 deployment status')
+output storageReaderRole1001Deployed bool = (!aiHubExists && enableAIFoundryHub)
+
+@description('Storage Reader Role 2001 deployment status')
+output storageReaderRole2001Deployed bool = (!aiHubExists && enableAIFoundryHub)

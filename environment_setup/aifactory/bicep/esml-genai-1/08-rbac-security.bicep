@@ -462,6 +462,33 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(ba
   ]
 }
 
+
+// ============== AI HUB - STORAGE PRIVATE ENDPOINT READER ROLE ASSIGNMENTS ==============
+var genaiName = namingConvention.outputs.projectTypeGenAIName
+
+// Assign Reader role on storage account 1001 blob private endpoint to AI Project
+module storageReaderRole1001 '../modules/storagePendReaderToAIProject.bicep' = if(!aiHubExists && enableAIFoundryHub) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '06-storageReader1001${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: storageAccount1001Name
+    aiProjectName: aifV1ProjectName
+    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
+  }
+}
+
+// Assign Reader role on storage account 2001 blob private endpoint to AI Project
+module storageReaderRole2001 '../modules/storagePendReaderToAIProject.bicep' = if(!aiHubExists && enableAIFoundryHub) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: '06-storageReader2001${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    storageAccountName: storageAccount2001Name
+    aiProjectName: aifV1ProjectName
+    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}'
+  }
+}
+
+
 // ============== RBAC MODULES - AI SERVICES ==============
 
 // RBAC for OpenAI - Storage, Search, and User Access
