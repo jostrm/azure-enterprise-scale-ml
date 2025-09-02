@@ -142,9 +142,9 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicG
     }
     largeFileSharesState: 'Disabled'
     minimumTlsVersion: 'TLS1_2'
-    networkAcls: !enablePublicAccessWithPerimeter ? {
+    networkAcls: (!enablePublicAccessWithPerimeter && (enablePublicGenAIAccess || !empty(ipRules) || !empty(vnetRules))) ? {
       bypass: 'AzureServices' 
-      defaultAction: 'Deny' 
+      defaultAction: enablePublicGenAIAccess && empty(ipRules) && empty(vnetRules) ? 'Allow' : 'Deny'
       virtualNetworkRules:rules
       ipRules:empty(ipRules)?[]:ipRules
     }:null
