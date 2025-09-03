@@ -2,6 +2,7 @@ trigger:
   branches:
     include:
       - release/project*
+      - main
 variables:
 - template: ../variables/variables.yaml
 
@@ -18,7 +19,7 @@ stages:
       condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
       displayName: Deploy Private Network
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Dev  
       strategy:
         runOnce:
@@ -33,7 +34,7 @@ stages:
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Dev  
       strategy:
         runOnce:
@@ -45,6 +46,7 @@ stages:
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
 - stage: Stage_GenAI_Project
   displayName: Stage GenAI Project
+  condition: ne(variables['Build.SourceBranch'], 'refs/heads/main')
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
@@ -55,7 +57,7 @@ stages:
       condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
       displayName: Deploy Private Network
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Stage  
       strategy:
         runOnce:
@@ -70,7 +72,7 @@ stages:
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Stage  
       strategy:
         runOnce:
@@ -82,6 +84,7 @@ stages:
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
 - stage: Prod_GenAI_Project
   displayName: Prod GenAI Project
+  condition: ne(variables['Build.SourceBranch'], 'refs/heads/main')
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
@@ -92,7 +95,7 @@ stages:
       condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
       displayName: Deploy Private Network
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Prod  
       strategy:
         runOnce:
@@ -107,7 +110,7 @@ stages:
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Prod
       variables:
         dev_test_prod: "prod"

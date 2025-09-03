@@ -1,8 +1,4 @@
 variables:
-  # README: What TODO to do a minimum setup?
-  # 1) TODO variables: Minimum setup: Fill out all (29) variable with 'TODO' in comment or as value, in MANDATORY
-  # 2) BEWARE variables: Read this comments. Some (3) variables needs to be set PRE and POST project creation
-
   # ============================================================================
   # #### DO NOT TOUCH ####
   # ============================================================================
@@ -28,13 +24,13 @@ variables:
   admin_aiSearchTier: "standard" # ['S0', 'S1', 'standard', 'standard2']
   admin_semanticSearchTier: "disabled" # ['disabled', 'free', 'standard']
   admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
-  admin_bicep_input_keyvault_subscription: "TODO" # seeding keuvyalt, subscription id
-  admin_bicep_kv_fw_rg: "TODO" # Resource Group name for seeding Keyvault
-  admin_bicep_kv_fw: "TODO" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
+  admin_bicep_kv_fw_rg: "TODO_ResourceGourp" # Resource Group name for seeding Keyvault
+  admin_bicep_kv_fw: "TODO_Name" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
   useCommonACR: true # Use common Azure Container Registry (save cost), instead of each project having its own.
   admin_hybridBenefit: "true"
   admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 7 lowest. 0 is disabled. 90 days is recommended.
-  azure_machinelearning_sp_oid: "TODO" # Azure Machine Learning service principle Object ID. Find it in Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
+  azure_machinelearning_sp_oid: "TODO_ObjectID" # Azure Machine Learning service principle Object ID. Find it in Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
   use_ad_groups: "true" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
 
   # ============================================================================
@@ -54,10 +50,10 @@ variables:
   lakeContainerName: "lake3"
   adminUsername: "esmladmin"
   centralDnsZoneByPolicyInHub: "false"
-  privDnsSubscription_param: "TODO"
-  privDnsResourceGroup_param: "TODO"
-  tenantId: "TODO"
-  databricksOID: "TODO"
+  privDnsSubscription_param: "TODO_SubID"
+  privDnsResourceGroup_param: "TODO_rg_name"
+  tenantId: "TODO_tenantId"
+  databricksOID: "TODO_ObjectID"
   databricksPrivate: "false"
   AMLStudioUIPrivate: "true"
   inputCommonSPIDKey: "esml-common-sp-id"
@@ -68,29 +64,28 @@ variables:
   # MANDATORY(CHANGE ONCE): Azure Devops
   # ============================================================================
   # Azure DevOps - Service Connections for task subscription
-  dev_service_connection: "TODO" # Name of service connection for DEV Azure subscription
-  test_service_connection: "TODO" # Name of service connection TEST Azure subscription
-  prod_service_connection: "TODO" # Name of service connection PROD Azure subscription
+  dev_service_connection: "esml-aifactory-infra-dev" # Name of service connection for DEV Azure subscription
+  test_service_connection: "esml-aifactory-infra-dev" # Name of service connection TEST Azure subscription
+  prod_service_connection: "esml-aifactory-infra-dev" # Name of service connection PROD Azure subscription
   # Azure DevOps - Service Connections for seeding keyvault, that may be in another subscription
-  dev_seeding_kv_service_connection: "TODO" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
-  test_seeding_kv_service_connection: "TODO" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
-  prod_seeding_kv_service_connection: "TODO" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
+  dev_seeding_kv_service_connection: "esml-aifactory-infra-dev" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
+  test_seeding_kv_service_connection: "esml-aifactory-infra-dev" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
+  prod_seeding_kv_service_connection: "esml-aifactory-infra-dev" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
   # ============================================================================
   # MANDATORY(CHANGE RARELY):NETWORKING: Networking modes
-  #  [false, false, false ] = private UI with private backend. No public IP
+  #  [false, false, false ] = private UI with private backend. No public IP (Bastion host + VM, Azure VPN, Peering)
   #  [true, true, false ]  = public UI for IP whitelisted devices, with private backend
-  #  [true, true, true ]   = public UI with private backend
+  #  [true, true, true ]   = public UI with private backend 
   # ============================================================================
-  enablePublicGenAIAccess: "false" # TODO
-  allowPublicAccessWhenBehindVnet: "false" # TODO
-  enablePublicAccessWithPerimeter: "false" # TODO
+  enablePublicGenAIAccess: "false"
+  allowPublicAccessWhenBehindVnet: "false"
+  enablePublicAccessWithPerimeter: "false"
   # ============================================================================
   # MANDATORY(CHANGE RARELY):Client Access: Services to be added to deployment. CreateIfNotExists logic
   # ============================================================================
-  addBastionHost: "false" # TODO
-  enableAdminVM: "false" # TODO
-  serviceSettingDeployProjectVM: "false"
-
+  addBastionHost: "false" # COMMON resource group
+  enableAdminVM: "false" # COMMON resource group
+  
   # ============================================================================
   # MANDATORY(CHANGE RARELY): AI Factory scale set.
   # WHAT: 
@@ -102,32 +97,33 @@ variables:
   # ============================================================================
   # MANDATORY(CHANGE RARELY): Environments: Dev, Stage, Prod per AI Factory scaleset
   # ============================================================================
-  dev_sub_id: "TODO" # SubscriptionID dev
-  test_sub_id: "TODO" # SubscriptionID test
-  prod_sub_id: "TODO" # SubscriptionID prod
+  dev_sub_id: "TODO_SubID" # SubscriptionID dev
+  test_sub_id: "TODO_SubID" # SubscriptionID test
+  prod_sub_id: "TODO_SubID" # SubscriptionID prod
   # ============================================================================
   # MANDATORY(CHANGE RARELY): Networking per environment and AI Factory scaleset
   # ============================================================================
       # NOTE: When supplying an agent subnet, the AI Foundry Account will automatically create a capability host for the agent service.
-      # NB! In that case, Provided subnet must be in address space in the range of 172 or 192
+      # NB! In that case, Provided subnet must be in address space in the range of 172.16.0.0/12 or 192.168.0.0/16 (class B or C). And delegated to: Microsoft.App/environment
+      # - Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
       # 10.x.x.x (/8) is heavily used for IoT and machine learning (e.g., HVAC, AV, VoIP, ML-clusters)
         # Example vnet 10.16.0.0/16 with subets [10.XX.0.0/20,172.XX.16.0/20,10.XX.32.0/25,10.XX.33.0/26]
       # 172.x.x.x (/12)is often used for hosted systems and backend platforms, especially in Azure and hybrid setups
         # Example vnet 172.16.0.0/16 with subets [172.16.XX.0/26,172.16.XX.64/26,172.16.XX.128/26,172.16.XX.192/26]
       # 192.x.x.x  (/16) is less commonly used in large-scale Azure deployments due to its smaller address space.
       # WAF AI Factory Recommended: 172.16.0.0/16
-  common_vnet_cidr: "172.16.0.0/16" # TODO:2025-08: Needs to start with 172 or 192, otherwise AI Foundry deployment fails, due to AGENTS needing subnets
+  common_vnet_cidr: "172.16.0.0/16"
 
-  common_subnet_cidr: "172.16.XX.0/26" # TODO
-  common_subnet_scoring_cidr: "172.16.XX.64/26" # TODO
+  common_subnet_cidr: "172.16.XX.0/26"
+  common_subnet_scoring_cidr: "172.16.XX.64/26"
   
   common_pbi_subnet_name: "snet-esml-cmn-pbi-001"
-  common_pbi_subnet_cidr: "172.16.XX.128/26" # TODO
+  common_pbi_subnet_cidr: "172.16.XX.128/26"
   
-  common_bastion_subnet_name: "AzureBastionSubnet" # Cannot be changed due to Azure Bastion.
-  common_bastion_subnet_cidr: "172.16.XX.192/26" #TODO
+  common_bastion_subnet_name: "AzureBastionSubnet"
+  common_bastion_subnet_cidr: "172.16.XX.192/26"
 
-  dev_cidr_range: "61" # TODO: CIDR range for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
+  dev_cidr_range: "61" # CIDR range for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
   test_cidr_range: "62"
   prod_cidr_range: "63"
 
@@ -139,12 +135,20 @@ variables:
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
   admin_projectType: "genai-1" # Azure Devops: What project type to deploy? [esml,genai-1,genai-2] to fetch subnets from Bicep deployment.
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
-  tagsProject: '{"Environment":"$(dev_test_prod)","Project":"RAG Chat 1","Owner":"$(technical_admins_email)","CostCenter":"123456"}'
+  tagsProject: '{"Environment":"$(dev_test_prod)","Project":"RAG Chat 1","Owner":"$(technical_admins_email)","CostCenter":"556677"}'
   project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. "10.123.456.10,124.56.78.0/24"
-  acr_IP_whitelist: "" # Selected networks approved IPs to use Container Registry, if selected networks. Default = private.
-    
-  technical_admins_ad_object_id: "37e0899e-09bb-4d1b-b814-d3abb2c560f5" # AD group Object ID or User Object IDs,in a commas separated list
-  technical_admins_email: "jostrm@microsoft.com" # Emails in a commas separated list
+  
+  # Container registry
+  acr_IP_whitelist: "" # Selected networks approved IPs
+  acr_adminUserEnabled: "false" # true, enable admin user. false, disable admin user (more secure)
+  acr_dedicated: "true" # Premium only
+  acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints
+
+  #technical_admins_ad_object_id: "4dd75919-56b3-4e7e-a265-dc96f9cd4a58,a381a88d-9b9d-453a-895f-eaaa0347b86b"
+  #technical_admins_email: "joakim, user1" # Email adresses, names, or some sort id ID, in a commas separated list, mapping to above ObjectID list
+  technical_admins_ad_object_id: "" # AD group Object ID
+  technical_admins_email: "" # email or name of AD group
+  serviceSettingDeployProjectVM: "false" # VM Project resource group, to use with BASTION
 
   # ============================================================================
   # MANDATORY (PRE SETUP of a PROJECT): AI Factory salt frp, COMMON RG
@@ -163,37 +167,54 @@ variables:
 
   # ============================================================================
   # MANDATORY:Services to be added to deployment. CreateIfNotExists logic
-  # TODO: Check below if you want to disable/enable any service before deployment
+  # ============================================================================
+  # ============================================================================
+  # Example 01 Demo Scenario Standalone: AI Layer (RAG: AI foundry, AI Search)
+  # - Services: enableAIFoundryHub, enableAISearch, serviceSettingDeployFunction, serviceSettingDeployContainerApps, serviceSettingDeployAppInsightsDashboard, serviceSettingDeployCosmosDB
+  # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
+  # Example 02 Demo Scenario Standalone: DB layer - AI layer - App layer
+  # - Services: enableAIFoundryHub, enableAISearch, serviceSettingDeployFunction, serviceSettingDeployContainerApps, serviceSettingDeployAppInsightsDashboard, serviceSettingDeployCosmosDB
+  # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
   enableAIServices: "true"
   enableAIFoundryHub: "true"
-  enableAIFoundryV2: "true"
+  # enableAIFoundryV2: "false" # AVM option not supporting customers enterprise grade requirements, and also uses AVM with non GA technologies. And only single service pends.
+  enableAIFoundryV21: "true" # Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
+  updateAIFoundryV21: "true"
+
+  enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # true, only connections is created to AIFactory created services. false, Azure will create a default project, with additional CosmosDB, Storage Account, AI Search, and connections
+  disableAgentNetworkInjection: "true" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
+  # Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
+  # Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
+    
   enableAISearch: "true"
-  enableAzureMachineLearning: "false" # jostrm: AML, Databricks, ADF, EventHubs
-  serviceSettingDeployFunction: "true"
+  enableAzureMachineLearning: "false" # TODO: AML, Databricks, ADF, EventHubs
+  serviceSettingDeployAzureOpenAI: "false"
+  serviceSettingDeployAzureAIVision: "false"
+  serviceSettingDeployAzureSpeech: "false"
+  serviceSettingDeployAIDocIntelligence: "false"
+  disableContributorAccessForUsers: "false"
+  serviceSettingDeployCosmosDB: "true" # true, since needed for AI Foundry V2 project, agents.
+  serviceSettingDeployPostgreSQL: "false"
+  serviceSettingDeployRedisCache: "false"
+  serviceSettingDeploySQLDatabase: "false"
+  
+  serviceSettingDeployFunction: "false"
   functionRuntime: "dotnet"
   functionVersion: "v7.0"
-  serviceSettingDeployWebApp: "true"
+  
+  serviceSettingDeployWebApp: "false"
   webAppRuntime: "python"
   webAppRuntimeVersion: "3.11"
   aseSku: "IsolatedV2"
   aseSkuCode: "I1v2"
   aseSkuWorkers: 1
-  serviceSettingDeployContainerApps: "true"
-  serviceSettingDeployAppInsightsDashboard: "true"
-  aca_a_registry_image: "containerapps-default:latest"
-  aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
-  serviceSettingDeployBingSearch: "false" # Internal Server Error
-  serviceSettingDeployAzureOpenAI: "true"
-  serviceSettingDeployAzureAIVision: "true"
-  serviceSettingDeployAzureSpeech: "true"
-  serviceSettingDeployAIDocIntelligence: "true"
-  disableContributorAccessForUsers: "false"
-  serviceSettingDeployCosmosDB: "true"
-  serviceSettingDeployPostgreSQL: "true"
-  serviceSettingDeployRedisCache: "true"
-  serviceSettingDeploySQLDatabase: "true"
-
+  
+  serviceSettingDeployContainerApps: "false"
+  serviceSettingDeployAppInsightsDashboard: "false"
+  aca_a_registry_image: # "containerapps-default:latest"
+  aca_w_registry_image: #"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    
   # ============================================================================
   # MANDATORY (POST SETUP of a PROJECT): aifactory_salt_random
   # ============================================================================
@@ -204,7 +225,7 @@ variables:
   # Usage: A non-deterministic value globally unique
   # ============================================================================
   
-  #aifactory_salt_random: "5512c02153" # 10 characters. Look at the "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
+  # Look at the "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
   aifactory_salt_random: "" # 10 characters. Look at the "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
   
   # ============================================================================
@@ -213,7 +234,7 @@ variables:
   # Description: runNetworkingVar:"true"(default) 
   #  Set to true when creating a new project, "false" to UPDATE or ADD services
   # ============================================================================
-  runNetworkingVar: "true" # true, when creating a new project. set to false if you want to UPDATE or ADD services to a project. 
+  runNetworkingVar: "false" # true, when creating a new project. set to false if you want to UPDATE or ADD services to a project. 
 
 ## ============================================================================
 ## END - FOREACH PER PROJECT (MANDATORY)
@@ -258,18 +279,26 @@ variables:
   admin_aml_computeInstance_testProd_sku_override: "Standard_ND96amsr_A100_v4"
   # ============================================================================
   # OPTIONAL: GENAI: Default Models to start with.
-  # TODO: Check below if you want to enable/disable any model deployments
   # ============================================================================
-  deployModel_gpt_4: "false"
-  modelGPT4Name: ""
-  modelGPT4Version: ""
+  deployModel_gpt_X: "false"
+  modelGPTXName: "gpt-5-mini"
+  modelGPTXVersion: ""
+  modelGPTXSku: "DataZoneStandard" # ['Standard','DataZoneStandard','GlobalStandard']
+  modelGPTXCapacity: 30 # TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K
+
   deployModel_text_embedding_ada_002: "true"
-  deployModel_text_embedding_3_large: "false"
+  deployModel_text_embedding_3_large: "true"
   deployModel_text_embedding_3_small: "false"
   default_embedding_capacity: 25
+
   deployModel_gpt_4o_mini: "false"
-  default_gpt_capacity: 40
-  default_model_sku: "Standard"
+  default_gpt_4o_mini_version: "2024-07-18" # Note: This model with version '2024-07-18' does not support Bing search grounding in Agents.
+
+  deployModel_gpt_4o: "true"
+  default_gpt_4o_version: "2024-11-20" # "2024-08-06", "2024-11-20"
+
+  default_gpt_capacity: 40 # TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K
+  default_model_sku: "Standard"  #  ['Standard','DataZoneStandard','GlobalStandard']
   # ============================================================================
   # OPTIONAL: Change if you want to create new resources. Keeps old.
   # ============================================================================
@@ -297,19 +326,23 @@ variables:
   subnetProjDatabricksPublic: ""
   subnetProjDatabricksPrivate: ""
   byoASEv3: "false"
-  byoAseFullResourceId: ""
+  byoAseFullResourceId: "/subscriptions/...yourASEnameS2"
   byoAseAppServicePlanResourceId: ""
 
   # ============================================================================
-  # GenAI-DEBUG - Dont touch: infra AIFactory core team only. To enable/disable full sections
+  # GenAI-DEBUG - Dont touch: infra AIFactory core team only. 
+  # Purpose: To DISABLE full sections (for efficiency, if re-running pipeline)
   # ============================================================================
-  debug_disable_05_build_acr_image: "false" # Also temporary set ACR networking to selected networks, whitelist Azure Deveops/GHA IPs, then closes to private in last task
-  debug_disable_61_foundation: "false"
-  debug_disable_62_core_infrastructure: "false"
-  debug_disable_63_cognitive_services: "false"
-  debug_disable_64_databases: "false"
-  debug_disable_65_compute_services: "false"
-  debug_disable_66_ml_platform: "false"
-  debug_disable_67_rbac_security: "false"
+  debug_disable_05_build_acr_image: "true" # Cannot be disabled if ContainerApps is enabled. It needs ACR  networking with whitelist to Azure Deveops/GHA IPs, that this closes in the end.
+  debug_disable_61_foundation: "false" # Resource group, UAMI's, VM
+  debug_disable_62_core_infrastructure: "false" # Application Insights, Keyvault, Storage, ACR
+  debug_disable_63_cognitive_services: "false" # AI Search, OpenAI Standalone, Vision standalone, Speech standalone, ...
+  debug_disable_64_databases: "false" # CosmosDB, SQL Database, ...
+  debug_disable_65_compute_services: "false" # ContainerApps, WebApp, FunctionApp
+  debug_disable_66_ai_platform: "false" # AI Foundry Hub (V1) with default project, and connections to AISearch, Storage, ...
+  debug_disable_67_ml_platform: "true" # Azure Machine Learning, Datafactory, Databricks
+  debug_disable_68_rbac_security: "false" # RBAC for 61-67
+  debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage)
+
 
 

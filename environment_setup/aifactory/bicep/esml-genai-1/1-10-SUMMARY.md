@@ -30,25 +30,25 @@ Successfully transformed a **3,492-line monolithic Bicep file** into a **compreh
 - **Dependencies:** None (foundational)
 - **Estimated Time:** 8-10 minutes
 
-### Phase 2: Cognitive Services
-**File:** `02-cognitive-services.bicep` (515 lines)
-- ✅ **Azure OpenAI** with GPT-4 and embedding models
-- ✅ **AI Search** with semantic search capabilities
-- ✅ **Computer Vision** for image analysis
-- ✅ **Speech Services** for audio processing
-- ✅ **AI Document Intelligence** for document processing
-- ✅ **Content Safety** for responsible AI
-- **Dependencies:** Foundation
-- **Estimated Time:** 12-15 minutes
-
-### Phase 3: Core Infrastructure
-**File:** `03-core-infrastructure.bicep` 
+### Phase 2: Core Infrastructure
+**File:** `02-core-infrastructure.bicep` 
 - ✅ **Storage Accounts** with private endpoints
 - ✅ **Key Vault** for secrets management
 - ✅ **Container Registry** for ML containers
 - ✅ **Application Insights** for monitoring
 - ✅ **Virtual Machine** for development
 - ✅ **Private networking** integration
+- **Dependencies:** Foundation
+- **Estimated Time:** 12-15 minutes
+
+### Phase 3: Cognitive Services
+**File:** `04-cognitive-services.bicep` (515 lines)
+- ✅ **Azure OpenAI** with GPT-4 and embedding models
+- ✅ **AI Search** with semantic search capabilities
+- ✅ **Computer Vision** for image analysis
+- ✅ **Speech Services** for audio processing
+- ✅ **AI Document Intelligence** for document processing
+- ✅ **Content Safety** for responsible AI
 - **Dependencies:** Foundation
 - **Estimated Time:** 12-15 minutes
 
