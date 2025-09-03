@@ -20,6 +20,7 @@ param vnetRule2 string = ''
 param postGreSQLExists bool = false
 param keyvaultExists bool = false
 param aiSearchExists bool = false
+param DEBUG_network_env string = ''
 
 // DEBUG Parameters - All optional with default values
 @description('Enable AI Services')

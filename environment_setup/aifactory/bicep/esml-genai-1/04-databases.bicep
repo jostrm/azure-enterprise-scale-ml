@@ -161,7 +161,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResource
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: '04-naming-${targetResourceGroup}'
+  name: take('04-naming-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -218,7 +218,7 @@ var sqlServerSKUObject_DTU = {
 
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
-  name: '04-getPrivDnsZ-${targetResourceGroup}'
+  name: take('04-getPrivDnsZ-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     location: location
@@ -230,7 +230,7 @@ var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
 // Assumes the principals exists.
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: '04-getMI-${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-getMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
@@ -248,7 +248,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
 
 // Access policies for principals
 module spAndMI2Array '../modules/spAndMiArray.bicep' = {
-  name: '04-spAndMI2Array-${targetResourceGroup}'
+  name: take('04-spAndMI2Array-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
@@ -279,7 +279,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 
 module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && serviceSettingDeployCosmosDB) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-CosmosDB4${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-CosmosDB4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     logAnalyticsWorkspaceResourceId: laWorkspaceName
     managedIdentities: {
@@ -364,7 +364,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
 
 module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmosDBExists && serviceSettingDeployCosmosDB) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-cosmosRbac${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-cosmosRbac${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     cosmosName: cosmosDBName
     usersOrAdGroupArray: p011_genai_team_lead_array
@@ -377,7 +377,7 @@ module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmo
 
 module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployCosmosDB && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-privDnsCosmos${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-privDnsCosmos${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     dnsConfig: var_cosmosdb_dnsConfig
     privateLinksDnsZones:privateLinksDnsZones
@@ -392,7 +392,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !c
 
 module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(!postgreSQLExists && serviceSettingDeployPostgreSQL) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-PostgreSQL4${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-PostgreSQL4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: postgreSQLName
     location: location
@@ -418,7 +418,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
 
 module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bicep' = if(!postgreSQLExists && serviceSettingDeployPostgreSQL) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     postgreSqlServerName: postgreSQLName
     useAdGroups: useAdGroups
@@ -433,7 +433,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
 
 module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployPostgreSQL && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-privDnsPGres${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-privDnsPGres${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     dnsConfig: var_postgreSQL_dnsConfig
     privateLinksDnsZones:privateLinksDnsZones
@@ -448,7 +448,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists
 
 module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && serviceSettingDeployRedisCache) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-RedisCache4${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-RedisCache4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: redisName
     location: location
@@ -467,7 +467,7 @@ module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && 
 
 module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!redisExists && serviceSettingDeployRedisCache) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-RedisCacheRbac4${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-RedisCacheRbac4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     redisName: redisName
     useAdGroups: useAdGroups
@@ -481,7 +481,7 @@ module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!redisEx
 
 module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployRedisCache && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-privDnsRedis${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-privDnsRedis${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     dnsConfig: var_redisCache_dnsConfig
     privateLinksDnsZones:privateLinksDnsZones
@@ -496,7 +496,7 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !
 
 module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlServerExists && serviceSettingDeploySQLDatabase) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-SqlServer4${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-SqlServer4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     serverName: sqlServerName
     databaseName: sqlDBName
@@ -516,7 +516,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlS
 
 module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!sqlServerExists && serviceSettingDeploySQLDatabase) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-SqlServerRbac4${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-SqlServerRbac4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     sqlServerName: sqlServerName
     useAdGroups: useAdGroups
@@ -530,7 +530,7 @@ module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!sq
 
 module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !centralDnsZoneByPolicyInHub && serviceSettingDeploySQLDatabase && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '04-privDnsSQL${deploymentProjSpecificUniqueSuffix}'
+  name: take('04-privDnsSQL${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     dnsConfig: var_sqlServer_dnsConfig
     privateLinksDnsZones:privateLinksDnsZones

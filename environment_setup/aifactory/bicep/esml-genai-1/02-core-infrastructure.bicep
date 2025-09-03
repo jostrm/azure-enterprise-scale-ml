@@ -11,7 +11,6 @@ targetScope = 'subscription'
 // - Bing Search (if enabled)
 // ================================================================
 
-// ============================================================================
 // SKU for services
 // ============================================================================
 @allowed(['Standard_LRS', 'Standard_GRS', 'Standard_RAGRS', 'Standard_ZRS', 'Premium_LRS', 'Premium_ZRS', 'Standard_GZRS', 'Standard_RAGZRS'])
@@ -173,7 +172,7 @@ var commonSubnetName = !empty(subnetCommon)?replace(subnetCommon, '<network_env>
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: '02-naming-${targetResourceGroup}' // max 64 chars
+  name: take('02-naming-${targetResourceGroup}', 64) // max 64 chars
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -268,7 +267,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-getPrivDnsZ-${targetResourceGroup}'
+  name: take('02-getPrivDnsZ-${targetResourceGroup}', 64)
   params: {
     location: location
     privDnsResourceGroupName: privDnsResourceGroupName
@@ -279,7 +278,7 @@ var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
 // Get managed identity principal IDs using helper modules
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: '02-getPrMI-${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-getPrMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
@@ -288,7 +287,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 
 // Assumes the principals exists.
 module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: '02-getACAMI-${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-getACAMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miACAName
@@ -315,7 +314,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 
 module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: applicationInsightName
     logWorkspaceName: laWorkspaceName
@@ -338,7 +337,7 @@ var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: []
 // Main storage account for ML/AI workloads
 module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-AMLGenAISto1${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-AMLGenAISto1${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     skuName: storageAccountSkuName
@@ -404,7 +403,7 @@ var var_acr_dnsConfig = !acrProjectExists? acr.outputs.dnsConfig: []
 
 module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyvaultName: keyvaultName
     location: location
@@ -469,7 +468,7 @@ module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useC
 
 // Get existing IP rules from common ACR if using common ACR
 module getExistingAcrIpRules '../modules/get-acr-ip-rules.bicep' = if (useCommonACR) {
-  name: '02-getACRIpRules-${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-getACRIpRules-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   params: {
     containerRegistryName: acrCommonName_Static
@@ -483,7 +482,7 @@ var existingIpRules = useCommonACR ? getExistingAcrIpRules.outputs.ipRules : []
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
 module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR == true){
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
-  name: '02-AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrCommonName_Static
     skuName: containerRegistrySkuName
@@ -538,7 +537,7 @@ module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExis
 
 module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serviceSettingDeployProjectVM == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-privVM4${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-privVM4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     adminUsername: adminUsername
     adminPassword: adminPassword
@@ -569,7 +568,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (!empty
 
 // Copy secrets from external key vault to project key vault
 module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists && !empty(inputKeyvault)) {
-  name: '02-kvSecretsS2P${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-kvSecretsS2P${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     spAppIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) ? externalKv!.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) : ''
@@ -594,7 +593,7 @@ var keyVaultContributorRoleId = 'f25e0fa2-a7c8-4377-a976-54943a77a395' // Manage
 // Project key vault RBAC assignments for technical contact and team
 module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultExists && !empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-kvRbacPrj${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-kvRbacPrj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: keyvaultName
     userObjectIds: var_all_principals
@@ -615,7 +614,7 @@ module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultE
 // Common key vault access policy for technical contact
 module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '02-kvSecretsGL${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-kvSecretsGL${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultPermissions: {
       secrets: [
@@ -636,7 +635,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!e
 // Service principal access to common key vault (keeping access policy model)
 module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '02-spGetList${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-spGetList${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultPermissions: {
       secrets: [
@@ -658,7 +657,7 @@ module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if 
 // Storage Account Private DNS
 module privateDnsStorage '../modules/privateDns.bicep' = if(!storageAccount1001Exists && centralDnsZoneByPolicyInHub == false) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-corePrivDnsSA${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-corePrivDnsSA${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     dnsConfig: var_sacc_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -672,7 +671,7 @@ module privateDnsStorage '../modules/privateDns.bicep' = if(!storageAccount1001E
 // Key Vault Private DNS
 module privateDnsKeyVault '../modules/privateDns.bicep' = if(!keyvaultExists && centralDnsZoneByPolicyInHub == false) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-corePrivDnsKV${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-corePrivDnsKV${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     dnsConfig: var_kv1_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones
@@ -686,7 +685,7 @@ module privateDnsKeyVault '../modules/privateDns.bicep' = if(!keyvaultExists && 
 // Container Registry Private DNS
 module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(!acrProjectExists && !centralDnsZoneByPolicyInHub && !useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-corePrivDnsACR${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-corePrivDnsACR${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     dnsConfig: var_acr_dnsConfig
     privateLinksDnsZones: privateLinksDnsZones

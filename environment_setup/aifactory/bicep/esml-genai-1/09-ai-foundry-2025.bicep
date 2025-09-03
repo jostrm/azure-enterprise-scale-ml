@@ -179,7 +179,7 @@ var commonSubnetResourceId = genaiSubnetId
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: '09-naming-${targetResourceGroup}'
+  name: take('09-naming-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -207,7 +207,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 
 var miPrjName = namingConvention.outputs.miPrjName
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: '09-getMI-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-getMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
@@ -218,7 +218,7 @@ var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
 
 var miAcaName = namingConvention.outputs.miACAName
 module getAcaMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: '09-getAcaMI-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-getAcaMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miAcaName
@@ -235,7 +235,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
 
 // Get the Key Vault secret as a string using reference function
 module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
-  name: '09-spAndMI2Array-${targetResourceGroup}'
+  name: take('09-spAndMI2Array-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
@@ -254,7 +254,7 @@ var aifV2ProjectName = namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
-  name: '09-getPrivDnsZ-${targetResourceGroup}'
+  name: take('09-getPrivDnsZ-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     location: location
@@ -346,7 +346,7 @@ var networkAclsObject = networkAcls
 // We use deployment scripts to update permissions if needed after deployment
 module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFoundryV2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-AifV2_${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-AifV2_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: aifV2Name
     defaultProjectName: enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d2'
@@ -389,7 +389,7 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
 // Add the new FDP cognitive services module
 module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFoundryV2 && enableAIFactoryCreatedDefaultProjectForAIFv2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-AifV2_Prj_${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-AifV2_Prj_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     cosmosDBname: serviceSettingDeployCosmosDB? namingConvention.outputs.cosmosDBName : ''
     name: aifV2ProjectName
@@ -451,7 +451,7 @@ output rbacSecurityPhaseCompleted bool = true
 
 // Get AI Search principal ID conditionally
 module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearch) {
-  name: '09-getAISearch-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-getAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     aiSearchName: namingConvention.outputs.safeNameAISearch
@@ -462,7 +462,7 @@ var aiSearchPrincipalId = enableAISearch ? getAISearchInfo!.outputs.principalId 
 
 // Create role assignments module to build the dynamic array
 module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
-  name: '09-roleBuilder-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-roleBuilder-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     userObjectIds: p011_genai_team_lead_array
@@ -488,7 +488,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
 // Subnet delegation for Container Apps
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists) && (enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection)) {
-  name: '09-snetDelegACA${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
     vnetName: vnetNameFull
@@ -509,7 +509,7 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!container
 // AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
 module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: aifV2Name
     kind: 'AIServices'
@@ -577,7 +577,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
 // Add the new FDP cognitive services module
 module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-AifV21_Prj_${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-AifV21_Prj_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: aifV2ProjectName
     location: location
@@ -600,7 +600,7 @@ var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' //
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
 module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if((enableAISearch && enableAIFoundryV21) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     aiSearchName: namingConvention.outputs.safeNameAISearch
     #disable-next-line BCP318
@@ -623,7 +623,7 @@ var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-rbacStorage-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-rbacStorage-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: namingConvention.outputs.storageAccount1001Name
     #disable-next-line BCP318
@@ -643,7 +643,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 // CRITICAL: Add Key Vault RBAC for Agent playground functionality
 module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
     #disable-next-line BCP318
@@ -662,7 +662,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
 // ADDITIONAL: Assign specific Key Vault roles to AI Foundry MI for project Key Vault 
 module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}'
+  name: take('09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
     #disable-next-line BCP318

@@ -392,7 +392,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${projectSalt}'
 // AI Factory - naming convention (imported from shared module) 
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: '01-naming-${targetResourceGroup}'
+  name: take('01-naming-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -437,7 +437,7 @@ var acaSubnetName = namingOutputs.acaSubnetName
 
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '01-getPrivDnsZ-${targetResourceGroup}'
+  name: take('01-getPrivDnsZ-${targetResourceGroup}', 64)
   params: {
     location: location
     privDnsResourceGroupName: privDnsResourceGroupName
@@ -605,7 +605,7 @@ var privateLinksDnsZonesArray = [
 @description('AIFACTORY-UPDATE-121: Create Private DNS Zones if not centralized')
 module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesIfNotExists.bicep' = if (centralDnsZoneByPolicyInHub == false) {
   scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-  name: guid('createNewPrivateDnsZones',commonResourceGroupRef.id, subscriptionIdDevTestProd)
+  name: take(guid('createNewPrivateDnsZones',commonResourceGroupRef.id, subscriptionIdDevTestProd), 64)
   params: {
     privateLinksDnsZones: privateLinksDnsZonesArray
     privDnsSubscription: privDnsSubscription
@@ -623,7 +623,7 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
 // Project Managed Identity
 module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '01-miForPrj${deploymentProjSpecificUniqueSuffix}'
+  name: take('01-miForPrj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: miPrjName
     location: location
@@ -637,7 +637,7 @@ module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
 // Container Apps Managed Identity
 module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '01-miForAca${deploymentProjSpecificUniqueSuffix}'
+  name: take('01-miForAca${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: miACAName
     location: location
@@ -651,7 +651,7 @@ module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
 
 // Debug Module (optional)
 module debug './00-debug.bicep' = if (enableDebugging) {
-  name: '01-DEBUG-${deploymentProjSpecificUniqueSuffix}'
+  name: take('01-DEBUG-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     projectName: projectName
@@ -697,6 +697,7 @@ module debug './00-debug.bicep' = if (enableDebugging) {
     DEBUG_network_env_dev: DEBUG_network_env_dev
     DEBUG_network_env_stage: DEBUG_network_env_stage
     DEBUG_network_env_prod: DEBUG_network_env_prod
+    DEBUG_network_env: network_env
     DEBUG_vnetResourceGroup_param: DEBUG_vnetResourceGroup_param
     DEBUG_vnetNameFull_param: DEBUG_vnetNameFull_param
     DEBUG_commonResourceGroup_param: DEBUG_commonResourceGroup_param
@@ -745,7 +746,7 @@ module debug './00-debug.bicep' = if (enableDebugging) {
 
 module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resourceExists.storageAccount1001) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '01-VMAdminLogin4${deploymentProjSpecificUniqueSuffix}'
+  name: take('01-VMAdminLogin4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     userId: technicalContactId
     userEmail: technicalContactEmail
