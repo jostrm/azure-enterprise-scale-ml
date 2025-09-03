@@ -697,6 +697,7 @@ module debug './00-debug.bicep' = if (enableDebugging) {
     DEBUG_network_env_dev: DEBUG_network_env_dev
     DEBUG_network_env_stage: DEBUG_network_env_stage
     DEBUG_network_env_prod: DEBUG_network_env_prod
+    DEBUG_network_env: network_env
     DEBUG_vnetResourceGroup_param: DEBUG_vnetResourceGroup_param
     DEBUG_vnetNameFull_param: DEBUG_vnetNameFull_param
     DEBUG_commonResourceGroup_param: DEBUG_commonResourceGroup_param
