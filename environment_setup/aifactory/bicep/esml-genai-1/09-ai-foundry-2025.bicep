@@ -16,6 +16,7 @@ targetScope = 'subscription'
 param env string
 
 param updateAIFoundryV21 bool = false
+param addAIFoundryV21 bool = false
 param containerAppsEnvExists bool = false
 param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = true
 @description('Project number (e.g., "005")')
@@ -250,8 +251,11 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 // AI Foundry V2 specific names (12)
-var aifV2Name = namingConvention.outputs.aifV2Name // aif2qoygyc7e
-var aifV2ProjectName = namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
+var aifRandom = take('aif${randomValue}',12)
+var aifpRandom = take('aifp${randomValue}',12)
+
+var aifV2Name = addAIFoundryV21? aifRandom: namingConvention.outputs.aifV2Name // aif2qoygyc7e
+var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
