@@ -213,7 +213,7 @@ var commonSubnetResourceId = commonSubnet.id
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: '06-naming-${targetResourceGroup}'
+  name: take('06-naming-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -304,7 +304,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
 
 // Private DNS zones (simplified structure)
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
-  name: '06-getPrivDnsZ-${targetResourceGroup}'
+  name: take('06-getPrivDnsZ-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     location: location
@@ -382,7 +382,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
 
 module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-AzureMLDepl${deploymentProjSpecificUniqueSuffix}'
+  name: take('06-AzureMLDepl${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: amlName
     managedIdentities: {
@@ -472,7 +472,7 @@ resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' 
 var var_miPrj_PrincipalId = miPrjREF.properties.principalId
 
 module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
-  name: '06-spAndMI2Array-${targetResourceGroup}'
+  name: take('06-spAndMI2Array-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
@@ -492,7 +492,7 @@ var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 // RBAC for Azure ML
 module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-rbacUsersAmlV2${deploymentProjSpecificUniqueSuffix}'
+  name: take('06-rbacUsersAmlV2${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount2001Name
     userObjectIds: p011_genai_team_lead_array
@@ -551,7 +551,7 @@ var aiModels = concat(
 // ============== AI FOUNDRY HUB ==============
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-aiHubModule${deploymentProjSpecificUniqueSuffix}'
+  name: take('06-aiHubModule${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: aifV1HubName
     managedIdentities: {
@@ -604,7 +604,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
 
 module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == false && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-rbacAcrProject${deploymentProjSpecificUniqueSuffix}'
+  name: take('06-rbacAcrProject${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     acrName: var_acr_cmn_or_prj
     aiHubName: aifV1HubName
@@ -619,7 +619,7 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
 
 module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}'
+  name: take('06-rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     amlName: amlName
     servicePrincipleAndMIArray: spAndMiArray
