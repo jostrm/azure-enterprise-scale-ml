@@ -445,7 +445,7 @@ var processedIpRules = [for ip in ipWhitelist_array: {
 // Project-specific container registry (if not using common ACR)
 module acr '../modules/containerRegistry.bicep' = if (!acrProjectExists && !useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '02-AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}'
+  name: take('02-AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     containerRegistryName: acrProjectName
     skuName: containerRegistrySkuName
