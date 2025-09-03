@@ -157,12 +157,13 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
-var processedIpRules_ensure_32 = [for ip in ipWhitelist_array: {
+var filteredIpWhitelist_array = filter(ipWhitelist_array, ip => length(ip) > 5)
+var processedIpRules_ensure_32 = [for ip in filteredIpWhitelist_array: {
   action: 'Allow'
   value: contains(ip, '/') ? ip : '${ip}/32'
 }]
 
-var processedIpRules_remove32 = [for ip in ipWhitelist_array: {
+var processedIpRules_remove32 = [for ip in filteredIpWhitelist_array: {
   action: 'Allow'
   value: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip
 }]
