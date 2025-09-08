@@ -530,6 +530,12 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
           privateDnsZoneId: privateLinksDnsZones.cognitiveservices.id//cognitiveservices
         }
       }
+      {
+        name: privateLinksDnsZones.servicesai.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.servicesai.id
+        }
+      }
     ]
   }
 }

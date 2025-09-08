@@ -113,6 +113,10 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.agentsvc.azure-automation.net'
     name:'privatelink.agentsvc.azure-automation.net'
   }
+  servicesai: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.services.ai.azure.com'
+    name:'privatelink.services.ai.azure.com'
+  }
   azurecontainerapps: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.${location}.azurecontainerapps.io'
     name:'privatelink.${location}.azurecontainerapps.io'

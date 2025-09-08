@@ -1,0 +1,5 @@
+# Ignore old/legacy files
+old/
+
+# Ignore specific file (alternative approach)
+# old/32-main.bicep

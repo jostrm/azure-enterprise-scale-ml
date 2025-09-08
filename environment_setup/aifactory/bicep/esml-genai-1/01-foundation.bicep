@@ -53,6 +53,7 @@ param zonePostgresExists bool = false
 param zoneSqlExists bool = false
 param zoneMongoExists bool = false
 param zoneRedisExists bool = false
+param zoneServicesAiExists bool = false
 
 var resourceExists = {
   miACA: miACAExists
@@ -589,6 +590,11 @@ var privateLinksDnsZonesArray = [
     name: privateLinksDnsZones.sql.name
     id: privateLinksDnsZones.sql.id
     exists: zoneSqlExists
+  }
+  {
+    name: privateLinksDnsZones.servicesai.name
+    id: privateLinksDnsZones.servicesai.id
+    exists: zoneServicesAiExists
   }
   {
     name: privateLinksDnsZones.cosmosdbmongo.name

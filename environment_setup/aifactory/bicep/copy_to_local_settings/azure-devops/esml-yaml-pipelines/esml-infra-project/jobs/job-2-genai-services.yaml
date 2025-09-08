@@ -292,6 +292,7 @@ steps:
         [zonepostgres]="privatelink.postgres.database.azure.com"
         [zonesql]="privatelink.database.windows.net"
         [zoneMongo]="privatelink.mongo.cosmos.azure.com"
+        [zoneServicesAi]="privatelink.services.ai.azure.com"
       )
 
       # Helper function to check if a Private DNS Zone exists
@@ -571,6 +572,7 @@ steps:
         ["zonepostgresExists"]="$(zonepostgresExists)"
         ["zonesqlExists"]="$(zonesqlExists)"
         ["zoneMongoExists"]="$(zoneMongoExists)"
+        ["zoneServicesAiExists"]="$(zoneServicesAiExists)"
         ["aifactory_salt_random"]="$(aifactory_salt_random)"
       )
 
@@ -637,6 +639,7 @@ steps:
      --parameters zonePostgresExists="$(zonepostgresExists)" \
      --parameters zoneSqlExists="$(zonesqlExists)" \
      --parameters zoneMongoExists="$(zoneMongoExists)" \
+     --parameters zoneServicesAiExists="$(zoneServicesAiExists)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
