@@ -300,7 +300,8 @@ var var_miAca_PrincipalId = getACAMIPrincipalId.outputs.principalId
 
 var mi_array = array(var_miPrj_PrincipalId)
 var mi_array2 = array(var_miAca_PrincipalId)
-var var_all_principals = union(p011_genai_team_lead_array, mi_array, mi_array2)
+var mi_principals_only = union(mi_array, mi_array2)
+//var var_all_principals = union(p011_genai_team_lead_array, mi_array, mi_array2)
 
 resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
@@ -596,9 +597,9 @@ module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultE
   name: take('02-kvRbacPrj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: keyvaultName
-    userObjectIds: var_all_principals
+    userObjectIds: p011_genai_team_lead_array
     servicePrincipalIds: [] // Will be handled separately
-    managedIdentityIds: [] // Will be handled separately
+    managedIdentityIds: mi_principals_only // Both project and ACA managed identities
     useAdGroups: useAdGroups
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId

@@ -106,3 +106,10 @@ resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/proje
 
 output projectId string = project.id
 output projectName string = project.name
+output projectPrincipalId string = project.identity.principalId
+#disable-next-line BCP053
+output projectWorkspaceId string = project.properties.internalId
+// return the BYO connection names
+output cosmosDBConnection string = cosmosDBname
+output azureStorageConnection string = storageName
+output aiSearchConnection string = aiSearchName

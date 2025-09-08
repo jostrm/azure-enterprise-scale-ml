@@ -392,7 +392,8 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
       : (!empty(networkAcls ?? {}) ? 'Enabled' : 'Disabled')
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties
-    disableLocalAuth: disableLocalAuth
+    //disableLocalAuth: disableLocalAuth
+    disableLocalAuth: false // Agent service does not seem to support API key based authentication
     #disable-next-line BCP036
     networkInjections: !disableAgentNetworkInjection && !empty(agentSubnetResourceId) ? [
       {

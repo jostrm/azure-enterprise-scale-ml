@@ -12,6 +12,7 @@ var searchIndexDataReader = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 //Lets you manage Search services, but not access to them.
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
+var azureAIDeveloperRoleId = '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer - CRITICAL for Chat with data
 
 
 // --------------- SEARCH ---------------- //
@@ -57,6 +58,18 @@ resource searchServiceContributor 'Microsoft.Authorization/roleAssignments@2022-
     principalId: userObjectIds[i]
     principalType:useAdGroups? 'Group':'User'
     description:'022: CONTRIBUTOR to USER with OID  ${userObjectIds[i]} for : ${existingAiSearch.name}'
+  }
+  scope:existingAiSearch
+}]
+
+@description('Role Assignment for Azure AI Search: Azure AI Developer for users. CRITICAL for Chat with data scenarios.')
+resource azureAIDeveloperUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):if(!empty(aiSearchName)){
+  name: guid(existingAiSearch.id, azureAIDeveloperRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'023: Azure AI Developer to USER with OID  ${userObjectIds[i]} for : ${existingAiSearch.name}'
   }
   scope:existingAiSearch
 }]

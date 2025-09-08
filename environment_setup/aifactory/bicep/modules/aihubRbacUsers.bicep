@@ -63,6 +63,7 @@ var cognitiveServicesCustomVisionContributorRoleId = 'c1ff6cc2-c111-46fe-8896-e0
 // Storage
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
+var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88' // For Azure Functions and queue processing
 
 // Cognitive Services: OpenAI, AI services
 // See table: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/role-based-access-control
@@ -262,6 +263,52 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor2SP 'Microsoft.Au
     principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
     description:'storageFileDataContributorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingStorageAccount2.name}'
+  }
+  scope:existingStorageAccount2
+}]
+
+@description('Role Assignment for Azure Storage: StorageQueueDataContributor for users. Grants read/write/delete permissions to Queue storage resources for Azure Functions')
+resource userStorageQueueDataContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(existingStorageAccount.id, storageQueueDataContributorRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'Storage Queue Data Contributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount.name}'
+  }
+  scope:existingStorageAccount
+}]
+
+resource userStorageQueueDataContributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingStorageAccount.id, storageQueueDataContributorRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'Storage Queue Data Contributor to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingStorageAccount.name}'
+  }
+  scope:existingStorageAccount
+}]
+
+@description('Role Assignment for Azure Storage 2: StorageQueueDataContributor for users. Grants read/write/delete permissions to Queue storage resources for Azure Functions')
+resource userStorageQueueDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(existingStorageAccount2.id, storageQueueDataContributorRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'Storage Queue Data Contributor to USER with OID  ${userObjectIds[i]} for : ${existingStorageAccount2.name}'
+  }
+  scope:existingStorageAccount2
+}]
+
+resource userStorageQueueDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(existingStorageAccount2.id, storageQueueDataContributorRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'Storage Queue Data Contributor to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingStorageAccount2.name}'
   }
   scope:existingStorageAccount2
 }]

@@ -1,7 +1,9 @@
 // ================================================================
 // RBAC AI STORAGE ACCOUNTS FOR AI FOUNDRY V2.1 MODULE
 // This module assigns RBAC roles to AI Foundry system-assigned MI on Storage Accounts
-// Roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor
+// Roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor, Storage Queue Data Contributor
+// Required for: Data access, PromptFlow, Azure Functions, Queue processing
+// Note: Azure AI Developer role should be assigned on AI Services resource, not storage
 // ================================================================
 
 @description('The name of the storage account')
@@ -10,20 +12,17 @@ param storageAccountName string
 @description('The principal ID of the AI Foundry system-assigned managed identity')
 param principalId string
 
+@description('The principal ID of the AI Foundry project system-assigned managed identity')
+param projectPrincipalId string = ''
+
 @description('Storage Blob Data Contributor role ID')
 param storageBlobDataContributorRoleId string
 
 @description('Storage File Data Privileged Contributor role ID')
 param storageFileDataPrivilegedContributorRoleId string
 
-@description('Azure AI Developer role ID')
-param azureAIDeveloperRoleId string = '64702f94-c441-49e6-a78b-ef80e0188fee'
-
-@description('Array of user object IDs to assign Azure AI Developer role')
-param userObjectIds array = []
-
-@description('Whether the user principals are Azure AD Groups')
-param useAdGroups bool = true
+@description('Storage Queue Data Contributor role ID')
+param storageQueueDataContributorRoleId string = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 
 // Reference the existing storage account
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
@@ -52,30 +51,54 @@ resource storageFileDataPrivilegedContributorAssignment 'Microsoft.Authorization
   }
 }
 
-// Assign Azure AI Developer role to AI Foundry system-assigned MI
-resource azureAIDeveloperSystemMIAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, principalId, azureAIDeveloperRoleId)
+// Assign Storage Queue Data Contributor role
+resource storageQueueDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, principalId, storageQueueDataContributorRoleId)
   scope: storageAccount
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
     principalId: principalId
     principalType: 'ServicePrincipal'
   }
 }
 
-// Assign Azure AI Developer role to users/groups for Chat with Data scenarios
-resource azureAIDeveloperUserAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, index) in userObjectIds: {
-  name: guid(storageAccount.id, userObjectId, azureAIDeveloperRoleId, string(index))
+// ============== PROJECT PRINCIPAL ROLE ASSIGNMENTS ==============
+
+// Assign Storage Blob Data Contributor role to Project Principal
+resource projectStorageBlobDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(storageAccount.id, projectPrincipalId, storageBlobDataContributorRoleId, 'project')
   scope: storageAccount
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
-    principalId: userObjectId
-    principalType: useAdGroups ? 'Group' : 'User'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
   }
-}]
+}
+
+// Assign Storage File Data Privileged Contributor role to Project Principal
+resource projectStorageFileDataPrivilegedContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(storageAccount.id, projectPrincipalId, storageFileDataPrivilegedContributorRoleId, 'project')
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Assign Storage Queue Data Contributor role to Project Principal
+resource projectStorageQueueDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(storageAccount.id, projectPrincipalId, storageQueueDataContributorRoleId, 'project')
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
 
 @description('Storage Account RBAC assignments completed successfully')
 output rbacAssignmentsCompleted bool = true
 
 @description('Number of role assignments created')
-output roleAssignmentsCount int = 2 + length(userObjectIds)
+output roleAssignmentsCount int = (3 + (!empty(projectPrincipalId) ? 3 : 0))

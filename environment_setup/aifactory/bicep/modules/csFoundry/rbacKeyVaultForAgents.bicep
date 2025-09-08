@@ -11,17 +11,17 @@ param keyVaultName string
 @description('The principal ID of the AI Foundry system-assigned managed identity')
 param principalId string
 
+@description('The principal ID of the AI Foundry project system-assigned managed identity')
+param projectPrincipalId string = ''
+
 @description('Key Vault Secrets User role ID')
 param keyVaultSecretsUserRoleId string = '4633458b-17de-408a-b874-0445c86b69e6'
 
 @description('Key Vault Contributor role ID')
 param keyVaultContributorRoleId string = 'f25e0fa2-a7c8-4377-a976-54943a77a395'
 
-@description('Array of user object IDs to assign Key Vault roles')
-param userObjectIds array = []
-
-@description('Whether the user principals are Azure AD Groups')
-param useAdGroups bool = true
+@description('Key Vault Secrets Officer role ID - For Agent operations')
+param keyVaultSecretsOfficerRoleId string = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
 
 // Reference the existing Key Vault service
 resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
@@ -50,19 +50,34 @@ resource keyVaultContributorSystemMIAssignment 'Microsoft.Authorization/roleAssi
   }
 }
 
-// Assign Key Vault Secrets User role to users/groups for Agent playground
-resource keyVaultSecretsUserAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, index) in userObjectIds: {
-  name: guid(keyVault.id, userObjectId, keyVaultSecretsUserRoleId, string(index))
+// ============== PROJECT PRINCIPAL ROLE ASSIGNMENTS ==============
+
+// Assign Key Vault Secrets User role to Project Principal
+resource projectKeyVaultSecretsUserAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(keyVault.id, projectPrincipalId, keyVaultSecretsUserRoleId, 'project')
   scope: keyVault
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
-    principalId: userObjectId
-    principalType: useAdGroups ? 'Group' : 'User'
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+    description: 'AI Foundry project managed identity - Key Vault Secrets User for Agent operations'
   }
-}]
+}
+
+// Assign Key Vault Secrets Officer role to Project Principal
+resource projectKeyVaultSecretsOfficerAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(keyVault.id, projectPrincipalId, keyVaultSecretsOfficerRoleId, 'project')
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsOfficerRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+    description: 'AI Foundry project managed identity - Key Vault Secrets Officer for Agent operations'
+  }
+}
 
 @description('Key Vault RBAC assignments completed successfully')
 output rbacAssignmentsCompleted bool = true
 
 @description('Number of role assignments created')
-output roleAssignmentsCount int = 2 + length(userObjectIds)
+output roleAssignmentsCount int = (2 + (!empty(projectPrincipalId) ? 2 : 0))
