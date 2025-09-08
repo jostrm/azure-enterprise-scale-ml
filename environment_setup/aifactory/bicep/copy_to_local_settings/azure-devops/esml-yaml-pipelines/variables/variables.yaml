@@ -21,7 +21,7 @@ variables:
   tags: '{"Environment":"$(dev_test_prod)","Project":"AIFactory","Owner":"$(technical_admins_email)","CostCenter":"TODO"}'
   admin_location: "eastus2"
   admin_locationSuffix: "eus2"
-  admin_aiSearchTier: "standard" # ['S0', 'S1', 'standard', 'standard2']
+  admin_aiSearchTier: "standard" # ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
   admin_semanticSearchTier: "disabled" # ['disabled', 'free', 'standard']
   admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id

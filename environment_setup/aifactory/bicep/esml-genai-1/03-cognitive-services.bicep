@@ -17,7 +17,7 @@ targetScope = 'subscription'
 // ============================================================================
 @allowed(['disabled', 'free', 'standard'])
 param semanticSearchTier string = 'free'
-@allowed(['S0', 'S1', 'standard', 'standard2'])
+@allowed(['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'])
 param aiSearchSKUName string = 'standard'
 param aiSearchReplicaCount int = 1
 param aiSearchPartitionCount int = 1

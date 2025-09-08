@@ -12,12 +12,15 @@ import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types
 param managedIdentities managedIdentityAllType?
 
 param sharedPrivateLinks array = []
-@allowed([
-  'S0' // 'Free': Invalid SKU name
-  'S1' // 'Basic': Invalid SKU name
-  'standard'
-  'standard2' // 0 out of 0 quota, is default, apply to get this.
-])
+
+//@allowed([
+//  'S0' // 'Free': Invalid SKU name
+//  'S1' // 'Basic': Invalid SKU name
+//  'standard'
+//  'standard2' // 0 out of 0 quota, is default, apply to get this.
+//])
+
+@allowed(['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'])
 param skuName string = 'standard' 
 @allowed([
   'default'
