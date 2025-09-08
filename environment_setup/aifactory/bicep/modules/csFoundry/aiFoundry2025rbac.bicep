@@ -40,6 +40,9 @@ param userObjectIds array = []
 @description('Array of service principal IDs to assign roles to')
 param servicePrincipalIds array = []
 
+@description('Project principal ID to assign roles to')
+param projectPrincipalId string = ''
+
 @description('Name of the Cognitive Services account to assign roles for')
 param cognitiveServicesAccountName string
 
@@ -54,6 +57,9 @@ param openAIContributorRoleId string
 
 @description('Role definition ID for OpenAI User')
 param openAIUserRoleId string
+
+@description('Role definition ID for Azure AI Developer')
+param azureAIDeveloperRoleId string = '64702f94-c441-49e6-a78b-ef80e0188fee'
 
 @description('Whether to use AD Groups instead of individual users')
 param useAdGroups bool = false
@@ -106,6 +112,71 @@ resource openAIUserRoleAssignmentServicePrincipals 'Microsoft.Authorization/role
   }
 }]
 
+// Assign Azure AI Developer role to users
+resource azureAIDeveloperRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
+  name: guid(cognitiveServicesAccount.id, userObjectId, azureAIDeveloperRoleId, 'ai-developer')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
+    principalId: userObjectId
+    principalType: useAdGroups ? 'Group' : 'User'
+  }
+}]
+
+// ============== PROJECT PRINCIPAL ROLE ASSIGNMENTS ==============
+
+// Assign OpenAI Contributor role to project principal
+resource openAIContributorRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, openAIContributorRoleId, 'project-contributor')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+    description: 'AI Foundry project managed identity - OpenAI Contributor for project operations'
+  }
+}
+
+// Assign Cognitive Services Contributor role to project principal
+resource cognitiveServicesContributorRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, cognitiveServicesContributorRoleId, 'project-cs-contributor')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+    description: 'AI Foundry project managed identity - Cognitive Services Contributor for project operations'
+  }
+}
+
+// Assign Cognitive Services User role to project principal
+resource cognitiveServicesUserRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, cognitiveServicesUserRoleId, 'project-cs-user')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+    description: 'AI Foundry project managed identity - Cognitive Services User for project operations'
+  }
+}
+
+// Assign Azure AI Developer role to project principal
+resource azureAIDeveloperRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, azureAIDeveloperRoleId, 'project-ai-developer')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+    description: 'AI Foundry project managed identity - Azure AI Developer for project operations'
+  }
+}
+
 // Output the assigned role names for reference
-output userRoleNames array = [for (userObjectId, i) in userObjectIds: 'User ${userObjectId} assigned OpenAI Contributor, Cognitive Services Contributor, and Cognitive Services User roles']
+output userRoleNames array = [for (userObjectId, i) in userObjectIds: 'User ${userObjectId} assigned OpenAI Contributor, Cognitive Services Contributor, Cognitive Services User, and Azure AI Developer roles']
 output servicePrincipalRoleNames array = [for (spId, i) in servicePrincipalIds: 'Service Principal ${spId} assigned OpenAI User role']
+output projectPrincipalRoleNames string = !empty(projectPrincipalId) ? 'Project Principal ${projectPrincipalId} assigned OpenAI Contributor, Cognitive Services Contributor, Cognitive Services User, and Azure AI Developer roles' : 'No project principal provided'
+
+@description('Number of role assignments created')
+output roleAssignmentsCount int = (length(userObjectIds) * 4) + length(servicePrincipalIds) + (!empty(projectPrincipalId) ? 4 : 0)

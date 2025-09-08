@@ -11,6 +11,7 @@ param cosmosDBname string
 
 @description('Name of the customers existing Azure Storage Account')
 param storageName string
+param storageName2 string
 
 @description('Foundry Account Name')
 param aiFoundryV2Name string
@@ -56,20 +57,36 @@ resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/
   name: storageName
   parent: project
   properties: {
-    category: 'AzureBlob'
+    category: 'AzureStorageAccount'
     target: storageAccount.properties.primaryEndpoints.blob
+    authType: 'AAD'
+    metadata: {
+      ApiType: 'Azure'
+      ResourceId: storageAccount.id
+      location: storageAccount.location
+      //accountName: storageAccount.name
+      //containerName: 'default'
+    }
+  }
+}
+resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
+  name: storageName2
+  parent: project
+  properties: {
+    category: 'AzureBlob'
     // target: storageAccountTarget
+    //category: 'AzureStorageAccount'
+    target: storageAccount.properties.primaryEndpoints.blob
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
       ResourceId: storageAccount.id
       location: storageAccount.location
       accountName: storageAccount.name
-      containerName: '${name}proj'
+      containerName: 'default'
     }
   }
 }
-
 resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (!empty(aiSearchName)) {
   name: aiSearchService.name
   parent: project

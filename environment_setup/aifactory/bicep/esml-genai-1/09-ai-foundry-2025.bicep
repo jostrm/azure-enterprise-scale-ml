@@ -406,6 +406,7 @@ module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFo
     name: aifV2ProjectName
     location: location
     storageName: namingConvention.outputs.storageAccount1001Name
+    storageName2: namingConvention.outputs.storageAccount2001Name
     #disable-next-line BCP318
     aiFoundryV2Name: aiFoundry2025.outputs.name
     aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
@@ -435,27 +436,6 @@ var keyVaultContributorRoleId = 'f25e0fa2-a7c8-4377-a976-54943a77a395' // Key Va
 var keyVaultSecretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7' // Key Vault Secrets Officer - for Agent operations
 var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor - for resource management
 var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader - for resource access
-
-// Function to assign roles to users and service principals for a cognitive services account
-@description('Function to assign roles to users and service principals for a cognitive services account')
-module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if(enableAIFoundryV2) {
-  name: '07-CSRoleAssignments-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  params: {
-    userObjectIds: p011_genai_team_lead_array
-    servicePrincipalIds: spAndMiArray
-    cognitiveServicesAccountName: aifV2Name
-    cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
-    cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
-    openAIContributorRoleId: openAIContributorRoleId
-    openAIUserRoleId: openAIUserRoleId
-    useAdGroups: useAdGroups
-  }
-  dependsOn: [
-    spAndMI2ArrayModule
-    namingConvention
-  ]
-}
 
 @description('RBAC Security Phase 7 deployment completed successfully')
 output rbacSecurityPhaseCompleted bool = true
@@ -604,6 +584,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
     name: aifV2ProjectName
     location: location
     storageName: namingConvention.outputs.storageAccount1001Name
+    storageName2: namingConvention.outputs.storageAccount2001Name
     #disable-next-line BCP318
     aiFoundryV2Name: aiFoundry2025NoAvm.outputs.name
     aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
@@ -619,6 +600,31 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
 var projectPrincipal = projectV21.outputs.projectPrincipalId
 #disable-next-line BCP318
 var projectWorkspaceId = projectV21.outputs.projectWorkspaceId
+
+// Function to assign roles to users and service principals for a cognitive services account
+@description('Function to assign roles to users and service principals for a cognitive services account')
+module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  name: '07-AifV21_UserRBAC-${deploymentProjSpecificUniqueSuffix}'
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    userObjectIds: p011_genai_team_lead_array
+    servicePrincipalIds: spAndMiArray
+    projectPrincipalId: projectPrincipal
+    cognitiveServicesAccountName: aifV2Name
+    cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
+    cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
+    openAIContributorRoleId: openAIContributorRoleId
+    openAIUserRoleId: openAIUserRoleId
+    azureAIDeveloperRoleId: azureAIDeveloperRoleId
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    spAndMI2ArrayModule
+    namingConvention
+    aiFoundry2025NoAvm
+    projectV21
+  ]
+}
 
 module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && serviceSettingDeployCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -713,6 +719,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   name: take('09-rbacStorage-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
+    storageAccountName2: namingConvention.outputs.storageAccount2001Name
     #disable-next-line BCP318
     principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
     projectPrincipalId: projectPrincipal

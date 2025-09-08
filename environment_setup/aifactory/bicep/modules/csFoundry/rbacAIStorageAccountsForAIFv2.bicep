@@ -8,6 +8,7 @@
 
 @description('The name of the storage account')
 param storageAccountName string
+param storageAccountName2 string
 
 @description('The principal ID of the AI Foundry system-assigned managed identity')
 param principalId string
@@ -25,8 +26,13 @@ param storageFileDataPrivilegedContributorRoleId string
 param storageQueueDataContributorRoleId string = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 
 // Reference the existing storage account
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
+resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' existing = {
   name: storageAccountName
+}
+
+// Reference the second existing storage account
+resource storageAccount2 'Microsoft.Storage/storageAccounts@2025-01-01' existing = {
+  name: storageAccountName2
 }
 
 // Assign Storage Blob Data Contributor role
@@ -97,8 +103,78 @@ resource projectStorageQueueDataContributorAssignment 'Microsoft.Authorization/r
   }
 }
 
+// ============== STORAGE ACCOUNT 2 ROLE ASSIGNMENTS ==============
+
+// Assign Storage Blob Data Contributor role to Storage Account 2
+resource storageBlobDataContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount2.id, principalId, storageBlobDataContributorRoleId)
+  scope: storageAccount2
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Assign Storage File Data Privileged Contributor role to Storage Account 2
+resource storageFileDataPrivilegedContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount2.id, principalId, storageFileDataPrivilegedContributorRoleId)
+  scope: storageAccount2
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Assign Storage Queue Data Contributor role to Storage Account 2
+resource storageQueueDataContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount2.id, principalId, storageQueueDataContributorRoleId)
+  scope: storageAccount2
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ============== STORAGE ACCOUNT 2 PROJECT PRINCIPAL ROLE ASSIGNMENTS ==============
+
+// Assign Storage Blob Data Contributor role to Project Principal for Storage Account 2
+resource projectStorageBlobDataContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(storageAccount2.id, projectPrincipalId, storageBlobDataContributorRoleId, 'project')
+  scope: storageAccount2
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Assign Storage File Data Privileged Contributor role to Project Principal for Storage Account 2
+resource projectStorageFileDataPrivilegedContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(storageAccount2.id, projectPrincipalId, storageFileDataPrivilegedContributorRoleId, 'project')
+  scope: storageAccount2
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Assign Storage Queue Data Contributor role to Project Principal for Storage Account 2
+resource projectStorageQueueDataContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(storageAccount2.id, projectPrincipalId, storageQueueDataContributorRoleId, 'project')
+  scope: storageAccount2
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 @description('Storage Account RBAC assignments completed successfully')
 output rbacAssignmentsCompleted bool = true
 
 @description('Number of role assignments created')
-output roleAssignmentsCount int = (3 + (!empty(projectPrincipalId) ? 3 : 0))
+output roleAssignmentsCount int = (6 + (!empty(projectPrincipalId) ? 6 : 0))

@@ -11,7 +11,7 @@ param storageName string
 param projectWorkspaceId string
 
 // Reference existing storage account
-resource storage 'Microsoft.Storage/storageAccounts@2022-05-01' existing = {
+resource storage 'Microsoft.Storage/storageAccounts@2025-01-01' existing = {
   name: storageName
   scope: resourceGroup()
 }
