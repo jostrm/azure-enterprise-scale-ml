@@ -60,6 +60,7 @@ param serviceSettingDeployProjectVM bool = false
 // Security and networking
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
+param allowPublicAccessWhenBehindVnet bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
 // PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
@@ -104,7 +105,6 @@ param hybridBenefit bool = false
 
 // Container Registry
 param useCommonACR bool = true
-param allowPublicAccessWhenBehindVnet bool = false
 param acr_adminUserEnabled bool = false
 param acr_dedicated bool = true
 
@@ -413,6 +413,7 @@ module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
     soft_delete_days: keyvaultSoftDeleteDays
     tenantIdentity: tenant().tenantId
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    enablePublicGenAIAccess:enablePublicGenAIAccess
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
