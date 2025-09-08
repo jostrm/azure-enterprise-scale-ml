@@ -7,6 +7,13 @@ existingAiServicesResource, existingAiHubResource, existingAiHubProjectResource,
 
 */
 
+// ============== RBAC CONDITIONS ==============
+// This template implements conditional role assignments that prevent users from assigning
+// privileged administrator roles (Owner, User Access Administrator, RBAC Administrator).
+// This follows the "Allow user to assign all roles except privileged administrator roles" pattern.
+// The condition uses Azure ABAC (Attribute-Based Access Control) to restrict role assignments.
+// ============================================
+
 // Parameters for resource and principal IDs
 param storageAccountName string // Name of Azure Storage Account
 param storageAccountName2 string // Name of Azure Storage Account
@@ -17,7 +24,8 @@ param aiHubName string
 param aiHubProjectName string
 param useAdGroups bool = false // Use AD groups for role assignments
 param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
-param disableContributorAccessForUsers bool = false // Disable contributor access for users
+param disableContributorAccessForUsers bool = false // Disable Contributor access for users
+param disableRBACAdminOnRGForUsers bool = false // Disable Role Based Access Control Administrator for users on resource group
 
 // ############## RG level ##############
 
@@ -27,6 +35,14 @@ var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d' // EP, App service or
 
 var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // User -> RG
 var roleBasedAccessControlAdministratorRG = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'
+
+// Privileged administrator roles that should be excluded from RBAC assignments
+var ownerRoleId = '8e3af657-a8ff-443c-a75c-2fe8c4bcb635' // Owner
+var userAccessAdministratorRoleId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9' // User Access Administrator  
+var rbacAdministratorRoleId = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168' // Role Based Access Control Administrator
+
+// Condition to prevent assignment of privileged administrator roles (Owner, UAA, RBAC)
+var excludePrivilegedRolesCondition = '((!(ActionMatches{\'Microsoft.Authorization/roleAssignments/write\'} AND @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ownerRoleId}, ${userAccessAdministratorRoleId}, ${rbacAdministratorRoleId}})))'
 
 var aiUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d' // User to RG level, to all underlying resources (aiservices, AIF_v2_agents)
 // ############## RG LEVEL END
@@ -497,15 +513,17 @@ resource contributorRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   scope:resourceGroup()
 }]
 
-// --------------- RG:User Access Admin//
-@description('Role Assignment for ResoureGroup: RoleBasedAccessControlAdministrator for users.')
-resource roleBasedAccessControlAdminRGRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+// --------------- RG:User Access Admin
+@description('Role Assignment for ResoureGroup: RoleBasedAccessControlAdministrator for users with conditions to exclude privileged roles.')
+resource roleBasedAccessControlAdminRGRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):if(!disableRBACAdminOnRGForUsers){
   name: guid(resourceGroupId, roleBasedAccessControlAdministratorRG, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleBasedAccessControlAdministratorRG)
     principalId: userObjectIds[i]
     principalType:useAdGroups? 'Group':'User'
-    description:'030: RoleBasedAccessControlAdministrator on RG to USER with OID  ${userObjectIds[i]} for : ${resourceGroupId}'
+    description:'030: RoleBasedAccessControlAdministrator on RG to USER with OID  ${userObjectIds[i]} for : ${resourceGroupId} - excludes privileged administrator roles'
+    condition: excludePrivilegedRolesCondition
+    conditionVersion: '2.0'
   }
   scope:resourceGroup()
 }]
@@ -515,7 +533,9 @@ resource roleBasedAccessControlAdminRGRoleSP 'Microsoft.Authorization/roleAssign
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleBasedAccessControlAdministratorRG)
     principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
-    description:'roleBasedAccessControlAdministrator to project service principal OID:${servicePrincipleAndMIArray[i]} for RG: ${resourceGroupId}'
+    description:'roleBasedAccessControlAdministrator to project service principal OID:${servicePrincipleAndMIArray[i]} for RG: ${resourceGroupId} - excludes privileged administrator roles'
+    condition: excludePrivilegedRolesCondition
+    conditionVersion: '2.0'
   }
   scope:resourceGroup()
 }]

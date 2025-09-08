@@ -78,6 +78,123 @@ param acaSubnetId string = ''
 
 // Resource group naming
 param commonRGNamePrefix string
+
+
+// Enable flags from parameter files
+@description('Enable Azure Machine Learning deployment')
+param enableAzureMachineLearning bool = false
+
+@description('Enable AI Foundry Hub deployment')
+param enableAIFoundryHub bool = false
+@description('Enable AI Foundry V2 deployment')
+param enableAIFoundryV2 bool = false
+@description('Enable AI Foundry V21 deployment')
+param enableAIFoundryV21 bool = false
+
+@description('Enable AI Services deployment')
+param enableAIServices bool = false
+
+@description('Enable AI Search deployment')
+param enableAISearch bool = false
+
+@description('Enable Azure OpenAI deployment')
+param serviceSettingDeployAzureOpenAI bool = false
+
+@description('Enable Azure AI Vision deployment')
+param serviceSettingDeployAzureAIVision bool = false
+
+@description('Enable Azure Speech deployment')
+param serviceSettingDeployAzureSpeech bool = false
+
+@description('Enable AI Document Intelligence deployment')
+param serviceSettingDeployAIDocIntelligence bool = false
+
+@description('Enable Azure Function deployment')
+param serviceSettingDeployFunction bool = false
+
+@description('Enable Azure Web App deployment')
+param serviceSettingDeployWebApp bool = false
+
+@description('Enable Container Apps deployment')
+param serviceSettingDeployContainerApps bool = false
+
+@description('Enable Application Insights Dashboard deployment')
+param serviceSettingDeployAppInsightsDashboard bool = false
+
+@description('Enable Cosmos DB deployment')
+param serviceSettingDeployCosmosDB bool = false
+
+@description('Enable PostgreSQL deployment')
+param serviceSettingDeployPostgreSQL bool = false
+
+@description('Enable Redis Cache deployment')
+param serviceSettingDeployRedisCache bool = false
+
+@description('Enable SQL Database deployment')
+param serviceSettingDeploySQLDatabase bool = false
+
+// Security and networking
+param addBastionHost bool = false
+param bastionResourceGroup string = ''
+param bastionSubscription string = ''
+param bastionName string = ''
+param vnetNameFullBastion string = ''
+param disableContributorAccessForUsers bool = false
+param disableRBACAdminOnRGForUsers bool = false
+
+// Required resource references. Networking parameters for calculation
+param vnetNameBase string
+param vnetResourceGroup_param string = ''
+param vnetNameFull_param string = ''
+param network_env string = ''
+
+// Private DNS configuration
+param centralDnsZoneByPolicyInHub bool = false
+param privDnsSubscription_param string = ''
+param privDnsResourceGroup_param string = ''
+
+// Resource group configuration
+param commonResourceGroup_param string = ''
+param projectPrefix string = 'esml-'
+param projectSuffix string = '-rg'
+// Seeding Key Vault parameters
+param inputKeyvault string
+param inputKeyvaultResourcegroup string
+param inputKeyvaultSubscription string
+param projectServicePrincipleOID_SeedingKeyvaultName string
+
+param useAdGroups bool = true
+// Azure ML Object ID for cross-service permissions
+param azureMachineLearningObjectId string = ''
+
+// Data Lake parameters
+param datalakeName_param string = ''
+param commonLakeNamePrefixMax8chars string
+
+// Common ACR usage
+param useCommonACR bool = true
+
+// Tags
+param tagsProject object = {}
+param tags object = {}
+
+// Resource exists flags from Azure DevOps
+param amlExists bool = false
+param aiHubExists bool = false
+param aiServicesExists bool = false
+param aiSearchExists bool = false
+param openaiExists bool = false
+
+// Additional deployment control flags to prevent duplicate role assignments
+@description('Skip role assignments if they already exist (helps with re-runs)')
+param skipExistingRoleAssignments bool = true
+
+@description('Force recreation of role assignments (use with caution)')
+param forceRecreateRoleAssignments bool = false
+
+@description('Unique deployment identifier to avoid conflicts')
+param deploymentId string = utcNow('yyyyMMddHHmmss')
+
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
 var cmnName = namingConvention.outputs.cmnName
 
@@ -148,125 +265,9 @@ var openAIName = namingConvention.outputs.aoaiName
 //var acrCommonName = namingConvention.outputs.acrCommonName
 //var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 
-// Resource exists flags from Azure DevOps
-param amlExists bool = false
-param aiHubExists bool = false
-param aiServicesExists bool = false
-param aiSearchExists bool = false
-param openaiExists bool = false
-
-// Additional deployment control flags to prevent duplicate role assignments
-@description('Skip role assignments if they already exist (helps with re-runs)')
-param skipExistingRoleAssignments bool = true
-
-@description('Force recreation of role assignments (use with caution)')
-param forceRecreateRoleAssignments bool = false
-
-@description('Unique deployment identifier to avoid conflicts')
-param deploymentId string = utcNow('yyyyMMddHHmmss')
-
 // ============================================================================
 // Resource definitions
 // ============================================================================
-
-
-// Enable flags from parameter files
-@description('Enable Azure Machine Learning deployment')
-param enableAzureMachineLearning bool = false
-
-@description('Enable AI Foundry Hub deployment')
-param enableAIFoundryHub bool = false
-@description('Enable AI Foundry V2 deployment')
-param enableAIFoundryV2 bool = false
-@description('Enable AI Foundry V21 deployment')
-param enableAIFoundryV21 bool = false
-
-@description('Enable AI Services deployment')
-param enableAIServices bool = false
-
-@description('Enable AI Search deployment')
-param enableAISearch bool = false
-
-@description('Enable Azure OpenAI deployment')
-param serviceSettingDeployAzureOpenAI bool = false
-
-@description('Enable Azure AI Vision deployment')
-param serviceSettingDeployAzureAIVision bool = false
-
-@description('Enable Azure Speech deployment')
-param serviceSettingDeployAzureSpeech bool = false
-
-@description('Enable AI Document Intelligence deployment')
-param serviceSettingDeployAIDocIntelligence bool = false
-
-@description('Enable Azure Function deployment')
-param serviceSettingDeployFunction bool = false
-
-@description('Enable Azure Web App deployment')
-param serviceSettingDeployWebApp bool = false
-
-@description('Enable Container Apps deployment')
-param serviceSettingDeployContainerApps bool = false
-
-@description('Enable Application Insights Dashboard deployment')
-param serviceSettingDeployAppInsightsDashboard bool = false
-
-@description('Enable Cosmos DB deployment')
-param serviceSettingDeployCosmosDB bool = false
-
-@description('Enable PostgreSQL deployment')
-param serviceSettingDeployPostgreSQL bool = false
-
-@description('Enable Redis Cache deployment')
-param serviceSettingDeployRedisCache bool = false
-
-@description('Enable SQL Database deployment')
-param serviceSettingDeploySQLDatabase bool = false
-
-// Security and networking
-param addBastionHost bool = false
-param bastionResourceGroup string = ''
-param bastionSubscription string = ''
-param bastionName string = ''
-param vnetNameFullBastion string = ''
-param disableContributorAccessForUsers bool = false
-
-// Required resource references
-// Networking parameters for calculation
-param vnetNameBase string
-param vnetResourceGroup_param string = ''
-param vnetNameFull_param string = ''
-param network_env string = ''
-
-// Private DNS configuration
-param centralDnsZoneByPolicyInHub bool = false
-param privDnsSubscription_param string = ''
-param privDnsResourceGroup_param string = ''
-
-// Resource group configuration
-param commonResourceGroup_param string = ''
-param projectPrefix string = 'esml-'
-param projectSuffix string = '-rg'
-// Seeding Key Vault parameters
-param inputKeyvault string
-param inputKeyvaultResourcegroup string
-param inputKeyvaultSubscription string
-param projectServicePrincipleOID_SeedingKeyvaultName string
-
-param useAdGroups bool = true
-// Azure ML Object ID for cross-service permissions
-param azureMachineLearningObjectId string = ''
-
-// Data Lake parameters
-param datalakeName_param string = ''
-param commonLakeNamePrefixMax8chars string
-
-// Common ACR usage
-param useCommonACR bool = true
-
-// Tags
-param tagsProject object = {}
-param tags object = {}
 
 // ============== VARIABLES ==============
 
@@ -572,6 +573,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && e
     servicePrincipleAndMIArray: spAndMiUnique
     useAdGroups: useAdGroups
     disableContributorAccessForUsers: disableContributorAccessForUsers
+    disableRBACAdminOnRGForUsers:disableRBACAdminOnRGForUsers
   }
   dependsOn: [
     existingTargetRG

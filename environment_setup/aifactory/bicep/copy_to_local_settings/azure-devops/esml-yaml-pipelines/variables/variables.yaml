@@ -194,6 +194,7 @@ variables:
   serviceSettingDeployAzureSpeech: "false"
   serviceSettingDeployAIDocIntelligence: "false"
   disableContributorAccessForUsers: "false"
+  disableRBACAdminOnRGForUsers: "false"
   serviceSettingDeployCosmosDB: "true" # true, since needed for AI Foundry V2 project, agents.
   serviceSettingDeployPostgreSQL: "false"
   serviceSettingDeployRedisCache: "false"
