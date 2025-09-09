@@ -603,7 +603,7 @@ var projectWorkspaceId = projectV21.outputs.projectWorkspaceId
 
 // Function to assign roles to users and service principals for a cognitive services account
 @description('Function to assign roles to users and service principals for a cognitive services account')
-module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists)) {
   name: '07-AifV21_UserRBAC-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -644,11 +644,11 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     accountName: aifV2Name
     projectName: aifV2ProjectName
     #disable-next-line BCP318
-    cosmosDBConnection: projectV21.outputs.cosmosDBConnection
+    cosmosDBConnection: namingConvention.outputs.cosmosDBName
     #disable-next-line BCP318
-    azureStorageConnection: projectV21.outputs.azureStorageConnection
+    azureStorageConnection: namingConvention.outputs.storageAccount1001Name
     #disable-next-line BCP318
-    aiSearchConnection: projectV21.outputs.aiSearchConnection
+    aiSearchConnection: namingConvention.outputs.safeNameAISearch
     projectCapHost: projectCapHost
   }
   dependsOn: [
