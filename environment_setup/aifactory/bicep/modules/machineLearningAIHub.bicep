@@ -748,6 +748,7 @@ resource projectDataScientistRoleAssignment2 'Microsoft.Authorization/roleAssign
     principalType: 'ServicePrincipal'
     #disable-next-line BCP318
     principalId: aiProject2.identity.principalId
+    description: '05 - projectDataScientistRoleAssignment with azureMLDataScientistRole'
   }
 }
 
@@ -760,6 +761,7 @@ resource projectComputeOperatorRoleAssignment2 'Microsoft.Authorization/roleAssi
     principalType: 'ServicePrincipal'
     #disable-next-line BCP318
     principalId: aiProject2.identity.principalId
+    description: '06 - projectComputeOperatorRoleAssignment with azureMLComputeOperatorRole'
   }
 }
 
@@ -772,6 +774,7 @@ resource projectSecretsReaderRoleAssignment2 'Microsoft.Authorization/roleAssign
     principalType: 'ServicePrincipal'
     #disable-next-line BCP318
     principalId: aiProject2.identity.principalId
+    description: '07 - projectSecretsReaderRoleAssignment with amlWorkspaceSecretsReaderRole'
   }
 }
 
@@ -784,6 +787,7 @@ resource projectOpenAIUserRoleAssignment2 'Microsoft.Authorization/roleAssignmen
     principalType: 'ServicePrincipal'
     #disable-next-line BCP318
     principalId: aiProject2.identity.principalId
+    description: '08 - projectOpenAIUserRoleAssignment with cognitiveServicesOpenAiUserRole'
   }
 }
 
