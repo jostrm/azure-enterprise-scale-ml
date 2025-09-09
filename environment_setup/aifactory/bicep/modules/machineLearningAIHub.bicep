@@ -33,6 +33,7 @@ param enablePublicAccessWithPerimeter bool = false
 param createPrivateEndpoint bool = true
 param aiSearchName string
 param aifactorySalt string
+param aiHubExists bool = false
 param privateLinksDnsZones object
 @allowed([
   'Hub'
@@ -618,7 +619,7 @@ resource projectSecretsReaderRoleAssignment 'Microsoft.Authorization/roleAssignm
 }
 
 @description('Assign the AI Project MSI the ability to invoke models in Azure OpenAI.')
-resource projectOpenAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!enablePublicAccessWithPerimeter) {
+resource projectOpenAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!enablePublicAccessWithPerimeter && !aiHubExists) {
   scope: aiServices
   name: guid(aiServices.id, aiProject.id, cognitiveServicesOpenAiUserRole.id, 'openai-user')
   properties: {
@@ -779,7 +780,7 @@ resource projectSecretsReaderRoleAssignment2 'Microsoft.Authorization/roleAssign
 }
 
 @description('Assign the AI Project2 MSI the ability to invoke models in Azure OpenAI.')
-resource projectOpenAIUserRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(enablePublicAccessWithPerimeter) {
+resource projectOpenAIUserRoleAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(enablePublicAccessWithPerimeter && !aiHubExists) {
   scope: aiServices
   name: guid(aiServices.id, aiProject2.id, cognitiveServicesOpenAiUserRole.id, 'openai-user-2')
   properties: {

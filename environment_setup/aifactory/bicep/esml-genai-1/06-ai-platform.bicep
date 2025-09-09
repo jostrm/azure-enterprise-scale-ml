@@ -562,6 +562,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
       )
     }
     defaultProjectName: aifV1ProjectName
+    aiHubExists:aiHubExists
     location: location
     tags: tagsProject
     aifactorySuffix: aifactorySuffixRG
