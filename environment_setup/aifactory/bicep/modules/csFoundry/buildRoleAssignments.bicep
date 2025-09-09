@@ -128,6 +128,8 @@ var aiSearchRoleAssignments = enableAISearch && !empty(aiSearchPrincipalId) ? [
   }
 ] : []
 
+/* AI Developer is on Resource group scope, not Cognitive Services scope
+
 // Build Azure AI Developer role assignments for users (required for Chat with Data)
 var userAzureAIDeveloperRoleAssignments = [
   // Azure AI Developer roles for users/groups
@@ -147,6 +149,7 @@ var spAzureAIDeveloperRoleAssignments = [
     principalType: 'ServicePrincipal'
   }
 ]
+*/
 
 // Build Key Vault roles for users (required for Agent playground)
 var userKeyVaultRoleAssignments = [
@@ -172,11 +175,11 @@ var spKeyVaultRoleAssignments = [
 var allRoleAssignments = concat(
   userRoleAssignments,
   userOpenAIRoleAssignments,
-  userAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for users
+  //userAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for users
+  //spAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for service principals
   userKeyVaultRoleAssignments, // Add Key Vault Secrets User for users
   spCognitiveRoleAssignments,
   spOpenAIRoleAssignments,
-  spAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for service principals
   spKeyVaultRoleAssignments, // Add Key Vault Contributor for service principals
   aiSearchRoleAssignments
 )

@@ -640,7 +640,6 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
     cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
     openAIUserRoleId: openAIUserRoleId
-    azureAIDeveloperRoleId: azureAIDeveloperRoleId
     useAdGroups: useAdGroups
   }
   dependsOn: [

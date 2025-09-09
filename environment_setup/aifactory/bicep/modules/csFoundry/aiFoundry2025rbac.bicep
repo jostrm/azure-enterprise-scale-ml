@@ -1,5 +1,8 @@
 /* This (AVM) is worse, since using aiFoundry2025rbac.bicep
-┌─────────────────────────────────────────────────────────┐
+┌───────────────────────────────────────  }  }
+}]
+
+// Assign OpenAI User role to service principalsOpenAI User role to service principals┐
 │  POTENTIAL OVER-ASSIGNMENT ISSUE                        │
 │  ┌─────────────────────────────────────────────────────┐│
 │  │ From: Deploy-Your-AI-Application-In-Production repo:││
@@ -57,9 +60,6 @@ param openAIContributorRoleId string
 
 @description('Role definition ID for OpenAI User')
 param openAIUserRoleId string
-
-@description('Role definition ID for Azure AI Developer')
-param azureAIDeveloperRoleId string = '64702f94-c441-49e6-a78b-ef80e0188fee'
 
 @description('Whether to use AD Groups instead of individual users')
 param useAdGroups bool = false
@@ -169,22 +169,10 @@ resource cognitiveServicesUserRoleAssignmentProject 'Microsoft.Authorization/rol
   }
 }
 
-// Assign Azure AI Developer role to project principal
-resource azureAIDeveloperRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
-  name: guid(cognitiveServicesAccount.id, projectPrincipalId, azureAIDeveloperRoleId, 'project-ai-developer-manual')
-  scope: cognitiveServicesAccount
-  properties: {
-    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
-    principalId: projectPrincipalId
-    principalType: 'ServicePrincipal'
-    description: '!09:project-ai-developer-manual: AI Foundry project managed identity - Azure AI Developer for project operations'
-  }
-}
-
 // Output the assigned role names for reference
-output userRoleNames array = [for (userObjectId, i) in userObjectIds: 'User ${userObjectId} assigned OpenAI Contributor, Cognitive Services Contributor, Cognitive Services User, and Azure AI Developer roles']
+output userRoleNames array = [for (userObjectId, i) in userObjectIds: 'User ${userObjectId} assigned OpenAI Contributor, Cognitive Services Contributor, and Cognitive Services User roles']
 output servicePrincipalRoleNames array = [for (spId, i) in servicePrincipalIds: 'Service Principal ${spId} assigned OpenAI User role']
-output projectPrincipalRoleNames string = !empty(projectPrincipalId) ? 'Project Principal ${projectPrincipalId} assigned OpenAI Contributor, Cognitive Services Contributor, Cognitive Services User, and Azure AI Developer roles' : 'No project principal provided'
+output projectPrincipalRoleNames string = !empty(projectPrincipalId) ? 'Project Principal ${projectPrincipalId} assigned OpenAI Contributor, Cognitive Services Contributor, and Cognitive Services User roles' : 'No project principal provided'
 
 @description('Number of role assignments created')
-output roleAssignmentsCount int = (length(userObjectIds) * 4) + length(servicePrincipalIds) + (!empty(projectPrincipalId) ? 4 : 0)
+output roleAssignmentsCount int = (length(userObjectIds) * 3) + length(servicePrincipalIds) + (!empty(projectPrincipalId) ? 3 : 0)
