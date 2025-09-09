@@ -106,7 +106,8 @@ param prjResourceSuffixNoDash string = ''
 // CosmosDB
 param cosmosDBProvisionedThroughput int = 400
 param cosmosTotalThroughputLimit int = 4000
-param cosmosKind string = 'MongoDB'
+@allowed([ 'GlobalDocumentDB', 'MongoDB'])
+param cosmosKind string = 'GlobalDocumentDB'
 param cosmosMinimalTlsVersion string = 'Tls12'
 
 // PostgreSQL
