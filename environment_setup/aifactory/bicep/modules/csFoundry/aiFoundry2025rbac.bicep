@@ -70,12 +70,13 @@ resource cognitiveServicesAccount 'Microsoft.CognitiveServices/accounts@2023-10-
 
 // Assign OpenAI Contributor role to users
 resource openAIContributorRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
-  name: guid(cognitiveServicesAccount.id, userObjectId, openAIContributorRoleId, 'user-contributor-manual')
+  name: guid(cognitiveServicesAccount.id, userObjectId, openAIContributorRoleId, 'user-openai-contributor-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIContributorRoleId)
     principalId: userObjectId
     principalType: useAdGroups ? 'Group' : 'User'
+    description: '!01: user-openai-contributor-manual'
   }
 }]
 
@@ -87,9 +88,11 @@ resource cognitiveServicesContributorRoleAssignmentUsers 'Microsoft.Authorizatio
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
     principalId: userObjectId
     principalType: useAdGroups ? 'Group' : 'User'
+    description: '!02: user-cs-contributor-manual'
   }
 }]
 
+/*
 // Assign Cognitive Services User role to users
 resource cognitiveServicesUserRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
   name: guid(cognitiveServicesAccount.id, userObjectId, cognitiveServicesUserRoleId, 'user-cs-user-manual')
@@ -98,6 +101,7 @@ resource cognitiveServicesUserRoleAssignmentUsers 'Microsoft.Authorization/roleA
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
     principalId: userObjectId
     principalType: useAdGroups ? 'Group' : 'User'
+    description: '03: user-cs-user-manual'
   }
 }]
 
@@ -109,8 +113,11 @@ resource azureAIDeveloperRoleAssignmentUsers 'Microsoft.Authorization/roleAssign
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
     principalId: userObjectId
     principalType: useAdGroups ? 'Group' : 'User'
+    description: '04: user-ai-developer-manual'
   }
 }]
+
+*/
 
 // ============== PROJECT PRINCIPAL ROLE ASSIGNMENTS ==============
 
@@ -122,18 +129,19 @@ resource openAIUserRoleAssignmentServicePrincipals 'Microsoft.Authorization/role
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIUserRoleId)
     principalId: spId
     principalType: 'ServicePrincipal'
+    description: '!05: sp-user-manual (2 rows OK)'
   }
 }]
 
 // Assign OpenAI Contributor role to project principal
 resource openAIContributorRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
-  name: guid(cognitiveServicesAccount.id, projectPrincipalId, openAIContributorRoleId, 'project-contributor-manual')
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, openAIContributorRoleId, 'project-openai-contributor-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIContributorRoleId)
     principalId: projectPrincipalId
     principalType: 'ServicePrincipal'
-    description: 'AI Foundry project managed identity - OpenAI Contributor for project operations'
+    description: '!06:project-openai-contributor-manual: AI Foundry project managed identity - OpenAI Contributor for project operations'
   }
 }
 
@@ -145,7 +153,7 @@ resource cognitiveServicesContributorRoleAssignmentProject 'Microsoft.Authorizat
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
     principalId: projectPrincipalId
     principalType: 'ServicePrincipal'
-    description: 'AI Foundry project managed identity - Cognitive Services Contributor for project operations'
+    description: '!07:project-cs-contributor-manual:AI Foundry project managed identity - Cognitive Services Contributor for project operations'
   }
 }
 
@@ -157,7 +165,7 @@ resource cognitiveServicesUserRoleAssignmentProject 'Microsoft.Authorization/rol
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
     principalId: projectPrincipalId
     principalType: 'ServicePrincipal'
-    description: 'AI Foundry project managed identity - Cognitive Services User for project operations'
+    description: '!08:project-cs-user-manual: AI Foundry project managed identity - Cognitive Services User for project operations'
   }
 }
 
@@ -169,7 +177,7 @@ resource azureAIDeveloperRoleAssignmentProject 'Microsoft.Authorization/roleAssi
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
     principalId: projectPrincipalId
     principalType: 'ServicePrincipal'
-    description: 'AI Foundry project managed identity - Azure AI Developer for project operations'
+    description: '!09:project-ai-developer-manual: AI Foundry project managed identity - Azure AI Developer for project operations'
   }
 }
 

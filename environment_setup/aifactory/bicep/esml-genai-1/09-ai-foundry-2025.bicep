@@ -498,6 +498,7 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!container
 }
 
 var fqdn = [
+  // Private link FQDNs for networking
   'privatelink.blob.${environment().suffixes.storage}'
   'privatelink.cognitiveservices.azure.com'
   'privatelink.documents.azure.com'
@@ -505,6 +506,30 @@ var fqdn = [
   'privatelink.openai.azure.com'
   'privatelink.search.windows.net'
   'privatelink.services.ai.azure.com'
+  
+  // Public FQDNs for specific Azure services
+  // Storage Account 1 - Blob, File, Queue endpoints
+  '${namingConvention.outputs.storageAccount1001Name}.blob.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount1001Name}.file.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount1001Name}.queue.${environment().suffixes.storage}'
+  
+  // Storage Account 2 - Blob, File, Queue endpoints
+  '${namingConvention.outputs.storageAccount2001Name}.blob.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount2001Name}.file.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount2001Name}.queue.${environment().suffixes.storage}'
+  
+  // AI Search endpoint
+  '${namingConvention.outputs.safeNameAISearch}.search.windows.net'
+  
+  // Key Vault endpoint
+  '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
+  
+  // Cosmos DB endpoint (if enabled)
+  serviceSettingDeployCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
+  
+  // AI Services endpoint
+  '${aifV2Name}.cognitiveservices.azure.com'
+  '${aifV2Name}.openai.azure.com'
 ]
 
 // AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
