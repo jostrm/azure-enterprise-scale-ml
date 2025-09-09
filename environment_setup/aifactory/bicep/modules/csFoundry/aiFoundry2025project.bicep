@@ -31,6 +31,9 @@ resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existi
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
   name: storageName
 }
+resource storageAccount2 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
+  name: storageName2
+}
 
 resource aiSearchService 'Microsoft.Search/searchServices@2024-06-01-preview' existing =  if (!empty(aiSearchName)) {
   name: aiSearchName
@@ -73,16 +76,16 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
   name: storageName2
   parent: project
   properties: {
-    category: 'AzureBlob'
+    category: 'AzureStorageAccount'
     // target: storageAccountTarget
     //category: 'AzureStorageAccount'
-    target: storageAccount.properties.primaryEndpoints.blob
+    target: storageAccount2.properties.primaryEndpoints.blob
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
-      ResourceId: storageAccount.id
-      location: storageAccount.location
-      accountName: storageAccount.name
+      ResourceId: storageAccount2.id
+      location: storageAccount2.location
+      accountName: storageAccount2.name
       containerName: 'default'
     }
   }

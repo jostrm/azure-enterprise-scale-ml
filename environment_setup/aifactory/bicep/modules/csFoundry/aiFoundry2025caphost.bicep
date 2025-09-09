@@ -14,6 +14,18 @@ resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
    name: accountName
 }
 
+resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-06-01' = {
+  name: projectCapHost
+  parent: account
+  properties: {
+    capabilityHostKind: 'Agents'
+    vectorStoreConnections: vectorStoreConnections
+    storageConnections: storageConnections
+    threadStorageConnections: threadConnections
+  }
+
+}
+/*
 resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
   name: projectName
   parent: account
@@ -32,3 +44,6 @@ resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/ca
 }
 
 output projectCapHost string = projectCapabilityHost.name
+*/
+
+output accountCapHost string = accountCapabilityHost.name
