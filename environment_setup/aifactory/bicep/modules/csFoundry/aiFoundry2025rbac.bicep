@@ -70,7 +70,7 @@ resource cognitiveServicesAccount 'Microsoft.CognitiveServices/accounts@2023-10-
 
 // Assign OpenAI Contributor role to users
 resource openAIContributorRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
-  name: guid(cognitiveServicesAccount.id, userObjectId, openAIContributorRoleId, 'contributor')
+  name: guid(cognitiveServicesAccount.id, userObjectId, openAIContributorRoleId, 'user-contributor-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIContributorRoleId)
@@ -81,7 +81,7 @@ resource openAIContributorRoleAssignmentUsers 'Microsoft.Authorization/roleAssig
 
 // Assign Cognitive Services Contributor role to users
 resource cognitiveServicesContributorRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
-  name: guid(cognitiveServicesAccount.id, userObjectId, cognitiveServicesContributorRoleId, 'contributor')
+  name: guid(cognitiveServicesAccount.id, userObjectId, cognitiveServicesContributorRoleId, 'user-cs-contributor-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
@@ -92,7 +92,7 @@ resource cognitiveServicesContributorRoleAssignmentUsers 'Microsoft.Authorizatio
 
 // Assign Cognitive Services User role to users
 resource cognitiveServicesUserRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
-  name: guid(cognitiveServicesAccount.id, userObjectId, cognitiveServicesUserRoleId, 'user')
+  name: guid(cognitiveServicesAccount.id, userObjectId, cognitiveServicesUserRoleId, 'user-cs-user-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
@@ -101,20 +101,9 @@ resource cognitiveServicesUserRoleAssignmentUsers 'Microsoft.Authorization/roleA
   }
 }]
 
-// Assign OpenAI User role to service principals
-resource openAIUserRoleAssignmentServicePrincipals 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (spId, i) in servicePrincipalIds: {
-  name: guid(cognitiveServicesAccount.id, spId, openAIUserRoleId, 'sp-user')
-  scope: cognitiveServicesAccount
-  properties: {
-    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIUserRoleId)
-    principalId: spId
-    principalType: 'ServicePrincipal'
-  }
-}]
-
 // Assign Azure AI Developer role to users
 resource azureAIDeveloperRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
-  name: guid(cognitiveServicesAccount.id, userObjectId, azureAIDeveloperRoleId, 'ai-developer')
+  name: guid(cognitiveServicesAccount.id, userObjectId, azureAIDeveloperRoleId, 'user-ai-developer-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
@@ -125,9 +114,20 @@ resource azureAIDeveloperRoleAssignmentUsers 'Microsoft.Authorization/roleAssign
 
 // ============== PROJECT PRINCIPAL ROLE ASSIGNMENTS ==============
 
+// Assign OpenAI User role to service principals
+resource openAIUserRoleAssignmentServicePrincipals 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (spId, i) in servicePrincipalIds: {
+  name: guid(cognitiveServicesAccount.id, spId, openAIUserRoleId, 'sp-user-manual')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIUserRoleId)
+    principalId: spId
+    principalType: 'ServicePrincipal'
+  }
+}]
+
 // Assign OpenAI Contributor role to project principal
 resource openAIContributorRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
-  name: guid(cognitiveServicesAccount.id, projectPrincipalId, openAIContributorRoleId, 'project-contributor')
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, openAIContributorRoleId, 'project-contributor-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', openAIContributorRoleId)
@@ -139,7 +139,7 @@ resource openAIContributorRoleAssignmentProject 'Microsoft.Authorization/roleAss
 
 // Assign Cognitive Services Contributor role to project principal
 resource cognitiveServicesContributorRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
-  name: guid(cognitiveServicesAccount.id, projectPrincipalId, cognitiveServicesContributorRoleId, 'project-cs-contributor')
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, cognitiveServicesContributorRoleId, 'project-cs-contributor-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
@@ -151,7 +151,7 @@ resource cognitiveServicesContributorRoleAssignmentProject 'Microsoft.Authorizat
 
 // Assign Cognitive Services User role to project principal
 resource cognitiveServicesUserRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
-  name: guid(cognitiveServicesAccount.id, projectPrincipalId, cognitiveServicesUserRoleId, 'project-cs-user')
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, cognitiveServicesUserRoleId, 'project-cs-user-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUserRoleId)
@@ -163,7 +163,7 @@ resource cognitiveServicesUserRoleAssignmentProject 'Microsoft.Authorization/rol
 
 // Assign Azure AI Developer role to project principal
 resource azureAIDeveloperRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
-  name: guid(cognitiveServicesAccount.id, projectPrincipalId, azureAIDeveloperRoleId, 'project-ai-developer')
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, azureAIDeveloperRoleId, 'project-ai-developer-manual')
   scope: cognitiveServicesAccount
   properties: {
     roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
