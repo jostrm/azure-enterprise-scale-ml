@@ -251,6 +251,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       
     }
   }
+  /*
   resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: azureOpenAIConnectionName
     properties: {
@@ -270,6 +271,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       target: aiServices.properties.endpoint
     }
   }
+  */
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
