@@ -281,8 +281,8 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       useWorkspaceManagedIdentity: true
       //peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
       //peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
-      peRequirement: 'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: 'Active' // 'NotApplicable','Active', 'Inactive'
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
