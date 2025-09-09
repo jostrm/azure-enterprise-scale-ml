@@ -67,10 +67,13 @@ resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/
       ApiType: 'Azure'
       ResourceId: storageAccount.id
       location: storageAccount.location
-      //accountName: storageAccount.name
+      accountName: storageAccount.name
       //containerName: 'default'
     }
   }
+  dependsOn:[
+    project
+  ]
 }
 resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
   name: storageName2
@@ -89,7 +92,11 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
       containerName: 'default'
     }
   }
+  dependsOn:[
+    project_connection_azure_storage
+  ]
 }
+
 resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (!empty(aiSearchName)) {
   name: aiSearchService.name
   parent: project
@@ -105,6 +112,9 @@ resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts
       location: aiSearchService.location
     }
   }
+  dependsOn:[
+    project_connection_azure_storage2
+  ]
 }
 
 resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if  (!empty(cosmosDBname)) {
@@ -122,6 +132,9 @@ resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/proje
       location: cosmosDBAccount.location
     }
   }
+  dependsOn:[
+    project_connection_azureai_search
+  ]
 }
 
 output projectId string = project.id
