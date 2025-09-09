@@ -9,23 +9,22 @@ var threadConnections = ['${cosmosDBConnection}']
 var storageConnections = ['${azureStorageConnection}']
 var vectorStoreConnections = ['${aiSearchConnection}']
 
-
+// AI Foundry resource (AI Services)
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
    name: accountName
 }
 
 resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-06-01' = {
-  name: projectCapHost
+  name: '${projectCapHost}Account'
   parent: account
   properties: {
-    capabilityHostKind: 'Agents'
-    vectorStoreConnections: vectorStoreConnections
-    storageConnections: storageConnections
-    threadStorageConnections: threadConnections
   }
-
+  dependsOn: [
+    account  // Explicit dependency to ensure account is fetched first
+  ]
 }
-/*
+
+// AI foundry project
 resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
   name: projectName
   parent: account
@@ -40,10 +39,12 @@ resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/ca
     storageConnections: storageConnections
     threadStorageConnections: threadConnections
   }
-
+  dependsOn: [
+    account              //  Ensure account is fetched
+    project              // Ensure project is fetched  
+    accountCapabilityHost // Ensure account capability host is created first
+  ]
 }
 
 output projectCapHost string = projectCapabilityHost.name
-*/
-
 output accountCapHost string = accountCapabilityHost.name

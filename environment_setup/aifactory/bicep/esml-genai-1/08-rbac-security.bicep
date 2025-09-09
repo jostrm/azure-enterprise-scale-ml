@@ -202,7 +202,7 @@ var cmnName = namingConvention.outputs.cmnName
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: '07-naming-${targetResourceGroup}'
+  name: take('08-naming-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     env: env
@@ -300,7 +300,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
 
 var miPrjName = namingConvention.outputs.miPrjName
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: 'getMI-${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-getMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     managedIdentityName: miPrjName
@@ -309,7 +309,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 
 var var_miPrj_PrincipalId = getProjectMIPrincipalId.outputs.principalId
 module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
-  name: '07-spAndMI2Array-${targetResourceGroup}'
+  name: take('08-spAndMI2Array-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
@@ -435,7 +435,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2024-07-01' existi
 // Bastion in AIFactory COMMON RG, but with a custom name
 module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(empty(bastionResourceGroup) && addBastionHost) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '07rbac1GenAIRUsCmnKV${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbac1GenAIRUsCmnKV${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     common_kv_name: namingConvention.outputs.kvNameCommon
     user_object_ids: p011_genai_team_lead_array   
@@ -451,7 +451,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
 // Bastion Externally (Connectivity subscription and RG)
 module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(bastionResourceGroup) && !empty(bastionSubscription)) {
   scope: resourceGroup(bastionSubscription, bastionResourceGroup)
-  name: '07rbac2GenAIUsersBas${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbac2GenAIUsersBas${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     user_object_ids: p011_genai_team_lead_array
     bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
@@ -470,7 +470,7 @@ var genaiName = namingConvention.outputs.projectTypeGenAIName
 // Assign Reader role on storage account 1001 blob private endpoint to AI Project
 module storageReaderRole1001 '../modules/storagePendReaderToAIProject.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-storageReader1001${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-storageReader1001${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     aiProjectName: aifV1ProjectName
@@ -481,7 +481,7 @@ module storageReaderRole1001 '../modules/storagePendReaderToAIProject.bicep' = i
 // Assign Reader role on storage account 2001 blob private endpoint to AI Project
 module storageReaderRole2001 '../modules/storagePendReaderToAIProject.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '06-storageReader2001${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-storageReader2001${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount2001Name
     aiProjectName: aifV1ProjectName
@@ -495,7 +495,7 @@ module storageReaderRole2001 '../modules/storagePendReaderToAIProject.bicep' = i
 // RBAC for OpenAI - Storage, Search, and User Access
 module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureOpenAI && !openaiExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbac3OpenAI${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbac3OpenAI${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -515,7 +515,7 @@ module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDepl
 // RBAC for AI Services - Storage and Search Integration
 module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!aiServicesExists && enableAIServices) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbac4AIServ${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbac4AIServ${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -530,7 +530,7 @@ module rbacModuleAIServices '../modules/aihubRbacAIServices.bicep' = if(!aiServi
 // RBAC for AI Search - Cross-service Integration
 module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExists && enableAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbac5Search${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbac5Search${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -547,7 +547,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExi
 // RBAC for AI Hub to Azure ML Resource Group
 module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists && !empty(azureMachineLearningObjectId) && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     azureMachineLearningObjectId: azureMachineLearningObjectId
     aiHubName: aifV1HubName
@@ -561,7 +561,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
 // RBAC for Users to AI Hub and Projects
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbacUsersAIHub${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacUsersAIHub${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     aiServicesName: aiServicesName
     storageAccountName: storageAccount1001Name
@@ -583,7 +583,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && e
 // RBAC for Users to AI Search
 module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!aiSearchExists && enableAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbacAISearch${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacAISearch${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     aiSearchName: aiSearchName
     userObjectIds: p011_genai_team_lead_array
@@ -600,7 +600,7 @@ module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!aiSea
 // RBAC for Azure AI Vision (Optional)
 module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbacVision${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacVision${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -618,7 +618,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
 // RBAC for Azure Speech Services (Optional)
 module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbacSpeech${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacSpeech${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -636,7 +636,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
 // RBAC for AI Document Intelligence (Optional)
 module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: '07rbacDocs${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacDocs${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
@@ -656,7 +656,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIn
 // RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost && empty(bastionSubscription)) {
   scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
-  name: '07rbacGenAIUsVn${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacGenAIUsVn${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     user_object_ids: p011_genai_team_lead_array
     vNetName: vnetNameFull
@@ -672,7 +672,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 // Bastion VNet Externally (Connectivity subscription and RG || AI Factory Common RG)
 module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost && !empty(bastionSubscription)) {
   scope: resourceGroup(bastionSubscription, bastionResourceGroup)
-  name: '07rbacUseVnet${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacUseVnet${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     user_object_ids: p011_genai_team_lead_array
     vNetName: vnetNameFullBastion
@@ -690,7 +690,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
 // RBAC on ACR Push/Pull for users in Common Resource group
 module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '07rbacUsCmnACR${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacUsCmnACR${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
     servicePrincipleAndMIArray: spAndMiArray
@@ -708,7 +708,7 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
 // RBAC for Data Lake - AI Foundry Integration
 module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '07rbacLake4Prj${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacLake4Prj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
     aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
@@ -726,7 +726,7 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!ai
 // RBAC for Data Lake - Azure ML Integration
 module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: '07rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}'
+  name: take('08-rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
     aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID

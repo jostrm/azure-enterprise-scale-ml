@@ -24,6 +24,7 @@ param logAnalyticsWorkspaceResourceId string
 @maxValue(1000000)
 param autoscaleMaxThroughput int = 4000
 param databaseName string = 'aifdb'
+param databaseNameCaphost string = 'enterprise_memory'
 param containerName string = 'defaultcontainer'
 param partitionKeyPath string = '/id'
 param minimalTlsVersion string = 'Tls12' // docs. //todo: 'TLS 1.2' //done-error: 'Tls1_2'
@@ -128,7 +129,6 @@ resource cosmosDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024
     }
   }
 }
-
 // Add a SQL container resource
 resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-12-01-preview' = if(kind == 'GlobalDocumentDB') {
   parent: cosmosDatabase
@@ -165,6 +165,19 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
     } : {}
   }
 }
+// Caphost DB - enterprise_memory
+resource cosmosDatabaseCaphost 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-12-01-preview' = if(kind == 'GlobalDocumentDB') {
+  parent: cosmos
+  name: databaseNameCaphost
+  tags:tags
+  properties: {
+    resource: {
+      id: databaseNameCaphost
+    }
+  }
+}
+
+
 // Add MongoDB database and collection resources
 
 // MongoDB database
