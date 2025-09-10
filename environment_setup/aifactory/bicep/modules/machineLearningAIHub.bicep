@@ -192,8 +192,8 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: true
-    enableDataIsolation:enablePublicAccessWithPerimeter?false:true
+    provisionNetworkNow: false // v1.22 false from true 
+    enableDataIsolation: true // v1.22 true from: enablePublicAccessWithPerimeter?false:true
     discoveryUrl:'https://${location}.api.azureml.ms.net/discovery' // v1.22 Optional. The URL for the workspace discovery service.
 
     // network settings
@@ -259,6 +259,23 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
           }
         } : {}
       )
+    }
+  }
+    resource blob 'connections' = if(enablePublicAccessWithPerimeter) {
+    name: storageAccountName
+    properties: {
+      authType: 'AAD'
+      category: 'AzureBlob'
+      isSharedToAll: false
+      useWorkspaceManagedIdentity: true
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      sharedUserList: []
+      metadata: {
+        ApiType: 'Azure'
+        ResourceId: existingStorageAccount.id
+      }
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default'
     }
   }
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
@@ -424,8 +441,10 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: true
-    enableDataIsolation:false
+    //provisionNetworkNow: true
+    //enableDataIsolation:false
+    provisionNetworkNow: false // v1.22 false from true 
+    enableDataIsolation: true // v1.22 true from false
     v1LegacyMode:false
 
      // network settings
