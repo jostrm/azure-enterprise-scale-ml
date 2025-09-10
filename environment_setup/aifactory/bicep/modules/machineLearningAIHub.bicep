@@ -261,7 +261,73 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       )
     }
   }
-    resource blob 'connections' = if(enablePublicAccessWithPerimeter) {
+
+}
+
+@description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
+resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
+  name: aiHubDiagSettingName
+  scope: aiHub
+  properties: {
+    workspaceId: logWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+  }
+}
+
+@description('Azure Diagnostics: Azure AI Foundry hub 2 - allLogs')
+resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter) {
+  name: aiHubDiagSettingName
+  scope: aiHub2
+  properties: {
+    workspaceId: logWorkspace.id
+    logs: [
+      {
+        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
+        enabled: true
+        retentionPolicy: {
+          enabled: false
+          days: 0
+        }
+      }
+    ]
+  }
+}
+
+@description('This is a container for the ai foundry project.')
+resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter) {
+  name: defaultProjectName
+  location: location
+  tags: tags
+  kind: 'Project'
+  sku: {
+    name: 'Basic'
+    tier: 'Basic'
+  }
+  identity:identity
+  // This resource's identity is automatically assigned priviledge access to ACR, Storage, Key Vault, and Application Insights. 
+  // Since the priveleges are granted at the project/hub level have elevated access to the resources, it is recommended to isolate these resources
+  // to a resource group that only contains the project/hub.
+  properties: {
+    friendlyName: defaultProjectName
+    description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
+    v1LegacyMode: false
+    hbiWorkspace: false
+    hubResourceId:aiHub2.id
+    //enableDataIsolation: enablePublicAccessWithPerimeter?false:true
+    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
+    //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    
+  }
+  resource blob 'connections' = if(enablePublicAccessWithPerimeter) {
     name: storageAccountName
     properties: {
       authType: 'AAD'
@@ -335,72 +401,6 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       //}
     }
   }
-}
-
-@description('Azure Diagnostics: Azure AI Foundry hub - allLogs')
-resource aiHubDiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(!enablePublicAccessWithPerimeter) {
-  name: aiHubDiagSettingName
-  scope: aiHub
-  properties: {
-    workspaceId: logWorkspace.id
-    logs: [
-      {
-        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
-        enabled: true
-        retentionPolicy: {
-          enabled: false
-          days: 0
-        }
-      }
-    ]
-  }
-}
-
-@description('Azure Diagnostics: Azure AI Foundry hub 2 - allLogs')
-resource aiHub2DiagSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if(enablePublicAccessWithPerimeter) {
-  name: aiHubDiagSettingName
-  scope: aiHub2
-  properties: {
-    workspaceId: logWorkspace.id
-    logs: [
-      {
-        categoryGroup: 'allLogs' // All logs is a good choice for production on this resource.
-        enabled: true
-        retentionPolicy: {
-          enabled: false
-          days: 0
-        }
-      }
-    ]
-  }
-}
-
-@description('This is a container for the ai foundry project.')
-resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(enablePublicAccessWithPerimeter) {
-  name: defaultProjectName
-  location: location
-  tags: tags
-  kind: 'Project'
-  sku: {
-    name: 'Basic'
-    tier: 'Basic'
-  }
-  identity:identity
-  // This resource's identity is automatically assigned priviledge access to ACR, Storage, Key Vault, and Application Insights. 
-  // Since the priveleges are granted at the project/hub level have elevated access to the resources, it is recommended to isolate these resources
-  // to a resource group that only contains the project/hub.
-  properties: {
-    friendlyName: defaultProjectName
-    description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
-    v1LegacyMode: false
-    hbiWorkspace: false
-    hubResourceId:aiHub2.id
-    //enableDataIsolation: enablePublicAccessWithPerimeter?false:true
-    publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
-    //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
-    
-  }
-
   /*
   resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter) {
     name: epDefaultName2
