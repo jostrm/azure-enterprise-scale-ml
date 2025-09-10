@@ -39,11 +39,12 @@ param managedIdentities managedIdentityAllType?
 param deployModel_text_embedding_ada_002 bool = false // text-embedding-ada-002
 param deployModel_text_embedding_3_small bool = false // text-embedding-3-small
 param deployModel_text_embedding_3_large bool = false // text-embedding-3-large
+// GPT-4o-mini
 param deployModel_gpt_4o_mini bool = false // gpt-4o-mini
 param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'
-
+// GPT X
 param deployModel_gpt_X bool = false
 param modelGPTXName string = ''
 param modelGPTXVersion string = '1'// If your region doesn't support this version, please change it.
