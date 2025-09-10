@@ -199,13 +199,19 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     // network settings
     publicNetworkAccess:'Enabled'
     allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
-    managedNetwork: {
-      //firewallSku:'Basic' // v1.22 // 'Standard'
-      isolationMode:enablePublicAccessWithPerimeter?'Disabled':'AllowInternetOutbound' //'Disabled' meaning no restrictions
+    managedNetwork: enablePublicAccessWithPerimeter ? {
+      // When enablePublicAccessWithPerimeter is true, use minimal managed network (no outbound rules allowed)
+      isolationMode: 'Disabled'
       #disable-next-line BCP037
-      enableNetworkMonitor:false
-      managedNetworkKind: 'V1' // 'V1' or 'V2'
-      outboundRules:!enablePublicAccessWithPerimeter?{}: union(
+      enableNetworkMonitor: false
+      managedNetworkKind: 'V1'
+    } : {
+      // When enablePublicAccessWithPerimeter is false, use full managed network with outbound rules
+      isolationMode: 'AllowInternetOutbound'
+      #disable-next-line BCP037
+      enableNetworkMonitor: false
+      managedNetworkKind: 'V1'
+      outboundRules: union(
         {
           OpenAI: {
             type: 'PrivateEndpoint'
@@ -244,13 +250,15 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
             destination: {
               serviceResourceId: aiSearch.id
               subresourceTarget: 'searchService'
-              sparkEnabled: false
-              sparkStatus: 'Inactive'
+              //sparkEnabled: false
+              //sparkStatus: 'Inactive'
+              sparkEnabled: true
+              sparkStatus: 'Active'
             }
+            status: 'Active'
           }
         } : {}
       )
-      
     }
   }
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
@@ -267,10 +275,28 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
         ApiType: 'Azure'
         ResourceId: aiServices.id
       }
-      target: aiServices.properties.endpoint
+      target: 'https://${aiServices.name}.cognitiveservices.azure.com/'
+      //target: aiServices.properties.endpoint 
     }
   }
-
+  resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
+    name: azureOpenAIConnectionName
+    properties: {
+      authType: 'AAD'
+      category: 'AzureOpenAI'
+      isSharedToAll: true
+      useWorkspaceManagedIdentity: true
+      peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      sharedUserList: []
+      metadata: {
+        ApiType: 'Azure'
+        ResourceId: aiServices.id
+      }
+      target: 'https://${aiServices.name}.openai.azure.com/'
+    }
+  }
+  
   resource searchConnection2 'connections' =
   if (!empty(aiSearchName) && enablePublicAccessWithPerimeter) {
     name: azureAISearchConnectionName
@@ -281,7 +307,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
       peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
-      target: 'https://${aiSearch.name}.search.windows.net/' // aisearchprj001eus2devqoygy001.search.windows.net
+      target: 'https://${aiSearch.name}.search.windows.net/'
       metadata: {
         ApiType: 'Azure'
         ResourceId: aiSearch.id
@@ -428,9 +454,10 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
             destination: {
               serviceResourceId: aiSearch.id
               subresourceTarget: 'searchService'
-              sparkEnabled: false
-              sparkStatus: 'Inactive'
+              sparkEnabled: true
+              sparkStatus: 'Active'
             }
+            status: 'Active'
           } 
         } : {},
         {
@@ -444,13 +471,32 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
             }
             status: 'Active'
           }
+          SaBlob: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: existingStorageAccount.id
+              subresourceTarget: 'blob'
+              sparkEnabled: true
+              sparkStatus: 'Active'
+            }
+            status: 'Active'
+          }
+          SaFile: {
+            type: 'PrivateEndpoint'
+            destination: {
+              serviceResourceId: existingStorageAccount.id
+              subresourceTarget: 'file'
+              sparkEnabled: true
+              sparkStatus: 'Active'
+            }
+            status: 'Active'
+          }
         }
       )
     }
 
   }
 
-  /*
   resource aoaiConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: azureOpenAIConnectionName
     properties: {
@@ -465,10 +511,11 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
         ApiType: 'Azure'
         ResourceId: aiServices.id
       }
-      target: aiServices.properties.endpoint
+      target: 'https://${aiServices.name}.openai.azure.com/'
+      //aiServices.properties.endpoint // https://aiservicesprj001eus2devqoygy94311dbb24001.openai.azure.com/
     }
   }
-  */
+  
   resource aiServicesConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
@@ -483,7 +530,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
         ApiType: 'Azure'
         ResourceId: aiServices.id
       }
-      target: aiServices.properties.endpoint
+      target: 'https://${aiServices.name}.cognitiveservices.azure.com/'
+      //target: aiServices.properties.endpoint
     }
   }
 
@@ -496,6 +544,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
+      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       target: 'https://${aiSearch.name}.search.windows.net/'
       metadata: {
         ApiType: 'Azure'
