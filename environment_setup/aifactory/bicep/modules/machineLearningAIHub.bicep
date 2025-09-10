@@ -266,7 +266,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     properties: {
       authType: 'AAD'
       category: 'AIServices'
-      isSharedToAll: true
+      isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
       peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
@@ -284,7 +284,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     properties: {
       authType: 'AAD'
       category: 'AzureOpenAI'
-      isSharedToAll: true
+      isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
       peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
@@ -303,7 +303,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     properties: {
       authType: 'AAD'
       category: 'CognitiveSearch'
-      isSharedToAll: true
+      isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
       peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
@@ -502,7 +502,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     properties: {
       authType: 'AAD'
       category: 'AzureOpenAI'
-      isSharedToAll: true
+      isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
       peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
@@ -521,7 +521,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     properties: {
       authType: 'AAD'
       category: 'AIServices'
-      isSharedToAll: true
+      isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
       peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
@@ -541,7 +541,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     properties: {
       authType: 'AAD'
       category: 'CognitiveSearch'
-      isSharedToAll: true
+      isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
       peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
