@@ -205,7 +205,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       #disable-next-line BCP037
       enableNetworkMonitor:false
       managedNetworkKind: 'V1' // 'V1' or 'V2'
-      outboundRules:  union(
+      outboundRules:!enablePublicAccessWithPerimeter?{}: union(
         {
           OpenAI: {
             type: 'PrivateEndpoint'
