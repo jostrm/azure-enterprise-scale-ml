@@ -44,11 +44,11 @@ param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'
 
-param deployModel_gpt_4 bool = false // GPT-4
-param modelGPT4Name string = ''
-param modelGPT4Version string = ''// If your region doesn't support this version, please change it.
-param modelGPT4SKUName string = 'Standard'
-param modelGPT4SKUCapacity int = 30
+param deployModel_gpt_X bool = false
+param modelGPTXName string = ''
+param modelGPTXVersion string = '1'// If your region doesn't support this version, please change it.
+param modelGPTXSku string = 'Standard'
+param modelGPTXCapacity int = 30
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))
 
@@ -165,18 +165,18 @@ resource gpt4omini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01'
     ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
   ]
 }
-resource gpt4modelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (deployModel_gpt_4 && !empty(modelGPT4Version) && !empty(modelGPT4Name)) {
-  name: modelGPT4Name
+resource gptXmodelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (deployModel_gpt_X && !empty(modelGPTXVersion) && !empty(modelGPTXName)) {
+  name: modelGPTXName
   parent: aiServices
   sku: {
-    name: modelGPT4SKUName
-    capacity: modelGPT4SKUCapacity
+    name: modelGPTXSku
+    capacity: modelGPTXCapacity
   }
   properties: {
     model: {
       format: 'OpenAI'
-      name: modelGPT4Name
-      version:modelGPT4Version 
+      name: modelGPTXName
+      version:modelGPTXVersion
     }
     raiPolicyName: 'Microsoft.DefaultV2'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable' // 'NoAutoUpgrade'
@@ -209,7 +209,7 @@ resource embedding3large 'Microsoft.CognitiveServices/accounts/deployments@2023-
     ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
     ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
     ...(deployModel_gpt_4o_mini ? [gpt4omini] : [])
-    ...(deployModel_gpt_4 ? [gpt4modelOpenAI] : [])
+    ...(deployModel_gpt_X ? [gptXmodelOpenAI] : [])
   ]
 }
 

@@ -89,17 +89,32 @@ param serviceSettingDeployAzureAIVision bool = false
 param serviceSettingDeployAzureSpeech bool = false
 param serviceSettingDeployAIDocIntelligence bool = false
 
+// GPT X
+@description('Whether to deploy GPT-X model')
+param deployModel_gpt_X bool = false
+@description('GPT-X model name if deploying')
+param modelGPTXName string = 'gpt-5-mini'
+@description('GPT-X model version if deploying')
+param modelGPTXVersion string = '1'
+@allowed(['Standard','DataZoneStandard','GlobalStandard'])
+param modelGPTXSku string = 'DataZoneStandard'
+@description('TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K')
+param modelGPTXCapacity int = 30
+
 // Model deployment settings
 param deployModel_text_embedding_3_large bool = false
 param deployModel_text_embedding_3_small bool = false
 param deployModel_text_embedding_ada_002 bool = false
 param default_embedding_capacity int = 25
+
+// 4o-mini
 param deployModel_gpt_4o_mini bool = false
 param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'
-param deployModel_gpt_4 bool = false
-param modelGPT4Name string = ''
-param modelGPT4Version string = ''
+
+//param deployModel_gpt_4o bool = false
+//param modelGPT4Name string = ''
+//param modelGPT4Version string = ''
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
@@ -575,7 +590,6 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     subnetName: defaultSubnet
     vnetName: vnetNameFull
     keyvaultName: keyvaultName
-    modelGPT4Version: modelGPT4Version
     kind: kindAIServices
     publicNetworkAccess: enablePublicGenAIAccess
     vnetRules: [
@@ -586,8 +600,11 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     privateLinksDnsZones: privateLinksDnsZones
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    deployModel_gpt_4: deployModel_gpt_4
-    modelGPT4Name: modelGPT4Name
+    deployModel_gpt_X: deployModel_gpt_X
+    modelGPTXName: modelGPTXName
+    modelGPTXVersion: modelGPTXVersion
+    modelGPTXSku:modelGPTXSku
+    modelGPTXCapacity:modelGPTXCapacity
     deployModel_gpt_4o_mini: deployModel_gpt_4o_mini
     deployModel_text_embedding_3_small: deployModel_text_embedding_3_small
     deployModel_text_embedding_3_large: deployModel_text_embedding_3_large
@@ -628,8 +645,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
     sku: csOpenAISKU
     vnetName: vnetNameFull
     subnetName: genaiSubnetName
-    keyvaultName: keyvaultName
-    modelGPT4Version: modelGPT4Version
+    keyvaultName: keyvaultName    
     aiSearchPrincipalId: getAISearchInfo.outputs.principalId
     kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
