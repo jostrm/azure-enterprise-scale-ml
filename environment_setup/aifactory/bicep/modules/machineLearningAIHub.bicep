@@ -200,7 +200,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
       firewallSku:'Basic' // 'Standard'
-      isolationMode:'AllowInternetOutbound' //'Disabled' meaning no restrictions
+      isolationMode:enablePublicAccessWithPerimeter?'Disabled':'AllowInternetOutbound' //'Disabled' meaning no restrictions
       #disable-next-line BCP037
       enableNetworkMonitor:false
       managedNetworkKind: 'V1' // 'V1' or 'V2'

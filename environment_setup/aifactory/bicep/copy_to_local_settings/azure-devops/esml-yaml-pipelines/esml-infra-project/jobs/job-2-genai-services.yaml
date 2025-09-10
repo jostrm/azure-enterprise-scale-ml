@@ -784,6 +784,7 @@ steps:
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters acr_adminUserEnabled="$(acr_adminUserEnabled)" \
@@ -837,6 +838,8 @@ steps:
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters enableAISearch="$(enableAISearch)" \
+     --parameters aiSearchSKUName="$(admin_aiSearchTier)" \
+     --parameters semanticSearchTier="$(admin_semanticSearchTier)" \
      --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
      --parameters serviceSettingDeployContentSafety="$(serviceSettingDeployContentSafety)" \
      --parameters serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
@@ -854,7 +857,7 @@ steps:
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters miACAExists="$(miACAExists)" \
-     --parameters miPrjExists="$(miPrjExists)" \
+     --parameters miPrjExists="$(miPrjExists)" \     
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -902,6 +905,7 @@ steps:
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
+     --parameters cosmosKind="$(cosmosKind)" \
      --parameters serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
      --parameters serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
      --parameters serviceSettingDeploySQLDatabase="$(serviceSettingDeploySQLDatabase)" \
@@ -1039,7 +1043,6 @@ steps:
      --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \
-     --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
@@ -1121,6 +1124,7 @@ steps:
      --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
      --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
      --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
+     --parameters disableRBACAdminOnRGForUsers="$(disableRBACAdminOnRGForUsers)" \
      --parameters serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
      --parameters serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
      --parameters serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
@@ -1210,6 +1214,7 @@ steps:
      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
      --parameters containerAppsEnvExists="$(containerAppsEnvExists)" \
      --parameters updateAIFoundryV21="$(updateAIFoundryV21)" \
+     --parameters enableCaphost="$(enableAFoundryCaphost)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

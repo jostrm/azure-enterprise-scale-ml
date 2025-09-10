@@ -64,13 +64,13 @@ variables:
   # MANDATORY(CHANGE ONCE): Azure Devops
   # ============================================================================
   # Azure DevOps - Service Connections for task subscription
-  dev_service_connection: "esml-aifactory-infra-dev" # Name of service connection for DEV Azure subscription
-  test_service_connection: "esml-aifactory-infra-dev" # Name of service connection TEST Azure subscription
-  prod_service_connection: "esml-aifactory-infra-dev" # Name of service connection PROD Azure subscription
+  dev_service_connection: "todo_ado_service_connection" # Name of service connection for DEV Azure subscription
+  test_service_connection: "todo_ado_service_connection" # Name of service connection TEST Azure subscription
+  prod_service_connection: "todo_ado_service_connection" # Name of service connection PROD Azure subscription
   # Azure DevOps - Service Connections for seeding keyvault, that may be in another subscription
-  dev_seeding_kv_service_connection: "esml-aifactory-infra-dev" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
-  test_seeding_kv_service_connection: "esml-aifactory-infra-dev" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
-  prod_seeding_kv_service_connection: "esml-aifactory-infra-dev" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
+  dev_seeding_kv_service_connection: "todo_ado_service_connection" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
+  test_seeding_kv_service_connection: "todo_ado_service_connection" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
+  prod_seeding_kv_service_connection: "todo_ado_service_connection" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
   # ============================================================================
   # MANDATORY(CHANGE RARELY):NETWORKING: Networking modes
   #  [false, false, false ] = private UI with private backend. No public IP (Bastion host + VM, Azure VPN, Peering)
@@ -80,6 +80,12 @@ variables:
   enablePublicGenAIAccess: "false"
   allowPublicAccessWhenBehindVnet: "false"
   enablePublicAccessWithPerimeter: "false"
+
+  # ============================================================================
+  # MANDATORY(CHANGE RARELY):RBAC restrictions
+  # ============================================================================
+  disableContributorAccessForUsers: "false"
+  disableRBACAdminOnRGForUsers: "false"
   # ============================================================================
   # MANDATORY(CHANGE RARELY):Client Access: Services to be added to deployment. CreateIfNotExists logic
   # ============================================================================
@@ -135,7 +141,7 @@ variables:
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
   admin_projectType: "genai-1" # Azure Devops: What project type to deploy? [esml,genai-1,genai-2] to fetch subnets from Bicep deployment.
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
-  tagsProject: '{"Environment":"$(dev_test_prod)","Project":"RAG Chat 1","Owner":"$(technical_admins_email)","CostCenter":"556677"}'
+  tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
   project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. "10.123.456.10,124.56.78.0/24"
   
   # Container registry
@@ -144,10 +150,8 @@ variables:
   acr_dedicated: "true" # Premium only
   acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints
 
-  #technical_admins_ad_object_id: "4dd75919-56b3-4e7e-a265-dc96f9cd4a58,a381a88d-9b9d-453a-895f-eaaa0347b86b"
-  #technical_admins_email: "joakim, user1" # Email adresses, names, or some sort id ID, in a commas separated list, mapping to above ObjectID list
-  technical_admins_ad_object_id: "" # AD group Object ID
-  technical_admins_email: "" # email or name of AD group
+  technical_admins_ad_object_id: "TODO_EntraID_ObjectID" # TODO_EntraID_ObjectID commaseparated list, or just 1 ObjectID
+  technical_admins_email: "TODO_email_or_securitygroup_name" # email or name of AD group
   serviceSettingDeployProjectVM: "false" # VM Project resource group, to use with BASTION
 
   # ============================================================================
@@ -176,15 +180,21 @@ variables:
   # - Services: enableAIFoundryHub, enableAISearch, serviceSettingDeployFunction, serviceSettingDeployContainerApps, serviceSettingDeployAppInsightsDashboard, serviceSettingDeployCosmosDB
   # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
-  enableAIServices: "true"
-  enableAIFoundryHub: "true"
-  # enableAIFoundryV2: "false" # AVM option not supporting customers enterprise grade requirements, and also uses AVM with non GA technologies. And only single service pends.
-  enableAIFoundryV21: "true" # Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
-  updateAIFoundryV21: "true"
+  
+  # AI Foundry 2023-2025+
+  enableAIServices: "true" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
+  enableAIFoundryHub: "true" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
 
+  # AI Foundry 2025->
+  enableAIFoundryV21: "true" # Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
+  updateAIFoundryV21: "false" # Enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false meand "CreateIfNotExists"
+  addAIFoundryV21: "false" # Add new AI foundry with project, with a new random name (can be used for debugging, or running pipeline twice directly, not wating for deletion)
+  enableAFoundryCaphost: "false" # Ensures Agents metadata, and history/threads is saved in your subscription and network, using CosmosDB, Storage, AI Search
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # true, only connections is created to AIFactory created services. false, Azure will create a default project, with additional CosmosDB, Storage Account, AI Search, and connections
   disableAgentNetworkInjection: "true" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
-  # Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
+  # AI Foundry 2025, END
+
+  # More info: disableAgentNetworkInjection: Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
   # Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
     
   enableAISearch: "true"
@@ -193,9 +203,8 @@ variables:
   serviceSettingDeployAzureAIVision: "false"
   serviceSettingDeployAzureSpeech: "false"
   serviceSettingDeployAIDocIntelligence: "false"
-  disableContributorAccessForUsers: "false"
-  disableRBACAdminOnRGForUsers: "false"
   serviceSettingDeployCosmosDB: "true" # true, since needed for AI Foundry V2 project, agents.
+  cosmosKind: "GlobalDocumentDB" # "MongoDB", "GlobalDocumentDB"
   serviceSettingDeployPostgreSQL: "false"
   serviceSettingDeployRedisCache: "false"
   serviceSettingDeploySQLDatabase: "false"
@@ -334,16 +343,16 @@ variables:
   # GenAI-DEBUG - Dont touch: infra AIFactory core team only. 
   # Purpose: To DISABLE full sections (for efficiency, if re-running pipeline)
   # ============================================================================
-  debug_disable_05_build_acr_image: "true" # Cannot be disabled if ContainerApps is enabled. It needs ACR  networking with whitelist to Azure Deveops/GHA IPs, that this closes in the end.
+  debug_disable_05_build_acr_image: "false" # Cannot be disabled if ContainerApps is enabled. It needs ACR  networking with whitelist to Azure Deveops/GHA IPs, that this closes in the end.
   debug_disable_61_foundation: "false" # Resource group, UAMI's, VM
   debug_disable_62_core_infrastructure: "false" # Application Insights, Keyvault, Storage, ACR
   debug_disable_63_cognitive_services: "false" # AI Search, OpenAI Standalone, Vision standalone, Speech standalone, ...
   debug_disable_64_databases: "false" # CosmosDB, SQL Database, ...
   debug_disable_65_compute_services: "false" # ContainerApps, WebApp, FunctionApp
   debug_disable_66_ai_platform: "false" # AI Foundry Hub (V1) with default project, and connections to AISearch, Storage, ...
-  debug_disable_67_ml_platform: "true" # Azure Machine Learning, Datafactory, Databricks
+  debug_disable_67_ml_platform: "true" # Azure Machine Learning, Datafactory, Databricks§
   debug_disable_68_rbac_security: "false" # RBAC for 61-67
   debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage)
-
+  debug_disable_10_aifactory_dashboards: "true" # AI Factory Dashboards
 
 
