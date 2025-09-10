@@ -26,12 +26,13 @@ echo "API URL: ${api_url}"
 # Send DELETE request and capture headers
 echo "Sending DELETE request..."
 response_headers=$(mktemp)
-curl -X DELETE \
+http_code=$(curl -X DELETE \
      -H "Authorization: Bearer ${access_token}" \
      -H "Content-Type: application/json" \
      -D "${response_headers}" \
      -s \
-     "${api_url}"
+     -w "%{http_code}" \
+     "${api_url}")
      
 # Check if the curl command was successful
 if [ $? -ne 0 ]; then
@@ -40,11 +41,28 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Extract the Azure-AsyncOperation URL from the response headers
-operation_url=$(grep -i "Azure-AsyncOperation" "${response_headers}" | cut -d' ' -f2 | tr -d '\r')
+echo "HTTP Response Code: ${http_code}"
 
-if [ -z "${operation_url}" ]; then
-    echo -e "\nError: Could not find operation URL in the response."
+# Check for immediate success (204 No Content means successful deletion)
+if [ "${http_code}" = "204" ]; then
+    echo -e "\nCapability host deleted successfully (immediate deletion)."
+    rm -f "${response_headers}"
+    exit 0
+fi
+
+# For other success codes, look for async operation
+if [ "${http_code}" = "202" ]; then
+    # Extract the Azure-AsyncOperation URL from the response headers
+    operation_url=$(grep -i "Azure-AsyncOperation" "${response_headers}" | cut -d' ' -f2 | tr -d '\r')
+    
+    if [ -z "${operation_url}" ]; then
+        echo -e "\nError: Expected async operation URL but could not find it in the response."
+        cat "${response_headers}"
+        rm -f "${response_headers}"
+        exit 1
+    fi
+else
+    echo -e "\nUnexpected HTTP response code: ${http_code}"
     cat "${response_headers}"
     rm -f "${response_headers}"
     exit 1
@@ -56,8 +74,8 @@ echo -e "\nCapability host deletion request initiated."
 echo "Monitoring operation: ${operation_url}"
 
 # Poll the operation URL until the operation completes
-status="Creating"
-while [ "${status}" = "Creating" ]; do
+status="InProgress"
+while [ "${status}" = "InProgress" ] || [ "${status}" = "Running" ]; do
     echo "Checking operation status..."
     access_token=$(az account get-access-token --query accessToken -o tsv)
     # Get the operation status
@@ -84,7 +102,7 @@ while [ "${status}" = "Creating" ]; do
 
     echo "Current status: ${status}"
 
-    if [ "${status}" = "Creating" ]; then
+    if [ "${status}" = "InProgress" ] || [ "${status}" = "Running" ]; then
         echo "Operation still in progress. Waiting 10 seconds before checking again..."
         sleep 10
     fi

@@ -15,7 +15,7 @@ resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
 }
 
 resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-06-01' = {
-  name: '${projectCapHost}Account'
+  name: '${projectCapHost}acc'
   parent: account
   properties: {
   }

@@ -119,7 +119,6 @@ param technicalAdminsEmail string = ''
 param subscriptionIdDevTestProd string = subscription().subscriptionId
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
-param projectCapHost string = 'aif2caphostprj'
 
 // Seeding Key Vault parameters
 param inputKeyvault string
@@ -262,6 +261,7 @@ var aifV2Name = addAIFoundryV21? aifRandom: namingConvention.outputs.aifV2Name /
 var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var projectCapHost= '${aifV2Name}caphost'
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
