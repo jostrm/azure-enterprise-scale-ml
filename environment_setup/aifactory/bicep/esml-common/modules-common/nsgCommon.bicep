@@ -59,7 +59,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         name: 'Bastion_GetSessionInformation'
         properties: {
             description: 'Bastion will reach to the VM (DSVM / jump server) over private IP. RDP/SSH ports 3389/22. NB! Change the IP range if not working'
-            protocol: '*'
+            protocol: 'Tcp'
             sourcePortRange: '*'
             sourceAddressPrefix: bastionIpRange
             destinationAddressPrefix: '*'
@@ -75,6 +75,47 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationAddressPrefixes: []
         }
       }
+      // DEBUG RULE - UNCOMMENT ONLY FOR TROUBLESHOOTING
+      // WARNING: This allows ALL inbound traffic - use only temporarily!
+      // To enable: Remove the // comments from the rule below
+      /*
+      {
+        name: 'DEBUG_AllowAllInbound_TEMPORARY'
+        properties: {
+            description: 'DEBUG ONLY: Allow all inbound for troubleshooting AI Foundry agents. REMOVE AFTER DEBUGGING!'
+            protocol: '*'
+            sourcePortRange: '*'
+            destinationPortRange: '*'
+            sourceAddressPrefix: '*'
+            destinationAddressPrefix: '*'
+            access: 'Allow'
+            priority: 500
+            direction: 'Inbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
+      */
+      {
+        name: 'DenyAllInboundExceptExplicit'
+        properties: {
+            description: 'Deny all other inbound traffic not explicitly allowed above'
+            protocol: '*'
+            sourcePortRange: '*'
+            destinationPortRange: '*'
+            sourceAddressPrefix: '*'
+            destinationAddressPrefix: '*'
+            access: 'Deny'
+            priority: 4000
+            direction: 'Inbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
       // --- Outbound --- 
       {
         name: 'AzureDevOps_Allow_1'
@@ -83,7 +124,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             protocol: '*'
             sourcePortRange: '*'
             destinationPortRange: '*'
-            sourceAddressPrefix: '*'
+            sourceAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
             priority: 100
             direction: 'Outbound'
@@ -139,10 +180,10 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       {// !! 
         name: 'AzureActiveDirectory'
         properties: {
-          description: 'AML !!'
+          description: 'AML - Azure AD authentication (HTTPS only)'
           protocol: 'Tcp'
           sourcePortRange: '*'
-          destinationPortRange: '*'
+          destinationPortRange: '443'
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureActiveDirectory'
           access: 'Allow'
@@ -181,28 +222,17 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       {// !!
         name: 'AzureStorageAccount'
         properties: {
-          description: 'AML !!'
+          description: 'AML - Azure Storage (HTTPS and SMB)'
           protocol: 'Tcp'
           sourcePortRange: '*'
-          destinationPortRange: '443'
+          destinationPortRanges: [
+            '443'
+            '445'
+          ]
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'Storage.${location}'
           access: 'Allow'
           priority: 160
-          direction: 'Outbound'
-        }
-      }
-       {// !!
-        name: 'AzureStorageAccount2'
-        properties: {
-          description: 'AML'
-          protocol: 'Tcp'
-          sourcePortRange: '*'
-          destinationPortRange: '445'
-          sourceAddressPrefix: '*'
-          destinationAddressPrefix: 'Storage.${location}'
-          access: 'Allow'
-          priority: 161
           direction: 'Outbound'
         }
       }
@@ -307,6 +337,29 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationAddressPrefix: 'AzureMachineLearning'
         }
       }
+      // DEBUG RULE - UNCOMMENT ONLY FOR TROUBLESHOOTING
+      // WARNING: This allows ALL outbound traffic - use for connectivity debugging
+      // To enable: Remove the /* */ comments from the rule below
+      /*
+      {
+        name: 'DEBUG_AllowAllOutbound_TEMPORARY'
+        properties: {
+            description: 'DEBUG ONLY: Allow all outbound for troubleshooting connectivity issues. REMOVE AFTER DEBUGGING!'
+            protocol: '*'
+            sourcePortRange: '*'
+            destinationPortRange: '*'
+            sourceAddressPrefix: '*'
+            destinationAddressPrefix: '*'
+            access: 'Allow'
+            priority: 50
+            direction: 'Outbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
+      */
     ]
   }
 }

@@ -194,12 +194,13 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     hbiWorkspace:false
     provisionNetworkNow: true
     enableDataIsolation:enablePublicAccessWithPerimeter?false:true
+    discoveryUrl:'https://${location}.api.azureml.ms.net/discovery' // v1.22 Optional. The URL for the workspace discovery service.
 
     // network settings
     publicNetworkAccess:'Enabled'
     allowPublicAccessWhenBehindVnet: enablePublicAccessWithPerimeter? true: allowPublicAccessWhenBehindVnet
     managedNetwork: {
-      firewallSku:'Basic' // 'Standard'
+      //firewallSku:'Basic' // v1.22 // 'Standard'
       isolationMode:enablePublicAccessWithPerimeter?'Disabled':'AllowInternetOutbound' //'Disabled' meaning no restrictions
       #disable-next-line BCP037
       enableNetworkMonitor:false
@@ -252,27 +253,6 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       
     }
   }
-  /*
-  resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
-    name: azureOpenAIConnectionName
-    properties: {
-      authType: 'AAD'
-      category: 'AzureOpenAI'
-      isSharedToAll: true
-      useWorkspaceManagedIdentity: true
-      //peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      //peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
-      peRequirement: 'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: 'Active' // 'NotApplicable','Active', 'Inactive'
-      sharedUserList: []
-      metadata: {
-        ApiType: 'Azure'
-        ResourceId: aiServices.id
-      }
-      target: aiServices.properties.endpoint
-    }
-  }
-  */
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
@@ -280,8 +260,6 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       category: 'AIServices'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
-      //peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-      //peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
       peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
@@ -301,10 +279,9 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       category: 'CognitiveSearch'
       isSharedToAll: true
       useWorkspaceManagedIdentity: true
-      //peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-      peRequirement: 'Required'
-      peStatus: 'Active'
-      target: 'https://${aiSearch.name}.search.windows.net/'
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      target: 'https://${aiSearch.name}.search.windows.net/' // aisearchprj001eus2devqoygy001.search.windows.net
       metadata: {
         ApiType: 'Azure'
         ResourceId: aiSearch.id

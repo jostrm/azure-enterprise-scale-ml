@@ -555,11 +555,13 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
   params: {
     name: aifV1HubName
     managedIdentities: {
-      systemAssigned: true
+      systemAssigned: true 
+      /* // v1.22
       userAssignedResourceIds: concat(
         !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
         !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
       )
+      */
     }
     defaultProjectName: aifV1ProjectName
     aiHubExists:aiHubExists

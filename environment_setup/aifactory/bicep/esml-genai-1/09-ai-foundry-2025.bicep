@@ -555,10 +555,12 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     networkAcls: shouldCreateNetworkAcls ? networkAclsObject : networkAclsEmpty
     managedIdentities: {
       systemAssigned: true
+      /* v1.22
       userAssignedResourceIds: concat(
         !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
         !empty(miAcaName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miAcaName)) : []
       )
+      */
     }
     deployments: [
       for model in aiModels: {
