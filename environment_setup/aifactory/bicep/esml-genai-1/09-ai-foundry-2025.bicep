@@ -259,6 +259,7 @@ var cleanRandomValue = !empty(randomValue) ? toLower(replace(replace(randomValue
 var aifRandom = take('aif${cleanRandomValue}',12)
 var aifpRandom = take('aifp${cleanRandomValue}',12)
 
+var aif2SubdomainName = cleanRandomValue
 var aifV2Name = addAIFoundryV21? aifRandom: namingConvention.outputs.aifV2Name // aif2qoygyc7e
 var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
@@ -545,7 +546,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     location: location
     enableTelemetry: false
     tags: tagsProject
-    //customSubDomainName: aifV2Name // optional
+    customSubDomainName: aif2SubdomainName // aifV2Name // optional
     allowedFqdnList: fqdn
     restrictOutboundNetworkAccess: false // Agents need outbound access for various services such as AI Search, Key Vault, Storage, etc.
     publicNetworkAccess: enablePublicAccessWithPerimeter || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(processedIpRules_remove32) ? 'Enabled' : 'Disabled'

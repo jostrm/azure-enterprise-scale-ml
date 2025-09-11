@@ -35,6 +35,8 @@ metadata description = 'This module deploys a Cognitive Service.'
 └─────────────────────────────────────────────────────────┘
 */
 @description('Required. The name of Cognitive Services account.')
+@minLength(2)
+@maxLength(64)
 param name string
 @description('Required. Kind of the Cognitive Services account. Use \'Get-AzCognitiveServicesAccountSku\' to determine a valid combinations of \'kind\' and \'SKU\' for your Azure region.')
 @allowed([
@@ -108,6 +110,8 @@ param diagnosticSettings diagnosticSettingFullType[]?
 param publicNetworkAccess string?
 
 @description('Conditional. Subdomain name used for token-based authentication. Required if \'networkAcls\' or \'privateEndpoints\' are set.')
+@minLength(2)
+@maxLength(64)
 param customSubDomainName string?
 
 @description('Optional. A collection of rules governing the accessibility from specific network locations.')
@@ -376,8 +380,8 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     name: sku
   }
   properties: {
-    allowProjectManagement: allowProjectManagement
-    defaultProject: defaultProjectName
+    //allowProjectManagement: allowProjectManagement
+    //defaultProject: defaultProjectName
     customSubDomainName: customSubDomainName
     networkAcls: !empty(networkAcls ?? {})
       ? {
