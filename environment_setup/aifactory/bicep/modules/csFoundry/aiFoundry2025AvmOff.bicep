@@ -436,6 +436,63 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-previ
   }
 }
 
+/*
+resource pendCogServiceAIF 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpointsAIFactoryWay) {
+  name: '${cognitiveService.name}-pend' //'${privateEndpointName}-2'
+  location: location
+  tags: tags
+  properties: {
+    customNetworkInterfaceName: '${cognitiveService.name}-pend-nic'
+    privateLinkServiceConnections: [
+      {
+        name: '${cognitiveService.name}-pend'
+        properties: {
+          groupIds: [
+            'account'
+          ]
+          privateLinkServiceId: cognitiveService.id
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+        }
+      }
+    ]
+    subnet: {
+      id: privateEndpointSubnetRID
+    }
+  }
+}
+
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay) {
+  name: '${pendCogServiceAIF.name}DnsZone'
+  parent: pendCogServiceAIF
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateLinksDnsZones.openai.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.openai.id //openai
+        }
+      }
+      {
+        name: privateLinksDnsZones.cognitiveservices.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.cognitiveservices.id//cognitiveservices
+        }
+      }
+      {
+        name: privateLinksDnsZones.servicesai.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.servicesai.id
+        }
+      }
+    ]
+  }
+}
+*/
+
 @batchSize(1)
 resource cognitiveService_deployments 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = [
   for (deployment, index) in (deployments ?? []): {

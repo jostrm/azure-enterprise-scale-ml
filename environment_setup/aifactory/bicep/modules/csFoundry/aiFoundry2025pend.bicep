@@ -11,7 +11,7 @@ param cognitiveServiceId string
 param location string
 
 @description('Optional. Tags of the resource.')
-param tags object = {}
+param tags object
 
 // AI Factory private endpoint information
 @description('Required. Private DNS zones configuration.')

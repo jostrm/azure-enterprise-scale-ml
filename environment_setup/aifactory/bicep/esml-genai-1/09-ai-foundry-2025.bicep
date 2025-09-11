@@ -177,8 +177,6 @@ resource commonSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' exi
   name: '${vnetNameFull}/${commonSubnetPends}'
   scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
 }
-//var commonSubnetResourceId = commonSubnet.id
-var commonSubnetResourceId = genaiSubnetId
 
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
@@ -341,7 +339,7 @@ var networkAcls = shouldCreateNetworkAcls ? {
   defaultAction: enablePublicGenAIAccess && empty(processedIpRules_remove32) ? 'Allow' : 'Deny'
   virtualNetworkRules: [
     {
-      id: commonSubnetResourceId
+      id: genaiSubnetId
       ignoreMissingVnetServiceEndpoint: false
     }
   ]
@@ -548,7 +546,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     enableTelemetry: false
     tags: tagsProject
     customSubDomainName: aif2SubdomainName // aifV2Name // optional
-    allowedFqdnList: fqdn
+    //allowedFqdnList: fqdn
     restrictOutboundNetworkAccess: false // Agents need outbound access for various services such as AI Search, Key Vault, Storage, etc.
     publicNetworkAccess: enablePublicAccessWithPerimeter || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(processedIpRules_remove32) ? 'Enabled' : 'Disabled'
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
@@ -583,7 +581,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
         versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
       }
     ]
-    privateEndpointSubnetRID: commonSubnetResourceId
+    privateEndpointSubnetRID: genaiSubnetId
     privateLinksDnsZones: privateLinksDnsZones
     createPrivateEndpointsAIFactoryWay: true
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
@@ -639,7 +637,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     cognitiveServiceId: aiFoundry2025NoAvm.outputs.resourceId
     location: location
     tags: tagsProject
-    privateEndpointSubnetRID: commonSubnetResourceId
+    privateEndpointSubnetRID: genaiSubnetId
     privateLinksDnsZones: privateLinksDnsZones
     createPrivateEndpointsAIFactoryWay: true
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
