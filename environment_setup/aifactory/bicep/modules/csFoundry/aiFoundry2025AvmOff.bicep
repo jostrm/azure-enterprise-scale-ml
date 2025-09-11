@@ -190,15 +190,29 @@ var formattedUserAssignedIdentities = reduce(
   {},
   (cur, next) => union(cur, next)
 ) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
-var identity = !empty(managedIdentities)
+
+// Determine identity type first
+var hasUserAssignedIdentities = !empty(managedIdentities.?userAssignedResourceIds ?? [])
+var hasSystemAssignedIdentity = (managedIdentities.?systemAssigned ?? false)
+
+var identityType = !empty(managedIdentities)
+  ? (hasSystemAssignedIdentity && hasUserAssignedIdentities)
+    ? 'SystemAssigned,UserAssigned'
+    : hasSystemAssignedIdentity
+    ? 'SystemAssigned'
+    : hasUserAssignedIdentities
+    ? 'UserAssigned'
+    : 'None'
+  : 'SystemAssigned'
+
+// Build identity object with conditional properties
+var identity = identityType == 'UserAssigned' || identityType == 'SystemAssigned,UserAssigned'
   ? {
-      type: (managedIdentities.?systemAssigned ?? false)
-        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
-        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
-      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : {}
+      type: identityType
+      userAssignedIdentities: formattedUserAssignedIdentities
     }
   : {
-      type: 'SystemAssigned'
+      type: identityType
     }
 
 var builtInRoleNames = {
