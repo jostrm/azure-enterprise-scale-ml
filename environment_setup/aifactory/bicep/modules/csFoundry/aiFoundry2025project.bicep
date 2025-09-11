@@ -65,7 +65,7 @@ resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/
     target: storageAccount.properties.primaryEndpoints.blob
     useWorkspaceManagedIdentity: true
     peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+    peStatus: enablePublicAccessWithPerimeter? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
@@ -89,7 +89,7 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
     target: storageAccount2.properties.primaryEndpoints.blob
     useWorkspaceManagedIdentity: true
     peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+    peStatus: enablePublicAccessWithPerimeter? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
@@ -112,7 +112,7 @@ resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@
     isSharedToAll: true
     useWorkspaceManagedIdentity: true
     peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-    peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+    peStatus: enablePublicAccessWithPerimeter?'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
     //sharedUserList: []
     metadata: {
       ApiType: 'Azure'
@@ -136,7 +136,7 @@ resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts
     isSharedToAll: true
     useWorkspaceManagedIdentity: true
     peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+    peStatus: enablePublicAccessWithPerimeter? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
     metadata: {
       ApiType: 'Azure'
       ResourceId: aiSearchService.id
@@ -160,7 +160,7 @@ resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/proje
     isSharedToAll: true
     useWorkspaceManagedIdentity: true
     peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+    peStatus: enablePublicAccessWithPerimeter? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
     metadata: {
       ApiType: 'Azure'
       ResourceId: cosmosDBAccount.id

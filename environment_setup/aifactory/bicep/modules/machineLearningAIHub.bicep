@@ -335,7 +335,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicAccessWithPerimeter?'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -354,7 +354,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicAccessWithPerimeter?'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -373,7 +373,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicGenAIAccess? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -393,7 +393,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicAccessWithPerimeter?'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       target: 'https://${aiSearch.name}.search.windows.net/'
       metadata: {
         ApiType: 'Azure'
@@ -530,7 +530,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicGenAIAccess? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -571,7 +571,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicAccessWithPerimeter?'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -590,7 +590,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
-      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicAccessWithPerimeter? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
@@ -610,7 +610,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
       peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
-      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peStatus: enablePublicGenAIAccess? 'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
       target: 'https://${aiSearch.name}.search.windows.net/'
       metadata: {
         ApiType: 'Azure'
