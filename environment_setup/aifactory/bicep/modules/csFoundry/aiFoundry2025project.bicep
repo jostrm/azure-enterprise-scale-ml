@@ -104,7 +104,7 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
   ]
 }
 resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
-  name: '${storageName}_default'
+  name: 'default'
   parent: project
   properties: {
     authType: 'AAD'

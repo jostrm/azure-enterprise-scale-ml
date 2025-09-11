@@ -545,8 +545,9 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     location: location
     enableTelemetry: false
     tags: tagsProject
-    customSubDomainName: aifV2Name
+    //customSubDomainName: aifV2Name // optional
     allowedFqdnList: fqdn
+    restrictOutboundNetworkAccess: false // Agents need outbound access for various services such as AI Search, Key Vault, Storage, etc.
     publicNetworkAccess: enablePublicAccessWithPerimeter || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(processedIpRules_remove32) ? 'Enabled' : 'Disabled'
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: disableAgentNetworkInjection
