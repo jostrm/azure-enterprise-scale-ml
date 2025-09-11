@@ -521,8 +521,8 @@ var fqdnRaw = [
   '${namingConvention.outputs.storageAccount2001Name}.file.${environment().suffixes.storage}'
   '${namingConvention.outputs.storageAccount2001Name}.queue.${environment().suffixes.storage}'
   
-  // AI Search endpoint
-  '${namingConvention.outputs.safeNameAISearch}.search.windows.net'
+  // AI Search endpoint (conditionally included)
+  enableAISearch ? '${namingConvention.outputs.safeNameAISearch}.search.windows.net' : ''
   
   // Key Vault endpoint
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
