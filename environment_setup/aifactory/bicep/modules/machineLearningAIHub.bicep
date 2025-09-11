@@ -339,9 +339,11 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'
-        ResourceId: existingStorageAccount.id
+        ResourceId: existingStorageAccount.id // Required metadata property ContainerName is missing;Required metadata property AccountName is missing
+        ContainerName: 'default'
+        AccountName: existingStorageAccount.name
       }
-      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default'
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default/'
     }
   }
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
