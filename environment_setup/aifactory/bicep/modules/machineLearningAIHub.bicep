@@ -327,8 +327,8 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     
   }
-  resource blob 'connections' = if(enablePublicAccessWithPerimeter) {
-    name: storageAccountName
+  resource blob2 'connections' = if(enablePublicAccessWithPerimeter) {
+    name: '${storageAccountName}_default'
     properties: {
       authType: 'AAD'
       category: 'AzureBlob'
@@ -343,7 +343,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
         ContainerName: 'default'
         AccountName: existingStorageAccount.name
       }
-      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default/'
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
     }
   }
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
@@ -536,7 +536,25 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       //aiServices.properties.endpoint // https://aiservicesprj001eus2devqoygy94311dbb24001.openai.azure.com/
     }
   }
-  
+  resource blob 'connections' = if(!enablePublicAccessWithPerimeter) {
+    name: '${storageAccountName}_default'
+    properties: {
+      authType: 'AAD'
+      category: 'AzureBlob'
+      isSharedToAll: false
+      useWorkspaceManagedIdentity: true
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+      peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      sharedUserList: []
+      metadata: {
+        ApiType: 'Azure'
+        ResourceId: existingStorageAccount.id // Required metadata property ContainerName is missing;Required metadata property AccountName is missing
+        ContainerName: 'default'
+        AccountName: existingStorageAccount.name
+      }
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
+    }
+  }
   resource aiServicesConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
