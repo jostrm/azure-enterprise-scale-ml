@@ -364,6 +364,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       //target: aiServices.properties.endpoint 
     }
   }
+  /*
   resource aoaiConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: azureOpenAIConnectionName
     properties: {
@@ -381,7 +382,8 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       target: 'https://${aiServices.name}.openai.azure.com/'
     }
   }
-  
+  */
+
   resource searchConnection2 'connections' =
   if (!empty(aiSearchName) && enablePublicAccessWithPerimeter) {
     name: azureAISearchConnectionName
@@ -517,7 +519,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     }
 
   }
-
+  /*
   resource aoaiConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: azureOpenAIConnectionName
     properties: {
@@ -536,6 +538,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       //aiServices.properties.endpoint // https://aiservicesprj001eus2devqoygy94311dbb24001.openai.azure.com/
     }
   }
+  */
   resource blob 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: '${storageAccountName}_default'
     properties: {
