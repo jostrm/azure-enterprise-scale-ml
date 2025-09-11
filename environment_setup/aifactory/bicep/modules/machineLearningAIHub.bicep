@@ -327,6 +327,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     
   }
+  /* Object reference not set to an instance of an object.
   resource blob2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: 'default'
     properties: {
@@ -346,6 +347,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
     }
   }
+  */
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
@@ -405,7 +407,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       //}
     }
   }
-  /*
+  /* Object reference not set to an instance of an object.
   resource endpoint2 'onlineEndpoints' = if(enablePublicAccessWithPerimeter) {
     name: epDefaultName2
     location: location
@@ -563,6 +565,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     hubResourceId: aiHub.id
   }
+  /*
   resource blob 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: 'default'
     properties: {
@@ -582,6 +585,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
       target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
     }
   }
+  */
   resource aiServicesConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
     name: azureAIServicesConnectionName
     properties: {
