@@ -494,6 +494,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
             }
             status: 'Active'
           }
+          /* Cannot add these. If so. Error: "There is already an outbound rule to the same destination"
           SaBlob: {
             type: 'PrivateEndpoint'
             destination: {
@@ -514,6 +515,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
             }
             status: 'Active'
           }
+          */
         }
       )
     }
