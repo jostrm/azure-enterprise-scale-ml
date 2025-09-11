@@ -254,12 +254,10 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 // AI Foundry V2 specific names (12)
-// Ensure global uniqueness for Cognitive Services custom subdomain
+// Ensure domain name compliance: lowercase, no special chars, proper length
 var cleanRandomValue = !empty(randomValue) ? toLower(replace(replace(randomValue, '-', ''), '_', '')) : randomSalt
-// Use subscription ID + resource group + random for better global uniqueness
-var globallyUniqueString = take(uniqueString(subscription().subscriptionId, targetResourceGroup, cleanRandomValue), 8)
-var aifRandom = take('aif${globallyUniqueString}',12)
-var aifpRandom = take('aifp${globallyUniqueString}',12)
+var aifRandom = take('aif${cleanRandomValue}',12)
+var aifpRandom = take('aifp${cleanRandomValue}',12)
 
 var aifV2Name = addAIFoundryV21? aifRandom: namingConvention.outputs.aifV2Name // aif2qoygyc7e
 var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2pqoygyc7

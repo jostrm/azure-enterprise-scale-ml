@@ -120,7 +120,7 @@ resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@
       ContainerName: 'default'
       AccountName: storageAccount.name
     }
-    target: 'https://${storageAccount.name}.blob.${environment().suffixes.storage}/default'
+    target: 'https://${storageAccount.name}.blob.${environment().suffixes.storage}/'
   }
   dependsOn: [
     project_connection_azure_storage2
