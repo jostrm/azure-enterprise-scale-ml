@@ -105,6 +105,7 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
 }
 resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
   name: '${storageName}_default'
+  parent: project
   properties: {
     authType: 'AAD'
     category: 'AzureBlob'
@@ -121,6 +122,9 @@ resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@
     }
     target: 'https://${storageAccount.name}.blob.${environment().suffixes.storage}/default'
   }
+  dependsOn: [
+    project_connection_azure_storage2
+  ]
 }
 resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (!empty(aiSearchName)) {
   name: aiSearchService.name
