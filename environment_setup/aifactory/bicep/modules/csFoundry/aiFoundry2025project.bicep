@@ -119,7 +119,7 @@ resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@
       ContainerName: 'default'
       AccountName: storageAccount.name
     }
-    target: 'https://${storageAccount.name}.blob.${environment().suffixes.storage}/'
+    target: 'https://${storageAccount.name}.blob.${environment().suffixes.storage}/default'
   }
 }
 resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (!empty(aiSearchName)) {
