@@ -193,11 +193,13 @@ var formattedUserAssignedIdentities = reduce(
 var identity = !empty(managedIdentities)
   ? {
       type: (managedIdentities.?systemAssigned ?? false)
-        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned')
-        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : null)
-      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : {}
     }
-  : null
+  : {
+      type: 'SystemAssigned'
+    }
 
 var builtInRoleNames = {
   'Cognitive Services Contributor': subscriptionResourceId(
@@ -370,12 +372,13 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
 // For DEMO purpose, at least best of both worlds: agent private network injection + public user access with restrictions (IP whitelisting)
 // @2025-04-01-preview - name (32)
 // @2025-06-01: name (12)
-resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
+// 2025-09-11: prevalidation: InvalidTemplateDeployment, InvalidDomainName:  icrosoft.CognitiveServices/accounts@2025-06-01
+resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' = {
   name: name
   kind: kind
   identity: identity
   location: location
-  tags: tags
+  tags: tags!
   sku: {
     name: sku
   }
@@ -429,6 +432,7 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     restrictOutboundNetworkAccess: restrictOutboundNetworkAccess
     userOwnedStorage: userOwnedStorage
     dynamicThrottlingEnabled: dynamicThrottlingEnabled
+    storedCompletionsDisabled:true
   }
 }
 

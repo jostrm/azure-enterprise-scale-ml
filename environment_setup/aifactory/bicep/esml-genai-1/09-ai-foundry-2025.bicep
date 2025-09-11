@@ -168,7 +168,7 @@ var processedIpRules_ensure_32 = [for ip in filteredIpWhitelist_array: {
 }]
 
 var processedIpRules_remove32 = [for ip in filteredIpWhitelist_array: {
-  action: 'Allow'
+  //action: 'Allow'
   value: endsWith(ip, '/32') ? substring(ip, 0, length(ip) - 3) : ip
 }]
 
