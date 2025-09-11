@@ -343,7 +343,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
         ContainerName: 'default'
         AccountName: existingStorageAccount.name
       }
-      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default'
     }
   }
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
@@ -555,7 +555,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
         ContainerName: 'default'
         AccountName: existingStorageAccount.name
       }
-      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default'
     }
   }
   resource aiServicesConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
