@@ -142,12 +142,25 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicG
     }
     largeFileSharesState: 'Disabled'
     minimumTlsVersion: 'TLS1_2'
-    networkAcls: (!enablePublicAccessWithPerimeter && (enablePublicGenAIAccess || !empty(ipRules) || !empty(vnetRules))) ? {
+    networkAcls: (enablePublicAccessWithPerimeter && enablePublicGenAIAccess) ? {
+      // Scenario 2: Fully public with vnetRules but no ipRules
+      bypass: 'AzureServices'
+      defaultAction: 'Allow'
+      virtualNetworkRules: rules
+      ipRules: []
+    } : (!enablePublicAccessWithPerimeter && enablePublicGenAIAccess) ? {
+      // Scenario 1: IP-whitelisting with both vnetRules and ipRules
+      bypass: 'AzureServices'
+      defaultAction: 'Deny'
+      virtualNetworkRules: rules
+      ipRules: empty(ipRules) ? [] : ipRules
+    } : (enablePublicGenAIAccess || !empty(ipRules) || !empty(vnetRules)) ? {
+      // Other scenarios
       bypass: 'AzureServices' 
       defaultAction: enablePublicGenAIAccess && empty(ipRules) && empty(vnetRules) ? 'Allow' : 'Deny'
-      virtualNetworkRules:rules
-      ipRules:empty(ipRules)?[]:ipRules
-    }:null
+      virtualNetworkRules: rules
+      ipRules: empty(ipRules) ? [] : ipRules
+    } : null
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
     name: 'default'
