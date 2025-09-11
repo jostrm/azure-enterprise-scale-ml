@@ -356,8 +356,7 @@ var networkAclsEmpty = {
 
 var networkAclsObject = networkAcls
 
-// Role assignments are now managed in 07-rbac-security.bicep
-// We use deployment scripts to update permissions if needed after deployment
+/*
 module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFoundryV2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV2_${deploymentProjSpecificUniqueSuffix}', 64)
@@ -399,8 +398,9 @@ module aiFoundry2025 '../modules/csFoundry/aiFoundry2025.bicep' = if(enableAIFou
     // Dependencies handled through parameters - storage, keyvault, ACR, AI Search should exist from previous phases
   ]
 }
+*/
 
-// Add the new FDP cognitive services module
+/*
 module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFoundryV2 && enableAIFactoryCreatedDefaultProjectForAIFv2) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV2_Prj_${deploymentProjSpecificUniqueSuffix}', 64)
@@ -419,6 +419,7 @@ module project '../modules/csFoundry/aiFoundry2025project.bicep' = if(enableAIFo
       aiFoundry2025
     ]
 }
+*/
 
 // ============================================================================
 // COGNITIVE SERVICES & OPENAI ROLE ASSIGNMENTS
@@ -553,7 +554,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: disableAgentNetworkInjection
     allowProjectManagement: true
-    defaultProjectName:enableAIFactoryCreatedDefaultProjectForAIFv2? null: '${aifV2ProjectName}-d21'
+    defaultProjectName: enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
     #disable-next-line BCP318
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     networkAcls: shouldCreateNetworkAcls ? networkAclsObject : networkAclsEmpty
@@ -832,16 +833,16 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
 output aiModelsConfiguration array = aiModels
 
 @description('AI Foundry V2 deployment status')
-output aiFoundryV2Deployed bool = enableAIFoundryV2
+output aiFoundryV2Deployed bool = enableAIFoundryV21
 
 @description('AI Foundry V2 name')
-output aiFoundryV2Name string = enableAIFoundryV2 ? aiFoundry2025!.outputs.name : ''
+output aiFoundryV2Name string = enableAIFoundryV21 ? aiFoundry2025NoAvm!.outputs.name : ''
 
 @description('AI Foundry V2 resource ID')
-output aiFoundryV2ResourceId string = enableAIFoundryV2 ? aiFoundry2025!.outputs.resourceId : ''
+output aiFoundryV2ResourceId string = enableAIFoundryV21 ? aiFoundry2025NoAvm!.outputs.resourceId : ''
 
 @description('AI Foundry Project deployment status')
-output aiFoundryProjectDeployed bool = enableAIFoundryV2
+output aiFoundryProjectDeployed bool = enableAIFoundryV21
 
 @description('AI Models deployed count')
 output aiModelsDeployed int = length(aiModels)

@@ -383,8 +383,8 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-previ
     name: sku
   }
   properties: {
-    //allowProjectManagement: allowProjectManagement
-    //defaultProject: defaultProjectName
+    allowProjectManagement: allowProjectManagement
+    defaultProject: defaultProjectName
     customSubDomainName: customSubDomainName
     networkAcls: !empty(networkAcls ?? {})
       ? {
