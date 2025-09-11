@@ -312,7 +312,7 @@ var var_csDocIntelligence_dnsConfig = csDocIntelligence.outputs.dnsConfig
 var var_csAzureOpenAI_dnsConfig = csAzureOpenAI.outputs.dnsConfig
 
 #disable-next-line BCP318
-var var_aiSearchService_dnsConfig = enableAISearch ? aiSearchService.outputs.dnsConfig : []
+var var_aiSearchService_dnsConfig = enableAISearch ? (!empty(aiSearchService.outputs.dnsConfig[0].name) ? aiSearchService.outputs.dnsConfig : []) : []
 
 #disable-next-line BCP318
 var var_sa4AIsearch_dnsConfig = sa4AIsearch.outputs.dnsConfig
@@ -646,7 +646,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
     vnetName: vnetNameFull
     subnetName: genaiSubnetName
     keyvaultName: keyvaultName    
-    aiSearchPrincipalId: getAISearchInfo.outputs.principalId
+    aiSearchPrincipalId: getAISearchInfo.outputs.principalId // will return empty if AI Search does not exist''
     kind: kindAOpenAI
     pendCogSerName: 'p-${projectName}-openai-${genaiName}'
     publicNetworkAccess: enablePublicGenAIAccess

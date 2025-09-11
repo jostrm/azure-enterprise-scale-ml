@@ -554,7 +554,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     restrictOutboundNetworkAccess: false // Agents need outbound access for various services such as AI Search, Key Vault, Storage, etc.
     publicNetworkAccess: enablePublicAccessWithPerimeter || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(processedIpRules_remove32) ? 'Enabled' : 'Disabled'
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
-    disableAgentNetworkInjection: disableAgentNetworkInjection
+    disableAgentNetworkInjection: enablePublicAccessWithPerimeter? true: disableAgentNetworkInjection
     allowProjectManagement: true
     defaultProjectName: enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
     #disable-next-line BCP318
@@ -632,7 +632,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
 }
 
 // AI Foundry Private Endpoints - deployed after main service
-module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(!enablePublicAccessWithPerimeter && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21-PrivateEndpoints_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

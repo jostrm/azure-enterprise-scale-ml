@@ -215,7 +215,7 @@ resource embedding3large 'Microsoft.CognitiveServices/accounts/deployments@2023-
 }
 
 // aiservicesprj003sdcdev3pmpb002 in state Accepted (Code: AccountProvisioningStateInvalid)
-resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = if (!enablePublicAccessWithPerimeter) {
   location: location
   name: pendCogSerName
   properties: {
@@ -242,7 +242,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false) {
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false && !enablePublicAccessWithPerimeter) {
   name: '${pendCognitiveServices.name}DnsZone'
   parent: pendCognitiveServices
   properties:{

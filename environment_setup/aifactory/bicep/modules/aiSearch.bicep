@@ -126,7 +126,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(!ena
 
 }
 
-resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
   name: privateEndpointName
   location: location
   tags: tags
@@ -164,7 +164,7 @@ output principalId string = aiSearch.identity.principalId
 
 output dnsConfig array = [
   {
-    name: pendAISearch.name
+    name:!enablePublicAccessWithPerimeter ? pendAISearch.name : ''
     type: 'searchService'
     id:aiSearch.id
   }
