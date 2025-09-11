@@ -565,8 +565,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       category: 'AIServices'
       isSharedToAll: false
       useWorkspaceManagedIdentity: true
-      peRequirement: enablePublicGenAIAccess?'NotRequired':'Required'
-      peStatus: enablePublicGenAIAccess? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+      peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+      peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
       sharedUserList: []
       metadata: {
         ApiType: 'Azure'

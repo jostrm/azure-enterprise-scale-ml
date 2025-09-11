@@ -616,6 +616,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
     aiFoundryV2Name: aiFoundry2025NoAvm.outputs.name
     aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
     cosmosDBname: serviceSettingDeployCosmosDB? namingConvention.outputs.cosmosDBName : ''
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     }
     dependsOn: [
       existingTargetRG

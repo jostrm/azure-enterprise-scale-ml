@@ -18,6 +18,7 @@ param aiFoundryV2Name string
 
 @description('Azure Search Service Name')
 param aiSearchName string
+param enablePublicAccessWithPerimeter bool = false
 
 @description('Name of the first project')
 param defaultProjectName string = name
@@ -62,6 +63,9 @@ resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/
   properties: {
     category: 'AzureStorageAccount'
     target: storageAccount.properties.primaryEndpoints.blob
+    useWorkspaceManagedIdentity: true
+    peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
@@ -83,6 +87,9 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
     // target: storageAccountTarget
     //category: 'AzureStorageAccount'
     target: storageAccount2.properties.primaryEndpoints.blob
+    useWorkspaceManagedIdentity: true
+    peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
     authType: 'AAD'
     metadata: {
       ApiType: 'Azure'
@@ -96,7 +103,25 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
     project_connection_azure_storage
   ]
 }
-
+resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
+  name: '${storageName}_default'
+  properties: {
+    authType: 'AAD'
+    category: 'AzureBlob'
+    isSharedToAll: true
+    useWorkspaceManagedIdentity: true
+    peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
+    peStatus: enablePublicAccessWithPerimeter?'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
+    //sharedUserList: []
+    metadata: {
+      ApiType: 'Azure'
+      ResourceId:  storageAccount.id
+      ContainerName: 'default'
+      AccountName: storageAccount.name
+    }
+    target: 'https://${storageAccount.name}.blob.${environment().suffixes.storage}/'
+  }
+}
 resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (!empty(aiSearchName)) {
   name: aiSearchService.name
   parent: project
@@ -105,6 +130,9 @@ resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts
     target: 'https://${aiSearchService.name}.search.windows.net/'
     authType: 'AAD'
     isSharedToAll: true
+    useWorkspaceManagedIdentity: true
+    peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
     metadata: {
       ApiType: 'Azure'
       ResourceId: aiSearchService.id
@@ -125,6 +153,10 @@ resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/proje
     #disable-next-line BCP318
     target: cosmosDBAccount.properties.documentEndpoint
     authType: 'AAD'
+    isSharedToAll: true
+    useWorkspaceManagedIdentity: true
+    peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required'
+    peStatus: enablePublicAccessWithPerimeter? 'NotApplicable':'Active' // 'NotApplicable','Active', 'Inactive'
     metadata: {
       ApiType: 'Azure'
       ResourceId: cosmosDBAccount.id
