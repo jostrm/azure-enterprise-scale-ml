@@ -624,6 +624,32 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
     ]
 }
 
+// AI Foundry Private Endpoints - deployed after main service
+module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV21-PrivateEndpoints_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: aifV2Name
+    #disable-next-line BCP318
+    cognitiveServiceId: aiFoundry2025NoAvm.outputs.resourceId
+    location: location
+    tags: tagsProject
+    privateEndpointSubnetRID: commonSubnetResourceId
+    privateLinksDnsZones: privateLinksDnsZones
+    createPrivateEndpointsAIFactoryWay: true
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+  }
+  dependsOn: [
+    aiFoundry2025NoAvm
+    existingTargetRG
+    projectV21
+    assignCognitiveServicesRoles // Add... some extra dependencies, to not having AI Foundry "Account in state accepted" errror
+    rbacAISearchForAIFv21 // Add..
+    rbacAIStorageAccountsForAIFv21 // Add
+    rbacProjectKeyVaultForAIFoundry // Add
+  ]
+}
+
 #disable-next-line BCP318
 var projectPrincipal = projectV21.outputs.projectPrincipalId
 #disable-next-line BCP318
