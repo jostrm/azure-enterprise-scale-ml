@@ -103,29 +103,7 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
     project_connection_azure_storage
   ]
 }
-resource blobDefault 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = {
-  name: 'default'
-  parent: project
-  properties: {
-    authType: 'AAD'
-    category: 'AzureBlob'
-    isSharedToAll: true
-    useWorkspaceManagedIdentity: true
-    peRequirement: enablePublicAccessWithPerimeter?'NotRequired':'Required' // 	'NotApplicable','NotRequired', 'Required'
-    peStatus: enablePublicAccessWithPerimeter?'Inactive':'Active' // 'NotApplicable','Active', 'Inactive'
-    //sharedUserList: []
-    metadata: {
-      ApiType: 'Azure'
-      ResourceId:  storageAccount.id
-      ContainerName: 'default'
-      AccountName: storageAccount.name
-    }
-    target: 'https://${storageAccount.name}.blob.${environment().suffixes.storage}/'
-  }
-  dependsOn: [
-    project_connection_azure_storage2
-  ]
-}
+
 resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01' = if (!empty(aiSearchName)) {
   name: aiSearchService.name
   parent: project
