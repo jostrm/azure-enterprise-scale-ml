@@ -328,7 +328,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     
   }
   resource blob2 'connections' = if(enablePublicAccessWithPerimeter) {
-    name: '${storageAccountName}_default'
+    name: 'default'
     properties: {
       authType: 'AAD'
       category: 'AzureBlob'
@@ -343,7 +343,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
         ContainerName: 'default'
         AccountName: existingStorageAccount.name
       }
-      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default'
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
     }
   }
   resource aiServicesConnection2 'connections' = if(enablePublicAccessWithPerimeter) {
@@ -541,8 +541,30 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     }
   }
   */
+  
+}
+
+@description('This is a container for the ai foundry project.')
+resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(!enablePublicAccessWithPerimeter) {
+  name: defaultProjectName
+  location: location
+  tags: tags
+  kind: 'Project'
+  sku: {
+    name: 'Basic'
+    tier: 'Basic'
+  }
+  identity: identity
+  properties: {
+    friendlyName: defaultProjectName
+    description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
+    v1LegacyMode: false
+    hbiWorkspace: false
+    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
+    hubResourceId: aiHub.id
+  }
   resource blob 'connections' = if(!enablePublicAccessWithPerimeter) {
-    name: '${storageAccountName}_default'
+    name: 'default'
     properties: {
       authType: 'AAD'
       category: 'AzureBlob'
@@ -557,7 +579,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
         ContainerName: 'default'
         AccountName: existingStorageAccount.name
       }
-      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/default'
+      target: 'https://${existingStorageAccount.name}.blob.${environment().suffixes.storage}/'
     }
   }
   resource aiServicesConnection 'connections' = if(!enablePublicAccessWithPerimeter) {
@@ -600,28 +622,6 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       //}
     }
   }
-}
-
-@description('This is a container for the ai foundry project.')
-resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(!enablePublicAccessWithPerimeter) {
-  name: defaultProjectName
-  location: location
-  tags: tags
-  kind: 'Project'
-  sku: {
-    name: 'Basic'
-    tier: 'Basic'
-  }
-  identity: identity
-  properties: {
-    friendlyName: defaultProjectName
-    description: 'Project for AI Factory project${aifactoryProjectNumber} in ${env} environment in ${location}'
-    v1LegacyMode: false
-    hbiWorkspace: false
-    publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
-    hubResourceId: aiHub.id
-  }
-  
   /*
   resource endpoint 'onlineEndpoints' = if(!enablePublicAccessWithPerimeter) {
     name: epDefaultName
