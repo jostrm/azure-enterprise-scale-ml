@@ -849,7 +849,12 @@ steps:
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
      --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
-     --parameters deployModel_gpt_4="$(deployModel_gpt_4)" \
+     --parameters default_gpt_capacity="$(default_gpt_capacity)" \
+     --parameters default_model_sku="$(default_model_sku)" \
+     --parameters modelGPTXName="$(modelGPTXName)" \
+     --parameters modelGPTXVersion="$(modelGPTXVersion)" \
+     --parameters modelGPTXSku="$(modelGPTXSku)" \
+     --parameters modelGPTXCapacity="$(modelGPTXCapacity)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
@@ -857,7 +862,7 @@ steps:
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters miACAExists="$(miACAExists)" \
-     --parameters miPrjExists="$(miPrjExists)" \     
+     --parameters miPrjExists="$(miPrjExists)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1055,6 +1060,7 @@ steps:
      --parameters default_gpt_capacity="$(default_gpt_capacity)" \
      --parameters default_model_sku="$(default_model_sku)" \
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
+     --parameters deployModel_gpt_X="$(deployModel_gpt_X)" \
      --parameters modelGPTXName="$(modelGPTXName)" \
      --parameters modelGPTXVersion="$(modelGPTXVersion)" \
      --parameters modelGPTXSku="$(modelGPTXSku)" \
