@@ -203,7 +203,7 @@ variables:
   serviceSettingDeployAzureAIVision: "false"
   serviceSettingDeployAzureSpeech: "false"
   serviceSettingDeployAIDocIntelligence: "false"
-  serviceSettingDeployCosmosDB: "true" # true, since needed for AI Foundry V2 project, agents.
+  serviceSettingDeployCosmosDB: "true" # true, if creating an own Capability host (enableAFoundryCaphost; "true"), then it is needed for AI Foundry V2 project, agents.
   cosmosKind: "GlobalDocumentDB" # "MongoDB", "GlobalDocumentDB"
   serviceSettingDeployPostgreSQL: "false"
   serviceSettingDeployRedisCache: "false"
