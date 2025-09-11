@@ -499,7 +499,8 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!container
   }
 }
 
-var fqdn = [
+// Raw FQDN array with potential empty strings
+var fqdnRaw = [
   // Private link FQDNs for networking
   'privatelink.blob.${environment().suffixes.storage}'
   'privatelink.cognitiveservices.azure.com'
@@ -526,13 +527,16 @@ var fqdn = [
   // Key Vault endpoint
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
   
-  // Cosmos DB endpoint (if enabled)
+  // Cosmos DB endpoint (conditionally included)
   serviceSettingDeployCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
   
   // AI Services endpoint
   '${aifV2Name}.cognitiveservices.azure.com'
   '${aifV2Name}.openai.azure.com'
 ]
+
+// Filter out empty strings to ensure valid FQDN list for Azure validation
+var fqdn = filter(fqdnRaw, fqdnEntry => !empty(fqdnEntry))
 
 // AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
 module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
@@ -545,8 +549,8 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     location: location
     enableTelemetry: false
     tags: tagsProject
-    customSubDomainName: aif2SubdomainName // aifV2Name // optional
-    //allowedFqdnList: fqdn
+    customSubDomainName: aifV2Name // aif2SubdomainName // aifV2Name // optional
+    allowedFqdnList: fqdn // Now properly filtered to exclude empty strings
     restrictOutboundNetworkAccess: false // Agents need outbound access for various services such as AI Search, Key Vault, Storage, etc.
     publicNetworkAccess: enablePublicAccessWithPerimeter || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(processedIpRules_remove32) ? 'Enabled' : 'Disabled'
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
