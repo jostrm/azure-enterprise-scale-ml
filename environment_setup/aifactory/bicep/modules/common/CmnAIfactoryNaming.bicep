@@ -99,8 +99,8 @@ var aifV2PrjName =take(replace(toLower('aif2p${uniqueInAIFenv}${randomSalt}'), '
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var amlName = 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var safeNameAISearch = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${resourceSuffix}'), '-', '') // AzureAISearch4prj0025kxmv
-var aiServicesName = replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'), '-', '') 
+var safeNameAISearch = take(replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'), '-', ''), 64) // AzureAISearch4prj0025kxmv
+var aiServicesName = take(replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'), '-', ''), 64) 
 
 // Monitoring and Insights
 var dashboardInsightsName = 'AIFactory${aifactorySuffixRG}-${projectName}-insights-${env}-${uniqueInAIFenv}${resourceSuffix}'
