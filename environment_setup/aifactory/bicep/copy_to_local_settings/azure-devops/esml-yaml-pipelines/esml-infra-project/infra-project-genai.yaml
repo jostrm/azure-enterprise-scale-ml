@@ -3,8 +3,9 @@ trigger:
     include:
       - release/project*
       - main
+
 variables:
-- template: ../variables/variables.yaml
+  - template: ../variables/variables.yaml
 
 stages:
 - stage: Dev_GenAI_Project
@@ -26,6 +27,10 @@ stages:
         runOnce:
           deploy:
             steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
@@ -42,6 +47,10 @@ stages:
         runOnce:
           deploy:
             steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
@@ -56,24 +65,58 @@ stages:
                     $retryMinutes = "$(retryMinutes)"
                     $retrySeconds = [int]$retryMinutes * 60
                     Write-Host "Attempt 1 failed. Waiting $retryMinutes minutes ($retrySeconds seconds) before retry 1..."
+                    
+                    # Set debug variables for retry attempt - skip resource-intensive tasks
+                    Write-Host "Setting debug variables (all except debug_disable_10_aifactory_dashboards,debug_disable_67_ml_platform) to be ENABLED for NEW attempt..."
+                    echo "##vso[task.setvariable variable=debug_disable_05_build_acr_image]false"
+                    echo "##vso[task.setvariable variable=debug_disable_61_foundation]false" 
+                    echo "##vso[task.setvariable variable=debug_disable_62_core_infrastructure]false"
+                    echo "##vso[task.setvariable variable=debug_disable_63_cognitive_services]false"
+                    echo "##vso[task.setvariable variable=debug_disable_64_databases]false"
+                    echo "##vso[task.setvariable variable=debug_disable_65_compute_services]false"
+                    echo "##vso[task.setvariable variable=debug_disable_66_ai_platform]false"
+                    echo "##vso[task.setvariable variable=debug_disable_67_ml_platform]true"
+                    echo "##vso[task.setvariable variable=debug_disable_68_rbac_security]false"
+                    echo "##vso[task.setvariable variable=debug_disable_69_aifoundry_2025]false"
+                    echo "##vso[task.setvariable variable=debug_disable_10_aifactory_dashboards]true"
+                    Write-Host "Debug variables set for retry robustness."
+
                     Start-Sleep -Seconds $retrySeconds
                     Write-Host "Wait completed. Starting retry attempt 1..."
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
-              # Second Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 3)
+              # Second Retry: Extended wait and retry on failure (if enabled and maxRetryAttempts >= 3)
               - task: PowerShell@2
-                displayName: 'Wait before retry 2'
+                displayName: 'Extended wait before retry 2'
                 condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
                 inputs:
                   targetType: 'inline'
                   script: |
                     $retryMinutesExtended = "$(retryMinutesExtended)"
                     $retrySeconds = [int]$retryMinutesExtended * 60
-                    Write-Host "Attempt 2 failed. Waiting $retryMinutesExtended minutes ($retrySeconds seconds) before retry 2..."
+                    Write-Host "Attempt 2 failed. Waiting $retryMinutesExtended minutes ($retrySeconds seconds) before final retry..."
+                    
+                    Write-Host "Attempt 1 failed. Waiting $retryMinutes minutes ($retrySeconds seconds) before retry 1..."
+                    
+                    # Set debug variables for retry attempt - skip resource-intensive tasks
+                    Write-Host "DISABLE: 05,61,62 to optimize NEW attempt..."
+                    echo "##vso[task.setvariable variable=debug_disable_05_build_acr_image]true"
+                    echo "##vso[task.setvariable variable=debug_disable_61_foundation]true" 
+                    echo "##vso[task.setvariable variable=debug_disable_62_core_infrastructure]true"
+                    echo "##vso[task.setvariable variable=debug_disable_63_cognitive_services]false"
+                    echo "##vso[task.setvariable variable=debug_disable_64_databases]false"
+                    echo "##vso[task.setvariable variable=debug_disable_65_compute_services]false"
+                    echo "##vso[task.setvariable variable=debug_disable_66_ai_platform]false"
+                    echo "##vso[task.setvariable variable=debug_disable_67_ml_platform]true"
+                    echo "##vso[task.setvariable variable=debug_disable_68_rbac_security]false"
+                    echo "##vso[task.setvariable variable=debug_disable_69_aifoundry_2025]false"
+                    echo "##vso[task.setvariable variable=debug_disable_10_aifactory_dashboards]true"
+                    Write-Host "Debug variables set for retry optimization."
+
                     Start-Sleep -Seconds $retrySeconds
-                    Write-Host "Wait completed. Starting final retry attempt..."
+                    Write-Host "Extended wait completed. Starting final retry attempt..."
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
@@ -98,6 +141,10 @@ stages:
         runOnce:
           deploy:
             steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
@@ -114,6 +161,10 @@ stages:
         runOnce:
           deploy:
             steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
@@ -170,6 +221,10 @@ stages:
         runOnce:
           deploy:
             steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
@@ -191,6 +246,10 @@ stages:
         runOnce:
           deploy:
             steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}

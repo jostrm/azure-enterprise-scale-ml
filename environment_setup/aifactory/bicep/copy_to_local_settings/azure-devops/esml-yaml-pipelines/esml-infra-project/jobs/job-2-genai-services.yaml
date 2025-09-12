@@ -5,12 +5,58 @@ parameters:
     type: string
 
 steps:
-
-- checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
-  submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
-  continueOnError: false # Continue running even on failure?.  (false,n,no,off,on,true,y,yes)
-  displayName: GIT # Human-readable name for the task. 
-  enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
+- task: PowerShell@2
+  displayName: '00_check_for_submodule'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "=== MANUAL SUBMODULE INITIALIZATION ==="
+      Write-Host "Current directory: $(Get-Location)"
+      Write-Host "Working directory: $(System.DefaultWorkingDirectory)"
+      
+      # Change to the repository root
+      Set-Location "$(System.DefaultWorkingDirectory)"
+      Write-Host "Changed to: $(Get-Location)"
+      
+      # Check if .gitmodules exists
+      if (Test-Path ".gitmodules") {
+        Write-Host "✅ .gitmodules file found"
+        Write-Host "Contents of .gitmodules:"
+        Get-Content ".gitmodules"
+        
+        # Initialize and update submodules manually
+        Write-Host "Running: git submodule init"
+        git submodule init
+        
+        Write-Host "Running: git submodule update --recursive"
+        git submodule update --recursive
+        
+        Write-Host "Submodule branch information:"
+        cd azure-enterprise-scale-ml
+        $currentBranch = git branch --show-current
+        if ($currentBranch) {
+          Write-Host "✅ Current branch: $currentBranch"
+        } else {
+          Write-Host "✅ Detached HEAD - checking commit info:"
+          $commitInfo = git log --oneline -1
+          Write-Host "   Current commit: $commitInfo"
+        }
+        
+        Write-Host "Available branches:"
+        git branch -a | ForEach-Object { 
+          $branch = $_.Trim()
+          if ($branch -match "remotes/origin/(main|release/.*)") {
+            Write-Host "   $branch"
+          }
+        }
+        cd ..
+      } else {
+        Write-Host "❌ .gitmodules file NOT found"
+      }
+      
+      Write-Host "Final directory contents:"
+      Get-ChildItem | Format-Table Name, IsDirectory
+      Write-Host "=== END MANUAL SUBMODULE INIT ==="
 
 - task: AzureCLI@2
   displayName: '00_generate_deployment_random_value'
@@ -162,14 +208,51 @@ steps:
       Write-Host "Current working directory: $(Get-Location)"
       Write-Host "Verifying files exist:"
       Get-ChildItem -Path $tempDir -Filter "*.json" | ForEach-Object { Write-Host "  Found: $($_.FullName)" }
+- task: PowerShell@2
+  displayName: '04_debug_check_files_and_paths'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "=== DEBUG: Checking file paths and submodule checkout ==="
+      Write-Host "Current working directory: $(Get-Location)"
+      Write-Host "System.DefaultWorkingDirectory: $(System.DefaultWorkingDirectory)"
+      Write-Host "Contents of $(System.DefaultWorkingDirectory):"
+      Get-ChildItem "$(System.DefaultWorkingDirectory)" | Format-Table Name, IsDirectory
+      
+      if (Test-Path "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml") {
+        Write-Host "✅ azure-enterprise-scale-ml submodule exists"
+        Write-Host "Contents of azure-enterprise-scale-ml:"
+        Get-ChildItem "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml" | Format-Table Name, IsDirectory
+        
+        $scriptPath = "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts"
+        if (Test-Path $scriptPath) {
+          Write-Host "✅ Scripts directory exists: $scriptPath"
+          Write-Host "Contents of scripts directory:"
+          Get-ChildItem $scriptPath | Format-Table Name
+          
+          $fullScriptPath = "$scriptPath/genDynamicNetworkParamFile.ps1"
+          if (Test-Path $fullScriptPath) {
+            Write-Host "✅ Script file exists: $fullScriptPath"
+          } else {
+            Write-Host "❌ Script file NOT found: $fullScriptPath"
+          }
+        } else {
+          Write-Host "❌ Scripts directory NOT found: $scriptPath"
+        }
+      } else {
+        Write-Host "❌ azure-enterprise-scale-ml submodule NOT found"
+      }
+      Write-Host "=== END DEBUG ==="
+
 - task: AzureCLI@2
   displayName: '04_pwsh_fetch_network_parameters'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: pscore
-    scriptPath: 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
+    # scriptPath: 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
+    ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
     arguments: '-spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -useServicePrincipal -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)"'
-    workingDirectory: '$(System.DefaultWorkingDirectory)'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
 - task: AzureCLI@2
   displayName: '05_Build default image offline, to private registry (ACR) if not exists'
   condition: and(eq(variables['serviceSettingDeployContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'))
