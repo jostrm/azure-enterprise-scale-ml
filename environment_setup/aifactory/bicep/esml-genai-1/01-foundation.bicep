@@ -130,7 +130,7 @@ param tagsProject object
 param enableDebugging bool = false
 
 @description('Random value for unique naming')
-param randomValue string = ''
+param randomValue string
 
 @description('Salt values for random naming')
 param aifactorySalt10char string = ''

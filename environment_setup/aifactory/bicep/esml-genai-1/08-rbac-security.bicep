@@ -66,7 +66,7 @@ param resourceSuffix string
 
 // Required parameters for naming convention module
 param aifactorySalt10char string = ''
-param randomValue string = ''
+param randomValue string
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
 param subscriptionIdDevTestProd string = subscription().subscriptionId
@@ -198,6 +198,9 @@ param deploymentId string = utcNow('yyyyMMddHHmmss')
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
 var cmnName = namingConvention.outputs.cmnName
 
+// SPECIAL
+var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
+
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
@@ -319,10 +322,6 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
       getProjectMIPrincipalId
   ]
 }
-
-// SPECIAL
-
-var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
 
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray

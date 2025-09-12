@@ -136,7 +136,7 @@ param inputKeyvaultSubscription string
 param projectServicePrincipleOID_SeedingKeyvaultName string
 param aifactorySalt10char string = ''
 @description('Random value for deployment uniqueness')
-param randomValue string = ''
+param randomValue string
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
 

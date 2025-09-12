@@ -59,7 +59,7 @@ param commonResourceSuffix string
 param resourceSuffix string
 
 @description('Random value for deployment uniqueness')
-param randomValue string = ''
+param randomValue string
 
 // Resource exists flags from Azure DevOps
 param aiServicesExists bool = false

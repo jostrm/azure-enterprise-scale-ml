@@ -162,7 +162,7 @@ param commonRGNamePrefix string
 
 // Naming convention module
 param aifactorySalt10char string = ''
-param randomValue string = ''
+param randomValue string
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
 param subscriptionIdDevTestProd string = subscription().subscriptionId
