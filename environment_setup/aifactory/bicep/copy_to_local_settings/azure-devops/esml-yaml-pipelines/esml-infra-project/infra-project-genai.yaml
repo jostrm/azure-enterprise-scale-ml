@@ -34,7 +34,7 @@ stages:
       condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
-      timeoutInMinutes: 120
+      timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
         vmImage: windows-2022
       environment: Dev  
@@ -42,6 +42,38 @@ stages:
         runOnce:
           deploy:
             steps:
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.dev_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+              # First Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 2)
+              - task: PowerShell@2
+                displayName: 'Wait before retry 1'
+                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $retryMinutes = "$(retryMinutes)"
+                    $retrySeconds = [int]$retryMinutes * 60
+                    Write-Host "Attempt 1 failed. Waiting $retryMinutes minutes ($retrySeconds seconds) before retry 1..."
+                    Start-Sleep -Seconds $retrySeconds
+                    Write-Host "Wait completed. Starting retry attempt 1..."
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.dev_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+              # Second Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 3)
+              - task: PowerShell@2
+                displayName: 'Wait before retry 2'
+                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $retryMinutesExtended = "$(retryMinutesExtended)"
+                    $retrySeconds = [int]$retryMinutesExtended * 60
+                    Write-Host "Attempt 2 failed. Waiting $retryMinutesExtended minutes ($retrySeconds seconds) before retry 2..."
+                    Start-Sleep -Seconds $retrySeconds
+                    Write-Host "Wait completed. Starting final retry attempt..."
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
@@ -58,7 +90,7 @@ stages:
     - deployment: ESGenAI_Networking
       condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
       displayName: Deploy Private Network
-      timeoutInMinutes: 120
+      timeoutInMinutes: 240
       pool:
         vmImage: windows-2022
       environment: Stage  
@@ -74,7 +106,7 @@ stages:
       condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
-      timeoutInMinutes: 120
+      timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
         vmImage: windows-2022
       environment: Stage  
@@ -82,6 +114,38 @@ stages:
         runOnce:
           deploy:
             steps:
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.test_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+              # First Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 2)
+              - task: PowerShell@2
+                displayName: 'Wait before retry 1'
+                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $retryMinutes = "$(retryMinutes)"
+                    $retrySeconds = [int]$retryMinutes * 60
+                    Write-Host "Attempt 1 failed. Waiting $retryMinutes minutes ($retrySeconds seconds) before retry 1..."
+                    Start-Sleep -Seconds $retrySeconds
+                    Write-Host "Wait completed. Starting retry attempt 1..."
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.test_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+              # Second Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 3)
+              - task: PowerShell@2
+                displayName: 'Wait before retry 2'
+                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $retryMinutesExtended = "$(retryMinutesExtended)"
+                    $retrySeconds = [int]$retryMinutesExtended * 60
+                    Write-Host "Attempt 2 failed. Waiting $retryMinutesExtended minutes ($retrySeconds seconds) before retry 2..."
+                    Start-Sleep -Seconds $retrySeconds
+                    Write-Host "Wait completed. Starting final retry attempt..."
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
@@ -114,7 +178,7 @@ stages:
       condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
-      timeoutInMinutes: 120
+      timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
         vmImage: windows-2022
       environment: Prod
@@ -127,6 +191,38 @@ stages:
         runOnce:
           deploy:
             steps:
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.prod_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+              # First Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 2)
+              - task: PowerShell@2
+                displayName: 'Wait before retry 1'
+                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $retryMinutes = "$(retryMinutes)"
+                    $retrySeconds = [int]$retryMinutes * 60
+                    Write-Host "Attempt 1 failed. Waiting $retryMinutes minutes ($retrySeconds seconds) before retry 1..."
+                    Start-Sleep -Seconds $retrySeconds
+                    Write-Host "Wait completed. Starting retry attempt 1..."
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.prod_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+              # Second Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 3)
+              - task: PowerShell@2
+                displayName: 'Wait before retry 2'
+                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    $retryMinutesExtended = "$(retryMinutesExtended)"
+                    $retrySeconds = [int]$retryMinutesExtended * 60
+                    Write-Host "Attempt 2 failed. Waiting $retryMinutesExtended minutes ($retrySeconds seconds) before retry 2..."
+                    Start-Sleep -Seconds $retrySeconds
+                    Write-Host "Wait completed. Starting final retry attempt..."
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}

@@ -3,6 +3,7 @@ variables:
   # #### DO NOT TOUCH ####
   # ============================================================================
   admin_ip_fw: "" # Leave this. Will be set by pipeline
+  aifactory_salt_random: "" # 10 characters. Based on "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
   # ============================================================================
   # #### END - DO NOT TOUCH####
   # ============================================================================
@@ -227,19 +228,6 @@ variables:
   aca_w_registry_image: #"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
     
   # ============================================================================
-  # MANDATORY (POST SETUP of a PROJECT): aifactory_salt_random
-  # ============================================================================
-  # Description: aifactory_salt_random:""(default) [10 chars]
-  # What: 
-  #   A deteministic unique value unique for the AIFactory environment, based on the Common RG name.
-  # How to find it: "User created Managed Identity" to find this value post creation, '19x2858d4a' in 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
-  # Usage: A non-deterministic value globally unique
-  # ============================================================================
-  
-  # Look at the "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
-  aifactory_salt_random: "" # 10 characters. Look at the "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
-  
-  # ============================================================================
   # MANDATORY (POST SETUP of a PROJECT): runNetworkingVar
   # ============================================================================
   # Description: runNetworkingVar:"true"(default) 
@@ -360,4 +348,11 @@ variables:
   # Note: You still need to PURGE AIServices and AI Foundry project (2025) due to soft delete
   # ============================================================================
   debugEnableCleaning: "false" # Enable error cleanup tasks (71-73) that delete resources on deployment failures. Set to "true" to enable cleanup tasks.
+  # ============================================================================
+  # RETRY SETTINGS - Job Retry Configuration
+  # ============================================================================
+  enableRetries: "true" # Enable automatic job retries on failure. Set to "true" to enable retry logic for GenAI services deployment.
+  retryMinutes: "5" # Number of minutes to wait between 1st and 2nd attempts. Default is 5 minutes.
+  retryMinutesExtended: "15" # Number of minutes to wait between 2nd and 3rd attempts. Default is 15 minutes.
+  maxRetryAttempts: "2" # Maximum number of total attempts (1 original + 2 retries = 3 total attempts). Valid values: 1, 2, or 3.
   
