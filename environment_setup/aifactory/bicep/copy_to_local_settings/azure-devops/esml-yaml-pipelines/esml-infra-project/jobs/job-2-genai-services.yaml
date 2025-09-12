@@ -84,7 +84,85 @@ steps:
   inputs:
     azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     KeyVaultName: '$(admin_bicep_kv_fw)'
-
+- task: AzureCLI@2
+  displayName: '03b_create_temp_json_files'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+      # Create temporary JSON files from YAML variables with correct filenames expected by task 04
+      $tempDir = "$(System.DefaultWorkingDirectory)/aifactory/parameters/"
+      New-Item -ItemType Directory -Force -Path $tempDir
+      
+      # 10-esml-globals-1.json (bicepPar1)
+      $globals1 = @{
+        '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
+        contentVersion = "1.0.0.0"
+        parameters = @{
+          aifactorySuffixRG = @{ value = "$(admin_aifactorySuffixRG)" }
+          commonRGNamePrefix = @{ value = "$(admin_aifactoryPrefixRG)" }
+          locationSuffix = @{ value = "$(admin_locationSuffix)" }
+          location = @{ value = "$(admin_location)" }
+        }
+      }
+      $globals1 | ConvertTo-Json -Depth 5 | Out-File "$tempDir/10-esml-globals-1.json" -Encoding UTF8
+      
+      # 10-esml-globals-2-12_13_21_22.json (bicepPar2)
+      $globals2 = @{
+        '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
+        contentVersion = "1.0.0.0"
+        parameters = @{
+          commonResourceSuffix = @{ value = "$(admin_commonResourceSuffix)" }
+          vnetNameBase = @{ value = "$(vnetNameBase)" }
+        }
+      }
+      $globals2 | ConvertTo-Json -Depth 5 | Out-File "$tempDir/10-esml-globals-2-12_13_21_22.json" -Encoding UTF8
+      
+      # 10-esml-globals-4-13_21_22.json (bicepPar3) - Add more parameters that are commonly needed
+      $globals4 = @{
+        '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
+        contentVersion = "1.0.0.0"
+        parameters = @{
+          resourceSuffix = @{ value = "$(admin_prjResourceSuffix)" }
+          tenantId = @{ value = "$(tenantId)" }
+        }
+      }
+      $globals4 | ConvertTo-Json -Depth 5 | Out-File "$tempDir/10-esml-globals-4-13_21_22.json" -Encoding UTF8
+      
+      # 21-22-esml-prj-parameters.json (bicepPar4)
+      $project = @{
+        '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
+        contentVersion = "1.0.0.0"
+        parameters = @{
+          vnetResourceGroupBase = @{ value = "$(vnetResourceGroupBase)" }
+        }
+      }
+      $project | ConvertTo-Json -Depth 5 | Out-File "$tempDir/21-22-esml-prj-parameters.json" -Encoding UTF8
+      
+      # 10-esml-globals-override.json (bicepPar5)
+      $override = @{
+        '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
+        contentVersion = "1.0.0.0"
+        parameters = @{
+          vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_param)" }
+          vnetNameFull_param = @{ value = "$(vnetNameFull_param)" }
+        }
+      }
+      $override | ConvertTo-Json -Depth 5 | Out-File "$tempDir/10-esml-globals-override.json" -Encoding UTF8
+      
+      Write-Host "Parameter JSON files created successfully with correct filenames:"
+      Write-Host "- 10-esml-globals-1.json"
+      Write-Host "- 10-esml-globals-2-12_13_21_22.json" 
+      Write-Host "- 10-esml-globals-4-13_21_22.json"
+      Write-Host "- 21-22-esml-prj-parameters.json"
+      Write-Host "- 10-esml-globals-override.json"
+      
+      # Debug: Show actual paths and verify files exist
+      Write-Host "Files created in directory: $tempDir"
+      Write-Host "Current working directory: $(Get-Location)"
+      Write-Host "Verifying files exist:"
+      Get-ChildItem -Path $tempDir -Filter "*.json" | ForEach-Object { Write-Host "  Found: $($_.FullName)" }
 - task: AzureCLI@2
   displayName: '04_pwsh_fetch_network_parameters'
   inputs:
@@ -447,18 +525,7 @@ steps:
       suffixKeyvault="${twoNumbers}"
 
       aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
-      # aifProjectName="aifp-${projectNumber}-1-${locationSuffix}-${envName}"
-      aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}" # # TODO=DONE
-      
-      # aiFoundryV2NameFull="aifV2${projectNumber}${locationSuffix}${envName}"
-      # aiFoundryV2Name="${aiFoundryV2NameFull:0:12}"
-
-      # aiFoundryV2Name="aif-V2${projectNumber}${locationSuffix}${envName}"
-      # aiFoundryV2Prj="aif-V2-prj-${projectNumber}-${locationSuffix}-${envName}"
-
-      # aiFoundryV2Name="aifV2${projectNumber}${locationSuffix}${envName}"
-      # @2025-04-01-preview
-      # aiFoundryV2Name="aif-V2-${projectNumber}-${locationSuffix}-${envName}"
+      aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aiFoundryV2Name="aif2"
       
       amlName="aml-${projectName}-${locationSuffix}-${envName}"
@@ -591,6 +658,67 @@ steps:
       done
 
       echo "All required parameters are set and valid."
+
+- task: AzureCLI@2
+  displayName: '05d_Extract_and_set_aifactory_salt_random'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      # Check if miPrjExists is true
+      miPrjExists="$(miPrjExists)"
+      echo "miPrjExists value: $miPrjExists"
+      
+      if [ "$miPrjExists" = "true" ]; then
+        echo "Managed Identity exists, extracting aifactory_salt_random..."
+        
+        # Input parameters
+        commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+        projectNumber="$(project_number_000)"
+        projectName="prj${projectNumber}"
+        locationSuffix="$(admin_locationSuffix)"
+        envName="$(dev_test_prod)"
+        aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+        miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+        
+        # Construct resource group name
+        projectNameReplaced="${projectName/prj/project}"
+        targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+        
+        echo "Looking for managed identity with prefix: $miPrjPrefix"
+        echo "In resource group: $targetResourceGroup"
+        
+        # Find the managed identity resource
+        miResourceName=$(az resource list \
+          --resource-group "$targetResourceGroup" \
+          --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
+          --query "[?starts_with(name, '$miPrjPrefix')].name" \
+          --output tsv)
+        
+        if [ -n "$miResourceName" ]; then
+          echo "Found managed identity: $miResourceName"
+          
+          # Extract 10 characters starting from the end minus 4 characters
+          # Example: mi-prj001-eus2-dev-qoygyf7d0ac126c-001 -> f7d0ac126c
+          saltValue="${miResourceName: -14:10}"
+          
+          echo "Extracted salt value: $saltValue"
+          echo "##vso[task.setvariable variable=aifactory_salt_random]$saltValue"
+          
+        else
+          echo "Warning: Could not find managed identity resource with prefix '$miPrjPrefix'"
+          echo "##vso[task.setvariable variable=aifactory_salt_random]"
+        fi
+        
+      else
+        echo "miPrjExists is false, skipping salt extraction"
+        echo "##vso[task.setvariable variable=aifactory_salt_random]"
+      fi
 
 # --- REPLACED SINGLE DEPLOY TASK WITH SEVEN SEQUENTIAL PHASE TASKS ---
 
@@ -1223,6 +1351,521 @@ steps:
      --parameters enableCaphost="$(enableAFoundryCaphost)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '71_If_Error_AIFoundryHubAndProject_DeleteIt'
+  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      echo "=== AI Foundry Hub and Project Error Cleanup ==="
+      echo "This task runs only when 66-ai-platform task failed with AIFoundry Hub/Project related errors"
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      # Input parameters - replicating the same logic from 05b_Check if resource exists
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      resourceSuffix="$(admin_prjResourceSuffix)"
+      
+      # Construct resource group name
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+      
+      # Resource names (same as in 05b task)
+      aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+      aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+      
+      echo "Target Resource Group: $targetResourceGroup"
+      echo "AI Hub Name Pattern: $aiHubName"
+      echo "AI Project Name Pattern: $aifProjectName"
+      
+      # Check if this is specifically an AI Platform (66-ai-platform) related error
+      echo "Checking if error is related to AI Platform deployment (66-ai-platform)..."
+      
+      # Get the error details from recent deployments
+      DEPLOYMENT_NAME_PATTERN="06-aiHubModule"
+      AI_HUB_RESOURCE_PATTERN="$aiHubName"
+      AIF_PROJECT_RESOURCE_PATTERN="$aifProjectName"
+      
+      echo "Looking for deployment errors containing: $DEPLOYMENT_NAME_PATTERN"
+      echo "Looking for resource errors mentioning: $AI_HUB_RESOURCE_PATTERN or $AIF_PROJECT_RESOURCE_PATTERN"
+      
+      # Check recent deployment failures for AI Platform related patterns
+      echo "Checking recent deployments for AI Platform (66-ai-platform) related failures..."
+      recent_deployments=$(az deployment sub list \
+        --subscription "$(dev_test_prod_sub_id)" \
+        --query "[?starts_with(name, 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)') && contains(name, '66-ai-platform')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
+        --output json 2>/dev/null || echo "[]")
+      
+      echo "Recent AI Platform deployments: $recent_deployments"
+      
+      # Check if we should proceed with cleanup based on error patterns
+      should_cleanup="false"
+      
+      if echo "$recent_deployments" | grep -qi "06-aiHubModule\|$aiHubName\|$aifProjectName"; then
+        echo "Found AI Platform (66-ai-platform) related deployment errors"
+        should_cleanup="true"
+      fi
+      
+      # Alternative check: look for AI Hub/Project resources that might exist but be in error state
+      ai_hub_resources=$(az resource list \
+        --resource-group "$targetResourceGroup" \
+        --resource-type "Microsoft.MachineLearningServices/workspaces" \
+        --query "[?starts_with(name, '$aiHubName') || starts_with(name, '$aifProjectName')].name" \
+        --output tsv 2>/dev/null || echo "")
+      
+      if [ -n "$ai_hub_resources" ]; then
+        echo "Found existing AI Hub/Project resources that may need cleanup"
+        should_cleanup="true"
+      fi
+      
+      if [ "$should_cleanup" = "true" ]; then
+        echo "=== Proceeding with AI Foundry Hub and Project resource cleanup ==="
+      
+      # Function to delete resource and its related components with fuzzy endpoint matching
+      delete_ai_resource_and_endpoints() {
+        local resourceName="$1"
+        local resourceType="$2"
+        
+        echo "=== Processing resource: $resourceName ==="
+        
+        # Check if the resource exists
+        if az resource show --resource-group "$targetResourceGroup" --name "$resourceName" --resource-type "$resourceType" &> /dev/null; then
+          echo "Found resource: $resourceName"
+          
+          # Delete private endpoints and NICs using fuzzy matching (since they have random salt)
+          echo "Searching for private endpoints matching pattern: ${resourceName}*-pend"
+          privateEndpoints=$(az network private-endpoint list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend')].name" --output tsv)
+          
+          if [ -n "$privateEndpoints" ]; then
+            while IFS= read -r pendName; do
+              if [ -n "$pendName" ]; then
+                echo "Deleting private endpoint: $pendName"
+                az network private-endpoint delete \
+                  --resource-group "$targetResourceGroup" \
+                  --name "$pendName" \
+                  --yes || echo "Failed to delete private endpoint $pendName"
+              fi
+            done <<< "$privateEndpoints"
+          else
+            echo "No private endpoints found for resource $resourceName"
+          fi
+          
+          echo "Searching for NICs matching pattern: ${resourceName}*-pend-nic"
+          nics=$(az network nic list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend-nic')].name" --output tsv)
+          
+          if [ -n "$nics" ]; then
+            while IFS= read -r nicName; do
+              if [ -n "$nicName" ]; then
+                echo "Deleting NIC: $nicName"
+                az network nic delete \
+                  --resource-group "$targetResourceGroup" \
+                  --name "$nicName" \
+                  --yes || echo "Failed to delete NIC $nicName"
+              fi
+            done <<< "$nics"
+          else
+            echo "No NICs found for resource $resourceName"
+          fi
+          
+          # Delete the main resource
+          echo "Deleting main resource: $resourceName"
+          az resource delete \
+            --resource-group "$targetResourceGroup" \
+            --name "$resourceName" \
+            --resource-type "$resourceType" \
+            --yes || echo "Failed to delete resource $resourceName"
+            
+          echo "Cleanup completed for resource: $resourceName"
+        else
+          echo "Resource $resourceName not found, skipping"
+        fi
+      }
+      
+      # Look for AI Hub resources that match the pattern
+      echo "=== Searching for AI Hub resources ==="
+      aiHubResources=$(az resource list \
+        --resource-group "$targetResourceGroup" \
+        --resource-type "Microsoft.MachineLearningServices/workspaces" \
+        --query "[?starts_with(name, '$aiHubName')].name" \
+        --output tsv)
+      
+      if [ -n "$aiHubResources" ]; then
+        echo "Found AI Hub resources to clean up:"
+        echo "$aiHubResources"
+        while IFS= read -r hubName; do
+          if [ -n "$hubName" ]; then
+            delete_ai_resource_and_endpoints "$hubName" "Microsoft.MachineLearningServices/workspaces"
+          fi
+        done <<< "$aiHubResources"
+      else
+        echo "No AI Hub resources found matching pattern: $aiHubName"
+      fi
+      
+      # Look for AI Project resources that match the pattern
+      echo "=== Searching for AI Project resources ==="
+      aifProjectResources=$(az resource list \
+        --resource-group "$targetResourceGroup" \
+        --resource-type "Microsoft.MachineLearningServices/workspaces" \
+        --query "[?starts_with(name, '$aifProjectName')].name" \
+        --output tsv)
+      
+      if [ -n "$aifProjectResources" ]; then
+        echo "Found AI Project resources to clean up:"
+        echo "$aifProjectResources"
+        while IFS= read -r projectName; do
+          if [ -n "$projectName" ]; then
+            delete_ai_resource_and_endpoints "$projectName" "Microsoft.MachineLearningServices/workspaces"
+          fi
+        done <<< "$aifProjectResources"
+      else
+        echo "No AI Project resources found matching pattern: $aifProjectName"
+      fi
+      
+      else
+        echo "No AI Platform (66-ai-platform) related errors detected. Skipping cleanup."
+        echo "This cleanup only runs for errors related to:"
+        echo "- Resources mentioning '$aiHubName' or '$aifProjectName'"
+        echo "- Deployments containing '06-aiHubModule'"
+        echo "- Task '66-ai-platform' failures"
+      fi
+      
+      echo "=== AI Foundry Hub and Project Error Cleanup Completed ==="
+- task: AzureCLI@2
+  displayName: '72_If_Error_AIServices_DeleteIt'
+  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      echo "=== AI Services Error Cleanup ==="
+      echo "This task runs only when 63-cognitive-services task failed with AI Services related errors"
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      # Input parameters - replicating the same logic from 05b_Check if resource exists
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      
+      # Construct resource group name
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+      
+      # AI Services name pattern (same as in 05b task)
+      aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
+      
+      echo "Target Resource Group: $targetResourceGroup"
+      echo "AI Services Name Pattern: $aiServicesPrefix"
+      
+      # Check if this is specifically a Cognitive Services (63-cognitive-services) related error
+      echo "Checking if error is related to Cognitive Services deployment (63-cognitive-services)..."
+      
+      # Get the error details from recent deployments
+      DEPLOYMENT_NAME_PATTERN="03-AIServices"
+      AI_SERVICES_RESOURCE_PATTERN="$aiServicesPrefix"
+      
+      echo "Looking for deployment errors containing: $DEPLOYMENT_NAME_PATTERN"
+      echo "Looking for resource errors mentioning: $AI_SERVICES_RESOURCE_PATTERN"
+      
+      # Check recent deployment failures for Cognitive Services related patterns
+      echo "Checking recent deployments for Cognitive Services (63-cognitive-services) related failures..."
+      recent_deployments=$(az deployment sub list \
+        --subscription "$(dev_test_prod_sub_id)" \
+        --query "[?starts_with(name, 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)') && contains(name, '63-cognitive-services')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
+        --output json 2>/dev/null || echo "[]")
+      
+      echo "Recent Cognitive Services deployments: $recent_deployments"
+      
+      # Check if we should proceed with cleanup based on error patterns
+      should_cleanup="false"
+      
+      if echo "$recent_deployments" | grep -qi "03-AIServices\|$aiServicesPrefix"; then
+        echo "Found Cognitive Services (63-cognitive-services) related deployment errors"
+        should_cleanup="true"
+      fi
+      
+      # Alternative check: look for AI Services resources that might exist but be in error state
+      ai_services_resources=$(az resource list \
+        --resource-group "$targetResourceGroup" \
+        --resource-type "Microsoft.CognitiveServices/accounts" \
+        --query "[?starts_with(name, '$aiServicesPrefix')].name" \
+        --output tsv 2>/dev/null || echo "")
+      
+      if [ -n "$ai_services_resources" ]; then
+        echo "Found existing AI Services resources that may need cleanup"
+        should_cleanup="true"
+      fi
+      
+      if [ "$should_cleanup" = "true" ]; then
+        echo "=== Proceeding with AI Services resource cleanup ==="
+      
+      # Function to delete AI Services resource and its related components with fuzzy endpoint matching
+      delete_ai_services_and_endpoints() {
+        local resourceName="$1"
+        local resourceType="$2"
+        
+        echo "=== Processing AI Services resource: $resourceName ==="
+        
+        # Check if the resource exists
+        if az resource show --resource-group "$targetResourceGroup" --name "$resourceName" --resource-type "$resourceType" &> /dev/null; then
+          echo "Found AI Services resource: $resourceName"
+          
+          # Delete private endpoints and NICs using fuzzy matching (since they have random salt)
+          echo "Searching for private endpoints matching pattern: ${resourceName}*-pend"
+          privateEndpoints=$(az network private-endpoint list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend')].name" --output tsv)
+          
+          if [ -n "$privateEndpoints" ]; then
+            while IFS= read -r pendName; do
+              if [ -n "$pendName" ]; then
+                echo "Deleting private endpoint: $pendName"
+                az network private-endpoint delete \
+                  --resource-group "$targetResourceGroup" \
+                  --name "$pendName" \
+                  --yes || echo "Failed to delete private endpoint $pendName"
+              fi
+            done <<< "$privateEndpoints"
+          else
+            echo "No private endpoints found for AI Services resource $resourceName"
+          fi
+          
+          echo "Searching for NICs matching pattern: ${resourceName}*-pend-nic"
+          nics=$(az network nic list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend-nic')].name" --output tsv)
+          
+          if [ -n "$nics" ]; then
+            while IFS= read -r nicName; do
+              if [ -n "$nicName" ]; then
+                echo "Deleting NIC: $nicName"
+                az network nic delete \
+                  --resource-group "$targetResourceGroup" \
+                  --name "$nicName" \
+                  --yes || echo "Failed to delete NIC $nicName"
+              fi
+            done <<< "$nics"
+          else
+            echo "No NICs found for AI Services resource $resourceName"
+          fi
+          
+          # Delete the main AI Services resource
+          echo "Deleting AI Services resource: $resourceName"
+          az resource delete \
+            --resource-group "$targetResourceGroup" \
+            --name "$resourceName" \
+            --resource-type "$resourceType" \
+            --yes || echo "Failed to delete AI Services resource $resourceName"
+            
+          echo "Cleanup completed for AI Services resource: $resourceName"
+        else
+          echo "AI Services resource $resourceName not found, skipping"
+        fi
+      }
+      
+      # Look for AI Services resources that match the pattern
+      echo "=== Searching for AI Services resources ==="
+      aiServicesResources=$(az resource list \
+        --resource-group "$targetResourceGroup" \
+        --resource-type "Microsoft.CognitiveServices/accounts" \
+        --query "[?starts_with(name, '$aiServicesPrefix')].name" \
+        --output tsv)
+      
+      if [ -n "$aiServicesResources" ]; then
+        echo "Found AI Services resources to clean up:"
+        echo "$aiServicesResources"
+        while IFS= read -r serviceName; do
+          if [ -n "$serviceName" ]; then
+            delete_ai_services_and_endpoints "$serviceName" "Microsoft.CognitiveServices/accounts"
+          fi
+        done <<< "$aiServicesResources"
+      else
+        echo "No AI Services resources found matching pattern: $aiServicesPrefix"
+      fi
+      
+      else
+        echo "No Cognitive Services (63-cognitive-services) related errors detected. Skipping cleanup."
+        echo "This cleanup only runs for errors related to:"
+        echo "- Resources starting with '$aiServicesPrefix'"
+        echo "- Deployments containing '03-AIServices'"
+        echo "- Task '63-cognitive-services' failures"
+      fi
+      
+      echo "=== AI Services Error Cleanup Completed ==="
+- task: AzureCLI@2
+  displayName: '73_If_Error_AIFoundryProject_DeleteIt'
+  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      echo "=== AI Foundry Project Error Cleanup ==="
+      echo "This task runs only when 69-aifoundry-2025 task failed with AIFoundry V2 related errors"
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      # Input parameters - replicating the same logic from 05b_Check if resource exists
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      
+      # Construct resource group name
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+      
+      # AI Foundry V2 name pattern (same as in 05b task)
+      aiFoundryV2Name="aif2"
+      
+      echo "Target Resource Group: $targetResourceGroup"
+      echo "AI Foundry V2 Name Pattern: $aiFoundryV2Name"
+      
+      # Check if this is specifically an AIFoundry V2 related error
+      echo "Checking if error is related to AIFoundry V2 resources..."
+      
+      # Get the error details from the pipeline (this will help identify if it's aif2 related)
+      DEPLOYMENT_NAME_PATTERN="09-AifV2-NoAvm_"
+      AIF2_RESOURCE_PATTERN="aif2"
+      
+      echo "Looking for deployment errors containing: $DEPLOYMENT_NAME_PATTERN"
+      echo "Looking for resource errors starting with: $AIF2_RESOURCE_PATTERN"
+      
+      # Check recent deployment failures for AIFoundry V2 patterns
+      echo "Checking recent deployments for AIFoundry V2 related failures..."
+      recent_deployments=$(az deployment sub list \
+        --subscription "$(dev_test_prod_sub_id)" \
+        --query "[?starts_with(name, 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)') && contains(name, '69-aifoundry-2025')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
+        --output json 2>/dev/null || echo "[]")
+      
+      echo "Recent deployments: $recent_deployments"
+      
+      # Check if we should proceed with cleanup based on error patterns
+      should_cleanup="false"
+      
+      if echo "$recent_deployments" | grep -qi "09-AifV2-NoAvm_\|aif2"; then
+        echo "Found AIFoundry V2 related deployment errors"
+        should_cleanup="true"
+      fi
+      
+      # Alternative check: look for AIFoundry V2 resources that might exist but be in error state
+      aif2_resources=$(az resource list \
+        --resource-group "$targetResourceGroup" \
+        --resource-type "Microsoft.CognitiveServices/accounts" \
+        --query "[?starts_with(name, '$aiFoundryV2Name')].name" \
+        --output tsv 2>/dev/null || echo "")
+      
+      if [ -n "$aif2_resources" ]; then
+        echo "Found existing AIFoundry V2 resources that may need cleanup"
+        should_cleanup="true"
+      fi
+      
+      if [ "$should_cleanup" = "true" ]; then
+        echo "=== Proceeding with AIFoundry V2 resource cleanup ==="
+        
+        # Function to delete AIFoundry V2 resource and its related components with fuzzy endpoint matching
+        delete_aifoundry_v2_and_endpoints() {
+          local resourceName="$1"
+          local resourceType="$2"
+          
+          echo "=== Processing AIFoundry V2 resource: $resourceName ==="
+          
+          # Check if the resource exists
+          if az resource show --resource-group "$targetResourceGroup" --name "$resourceName" --resource-type "$resourceType" &> /dev/null; then
+            echo "Found AIFoundry V2 resource: $resourceName"
+            
+            # Delete private endpoints and NICs using fuzzy matching (since they have random salt)
+            echo "Searching for private endpoints matching pattern: ${resourceName}-pend"
+            privateEndpoints=$(az network private-endpoint list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}-pend')].name" --output tsv)
+            
+            if [ -n "$privateEndpoints" ]; then
+              while IFS= read -r pendName; do
+                if [ -n "$pendName" ]; then
+                  echo "Deleting private endpoint: $pendName"
+                  az network private-endpoint delete \
+                    --resource-group "$targetResourceGroup" \
+                    --name "$pendName" \
+                    --yes || echo "Failed to delete private endpoint $pendName"
+                fi
+              done <<< "$privateEndpoints"
+            else
+              echo "No private endpoints found for AIFoundry V2 resource $resourceName"
+            fi
+            
+            echo "Searching for NICs matching pattern: ${resourceName}-pend-nic"
+            nics=$(az network nic list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}-pend-nic')].name" --output tsv)
+            
+            if [ -n "$nics" ]; then
+              while IFS= read -r nicName; do
+                if [ -n "$nicName" ]; then
+                  echo "Deleting NIC: $nicName"
+                  az network nic delete \
+                    --resource-group "$targetResourceGroup" \
+                    --name "$nicName" \
+                    --yes || echo "Failed to delete NIC $nicName"
+                fi
+              done <<< "$nics"
+            else
+              echo "No NICs found for AIFoundry V2 resource $resourceName"
+            fi
+            
+            # Delete the main AIFoundry V2 resource
+            echo "Deleting AIFoundry V2 resource: $resourceName"
+            az resource delete \
+              --resource-group "$targetResourceGroup" \
+              --name "$resourceName" \
+              --resource-type "$resourceType" \
+              --yes || echo "Failed to delete AIFoundry V2 resource $resourceName"
+              
+            echo "Cleanup completed for AIFoundry V2 resource: $resourceName"
+          else
+            echo "AIFoundry V2 resource $resourceName not found, skipping"
+          fi
+        }
+        
+        # Look for AIFoundry V2 resources that match the pattern
+        echo "=== Searching for AIFoundry V2 resources ==="
+        aifoundryV2Resources=$(az resource list \
+          --resource-group "$targetResourceGroup" \
+          --resource-type "Microsoft.CognitiveServices/accounts" \
+          --query "[?starts_with(name, '$aiFoundryV2Name')].name" \
+          --output tsv)
+        
+        if [ -n "$aifoundryV2Resources" ]; then
+          echo "Found AIFoundry V2 resources to clean up:"
+          echo "$aifoundryV2Resources"
+          while IFS= read -r serviceName; do
+            if [ -n "$serviceName" ]; then
+              delete_aifoundry_v2_and_endpoints "$serviceName" "Microsoft.CognitiveServices/accounts"
+            fi
+          done <<< "$aifoundryV2Resources"
+        else
+          echo "No AIFoundry V2 resources found matching pattern: $aiFoundryV2Name"
+        fi
+        
+      else
+        echo "No AIFoundry V2 related errors detected. Skipping cleanup."
+        echo "This cleanup only runs for errors related to:"
+        echo "- Resources starting with 'aif2'"
+        echo "- Deployments containing '09-AifV2-NoAvm_'"
+      fi
+      
+      echo "=== AI Foundry Project Error Cleanup Completed ==="
 - task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   inputs:

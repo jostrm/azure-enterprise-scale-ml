@@ -141,6 +141,7 @@ variables:
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
   admin_projectType: "genai-1" # Azure Devops: What project type to deploy? [esml,genai-1,genai-2] to fetch subnets from Bicep deployment.
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
+  tag_costcenter: "1234"
   tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
   project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. "10.123.456.10,124.56.78.0/24"
   
@@ -354,5 +355,9 @@ variables:
   debug_disable_68_rbac_security: "false" # RBAC for 61-67
   debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage)
   debug_disable_10_aifactory_dashboards: "true" # AI Factory Dashboards
-
-
+  # ============================================================================
+  # DEBUG SETTINGS - Error Cleanup Tasks
+  # Note: You still need to PURGE AIServices and AI Foundry project (2025) due to soft delete
+  # ============================================================================
+  debugEnableCleaning: "false" # Enable error cleanup tasks (71-73) that delete resources on deployment failures. Set to "true" to enable cleanup tasks.
+  
