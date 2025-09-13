@@ -192,6 +192,14 @@ steps:
         parameters = @{
           vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_param)" }
           vnetNameFull_param = @{ value = "$(vnetNameFull_param)" }
+          subnetCommon = @{ value = "$(subnetCommon)" }
+          subnetCommonScoring = @{ value = "$(subnetCommonScoring)" }
+          subnetCommonPowerbiGw = @{ value = "$(subnetCommonPowerbiGw)" }
+          subnetProjGenAI = @{ value = "$(subnetProjGenAI)" }
+          subnetProjAKS = @{ value = "$(subnetProjAKS)" }
+          subnetProjACA = @{ value = "$(subnetProjACA)" }
+          subnetProjDatabricksPublic = @{ value = "$(subnetProjDatabricksPublic)" }
+          subnetProjDatabricksPrivate = @{ value = "$(subnetProjDatabricksPrivate)" }
         }
       }
       $override | ConvertTo-Json -Depth 5 | Out-File "$tempDir/10-esml-globals-override.json" -Encoding UTF8
