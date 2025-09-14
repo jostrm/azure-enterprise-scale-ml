@@ -354,8 +354,8 @@ var var_amlPrincipalId = (!amlExists && enableAzureMachineLearning) ? amlREF.ide
 // ============== AI HUB Principal ID ==============
 // AI Foundry Hub dynamic naming logic (matches CmnAIfactoryNaming.bicep)
 var cleanRandomValue = !empty(randomValue) ? toLower(replace(replace(randomValue, '-', ''), '_', '')) : randomSalt
-var aifRandom = take(cleanRandomValue,12)
-// aif-hub-001-eus2-dev-qoygy-001 (30) + 12 = 42
+var aifRandom = take(cleanRandomValue,2)
+// aif-hub-001-eus2-dev-qoygy-001 (30) + 2 = 32
 var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${aifRandom}${resourceSuffix}',64)
 var aiHubName_Static = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 

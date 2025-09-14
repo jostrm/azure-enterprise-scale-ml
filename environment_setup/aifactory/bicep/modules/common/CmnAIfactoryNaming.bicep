@@ -89,9 +89,9 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 // AI Foundry Hub specific names (12)
 // Ensure domain name compliance: lowercase, no special chars, proper length
 var cleanRandomValue = !empty(randomValue) ? toLower(replace(replace(randomValue, '-', ''), '_', '')) : randomSalt
-var aifRandom = take(cleanRandomValue,12)
+var aifRandom = take(cleanRandomValue,2)
 
-// aif-hub-001-eus2-dev-qoygy-001 (30) + 12 = 42
+// aif-hub-001-eus2-dev-qoygy-001 (30) + 2 = 32
 var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${aifRandom}${resourceSuffix}',64)
 var aifV1HubName = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // TODO=DONE
