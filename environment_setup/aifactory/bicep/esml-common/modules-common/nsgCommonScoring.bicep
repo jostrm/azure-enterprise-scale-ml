@@ -12,7 +12,7 @@ param bastionIpRange string
 
 // TODO: outbound connection to ports 443, 445 for storage service tag
 
-resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
+resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: name
   location: location
   tags: tags
@@ -29,7 +29,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'AzureMachineLearning'
           destinationAddressPrefix: '*'
           access: 'Allow'
-          priority: 1050
+          priority: 4200
           direction: 'Inbound'
           sourcePortRanges: []
           destinationPortRanges: []
@@ -47,7 +47,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'BatchNodeManagement'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 1040
+            priority: 4100
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -64,7 +64,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: bastionIpRange
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 1300
+            priority: 4300
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: [
@@ -77,7 +77,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       }
       // DEBUG RULE - UNCOMMENT ONLY FOR TROUBLESHOOTING
       // WARNING: This allows ALL inbound traffic - use only temporarily!
-      // To enable: Remove the /* */ comments from the rule below
+      // To enable: Remove the // comments from the rule below
       /*
       {
         name: 'DEBUG_AllowAllInbound_TEMPORARY'
@@ -89,7 +89,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 500
+            priority: 4000
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -98,6 +98,24 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       */
+       {
+        name: 'Allow_VNet_Inbound'
+        properties: {
+            description: 'Allow traffic from other subnets in same VNet'
+            protocol: '*'
+            sourcePortRange: '*'
+            destinationPortRange: '*'
+            sourceAddressPrefix: 'VirtualNetwork'
+            destinationAddressPrefix: '*'
+            access: 'Allow'
+            priority: 3900
+            direction: 'Inbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
       {
         name: 'DenyAllInboundExceptExplicit'
         properties: {
@@ -108,7 +126,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Deny'
-            priority: 4000
+            priority: 65000
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -126,7 +144,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '*'
             sourceAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 100
+            priority: 4000
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -140,6 +158,24 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       {
+        name: 'AzureActiveDirectoryDomainServices_Allow'
+        properties: {
+            description: 'Required for Azure Active Directory Domain Services communication'
+            protocol: 'Tcp'
+            sourcePortRange: '*'
+            destinationPortRange: '443'
+            sourceAddressPrefix: '*'
+            destinationAddressPrefix: 'AzureActiveDirectoryDomainServices'
+            access: 'Allow'
+            priority: 4050
+            direction: 'Outbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
+      {
         name: 'AADLoginForWindows_Allow3services'
         properties: {
             description: 'To enable Azure AD authentication for Windows VMs.'
@@ -149,7 +185,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 110
+            priority: 4100
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -168,7 +204,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '169.254.169.254'
             access: 'Allow'
-            priority: 120
+            priority: 4200
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -187,7 +223,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureActiveDirectory'
           access: 'Allow'
-          priority: 130
+          priority: 4300
           direction: 'Outbound'
         }
       }
@@ -201,7 +237,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureMachineLearning'
           access: 'Allow'
-          priority: 140
+          priority: 4400
           direction: 'Outbound'
         }
       }
@@ -215,7 +251,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureResourceManager'
           access: 'Allow'
-          priority: 150
+          priority: 4500
           direction: 'Outbound'
         }
       }
@@ -232,7 +268,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'Storage.${location}'
           access: 'Allow'
-          priority: 160
+          priority: 4600
           direction: 'Outbound'
         }
       }
@@ -246,7 +282,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureFrontDoor.FrontEnd'
           access: 'Allow'
-          priority: 170
+          priority: 4700
           direction: 'Outbound'
         }
       }
@@ -260,7 +296,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureContainerRegistry.${location}'
           access: 'Allow'
-          priority: 180
+          priority: 4800
           direction: 'Outbound'
         }
       }
@@ -274,7 +310,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'MicrosoftContainerRegistry'
           access: 'Allow'
-          priority: 200
+          priority: 4900
           direction: 'Outbound'
         }
       }
@@ -287,7 +323,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '80'
             sourceAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 220
+            priority: 5000
             direction: 'Outbound'
             destinationAddressPrefix: 'VirtualNetwork'
         }
@@ -301,7 +337,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '5831'
             sourceAddressPrefix: '*'
             access: 'Allow'
-            priority: 230
+            priority: 5100
             direction: 'Outbound'
             destinationAddressPrefix: 'AzureMachineLearning'
         }
@@ -315,7 +351,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '5831'
             sourceAddressPrefix: '*'
             access: 'Allow'
-            priority: 1320
+            priority: 5300
             direction: 'Outbound'
             destinationAddressPrefix: 'BatchNodeManagement.${location}'
         }
@@ -332,9 +368,27 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             ]
             sourceAddressPrefix: '*'
             access: 'Allow'
-            priority: 250
+            priority: 5200
             direction: 'Outbound'
             destinationAddressPrefix: 'AzureMachineLearning'
+        }
+      }
+      {
+        name: 'Allow_VNet_Outbound'
+        properties: {
+            description: 'Allow traffic to other subnets in same VNet'
+            protocol: '*'
+            sourcePortRange: '*'
+            destinationPortRange: '*'
+            sourceAddressPrefix: '*'
+            destinationAddressPrefix: 'VirtualNetwork'
+            access: 'Allow'
+            priority: 3000
+            direction: 'Outbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
         }
       }
       // DEBUG RULE - UNCOMMENT ONLY FOR TROUBLESHOOTING
@@ -351,7 +405,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 50
+            priority: 4000
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -364,4 +418,4 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   }
 }
 
-output nsgId string = cmnNsg.id
+output nsgId string = cmnNsgScoring.id
