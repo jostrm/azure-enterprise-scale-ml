@@ -86,6 +86,8 @@ param enableAzureMachineLearning bool = false
 
 @description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = false
+@description('Add AI Foundry Hub with random naming for debugging/testing')
+param addAIFoundryHub bool = false
 @description('Enable AI Foundry V2 deployment')
 param enableAIFoundryV2 bool = false
 @description('Enable AI Foundry V21 deployment')
@@ -224,6 +226,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId: genaiSubnetId
     aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    addAIFoundryHub: addAIFoundryHub
   }
 }
 
@@ -349,7 +352,13 @@ resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview
 var var_amlPrincipalId = (!amlExists && enableAzureMachineLearning) ? amlREF.identity.principalId : ''
 
 // ============== AI HUB Principal ID ==============
-var aiHubName_Static = 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+// AI Foundry Hub dynamic naming logic (matches CmnAIfactoryNaming.bicep)
+var cleanRandomValue = !empty(randomValue) ? toLower(replace(replace(randomValue, '-', ''), '_', '')) : randomSalt
+var aifRandom = take(cleanRandomValue,12)
+// aif-hub-001-eus2-dev-qoygy-001 (30) + 12 = 42
+var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${aifRandom}${resourceSuffix}',64)
+var aiHubName_Static = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+
 resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!aiHubExists && enableAIFoundryHub) {
   name: aiHubName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)

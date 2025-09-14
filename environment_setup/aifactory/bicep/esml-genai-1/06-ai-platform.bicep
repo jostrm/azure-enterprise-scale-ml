@@ -49,6 +49,8 @@ param enableAzureMachineLearning bool = false
 param serviceSettingDeployCosmosDB bool = false
 @description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = false
+@description('Add AI Foundry Hub with random naming for debugging/testing')
+param addAIFoundryHub bool = false
 @description('Enable AI Foundry 2 features')
 param enableAIFoundryV2 bool = false
 param serviceSettingDeployAzureOpenAI bool = false
@@ -232,6 +234,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId: genaiSubnetId
     aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    addAIFoundryHub: addAIFoundryHub
   }
 }
 

@@ -45,6 +45,9 @@ param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string
 
+@description('Add AI Foundry Hub with random naming for debugging/testing')
+param addAIFoundryHub bool = false
+
 // ============== VARIABLES ==============
 var projectName = 'prj${projectNumber}'
 var cmnName = 'cmn'
@@ -83,8 +86,14 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 // ============================================================================
 
 // AI Foundry V1
-var aifV1HubName = 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-//var aifV1ProjectName = 'aifp-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+// AI Foundry Hub specific names (12)
+// Ensure domain name compliance: lowercase, no special chars, proper length
+var cleanRandomValue = !empty(randomValue) ? toLower(replace(replace(randomValue, '-', ''), '_', '')) : randomSalt
+var aifRandom = take(cleanRandomValue,12)
+
+// aif-hub-001-eus2-dev-qoygy-001 (30) + 12 = 42
+var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${aifRandom}${resourceSuffix}',64)
+var aifV1HubName = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // TODO=DONE
 
 // AI Foundry V2 (2025):aif-V2-001-eus-dev-12345-001 = 28
