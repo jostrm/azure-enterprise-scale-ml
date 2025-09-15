@@ -192,9 +192,9 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: false // v1.22 false from true 
+    provisionNetworkNow: true // v1.22 false from true -> v1.22.1 true again
     enableDataIsolation: true // v1.22 true from: enablePublicAccessWithPerimeter?false:true
-    discoveryUrl:'https://${location}.api.azureml.ms.net/discovery' // v1.22 Optional. The URL for the workspace discovery service.
+    //discoveryUrl:'https://${location}.api.azureml.ms.net/discovery' // v1.22 Added optional -> v1.22.1 removed again
 
     // network settings
     publicNetworkAccess:'Enabled'
@@ -204,13 +204,15 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       isolationMode: 'Disabled'
       #disable-next-line BCP037
       enableNetworkMonitor: false
-      managedNetworkKind: 'V1'
+      managedNetworkKind: 'V1' 
+      firewallSku:'Basic' // 'Standard' V1.22 remove this param -> -> v1.22.1 added again
     } : {
       // When enablePublicAccessWithPerimeter is false, use full managed network with outbound rules
       isolationMode: 'AllowInternetOutbound'
       #disable-next-line BCP037
       enableNetworkMonitor: false
       managedNetworkKind: 'V1'
+      firewallSku:'Basic' // 'Standard'
       outboundRules: union(
         {
           OpenAI: {
@@ -449,15 +451,9 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     hbiWorkspace:false
     //provisionNetworkNow: true
     //enableDataIsolation:false
-    provisionNetworkNow: false // v1.22 false from true 
+    provisionNetworkNow: true // v1.22 false from true -> v1.22.1 true again
     enableDataIsolation: true // v1.22 true from false
     v1LegacyMode:false
-
-     // network settings
-    //serverlessComputeSettings: {
-    //  serverlessComputeCustomSubnet: subnet.id
-    //  serverlessComputeNoPublicIP: !allowPublicAccessWhenBehindVnet
-    //}
 
     // network settings
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
@@ -468,7 +464,8 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       ipRules: ipRules
     } : null
     managedNetwork: {
-      firewallSku:'Basic' // 'Standard'
+      firewallSku:'Basic' // 'Standard' V1.22 remove this param -> -> v1.22.1 added again
+      managedNetworkKind: 'V1' // v1.22.1 added this, to ensure PG has not defaulted to V2 just now
       isolationMode:'AllowInternetOutbound' // enablePublicGenAIAccess? 'AllowInternetOutbound': 'AllowOnlyApprovedOutbound'
       #disable-next-line BCP037
       enableNetworkMonitor:false
