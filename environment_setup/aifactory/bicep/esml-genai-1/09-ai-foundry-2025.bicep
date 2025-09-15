@@ -472,17 +472,38 @@ var fqdnRaw = [
   // Azure Container Apps (ACA) required FQDNs for AI agents
   // All scenarios - Microsoft Container Registry (MCR)
   'mcr.microsoft.com'
-  '*.data.mcr.microsoft.com'
+  // '*.data.mcr.microsoft.com' - replaced with regional endpoints
+  '${location}.data.mcr.microsoft.com'
+  'eastus.data.mcr.microsoft.com'
+  'westus.data.mcr.microsoft.com'
+  'eastus2.data.mcr.microsoft.com'
+  'westus2.data.mcr.microsoft.com'
+  'northeurope.data.mcr.microsoft.com'
+  'westeurope.data.mcr.microsoft.com'
+  'swedencentral.data.mcr.microsoft.com'
   
   // Azure Container Registry (ACR) - already covered by storage patterns above
   // '*.blob.core.windows.net' - already included above
   'login.microsoft.com'
   
-  // Managed Identity
-  '*.identity.azure.net'
+  // Managed Identity endpoints
+  // '*.identity.azure.net' - replaced with regional endpoints
+  '${location}.identity.azure.net'
+  'eastus.identity.azure.net'
+  'westus.identity.azure.net'
+  'eastus2.identity.azure.net'
+  'westus2.identity.azure.net'
+  'northeurope.identity.azure.net'
+  'westeurope.identity.azure.net'
+  'swedencentral.identity.azure.net'
+  
+  // Authentication endpoints
   environment().authentication.loginEndpoint
-  '*.${environment().authentication.audiences[0]}'
-  '*.login.microsoft.com'
+  // '*.${environment().authentication.audiences[0]}' - using environment-specific endpoints
+  replace(environment().authentication.loginEndpoint, 'https://', '')
+  // '*.login.microsoft.com' - replaced with specific endpoints
+  'login.microsoft.com'
+  'account.microsoft.com'
   
   // Aspire Dashboard (location-specific)
   '${location}.ext.azurecontainerapps.dev'
@@ -493,8 +514,9 @@ var fqdnRaw = [
   'production.cloudflare.docker.com'
 ]
 
-// Filter out empty strings to ensure valid FQDN list for Azure validation
-var fqdn = filter(fqdnRaw, fqdnEntry => !empty(fqdnEntry))
+// Filter out empty strings and remove duplicates to ensure valid FQDN list for Azure validation
+var fqdnFiltered = filter(fqdnRaw, fqdnEntry => !empty(fqdnEntry))
+var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ? current : union(current, [next]))
 
 // AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
 module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
