@@ -359,12 +359,22 @@ var aifRandom = take(cleanRandomValue,2)
 var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${aifRandom}${resourceSuffix}',64)
 var aiHubName_Static = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
+// aif-p-002-1-eus2-dev-qoygy-001
+var aiHubProjectName_Static = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+
 resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!aiHubExists && enableAIFoundryHub) {
   name: aiHubName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
+resource existingAIHubProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!aiHubExists && enableAIFoundryHub) {
+  name: aiHubProjectName_Static
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
 #disable-next-line BCP318
 var var_aiHubPrincipalId = (!aiHubExists && enableAIFoundryHub) ? aiHubREF.identity.principalId : ''
+#disable-next-line BCP318
+var var_aiHubProjectPrincipalId = (!aiHubExists && enableAIFoundryHub) ? existingAIHubProject.identity.principalId : ''
 
 // ============== OPENAI Principal ID ==============
 var openAIName_Static = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
@@ -561,6 +571,8 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
     azureMachineLearningObjectId: azureMachineLearningObjectId
     aiHubName: aifV1HubName
     aiHubPrincipalId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
+    aiHubProjectName: aifV1ProjectName
+    aiHubProjectPrincipalId: var_aiHubProjectPrincipalId // Using computed variable for AI Hub project principal ID
   }
   dependsOn: [
     existingTargetRG

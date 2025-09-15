@@ -2,15 +2,16 @@ param azureMachineLearningObjectId string
 param aiHubName string = ''
 param aiHubPrincipalId string = ''
 param aiHubProjectName string = ''
+param aiHubProjectPrincipalId string = ''
 param aiSearchName string = ''
 
 var aml_appId = '0736f41a-0425-4b46-bdb5-1563eff02385'
-var contributorRole = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Hub -is-> AI services
 var azureAIAdministrator = 'b78c5d69-af96-48a3-bf8d-a8b4d589de94' // AIHub -> RG: (AIServices, AI Projects, Agents)
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // User -> RG
+var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' 
 // Search
 var searchIndexDataReader = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
+var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 
 resource aiHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing  = if(!empty(aiHubName)) {
   name: aiHubName
@@ -23,12 +24,13 @@ resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' e
   name: aiSearchName
 }
 
+// Project
 @description('Role Assignment to Azure AI Search: SearchIndexDataContributor AI Hub project. Grants full access to Azure Cognitive Search index data')
 resource searchServiceContributorRole2Project 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!empty(aiSearchName)) {
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, existingAIHubProject.id)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
-    principalId: existingAIHubProject.id
+    principalId: aiHubProjectPrincipalId // existingAIHubProject.id
     principalType:'ServicePrincipal'
     description:'001 - searchServiceContributorRoleId to AI Hub project'
   }
@@ -39,34 +41,45 @@ resource searchIndexDataReader2Project 'Microsoft.Authorization/roleAssignments@
   name: guid(existingAiSearch.id, searchIndexDataReader, existingAIHubProject.id)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReader)
-    principalId: existingAIHubProject.id
+    principalId: aiHubProjectPrincipalId // existingAIHubProject.id
     principalType:'ServicePrincipal'
     description:'002 - searchIndexDataReader to AI Hub project'
   }
   scope:existingAiSearch
 }
-
-@description('Role Assignment for ResoureGroup: AzureML OID for Contributor')
-resource acrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id, contributorRole,azureMachineLearningObjectId)
+@description('Role Assignment to Azure AI Search: searchIndexDataReader for users. 	Grants full access to Azure Cognitive Search index data')
+resource searchIndexDataContributor2Project 'Microsoft.Authorization/roleAssignments@2022-04-01'  = if(!empty(aiSearchName)) {
+  name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, existingAIHubProject.id)
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRole)
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
+    principalId: aiHubProjectPrincipalId // existingAIHubProject.id
+    principalType:'ServicePrincipal'
+    description:'003 - searchIndexDataContributorRoleId to AI Hub project'
+  }
+  scope:existingAiSearch
+}
+
+// RG scope: Contributor for Aml OID and AI Hub
+@description('Role Assignment for ResoureGroup: AzureML OID for Contributor')
+resource contributorAmlOID 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, contributorRoleId,azureMachineLearningObjectId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: azureMachineLearningObjectId
     principalType: 'ServicePrincipal'
-    description:'Contributor on RG for AML SP on RG: ${resourceGroup().id}'
+    description:'010 - Contributor on RG for AML SP on RG: ${resourceGroup().id}'
   }
   scope:resourceGroup()
 }
 
-// AI Hub on RG level
-@description('AI Hub: azureAIAdministrator:')
-resource azureAIAdministratorAiHub 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(aiHubName)) {
+@description('AI Hub: contributorRoleId:')
+resource contributorAIHub 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(aiHubName)) {
   name: guid(resourceGroup().id, contributorRoleId, aiHubPrincipalId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
     principalId: aiHubPrincipalId
     principalType: 'ServicePrincipal'
-    description:'contributorRoleId role to AI Hub for : ${aiHub.name}'
+    description:'011 - Contributor on RG for AI Hub: ${aiHub.name}'
   }
   scope:resourceGroup()
 }
