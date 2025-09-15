@@ -451,7 +451,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     hbiWorkspace:false
     //provisionNetworkNow: true
     //enableDataIsolation:false
-    provisionNetworkNow: true // v1.22 false from true -> v1.22.1 true again
+    provisionNetworkNow: false // v1.22 false from true
     enableDataIsolation: true // v1.22 true from false
     v1LegacyMode:false
 
