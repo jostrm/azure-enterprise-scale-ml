@@ -553,6 +553,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExi
 // ============== RBAC MODULES - AI HUB AND ML PLATFORM ==============
 
 // RBAC for AI Hub to Azure ML Resource Group
+//  Please ensure that the project managed identity has Search Index Data Reader and Search Service Contributor roles on the Search resource
 module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists && !empty(azureMachineLearningObjectId) && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbac6Aml2RG${deploymentProjSpecificUniqueSuffix}', 64)

@@ -43,6 +43,7 @@ param commonResourceSuffix string
 
 @description('Project-specific resource suffix')
 param resourceSuffix string
+param postGresAdminEmails string = ''
 
 // Resource exists flags from Azure DevOps
 param cosmosDBExists bool = false
@@ -181,6 +182,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId: genaiSubnetId
     aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    postGresAdminEmails:postGresAdminEmails
   }
 }
 
@@ -188,6 +190,9 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 var miPrjName = namingConvention.outputs.miPrjName
 var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+
+var postGresAdminEmailsArray = namingConvention.outputs.postGresAdminEmails
+
 var defaultSubnet = namingConvention.outputs.defaultSubnet
 
 // Import specific names needed for database deployment
@@ -425,7 +430,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
     useAdGroups: useAdGroups
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
-    adminNames: p011_genai_team_lead_email_array
+    adminNames: postGresAdminEmailsArray
   }
   dependsOn: [
     postgreSQL

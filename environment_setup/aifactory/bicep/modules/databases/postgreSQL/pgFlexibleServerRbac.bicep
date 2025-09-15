@@ -33,6 +33,7 @@ resource spPostgreSqlRoleAssignment 'Microsoft.Authorization/roleAssignments@202
   }
 }]
 
+
 resource pgAdmins 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2025-01-01-preview' = [for admin in adminNames: if(!empty(adminNames)) {
   name: guid(postgreSqlServer.id, contributorRoleId, admin)
   parent: postgreSqlServer

@@ -45,6 +45,8 @@ param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string
 
+param postGresAdminEmails string = ''
+
 @description('Add AI Foundry Hub with random naming for debugging/testing')
 param addAIFoundryHub bool = false
 
@@ -62,6 +64,9 @@ var resourceSuffixPlusOne = '-${padLeft(string(int(substring(resourceSuffix,1,3)
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
 var p011_genai_team_lead_array = (empty(technicalAdminsObjectID)) ? [] : union(technicalAdminsObjectID_array,[])
+
+var postGresAdminEmailsLocal_array = array(split(replace(postGresAdminEmails,'\\s+', ''),','))
+var postGresAdminEmailsLocal = (empty(postGresAdminEmails)) ? [] : union(postGresAdminEmailsLocal_array,[])
 
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
 var p011_genai_team_lead_email_array = (empty(technicalAdminsEmail)) ? [] : technicalAdminsEmail_array
@@ -239,6 +244,7 @@ output genaiName string = genaiName
 output prjResourceSuffixNoDash string = prjResourceSuffixNoDash
 output twoNumbers string = twoNumbers
 output p011_genai_team_lead_array array = p011_genai_team_lead_array
+output postGresAdminEmails array = postGresAdminEmailsLocal
 output p011_genai_team_lead_email_array array = p011_genai_team_lead_email_array
 output uniqueInAIFenv string = uniqueInAIFenv
 output randomSalt string = randomSalt
