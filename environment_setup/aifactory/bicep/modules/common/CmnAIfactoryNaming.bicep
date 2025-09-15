@@ -93,7 +93,7 @@ var uniqueInAIFenv = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
 // AI Foundry V1
 // AI Foundry Hub specific names (12)
 // Ensure domain name compliance: lowercase, no special chars, proper length
-var cleanRandomValue = !empty(randomValue) ? toLower(replace(replace(randomValue, '-', ''), '_', '')) : randomSalt
+var cleanRandomValue = toLower(replace(replace(randomSalt, '-', ''), '_', ''))
 var aifRandom = take(cleanRandomValue,2)
 
 // aif-hub-001-eus2-dev-qoygy-001 (30) + 2 = 32
