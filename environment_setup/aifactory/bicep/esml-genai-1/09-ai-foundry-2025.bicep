@@ -468,6 +468,29 @@ var fqdnRaw = [
   // AI Services endpoint
   '${aifV2Name}.cognitiveservices.azure.com'
   '${aifV2Name}.openai.azure.com'
+  
+  // Azure Container Apps (ACA) required FQDNs for AI agents
+  // All scenarios - Microsoft Container Registry (MCR)
+  'mcr.microsoft.com'
+  '*.data.mcr.microsoft.com'
+  
+  // Azure Container Registry (ACR) - already covered by storage patterns above
+  // '*.blob.core.windows.net' - already included above
+  'login.microsoft.com'
+  
+  // Managed Identity
+  '*.identity.azure.net'
+  environment().authentication.loginEndpoint
+  '*.${environment().authentication.audiences[0]}'
+  '*.login.microsoft.com'
+  
+  // Aspire Dashboard (location-specific)
+  '${location}.ext.azurecontainerapps.dev'
+  
+  // Docker Hub Registry (if needed)
+  'hub.docker.com'
+  'registry-1.docker.io'
+  'production.cloudflare.docker.com'
 ]
 
 // Filter out empty strings to ensure valid FQDN list for Azure validation
