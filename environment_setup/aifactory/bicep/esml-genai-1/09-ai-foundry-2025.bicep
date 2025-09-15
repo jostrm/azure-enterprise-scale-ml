@@ -498,7 +498,7 @@ var fqdnRaw = [
   'swedencentral.identity.azure.net'
   
   // Authentication endpoints
-  environment().authentication.loginEndpoint
+  // environment().authentication.loginEndpoint - REMOVED: contains https:// prefix which is invalid in FQDN
   // '*.${environment().authentication.audiences[0]}' - using environment-specific endpoints
   replace(environment().authentication.loginEndpoint, 'https://', '')
   // '*.login.microsoft.com' - replaced with specific endpoints
