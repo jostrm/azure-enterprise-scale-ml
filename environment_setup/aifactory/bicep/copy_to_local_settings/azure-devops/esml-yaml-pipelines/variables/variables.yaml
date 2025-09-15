@@ -208,7 +208,7 @@ variables:
   serviceSettingDeployCosmosDB: "true" # true, if creating an own Capability host (enableAFoundryCaphost; "true"), then it is needed for AI Foundry V2 project, agents.
   cosmosKind: "GlobalDocumentDB" # "MongoDB", "GlobalDocumentDB"
   serviceSettingDeployPostgreSQL: "false"
-  postGresAdminEmails = "" # pass a commaseparated list of email addresses. or a single email address
+  postGresAdminEmails: "" # pass a commaseparated list of email addresses. or a single email address
   serviceSettingDeployRedisCache: "false"
   serviceSettingDeploySQLDatabase: "false"
   

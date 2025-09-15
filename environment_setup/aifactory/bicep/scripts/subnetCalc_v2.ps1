@@ -536,6 +536,12 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     $templateName = "subnetParameters.json"
     
+    # Create directory if it doesn't exist
+    if (!(Test-Path $filePath)) {
+        Write-Host "Creating directory: $filePath" -ForegroundColor Yellow
+        New-Item -ItemType Directory -Path $filePath -Force | Out-Null
+    }
+    
     $template | Out-File (Join-Path $filePath $templateName)
     $fullPath = (Join-Path $filePath $templateName)
     $resolvedPath = Resolve-Path $fullPath
