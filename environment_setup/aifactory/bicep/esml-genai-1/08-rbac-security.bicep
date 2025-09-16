@@ -492,7 +492,7 @@ module storageReaderRole1001 '../modules/storagePendReaderToAIProject.bicep' = i
   params: {
     storageAccountName: storageAccount1001Name
     aiProjectName: aifV1ProjectName
-    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
+    blobPrivateEndpointName: '${storageAccount1001Name}-blob-pend'
   }
 }
 
@@ -503,7 +503,7 @@ module storageReaderRole2001 '../modules/storagePendReaderToAIProject.bicep' = i
   params: {
     storageAccountName: storageAccount2001Name
     aiProjectName: aifV1ProjectName
-    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}'
+    blobPrivateEndpointName: '${storageAccount2001Name}-blob-pend'
   }
 }
 
