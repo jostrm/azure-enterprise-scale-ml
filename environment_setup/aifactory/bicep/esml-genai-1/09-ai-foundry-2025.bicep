@@ -481,21 +481,22 @@ var fqdnRaw = [
   'mcr.microsoft.com'
   // '*.data.mcr.microsoft.com' - replaced with regional endpoints
   mcrLocationEndpoint // Safe location-based endpoint
-  'eastus.data.mcr.microsoft.com'
-  'westus.data.mcr.microsoft.com'
-  'eastus2.data.mcr.microsoft.com'
-  'westus2.data.mcr.microsoft.com'
-  'northeurope.data.mcr.microsoft.com'
-  'westeurope.data.mcr.microsoft.com'
-  'swedencentral.data.mcr.microsoft.com'
+  // Aspire Dashboard (location-specific) - FIXED: Use safe domain construction
+  // Only include location-specific ACA endpoint if location supports it
+  acaLocationEndpoint // Safe location-based ACA endpoint
   
-  // Azure Container Registry (ACR) - already covered by storage patterns above
-  // '*.blob.core.windows.net' - already included above
-  'login.microsoft.com'
+  //'eastus.data.mcr.microsoft.com'
+  //'westus.data.mcr.microsoft.com'
+  //'eastus2.data.mcr.microsoft.com'
+  //'westus2.data.mcr.microsoft.com'
+  //'northeurope.data.mcr.microsoft.com'
+  //'westeurope.data.mcr.microsoft.com'
+  //'swedencentral.data.mcr.microsoft.com'
   
   // Azure Resource Management and Identity endpoints
   // FIXED: Replaced non-existent *.identity.azure.net domains with actual Azure endpoints using environment() function
-  replace(environment().resourceManager, 'https://', '')
+  
+  //replace(environment().resourceManager, 'https://', '')
   'graph.microsoft.com'
   replace('https://${environment().suffixes.keyvaultDns}', 'https://', '')
   replace('https://${environment().suffixes.storage}', 'https://', '')
@@ -504,14 +505,15 @@ var fqdnRaw = [
   // environment().authentication.loginEndpoint - REMOVED: contains https:// prefix which is invalid in FQDN
   // '*.${environment().authentication.audiences[0]}' - using environment-specific endpoints
   replace(environment().authentication.loginEndpoint, 'https://', '')
+  
   // '*.login.microsoft.com' - replaced with specific endpoints
-  'login.microsoft.com'
-  'account.microsoft.com'
-  
-  // Aspire Dashboard (location-specific) - FIXED: Use safe domain construction
-  // Only include location-specific ACA endpoint if location supports it
-  acaLocationEndpoint // Safe location-based ACA endpoint
-  
+  'account.login.microsoft.com'
+  'portal.login.microsoft.com'
+  'oauth.login.microsoft.com'
+  'secure.login.microsoft.com'
+  'sso.login.microsoft.com'
+  'device.login.microsoft.com'
+
   // Docker Hub Registry (if needed)
   'hub.docker.com'
   'registry-1.docker.io'
