@@ -42,9 +42,6 @@ param randomValue string
 @description('AI Factory suffix for resource groups')
 param aifactorySuffixRG string
 
-@description('Common resource group name')
-param commonResourceGroupName string
-
 @description('Subscription ID for dev/test/prod')
 param subscriptionIdDevTestProd string
 
@@ -85,9 +82,6 @@ param vnetNameBase string = 'vnet-cmn'
 @description('VNet resource group name with placeholder for network environment')
 param vnetResourceGroup_param string = ''
 
-@description('Common resource group name for VNet')
-param commonResourceGroup string = commonResourceGroupName
-
 @description('Add AI Foundry Hub with random naming')
 param addAIFoundryHub bool = false
 
@@ -96,9 +90,6 @@ param commonRGNamePrefix string = ''
 
 @description('Project prefix for resource naming')
 param projectPrefix string = ''
-
-@description('Project name for resource group construction')
-param projectName string = 'prj${projectNumber}'
 
 @description('Project suffix for resource group naming')
 param projectSuffix string = resourceSuffix
@@ -134,6 +125,7 @@ param AMLStudioUIPrivate bool = true
 param centralDnsZoneByPolicyInHub bool = false
 param useCommonACR bool = true
 param useAdGroups bool = false
+param commonResourceGroup_param string = ''
 
 // Tags specific to project (separate from generic tags already present)
 param tagsProject object = {}
@@ -149,6 +141,8 @@ param inputKeyvaultSubscription string
 @description('Secret name in Key Vault that stores Service Principal ObjectId used for seeding')
 param projectServicePrincipleOID_SeedingKeyvaultName string
 
+var projectName = 'prj${projectNumber}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
 
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID of existing MI. Needs static name in existing
@@ -181,7 +175,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     aifactorySalt10char: aifactorySalt10char
     randomValue: randomValue
     aifactorySuffixRG: aifactorySuffixRG
-    commonResourceGroupName: commonResourceGroupName
+    commonResourceGroupName: commonResourceGroup
     commonRGNamePrefix: commonRGNamePrefix
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
     genaiSubnetId: genaiSubnetId
