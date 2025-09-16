@@ -3,11 +3,8 @@ targetScope = 'subscription'
 // ================================================================
 // ML PLATFORM DEPLOYMENT - Phase 6 Implementation
 // This file deploys ML and AI platform services including:
-// - Azure Machine Learning Workspace (v2)
 // - AI Foundry Hub and Project (pre 2025)
-// - Azure Kubernetes Service (AKS) for ML workloads
-// - Compute Instances and Clusters
-// - RBAC and permissions for ML platform
+// - RBAC and permissions for AI platform
 // ================================================================
 
 // ============================================================================
@@ -44,8 +41,6 @@ param aksExists bool = false
 param miPrjExists bool = false
 
 // Enable flags from parameter files
-@description('Enable Azure Machine Learning deployment')
-param enableAzureMachineLearning bool = false
 param serviceSettingDeployCosmosDB bool = false
 @description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = false
@@ -381,69 +376,6 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
-// ============== AZURE MACHINE LEARNING WORKSPACE ==============
-
-module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzureMachineLearning) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('06-AzureMLDepl${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    name: amlName
-    managedIdentities: {
-      systemAssigned: true
-      userAssignedResourceIds: concat(
-        !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
-        !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
-      )
-    }
-    uniqueDepl: deploymentProjSpecificUniqueSuffix
-    uniqueSalt5char: namingConvention.outputs.uniqueInAIFenv
-    projectName: projectName
-    projectNumber: projectNumber
-    location: location
-    locationSuffix: locationSuffix
-    aifactorySuffix: aifactorySuffixRG
-    skuName: mlWorkspaceSkuName
-    skuTier: mlWorkspaceSkuTier
-    env: env
-    aksSubnetId: aksSubnetId
-    aksSubnetName: aksSubnetName
-    aksDnsServiceIP: aksDnsServiceIP
-    aksServiceCidr: aksServiceCidr
-    tags: tagsProject
-    vnetId: vnet.id
-    subnetName: defaultSubnet
-    privateEndpointName: 'pend-${projectName}-aml-to-vnt-mlcmn'
-    amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
-    notebookPrivateDnsZoneID: privateLinksDnsZones.notebooks.id
-    allowPublicAccessWhenBehindVnet: (AMLStudioUIPrivate == true && empty(ipWhitelist_remove_ending_32)) ? false : true
-    enablePublicAccessWithPerimeter: AMLStudioUIPrivate == false ? true : false
-    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
-    aksVmSku_dev: aks_dev_sku_param
-    aksVmSku_testProd: aks_test_prod_sku_param
-    aksNodes_dev: aks_dev_nodes_param
-    aksNodes_testProd: aks_test_prod_nodes_param
-    kubernetesVersionAndOrchestrator: aks_version_param
-    amlComputeDefaultVmSize_dev: aml_cluster_dev_sku_param
-    amlComputeDefaultVmSize_testProd: aml_cluster_test_prod_sku_param
-    amlComputeMaxNodex_dev: aml_cluster_dev_nodes_param
-    amlComputeMaxNodex_testProd: aml_cluster_test_prod_nodes_param
-    ciVmSku_dev: aml_ci_dev_sku_param
-    ciVmSku_testProd: aml_ci_test_prod_sku_param
-    ipRules: empty(processedIpRulesAzureML) ? [] : processedIpRulesAzureML
-    //ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32
-    ipWhitelist_array: empty(ipWhitelist_normalized) ? [] : ipWhitelist_normalized
-    saName: storageAccount2001Name
-    kvName: keyvaultName
-    acrName: var_acr_cmn_or_prj
-    acrRGName: useCommonACR ? commonResourceGroup : targetResourceGroup
-    appInsightsName: applicationInsightName
-  }
-  dependsOn: [
-    existingTargetRG
-    // Dependencies handled through parameters - storage, keyvault, ACR should exist from previous phases
-  ]
-}
-
 // ALTERNATIVE WAY - NO WARNING of BCP318
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
   name: take('05-getPrjMI-${deploymentProjSpecificUniqueSuffix}', 64)
@@ -491,23 +423,6 @@ var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 // END SPECIAL
 // ============================================================================
 
-
-// RBAC for Azure ML
-module rbacAmlv2 '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzureMachineLearning) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('06-rbacUsersAmlV2${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    storageAccountName: storageAccount2001Name
-    userObjectIds: p011_genai_team_lead_array
-    azureMLworkspaceName: amlName
-    servicePrincipleAndMIArray: spAndMiArray
-    useAdGroups: useAdGroups
-    user2Storage: true
-  }
-  dependsOn: [
-    ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
-  ]
-}
 
 // ============== AI FOUNDRY V2 - 2025 ==============
 
@@ -621,31 +536,10 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
   ]
 }
 
-// ============== MACHINE LEARNING RBAC ==============
-
-module rbackSPfromDBX2AMLSWC '../modules/machinelearningRBAC.bicep' = if(!amlExists && enableAzureMachineLearning) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('06-rbacDBX2AMLGenAI${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    amlName: amlName
-    servicePrincipleAndMIArray: spAndMiArray
-    adfSP: '' // ADF Service Principal - empty if not using ADF integration
-    projectADuser: ''
-    additionalUserIds: p011_genai_team_lead_array
-    useAdGroups: useAdGroups
-  }
-  dependsOn: [
-    ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
-    logAnalyticsWorkspaceOpInsight
-  ]
-}
-
 // ============== OUTPUTS - Simplified ==============
 // Note: Outputs simplified to avoid conditional module reference issues
 // Resource information should be retrieved through Azure CLI queries after deployment
 
-@description('Azure ML Workspace deployment status')
-output azureMLDeployed bool = (!amlExists && enableAzureMachineLearning)
 
 @description('AI Foundry Hub deployment status')
 output aiFoundryHubDeployed bool = (!aiHubExists && enableAIFoundryHub)
@@ -655,9 +549,6 @@ output aiFoundryv2Deployed bool = (!aifProjectExists && enableAIFoundryV2)
 
 @description('Project-specific ACR RBAC deployment status')
 output acrRbacDeployed bool = (useCommonACR == false && enableAIFoundryHub)
-
-@description('ML Platform RBAC deployment status')
-output mlPlatformRbacDeployed bool = (!amlExists && enableAzureMachineLearning)
 
 @description('Storage Reader Role 1001 deployment status')
 output storageReaderRole1001Deployed bool = (!aiHubExists && enableAIFoundryHub)

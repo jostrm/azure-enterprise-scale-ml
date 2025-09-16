@@ -3,19 +3,47 @@
 echo "=== AI Factory Hosts File Generator with Private IPs ==="
 echo "Generating hosts file entries for all deployed resources with actual private IP addresses"
 
-az account set --subscription "$(dev_test_prod_sub_id)"
+# Map positional arguments passed from the pipeline (if provided)
+# Expected order (as passed by the AzureCLI task):
+# 1 dev_test_prod_sub_id
+# 2 admin_aifactoryPrefixRG
+# 3 project_number_000
+# 4 admin_locationSuffix
+# 5 dev_test_prod
+# 6 admin_aifactorySuffixRG
+# 7 admin_prjResourceSuffix
+# 8 aifactory_salt
+# 9 aifactory_salt_random
+# 10 deployment_random_value
+# 11 projectPrefix
+# 12 projectSuffix
+if [ $# -ge 1 ]; then dev_test_prod_sub_id="$1"; fi
+if [ $# -ge 2 ]; then admin_aifactoryPrefixRG="$2"; fi
+if [ $# -ge 3 ]; then project_number_000="$3"; fi
+if [ $# -ge 4 ]; then admin_locationSuffix="$4"; fi
+if [ $# -ge 5 ]; then dev_test_prod="$5"; fi
+if [ $# -ge 6 ]; then admin_aifactorySuffixRG="$6"; fi
+if [ $# -ge 7 ]; then admin_prjResourceSuffix="$7"; fi
+if [ $# -ge 8 ]; then aifactory_salt="$8"; fi
+if [ $# -ge 9 ]; then aifactory_salt_random="$9"; fi
+if [ $# -ge 10 ]; then deployment_random_value="${10}"; fi
+if [ $# -ge 11 ]; then projectPrefix="${11}"; fi
+if [ $# -ge 12 ]; then projectSuffix="${12}"; fi
 
-# Get variables from pipeline
-commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-projectNumber="$(project_number_000)"
+# Use the subscription provided
+az account set --subscription "$dev_test_prod_sub_id"
+
+# Get variables from pipeline (now from positional args / shell variables)
+commonRGNamePrefix="$admin_aifactoryPrefixRG"
+projectNumber="$project_number_000"
 projectName="prj${projectNumber}"
-locationSuffix="$(admin_locationSuffix)"
-envName="$(dev_test_prod)"
-aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-resourceSuffix="$(admin_prjResourceSuffix)"
-aifactorySalt="$(aifactory_salt)"
-aifactorySaltRandom="$(aifactory_salt_random)"
-randomValue="$(deployment_random_value)"
+locationSuffix="$admin_locationSuffix"
+envName="$dev_test_prod"
+aifactorySuffixRG="$admin_aifactorySuffixRG"
+resourceSuffix="$admin_prjResourceSuffix"
+aifactorySalt="$aifactory_salt"
+aifactorySaltRandom="$aifactory_salt_random"
+randomValue="$deployment_random_value"
 prjResourceSuffixNoDash=$(echo "${resourceSuffix}" | sed 's/-//g')
 twoNumbers=$(echo "${resourceSuffix}" | cut -c3-4)
 
