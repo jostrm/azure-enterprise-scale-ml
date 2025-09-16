@@ -486,16 +486,12 @@ var fqdnRaw = [
   // '*.blob.core.windows.net' - already included above
   'login.microsoft.com'
   
-  // Managed Identity endpoints
-  // '*.identity.azure.net' - replaced with regional endpoints
-  '${location}.identity.azure.net'
-  'eastus.identity.azure.net'
-  'westus.identity.azure.net'
-  'eastus2.identity.azure.net'
-  'westus2.identity.azure.net'
-  'northeurope.identity.azure.net'
-  'westeurope.identity.azure.net'
-  'swedencentral.identity.azure.net'
+  // Azure Resource Management and Identity endpoints
+  // FIXED: Replaced non-existent *.identity.azure.net domains with actual Azure endpoints using environment() function
+  replace(environment().resourceManager, 'https://', '')
+  'graph.microsoft.com'
+  replace('https://${environment().suffixes.keyvaultDns}', 'https://', '')
+  replace('https://${environment().suffixes.storage}', 'https://', '')
   
   // Authentication endpoints
   // environment().authentication.loginEndpoint - REMOVED: contains https:// prefix which is invalid in FQDN
