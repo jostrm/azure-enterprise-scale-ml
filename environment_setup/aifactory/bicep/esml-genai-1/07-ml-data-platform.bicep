@@ -336,7 +336,7 @@ module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && en
     location: location
     tags: tags
     vnetId: vnet.id
-    subnetName: namingConvention.outputs.defaultSubnet
+    subnetName: namingConvention.outputs.genaiSubnetName
     portalPrivateEndpointName: '${dataFactoryName}-portal-pend'
     runtimePrivateEndpointName: '${dataFactoryName}-dataFactory-pend'
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
