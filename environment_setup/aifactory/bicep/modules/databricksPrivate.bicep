@@ -99,16 +99,17 @@ resource databricksPrivate 'Microsoft.Databricks/workspaces@2024-05-01' = {
 }
 
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2021-08-01' = {
-  name: privateEndpointName
+  name: '${name}-pend'
   location: location
   properties: {
     subnet: {
       id: subnetRef
       name: subnetName
     }
+    customNetworkInterfaceName: '${name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: privateEndpointName
+        name: '${name}-pend'
         properties: {
           privateLinkServiceId: databricksPrivate.id
           groupIds: [

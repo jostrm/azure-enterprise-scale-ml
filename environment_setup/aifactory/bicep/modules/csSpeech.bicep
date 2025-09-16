@@ -53,17 +53,17 @@ resource csAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   
 }
 
-resource pendCognitiveServicesSpeech 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+resource pendCognitiveServicesSpeech 'Microsoft.Network/privateEndpoints@2023-04-01' = if(!enablePublicAccessWithPerimeter){
   location: location
-  name: pendCogSerName
+  name: '${nameCleaned}-pend'
   properties: {
     subnet: {
       id: subnet.id
     }
-    customNetworkInterfaceName: 'pend-nic-${kind}-${nameCleaned}'
+    customNetworkInterfaceName: '${nameCleaned}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: pendCogSerName
+        name: '${nameCleaned}-pend'
         properties: {
           privateLinkServiceId: csAccount.id
           groupIds: [
@@ -117,7 +117,7 @@ output principalId string = csAccount.identity.principalId
 
 output dnsConfig array = [
   {
-    name: pendCognitiveServicesSpeech.name
+    name: !enablePublicAccessWithPerimeter? pendCognitiveServicesSpeech.name: ''
     type: 'cognitiveservices'
     id:csAccount.id
     groupid:'account'

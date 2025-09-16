@@ -340,6 +340,93 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
 
+// Safe domain construction to avoid InvalidDomainName errors
+var safeLocation = toLower(location)
+
+// Create location-specific domains for all regions - Azure Container Apps and MCR are widely available
+var acaLocationEndpoint = '${safeLocation}.ext.azurecontainerapps.dev'
+var mcrLocationEndpoint = '${safeLocation}.data.mcr.microsoft.com'
+
+// Raw FQDN array with potential empty strings
+var fqdnRaw = [
+  // Private link FQDNs for networking
+  'privatelink.blob.${environment().suffixes.storage}'
+  'privatelink.cognitiveservices.azure.com'
+  'privatelink.documents.azure.com'
+  'privatelink.file.${environment().suffixes.storage}'
+  'privatelink.openai.azure.com'
+  'privatelink.search.windows.net'
+  'privatelink.services.ai.azure.com'
+  
+  // Public FQDNs for specific Azure services
+  // Storage Account 1 - Blob, File, Queue endpoints
+  '${namingConvention.outputs.storageAccount1001Name}.blob.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount1001Name}.file.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount1001Name}.queue.${environment().suffixes.storage}'
+  
+  // Storage Account 2 - Blob, File, Queue endpoints
+  '${namingConvention.outputs.storageAccount2001Name}.blob.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount2001Name}.file.${environment().suffixes.storage}'
+  '${namingConvention.outputs.storageAccount2001Name}.queue.${environment().suffixes.storage}'
+  
+  // AI Search endpoint (conditionally included)
+  enableAISearch ? '${namingConvention.outputs.safeNameAISearch}.search.windows.net' : ''
+  
+  // Key Vault endpoint
+  '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
+  
+  // Cosmos DB endpoint (conditionally included)
+  //serviceSettingDeployCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
+  
+  // AI Services endpoint
+  '${aifV2Name}.cognitiveservices.azure.com'
+  '${aifV2Name}.openai.azure.com'
+  
+  // #### Azure Container Apps (ACA) required FQDNs for AI agents ####
+  
+  // All scenarios - Microsoft Container Registry (MCR)
+  'mcr.microsoft.com'
+  // '*.data.mcr.microsoft.com' - replaced with regional endpoints
+  mcrLocationEndpoint // Safe location-based endpoint
+  // Aspire Dashboard 
+  acaLocationEndpoint // Safe location-based ACA endpoint
+
+  // Not inACA documented but required for various functionalities, Microsoft Graph API
+  'graph.microsoft.com'
+
+   // *.identity.azure.net
+  'login.identity.azure.net'
+  '${tenant().tenantId}.identity.azure.net'
+  'sts.identity.azure.net'
+
+  // '*.login.microsoft.com' - replaced with environment-specific endpoints
+  /* Examples:    
+  'login.microsoft.com'
+  'account.login.microsoft.com'
+  'portal.login.microsoft.com'
+  'oauth.login.microsoft.com'
+  'secure.login.microsoft.com'
+  'sso.login.microsoft.com'
+  'device.login.microsoft.com'
+  */
+  replace(environment().authentication.loginEndpoint, 'https://', '')
+  'account.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'portal.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'oauth.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'secure.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'sso.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'device.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+
+  // Docker Hub Registry (if needed)
+  'hub.docker.com'
+  'registry-1.docker.io'
+  'production.cloudflare.docker.com'
+]
+
+// Filter out empty strings and remove duplicates to ensure valid FQDN list for Azure validation
+var fqdnFiltered = filter(fqdnRaw, fqdnEntry => !empty(fqdnEntry))
+var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ? current : union(current, [next]))
+
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID, only if created in this module, else ignore.
 // ============================================================================

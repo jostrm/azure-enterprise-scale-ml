@@ -476,45 +476,40 @@ var fqdnRaw = [
   '${aifV2Name}.cognitiveservices.azure.com'
   '${aifV2Name}.openai.azure.com'
   
-  // Azure Container Apps (ACA) required FQDNs for AI agents
+  // #### Azure Container Apps (ACA) required FQDNs for AI agents ####
   
   // All scenarios - Microsoft Container Registry (MCR)
   'mcr.microsoft.com'
   // '*.data.mcr.microsoft.com' - replaced with regional endpoints
   mcrLocationEndpoint // Safe location-based endpoint
-  // Aspire Dashboard (location-specific) - FIXED: Use safe domain construction
+  // Aspire Dashboard 
   acaLocationEndpoint // Safe location-based ACA endpoint
-  
-  // Azure Resource Management and Identity endpoints
-  // FIXED: Replaced non-existent *.identity.azure.net domains with actual Azure endpoints using environment() function
-  //replace(environment().resourceManager, 'https://', '')
-  //replace('https://${environment().suffixes.keyvaultDns}', 'https://', '')
-  //replace('https://${environment().suffixes.storage}', 'https://', '')
-  
-  // Authentication endpoints
-  // environment().authentication.loginEndpoint - REMOVED: contains https:// prefix which is invalid in FQDN
-  // '*.${environment().authentication.audiences[0]}' - using environment-specific endpoints
-  //replace(environment().authentication.loginEndpoint, 'https://', '')
-  
-  // Not in documented but required for various functionalities
-  // Microsoft Graph API
+
+  // Not inACA documented but required for various functionalities, Microsoft Graph API
   'graph.microsoft.com'
 
-  // login.microsoft.com
-  'login.microsoft.com'
-
-  // *.identity.azure.net
+   // *.identity.azure.net
   'login.identity.azure.net'
   '${tenant().tenantId}.identity.azure.net'
   'sts.identity.azure.net'
 
-  // '*.login.microsoft.com' - replaced with specific endpoints
+  // '*.login.microsoft.com' - replaced with environment-specific endpoints
+  /* Examples:    
+  'login.microsoft.com'
   'account.login.microsoft.com'
   'portal.login.microsoft.com'
   'oauth.login.microsoft.com'
   'secure.login.microsoft.com'
   'sso.login.microsoft.com'
   'device.login.microsoft.com'
+  */
+  replace(environment().authentication.loginEndpoint, 'https://', '')
+  'account.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'portal.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'oauth.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'secure.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'sso.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  'device.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
 
   // Docker Hub Registry (if needed)
   'hub.docker.com'

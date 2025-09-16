@@ -454,10 +454,10 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
     location: location
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}'
-    filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}'
-    queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}'
-    tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}'
+    blobPrivateEndpointName: '${storageAccount2001Name}-blob-pend'
+    filePrivateEndpointName: '${storageAccount2001Name}-file-pend'
+    queuePrivateEndpointName: '${storageAccount2001Name}-queue-pend'
+    tablePrivateEndpointName: '${storageAccount2001Name}-table-pend'
     tags: tagsProject
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
     containers: [

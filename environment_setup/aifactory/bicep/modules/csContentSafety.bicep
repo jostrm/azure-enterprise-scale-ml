@@ -57,17 +57,17 @@ resource contentSafetyAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' 
   
 }
 
-resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = if(!enablePublicAccessWithPerimeter){
   location: location
-  name: pendCogSerName
+  name: '${contentsafetyName}-pend'
   properties: {
     subnet: {
       id: subnet.id
     }
-    customNetworkInterfaceName: 'pend-nic-${kind}-${contentsafetyName}'
+    customNetworkInterfaceName: '${contentsafetyName}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: pendCogSerName
+        name: '${contentsafetyName}-pend'
         properties: {
           privateLinkServiceId: contentSafetyAccount.id
           groupIds: [
@@ -90,7 +90,7 @@ output resourceId string = contentSafetyAccount.id
 
 output dnsConfig array = [
   {
-    name: pendCognitiveServices.name
+    name:!enablePublicAccessWithPerimeter? pendCognitiveServices.name: ''
     type: 'cognitiveservices'
     id:contentSafetyAccount.id
     groupid:'account'

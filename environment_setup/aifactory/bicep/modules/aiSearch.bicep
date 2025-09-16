@@ -127,7 +127,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(!ena
 }
 
 resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
-  name: privateEndpointName
+  name: aiSearch.name
   location: location
   tags: tags
   properties: {
@@ -137,7 +137,7 @@ resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enab
     customNetworkInterfaceName: '${aiSearch.name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: privateEndpointName
+        name: aiSearch.name
         properties: {
           privateLinkServiceId: aiSearch.id
           groupIds: [

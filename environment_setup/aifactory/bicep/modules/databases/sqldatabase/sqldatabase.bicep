@@ -168,15 +168,16 @@ resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' exist
 }
 
 resource pendSQLServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
-  name: 'pend-sqlServer-SQLDatabaseIn-${serverName}'
+  name: '${serverName}-pend'
   location: location
   properties: {
     subnet: {
       id: subnetPend.id
     }
+    customNetworkInterfaceName: '${serverName}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: 'pend-sqlServer-SQLDatabaseIn-${serverName}'
+        name: '${serverName}-pend'
         properties: {
           privateLinkServiceId: sqlServer.id
           groupIds: [

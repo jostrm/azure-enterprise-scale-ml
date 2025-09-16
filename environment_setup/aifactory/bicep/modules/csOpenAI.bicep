@@ -145,18 +145,18 @@ resource openAIDiagSettingsOpenAI 'Microsoft.Insights/diagnosticSettings@2021-05
   }
 }
 
-resource pendCognitiveServicesOpenAI 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+resource pendCognitiveServicesOpenAI 'Microsoft.Network/privateEndpoints@2023-04-01' = if(!enablePublicAccessWithPerimeter){
   location: location
-  name: pendCogSerName
+  name: '${cognitiveName}-pend'
   tags: tags
   properties: {
     subnet: {
       id: subnet.id
     }
-    customNetworkInterfaceName: 'pend-nic-${kind}-${cognitiveName}'
+    customNetworkInterfaceName: '${cognitiveName}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: pendCogSerName
+        name: '${cognitiveName}-pend'
         properties: {
           privateLinkServiceId: cognitiveOpenAI.id
           groupIds: [
@@ -224,7 +224,7 @@ output principalId string = cognitiveOpenAI.identity.principalId // SystemAssign
 
 output dnsConfig array = [
   {
-    name: pendCognitiveServicesOpenAI.name
+    name: !enablePublicAccessWithPerimeter? pendCognitiveServicesOpenAI.name: ''
     type: 'openai'
     id:cognitiveOpenAI.id
     groupid:'account'

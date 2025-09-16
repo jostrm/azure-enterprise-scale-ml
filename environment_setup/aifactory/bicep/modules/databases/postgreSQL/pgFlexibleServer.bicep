@@ -163,15 +163,16 @@ resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' exist
 }
 
 resource pendPostgresServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
-  name: 'pend-postgreSQLFlexibleServer-${name}'
+  name: '${name}-pend'
   location: location
   properties: {
     subnet: {
       id: subnetPend.id
     }
+    customNetworkInterfaceName: '${name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: 'pend-postgreSQLFlexibleServer-${name}'
+        name: '${name}-pend'
         properties: {
           privateLinkServiceId: postgreSQLFlex.id
           groupIds: [

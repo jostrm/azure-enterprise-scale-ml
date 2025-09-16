@@ -87,16 +87,16 @@ resource managedEndpointPrimaryKeyEntry 'Microsoft.KeyVault/vaults/secrets@2023-
 
 resource eventHubPend 'Microsoft.Network/privateEndpoints@2023-04-01' = {
   location: location
-  name: privateEndpointName
+  name: eventHubName
   properties: {
     subnet: {
       id: subnetRef
       name: subnetName
     }
-    customNetworkInterfaceName: '${privateEndpointName}-nic'
+    customNetworkInterfaceName: '${eventHubName}-nic'
     privateLinkServiceConnections: [
       {
-        name: privateEndpointName
+        name: eventHubName
         properties: {
           privateLinkServiceId: namespaceNameEV.id
           groupIds: [

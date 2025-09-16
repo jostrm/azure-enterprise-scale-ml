@@ -58,17 +58,17 @@ resource visionAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   
 }
 
-resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = {
+resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = if(!enablePublicAccessWithPerimeter){
   location: location
-  name: pendCogSerName
+  name: '${nameCleaned}-pend'
   properties: {
     subnet: {
       id: subnet.id
     }
-    customNetworkInterfaceName: 'pend-nic-${kind}-${nameCleaned}'
+    customNetworkInterfaceName: '${nameCleaned}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: pendCogSerName
+        name: '${nameCleaned}-pend'
         properties: {
           privateLinkServiceId: visionAccount.id
           groupIds: [
@@ -127,7 +127,7 @@ output computerVisionEndpoint string = visionAccount.properties.endpoint
 
 output dnsConfig array = [
   {
-    name: pendCognitiveServices.name
+    name: !enablePublicAccessWithPerimeter? pendCognitiveServices.name: ''
     type: 'cognitiveservices'
     id:visionAccount.id
     groupid:'account'

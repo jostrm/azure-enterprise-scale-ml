@@ -114,15 +114,16 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing
 }
 
 resource pendAca 'Microsoft.Network/privateEndpoints@2022-01-01' = if(createPrivateEndpoint) {
-  name: 'pend-acaenv-${name}'
+  name: '${name}-pend'
   location: location
   properties: {
     subnet: {
       id: subnetPend.id
     }
+    customNetworkInterfaceName: '${name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: 'pend-aca-${name}'
+        name: '${name}-pend'
         properties: {
           privateLinkServiceId: containerAppsEnvironment.id
           groupIds: [

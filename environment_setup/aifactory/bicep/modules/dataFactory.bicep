@@ -62,8 +62,8 @@ resource adf 'Microsoft.DataFactory/factories@2018-06-01' = {
   }
 }
 
-resource pendAdf 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in groupIds: {
-  name: obj.name
+resource pendAdf 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in groupIds: if(!enablePublicAccessWithPerimeter){
+  name: '${name}-${obj.gid}-pend'
   location: location
   tags: tags
   properties: {
@@ -71,10 +71,10 @@ resource pendAdf 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in g
       id: subnetRef
       name: subnetName
     }
-    customNetworkInterfaceName: 'pend-adf-${obj.name}'
+    customNetworkInterfaceName: '${name}-${obj.gid}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: 'pend-adf-${obj.gid}'
+        name: '${name}-${obj.gid}-pend'
         properties: {
           privateLinkServiceId: adf.id
           groupIds: [
@@ -97,13 +97,15 @@ output principalId string = adf.identity.principalId
 
 output dnsConfig array = [
   {
-    name: pendAdf[0].name
+    name: !enablePublicAccessWithPerimeter? pendAdf[0].name: ''
     type: 'portal'
     id:adf.id
+    groupid:groupIds[0].gid
   }
   {
-    name: pendAdf[1].name
+    name: !enablePublicAccessWithPerimeter? pendAdf[1].name: ''
     type: 'dataFactory'
     id:adf.id
+    groupid:groupIds[1].gid
   }
 ]

@@ -219,15 +219,16 @@ resource subnetPend 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' exist
 }
 
 resource pendRedis 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
-  name: 'pend-redis-${name}'
+  name: '${name}-pend'
   location: location
   properties: {
     subnet: {
       id: subnetPend.id
     }
+    customNetworkInterfaceName: '${name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: 'pend-redis-${name}'
+        name: '${name}-pend'
         properties: {
           privateLinkServiceId: redisCache.id
           groupIds: [

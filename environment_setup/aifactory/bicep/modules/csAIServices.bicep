@@ -217,15 +217,15 @@ resource embedding3large 'Microsoft.CognitiveServices/accounts/deployments@2023-
 // aiservicesprj003sdcdev3pmpb002 in state Accepted (Code: AccountProvisioningStateInvalid)
 resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' = if (!enablePublicAccessWithPerimeter) {
   location: location
-  name: pendCogSerName
+  name: '${nameCleaned}-pend'
   properties: {
     subnet: {
       id: subnet.id
     }
-    customNetworkInterfaceName: '${pendCogSerName}-nic'
+    customNetworkInterfaceName: '${nameCleaned}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: pendCogSerName
+        name: '${nameCleaned}-pend'
         properties: {
           privateLinkServiceId: aiServices.id
           groupIds: [

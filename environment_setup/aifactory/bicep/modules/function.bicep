@@ -264,16 +264,17 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
 
 // Create private endpoint
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-05-01' = if(createPrivateEndpoint && !byoASEv3) {
-  name: 'p-${name}-function'
+ name: '${name}-pend'
   location: location
   tags: tags
   properties: {
     subnet: {
       id: subnet.id
     }
+    customNetworkInterfaceName: '${name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: 'p-${name}-function'
+        name: '${name}-pend'
         properties: {
           privateLinkServiceId: functionApp.id
           groupIds: [

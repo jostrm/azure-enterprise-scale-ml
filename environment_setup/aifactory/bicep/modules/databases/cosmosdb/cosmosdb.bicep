@@ -219,15 +219,16 @@ resource mongoCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases
   }
 }
 resource pendCosmos 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpoint) {
-  name: 'pend-cosmosdb-${kind}-${name}'
+  name: '${name}-pend'
   location: location
   properties: {
     subnet: {
       id: subnetPend.id
     }
+    customNetworkInterfaceName: '${name}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: 'pend-cosmosdb-${kind}-${name}'
+        name: '${name}-pend'
         properties: {
           privateLinkServiceId: cosmos.id
           groupIds: [

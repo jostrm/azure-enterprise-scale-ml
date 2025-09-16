@@ -348,10 +348,10 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     location: location
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    blobPrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-blob-${genaiName}ml'
-    filePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-file-${genaiName}ml'
-    queuePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-queue-${genaiName}ml'
-    tablePrivateEndpointName: 'p-sa-${projectName}${locationSuffix}${env}-table-${genaiName}ml'
+    blobPrivateEndpointName: '${storageAccount1001Name}-blob-pend'
+    filePrivateEndpointName: '${storageAccount1001Name}-file-pend'
+    queuePrivateEndpointName: '${storageAccount1001Name}-queue-pend'
+    tablePrivateEndpointName: '${storageAccount1001Name}-table-pend'
     tags: tagsProject
     containers: [
       {

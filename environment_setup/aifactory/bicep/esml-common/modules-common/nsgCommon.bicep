@@ -378,6 +378,74 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationAddressPrefix: 'AzureMachineLearning'
         }
       }
+      {// !! Data Factory Rules
+        name: 'AzureDataFactory_Portal'
+        properties: {
+          description: 'Required for Data Factory portal authoring and monitoring'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 5400
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: [
+            'adf.azure.com'
+          ]
+        }
+      }
+      {// !!
+        name: 'AzureDataFactory_SelfHostedIR'
+        properties: {
+          description: 'Required for self-hosted IR to connect to Data Factory'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'DataFactory.${location}'
+          access: 'Allow'
+          priority: 5500
+          direction: 'Outbound'
+        }
+      }
+      {// !!
+        name: 'ServiceBus_InteractiveAuthoring'
+        properties: {
+          description: 'Required for self-hosted IR interactive authoring'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'ServiceBus'
+          access: 'Allow'
+          priority: 5600
+          direction: 'Outbound'
+        }
+      }
+      {// !!
+        name: 'Microsoft_Downloads'
+        properties: {
+          description: 'Required for self-hosted IR updates from Microsoft'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 5700
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: [
+            'download.microsoft.com'
+          ]
+        }
+      }
       {
         name: 'Allow_VNet_Outbound'
         properties: {
