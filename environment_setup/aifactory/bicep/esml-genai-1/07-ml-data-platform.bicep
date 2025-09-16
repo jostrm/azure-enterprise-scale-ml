@@ -36,7 +36,7 @@ param commonResourceSuffix string
 param resourceSuffix string
 
 @description('Random salt for unique naming')
-param aifactorySalt10char string
+param aifactorySalt10char string = ''
 param randomValue string
 
 @description('AI Factory suffix for resource groups')
@@ -303,7 +303,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
 }
 
 // ===== SPECIAL: Managed Identity principal & SP+MI array (copied from 06) =====
-var randomSaltLogic = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
+var randomSaltLogic = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? (empty(randomValue) ? substring(uniqueString(subscription().subscriptionId), 0, 10) : substring(randomValue, 0, 10)) : aifactorySalt10char
 var miPrjName_Static = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${randomSaltLogic}${resourceSuffix}'
 resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: miPrjName_Static

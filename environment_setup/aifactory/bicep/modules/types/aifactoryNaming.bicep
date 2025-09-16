@@ -81,6 +81,7 @@ type aifactoryNamingType = {
   projectTypeESMLName: string
   projectTypeGenAIName: string
   aksClusterName: string
+  dataFactoryName: string
 }
 
 @export()
