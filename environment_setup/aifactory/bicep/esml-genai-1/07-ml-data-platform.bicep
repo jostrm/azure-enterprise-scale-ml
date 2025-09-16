@@ -45,9 +45,6 @@ param aifactorySuffixRG string
 @description('Common resource group name')
 param commonResourceGroupName string
 
-@description('Project resource group name')
-param projectResourceGroupName string
-
 @description('Subscription ID for dev/test/prod')
 param subscriptionIdDevTestProd string
 
@@ -338,8 +335,8 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 
 // Azure Data Factory deployment
 module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && enableDatafactory) {
-  name: 'data-factory-deployment'
-  scope: resourceGroup(subscriptionIdDevTestProd, projectResourceGroupName)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('06-Datafactory-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     name: dataFactoryName
     location: location
