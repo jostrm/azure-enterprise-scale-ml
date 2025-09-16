@@ -485,18 +485,9 @@ var fqdnRaw = [
   // Only include location-specific ACA endpoint if location supports it
   acaLocationEndpoint // Safe location-based ACA endpoint
   
-  //'eastus.data.mcr.microsoft.com'
-  //'westus.data.mcr.microsoft.com'
-  //'eastus2.data.mcr.microsoft.com'
-  //'westus2.data.mcr.microsoft.com'
-  //'northeurope.data.mcr.microsoft.com'
-  //'westeurope.data.mcr.microsoft.com'
-  //'swedencentral.data.mcr.microsoft.com'
-  
   // Azure Resource Management and Identity endpoints
   // FIXED: Replaced non-existent *.identity.azure.net domains with actual Azure endpoints using environment() function
-  
-  //replace(environment().resourceManager, 'https://', '')
+  replace(environment().resourceManager, 'https://', '')
   'graph.microsoft.com'
   replace('https://${environment().suffixes.keyvaultDns}', 'https://', '')
   replace('https://${environment().suffixes.storage}', 'https://', '')
@@ -506,6 +497,14 @@ var fqdnRaw = [
   // '*.${environment().authentication.audiences[0]}' - using environment-specific endpoints
   replace(environment().authentication.loginEndpoint, 'https://', '')
   
+  // login.microsoft.com
+  'login.microsoft.com'
+
+  // *.identity.azure.net
+  'login.identity.azure.net'
+  '${tenant().tenantId}.identity.azure.net'
+  'sts.identity.azure.net'
+
   // '*.login.microsoft.com' - replaced with specific endpoints
   'account.login.microsoft.com'
   'portal.login.microsoft.com'
