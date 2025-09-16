@@ -171,6 +171,7 @@ var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment
 var segmentsACA = split(acaSubnetId, '/')
 var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
 
+var adfName = 'adf-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
 // ============== OUTPUTS ==============
 
@@ -251,6 +252,7 @@ output randomSalt string = randomSalt
 output projectTypeESMLName string = 'esml'
 output projectTypeGenAIName string = 'genai'
 output aksClusterName string = 'esml${projectNumber}-${locationSuffix}-${env}'
+output dataFactoryName string = adfName
 
 // Complete naming convention output with type safety
 output namingConvention aifactoryNamingType = {
@@ -329,4 +331,5 @@ output namingConvention aifactoryNamingType = {
   projectTypeESMLName: 'esml'
   projectTypeGenAIName: 'genai'
   aksClusterName: 'esml${projectNumber}-${locationSuffix}-${env}'
+  dataFactoryName: adfName
 }

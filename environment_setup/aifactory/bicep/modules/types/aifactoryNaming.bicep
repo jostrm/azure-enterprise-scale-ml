@@ -101,4 +101,5 @@ type aifactoryNamingInput = {
   genaiSubnetId: string
   aksSubnetId: string
   acaSubnetId: string
+  adfName: string
 }

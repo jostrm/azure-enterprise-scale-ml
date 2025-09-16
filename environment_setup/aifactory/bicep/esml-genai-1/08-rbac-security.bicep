@@ -83,7 +83,7 @@ param commonRGNamePrefix string
 // Enable flags from parameter files
 @description('Enable Azure Machine Learning deployment')
 param enableAzureMachineLearning bool = false
-
+param enableDatafactory bool = false
 @description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = false
 @description('Add AI Foundry Hub with random naming for debugging/testing')
@@ -616,10 +616,26 @@ module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!aiSea
   ]
 }
 
+module rbacDatafactory '../modules/datafactoryRBAC.bicep' = if(enableDatafactory) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('08-rbacDatafactory${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    additionalUserIds: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
+    servicePrincipleAndMIArray: spAndMiArray
+    datafactoryName:namingConvention.outputs.dataFactoryName
+    disableContributorAccessForUsers: disableContributorAccessForUsers
+  }
+  dependsOn: [
+    existingTargetRG
+    rbacModuleUsers
+  ]
+}
+
 // ============== RBAC MODULES - OPTIONAL COGNITIVE SERVICES ==============
 
 // RBAC for Azure AI Vision (Optional)
-module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision == true) {
+module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacVision${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -637,7 +653,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
 }
 
 // RBAC for Azure Speech Services (Optional)
-module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech == true) {
+module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacSpeech${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -655,7 +671,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
 }
 
 // RBAC for AI Document Intelligence (Optional)
-module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence == true) {
+module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacDocs${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

@@ -60,12 +60,16 @@ resource adf 'Microsoft.DataFactory/factories@2018-06-01' = {
     globalParameters: {}
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled': 'Disabled'
   }
+
 }
 
 resource pendAdf 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in groupIds: if(!enablePublicAccessWithPerimeter){
   name: '${name}-${obj.gid}-pend'
   location: location
   tags: tags
+  dependsOn: [
+    adf
+  ]
   properties: {
     subnet: {
       id: subnetRef
