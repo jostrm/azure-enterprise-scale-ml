@@ -181,10 +181,12 @@ param tagsProject object = {}
 param tags object = {}
 
 // Resource exists flags from Azure DevOps
+param updateRbac bool = false
 param amlExists bool = false
 param aiHubExists bool = false
 param aiServicesExists bool = false
 param aiSearchExists bool = false
+param dataFactoryExists bool = false
 param openaiExists bool = false
 
 // Additional deployment control flags to prevent duplicate role assignments
@@ -616,7 +618,7 @@ module rbacModuleUsersToSearch '../modules/aiSearchRbacUsers.bicep' = if (!aiSea
   ]
 }
 
-module rbacDatafactory '../modules/datafactoryRBAC.bicep' = if(enableDatafactory) {
+module rbacDatafactory '../modules/datafactoryRBAC.bicep' = if(!dataFactoryExists && enableDatafactory) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacDatafactory${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

@@ -40,6 +40,7 @@ resource machineLearningPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024
   location: location
   tags: tags
   properties: {
+    customNetworkInterfaceName: '${machineLearningPleName}-nic'
     privateLinkServiceConnections: [
       {
         name: machineLearningPleName

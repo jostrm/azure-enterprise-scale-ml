@@ -11,6 +11,10 @@ targetScope = 'subscription'
 // - RBAC and permissions for ML platform, Data Factory, Databricks
 // ================================================================
 
+// ============== SKUs ==============
+param mlWorkspaceSkuName string = 'basic'
+param mlWorkspaceSkuTier string = 'basic'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -22,7 +26,7 @@ param projectNumber string
 @description('Location for all resources')
 param location string
 
-@description('Location suffix (e.g., "weu", "swc")')
+@description('Location suffix (e.g., "weu", "sdc")')
 param locationSuffix string
 
 @description('Common resource suffix (e.g., "-001")')
@@ -103,13 +107,11 @@ param projectName string = 'prj${projectNumber}'
 param projectSuffix string = resourceSuffix
 
 // ================= ADDITIONAL AZURE ML PARAMETERS (migrated from 06) =================
-// Azure ML Workspace SKUs
-param mlWorkspaceSkuName string = 'basic'
-param mlWorkspaceSkuTier string = 'basic'
-
 // Resource exists flags
 @description('Indicates if AML workspace already exists (set by pipeline)')
 param amlExists bool = false
+param aksExists bool = false
+param dataFactoryExists bool = false
 
 // Networking / AKS settings needed for AML & attached AKS
 param aksServiceCidr string = '10.0.0.0/16'
@@ -335,7 +337,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 }
 
 // Azure Data Factory deployment
-module dataFactory '../modules/dataFactory.bicep' = if (enableDatafactory) {
+module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && enableDatafactory) {
   name: 'data-factory-deployment'
   scope: resourceGroup(subscriptionIdDevTestProd, projectResourceGroupName)
   params: {
@@ -389,7 +391,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
     notebookPrivateDnsZoneID: privateLinksDnsZones.notebooks.id
     allowPublicAccessWhenBehindVnet: (AMLStudioUIPrivate == true && empty(ipWhitelist_remove_ending_32)) ? false : true
-    enablePublicAccessWithPerimeter: AMLStudioUIPrivate == false ? true : false
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter // AMLStudioUIPrivate == false ? true : false
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
     aksVmSku_testProd: aks_test_prod_sku_param
@@ -413,6 +415,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   }
   dependsOn: [
     existingTargetRG
+    dataFactory
     // Dependencies handled through parameters - storage, keyvault, ACR should exist from previous phases
   ]
 }
@@ -432,6 +435,7 @@ module rbacAmlv2Storage '../modules/rbacStorageAml.bicep' = if(!amlExists && ena
   }
   dependsOn: [
     ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
+    ...(!dataFactoryExists && enableDatafactory ? [dataFactory] : [])
   ]
 }
 
@@ -443,7 +447,8 @@ module rbacAmlv2SPsAndADF '../modules/machinelearningRBAC.bicep' = if(!amlExists
   params: {
     amlName: amlName
     servicePrincipleAndMIArray: spAndMiArray
-    adfSP: '' // ADF Service Principal - empty if not using ADF integration
+    #disable-next-line BCP318
+    adfSP: enableDatafactory? dataFactory.outputs.principalId: '' // ADF Service Principal - empty if not using ADF integration
     projectADuser: ''
     additionalUserIds: p011_genai_team_lead_array
     useAdGroups: useAdGroups
@@ -451,6 +456,7 @@ module rbacAmlv2SPsAndADF '../modules/machinelearningRBAC.bicep' = if(!amlExists
   dependsOn: [
     ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
     logAnalyticsWorkspaceOpInsight
+    ...(!dataFactoryExists && enableDatafactory ? [dataFactory] : [])
   ]
 }
 

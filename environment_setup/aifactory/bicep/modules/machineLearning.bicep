@@ -205,6 +205,7 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
   ]
   
 }
+var pendName = '${nameManaged}-pend'
 module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
   name: 'mlNetworking2${uniqueDepl}'
   scope: resourceGroup()
@@ -213,11 +214,14 @@ module machineLearningPrivateEndpoint2 'machinelearningNetwork.bicep' = {
     tags: tags
     workspaceArmId: machineLearningStudioManaged.id
     subnetId: subnetRef
-    machineLearningPleName: privateEndpointName2
+    machineLearningPleName: pendName
     amlPrivateDnsZoneID: amlPrivateDnsZoneID
     notebookPrivateDnsZoneID: notebookPrivateDnsZoneID
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
+  dependsOn:[
+    machineLearningStudioManaged
+  ]
 }
 
 //resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@2022-10-01' = {
@@ -302,7 +306,7 @@ resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/worksp
     aksTestProd
   ]
 }
-
+var pendName1 = '${name}-pend'
 module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
   name: 'mlNetworking1${uniqueDepl}'
   scope: resourceGroup()
@@ -311,14 +315,17 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
     tags: tags
     workspaceArmId: (env=='dev')? machineLearningStudio.id: machineLearningStudioTestProd.id
     subnetId: subnetRef
-    machineLearningPleName: privateEndpointName
+    machineLearningPleName: pendName1
     amlPrivateDnsZoneID: amlPrivateDnsZoneID
     notebookPrivateDnsZoneID: notebookPrivateDnsZoneID
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
+  dependsOn: [
+    ...(env == 'dev' ? [machineLearningStudio] : [machineLearningStudioTestProd])
+  ]
 }
 
-var aksName = 'esml${projectNumber}-${locationSuffix}-${env}' // esml001-weu-prod (20/16) VS esml001-weu-prod (16/16)
+var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // esml001-weu-prod (20/16) VS esml001-weu-prod (16/16)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
 module aksDev 'aksCluster.bicep'  = if(env == 'dev') {

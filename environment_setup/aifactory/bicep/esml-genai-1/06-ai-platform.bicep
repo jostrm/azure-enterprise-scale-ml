@@ -1,5 +1,4 @@
 targetScope = 'subscription'
-
 // ================================================================
 // ML PLATFORM DEPLOYMENT - Phase 6 Implementation
 // This file deploys ML and AI platform services including:
@@ -7,12 +6,6 @@ targetScope = 'subscription'
 // - RBAC and permissions for AI platform
 // ================================================================
 
-// ============================================================================
-// Azure ML Workspace SKUs
-param mlWorkspaceSkuName string = 'basic'
-param mlWorkspaceSkuTier string = 'basic'
-
-// ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
 param env string
@@ -33,21 +26,14 @@ param commonResourceSuffix string
 param resourceSuffix string
 
 // Resource exists flags from Azure DevOps
-param amlExists bool = false
 param aiHubExists bool = false
 param aifProjectExists bool = false
 param aiFoundryV2Exists bool = false
-param aksExists bool = false
 param miPrjExists bool = false
 
 // Enable flags from parameter files
-param serviceSettingDeployCosmosDB bool = false
-@description('Enable AI Foundry Hub deployment')
 param enableAIFoundryHub bool = false
-@description('Add AI Foundry Hub with random naming for debugging/testing')
 param addAIFoundryHub bool = false
-@description('Enable AI Foundry 2 features')
-param enableAIFoundryV2 bool = false
 param serviceSettingDeployAzureOpenAI bool = false
 param enableAISearch bool = false
 param enableAIServices bool = false
@@ -97,7 +83,6 @@ param enablePublicGenAIAccess bool = false
 param allowPublicAccessWhenBehindVnet bool = false
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
-param AMLStudioUIPrivate bool = true
 
 // PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
 param genaiSubnetId string
@@ -109,42 +94,15 @@ param vnetNameBase string
 param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param network_env string = ''
-
-@description('Common default subnet')
 param common_subnet_name string // TODO - 31-network.bicep for own subnet
 param subnetCommon string = ''
 param subnetCommonScoring string = ''
-
 // Private DNS configuration
 param privDnsSubscription_param string = ''
 param privDnsResourceGroup_param string = ''
 
 // Resource group configuration
 param commonResourceGroup_param string = ''
-
-// AKS Configuration
-param aksServiceCidr string = '10.0.0.0/16'
-param aksDnsServiceIP string = '10.0.0.10'
-param aksDockerBridgeCidr string = '172.17.0.1/16'
-param aksOutboundType string = 'loadBalancer'
-var aksDefaultVersion = '1.30.3'
-
-// AKS SKU overrides
-param aks_dev_sku_override string = ''
-param aks_test_prod_sku_override string = ''
-param aks_version_override string = ''
-param aks_dev_nodes_override int = -1
-param aks_test_prod_nodes_override int = -1
-
-// Azure ML Compute Instance overrides
-param aml_ci_dev_sku_override string = ''
-param aml_ci_test_prod_sku_override string = ''
-
-// Azure ML Compute Cluster overrides
-param aml_cluster_dev_sku_override string = ''
-param aml_cluster_test_prod_sku_override string = ''
-param aml_cluster_dev_nodes_override int = -1
-param aml_cluster_test_prod_nodes_override int = -1
 
 // Tags
 param tagsProject object = {}
@@ -250,9 +208,8 @@ var aifV1ProjectName = namingConvention.outputs.aifV1ProjectName
 var aifV2ProjectName = namingConvention.outputs.aifV2Name
 var aifV2Name = namingConvention.outputs.aifV2PrjName
 
-// AI Search
+// Optional dependencies: AI Search, AI Services
 var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
-var aoaiName = serviceSettingDeployAzureOpenAI? namingConvention.outputs.aoaiName: ''
 var aiServicesName = enableAIServices? namingConvention.outputs.aiServicesName: ''
 
 // Common: AML, AI Fondry Hub
@@ -267,10 +224,6 @@ var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
-
-//var cmnName = namingConvention.outputs.cmnName
-//var uniqueInAIFenv = namingConvention.outputs.uniqueInAIFenv
-//var prjResourceSuffixNoDash = namingConvention.outputs.prjResourceSuffixNoDash
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -289,12 +242,6 @@ var processedIpRulesAIHub = [for ip in ipWhitelist_array: {
   value: trim(ip)
 }]
 
-// Network references using proper resource references
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  scope: resourceGroup(subscription().subscriptionId, vnetResourceGroupName)
-  name: vnetNameFull
-}
-
 resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
@@ -311,55 +258,6 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   }
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
-// ============== AKS AND ML COMPUTE DEFAULTS ==============
-
-// AKS: Azure Kubernetes Service defaults
-param aks_dev_defaults array = [
-  'Standard_B4ms' // 4 cores, 16GB, 32GB storage: Burstable
-  'Standard_A4m_v2' // 4cores, 32GB, 40GB storage
-  'Standard_D3_v2' // 4 cores, 14GB RAM, 200GB storage
-]
-
-param aks_testProd_defaults array = [
-  'Standard_DS13-2_v2' // 8 cores, 14GB, 112GB storage
-  'Standard_A8m_v2' // 8 cores, 64GB RAM, 80GB storage
-]
-
-// Azure ML Compute defaults
-param aml_dev_defaults array = [
-  'Standard_DS3_v2' // 4 cores, 14GB ram, 28GB storage
-  'Standard_F8s_v2' // 8,16,64
-  'Standard_DS12_v2' // 4 cores, 28GB RAM, 56GB storage
-]
-
-param aml_testProd_defaults array = [
-  'Standard_D13_v2' // 8 cores, 56GB, 400GB storage
-  'Standard_D4_v2' // 8 cores, 28GB RAM, 400GB storage
-  'Standard_F16s_v2' // 16 cores, 32GB RAM, 128GB storage
-]
-
-// Compute Instance defaults
-param ci_dev_defaults array = [
-  'Standard_DS11_v2' // 2 cores, 14GB RAM, 28GB storage
-]
-param ci_devTest_defaults array = [
-  'Standard_D11_v2'
-]
-
-// Compute parameter resolution with overrides
-var aks_dev_sku_param = !empty(aks_dev_sku_override) ? aks_dev_sku_override : aks_dev_defaults[0]
-var aks_test_prod_sku_param = !empty(aks_test_prod_sku_override) ? aks_test_prod_sku_override : aks_testProd_defaults[0]
-var aks_version_param = !empty(aks_version_override) ? aks_version_override : aksDefaultVersion
-var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
-var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
-
-var aml_ci_dev_sku_param = !empty(aml_ci_dev_sku_override) ? aml_ci_dev_sku_override : ci_dev_defaults[0]
-var aml_ci_test_prod_sku_param = !empty(aml_ci_test_prod_sku_override) ? aml_ci_test_prod_sku_override : ci_devTest_defaults[0]
-
-var aml_cluster_dev_sku_param = !empty(aml_cluster_dev_sku_override) ? aml_cluster_dev_sku_override : aml_dev_defaults[0]
-var aml_cluster_test_prod_sku_param = !empty(aml_cluster_test_prod_sku_override) ? aml_cluster_test_prod_sku_override : aml_testProd_defaults[1]
-var aml_cluster_dev_nodes_param = aml_cluster_dev_nodes_override != -1 ? aml_cluster_dev_nodes_override : 3
-var aml_cluster_test_prod_nodes_param = aml_cluster_test_prod_nodes_override != -1 ? aml_cluster_test_prod_nodes_override : 3
 
 resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
@@ -543,9 +441,6 @@ module rbacAcrProjectspecific '../modules/acrRbac.bicep' = if(useCommonACR == fa
 
 @description('AI Foundry Hub deployment status')
 output aiFoundryHubDeployed bool = (!aiHubExists && enableAIFoundryHub)
-
-@description('AI Foundry Preview deployment status')
-output aiFoundryv2Deployed bool = (!aifProjectExists && enableAIFoundryV2)
 
 @description('Project-specific ACR RBAC deployment status')
 output acrRbacDeployed bool = (useCommonACR == false && enableAIFoundryHub)

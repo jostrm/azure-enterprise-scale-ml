@@ -115,13 +115,13 @@ var identity = !empty(managedIdentities)
 
 // 2025-08 <- 2024-10-01-preview
 // 2025-08 -> 2025-07-01-preview
-resource azureMLv2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(env == 'dev') {
+resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview' = if(env == 'dev') {
   name: name
   location: location
   kind:'Default'
   sku: {
-    name:'Basic'
-    tier:'Basic'
+    name:skuName
+    tier:skuTier
   }
   identity:identity
   tags: tags
@@ -169,12 +169,10 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
   location: location
   kind:'Default'
   sku: {
-    name:'Basic'
-    tier:'Basic'
+    name:skuName
+    tier:skuTier
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: identity
   tags: tags
   properties: {
     allowRoleAssignmentOnRG: true
@@ -216,26 +214,30 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
   ]
 }
 
-module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = {
-  name: 'mlNetworking1${uniqueDepl}'
+var pendName = '${name}-pend'
+module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = if(!enablePublicAccessWithPerimeter) {
+  name: take('Amlv2-NW${uniqueDepl}',64)
   scope: resourceGroup()
   params: {
     location: location
     tags: tags
-    workspaceArmId: (env=='dev')? azureMLv2.id: amlv2TestProd.id
+    workspaceArmId: (env=='dev')? azureMLv2Dev.id: amlv2TestProd.id
     subnetId: subnetRef
-    machineLearningPleName: privateEndpointName
+    machineLearningPleName: pendName
     amlPrivateDnsZoneID: amlPrivateDnsZoneID
     notebookPrivateDnsZoneID: notebookPrivateDnsZoneID
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
+  dependsOn: [
+    ...(env == 'dev' ? [azureMLv2Dev] : [amlv2TestProd])
+  ]
 }
 
-var aksName = 'esml${projectNumber}-${locationSuffix}-${env}' // esml001-weu-prod (20/16) VS esml001-weu-prod (16/16)
+var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // aks001-weu-prod (20/16) VS aks001-weu-prod (16/16)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
 module aksDev 'aksCluster.bicep'  = if(env == 'dev') {
-  name: 'AMLAKSDev4${uniqueDepl}'
+  name: take('Amlv2-AKS-D${uniqueDepl}',64)
   params: {
     name: aksName // esml001-weu-prod
     tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
@@ -265,7 +267,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev') {
 }
 
 module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
-  name: 'AMLAKSTestProd4${uniqueDepl}'
+  name: take('Amlv2-AKS-TP${uniqueDepl}',64)
   params: {
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
     tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
@@ -298,7 +300,7 @@ module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
 //Microsoft.MachineLearningServices/workspaces/computes@2022-10-01
 resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='dev') {	
   name: aksName
-  parent: azureMLv2
+  parent: azureMLv2Dev
   location: location
   properties: {
     computeType: 'AKS'
@@ -321,9 +323,9 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
       
     }
   }
-  dependsOn:[
-    machineLearningPrivateEndpoint
-    azureMLv2
+  dependsOn: [
+    ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
+    azureMLv2Dev
   ]
 }
 //AKS attach compute PRIVATE cluster, without SSL
@@ -352,15 +354,15 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
       
     }
   }
-  dependsOn:[
-    machineLearningPrivateEndpoint
+  dependsOn: [
+    ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
     amlv2TestProd
   ]
 }
 //CPU Cluster
 resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(env =='dev') {
-  name: 'p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
-  parent: azureMLv2
+  name: take('p${projectNumber}-m01${locationSuffix}-${env}',16) // p001-m1-weu-prod (16/16...or 24)
+  parent: azureMLv2Dev
   location: location
   tags: tags
   identity: {
@@ -390,11 +392,11 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
   }
   dependsOn:[
     machineLearningPrivateEndpoint
-    azureMLv2
+    azureMLv2Dev
   ]
 }
 resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(env =='test' || env =='prod') {
-  name: 'p${projectNumber}-m01${locationSuffix}-${env}' // p001-m1-weu-prod (16/16...or 24)
+  name: take('p${projectNumber}-m01${locationSuffix}-${env}',16) // p001-m1-weu-prod (16/16...or 24)
   parent: amlv2TestProd
   location: location
   tags: tags
@@ -429,15 +431,7 @@ resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/wo
   ]
 }
 
-output amlId string = (env=='dev')? azureMLv2.id: amlv2TestProd.id
-output amlName string =(env=='dev')? azureMLv2.name: amlv2TestProd.name
+output amlId string = (env=='dev')? azureMLv2Dev.id: amlv2TestProd.id
+output amlName string =(env=='dev')? azureMLv2Dev.name: amlv2TestProd.name
 #disable-next-line BCP318
-output principalId string = (env=='dev')?azureMLv2.identity.principalId:  amlv2TestProd.identity.principalId
-
-// ###############  AML networking - custom networking ###############
-output dnsConfig array = [
-  {
-    name: privateEndpointName //pendAml.name
-    type: 'amlworkspace'
-  }
-]
+output principalId string = (env=='dev')?azureMLv2Dev.identity.principalId:  amlv2TestProd.identity.principalId
