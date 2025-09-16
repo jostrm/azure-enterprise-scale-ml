@@ -477,26 +477,29 @@ var fqdnRaw = [
   '${aifV2Name}.openai.azure.com'
   
   // Azure Container Apps (ACA) required FQDNs for AI agents
+  
   // All scenarios - Microsoft Container Registry (MCR)
   'mcr.microsoft.com'
   // '*.data.mcr.microsoft.com' - replaced with regional endpoints
   mcrLocationEndpoint // Safe location-based endpoint
   // Aspire Dashboard (location-specific) - FIXED: Use safe domain construction
-  // Only include location-specific ACA endpoint if location supports it
   acaLocationEndpoint // Safe location-based ACA endpoint
   
   // Azure Resource Management and Identity endpoints
   // FIXED: Replaced non-existent *.identity.azure.net domains with actual Azure endpoints using environment() function
-  replace(environment().resourceManager, 'https://', '')
-  'graph.microsoft.com'
-  replace('https://${environment().suffixes.keyvaultDns}', 'https://', '')
-  replace('https://${environment().suffixes.storage}', 'https://', '')
+  //replace(environment().resourceManager, 'https://', '')
+  //replace('https://${environment().suffixes.keyvaultDns}', 'https://', '')
+  //replace('https://${environment().suffixes.storage}', 'https://', '')
   
   // Authentication endpoints
   // environment().authentication.loginEndpoint - REMOVED: contains https:// prefix which is invalid in FQDN
   // '*.${environment().authentication.audiences[0]}' - using environment-specific endpoints
-  replace(environment().authentication.loginEndpoint, 'https://', '')
+  //replace(environment().authentication.loginEndpoint, 'https://', '')
   
+  // Not in documented but required for various functionalities
+  // Microsoft Graph API
+  'graph.microsoft.com'
+
   // login.microsoft.com
   'login.microsoft.com'
 
