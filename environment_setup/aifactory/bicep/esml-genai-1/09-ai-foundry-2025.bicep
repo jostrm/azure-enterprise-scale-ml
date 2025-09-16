@@ -494,7 +494,7 @@ var fqdnRaw = [
   'sts.identity.azure.net'
 
   // '*.login.microsoft.com' - replaced with environment-specific endpoints
-  /* Examples:    
+  
   'login.microsoft.com'
   'account.login.microsoft.com'
   'portal.login.microsoft.com'
@@ -502,7 +502,8 @@ var fqdnRaw = [
   'secure.login.microsoft.com'
   'sso.login.microsoft.com'
   'device.login.microsoft.com'
-  */
+  
+  /*
   replace(environment().authentication.loginEndpoint, 'https://', '')
   'account.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
   'portal.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
@@ -510,6 +511,7 @@ var fqdnRaw = [
   'secure.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
   'sso.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
   'device.${replace(environment().authentication.loginEndpoint, 'https://', '')}'
+  */
 
   // Docker Hub Registry (if needed)
   'hub.docker.com'
