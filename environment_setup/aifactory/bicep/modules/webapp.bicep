@@ -200,6 +200,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
     virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? null : integrationSubnet.id
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
+      http20Enabled: true  // enable HTTP/2.0
       alwaysOn: alwaysOn
       cors: {
         allowedOrigins: allowedOrigins

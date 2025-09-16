@@ -9,6 +9,11 @@ param tags object
 
 @description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
 param IPwhiteList_Array string[] = []
+param enableFlowLogs bool = true
+param storageAccountId string = ''
+param networkWatcherName string = 'NetworkWatcher_${location}'
+param networkWatcherResourceGroup string = 'NetworkWatcherRG'
+param flowLogRetentionDays int = 30
 
 resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: name
@@ -154,4 +159,25 @@ resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   }
 }
 
+// NSG Flow Logs - Note: This requires Network Watcher to exist in the target region
+resource nsgFlowLog 'Microsoft.Network/networkWatchers/flowLogs@2023-05-01' = if (enableFlowLogs && !empty(storageAccountId)) {
+  name: '${networkWatcherName}/flowlog-${name}'
+  location: location
+  tags: tags
+  properties: {
+    targetResourceId: bastionNsg.id
+    storageId: storageAccountId
+    enabled: true
+    retentionPolicy: {
+      days: flowLogRetentionDays
+      enabled: true
+    }
+    format: {
+      type: 'JSON'
+      version: 2
+    }
+  }
+}
+
 output bastionNsgId string = bastionNsg.id
+output flowLogId string = enableFlowLogs && !empty(storageAccountId) ? nsgFlowLog.id : ''

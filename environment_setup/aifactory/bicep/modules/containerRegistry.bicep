@@ -23,6 +23,8 @@ param dedicatedDataPoint bool = true
 param zoneRedundancy string = 'Disabled'
 param ipRules array = []
 param existingIpRules array = []
+param exportEnabled string = 'disabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
+param retentionDays int = 7 // days
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var policyOn = 'disabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
@@ -65,6 +67,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
       defaultAction: 'Deny'
       ipRules: uniqueIpRules
     }:null
+    
     dataEndpointEnabled: dedicatedDataPoint
     networkRuleBypassOptions:'AzureServices'
     policies: {
@@ -73,11 +76,14 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
       }
       retentionPolicy: {
         status: policyOn
-        days: 7
+        days: retentionDays
       }
       trustPolicy: {
         status: policyOn
         type: 'Notary'
+      }
+      exportPolicy: {
+        status: exportEnabled
       }
     }
     publicNetworkAccess: enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet?'Enabled': 'Disabled'

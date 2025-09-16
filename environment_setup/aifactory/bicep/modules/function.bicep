@@ -199,6 +199,7 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       alwaysOn: alwaysOn // aca
+      http20Enabled: true  // enable HTTP/2.0
       cors: {
         allowedOrigins: allowedOrigins
       }

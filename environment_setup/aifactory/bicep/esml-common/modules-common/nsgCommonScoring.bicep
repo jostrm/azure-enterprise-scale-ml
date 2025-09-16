@@ -9,6 +9,11 @@ param tags object
 
 @description('To lock INBOUND rule to only allow RDP anbd SSH ports from Azure Bastion  via private IP')
 param bastionIpRange string
+param enableFlowLogs bool = true
+param storageAccountId string = ''
+param networkWatcherName string = 'NetworkWatcher_${location}'
+param networkWatcherResourceGroup string = 'NetworkWatcherRG'
+param flowLogRetentionDays int = 30
 
 // TODO: outbound connection to ports 443, 445 for storage service tag
 
@@ -418,4 +423,25 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   }
 }
 
+// NSG Flow Logs - Note: This requires Network Watcher to exist in the target region
+resource nsgFlowLog 'Microsoft.Network/networkWatchers/flowLogs@2023-05-01' = if (enableFlowLogs && !empty(storageAccountId)) {
+  name: '${networkWatcherName}/flowlog-${name}'
+  location: location
+  tags: tags
+  properties: {
+    targetResourceId: cmnNsgScoring.id
+    storageId: storageAccountId
+    enabled: true
+    retentionPolicy: {
+      days: flowLogRetentionDays
+      enabled: true
+    }
+    format: {
+      type: 'JSON'
+      version: 2
+    }
+  }
+}
+
 output nsgId string = cmnNsgScoring.id
+output flowLogId string = enableFlowLogs && !empty(storageAccountId) ? nsgFlowLog.id : ''
