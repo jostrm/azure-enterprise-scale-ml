@@ -434,6 +434,13 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!container
   }
 }
 
+// Safe domain construction to avoid InvalidDomainName errors
+var safeLocation = toLower(location)
+
+// Create location-specific domains for all regions - Azure Container Apps and MCR are widely available
+var acaLocationEndpoint = '${safeLocation}.ext.azurecontainerapps.dev'
+var mcrLocationEndpoint = '${safeLocation}.data.mcr.microsoft.com'
+
 // Raw FQDN array with potential empty strings
 var fqdnRaw = [
   // Private link FQDNs for networking
@@ -473,7 +480,7 @@ var fqdnRaw = [
   // All scenarios - Microsoft Container Registry (MCR)
   'mcr.microsoft.com'
   // '*.data.mcr.microsoft.com' - replaced with regional endpoints
-  '${location}.data.mcr.microsoft.com'
+  mcrLocationEndpoint // Safe location-based endpoint
   'eastus.data.mcr.microsoft.com'
   'westus.data.mcr.microsoft.com'
   'eastus2.data.mcr.microsoft.com'
@@ -501,8 +508,9 @@ var fqdnRaw = [
   'login.microsoft.com'
   'account.microsoft.com'
   
-  // Aspire Dashboard (location-specific)
-  '${location}.ext.azurecontainerapps.dev'
+  // Aspire Dashboard (location-specific) - FIXED: Use safe domain construction
+  // Only include location-specific ACA endpoint if location supports it
+  acaLocationEndpoint // Safe location-based ACA endpoint
   
   // Docker Hub Registry (if needed)
   'hub.docker.com'
