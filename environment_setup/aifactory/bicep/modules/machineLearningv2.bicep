@@ -14,7 +14,7 @@ param aksSubnetName string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
-
+param aksExists bool = false
 @description('AKS own SSL on private cluster. MS auto SSL is not possible since private cluster')
 param ownSSL string = 'disabled' //enabled
 param aksCert string = ''
@@ -45,6 +45,8 @@ param kubernetesVersionAndOrchestrator string
 param allowPublicAccessWhenBehindVnet bool = false
 @description('ESML can run in DEMO mode, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can turn this off, to use your HUB instead.')
 param centralDnsZoneByPolicyInHub bool = false
+@description('Use Azure ML Managed Virtual Network. If false, uses custom VNet with subnets.')
+param useManagedNetwork bool = false
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
 // See Azure VM Sku: https://docs.microsoft.com/en-us/azure/virtual-machines/sizes-general
@@ -139,21 +141,19 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: false // v.1.22 Unsupported operation: Attempting to create AmlCompute compute in custom vnet
-    // Unsupported operation: Attempting to create AmlCompute compute in custom vnet
-    // ...when the workspace is configured with a Managed Virtual Network. Please ensure the subnet is set to null or the workspace is not configured with a Managed Virtual Network
+    provisionNetworkNow: useManagedNetwork // Only provision managed network if useManagedNetwork is true
     enableDataIsolation: false
     v1LegacyMode:false
 
     // network settings
     publicNetworkAccess: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
     allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
-    managedNetwork: {
+    managedNetwork: useManagedNetwork ? {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' //'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
       #disable-next-line BCP037
       enableNetworkMonitor:false
-    }
+    } : null
     //softDeleteEnabled: false
     ipAllowlist: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? ipWhitelist_array: null
     networkAcls: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? {
@@ -163,7 +163,7 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
     
   }
   dependsOn:[
-    aksDev
+    ...(!aksExists ? [aksDev] : [])
   ]
 }
 resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'  = if(env == 'test' || env == 'prod') {
@@ -190,19 +190,19 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: true
+    provisionNetworkNow: useManagedNetwork // Only provision managed network if useManagedNetwork is true
     enableDataIsolation: false
     v1LegacyMode:false
 
     // network settings
     publicNetworkAccess: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
     allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
-    managedNetwork: {
+    managedNetwork: useManagedNetwork ? {
       firewallSku:'Basic' // 'Standard'
       isolationMode:'AllowInternetOutBound' //'AllowInternetOutBound': 'AllowOnlyApprovedOutbound'
       #disable-next-line BCP037
       enableNetworkMonitor:false
-    }
+    } : null
     //softDeleteEnabled: false
     ipAllowlist: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? ipWhitelist_array: null
     networkAcls: (allowPublicAccessWhenBehindVnet && !empty(ipWhitelist_array)) ? {
@@ -212,7 +212,7 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
     
   }
   dependsOn:[
-    aksTestProd
+    ...(!aksExists ? [aksTestProd] : [])
   ]
 }
 
@@ -236,9 +236,10 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = if(!enabl
 }
 
 var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // aks001-weu-prod (20/16) VS aks001-weu-prod (16/16)
+var aksResourceId = resourceId('Microsoft.ContainerService/managedClusters', aksName)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
-module aksDev 'aksCluster.bicep'  = if(env == 'dev') {
+module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists) {
   name: take('Amlv2-AKS-D${uniqueDepl}',64)
   params: {
     name: aksName // esml001-weu-prod
@@ -268,7 +269,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev') {
   }
 }
 
-module aksTestProd 'aksCluster.bicep'  = if(env == 'test' || env == 'prod') {
+module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && !aksExists) {
   name: take('Amlv2-AKS-TP${uniqueDepl}',64)
   params: {
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
@@ -309,7 +310,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
     #disable-next-line BCP318
-    resourceId: ((env =='dev') ? aksDev.outputs.aksId : aksTestProd.outputs.aksId)  
+    resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
     properties: {
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
@@ -340,7 +341,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
     #disable-next-line BCP318
-    resourceId: ((env =='dev') ? aksDev.outputs.aksId : aksTestProd.outputs.aksId)  
+    resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
     properties: {
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
@@ -387,8 +388,8 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
         maxNodeCount: ((env =='dev') ? amlComputeMaxNodex_dev :  amlComputeMaxNodex_testProd)
         nodeIdleTimeBeforeScaleDown: 'PT120S'
       }
-      subnet: {
-        id: subnetRef
+      subnet: useManagedNetwork ? null : {
+        id: subnetRef // Only use custom subnet when not using managed network
       }
     }
   }
@@ -422,8 +423,8 @@ resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/wo
         maxNodeCount: ((env =='dev') ? amlComputeMaxNodex_dev :  amlComputeMaxNodex_testProd)
         nodeIdleTimeBeforeScaleDown: 'PT120S'
       }
-      subnet: {
-        id: subnetRef
+      subnet: useManagedNetwork ? null : {
+        id: subnetRef // Only use custom subnet when not using managed network
       }
     }
   }

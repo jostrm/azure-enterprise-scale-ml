@@ -361,6 +361,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
         //!empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
       //)
     }
+    aksExists:aksExists
     uniqueDepl: deploymentProjSpecificUniqueSuffix
     uniqueSalt5char: namingConvention.outputs.uniqueInAIFenv
     projectName: projectName
