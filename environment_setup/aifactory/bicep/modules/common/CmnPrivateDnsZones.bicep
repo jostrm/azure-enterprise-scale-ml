@@ -15,7 +15,7 @@ var privateAznbDnsZoneName = {
     azurecloud: 'privatelink.notebooks.azure.net'
 }
 
-// 2024-09-15: 25 entries
+// 2025-09-17: 27 entries
 var privateLinksDnsZones = {
   blob: {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.blob.${environment().suffixes.storage}'

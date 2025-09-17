@@ -139,7 +139,9 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
-    provisionNetworkNow: true
+    provisionNetworkNow: false // v.1.22 Unsupported operation: Attempting to create AmlCompute compute in custom vnet
+    // Unsupported operation: Attempting to create AmlCompute compute in custom vnet
+    // ...when the workspace is configured with a Managed Virtual Network. Please ensure the subnet is set to null or the workspace is not configured with a Managed Virtual Network
     enableDataIsolation: false
     v1LegacyMode:false
 
