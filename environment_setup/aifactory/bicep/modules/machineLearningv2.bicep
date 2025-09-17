@@ -120,8 +120,8 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
   location: location
   kind:'Default'
   sku: {
-    name:skuName
-    tier:skuTier
+    name: skuName
+    tier: skuTier
   }
   identity:identity
   tags: tags
@@ -169,8 +169,8 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
   location: location
   kind:'Default'
   sku: {
-    name:skuName
-    tier:skuTier
+    name: skuName
+    tier: skuTier
   }
   identity: identity
   tags: tags

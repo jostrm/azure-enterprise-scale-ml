@@ -158,8 +158,8 @@ resource machineLearningStudioManaged 'Microsoft.MachineLearningServices/workspa
   location: location
   kind:'Default'
   sku: {
-    name:'Basic'
-    tier:'Basic'
+    name: skuName
+    tier: skuTier
   }
   identity: identity
   tags: tags
@@ -233,10 +233,10 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
   location: location
   identity: identity
   tags: tags
-  //sku: {
-  //  name: skuName
-  //  tier: skuTier
-  //}
+  sku: {
+    name: skuName
+    tier: skuTier
+  }
   properties: {
     friendlyName: name
     description:  '${projectName}-${env}-${aiFactoryNumber}'
@@ -271,10 +271,10 @@ resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/worksp
   location: location
   identity: identity
   tags: tags
-  //sku: {
-  //  name: skuName
-  //  tier: skuTier
-  //}
+  sku: {
+    name: skuName
+    tier: skuTier
+  }
   properties: {
     friendlyName: name
     description:  '${projectName}-${env}-${aiFactoryNumber}'
