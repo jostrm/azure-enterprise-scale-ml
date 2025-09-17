@@ -3,12 +3,42 @@
 echo "=== Purge Soft-Deleted Resources After 5 Minutes ==="
 echo "This task purges soft-deleted resources from tasks 71-72 if they successfully deleted resources"
 
-az account set --subscription "$(dev_test_prod_sub_id)"
+# Map positional arguments passed from the pipeline
+# Expected order (as passed by the AzureCLI task):
+# 1 dev_test_prod_sub_id
+# 2 admin_aifactoryPrefixRG
+# 3 project_number_000
+# 4 admin_locationSuffix
+# 5 dev_test_prod
+# 6 admin_aifactorySuffixRG
+# 7 admin_prjResourceSuffix
+# 8 aifactory_salt
+# 9 aifactory_salt_random
+# 10 deployment_random_value
+# 11 projectPrefix
+# 12 projectSuffix
+# 13 71_deleted
+# 14 72_deleted
+# 15 admin_location
+if [ $# -ge 1 ]; then dev_test_prod_sub_id="$1"; fi
+if [ $# -ge 2 ]; then admin_aifactoryPrefixRG="$2"; fi
+if [ $# -ge 3 ]; then project_number_000="$3"; fi
+if [ $# -ge 4 ]; then admin_locationSuffix="$4"; fi
+if [ $# -ge 5 ]; then dev_test_prod="$5"; fi
+if [ $# -ge 6 ]; then admin_aifactorySuffixRG="$6"; fi
+if [ $# -ge 7 ]; then admin_prjResourceSuffix="$7"; fi
+if [ $# -ge 8 ]; then aifactory_salt="$8"; fi
+if [ $# -ge 9 ]; then aifactory_salt_random="$9"; fi
+if [ $# -ge 10 ]; then deployment_random_value="${10}"; fi
+if [ $# -ge 11 ]; then projectPrefix="${11}"; fi
+if [ $# -ge 12 ]; then projectSuffix="${12}"; fi
+if [ $# -ge 13 ]; then task_71_deleted="${13}"; fi
+if [ $# -ge 14 ]; then task_72_deleted="${14}"; fi
+if [ $# -ge 15 ]; then admin_location="${15}"; fi
+
+az account set --subscription "$dev_test_prod_sub_id"
 
 # Check which tasks performed deletions
-task_71_deleted="$(71_deleted)"
-task_72_deleted="$(72_deleted)"
-
 echo "Task 71 deleted resources: $task_71_deleted"
 echo "Task 72 deleted resources: $task_72_deleted"
 
@@ -17,13 +47,13 @@ echo "Waiting 5 minutes before attempting to purge soft-deleted resources..."
 sleep 300
 
 # Input parameters - replicating the same logic from previous tasks
-commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-projectNumber="$(project_number_000)"
+commonRGNamePrefix="$admin_aifactoryPrefixRG"
+projectNumber="$project_number_000"
 projectName="prj${projectNumber}"
-locationSuffix="$(admin_locationSuffix)"
-envName="$(dev_test_prod)"
-aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-location="$(admin_location)"
+locationSuffix="$admin_locationSuffix"
+envName="$dev_test_prod"
+aifactorySuffixRG="$admin_aifactorySuffixRG"
+location="$admin_location"
 
 echo "Location: $location"
 echo "Project: $projectName"

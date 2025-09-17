@@ -183,6 +183,7 @@ param tags object = {}
 // Resource exists flags from Azure DevOps
 param updateRbac bool = false
 param amlExists bool = false
+param aksExists bool = false
 param aiHubExists bool = false
 param aiServicesExists bool = false
 param aiSearchExists bool = false

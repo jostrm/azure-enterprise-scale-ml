@@ -3,15 +3,42 @@
 echo "=== AI Services Error Cleanup ==="
 echo "This task runs only when 63-cognitive-services task failed with AI Services related errors"
 
-az account set --subscription "$(dev_test_prod_sub_id)"
+# Map positional arguments passed from the pipeline
+# Expected order (as passed by the AzureCLI task):
+# 1 dev_test_prod_sub_id
+# 2 admin_aifactoryPrefixRG
+# 3 project_number_000
+# 4 admin_locationSuffix
+# 5 dev_test_prod
+# 6 admin_aifactorySuffixRG
+# 7 admin_prjResourceSuffix
+# 8 aifactory_salt
+# 9 aifactory_salt_random
+# 10 deployment_random_value
+# 11 projectPrefix
+# 12 projectSuffix
+if [ $# -ge 1 ]; then dev_test_prod_sub_id="$1"; fi
+if [ $# -ge 2 ]; then admin_aifactoryPrefixRG="$2"; fi
+if [ $# -ge 3 ]; then project_number_000="$3"; fi
+if [ $# -ge 4 ]; then admin_locationSuffix="$4"; fi
+if [ $# -ge 5 ]; then dev_test_prod="$5"; fi
+if [ $# -ge 6 ]; then admin_aifactorySuffixRG="$6"; fi
+if [ $# -ge 7 ]; then admin_prjResourceSuffix="$7"; fi
+if [ $# -ge 8 ]; then aifactory_salt="$8"; fi
+if [ $# -ge 9 ]; then aifactory_salt_random="$9"; fi
+if [ $# -ge 10 ]; then deployment_random_value="${10}"; fi
+if [ $# -ge 11 ]; then projectPrefix="${11}"; fi
+if [ $# -ge 12 ]; then projectSuffix="${12}"; fi
+
+az account set --subscription "$dev_test_prod_sub_id"
 
 # Input parameters - replicating the same logic from 05b_Check if resource exists
-commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-projectNumber="$(project_number_000)"
+commonRGNamePrefix="$admin_aifactoryPrefixRG"
+projectNumber="$project_number_000"
 projectName="prj${projectNumber}"
-locationSuffix="$(admin_locationSuffix)"
-envName="$(dev_test_prod)"
-aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+locationSuffix="$admin_locationSuffix"
+envName="$dev_test_prod"
+aifactorySuffixRG="$admin_aifactorySuffixRG"
 
 # Construct resource group name
 projectNameReplaced="${projectName/prj/project}"
@@ -36,8 +63,8 @@ echo "Looking for resource errors mentioning: $AI_SERVICES_RESOURCE_PATTERN"
 # Check recent deployment failures for Cognitive Services related patterns
 echo "Checking recent deployments for Cognitive Services (63-cognitive-services) related failures..."
 recent_deployments=$(az deployment sub list \
-  --subscription "$(dev_test_prod_sub_id)" \
-  --query "[?starts_with(name, 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)') && contains(name, '63-cognitive-services')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
+  --subscription "$dev_test_prod_sub_id" \
+  --query "[?starts_with(name, 'esml-p$project_number_000-$dev_test_prod-$admin_locationSuffix') && contains(name, '63-cognitive-services')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
   --output json 2>/dev/null || echo "[]")
 
 echo "Recent Cognitive Services deployments: $recent_deployments"
