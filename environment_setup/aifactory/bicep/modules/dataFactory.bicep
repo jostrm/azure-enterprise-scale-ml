@@ -11,6 +11,7 @@ param tags object
 param vnetId string
 
 @description('(Required) Specifies the subnet name that will be associated with the private endpoint')
+@minLength(1)
 param subnetName string
 
 @description('Specifies name of the portal private endpoint')
@@ -73,7 +74,6 @@ resource pendAdf 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in g
   properties: {
     subnet: {
       id: subnetRef
-      name: subnetName
     }
     customNetworkInterfaceName: '${name}-${obj.gid}-pend-nic'
     privateLinkServiceConnections: [
@@ -98,6 +98,7 @@ resource pendAdf 'Microsoft.Network/privateEndpoints@2023-04-01' = [for obj in g
 output adfId string = adf.id
 output adfName string = adf.name
 output principalId string = adf.identity.principalId
+output subnetReference string = subnetRef // Debug output to see the actual subnet reference being used
 
 output dnsConfig array = [
   {

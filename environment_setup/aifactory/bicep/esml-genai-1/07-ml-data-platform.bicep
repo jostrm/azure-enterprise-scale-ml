@@ -406,7 +406,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   }
   dependsOn: [
     existingTargetRG
-    dataFactory
+    ...(!dataFactoryExists && enableDatafactory ? [dataFactory] : [])
     // Dependencies handled through parameters - storage, keyvault, ACR should exist from previous phases
   ]
 }
