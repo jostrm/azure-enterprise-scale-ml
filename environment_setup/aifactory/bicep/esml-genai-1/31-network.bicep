@@ -154,8 +154,8 @@ module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr) && 
   }
   dependsOn: [
     ...(!sntAks002Exists && !empty(aks2SubnetCidr) ? [nsgAKS2] : [])
-    ...(!sntGenaiExists ? [genaiSnt] : [])
     ...(!sntAcaExists ? [acaSnt] : [])
+    ...(!sntGenaiExists ? [genaiSnt] : [])    
     ...(!sntAksExists ? [aksSnt] : [])
   ]
 }
@@ -279,6 +279,7 @@ module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && 
     ...(!sntAcaExists ? [acaSnt] : [])
     ...(!sntGenaiExists ? [genaiSnt] : [])
     ...(!sntAksExists ? [aksSnt] : [])
+    ...(!sntAks002Exists && !empty(aks2SubnetCidr) ? [aks2Snt] : [])
   ]
 }
 
@@ -331,9 +332,8 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPubSubnetCidr) 
 
   dependsOn: [
     ...(!sntDatabricksPubExists && !empty(dbxPubSubnetCidr) ? [nsgDbx] : [])
-    ...(!sntAcaExists ? [acaSnt] : [])
-    ...(!sntGenaiExists ? [genaiSnt] : [])
-    ...(!sntAksExists ? [aksSnt] : [])
+    ...(!sntAks002Exists ? [aks2Snt] : [])
+    ...(!sntAcaExists || !sntAca002Exists ? [acaSnt2] : [])
   ]
 }
 
@@ -356,9 +356,6 @@ module dbxPrivSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPrivSubnetCidr
   dependsOn: [
     ...(!sntDatabricksPrivExists && !empty(dbxPrivSubnetCidr) ? [nsgDbx] : [])
     ...(!sntDatabricksPubExists && !empty(dbxPubSubnetCidr) ? [dbxPubSnt] : [])
-    ...(!sntAcaExists ? [acaSnt] : [])
-    ...(!sntGenaiExists ? [genaiSnt] : [])
-    ...(!sntAksExists ? [aksSnt] : [])
   ]
 }
 // The following outputs are used for network_parameters.json
