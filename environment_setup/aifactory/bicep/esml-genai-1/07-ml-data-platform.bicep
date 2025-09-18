@@ -45,14 +45,19 @@ param aifactorySuffixRG string
 @description('Subscription ID for dev/test/prod')
 param subscriptionIdDevTestProd string
 
-@description('GenAI subnet ID')
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
-
-@description('AKS subnet ID')
 param aksSubnetId string
-
-@description('ACA subnet ID')
 param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 @description('Technical admins object ID')
 param technicalAdminsObjectID string = ''
@@ -60,11 +65,12 @@ param technicalAdminsObjectID string = ''
 @description('Technical admins email')
 param technicalAdminsEmail string = ''
 
-@description('Enable Data Factory deployment')
+@description('Enable deployments')
 param enableDatafactory bool = false
 param enableAzureMachineLearning bool = false
+param enableDatabricks bool = false
 
-@description('Enable public access with perimeter for Data Factory')
+@description('Enable public access with perimeter')
 param enablePublicAccessWithPerimeter bool = false
 
 @description('Tags to apply to all resources')
@@ -77,13 +83,10 @@ param network_env string = env
 param vnetNameFull_param string = ''
 
 @description('Base VNet name when no full name is provided')
-param vnetNameBase string = 'vnet-cmn'
+param vnetNameBase string // = 'vnet-cmn'
 
 @description('VNet resource group name with placeholder for network environment')
 param vnetResourceGroup_param string = ''
-
-@description('Add AI Foundry Hub with random naming')
-param addAIFoundryHub bool = false
 
 @description('Common resource group name prefix')
 param commonRGNamePrefix string = ''
@@ -100,6 +103,15 @@ param projectSuffix string = resourceSuffix
 param amlExists bool = false
 param aksExists bool = false
 param dataFactoryExists bool = false
+@description('Indicates if Databricks workspace already exists (set by pipeline)')
+param databricksExists bool = false
+
+// ================= DATARBRICKS PARAMETERS =================
+@description('Databricks SKU (trial, standard, premium)')
+@allowed(['trial','standard','premium'])
+param databricksSkuName string = 'standard'
+@description('Use custom VNet (customer-managed) for Databricks instead of managed networking')
+param useDatabricksCustomVNet bool = true
 
 // Networking / AKS settings needed for AML & attached AKS
 param aksServiceCidr string = '10.0.0.0/16'
@@ -156,9 +168,13 @@ var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0
 
 // ============== VARS ==============
 var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
-var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetName = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
 var dataFactoryName = 'adf-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+var databricksName = 'dbx-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+// Resource ID for the target virtual network derived from vnetName
+var vnetResourceId = resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks', vnetName)
+//var databricksPublicSubnetResourceId = !empty(dbxPubSubnetName) ? resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, dbxPubSubnetName) : ''
 
 // ============== MODULES ==============
 
@@ -178,12 +194,13 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     commonResourceGroupName: commonResourceGroup
     commonRGNamePrefix: commonRGNamePrefix
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
-    genaiSubnetId: genaiSubnetId
-    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
     technicalAdminsObjectID: technicalAdminsObjectID
-    technicalAdminsEmail: technicalAdminsEmail
-    addAIFoundryHub: addAIFoundryHub
+    technicalAdminsEmail: technicalAdminsEmail    
   }
 }
 
@@ -323,7 +340,7 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  name: vnetNameFull
+  name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
 }
 
@@ -356,10 +373,6 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     name: amlName
     managedIdentities: {
       systemAssigned: true
-      //userAssignedResourceIds: concat(
-        //!empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
-        //!empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
-      //)
     }
     aksExists:aksExists
     uniqueDepl: deploymentProjSpecificUniqueSuffix
@@ -372,7 +385,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     skuName: mlWorkspaceSkuName
     skuTier: mlWorkspaceSkuTier
     env: env
-    aksSubnetId: aksSubnetId
+    aksSubnetId: aks2SubnetId
     aksSubnetName: aksSubnetName
     aksDnsServiceIP: aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
@@ -383,7 +396,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     amlPrivateDnsZoneID: privateLinksDnsZones.amlworkspace.id
     notebookPrivateDnsZoneID: privateLinksDnsZones.notebooks.id
     allowPublicAccessWhenBehindVnet: (AMLStudioUIPrivate == true && empty(ipWhitelist_remove_ending_32)) ? false : true
-    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter // AMLStudioUIPrivate == false ? true : false
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     aksVmSku_dev: aks_dev_sku_param
     aksVmSku_testProd: aks_test_prod_sku_param
@@ -397,7 +410,6 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     ciVmSku_dev: aml_ci_dev_sku_param
     ciVmSku_testProd: aml_ci_test_prod_sku_param
     ipRules: empty(processedIpRulesAzureML) ? [] : processedIpRulesAzureML
-    //ipWhitelist_array: empty(ipWhitelist_remove_ending_32) ? [] : ipWhitelist_remove_ending_32
     ipWhitelist_array: empty(ipWhitelist_normalized) ? [] : ipWhitelist_normalized
     saName: storageAccount2001Name
     kvName: keyvaultName
@@ -408,10 +420,32 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   dependsOn: [
     existingTargetRG
     ...(!dataFactoryExists && enableDatafactory ? [dataFactory] : [])
-    // Dependencies handled through parameters - storage, keyvault, ACR should exist from previous phases
   ]
 }
 
+// Added: Azure Databricks Workspace (AVM) deployment
+module databricks 'br/public:avm/res/databricks/workspace:0.11.4' = if(!databricksExists && enableDatabricks) {
+  name: take('07-Dbx-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    name: databricksName
+    location: location
+    skuName: databricksSkuName
+    tags: tagsProject
+    // Network integration (optional)
+    customVirtualNetworkResourceId: useDatabricksCustomVNet ? vnetResourceId : ''
+    customPrivateSubnetName: useDatabricksCustomVNet ? dbxPrivSubnetName : ''
+    customPublicSubnetName: useDatabricksCustomVNet ? dbxPubSubnetName : ''
+    disablePublicIp: !enablePublicAccessWithPerimeter
+    publicNetworkAccess: enablePublicAccessWithPerimeter? 'Enabled':'Disabled'
+    // Link to AML workspace if deployed in same run
+    amlWorkspaceResourceId: (!amlExists && enableAzureMachineLearning) ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.MachineLearningServices/workspaces', amlName) : ''
+  }
+  dependsOn: [
+    ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
+    ...(!dataFactoryExists && enableDatafactory ? [dataFactory] : [])
+  ]
+}
 
 // ============== MACHINE LEARNING RBAC + AML to access STORAGE ==============
 module rbacAmlv2Storage '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzureMachineLearning) {
@@ -452,7 +486,6 @@ module rbacAmlv2SPsAndADF '../modules/machinelearningRBAC.bicep' = if(!amlExists
   ]
 }
 
-
 // ============== OUTPUTS ==============
 output dataFactoryEnabled bool = enableDatafactory
 
@@ -462,3 +495,7 @@ output dataFactoryName string = enableDatafactory ? dataFactory!.outputs.adfName
 output dataFactoryPrincipalId string = enableDatafactory ? dataFactory!.outputs.principalId : ''
 
 output azureMLDeployed bool = (!amlExists && enableAzureMachineLearning)
+output databricksDeployed bool = (!databricksExists && enableDatabricks)
+output databricksId string = (!databricksExists && enableDatabricks) ? databricks!.outputs.resourceId : ''
+output databricksNameOut string = (!databricksExists && enableDatabricks) ? databricks!.outputs.name : ''
+output databricksWorkspaceUrl string = (!databricksExists && enableDatabricks) ? databricks!.outputs.workspaceUrl : ''

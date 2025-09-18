@@ -72,10 +72,19 @@ param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
 param network_env string = ''
 
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
 @description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string = ''
+param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 @description('Private DNS configuration')
 param centralDnsZoneByPolicyInHub bool = false
@@ -164,7 +173,7 @@ param DEBUG_enableAISearch bool = false
 param DEBUG_enableAzureMachineLearning bool = false
 
 @description('Deploy Function App')
-param DEBUG_serviceSettingDeployFunction bool = true
+param DEBUG_enableFunction bool = true
 
 @description('Function runtime')
 param DEBUG_functionRuntime string = 'dotnet'
@@ -173,7 +182,7 @@ param DEBUG_functionRuntime string = 'dotnet'
 param DEBUG_functionVersion string = 'v7.0'
 
 @description('Deploy Web App')
-param DEBUG_serviceSettingDeployWebApp bool = true
+param DEBUG_enableWebApp bool = true
 
 @description('Web App runtime')
 param DEBUG_webAppRuntime string = 'python'
@@ -191,10 +200,10 @@ param DEBUG_aseSkuCode string = 'I1v2'
 param DEBUG_aseSkuWorkers int = 1
 
 @description('Deploy Container Apps')
-param DEBUG_serviceSettingDeployContainerApps bool = false
+param DEBUG_enableContainerApps bool = false
 
 @description('Deploy App Insights Dashboard')
-param DEBUG_serviceSettingDeployAppInsightsDashboard bool = false
+param DEBUG_enableAppInsightsDashboard bool = false
 
 @description('Container Apps API registry image')
 param DEBUG_aca_a_registry_image string = 'containerapps-default:latest'
@@ -203,34 +212,34 @@ param DEBUG_aca_a_registry_image string = 'containerapps-default:latest'
 param DEBUG_aca_w_registry_image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
 @description('Deploy Bing Search')
-param DEBUG_serviceSettingDeployBingSearch bool = false
+param DEBUG_enableBingSearch bool = false
 
 @description('Deploy Cosmos DB')
-param DEBUG_serviceSettingDeployCosmosDB bool = false
+param DEBUG_enableCosmosDB bool = false
 
 @description('Deploy Azure OpenAI')
-param DEBUG_serviceSettingDeployAzureOpenAI bool = false
+param DEBUG_enableAzureOpenAI bool = false
 
 @description('Deploy Azure AI Vision')
-param DEBUG_serviceSettingDeployAzureAIVision bool = false
+param DEBUG_enableAzureAIVision bool = false
 
 @description('Deploy Azure Speech')
-param DEBUG_serviceSettingDeployAzureSpeech bool = false
+param DEBUG_enableAzureSpeech bool = false
 
 @description('Deploy AI Document Intelligence')
-param DEBUG_serviceSettingDeployAIDocIntelligence bool = false
+param DEBUG_enableAIDocIntelligence bool = false
 
 @description('Disable Contributor Access for Users')
 param DEBUG_disableContributorAccessForUsers bool = false
 
 @description('Deploy PostgreSQL')
-param DEBUG_serviceSettingDeployPostgreSQL bool = false
+param DEBUG_enablePostgreSQL bool = false
 
 @description('Deploy Redis Cache')
-param DEBUG_serviceSettingDeployRedisCache bool = false
+param DEBUG_enableRedisCache bool = false
 
 @description('Deploy SQL Database')
-param DEBUG_serviceSettingDeploySQLDatabase bool = false
+param DEBUG_enableSQLDatabase bool = false
 
 @description('Bring Your Own subnets - false means use default subnets created by pipeline')
 param DEBUG_BYO_subnets bool = false
@@ -412,6 +421,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     acaSubnetId: acaSubnetId
     aksSubnetId:aksSubnetId
     genaiSubnetId:genaiSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
   }
   dependsOn: [
     projectResourceGroup
@@ -676,29 +687,29 @@ module debug './00-debug.bicep' = if (enableDebugging) {
     DEBUG_enableAIFoundryHub: DEBUG_enableAIFoundryHub
     DEBUG_enableAISearch: DEBUG_enableAISearch
     DEBUG_enableAzureMachineLearning: DEBUG_enableAzureMachineLearning
-    DEBUG_serviceSettingDeployFunction: DEBUG_serviceSettingDeployFunction
+    DEBUG_enableFunction: DEBUG_enableFunction
     DEBUG_functionRuntime: DEBUG_functionRuntime
     DEBUG_functionVersion: DEBUG_functionVersion
-    DEBUG_serviceSettingDeployWebApp: DEBUG_serviceSettingDeployWebApp
+    DEBUG_enableWebApp: DEBUG_enableWebApp
     DEBUG_webAppRuntime: DEBUG_webAppRuntime
     DEBUG_webAppRuntimeVersion: DEBUG_webAppRuntimeVersion
     DEBUG_aseSku: DEBUG_aseSku
     DEBUG_aseSkuCode: DEBUG_aseSkuCode
     DEBUG_aseSkuWorkers: DEBUG_aseSkuWorkers
-    DEBUG_serviceSettingDeployContainerApps: DEBUG_serviceSettingDeployContainerApps
-    DEBUG_serviceSettingDeployAppInsightsDashboard: DEBUG_serviceSettingDeployAppInsightsDashboard
+    DEBUG_enableContainerApps: DEBUG_enableContainerApps
+    DEBUG_enableAppInsightsDashboard: DEBUG_enableAppInsightsDashboard
     DEBUG_aca_a_registry_image: DEBUG_aca_a_registry_image
     DEBUG_aca_w_registry_image: DEBUG_aca_w_registry_image
-    DEBUG_serviceSettingDeployBingSearch: DEBUG_serviceSettingDeployBingSearch
-    DEBUG_serviceSettingDeployCosmosDB: DEBUG_serviceSettingDeployCosmosDB
-    DEBUG_serviceSettingDeployAzureOpenAI: DEBUG_serviceSettingDeployAzureOpenAI
-    DEBUG_serviceSettingDeployAzureAIVision: DEBUG_serviceSettingDeployAzureAIVision
-    DEBUG_serviceSettingDeployAzureSpeech: DEBUG_serviceSettingDeployAzureSpeech
-    DEBUG_serviceSettingDeployAIDocIntelligence: DEBUG_serviceSettingDeployAIDocIntelligence
+    DEBUG_enableBingSearch: DEBUG_enableBingSearch
+    DEBUG_enableCosmosDB: DEBUG_enableCosmosDB
+    DEBUG_enableAzureOpenAI: DEBUG_enableAzureOpenAI
+    DEBUG_enableAzureAIVision: DEBUG_enableAzureAIVision
+    DEBUG_enableAzureSpeech: DEBUG_enableAzureSpeech
+    DEBUG_enableAIDocIntelligence: DEBUG_enableAIDocIntelligence
     DEBUG_disableContributorAccessForUsers: DEBUG_disableContributorAccessForUsers
-    DEBUG_serviceSettingDeployPostgreSQL: DEBUG_serviceSettingDeployPostgreSQL
-    DEBUG_serviceSettingDeployRedisCache: DEBUG_serviceSettingDeployRedisCache
-    DEBUG_serviceSettingDeploySQLDatabase: DEBUG_serviceSettingDeploySQLDatabase
+    DEBUG_enablePostgreSQL: DEBUG_enablePostgreSQL
+    DEBUG_enableRedisCache: DEBUG_enableRedisCache
+    DEBUG_enableSQLDatabase: DEBUG_enableSQLDatabase
     DEBUG_BYO_subnets: DEBUG_BYO_subnets
     DEBUG_network_env_dev: DEBUG_network_env_dev
     DEBUG_network_env_stage: DEBUG_network_env_stage

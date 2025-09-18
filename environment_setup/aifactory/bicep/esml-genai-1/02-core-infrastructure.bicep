@@ -52,10 +52,10 @@ param miPrjExists bool = false
 
 // Enable flags from parameter files
 @description('Enable Bing Search deployment')
-param serviceSettingDeployBingSearch bool = false
+param enableBingSearch bool = false
 
 @description('Enable private VM deployment')
-param serviceSettingDeployProjectVM bool = false
+param enableProjectVM bool = false
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
@@ -63,10 +63,20 @@ param enablePublicAccessWithPerimeter bool = false
 param allowPublicAccessWhenBehindVnet bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
-// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string = ''
+param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
+
 // Base parameters
 param subnetCommon string = '' // Base parameter override (previous JSON)
 param common_subnet_name string // Base parameter override (previous JSON)
@@ -191,6 +201,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId: genaiSubnetId
     aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
   }
 }
 
@@ -401,7 +413,8 @@ var var_kv1_dnsConfig = !keyvaultExists? kv1.outputs.dnsConfig: []
 var var_acr_dnsConfig = !acrProjectExists? acr.outputs.dnsConfig: []
 
 // ============== KEY VAULT ==============
-
+// Resource ID for Databricks public subnet (optional, only if name provided)
+var databricksPublicSubnetResourceId = !empty(dbxPubSubnetName) ? resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, dbxPubSubnetName) : ''
 module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-AMGenAILKeyV4${deploymentProjSpecificUniqueSuffix}', 64)
@@ -421,6 +434,7 @@ module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
     keyvaultNetworkPolicySubnets: [
       genaiSubnetId
       aksSubnetId
+      ...( !empty(dbxPubSubnetName) ? [databricksPublicSubnetResourceId] : [] )
     ]
     ipRules: empty(processedIpRulesKv) ? [] : processedIpRulesKv
     secrets: deploySampleApp ? [
@@ -537,7 +551,7 @@ module miPrjRbacCmnACR '../modules/miRbac.bicep' = if(useCommonACR && !miPrjExis
 
 // ============== VIRTUAL MACHINE ==============
 
-module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && serviceSettingDeployProjectVM == true) {
+module vmPrivate '../modules/virtualMachinePrivate.bicep' = if(!vmExists && enableProjectVM == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-privVM4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -715,7 +729,7 @@ output containerRegistryDeployed bool = (!acrProjectExists && useCommonACR == fa
 output applicationInsightsDeployed bool = !applicationInsightExists
 
 @description('Virtual Machine deployment status')
-output virtualMachineDeployed bool = (!vmExists && serviceSettingDeployProjectVM)
+output virtualMachineDeployed bool = (!vmExists && enableProjectVM)
 
 //@description('Bing Search deployment status')
-//output bingSearchDeployed bool = (!bingExists && serviceSettingDeployBingSearch)
+//output bingSearchDeployed bool = (!bingExists && enableBingSearch)

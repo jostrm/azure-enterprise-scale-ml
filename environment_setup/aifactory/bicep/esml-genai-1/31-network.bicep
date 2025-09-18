@@ -2,14 +2,13 @@
 param genaiSubnetCidr string
 @description('Specifies cidr notation for aks subnet')
 param aksSubnetCidr string
+param aks2SubnetCidr string = ''
 @description('Specifies cidr notation for Azure Container Apps subnet')
 param acaSubnetCidr string = ''
-
-//@description('Specifies cidr notation for private databricks subnet')
-//param dbxPrivSubnetCidr string = ''
-
-//@description('Specifies cidr notation for public databricks subnet')
-//param dbxPubSubnetCidr string = ''
+param aca2SubnetCidr string = ''
+@description('Specifies cidr notation for databricks subnets')
+param dbxPrivSubnetCidr string = ''
+param dbxPubSubnetCidr string = ''
 
 @allowed([
   'dev'
@@ -79,6 +78,16 @@ var aksSubnetSettings =   {
     'Microsoft.CognitiveServices'
   ]
 }
+var aks2SubnetSettings =   {
+  cidr: aks2SubnetCidr
+  name: 'aks'
+  delegations: []
+  serviceEndpoints: [
+    'Microsoft.KeyVault'
+    'Microsoft.Storage'
+    'Microsoft.CognitiveServices'
+  ]
+}
 
 module nsgAKS '../modules/aksNsg.bicep' = {
   name: 'aksNsgAKS-${deploymentProjSpecificUniqueSuffix}'
@@ -88,6 +97,15 @@ module nsgAKS '../modules/aksNsg.bicep' = {
     tags:tags
   }
 }
+module nsgAKS2 '../modules/aksNsg.bicep' = if (!empty(aks2SubnetCidr)) {
+  name: 'aks2Nsg-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'aks2-nsg-${projectName}-${locationSuffix}-${env}' // AKS-NSG-PRJ001-EUS2-DEV in 'aks-nsg-prj001-eus2-dev'
+    location: location
+    tags:tags
+  }
+}
+
 
 module aksSnt '../modules/subnetWithNsg.bicep' = {
   name: 'aks-${deploymentProjSpecificUniqueSuffix}'
@@ -103,6 +121,23 @@ module aksSnt '../modules/subnetWithNsg.bicep' = {
   }
   dependsOn: [
     nsgAKS
+  ]
+}
+module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr)) {
+  name: 'aks2-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'snt-${projectName}-aks2'
+    virtualNetworkName: vnetNameFull
+    addressPrefix: aks2SubnetSettings.cidr
+    location: location
+    serviceEndpoints: aks2SubnetSettings.serviceEndpoints
+    delegations: aks2SubnetSettings.delegations
+    nsgId: !empty(aks2SubnetCidr) ? nsgAKS2!.outputs.nsgId : ''
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+  }
+  dependsOn: [
+    aksSnt
+    ...((!empty(aks2SubnetCidr)) ? [nsgAKS2] : [])
   ]
 }
 
@@ -141,8 +176,9 @@ module genaiSnt '../modules/subnetWithNsg.bicep' = {
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
   dependsOn: [
-    aksSnt
+    ...((!empty(aks2SubnetCidr)) ? [aks2Snt] : [aksSnt])
     nsgGenAI
+    aksSnt
   ]
 }
 
@@ -150,6 +186,19 @@ module genaiSnt '../modules/subnetWithNsg.bicep' = {
 var acaSubnetSettings =   {
   cidr: acaSubnetCidr
   name: 'acaSubnetSettings'
+  delegations: []
+  serviceEndpoints: [
+    'Microsoft.KeyVault'
+    'Microsoft.Storage'
+    'Microsoft.CognitiveServices'
+    'Microsoft.ContainerRegistry'
+    'Microsoft.AzureCosmosDB'
+    'Microsoft.Web'
+  ]
+}
+var aca2SubnetSettings =   {
+  cidr: aca2SubnetCidr
+  name: 'aca2SubnetSettings'
   delegations: []
   serviceEndpoints: [
     'Microsoft.KeyVault'
@@ -169,6 +218,14 @@ module nsgAca '../modules/nsgGenAI.bicep' = {
     tags:tags
   }
 }
+module nsg2Aca '../modules/nsgGenAI.bicep' = if (!empty(aca2SubnetCidr)) {
+  name: 'nsgAca2-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'aca2-nsg-${projectName}-${locationSuffix}-${env}'
+    location: location
+    tags:tags
+  }
+}
 module acaSnt '../modules/subnetWithNsg.bicep' = {
   name: 'acaSnet-${deploymentProjSpecificUniqueSuffix}'
   params: {
@@ -182,17 +239,118 @@ module acaSnt '../modules/subnetWithNsg.bicep' = {
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
   dependsOn: [
-    aksSnt
+    ...((!empty(aks2SubnetCidr)) ? [aks2Snt] : [aksSnt])
     nsgGenAI
     genaiSnt
   ]
 }
+module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr)) {
+  name: 'acaSnet2-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'snt-${projectName}-aca2'
+    virtualNetworkName: vnetNameFull
+    addressPrefix: aca2SubnetSettings.cidr
+    location: location
+    serviceEndpoints: aca2SubnetSettings.serviceEndpoints
+    delegations: []
+    nsgId: !empty(aca2SubnetCidr) ? nsg2Aca!.outputs.nsgId : ''
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+  }
+  dependsOn: [
+    ...((!empty(aks2SubnetCidr)) ? [aks2Snt] : [aksSnt])
+    nsgGenAI
+    genaiSnt
+    acaSnt
+    ...((!empty(aca2SubnetCidr)) ? [nsg2Aca] : [])
+  ]
+}
 
+// Subnet settings
+var dataBricksPrivateSubnetSettings = {
+  cidr: dbxPrivSubnetCidr
+  name: 'dbxpriv'
+  delegations: [
+    'Microsoft.Databricks/workspaces'
+  ]
+  serviceEndpoints: [
+    'Microsoft.KeyVault'
+    'Microsoft.Storage'
+  ]
+}
 
+var dataBricksPublicSubnetSettings =   {
+  cidr: dbxPubSubnetCidr
+  name: 'dbxpub'
+  delegations: [
+    'Microsoft.Databricks/workspaces'
+  ]
+  serviceEndpoints: [
+    'Microsoft.KeyVault'
+    'Microsoft.Storage'
+  ]
+}
+
+module nsgDbx '../modules/databricksNsg.bicep' = {
+  name: 'dbxNsg-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'dbx-nsg-${projectName}-${locationSuffix}-${env}'
+    location: location
+    tags:tags
+  }
+}
+
+module dbxPubSnt '../modules/subnetWithNsg.bicep' = {
+  name: 'dbxpub-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'snt-${projectName}-dbxpub'
+    virtualNetworkName: vnetNameFull
+    addressPrefix: dataBricksPublicSubnetSettings.cidr
+    location: location
+    serviceEndpoints: dataBricksPublicSubnetSettings.serviceEndpoints
+    delegations: dataBricksPublicSubnetSettings.delegations
+    nsgId: nsgDbx.outputs.nsgId
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+  }
+
+  dependsOn: [
+    nsgDbx
+    ...((!empty(aca2SubnetCidr)) ? [acaSnt2] : [acaSnt])
+    acaSnt
+    aksSnt
+    genaiSnt
+  ]
+}
+
+module dbxPrivSnt '../modules/subnetWithNsg.bicep' = {
+  name: 'dbxpriv-${deploymentProjSpecificUniqueSuffix}'
+  params: {
+    name: 'snt-${projectName}-dbxpriv'
+    virtualNetworkName: vnetNameFull
+    addressPrefix: dataBricksPrivateSubnetSettings.cidr
+    location: location
+    serviceEndpoints: dataBricksPrivateSubnetSettings.serviceEndpoints
+    delegations: dataBricksPrivateSubnetSettings.delegations
+    nsgId: nsgDbx.outputs.nsgId
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+  }
+
+  // Make sure that no overlapping processes are created
+  // On some cases AzureRm will return an error if paralell
+  // subnet creation processes are started
+  dependsOn: [
+    nsgDbx
+    dbxPubSnt
+    acaSnt
+    aksSnt
+    genaiSnt
+  ]
+}
 // The following outputs are used for network_parameters.json
 // that is generated by generateNetworkParameters.ps1 script
 output aksSubnetId string = aksSnt.outputs.subnetId
+output aks2SubnetId string = empty(aks2SubnetCidr) ? '' : aks2Snt!.outputs.subnetId
 output genaiSubnetId string = genaiSnt.outputs.subnetId
 output acaSubnetId string = acaSnt.outputs.subnetId
-output dbxPubSubnetName string = ''
-output dbxPrivSubnetName string = ''
+output aca2SubnetId string = empty(aca2SubnetCidr) ? '' : acaSnt2!.outputs.subnetId
+output dbxPubSubnetName string = empty(dbxPubSubnetCidr) ? '' : 'snt-${projectName}-dbxpub'
+output dbxPrivSubnetName string = empty(dbxPrivSubnetCidr) ? '' : 'snt-${projectName}-dbxpriv'

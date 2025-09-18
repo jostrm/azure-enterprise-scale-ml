@@ -367,6 +367,16 @@ if ($(Get-AzContext).Subscription -ne "") {
                 acaSubnetCidr     = '25' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
             }
         }
+        elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
+            write-host "projectTypeADO=all"
+            $requiredSubnets = [PsObject]@{
+                genaiSubnetCidr  = '25'
+                aksSubnetCidr     = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                aks2SubnetCidr    = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                acaSubnetCidr     = '25' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
+                aca2SubnetCidr    = '24' # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment.
+            }
+        }
         else {
             write-host "projectTypeADO=not supported value: '$($projectTypeADO)'"
             $requiredSubnets = [PsObject]@{
@@ -510,6 +520,51 @@ if ($(Get-AzContext).Subscription -ne "") {
 }
 "@
 
+ $templateAll = @"
+{
+    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "aksSubnetCidr": {
+            "value": "$($result["aksSubnetCidr"])"
+        },
+        "aks2SubnetCidr": {
+            "value": "$($result["aks2SubnetCidr"])"
+        },
+        "acaSubnetCidr": {
+            "value": "$($result["acaSubnetCidr"])"
+        },
+        "aca2SubnetCidr": {
+            "value": "$($result["aca2SubnetCidr"])"
+        },
+        "genaiSubnetCidr": {
+            "value": "$($result["genaiSubnetCidr"])"
+        },
+         "dbxPrivSubnetCidr": {
+            "value": "$($result["dbxPrivSubnetCidr"])"
+        },
+        "dbxPubSubnetCidr": {
+            "value": "$($result["dbxPubSubnetCidr"])"
+        },
+        "vnetNameBase": {
+            "value": "$vnetNameBase"
+        },
+        "location": {
+            "value": "$location"
+        },
+        "locationSuffix": {
+            "value": "$locationSuffix"
+        },
+        "vnetResourceGroup": {
+            "value": "$vnetResourceGroup"
+        },
+        "commonResourceSuffix": {
+            "value": "$commonResourceSuffix"
+        }
+    }
+}
+"@
+
     $template = "not set"
 
     if($projectTypeADO.Trim().ToLower() -eq "esml"){
@@ -525,6 +580,17 @@ if ($(Get-AzContext).Subscription -ne "") {
         write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
         write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
         write-host "acaSubnetCidr : $($result["acaSubnetCidr"])"
+    }
+    elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
+        Write-host "Template for subnetParameters.json is projectType:all"
+        $template = $templateAll
+        write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
+        write-host "aks2SubnetCidr   : $($result["aks2SubnetCidr"])"
+        write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
+        write-host "acaSubnetCidr : $($result["acaSubnetCidr"])"
+        write-host "aca2SubnetCidr : $($result["aca2SubnetCidr"])"
+        write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"
+        write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
     }
     else{
         Write-host "Template for subnetParameters.json is projectType:unsupported value: '$projectTypeADO'"

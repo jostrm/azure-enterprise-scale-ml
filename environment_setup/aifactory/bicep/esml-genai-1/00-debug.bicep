@@ -36,7 +36,7 @@ param DEBUG_enableAISearch bool = false
 param DEBUG_enableAzureMachineLearning bool = false
 
 @description('Deploy Function App')
-param DEBUG_serviceSettingDeployFunction bool = true
+param DEBUG_enableFunction bool = true
 
 @description('Function runtime')
 param DEBUG_functionRuntime string = 'dotnet'
@@ -45,7 +45,7 @@ param DEBUG_functionRuntime string = 'dotnet'
 param DEBUG_functionVersion string = 'v7.0'
 
 @description('Deploy Web App')
-param DEBUG_serviceSettingDeployWebApp bool = true
+param DEBUG_enableWebApp bool = true
 
 @description('Web App runtime')
 param DEBUG_webAppRuntime string = 'python'
@@ -63,10 +63,10 @@ param DEBUG_aseSkuCode string = 'I1v2'
 param DEBUG_aseSkuWorkers int = 1
 
 @description('Deploy Container Apps')
-param DEBUG_serviceSettingDeployContainerApps bool = false
+param DEBUG_enableContainerApps bool = false
 
 @description('Deploy App Insights Dashboard')
-param DEBUG_serviceSettingDeployAppInsightsDashboard bool = false
+param DEBUG_enableAppInsightsDashboard bool = false
 
 @description('Container Apps API registry image')
 param DEBUG_aca_a_registry_image string = 'containerapps-default:latest'
@@ -75,34 +75,34 @@ param DEBUG_aca_a_registry_image string = 'containerapps-default:latest'
 param DEBUG_aca_w_registry_image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
 @description('Deploy Bing Search')
-param DEBUG_serviceSettingDeployBingSearch bool = false
+param DEBUG_enableBingSearch bool = false
 
 @description('Deploy Cosmos DB')
-param DEBUG_serviceSettingDeployCosmosDB bool = false
+param DEBUG_enableCosmosDB bool = false
 
 @description('Deploy Azure OpenAI')
-param DEBUG_serviceSettingDeployAzureOpenAI bool = false
+param DEBUG_enableAzureOpenAI bool = false
 
 @description('Deploy Azure AI Vision')
-param DEBUG_serviceSettingDeployAzureAIVision bool = false
+param DEBUG_enableAzureAIVision bool = false
 
 @description('Deploy Azure Speech')
-param DEBUG_serviceSettingDeployAzureSpeech bool = false
+param DEBUG_enableAzureSpeech bool = false
 
 @description('Deploy AI Document Intelligence')
-param DEBUG_serviceSettingDeployAIDocIntelligence bool = false
+param DEBUG_enableAIDocIntelligence bool = false
 
 @description('Disable Contributor Access for Users')
 param DEBUG_disableContributorAccessForUsers bool = false
 
 @description('Deploy PostgreSQL')
-param DEBUG_serviceSettingDeployPostgreSQL bool = false
+param DEBUG_enablePostgreSQL bool = false
 
 @description('Deploy Redis Cache')
-param DEBUG_serviceSettingDeployRedisCache bool = false
+param DEBUG_enableRedisCache bool = false
 
 @description('Deploy SQL Database')
-param DEBUG_serviceSettingDeploySQLDatabase bool = false
+param DEBUG_enableSQLDatabase bool = false
 
 @description('Bring Your Own subnets - false means use default subnets created by pipeline')
 param DEBUG_BYO_subnets bool = false

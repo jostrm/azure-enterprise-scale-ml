@@ -83,20 +83,20 @@ param aiFoundryV2Exists bool = false
 param enableAIFoundryV21 bool = false
 param disableAgentNetworkInjection bool = true
 
-param serviceSettingDeployAppInsightsDashboard bool = true
-param serviceSettingDeployBingSearch bool = false
+param enableAppInsightsDashboard bool = true
+param enableBingSearch bool = false
 
 // Enable flags from parameter files
 @description('Enable Container Apps deployment')
-param serviceSettingDeployContainerApps bool = false
+param enableContainerApps bool = false
 
 @description('Enable Azure Function deployment')
-param serviceSettingDeployFunction bool = false
+param enableFunction bool = false
 
 @description('Enable Azure Web App deployment')
-param serviceSettingDeployWebApp bool = false
+param enableWebApp bool = false
 
-param serviceSettingDeployAzureOpenAI bool = false
+param enableAzureOpenAI bool = false
 param enableAISearch bool = false
 param enableAIServices bool = false
 
@@ -105,10 +105,19 @@ param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
-// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string = ''
+param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 // Networking parameters for calculation
 param vnetNameBase string
@@ -293,9 +302,11 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
-    genaiSubnetId: genaiSubnetId
-    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
   }
 }
 
@@ -312,7 +323,7 @@ var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
 var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
-var aoaiName = serviceSettingDeployAzureOpenAI? namingConvention.outputs.aoaiName: ''
+var aoaiName = enableAzureOpenAI? namingConvention.outputs.aoaiName: ''
 var aiServicesName = enableAIServices? namingConvention.outputs.aiServicesName: ''
 var bingName = namingConvention.outputs.bingName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
@@ -376,7 +387,7 @@ var fqdnRaw = [
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
   
   // Cosmos DB endpoint (conditionally included)
-  //serviceSettingDeployCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
+  //enableCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
   
   // AI Services endpoint
   '${aifV2Name}.cognitiveservices.azure.com'
@@ -431,13 +442,13 @@ var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ?
 // SPECIAL - Get PRINICPAL ID, only if created in this module, else ignore.
 // ============================================================================
 #disable-next-line BCP318
-var var_webAppPrincipalId = serviceSettingDeployWebApp && !webAppExists? webapp.outputs.principalId: ''
+var var_webAppPrincipalId = enableWebApp && !webAppExists? webapp.outputs.principalId: ''
 #disable-next-line BCP318
-var var_functionPrincipalId= serviceSettingDeployFunction && !functionAppExists? function.outputs.principalId: ''
+var var_functionPrincipalId= enableFunction && !functionAppExists? function.outputs.principalId: ''
 
 // Container App API domain/endpoint - using simplified logic
 #disable-next-line BCP318
-var var_containerAppApiDomain = serviceSettingDeployContainerApps && !containerAppAExists? acaApi.outputs.SERVICE_ACA_URI: ''
+var var_containerAppApiDomain = enableContainerApps && !containerAppAExists? acaApi.outputs.SERVICE_ACA_URI: ''
 
 // Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
 var ipSecurityRestrictions = [for ip in ipWhitelist_array: {
@@ -469,7 +480,7 @@ var allowedOrigins = [
 // ]
 
 #disable-next-line BCP318
-var var_webapp_dnsConfig = serviceSettingDeployWebApp && !webAppExists? webapp.outputs.dnsConfig: []
+var var_webapp_dnsConfig = enableWebApp && !webAppExists? webapp.outputs.dnsConfig: []
 
 // var var_containerAppsEnv_dnsConfig = [
 //   {
@@ -481,7 +492,7 @@ var var_webapp_dnsConfig = serviceSettingDeployWebApp && !webAppExists? webapp.o
 // ]
 
 #disable-next-line BCP318
-var var_containerAppsEnv_dnsConfig = serviceSettingDeployContainerApps && !containerAppsEnvExists? containerAppsEnv.outputs.dnsConfig: []
+var var_containerAppsEnv_dnsConfig = enableContainerApps && !containerAppsEnvExists? containerAppsEnv.outputs.dnsConfig: []
 
 // var var_function_dnsConfig = [
 //   {
@@ -493,7 +504,7 @@ var var_containerAppsEnv_dnsConfig = serviceSettingDeployContainerApps && !conta
 // ]
 
 #disable-next-line BCP318
-var var_function_dnsConfig = serviceSettingDeployFunction && !functionAppExists? function.outputs.dnsConfig: []
+var var_function_dnsConfig = enableFunction && !functionAppExists? function.outputs.dnsConfig: []
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
   name: commonResourceGroup
@@ -540,7 +551,7 @@ var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
-module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (serviceSettingDeployWebApp || serviceSettingDeployFunction) && !byoASEv3) {
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3) {
   name: take('05-snetDelegSF1${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -560,7 +571,7 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
 }
 
 // Subnet delegation for Container Apps
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists && serviceSettingDeployContainerApps) && (!aiFoundryV2Exists && !disableAgentNetworkInjection)) {
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists && enableContainerApps) && (!aiFoundryV2Exists && !disableAgentNetworkInjection)) {
   name: take('05-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -581,7 +592,7 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!container
 
 // ============== App insights Dashboard with AppInsights of type WEB  ==============
 
-module appinsights '../modules/appinsights.bicep' = if(!applicationInsightExists && serviceSettingDeployAppInsightsDashboard) {
+module appinsights '../modules/appinsights.bicep' = if(!applicationInsightExists && enableAppInsightsDashboard) {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   name: take('05-AppInsights4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -597,7 +608,7 @@ module appinsights '../modules/appinsights.bicep' = if(!applicationInsightExists
 }
 // ============== AZURE WEB APP ==============
 
-module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDeployWebApp) {
+module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-WebApp4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -647,7 +658,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && serviceSettingDepl
   ]
 }
 
-module privateDnsWebapp '../modules/privateDns.bicep' = if(!webAppExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployWebApp && !enablePublicAccessWithPerimeter && !byoASEv3) {
+module privateDnsWebapp '../modules/privateDns.bicep' = if(!webAppExists && !centralDnsZoneByPolicyInHub && enableWebApp && !enablePublicAccessWithPerimeter && !byoASEv3) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-privDnsWeb${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -661,7 +672,7 @@ module privateDnsWebapp '../modules/privateDns.bicep' = if(!webAppExists && !cen
 }
 
 // Add RBAC for WebApp MSI to access other resources (simplified)
-module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && serviceSettingDeployWebApp) {
+module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && enableWebApp) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-rbacForWebApp${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -679,7 +690,7 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && serv
 
 // ============== AZURE FUNCTION ==============
 
-module function '../modules/function.bicep' = if(!functionAppExists && serviceSettingDeployFunction) {
+module function '../modules/function.bicep' = if(!functionAppExists && enableFunction) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-Function4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -727,7 +738,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && serviceSe
 }
 
 // Add DNS zone configuration for the Azure Function private endpoint
-module privateDnsFunction '../modules/privateDns.bicep' = if(!functionAppExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployFunction && !enablePublicAccessWithPerimeter && !byoASEv3) {
+module privateDnsFunction '../modules/privateDns.bicep' = if(!functionAppExists && !centralDnsZoneByPolicyInHub && enableFunction && !enablePublicAccessWithPerimeter && !byoASEv3) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-privDnsFunc${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -741,7 +752,7 @@ module privateDnsFunction '../modules/privateDns.bicep' = if(!functionAppExists 
 }
 
 // Add RBAC for Function App MSI to access other resources (simplified)
-module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExists && serviceSettingDeployFunction) {
+module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExists && enableFunction) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-rbacForFunction${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -759,7 +770,7 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExist
 
 // ============== CONTAINER APPS ENVIRONMENT ==============
 
-module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvExists && serviceSettingDeployContainerApps) {
+module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvExists && enableContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-aca-env-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -794,7 +805,7 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
   ]
 }
 
-module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerAppsEnvExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployContainerApps && !enablePublicAccessWithPerimeter) {
+module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerAppsEnvExists && !centralDnsZoneByPolicyInHub && enableContainerApps && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-privDnsACAEnv${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -816,16 +827,16 @@ var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0
 var bingName_Static = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
 #disable-next-line BCP081
-resource bingREF 'Microsoft.Bing/accounts@2020-06-10' existing = if(serviceSettingDeployBingSearch) {
+resource bingREF 'Microsoft.Bing/accounts@2020-06-10' existing = if(enableBingSearch) {
   name: bingName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318 BCP422
-var var_bing_api_Key = serviceSettingDeployBingSearch? bingREF.listKeys().key1:'BCP318'
+var var_bing_api_Key = enableBingSearch? bingREF.listKeys().key1:'BCP318'
 
 // ============== CONTAINER APPS - API ==============
 
-module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && serviceSettingDeployContainerApps) {
+module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && enableContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-aca-a-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -876,7 +887,7 @@ module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && se
 
 // ============== CONTAINER APPS - WEB ==============
 
-module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists && serviceSettingDeployContainerApps) {
+module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists && enableContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05-aca-w-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -904,7 +915,7 @@ module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists &&
 
 // ============== RBAC FOR CONTAINER APPS ==============
 
-module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceSettingDeployContainerApps) {
+module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (enableContainerApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05rbacACAMI${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -924,22 +935,22 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (serviceS
 // Resource information should be retrieved through Azure CLI queries after deployment
 
 @description('Web App deployment status')
-output webAppDeployed bool = (!webAppExists && serviceSettingDeployWebApp)
+output webAppDeployed bool = (!webAppExists && enableWebApp)
 
 @description('Function App deployment status')
-output functionAppDeployed bool = (!functionAppExists && serviceSettingDeployFunction)
+output functionAppDeployed bool = (!functionAppExists && enableFunction)
 
 @description('Container Apps Environment deployment status')
-output containerAppsEnvDeployed bool = (!containerAppsEnvExists && serviceSettingDeployContainerApps)
+output containerAppsEnvDeployed bool = (!containerAppsEnvExists && enableContainerApps)
 
 @description('Container App API deployment status')
-output containerAppADeployed bool = (!containerAppAExists && serviceSettingDeployContainerApps)
+output containerAppADeployed bool = (!containerAppAExists && enableContainerApps)
 
 @description('Container App Web deployment status')
-output containerAppWDeployed bool = (!containerAppWExists && serviceSettingDeployContainerApps)
+output containerAppWDeployed bool = (!containerAppWExists && enableContainerApps)
 
 @description('ACR RBAC verification status for Container Apps')
-output acrRbacVerified bool = serviceSettingDeployContainerApps
+output acrRbacVerified bool = enableContainerApps
 
 @description('ACR RBAC verification timestamp')
-output acrRbacVerificationCompleted string = serviceSettingDeployContainerApps ? 'RBAC verification included in deployment' : 'RBAC verification not required'
+output acrRbacVerificationCompleted string = enableContainerApps ? 'RBAC verification included in deployment' : 'RBAC verification not required'

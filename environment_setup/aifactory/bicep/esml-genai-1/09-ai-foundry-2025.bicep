@@ -46,7 +46,7 @@ param enableCaphost bool = true
 param enableAISearch bool = true
 
 @description('Enable Cosmos DB integration')
-param serviceSettingDeployCosmosDB bool = false
+param enableCosmosDB bool = false
 
 // AI Models deployment parameters
 @description('Whether to deploy GPT-X model')
@@ -86,10 +86,19 @@ param default_model_sku string = 'Standard'
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
-// Networking subnet IDs
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator: genai-1')
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string = ''
+param acaSubnetId string
+@description('Optional subnets from subnet calculator: all')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 // Networking parameters for calculation
 param vnetNameBase string
@@ -198,9 +207,11 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
-    genaiSubnetId: genaiSubnetId
-    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
   }
 }
 
@@ -470,7 +481,7 @@ var fqdnRaw = [
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
   
   // Cosmos DB endpoint (conditionally included)
-  serviceSettingDeployCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
+  enableCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
   
   // AI Services endpoint
   '${aifV2Name}.cognitiveservices.azure.com'
@@ -607,7 +618,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
     #disable-next-line BCP318
     aiFoundryV2Name: aiFoundry2025NoAvm.outputs.name
     aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
-    cosmosDBname: serviceSettingDeployCosmosDB? namingConvention.outputs.cosmosDBName : ''
+    cosmosDBname: enableCosmosDB? namingConvention.outputs.cosmosDBName : ''
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     }
     dependsOn: [
@@ -671,7 +682,7 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   ]
 }
 
-module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && serviceSettingDeployCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_RBACpreCH_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -682,7 +693,7 @@ module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = i
 }
 
 // This module creates the capability host for the project and account
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && serviceSettingDeployCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -701,7 +712,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   ]
 }
 
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && serviceSettingDeployCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -715,7 +726,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if((
 // START CAPHOST RBAC: Some RBAC for COSMOS & STORAGE must be assigned AFTER the CAPABILITY HOST is created
 // - The Storage Blob Data Owner role must be assigned after.
 // - The Cosmos Built-In Data Contributor role must be assigned after.
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && serviceSettingDeployCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {

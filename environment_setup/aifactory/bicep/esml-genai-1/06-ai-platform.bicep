@@ -34,7 +34,7 @@ param miPrjExists bool = false
 // Enable flags from parameter files
 param enableAIFoundryHub bool = false
 param addAIFoundryHub bool = false
-param serviceSettingDeployAzureOpenAI bool = false
+param enableAzureOpenAI bool = false
 param enableAISearch bool = false
 param enableAIServices bool = false
 
@@ -84,10 +84,19 @@ param allowPublicAccessWhenBehindVnet bool = false
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
-// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string = ''
+param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 // Networking parameters for calculation
 param vnetNameBase string
@@ -184,9 +193,11 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
-    genaiSubnetId: genaiSubnetId
-    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
     addAIFoundryHub: addAIFoundryHub
   }
 }

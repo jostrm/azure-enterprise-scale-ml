@@ -9,7 +9,9 @@ type aifactoryNamingType = {
   // Subnets
   genaiSubnetName: string
   aksSubnetName: string
+  aks2SubnetName: string
   acaSubnetName: string
+  aca2SubnetName: string
   defaultSubnet: string
 
   // AI Foundry V1 (2023-2025)

@@ -83,11 +83,11 @@ param enableAIServices bool = true
 param enableAISearch bool = true
 
 @description('Enable specific service deployments')
-param serviceSettingDeployAzureOpenAI bool = false
-param serviceSettingDeployContentSafety bool = false
-param serviceSettingDeployAzureAIVision bool = false
-param serviceSettingDeployAzureSpeech bool = false
-param serviceSettingDeployAIDocIntelligence bool = false
+param enableAzureOpenAI bool = false
+param enableContentSafety bool = false
+param enableAzureAIVision bool = false
+param enableAzureSpeech bool = false
+param enableAIDocIntelligence bool = false
 
 // GPT X
 @description('Whether to deploy GPT-X model')
@@ -122,10 +122,19 @@ param enablePublicAccessWithPerimeter bool = false
 param enablePublicNetworkAccessForCognitive bool = true
 param disableLocalAuth bool = false
 
-// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string = ''
+param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 // Networking parameters for calculation
 param vnetNameBase string
@@ -242,6 +251,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId: genaiSubnetId
     aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
   }
 }
 
@@ -320,7 +331,7 @@ var var_sa4AIsearch_dnsConfig = sa4AIsearch.outputs.dnsConfig
 // ============== COGNITIVE SERVICES ==============
 
 // Content Safety
-module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDeployContentSafety == true) {
+module csContentSafety '../modules/csContentSafety.bicep' = if(enableContentSafety == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-ContentSafety${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -349,7 +360,7 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(serviceSettingDep
 }
 
 // Vision Services
-module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVision == true) {
+module csVision '../modules/csVision.bicep' = if(enableAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-Vision4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -380,7 +391,7 @@ module csVision '../modules/csVision.bicep' = if(serviceSettingDeployAzureAIVisi
 }
 
 // Speech Services
-module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech == true) {
+module csSpeech '../modules/csSpeech.bicep' = if(enableAzureSpeech == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-AISpeech4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -411,7 +422,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(serviceSettingDeployAzureSpeech
 }
 
 // Document Intelligence
-module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(serviceSettingDeployAIDocIntelligence == true) {
+module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIntelligence == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-AIDocInt4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -631,7 +642,7 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
 }
 
 // Azure OpenAI - with conditional AI Search principal ID
-module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSettingDeployAzureOpenAI) {
+module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && enableAzureOpenAI) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-AzureOpenAI4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -671,7 +682,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && serviceSe
 // ============== PRIVATE DNS MODULES ==============
 
 // Content Safety Private DNS
-module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployContentSafety == true) {
+module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && enableContentSafety == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-privDnsCS${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -685,7 +696,7 @@ module privateDnsContentSafety '../modules/privateDns.bicep' = if(centralDnsZone
 }
 
 // Vision Services Private DNS
-module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureAIVision == true) {
+module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && enableAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-privDnsVision${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -699,7 +710,7 @@ module privateDnsVision '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 }
 
 // Speech Services Private DNS
-module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAzureSpeech == true) {
+module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && enableAzureSpeech == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-privDnsSpeech${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -713,7 +724,7 @@ module privateDnsSpeech '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 }
 
 // Document Intelligence Private DNS
-module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && serviceSettingDeployAIDocIntelligence == true) {
+module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolicyInHub == false && enableAIDocIntelligence == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-privDnsDocInt${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -727,7 +738,7 @@ module privateDnsDocInt '../modules/privateDns.bicep' = if(centralDnsZoneByPolic
 }
 
 // Azure OpenAI Private DNS
-module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists && serviceSettingDeployAzureOpenAI && !centralDnsZoneByPolicyInHub) {
+module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists && enableAzureOpenAI && !centralDnsZoneByPolicyInHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-privDnsLAOAI${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

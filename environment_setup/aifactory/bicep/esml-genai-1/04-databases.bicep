@@ -53,26 +53,35 @@ param sqlServerExists bool = false
 
 // Enable flags from parameter files
 @description('Enable Cosmos DB deployment')
-param serviceSettingDeployCosmosDB bool = false
+param enableCosmosDB bool = false
 
 @description('Enable PostgreSQL deployment')
-param serviceSettingDeployPostgreSQL bool = false
+param enablePostgreSQL bool = false
 
 @description('Enable Redis Cache deployment')
-param serviceSettingDeployRedisCache bool = false
+param enableRedisCache bool = false
 
 @description('Enable SQL Database deployment')
-param serviceSettingDeploySQLDatabase bool = false
+param enableSQLDatabase bool = false
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
-// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator')
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string = ''
+param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 // Users
 param technicalAdminsObjectID string = ''
@@ -179,9 +188,11 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
-    genaiSubnetId: genaiSubnetId
-    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
     postGresAdminEmails:postGresAdminEmails
   }
 }
@@ -283,7 +294,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 
 // ============== COSMOS DB ==============
 
-module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && serviceSettingDeployCosmosDB) {
+module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && enableCosmosDB) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-CosmosDB4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -368,7 +379,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
   ]
 }
 
-module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmosDBExists && serviceSettingDeployCosmosDB) {
+module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmosDBExists && enableCosmosDB) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-cosmosRbac${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -381,7 +392,7 @@ module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmo
   ]
 }
 
-module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployCosmosDB && !enablePublicAccessWithPerimeter) {
+module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !centralDnsZoneByPolicyInHub && enableCosmosDB && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-privDnsCosmos${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -396,7 +407,7 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !c
 
 // ============== POSTGRESQL ==============
 
-module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(!postgreSQLExists && serviceSettingDeployPostgreSQL) {
+module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(!postgreSQLExists && enablePostgreSQL) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-PostgreSQL4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -422,7 +433,7 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
   ]
 }
 
-module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bicep' = if(!postgreSQLExists && serviceSettingDeployPostgreSQL) {
+module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bicep' = if(!postgreSQLExists && enablePostgreSQL) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -437,7 +448,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
   ]
 }
 
-module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployPostgreSQL && !enablePublicAccessWithPerimeter) {
+module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists && !centralDnsZoneByPolicyInHub && enablePostgreSQL && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-privDnsPGres${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -452,7 +463,7 @@ module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists
 
 // ============== REDIS CACHE ==============
 
-module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && serviceSettingDeployRedisCache) {
+module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && enableRedisCache) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-RedisCache4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -471,7 +482,7 @@ module redisCache '../modules/databases/redis/redis.bicep' = if(!redisExists && 
   ]
 }
 
-module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!redisExists && serviceSettingDeployRedisCache) {
+module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!redisExists && enableRedisCache) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-RedisCacheRbac4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -485,7 +496,7 @@ module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!redisEx
   ]
 }
 
-module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !centralDnsZoneByPolicyInHub && serviceSettingDeployRedisCache && !enablePublicAccessWithPerimeter) {
+module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !centralDnsZoneByPolicyInHub && enableRedisCache && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-privDnsRedis${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -500,7 +511,7 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !
 
 // ============== SQL SERVER & DATABASE ==============
 
-module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlServerExists && serviceSettingDeploySQLDatabase) {
+module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlServerExists && enableSQLDatabase) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-SqlServer4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -520,7 +531,7 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlS
   ]
 }
 
-module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!sqlServerExists && serviceSettingDeploySQLDatabase) {
+module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!sqlServerExists && enableSQLDatabase) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-SqlServerRbac4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -534,7 +545,7 @@ module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!sq
   ]
 }
 
-module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !centralDnsZoneByPolicyInHub && serviceSettingDeploySQLDatabase && !enablePublicAccessWithPerimeter) {
+module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !centralDnsZoneByPolicyInHub && enableSQLDatabase && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-privDnsSQL${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -552,13 +563,13 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !cen
 // Resource information should be retrieved through Azure CLI queries after deployment
 
 @description('Cosmos DB deployment status')
-output cosmosDBDeployed bool = (!cosmosDBExists && serviceSettingDeployCosmosDB)
+output cosmosDBDeployed bool = (!cosmosDBExists && enableCosmosDB)
 
 @description('PostgreSQL deployment status')
-output postgreSQLDeployed bool = (!postgreSQLExists && serviceSettingDeployPostgreSQL)
+output postgreSQLDeployed bool = (!postgreSQLExists && enablePostgreSQL)
 
 @description('Redis Cache deployment status')
-output redisCacheDeployed bool = (!redisExists && serviceSettingDeployRedisCache)
+output redisCacheDeployed bool = (!redisExists && enableRedisCache)
 
 @description('SQL Server deployment status')
-output sqlServerDeployed bool = (!sqlServerExists && serviceSettingDeploySQLDatabase)
+output sqlServerDeployed bool = (!sqlServerExists && enableSQLDatabase)

@@ -43,7 +43,9 @@ param commonResourceGroupName string
 param subscriptionIdDevTestProd string
 param genaiSubnetId string
 param aksSubnetId string
-param acaSubnetId string
+param aks2SubnetId string = ''
+param acaSubnetId string = ''
+param aca2SubnetId string = ''
 
 param postGresAdminEmails string = ''
 
@@ -165,11 +167,15 @@ var laWorkspaceName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}$
 // ============================================================================
 var segments = split(genaiSubnetId, '/')
 var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
-var defaultSubnet = genaiSubnetName
+var defaultSubnet = genaiSubnetName // Pend subnet
 var segmentsAKS = split(aksSubnetId, '/')
+var segmentsAKS2 = split(aks2SubnetId, '/')
 var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
+var aks2SubnetName = segmentsAKS2[length(segmentsAKS2) - 1] // Get the last segment, which is the subnet name
 var segmentsACA = split(acaSubnetId, '/')
+var segmentsACA2 = split(aca2SubnetId, '/')
 var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
+var aca2SubnetName = segmentsACA2[length(segmentsACA2) - 1] // Get the last segment, which is the subnet name
 
 var adfName = 'adf-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
@@ -178,8 +184,10 @@ var adfName = 'adf-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${
 // Subnets
 output genaiSubnetName string = genaiSubnetName
 output aksSubnetName string = aksSubnetName
+output aks2SubnetName string = aks2SubnetName
 output acaSubnetName string = acaSubnetName
-output defaultSubnet string = defaultSubnet
+output aca2SubnetName string = aca2SubnetName
+output defaultSubnet string = defaultSubnet // pend subnet is genai
 
 output aoaiName string = aoaiName
 output amlName string = amlName
@@ -259,7 +267,9 @@ output namingConvention aifactoryNamingType = {
   // Subnets
   genaiSubnetName: genaiSubnetName
   aksSubnetName: aksSubnetName
+  aks2SubnetName: aks2SubnetName
   acaSubnetName: acaSubnetName
+  aca2SubnetName: aca2SubnetName
   defaultSubnet: defaultSubnet
 
   // AI Foundry V1 (2023-2025)

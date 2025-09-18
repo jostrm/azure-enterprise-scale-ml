@@ -71,10 +71,19 @@ param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
 param subscriptionIdDevTestProd string = subscription().subscriptionId
 
-// PS-Calculated and set by .JSON, that Powershell dynamically created in networking part.
-param genaiSubnetId string = ''
-param aksSubnetId string = ''
-param acaSubnetId string = ''
+// ============================================================================
+// PS-Networking: Needs to be here, even if not used, since .JSON file
+// ============================================================================
+@description('Required subnet IDs from subnet calculator')
+param genaiSubnetId string
+param aksSubnetId string
+param acaSubnetId string
+@description('Optional subnets from subnet calculator')
+param aca2SubnetId string = ''
+param aks2SubnetId string = ''
+@description('if projectype is not genai-1, but instead all')
+param dbxPubSubnetName string = ''
+param dbxPrivSubnetName string = ''
 
 // Resource group naming
 param commonRGNamePrefix string
@@ -100,40 +109,40 @@ param enableAIServices bool = false
 param enableAISearch bool = false
 
 @description('Enable Azure OpenAI deployment')
-param serviceSettingDeployAzureOpenAI bool = false
+param enableAzureOpenAI bool = false
 
 @description('Enable Azure AI Vision deployment')
-param serviceSettingDeployAzureAIVision bool = false
+param enableAzureAIVision bool = false
 
 @description('Enable Azure Speech deployment')
-param serviceSettingDeployAzureSpeech bool = false
+param enableAzureSpeech bool = false
 
 @description('Enable AI Document Intelligence deployment')
-param serviceSettingDeployAIDocIntelligence bool = false
+param enableAIDocIntelligence bool = false
 
 @description('Enable Azure Function deployment')
-param serviceSettingDeployFunction bool = false
+param enableFunction bool = false
 
 @description('Enable Azure Web App deployment')
-param serviceSettingDeployWebApp bool = false
+param enableWebApp bool = false
 
 @description('Enable Container Apps deployment')
-param serviceSettingDeployContainerApps bool = false
+param enableContainerApps bool = false
 
 @description('Enable Application Insights Dashboard deployment')
-param serviceSettingDeployAppInsightsDashboard bool = false
+param enableAppInsightsDashboard bool = false
 
 @description('Enable Cosmos DB deployment')
-param serviceSettingDeployCosmosDB bool = false
+param enableCosmosDB bool = false
 
 @description('Enable PostgreSQL deployment')
-param serviceSettingDeployPostgreSQL bool = false
+param enablePostgreSQL bool = false
 
 @description('Enable Redis Cache deployment')
-param serviceSettingDeployRedisCache bool = false
+param enableRedisCache bool = false
 
 @description('Enable SQL Database deployment')
-param serviceSettingDeploySQLDatabase bool = false
+param enableSQLDatabase bool = false
 
 // Security and networking
 param addBastionHost bool = false
@@ -226,9 +235,11 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     technicalAdminsEmail: technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
-    genaiSubnetId: genaiSubnetId
-    aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+    aksSubnetId:aksSubnetId
+    genaiSubnetId:genaiSubnetId
+    aca2SubnetId: aca2SubnetId
+    aks2SubnetId: aks2SubnetId
     addAIFoundryHub: addAIFoundryHub
   }
 }
@@ -381,12 +392,12 @@ var var_aiHubProjectPrincipalId = (!aiHubExists && enableAIFoundryHub) ? existin
 
 // ============== OPENAI Principal ID ==============
 var openAIName_Static = 'aoai-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
-resource openAIREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (!openaiExists && serviceSettingDeployAzureOpenAI) {
+resource openAIREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (!openaiExists && enableAzureOpenAI) {
   name: openAIName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_openAIPrincipalId = (!openaiExists && serviceSettingDeployAzureOpenAI) ? openAIREF.identity.principalId : ''
+var var_openAIPrincipalId = (!openaiExists && enableAzureOpenAI) ? openAIREF.identity.principalId : ''
 
 // ============== AI SERVICES Principal ID ==============
 var aiServicesName_Static = replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomSalt}${prjResourceSuffixNoDash}'), '-', '') 
@@ -408,30 +419,30 @@ var var_aiSearchPrincipalId = (!aiSearchExists && enableAISearch) ? aiSearchREF.
 
 // ============== VISION SERVICES Principal ID ==============
 var visionName_Static = 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource visionREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (serviceSettingDeployAzureAIVision) {
+resource visionREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (enableAzureAIVision) {
   name: visionName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_visionPrincipalId = serviceSettingDeployAzureAIVision ? visionREF.identity.principalId : ''
+var var_visionPrincipalId = enableAzureAIVision ? visionREF.identity.principalId : ''
 
 // ============== SPEECH SERVICES Principal ID ==============
 var speechName_Static = 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource speechREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (serviceSettingDeployAzureSpeech) {
+resource speechREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (enableAzureSpeech) {
   name: speechName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_speechPrincipalId = serviceSettingDeployAzureSpeech ? speechREF.identity.principalId : ''
+var var_speechPrincipalId = enableAzureSpeech ? speechREF.identity.principalId : ''
 
 // ============== DOCUMENT INTELLIGENCE Principal ID ==============
 var docsName_Static = 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
-resource docsREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (serviceSettingDeployAIDocIntelligence) {
+resource docsREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (enableAIDocIntelligence) {
   name: docsName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_docsPrincipalId = serviceSettingDeployAIDocIntelligence ? docsREF.identity.principalId : ''
+var var_docsPrincipalId = enableAIDocIntelligence ? docsREF.identity.principalId : ''
 
 // Datalake with datalakeName based on local, static VARS such as uniqueInAIFenv_Static
 resource esmlCommonLake 'Microsoft.Storage/storageAccounts@2024-01-01' existing = {
@@ -514,7 +525,7 @@ module storageReaderRole2001 '../modules/storagePendReaderToAIProject.bicep' = i
 // ============== RBAC MODULES - AI SERVICES ==============
 
 // RBAC for OpenAI - Storage, Search, and User Access
-module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (serviceSettingDeployAzureOpenAI && !openaiExists) {
+module rbacForOpenAI '../modules/aihubRbacOpenAI.bicep' = if (enableAzureOpenAI && !openaiExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbac3OpenAI${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -638,7 +649,7 @@ module rbacDatafactory '../modules/datafactoryRBAC.bicep' = if(!dataFactoryExist
 // ============== RBAC MODULES - OPTIONAL COGNITIVE SERVICES ==============
 
 // RBAC for Azure AI Vision (Optional)
-module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAzureAIVision) {
+module rbacVision '../modules/aihubRbacVision.bicep' = if(enableAzureAIVision) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacVision${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -656,7 +667,7 @@ module rbacVision '../modules/aihubRbacVision.bicep' = if(serviceSettingDeployAz
 }
 
 // RBAC for Azure Speech Services (Optional)
-module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAzureSpeech) {
+module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(enableAzureSpeech) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacSpeech${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -674,7 +685,7 @@ module rbacSpeech '../modules/aihubRbacSpeech.bicep' = if(serviceSettingDeployAz
 }
 
 // RBAC for AI Document Intelligence (Optional)
-module rbacDocs '../modules/aihubRbacDoc.bicep' = if(serviceSettingDeployAIDocIntelligence) {
+module rbacDocs '../modules/aihubRbacDoc.bicep' = if(enableAIDocIntelligence) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacDocs${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -789,13 +800,13 @@ module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExist
 output keystoreAndBastionRbacDeployed bool = (empty(bastionResourceGroup) && addBastionHost) || (!empty(bastionResourceGroup) && !empty(bastionSubscription))
 
 @description('AI Services RBAC deployment status')
-output aiServicesRbacDeployed bool = (serviceSettingDeployAzureOpenAI && !openaiExists) || (!aiServicesExists && enableAIServices) || (!aiSearchExists && enableAISearch)
+output aiServicesRbacDeployed bool = (enableAzureOpenAI && !openaiExists) || (!aiServicesExists && enableAIServices) || (!aiSearchExists && enableAISearch)
 
 @description('AI Hub and ML Platform RBAC deployment status')
 output aiHubMlRbacDeployed bool = (!aiHubExists && !empty(azureMachineLearningObjectId) && enableAIFoundryHub) || (!aiHubExists && enableAIFoundryHub) || (!aiSearchExists && enableAISearch)
 
 @description('Optional Cognitive Services RBAC deployment status')
-output optionalCognitiveRbacDeployed bool = serviceSettingDeployAzureAIVision || serviceSettingDeployAzureSpeech || serviceSettingDeployAIDocIntelligence
+output optionalCognitiveRbacDeployed bool = enableAzureAIVision || enableAzureSpeech || enableAIDocIntelligence
 
 @description('Network and VNet RBAC deployment status')
 output networkRbacDeployed bool = (addBastionHost && empty(bastionSubscription)) || (addBastionHost && !empty(bastionSubscription))
