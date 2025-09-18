@@ -126,7 +126,7 @@ module aksSnt '../modules/subnetWithNsg.bicep' = {
 module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr)) {
   name: 'aks2-${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'snt-${projectName}-aks2'
+    name: 'snt-${projectName}-aks-002'
     virtualNetworkName: vnetNameFull
     addressPrefix: aks2SubnetSettings.cidr
     location: location
@@ -247,7 +247,7 @@ module acaSnt '../modules/subnetWithNsg.bicep' = {
 module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr)) {
   name: 'acaSnet2-${deploymentProjSpecificUniqueSuffix}'
   params: {
-    name: 'snt-${projectName}-aca2'
+    name: 'snt-${projectName}-aca-002'
     virtualNetworkName: vnetNameFull
     addressPrefix: aca2SubnetSettings.cidr
     location: location
