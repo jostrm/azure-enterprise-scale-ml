@@ -19,6 +19,10 @@ param storageAccountSkuName string = 'Standard_LRS'
 param containerRegistrySkuName string = 'Premium' // NB! Basic and Standard ACR SKUs don't support private endpoints.
 param bingSearchSKU string = 'S1'
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -318,6 +322,12 @@ var mi_principals_only = union(mi_array, mi_array2)
 resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
   scope: subscription(subscriptionIdDevTestProd)
+}
+
+// Log Analytics workspace reference for diagnostics
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laWorkspaceName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
 // ============== DNS CONFIGURATIONS ==============
@@ -709,6 +719,64 @@ module privateDnsContainerRegistry '../modules/privateDns.bicep' = if(!acrProjec
   dependsOn: [
     CmnZones
     existingTargetRG
+  ]
+}
+
+// ============== DIAGNOSTIC SETTINGS ==============
+
+// Storage Account 1001 Diagnostic Settings
+module storageAccount1001Diagnostics '../modules/diagnostics/storageAccountDiagnostics.bicep' = if (!storageAccount1001Exists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('02-diagStorage1001-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    storageAccountName: storageAccount1001Name
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    sacc
+  ]
+}
+
+// Key Vault Diagnostic Settings
+module keyVaultDiagnostics '../modules/diagnostics/keyVaultDiagnostics.bicep' = if (!keyvaultExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('02-diagKeyVault-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    keyVaultName: keyvaultName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    kv1
+  ]
+}
+
+// Container Registry Diagnostic Settings
+module containerRegistryDiagnostics '../modules/diagnostics/containerRegistryDiagnostics.bicep' = if (!acrProjectExists && !useCommonACR) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('02-diagACR-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    containerRegistryName: acrProjectName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    acr
+  ]
+}
+
+// Application Insights Diagnostic Settings
+module applicationInsightsDiagnostics '../modules/diagnostics/applicationInsightsDiagnostics.bicep' = if (!applicationInsightExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('02-diagAppInsights-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    applicationInsightsName: applicationInsightName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    applicationInsightOtherType
   ]
 }
 

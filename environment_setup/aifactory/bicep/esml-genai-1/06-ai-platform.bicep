@@ -38,6 +38,10 @@ param enableAzureOpenAI bool = false
 param enableAISearch bool = false
 param enableAIServices bool = false
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // AI Models deployment parameters
 @description('Whether to deploy GPT-X model')
 param deployModel_gpt_X bool = false

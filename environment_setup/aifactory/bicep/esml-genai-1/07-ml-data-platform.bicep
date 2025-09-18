@@ -17,10 +17,10 @@ param mlWorkspaceSkuTier string = 'basic'
 // ============== AKS SKUs ==============
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
-  'Base'
+  'Basic'
   'Standard'
 ])
-param aksSkuName string = 'Base'
+param aksSkuName string = 'Basic'
 
 @description('Specifies the SKU tier for the AKS cluster')
 @allowed([
@@ -29,6 +29,10 @@ param aksSkuName string = 'Base'
   'Premium'
 ])
 param aksSkuTier string = 'Standard'
+
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
 // ============== SKUs ==============
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
@@ -500,6 +504,36 @@ module rbacAmlv2SPsAndADF '../modules/machinelearningRBAC.bicep' = if(!amlExists
     ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
     logAnalyticsWorkspaceOpInsight
     ...(!dataFactoryExists && enableDatafactory ? [dataFactory] : [])
+  ]
+}
+
+// ============== DIAGNOSTIC SETTINGS ==============
+
+// Azure Machine Learning Diagnostic Settings
+module amlDiagnostics '../modules/diagnostics/azureMachineLearningDiagnostics.bicep' = if (!amlExists && enableAzureMachineLearning) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('07-diagAML-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    machineLearningWorkspaceName: amlName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    amlv2
+  ]
+}
+
+// Data Factory Diagnostic Settings
+module dataFactoryDiagnostics '../modules/diagnostics/dataFactoryDiagnostics.bicep' = if (!dataFactoryExists && enableDatafactory) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('07-diagDataFactory-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    dataFactoryName: dataFactoryName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceOpInsight.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    dataFactory
   ]
 }
 

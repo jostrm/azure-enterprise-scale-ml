@@ -39,6 +39,10 @@ param enableContainerDeployment bool = false
 @description('Enable development/debug mode')
 param enableDebugMode bool = false
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 @description('Enable sample data seeding')
 param enableSampleDataSeeding bool = true
 

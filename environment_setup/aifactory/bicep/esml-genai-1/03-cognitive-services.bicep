@@ -38,6 +38,10 @@ param aifactoryVersionMajor int = 1
 param aifactoryVersionMinor int = 22
 var activeVersion = 122
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -303,6 +307,12 @@ resource projectResourceGroupExists 'Microsoft.Resources/resourceGroups@2025-04-
 resource existingKeyvault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (keyvaultExists) {
   name: keyvaultName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
+// Log Analytics workspace reference for diagnostics
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laWorkspaceName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
 // ============== DNS CONFIGURATIONS ==============
@@ -776,6 +786,120 @@ module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(!storageAccount
   dependsOn: [
     CmnZones
     projectResourceGroupExists
+  ]
+}
+
+// ============== DIAGNOSTIC SETTINGS ==============
+
+// AI Services Diagnostic Settings
+module aiServicesDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (!aiServicesExists && enableAIServices) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagAIServices-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: aiServicesName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    aiServices
+  ]
+}
+
+// Azure OpenAI Diagnostic Settings
+module openaiDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (!openaiExists && enableAzureOpenAI) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagOpenAI-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: aoaiName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    csAzureOpenAI
+  ]
+}
+
+// Content Safety Diagnostic Settings
+module contentSafetyDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableContentSafety) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagContentSafety-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: 'cs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    csContentSafety
+  ]
+}
+
+// Vision Services Diagnostic Settings
+module visionDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAzureAIVision) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagVision-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: (!empty(serviceSettingOverrideRegionAzureAIVisionShort)) ? 'vision-${projectName}-${serviceSettingOverrideRegionAzureAIVisionShort}-${env}-${uniqueInAIFenv}${commonResourceSuffix}' : 'vision-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    csVision
+  ]
+}
+
+// Speech Services Diagnostic Settings
+module speechDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAzureSpeech) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagSpeech-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: 'speech-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    csSpeech
+  ]
+}
+
+// Document Intelligence Diagnostic Settings
+module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAIDocIntelligence) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagDocInt-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: 'docs-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    csDocIntelligence
+  ]
+}
+
+// AI Search Diagnostic Settings
+module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (!aiSearchExists && enableAISearch) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    searchServiceName: safeNameAISearch
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    aiSearchService
+  ]
+}
+
+// Storage Account Diagnostic Settings (for AI Search storage)
+module storageAccountDiagnostics '../modules/diagnostics/storageAccountDiagnostics.bicep' = if (!storageAccount2001Exists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-diagStorage-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    storageAccountName: storageAccount2001Name
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    sa4AIsearch
   ]
 }
 

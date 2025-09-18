@@ -24,6 +24,10 @@ param eventHubSkuTier string = 'Basic'
 @description('Event Hub Namespace SKU capacity (throughput units)')
 param eventHubSkuCapacity int = 1
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // ============== PARAMETERS ==============
 @allowed(['Consumption','Standard'])
 param logiAppType string = 'Standard' // Consumption or Standard. Consumption does not support: Private endpoints, VNet integration, Private connectivity

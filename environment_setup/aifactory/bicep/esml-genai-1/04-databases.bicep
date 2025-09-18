@@ -24,6 +24,10 @@ param redisSKU string = 'Standard'
 param sqlServerSKU_DTU string = 'S0'
 param sqlServerTier_DTU string = 'Standard'
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -244,6 +248,12 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
   }
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
+
+// Log Analytics workspace reference for diagnostics
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laWorkspaceName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
 
 // Assumes the principals exists.
 module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
@@ -554,6 +564,65 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !cen
   }
   dependsOn: [
     existingTargetRG
+    sqlServer
+  ]
+}
+
+// ============== DIAGNOSTIC SETTINGS ==============
+
+// Cosmos DB Diagnostic Settings
+module cosmosDbDiagnostics '../modules/diagnostics/cosmosDbDiagnostics.bicep' = if (!cosmosDBExists && enableCosmosDB) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-diagCosmosDB-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cosmosDbAccountName: cosmosDBName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    cosmosdb
+  ]
+}
+
+// PostgreSQL Diagnostic Settings
+module postgresqlDiagnostics '../modules/diagnostics/postgresqlDiagnostics.bicep' = if (!postgreSQLExists && enablePostgreSQL) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-diagPostgreSQL-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    postgresqlServerName: postgreSQLName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    postgreSQL
+  ]
+}
+
+// Redis Cache Diagnostic Settings
+module redisCacheDiagnostics '../modules/diagnostics/redisCacheDiagnostics.bicep' = if (!redisExists && enableRedisCache) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-diagRedis-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    redisCacheName: redisName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    redisCache
+  ]
+}
+
+// SQL Database Diagnostic Settings
+module sqlDatabaseDiagnostics '../modules/diagnostics/sqlDatabaseDiagnostics.bicep' = if (!sqlServerExists && enableSQLDatabase) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-diagSQLDB-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    sqlServerName: sqlServerName
+    sqlDatabaseName: sqlDBName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
     sqlServer
   ]
 }

@@ -1,0 +1,202 @@
+// ============================================================================
+// STORAGE ACCOUNT DIAGNOSTIC SETTINGS MODULE
+// ============================================================================
+// This module creates diagnostic settings for Storage Accounts with three tiers:
+// - Gold: All metrics and logs (comprehensive monitoring)
+// - Silver: Key metrics and logs (balanced monitoring)  
+// - Bronze: Essential metrics only (basic monitoring)
+
+@description('The name of the Storage Account resource')
+param storageAccountName string
+
+@description('The resource ID of the Log Analytics workspace for diagnostics')
+param logAnalyticsWorkspaceId string
+
+@description('Diagnostic setting level - determines metrics and logs collected')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
+@description('Optional. Storage Account name prefix for diagnostic setting')
+param diagnosticSettingName string = 'diag-${storageAccountName}'
+
+// Reference to existing Storage Account
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: storageAccountName
+}
+
+// Define metrics and logs based on diagnostic level
+var goldMetrics = [
+  {
+    category: 'AllMetrics'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 90
+    }
+  }
+]
+
+var silverMetrics = [
+  {
+    category: 'AllMetrics'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 30
+    }
+  }
+]
+
+var bronzeMetrics = [
+  {
+    category: 'AllMetrics'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 7
+    }
+  }
+]
+
+var goldLogs = [
+  {
+    category: 'StorageRead'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 90
+    }
+  }
+  {
+    category: 'StorageWrite'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 90
+    }
+  }
+  {
+    category: 'StorageDelete'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 90
+    }
+  }
+]
+
+var silverLogs = [
+  {
+    category: 'StorageWrite'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 30
+    }
+  }
+  {
+    category: 'StorageDelete'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 30
+    }
+  }
+]
+
+var bronzeLogs = [
+  {
+    category: 'StorageWrite'
+    enabled: true
+    retentionPolicy: {
+      enabled: true
+      days: 7
+    }
+  }
+]
+
+// Select metrics and logs based on diagnostic level
+var selectedMetrics = diagnosticSettingLevel == 'gold' ? goldMetrics : diagnosticSettingLevel == 'silver' ? silverMetrics : bronzeMetrics
+var selectedLogs = diagnosticSettingLevel == 'gold' ? goldLogs : diagnosticSettingLevel == 'silver' ? silverLogs : bronzeLogs
+
+// Storage Account Diagnostic Settings
+resource storageAccountDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: diagnosticSettingName
+  scope: storageAccount
+  properties: {
+    workspaceId: logAnalyticsWorkspaceId
+    metrics: selectedMetrics
+    logs: selectedLogs
+  }
+}
+
+// Blob Service Reference and Diagnostic Settings
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' existing = {
+  name: 'default'
+  parent: storageAccount
+}
+
+resource blobServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: '${diagnosticSettingName}-blob'
+  scope: blobService
+  properties: {
+    workspaceId: logAnalyticsWorkspaceId
+    metrics: selectedMetrics
+    logs: selectedLogs
+  }
+}
+
+// Table Service Reference and Diagnostic Settings  
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' existing = {
+  name: 'default'
+  parent: storageAccount
+}
+
+resource tableServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: '${diagnosticSettingName}-table'
+  scope: tableService
+  properties: {
+    workspaceId: logAnalyticsWorkspaceId
+    metrics: selectedMetrics
+    logs: selectedLogs
+  }
+}
+
+// Queue Service Reference and Diagnostic Settings
+resource queueService 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' existing = {
+  name: 'default'
+  parent: storageAccount
+}
+
+resource queueServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: '${diagnosticSettingName}-queue'
+  scope: queueService
+  properties: {
+    workspaceId: logAnalyticsWorkspaceId
+    metrics: selectedMetrics
+    logs: selectedLogs
+  }
+}
+
+// File Service Reference and Diagnostic Settings
+resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2023-05-01' existing = {
+  name: 'default'
+  parent: storageAccount
+}
+
+resource fileServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: '${diagnosticSettingName}-file'
+  scope: fileService
+  properties: {
+    workspaceId: logAnalyticsWorkspaceId
+    metrics: selectedMetrics
+    logs: selectedLogs
+  }
+}
+
+// Output diagnostic setting resource IDs
+output diagnosticSettingId string = storageAccountDiagnostics.id
+output blobDiagnosticSettingId string = blobServiceDiagnostics.id
+output tableDiagnosticSettingId string = tableServiceDiagnostics.id
+output queueDiagnosticSettingId string = queueServiceDiagnostics.id
+output fileDiagnosticSettingId string = fileServiceDiagnostics.id

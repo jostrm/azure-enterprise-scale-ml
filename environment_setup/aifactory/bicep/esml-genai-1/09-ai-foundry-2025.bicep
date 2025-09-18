@@ -38,6 +38,10 @@ param resourceSuffix string
 @description('Enable AI Foundry 2 features')
 param enableAIFoundryV2 bool = false
 param enableAIFoundryV21 bool = false
+
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
 param aiFoundryV2Exists bool = false
 
 @description('Enable Capability host for AI Foundry - BYO network and resources for thread, vector, storage')

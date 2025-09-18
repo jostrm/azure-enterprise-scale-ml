@@ -3,10 +3,10 @@ param name string
 // ============== SKUs ==============
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
-  'Base'
+  'Basic'
   'Standard'
 ])
-param skuName string = 'Base'
+param skuName string = 'Basic'
 
 @description('Specifies the SKU tier for the AKS cluster')
 @allowed([
@@ -23,7 +23,7 @@ param tags object
 param location string
 
 @description('Specifies version of kubernetes on the AKS cluster')
-param kubernetesVersion string
+param kubernetesVersion string // az aks get-versions --location westeurope --output table
 
 @description('Specifies the DNS prefix for the AKS cluster')
 param dnsPrefix string

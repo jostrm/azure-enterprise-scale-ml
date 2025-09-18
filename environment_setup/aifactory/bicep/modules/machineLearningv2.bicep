@@ -1,10 +1,10 @@
 // ============== SKUs ==============
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
-  'Base'
+  'Basic' // Base managed cluster SKU name is invalid. 'Basic' has been replaced by 'Base' since v2023-02-01.
   'Standard'
 ])
-param aksSkuName string = 'Base'
+param aksSkuName string = 'Basic'
 
 @description('Specifies the SKU tier for the AKS cluster')
 @allowed([

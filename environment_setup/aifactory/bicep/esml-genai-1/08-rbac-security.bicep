@@ -42,6 +42,10 @@ HOW TO TROUBLE SHOOT and fix "RoleAssignmentExists":
 ================ END ==================================================
 */
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])

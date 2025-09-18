@@ -48,6 +48,10 @@ param webappSKU object = {
   capacity: 1
 }
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -537,6 +541,12 @@ module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
 }
 var privateLinksDnsZones = CmnZones.outputs.privateLinksDnsZones
 
+// Log Analytics workspace reference for diagnostics
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laWorkspaceName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
+
 // Assumes the principals exists.
 module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
   name: take('03-getACAMI-${deploymentProjSpecificUniqueSuffix}', 64)
@@ -927,6 +937,78 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (enableCo
   dependsOn: [
     containerAppsEnv
     acaApi
+  ]
+}
+
+// ============== DIAGNOSTIC SETTINGS ==============
+
+// Application Insights Diagnostic Settings
+module appInsightsDiagnostics '../modules/diagnostics/applicationInsightsDiagnostics.bicep' = if (!applicationInsightExists && enableAppInsightsDashboard) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-diagAppInsights-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    applicationInsightsName: applicationInsightName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    appinsights
+  ]
+}
+
+// Web App Diagnostic Settings
+module webAppDiagnostics '../modules/diagnostics/webAppsDiagnostics.bicep' = if (!webAppExists && enableWebApp) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-diagWebApp-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    webAppName: webAppName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    webapp
+  ]
+}
+
+// Function App Diagnostic Settings
+module functionAppDiagnostics '../modules/diagnostics/functionAppsDiagnostics.bicep' = if (!functionAppExists && enableFunction) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-diagFunctionApp-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    functionAppName: functionAppName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    function
+  ]
+}
+
+// Container Apps API Diagnostic Settings
+module containerAppApiDiagnostics '../modules/diagnostics/containerAppsDiagnostics.bicep' = if (!containerAppAExists && enableContainerApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-diagContainerAppAPI-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    containerAppName: containerAppAName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    acaApi
+  ]
+}
+
+// Container Apps Web Diagnostic Settings
+module containerAppWebDiagnostics '../modules/diagnostics/containerAppsDiagnostics.bicep' = if (!containerAppWExists && enableContainerApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-diagContainerAppWeb-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    containerAppName: containerAppWName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    acaWebApp
   ]
 }
 

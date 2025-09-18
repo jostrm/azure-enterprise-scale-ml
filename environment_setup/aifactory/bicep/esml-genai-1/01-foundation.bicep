@@ -22,6 +22,10 @@ var activeVersion = 122
 @description('Use Azure AD Groups for RBAC')
 param useAdGroups bool = false
 
+@description('Diagnostic setting level for monitoring and logging')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
+
 // ============================================================================
 // PARAMETERS - Environment & Location
 // ============================================================================
