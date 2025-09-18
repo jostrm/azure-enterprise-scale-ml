@@ -153,8 +153,10 @@ module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr) && 
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
   dependsOn: [
-    aksSnt
-    ...((!empty(aks2SubnetCidr)) ? [nsgAKS2] : [])
+    ...(!sntAks002Exists && !empty(aks2SubnetCidr) ? [nsgAKS2] : [])
+    ...(!sntGenaiExists ? [genaiSnt] : [])
+    ...(!sntAcaExists ? [acaSnt] : [])
+    ...(!sntAksExists ? [aksSnt] : [])
   ]
 }
 
@@ -195,7 +197,6 @@ module genaiSnt '../modules/subnetWithNsg.bicep' = if(!sntGenaiExists){
   dependsOn: [
     ...(!sntGenaiExists ? [nsgGenAI] : [])
     ...(!sntAksExists ? [aksSnt] : [])
-    ...(!sntAks002Exists && !empty(aks2SubnetCidr) ? [aks2Snt] : [])
   ]
 }
 
@@ -259,7 +260,6 @@ module acaSnt '../modules/subnetWithNsg.bicep' = if(!sntAcaExists){
     ...(!sntAcaExists ? [nsgAca] : [])
     ...(!sntGenaiExists ? [genaiSnt] : [])
     ...(!sntAksExists ? [aksSnt] : [])
-    ...(!sntAks002Exists && !empty(aks2SubnetCidr) ? [aks2Snt] : [])
   ]
 }
 module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && !sntAca002Exists) {
@@ -279,7 +279,6 @@ module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && 
     ...(!sntAcaExists ? [acaSnt] : [])
     ...(!sntGenaiExists ? [genaiSnt] : [])
     ...(!sntAksExists ? [aksSnt] : [])
-    ...(!sntAks002Exists && !empty(aks2SubnetCidr) ? [aks2Snt] : [])
   ]
 }
 
@@ -333,7 +332,6 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPubSubnetCidr) 
   dependsOn: [
     ...(!sntDatabricksPubExists && !empty(dbxPubSubnetCidr) ? [nsgDbx] : [])
     ...(!sntAcaExists ? [acaSnt] : [])
-    ...(!sntAca002Exists && !empty(aca2SubnetCidr) ? [acaSnt2] : [])
     ...(!sntGenaiExists ? [genaiSnt] : [])
     ...(!sntAksExists ? [aksSnt] : [])
   ]
