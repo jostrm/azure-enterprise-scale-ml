@@ -1,6 +1,21 @@
 @description('Specifies the name of the AKS cluster')
 param name string
+// ============== SKUs ==============
+@description('Specifies the SKU name for the AKS cluster')
+@allowed([
+  'Base'
+  'Standard'
+])
+param skuName string = 'Base'
 
+@description('Specifies the SKU tier for the AKS cluster')
+@allowed([
+  'Free'
+  'Standard'
+  'Premium'
+])
+param skuTier string = 'Standard'
+// ============== SKUs ==============
 @description('Specifies the tags that should be applied to aks resources')
 param tags object
 
@@ -34,18 +49,19 @@ param nodeResourceGroup string
 
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
+param aksExists bool = false
 //param privateDNSZone string
 //param authorizedIPRanges array
 
 //skuName: 'basic' // basic -> 2023-02-01: 'base'
 //skuTier: 'paid' // free, paid -> 2023-02-01: free, standard
-resource aksCluster 'Microsoft.ContainerService/managedClusters@2021-03-01' = {
+resource aksCluster 'Microsoft.ContainerService/managedClusters@2021-03-01' = if(!aksExists) {
   name: name
   tags: tags
   location: location
   sku: {
-    name: 'Basic' // 'basic' (basic) -> 2023-02-01: ()'base')
-    tier: 'Paid' //'paid' (free, paid) -> 2023-02-01: (free, standard)
+    name: skuName
+    tier: skuTier
   }
   identity: {
     type: 'SystemAssigned'

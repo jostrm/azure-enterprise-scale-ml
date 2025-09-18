@@ -11,10 +11,25 @@ targetScope = 'subscription'
 // - RBAC and permissions for ML platform, Data Factory, Databricks
 // ================================================================
 
-// ============== SKUs ==============
+// ============== AML SKUs ==============
 param mlWorkspaceSkuName string = 'basic'
 param mlWorkspaceSkuTier string = 'basic'
+// ============== AKS SKUs ==============
+@description('Specifies the SKU name for the AKS cluster')
+@allowed([
+  'Base'
+  'Standard'
+])
+param aksSkuName string = 'Base'
 
+@description('Specifies the SKU tier for the AKS cluster')
+@allowed([
+  'Free'
+  'Standard'
+  'Premium'
+])
+param aksSkuTier string = 'Standard'
+// ============== SKUs ==============
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -375,6 +390,8 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
       systemAssigned: true
     }
     aksExists:aksExists
+    aksSkuName: aksSkuName
+    aksSkuTier: aksSkuTier
     uniqueDepl: deploymentProjSpecificUniqueSuffix
     uniqueSalt5char: namingConvention.outputs.uniqueInAIFenv
     projectName: projectName
@@ -387,8 +404,8 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     env: env
     aksSubnetId: aksExists ? '' : aks2SubnetId
     aksSubnetName: aksExists ? '' : aksSubnetName
-    aksDnsServiceIP: aksDnsServiceIP
-    aksServiceCidr: aksServiceCidr
+    aksDnsServiceIP: aksExists ? '' : aksDnsServiceIP
+    aksServiceCidr: aksExists ? '' : aksServiceCidr
     tags: tagsProject
     vnetId: vnet.id
     subnetName: defaultSubnet
@@ -398,11 +415,11 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     allowPublicAccessWhenBehindVnet: (AMLStudioUIPrivate == true && empty(ipWhitelist_remove_ending_32)) ? false : true
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
-    aksVmSku_dev: aks_dev_sku_param
-    aksVmSku_testProd: aks_test_prod_sku_param
-    aksNodes_dev: aks_dev_nodes_param
-    aksNodes_testProd: aks_test_prod_nodes_param
-    kubernetesVersionAndOrchestrator: aks_version_param
+    aksVmSku_dev: aksExists ? '' : aks_dev_sku_param
+    aksVmSku_testProd: aksExists ? '' : aks_test_prod_sku_param
+    aksNodes_dev: aksExists ? 0 : aks_dev_nodes_param
+    aksNodes_testProd: aksExists ? 0 : aks_test_prod_nodes_param
+    kubernetesVersionAndOrchestrator: aksExists ? '' : aks_version_param
     amlComputeDefaultVmSize_dev: aml_cluster_dev_sku_param
     amlComputeDefaultVmSize_testProd: aml_cluster_test_prod_sku_param
     amlComputeMaxNodex_dev: aml_cluster_dev_nodes_param

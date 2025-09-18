@@ -1,3 +1,19 @@
+// ============== SKUs ==============
+@description('Specifies the SKU name for the AKS cluster')
+@allowed([
+  'Base'
+  'Standard'
+])
+param aksSkuName string = 'Base'
+
+@description('Specifies the SKU tier for the AKS cluster')
+@allowed([
+  'Free'
+  'Standard'
+  'Premium'
+])
+param aksSkuTier string = 'Standard'
+// ============== SKUs ==============
 @description('Specifies the name of the new machine learning studio resources')
 param name string
 param uniqueDepl string
@@ -245,6 +261,9 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists) {
     name: aksName // esml001-weu-prod
     tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
     location: location
+    skuName: aksSkuName
+    skuTier: aksSkuTier
+    aksExists:aksExists
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table    // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns'
     enableRbac: true
@@ -275,6 +294,9 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
     tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
     location: location
+    skuName: aksSkuName
+    skuTier: aksSkuTier
+    aksExists:aksExists
     kubernetesVersion: kubernetesVersionAndOrchestrator // az aks get-versions --location westeurope --output table  1.22.6 and 1.23.3(preview) // in Westeurope '1.21.2'  is not allowed/supported
     dnsPrefix: '${aksName}-dns' // 'aks-${projectName}-${locationSuffix}-${env}${prjResourceSuffix}'
     enableRbac: true
