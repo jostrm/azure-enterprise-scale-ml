@@ -48,6 +48,23 @@ param subnetProjAKS string = ''
 param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
 param subnetProjACA string = ''
+
+// Subnet existence flags
+@description('Specifies whether GenAI subnet already exists')
+param sntGenaiExists bool = false
+@description('Specifies whether ACA subnet already exists')
+param sntAcaExists bool = false
+@description('Specifies whether ACA002 subnet already exists')
+param sntAca002Exists bool = false
+@description('Specifies whether AKS subnet already exists')
+param sntAksExists bool = false
+@description('Specifies whether AKS002 subnet already exists')
+param sntAks002Exists bool = false
+@description('Specifies whether Databricks Private subnet already exists')
+param sntDatabricksPrivExists bool = false
+@description('Specifies whether Databricks Public subnet already exists')
+param sntDatabricksPubExists bool = false
+
 param DOCS_byovnet_example string = ''
 param DOCS_byosnet_common_example string = ''
 param DOCS_byosnet_project_example string = ''
@@ -78,7 +95,7 @@ var aksSubnetSettings =   {
     'Microsoft.CognitiveServices'
   ]
 }
-var aks2SubnetSettings =   {
+var aks2SubnetSettings =  {
   cidr: aks2SubnetCidr
   name: 'aks'
   delegations: []
@@ -89,7 +106,7 @@ var aks2SubnetSettings =   {
   ]
 }
 
-module nsgAKS '../modules/aksNsg.bicep' = {
+module nsgAKS '../modules/aksNsg.bicep' = if(!sntAksExists){
   name: 'aksNsgAKS-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'aks-nsg-${projectName}-${locationSuffix}-${env}' // AKS-NSG-PRJ001-EUS2-DEV in 'aks-nsg-prj001-eus2-dev'
@@ -97,7 +114,7 @@ module nsgAKS '../modules/aksNsg.bicep' = {
     tags:tags
   }
 }
-module nsgAKS2 '../modules/aksNsg.bicep' = if (!empty(aks2SubnetCidr)) {
+module nsgAKS2 '../modules/aksNsg.bicep' = if (!empty(aks2SubnetCidr) && !sntAks002Exists) {
   name: 'aks2Nsg-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'aks2-nsg-${projectName}-${locationSuffix}-${env}' // AKS-NSG-PRJ001-EUS2-DEV in 'aks-nsg-prj001-eus2-dev'
@@ -107,7 +124,7 @@ module nsgAKS2 '../modules/aksNsg.bicep' = if (!empty(aks2SubnetCidr)) {
 }
 
 
-module aksSnt '../modules/subnetWithNsg.bicep' = {
+module aksSnt '../modules/subnetWithNsg.bicep' = if(!sntAksExists){
   name: 'aks-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-aks'
@@ -123,7 +140,7 @@ module aksSnt '../modules/subnetWithNsg.bicep' = {
     nsgAKS
   ]
 }
-module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr)) {
+module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr) && !sntAks002Exists) {
   name: 'aks2-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-aks-002'
@@ -154,7 +171,7 @@ var genaiSubnetSettings =   {
   ]
 }
 
-module nsgGenAI '../modules/nsgGenAI.bicep' = {
+module nsgGenAI '../modules/nsgGenAI.bicep' = if(!sntGenaiExists){
   name: 'nsgGenAI-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'genai-nsg-${projectName}-${locationSuffix}-${env}'
@@ -163,7 +180,7 @@ module nsgGenAI '../modules/nsgGenAI.bicep' = {
   }
 }
 
-module genaiSnt '../modules/subnetWithNsg.bicep' = {
+module genaiSnt '../modules/subnetWithNsg.bicep' = if(!sntGenaiExists){
   name: 'genai-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-genai'
@@ -210,7 +227,7 @@ var aca2SubnetSettings =   {
   ]
 }
 
-module nsgAca '../modules/nsgGenAI.bicep' = {
+module nsgAca '../modules/nsgGenAI.bicep' = if(!sntAcaExists){
   name: 'nsgAca-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'aca-nsg-${projectName}-${locationSuffix}-${env}'
@@ -218,7 +235,7 @@ module nsgAca '../modules/nsgGenAI.bicep' = {
     tags:tags
   }
 }
-module nsg2Aca '../modules/nsgGenAI.bicep' = if (!empty(aca2SubnetCidr)) {
+module nsg2Aca '../modules/nsgGenAI.bicep' = if (!empty(aca2SubnetCidr) && !sntAca002Exists) {
   name: 'nsgAca2-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'aca2-nsg-${projectName}-${locationSuffix}-${env}'
@@ -226,7 +243,7 @@ module nsg2Aca '../modules/nsgGenAI.bicep' = if (!empty(aca2SubnetCidr)) {
     tags:tags
   }
 }
-module acaSnt '../modules/subnetWithNsg.bicep' = {
+module acaSnt '../modules/subnetWithNsg.bicep' = if(!sntAcaExists){
   name: 'acaSnet-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-aca'
@@ -244,7 +261,7 @@ module acaSnt '../modules/subnetWithNsg.bicep' = {
     genaiSnt
   ]
 }
-module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr)) {
+module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && !sntAca002Exists) {
   name: 'acaSnet2-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-aca-002'
@@ -290,7 +307,7 @@ var dataBricksPublicSubnetSettings =   {
   ]
 }
 
-module nsgDbx '../modules/databricksNsg.bicep' = {
+module nsgDbx '../modules/databricksNsg.bicep' = if(!empty(dbxPubSubnetCidr) && !sntDatabricksPubExists){
   name: 'dbxNsg-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'dbx-nsg-${projectName}-${locationSuffix}-${env}'
@@ -299,7 +316,7 @@ module nsgDbx '../modules/databricksNsg.bicep' = {
   }
 }
 
-module dbxPubSnt '../modules/subnetWithNsg.bicep' = {
+module dbxPubSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPubSubnetCidr) && !sntDatabricksPubExists){
   name: 'dbxpub-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-dbxpub'
@@ -321,7 +338,7 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = {
   ]
 }
 
-module dbxPrivSnt '../modules/subnetWithNsg.bicep' = {
+module dbxPrivSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPrivSubnetCidr) && !sntDatabricksPrivExists){
   name: 'dbxpriv-${deploymentProjSpecificUniqueSuffix}'
   params: {
     name: 'snt-${projectName}-dbxpriv'
