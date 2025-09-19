@@ -3,10 +3,10 @@ param name string
 // ============== SKUs ==============
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
-  'Basic'
+  'Base'
   'Standard'
 ])
-param skuName string = 'Basic'
+param skuName string = 'Base'
 
 @description('Specifies the SKU tier for the AKS cluster')
 @allowed([
@@ -55,7 +55,8 @@ param aksExists bool = false
 
 //skuName: 'basic' // basic -> 2023-02-01: 'base'
 //skuTier: 'paid' // free, paid -> 2023-02-01: free, standard
-resource aksCluster 'Microsoft.ContainerService/managedClusters@2021-03-01' = if(!aksExists) {
+// Microsoft.ContainerService/managedClusters@2021-03-01
+resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if(!aksExists) {
   name: name
   tags: tags
   location: location
@@ -78,7 +79,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2021-03-01' = if
       outboundType: outboundType // 'userDefinedRouting' if you want private IP
       serviceCidr: aksServiceCidr
       dnsServiceIP: aksDnsServiceIP
-      dockerBridgeCidr: '172.17.0.1/16'
+      //dockerBridgeCidr: '172.17.0.1/16'
       loadBalancerSku: 'standard'
     }
     apiServerAccessProfile: { // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
