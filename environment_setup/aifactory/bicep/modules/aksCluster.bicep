@@ -4,7 +4,7 @@ param name string
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
   'Base'
-  'Paid'
+  'Standard'
 ])
 param skuName string = 'Base'
 

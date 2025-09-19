@@ -18,7 +18,7 @@ param mlWorkspaceSkuTier string = 'basic'
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
   'Base'
-  'Paid'
+  'Standard'
 ])
 param aksSkuName string = 'Base'
 
