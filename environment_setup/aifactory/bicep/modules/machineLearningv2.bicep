@@ -2,7 +2,7 @@
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
   'Base' // Base managed cluster SKU name is invalid. 'Basic' has been replaced by 'Base' since v2023-02-01.
-  'Standard'
+  'Paid'
 ])
 param aksSkuName string = 'Base'
 
