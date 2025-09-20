@@ -52,6 +52,9 @@ param postGresAdminEmails string = ''
 @description('Add AI Foundry Hub with random naming for debugging/testing')
 param addAIFoundryHub bool = false
 
+@description('Add Azure Machine Learning with random naming for debugging/testing')
+param addAzureMachineLearning bool = false
+
 // ============== VARIABLES ==============
 var projectName = 'prj${projectNumber}'
 var cmnName = 'cmn'
@@ -114,7 +117,11 @@ var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${randomSalt}'), '-',
 var aifV2PrjName =take(replace(toLower('aif2p${uniqueInAIFenv}${randomSalt}'), '-', ''),12)
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
-var amlName = 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
+
+// Azure Machine Learning specific names with random naming option for debugging/testing
+// aml-001-eus2-dev-qoygy-001 (28) + 2 = 30
+var amlWithRandom = take('aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${aifRandom}${resourceSuffix}',64)
+var amlName = addAzureMachineLearning ? amlWithRandom : 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var safeNameAISearch = take(replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'), '-', ''), 64) // AzureAISearch4prj0025kxmv
 var aiServicesName = take(replace(toLower('aiservices${projectName}${locationSuffix}${env}${uniqueInAIFenv}${randomSalt}${prjResourceSuffixNoDash}'), '-', ''), 64) 
 

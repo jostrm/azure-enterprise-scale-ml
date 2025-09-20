@@ -29,7 +29,7 @@ param aksSkuName string = 'Base'
   'Premium'
 ])
 param aksSkuTier string = 'Standard'
-
+param addAzureMachineLearning bool = false
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
@@ -219,7 +219,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     aca2SubnetId: aca2SubnetId
     aks2SubnetId: aks2SubnetId
     technicalAdminsObjectID: technicalAdminsObjectID
-    technicalAdminsEmail: technicalAdminsEmail    
+    technicalAdminsEmail: technicalAdminsEmail
+    addAzureMachineLearning: addAzureMachineLearning
   }
 }
 

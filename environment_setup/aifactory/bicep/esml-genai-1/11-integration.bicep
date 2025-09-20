@@ -140,6 +140,8 @@ param vnetResourceGroup_param string = ''
 
 @description('Add AI Foundry Hub with random naming')
 param addAIFoundryHub bool = false
+@description('Add Azure Machine Learning with random naming for debugging/testing')
+param addAzureMachineLearning bool = false
 
 @description('Common resource group name prefix')
 param commonRGNamePrefix string = ''
@@ -226,6 +228,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     technicalAdminsObjectID: technicalAdminsObjectID
     technicalAdminsEmail: technicalAdminsEmail
     addAIFoundryHub: addAIFoundryHub
+    addAzureMachineLearning: addAzureMachineLearning
   }
 }
 
