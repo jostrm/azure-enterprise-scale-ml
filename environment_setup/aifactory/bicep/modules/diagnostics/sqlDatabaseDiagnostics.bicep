@@ -32,26 +32,14 @@ var goldMetrics = [
   {
     category: 'Basic'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'InstanceAndAppAdvanced'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'WorkloadManagement'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -59,18 +47,10 @@ var silverMetrics = [
   {
     category: 'Basic'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'InstanceAndAppAdvanced'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -78,10 +58,6 @@ var bronzeMetrics = [
   {
     category: 'Basic'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 
@@ -89,74 +65,38 @@ var goldLogs = [
   {
     category: 'SQLInsights'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'AutomaticTuning'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'QueryStoreRuntimeStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'QueryStoreWaitStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'Errors'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DatabaseWaitStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'Timeouts'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'Blocks'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'Deadlocks'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -164,42 +104,22 @@ var silverLogs = [
   {
     category: 'SQLInsights'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'QueryStoreRuntimeStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'Errors'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'Timeouts'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'Deadlocks'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -207,18 +127,10 @@ var bronzeLogs = [
   {
     category: 'Errors'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
   {
     category: 'Timeouts'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 

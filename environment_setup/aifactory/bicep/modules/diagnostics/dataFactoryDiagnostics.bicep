@@ -29,10 +29,6 @@ var goldMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -40,10 +36,6 @@ var silverMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -51,10 +43,6 @@ var bronzeMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 
@@ -62,90 +50,46 @@ var goldLogs = [
   {
     category: 'ActivityRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'PipelineRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'TriggerRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SandboxPipelineRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SandboxActivityRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SSISPackageEventMessages'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SSISPackageExecutableStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SSISPackageEventMessageContext'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SSISPackageExecutionComponentPhases'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SSISPackageExecutionDataStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'SSISIntegrationRuntimeLogs'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -153,42 +97,22 @@ var silverLogs = [
   {
     category: 'ActivityRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'PipelineRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'TriggerRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'SSISPackageEventMessages'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'SSISIntegrationRuntimeLogs'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -196,18 +120,10 @@ var bronzeLogs = [
   {
     category: 'ActivityRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
   {
     category: 'PipelineRuns'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 

@@ -29,10 +29,6 @@ var goldMetrics = [
   {
     category: 'Requests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -40,10 +36,6 @@ var silverMetrics = [
   {
     category: 'Requests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -51,10 +43,6 @@ var bronzeMetrics = [
   {
     category: 'Requests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 
@@ -62,74 +50,38 @@ var goldLogs = [
   {
     category: 'DataPlaneRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'QueryRuntimeStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'PartitionKeyStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'PartitionKeyRUConsumption'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'ControlPlaneRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'CassandraRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'GremlinRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'MongoRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'TableApiRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -137,34 +89,18 @@ var silverLogs = [
   {
     category: 'DataPlaneRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'QueryRuntimeStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'PartitionKeyStatistics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'ControlPlaneRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -172,18 +108,10 @@ var bronzeLogs = [
   {
     category: 'DataPlaneRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
   {
     category: 'ControlPlaneRequests'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 

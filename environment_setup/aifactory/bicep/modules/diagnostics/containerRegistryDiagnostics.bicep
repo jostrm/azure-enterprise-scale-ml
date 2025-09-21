@@ -29,10 +29,6 @@ var goldMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -40,10 +36,6 @@ var silverMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -51,10 +43,6 @@ var bronzeMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 
@@ -62,18 +50,10 @@ var goldLogs = [
   {
     category: 'ContainerRegistryRepositoryEvents'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'ContainerRegistryLoginEvents'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -81,18 +61,10 @@ var silverLogs = [
   {
     category: 'ContainerRegistryRepositoryEvents'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'ContainerRegistryLoginEvents'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -100,10 +72,6 @@ var bronzeLogs = [
   {
     category: 'ContainerRegistryLoginEvents'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 

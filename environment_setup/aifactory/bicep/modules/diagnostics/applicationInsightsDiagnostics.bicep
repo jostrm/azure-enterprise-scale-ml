@@ -29,10 +29,6 @@ var goldMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -40,10 +36,6 @@ var silverMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -51,10 +43,6 @@ var bronzeMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 
@@ -62,10 +50,6 @@ var goldLogs = [
   {
     categoryGroup: 'allLogs'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -73,10 +57,6 @@ var silverLogs = [
   {
     categoryGroup: 'audit'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -84,10 +64,6 @@ var bronzeLogs = [
   {
     categoryGroup: 'audit'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 

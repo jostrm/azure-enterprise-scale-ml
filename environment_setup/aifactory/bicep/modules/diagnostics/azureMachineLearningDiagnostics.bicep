@@ -29,10 +29,6 @@ var goldMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -40,10 +36,6 @@ var silverMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -51,10 +43,6 @@ var bronzeMetrics = [
   {
     category: 'AllMetrics'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 
@@ -62,194 +50,98 @@ var goldLogs = [
   {
     category: 'AmlComputeClusterEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'AmlComputeClusterNodeEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'AmlComputeJobEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'AmlComputeCpuGpuUtilization'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'AmlRunStatusChangedEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'ModelsChangeEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'ModelsReadEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'ModelsActionEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DeploymentReadEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DeploymentEventACI'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DeploymentEventAKS'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'InferencingOperationAKS'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'InferencingOperationACI'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DataLabelChangeEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DataLabelReadEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'ComputeInstanceEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DataStoreChangeEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DataStoreReadEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DataSetChangeEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'DataSetReadEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'PipelineChangeEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'PipelineReadEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'RunEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
   {
     category: 'RunReadEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 90
-    }
   }
 ]
 
@@ -257,66 +149,34 @@ var silverLogs = [
   {
     category: 'AmlComputeClusterEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'AmlComputeJobEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'AmlRunStatusChangedEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'ModelsChangeEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'DeploymentEventAKS'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'InferencingOperationAKS'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'ComputeInstanceEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
   {
     category: 'RunEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 30
-    }
   }
 ]
 
@@ -324,26 +184,14 @@ var bronzeLogs = [
   {
     category: 'AmlComputeClusterEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
   {
     category: 'AmlRunStatusChangedEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
   {
     category: 'RunEvent'
     enabled: true
-    retentionPolicy: {
-      enabled: true
-      days: 7
-    }
   }
 ]
 
