@@ -370,11 +370,13 @@ if ($(Get-AzContext).Subscription -ne "") {
         elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
             write-host "projectTypeADO=all"
             $requiredSubnets = [PsObject]@{
-                genaiSubnetCidr  = '25'
+                genaiSubnetCidr   = '25'
                 aksSubnetCidr     = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 aks2SubnetCidr    = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 acaSubnetCidr     = '25' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
                 aca2SubnetCidr    = '24' # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment.
+                dbxPubSubnetCidr  = '26' # 23-26
+                dbxPrivSubnetCidr = '26' # 23-26
             }
         }
         else {
