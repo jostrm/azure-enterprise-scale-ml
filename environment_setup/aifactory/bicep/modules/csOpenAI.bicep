@@ -135,10 +135,6 @@ resource openAIDiagSettingsOpenAI 'Microsoft.Insights/diagnosticSettings@2021-05
       {
         categoryGroup: 'allLogs'
         enabled: true
-        retentionPolicy: {
-          enabled: false
-          days: 0
-        }
       }
     ]
     logAnalyticsDestinationType: null
