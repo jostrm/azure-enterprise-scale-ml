@@ -461,7 +461,7 @@ module databricks 'br/public:avm/res/databricks/workspace:0.11.4' = if(!databric
     disablePublicIp: !enablePublicAccessWithPerimeter
     publicNetworkAccess: enablePublicAccessWithPerimeter? 'Enabled':'Disabled'
     // Set correct NSG rules based on public network access
-    requiredNsgRules: enablePublicAccessWithPerimeter ? 'AllRules' : 'NoAzureDatabricksRules'
+    requiredNsgRules: enablePublicAccessWithPerimeter ? 'AllRules' : 'NoAzureDatabricksRules' // NoAzureServiceRules for internal use only, NoAzureDatabricksRules for private, AllRules: public
     // Link to AML workspace if deployed in same run
     amlWorkspaceResourceId: (!amlExists && enableAzureMachineLearning) ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.MachineLearningServices/workspaces', amlName) : ''
   }
