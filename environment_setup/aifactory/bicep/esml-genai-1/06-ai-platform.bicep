@@ -28,7 +28,6 @@ param resourceSuffix string
 // Resource exists flags from Azure DevOps
 param aiHubExists bool = false
 param aifProjectExists bool = false
-param aiFoundryV2Exists bool = false
 param miPrjExists bool = false
 
 // Enable flags from parameter files

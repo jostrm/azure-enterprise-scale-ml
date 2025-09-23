@@ -1,19 +1,15 @@
 trigger:
   branches:
     include:
-      - release/project*
-      - main
-
+      - project*
 variables:
   - template: ../variables/variables.yaml
-
 stages:
 - stage: Dev_GenAI_Project
   displayName: Dev GenAI Project
   variables:
     dev_test_prod: "dev"
     dev_test_prod_sub_id: "$(dev_sub_id)"
-    admin_projectType: "genai-1"
     network_env: "$(network_env_dev)"
   jobs:
     - deployment: ESGenAI_Networking
@@ -55,10 +51,27 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+              # Record the result of the initial deploy attempt (same pattern as Stage/Prod)
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = true if previous deploy failed'
+                condition: failed()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    Write-Host "##vso[task.setvariable variable=lastAttemptFailed]true"
+                    Write-Host "Initial deploy failed -> lastAttemptFailed=true"
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = false if previous deploy succeeded'
+                condition: succeeded()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    Write-Host "##vso[task.setvariable variable=lastAttemptFailed]false"
+                    Write-Host "Initial deploy succeeded -> lastAttemptFailed=false"
               # First Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 2)
               - task: PowerShell@2
                 displayName: 'Wait before retry 1'
-                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
+                condition: and(eq(variables['lastAttemptFailed'], 'true'), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
                 inputs:
                   targetType: 'inline'
                   script: |
@@ -66,55 +79,35 @@ stages:
                     $retrySeconds = [int]$retryMinutes * 60
                     Write-Host "Attempt 1 failed. Waiting $retryMinutes minutes ($retrySeconds seconds) before retry 1..."
                     
-                    # Set debug variables for retry attempt - skip resource-intensive tasks
-                    Write-Host "Setting debug variables (all except debug_disable_10_aifactory_dashboards,debug_disable_67_ml_platform) to be ENABLED for NEW attempt..."
-                    echo "##vso[task.setvariable variable=debug_disable_05_build_acr_image]false"
-                    echo "##vso[task.setvariable variable=debug_disable_61_foundation]false" 
-                    echo "##vso[task.setvariable variable=debug_disable_62_core_infrastructure]false"
-                    echo "##vso[task.setvariable variable=debug_disable_63_cognitive_services]false"
-                    echo "##vso[task.setvariable variable=debug_disable_64_databases]false"
-                    echo "##vso[task.setvariable variable=debug_disable_65_compute_services]false"
-                    echo "##vso[task.setvariable variable=debug_disable_66_ai_platform]false"
-                    echo "##vso[task.setvariable variable=debug_disable_67_ml_platform]true"
-                    echo "##vso[task.setvariable variable=debug_disable_68_rbac_security]false"
-                    echo "##vso[task.setvariable variable=debug_disable_69_aifoundry_2025]false"
-                    echo "##vso[task.setvariable variable=debug_disable_10_aifactory_dashboards]true"
-                    Write-Host "Debug variables set for retry robustness."
-
                     Start-Sleep -Seconds $retrySeconds
                     Write-Host "Wait completed. Starting retry attempt 1..."
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+              # Record the result of the retry attempt so the next (final) retry only runs when this attempt failed
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed based on Agent.JobStatus (retry 1)'
+                condition: always()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    Write-Host "Agent.JobStatus = '$(Agent.JobStatus)'"
+                    if ("$(Agent.JobStatus)" -eq 'Failed') {
+                      echo "##vso[task.setvariable variable=lastAttemptFailed]true"
+                    } else {
+                      echo "##vso[task.setvariable variable=lastAttemptFailed]false"
+                    }
               # Second Retry: Extended wait and retry on failure (if enabled and maxRetryAttempts >= 3)
               - task: PowerShell@2
                 displayName: 'Extended wait before retry 2'
-                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
+                condition: and(eq(variables['lastAttemptFailed'], 'true'), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
                 inputs:
                   targetType: 'inline'
                   script: |
                     $retryMinutesExtended = "$(retryMinutesExtended)"
                     $retrySeconds = [int]$retryMinutesExtended * 60
                     Write-Host "Attempt 2 failed. Waiting $retryMinutesExtended minutes ($retrySeconds seconds) before final retry..."
-                    
-                    Write-Host "Attempt 1 failed. Waiting $retryMinutes minutes ($retrySeconds seconds) before retry 1..."
-                    
-                    # Set debug variables for retry attempt - skip resource-intensive tasks
-                    Write-Host "DISABLE: 05,61,62 to optimize NEW attempt..."
-                    echo "##vso[task.setvariable variable=debug_disable_05_build_acr_image]true"
-                    echo "##vso[task.setvariable variable=debug_disable_61_foundation]true" 
-                    echo "##vso[task.setvariable variable=debug_disable_62_core_infrastructure]true"
-                    echo "##vso[task.setvariable variable=debug_disable_63_cognitive_services]false"
-                    echo "##vso[task.setvariable variable=debug_disable_64_databases]false"
-                    echo "##vso[task.setvariable variable=debug_disable_65_compute_services]false"
-                    echo "##vso[task.setvariable variable=debug_disable_66_ai_platform]false"
-                    echo "##vso[task.setvariable variable=debug_disable_67_ml_platform]true"
-                    echo "##vso[task.setvariable variable=debug_disable_68_rbac_security]false"
-                    echo "##vso[task.setvariable variable=debug_disable_69_aifoundry_2025]false"
-                    echo "##vso[task.setvariable variable=debug_disable_10_aifactory_dashboards]true"
-                    Write-Host "Debug variables set for retry optimization."
-
                     Start-Sleep -Seconds $retrySeconds
                     Write-Host "Extended wait completed. Starting final retry attempt..."
               - template: ./jobs/job-2-genai-services.yaml
@@ -123,11 +116,11 @@ stages:
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
 - stage: Stage_GenAI_Project
   displayName: Stage GenAI Project
-  condition: ne(variables['Build.SourceBranch'], 'refs/heads/main')
+  condition: and(ne(variables['Build.SourceBranch'], 'refs/heads/main'), succeeded('Dev_GenAI_Project'), eq(variables['deployToStage'], 'true'))
+  dependsOn: Dev_GenAI_Project
   variables:
     dev_test_prod: "test"
     dev_test_prod_sub_id: "$(test_sub_id)"
-    admin_projectType: "genai-1"
     network_env: "$(network_env_stage)"
   jobs:
     - deployment: ESGenAI_Networking
@@ -169,10 +162,25 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+              # Record the result of the last deploy attempt in a variable so retries only trigger when that specific attempt failed
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = true if previous deploy failed'
+                condition: failed()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]true"
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = false if previous deploy succeeded'
+                condition: succeeded()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]false"
               # First Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 2)
               - task: PowerShell@2
                 displayName: 'Wait before retry 1'
-                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
+                condition: and(eq(variables['lastAttemptFailed'], 'true'), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
                 inputs:
                   targetType: 'inline'
                   script: |
@@ -185,10 +193,25 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+              # Record the result of the retry attempt so the next retry only runs when this attempt failed
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = true if retry 1 failed'
+                condition: failed()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]true"
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = false if retry 1 succeeded'
+                condition: succeeded()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]false"
               # Second Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 3)
               - task: PowerShell@2
                 displayName: 'Wait before retry 2'
-                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
+                condition: and(eq(variables['lastAttemptFailed'], 'true'), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
                 inputs:
                   targetType: 'inline'
                   script: |
@@ -201,13 +224,28 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+              # Record the result of the final retry attempt (optional)
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = true if final retry failed'
+                condition: failed()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]true"
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = false if final retry succeeded'
+                condition: succeeded()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]false"
 - stage: Prod_GenAI_Project
   displayName: Prod GenAI Project
-  condition: ne(variables['Build.SourceBranch'], 'refs/heads/main')
+  condition: and(ne(variables['Build.SourceBranch'], 'refs/heads/main'), succeeded('Stage_GenAI_Project'), eq(variables['deployToProd'], 'true'))
+  dependsOn: Stage_GenAI_Project
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"
-    admin_projectType: "genai-1"
     network_env: "$(network_env_prod)"
   jobs:
     - deployment: ESGenAI_Networking
@@ -240,7 +278,6 @@ stages:
       variables:
         dev_test_prod: "prod"
         dev_test_prod_sub_id: "$(prod_sub_id)"
-        admin_projectType: "genai-1"
         network_env: "$(network_env_prod)"
       strategy:
         runOnce:
@@ -254,10 +291,25 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+              # Record the result of the last deploy attempt in a variable so retries only trigger when that specific attempt failed
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = true if previous deploy failed'
+                condition: failed()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]true"
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = false if previous deploy succeeded'
+                condition: succeeded()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]false"
               # First Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 2)
               - task: PowerShell@2
                 displayName: 'Wait before retry 1'
-                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
+                condition: and(eq(variables['lastAttemptFailed'], 'true'), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '2'))
                 inputs:
                   targetType: 'inline'
                   script: |
@@ -270,10 +322,25 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+              # Record the result of the retry attempt so the next (final) retry only runs when this attempt failed
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = true if retry 1 failed'
+                condition: failed()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]true"
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = false if retry 1 succeeded'
+                condition: succeeded()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]false"
               # Second Retry: Wait and retry on failure (if enabled and maxRetryAttempts >= 3)
               - task: PowerShell@2
                 displayName: 'Wait before retry 2'
-                condition: and(failed(), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
+                condition: and(eq(variables['lastAttemptFailed'], 'true'), eq(variables['enableRetries'], 'true'), ge(variables['maxRetryAttempts'], '3'))
                 inputs:
                   targetType: 'inline'
                   script: |
@@ -286,3 +353,18 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+              # Record the result of the final retry attempt (optional)
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = true if final retry failed'
+                condition: failed()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]true"
+              - task: PowerShell@2
+                displayName: 'Set lastAttemptFailed = false if final retry succeeded'
+                condition: succeeded()
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    echo "##vso[task.setvariable variable=lastAttemptFailed]false"

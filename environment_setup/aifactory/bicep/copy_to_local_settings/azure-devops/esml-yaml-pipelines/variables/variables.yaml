@@ -36,10 +36,9 @@ variables:
 
   # ============================================================================
   # OPTIONALLY (CHANGE ONCE) - Naming convention, on resource group
-  # 
   # ============================================================================
-  projectPrefix: '' # mrvel-1-[esml-]project001-eus2-dev-008-rg "" -> mrvel-1-project001-eus2-dev-008-rg
-  projectSuffix: '' # mrvel-1-esml-project001-eus2-dev-008[-rg] -> mrvel-1-project001-eus2-dev-008
+  projectPrefix: 'esml-' # mrvel-1-[esml-]project001-eus2-dev-008-rg "" -> mrvel-1-project001-eus2-dev-008-rg
+  projectSuffix: '-rg' # mrvel-1-esml-project001-eus2-dev-008[-rg] -> mrvel-1-project001-eus2-dev-008
 
   # ============================================================================
   # MANDATORY(CHANGE ONCE):BASE PARAMETERS: v1.22 updates: Moved from .json to this YAML
@@ -183,50 +182,57 @@ variables:
   # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
   
-  # AI Foundry 2023-2025+
+  # === AI Foundry 2023-2025+ ===
   enableAIServices: "true" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
   enableAIFoundryHub: "true" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
-
-  # AI Foundry 2025->
-  enableAIFoundryV21: "true" # Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
-  updateAIFoundryV21: "false" # Enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false meand "CreateIfNotExists"
+  addAIFoundryHub: "false"  # Add new AI Foundry Hub with project, with a new random name (Solution, if deletion, and Enterprise application is not deleted as it should)
+  # === AI foundry 2025 ===
+  enableAIFoundryV21: "true" # AI Foundry with default project. Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
+  updateAIFoundryV21: "true" # true, enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false means "CreateIfNotExists"
   addAIFoundryV21: "false" # Add new AI foundry with project, with a new random name (can be used for debugging, or running pipeline twice directly, not wating for deletion)
   enableAFoundryCaphost: "false" # Ensures Agents metadata, and history/threads is saved in your subscription and network, using CosmosDB, Storage, AI Search
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # true, only connections is created to AIFactory created services. false, Azure will create a default project, with additional CosmosDB, Storage Account, AI Search, and connections
   disableAgentNetworkInjection: "true" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
-  # AI Foundry 2025, END
+  # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
+  # NetworkInjection -> Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
 
-  # More info: disableAgentNetworkInjection: Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
-  # Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
-    
+  # === Data & Machine Learning ===
+  enableDatafactory: "false" # Datafactory
+  enableAzureMachineLearning: "false" # Azure Machine Learning v2 (TODO Databricks, EventHubs, LA)
+  addAzureMachineLearning: "false"
+  enableDatabricks: "false"
+  # === Cognitive Services ===
   enableAISearch: "true"
-  enableAzureMachineLearning: "false" # TODO: AML, Databricks, ADF, EventHubs
-  serviceSettingDeployAzureOpenAI: "false"
-  serviceSettingDeployAzureAIVision: "false"
-  serviceSettingDeployAzureSpeech: "false"
-  serviceSettingDeployAIDocIntelligence: "false"
-  serviceSettingDeployCosmosDB: "true" # true, if creating an own Capability host (enableAFoundryCaphost; "true"), then it is needed for AI Foundry V2 project, agents.
+  enableAzureOpenAI: "false"
+  enableAzureAIVision: "false"
+  enableAzureSpeech: "false"
+  enableAIDocIntelligence: "false"
+  # === Databases ===
+  enableCosmosDB: "false" # true, if creating an own Capability host (enableAFoundryCaphost; "true"), then it is needed for AI Foundry V2 project, agents.
   cosmosKind: "GlobalDocumentDB" # "MongoDB", "GlobalDocumentDB"
-  serviceSettingDeployPostgreSQL: "false"
-  postGresAdminEmails: "" # pass a commaseparated list of email addresses. or a single email address
-  serviceSettingDeployRedisCache: "false"
-  serviceSettingDeploySQLDatabase: "false"
-  
-  serviceSettingDeployFunction: "false"
+  enablePostgreSQL: "false"
+  postGresAdminEmails: "MngEnvMCAP806050.onmicrosoft.com" # pass a commaseparated list of email addresses. or a single email address
+  enableRedisCache: "false"
+  enableSQLDatabase: "false"
+  # === WebApp ===
+  enableFunction: "false"
   functionRuntime: "dotnet"
   functionVersion: "v7.0"
-  
-  serviceSettingDeployWebApp: "false"
+  # === Azure function ===
+  enableWebApp: "false"
   webAppRuntime: "python"
   webAppRuntimeVersion: "3.11"
   aseSku: "IsolatedV2"
   aseSkuCode: "I1v2"
   aseSkuWorkers: 1
-  
-  serviceSettingDeployContainerApps: "false"
-  serviceSettingDeployAppInsightsDashboard: "false"
-  aca_a_registry_image: # "containerapps-default:latest"
-  aca_w_registry_image: #"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  # === Container Apps ===
+  enableContainerApps: "false"
+  enableAppInsightsDashboard: "false"
+  # aca_a_registry_image: "containerapps-default:latest"
+  aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  # === Integration ===
+  enableLogicApps: "false"
+  enableEventHubs: "false"
     
   # ============================================================================
   # MANDATORY (POST SETUP of a PROJECT): runNetworkingVar
@@ -270,7 +276,7 @@ variables:
   admin_aks_gpu_sku_test_prod_override: "Standard_DS13-2_v2"
   admin_aks_nodes_dev_override: 1
   admin_aks_nodes_testProd_override: 3
-  admin_aks_version_override: "1.30.3" # AKS version. SDC: "1.30.3" | EUS: "1.30.3"
+  admin_aks_version_override: "1.33.2" # AKS version. SDC: "1.30.3" | EUS: "1.30.3"
   admin_aml_cluster_maxNodes_dev_override: 3
   admin_aml_cluster_maxNodes_testProd_override: 5
   admin_aml_cluster_sku_dev_override: "Standard_DS3_v2"
@@ -286,7 +292,7 @@ variables:
   modelGPTXSku: "DataZoneStandard" # ['Standard','DataZoneStandard','GlobalStandard']
   modelGPTXCapacity: 30 # TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K
 
-  deployModel_text_embedding_ada_002: "true"
+  deployModel_text_embedding_ada_002: "false"
   deployModel_text_embedding_3_large: "true"
   deployModel_text_embedding_3_small: "false"
   default_embedding_capacity: 25
@@ -322,7 +328,9 @@ variables:
   # DOCS_byosnet_project_example: "acme-<network_env>prj<xxx>-genai-eus2-subnet"
   subnetProjGenAI: ""
   subnetProjAKS: ""
+  subnetProjAKS2: ""
   subnetProjACA: ""
+  subnetProjACA2: ""
   subnetProjDatabricksPublic: ""
   subnetProjDatabricksPrivate: ""
   byoASEv3: "false"
@@ -340,7 +348,7 @@ variables:
   debug_disable_64_databases: "false" # CosmosDB, SQL Database, ...
   debug_disable_65_compute_services: "false" # ContainerApps, WebApp, FunctionApp
   debug_disable_66_ai_platform: "false" # AI Foundry Hub (V1) with default project, and connections to AISearch, Storage, ...
-  debug_disable_67_ml_platform: "true" # Azure Machine Learning, Datafactory, Databricks§
+  debug_disable_67_ml_platform: "false" # Azure Machine Learning, Datafactory, Databricks§
   debug_disable_68_rbac_security: "false" # RBAC for 61-67
   debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage)
   debug_disable_10_aifactory_dashboards: "true" # AI Factory Dashboards

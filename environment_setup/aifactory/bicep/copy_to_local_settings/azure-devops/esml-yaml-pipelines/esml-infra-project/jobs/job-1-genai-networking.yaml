@@ -4,12 +4,128 @@ parameters:
   - name: serviceConnectionSeeding
     type: string
 steps:
-- checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
-  submodules: true # set to 'true' for a single level of submodules or 'recursive' to get submodules of submodules. Default is not to fetch submodules.
-  continueOnError: false # Continue running even on failure?.  (false,n,no,off,on,true,y,yes)
-  displayName: GIT # Human-readable name for the task. 
-  enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
-  name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
+- task: AzureCLI@2
+  displayName: '00_validate_project_subnet_exists'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      # Construct subnet name based on project number
+      PROJECT_SUBNET_NAME="snt-prj$(project_number_000)-aks"
+      echo "Checking for subnet: $PROJECT_SUBNET_NAME"
+      
+      # Get vnet information from variables, with fallback to naming convention
+      VNET_NAME="$(vnetNameFull_param)"
+      VNET_RG="$(vnetResourceGroup_param)"
+      
+      # If VNET variables are not set, use naming convention
+      if [ -z "$VNET_NAME" ] || [ "$VNET_NAME" = "$(vnetNameFull_param)" ]; then
+        VNET_NAME="vnt-esmlcmn-$(admin_locationSuffix)-$(dev_test_prod)-001"
+        echo "VNET name not set, using naming convention: $VNET_NAME"
+      fi
+      
+      if [ -z "$VNET_RG" ] || [ "$VNET_RG" = "$(vnetResourceGroup_param)" ]; then
+        # Use the common resource group naming convention
+        VNET_RG="$(admin_aifactoryPrefixRG)esml-common-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "VNET resource group not set, using naming convention: $VNET_RG"
+      fi
+      
+      echo "VNET Name: $VNET_NAME"
+      echo "VNET Resource Group: $VNET_RG"
+      
+      # First check if VNET exists
+      if ! az network vnet show --name "$VNET_NAME" --resource-group "$VNET_RG" &> /dev/null; then
+        echo "❌ ERROR: VNET '$VNET_NAME' does not exist in resource group '$VNET_RG'"
+        echo "Please ensure the common networking infrastructure is deployed first."
+        exit 1
+      fi
+      
+      # Check if project AKS subnet exists
+      if az network vnet subnet show --name "$PROJECT_SUBNET_NAME" --vnet-name "$VNET_NAME" --resource-group "$VNET_RG" &> /dev/null; then
+        echo "ℹ️ INFO: Some subnets for project $(project_number_000) already exist. I will add subnets if not exists, but not touch existing."
+        echo ""
+        echo "Found existing subnet: $PROJECT_SUBNET_NAME"
+        echo "Target VNET: $VNET_NAME"
+        echo "Target Resource Group: $VNET_RG"
+        echo ""
+        echo "Options:"
+        echo "1. If you want to recrease all subnets - delete existing subnets before re-running this pipeline"
+        echo "2. If you dont want to touch ANY subnets, and not add any potential new ones, set variable 'runNetworkingVar' to 'false' in VARIABLES.YAML, and this JOB will be skipped next time"
+        echo ""
+        exit 0
+      else
+        echo "✅ Subnet '$PROJECT_SUBNET_NAME' does not exist. Proceeding with subnet creation, with create if not EXISTS logic."
+      fi
+- task: PowerShell@2
+  displayName: '00_check_submodule_and_paths'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "=== CHECKING SUBMODULE AND PATHS ==="
+      Write-Host "Current directory: $(Get-Location)"
+      Write-Host "Working directory: $(System.DefaultWorkingDirectory)"
+      
+      # Change to the repository root
+      Set-Location "$(System.DefaultWorkingDirectory)"
+      Write-Host "Changed to: $(Get-Location)"
+      
+      # Check if .gitmodules exists
+      if (Test-Path ".gitmodules") {
+        Write-Host "✅ .gitmodules file found"
+        Write-Host "Contents of .gitmodules:"
+        Get-Content ".gitmodules"
+        
+        # Check if submodule directory exists
+        if (Test-Path "azure-enterprise-scale-ml") {
+          Write-Host "✅ azure-enterprise-scale-ml directory exists"
+          
+          # Check if the required script path exists
+          $scriptPath = "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts"
+          if (Test-Path $scriptPath) {
+            Write-Host "✅ Scripts directory exists: $scriptPath"
+            Write-Host "Contents of scripts directory:"
+            Get-ChildItem $scriptPath | Format-Table Name
+            
+            $subnetScriptPath = "$scriptPath/subnetCalc_v2.ps1"
+            if (Test-Path $subnetScriptPath) {
+              Write-Host "✅ subnetCalc_v2.ps1 script exists"
+            } else {
+              Write-Host "❌ subnetCalc_v2.ps1 script NOT found"
+              Write-Host "Available PowerShell scripts in directory:"
+              Get-ChildItem $scriptPath -Filter "*.ps1" | Format-Table Name
+            }
+          } else {
+            Write-Host "❌ Scripts directory NOT found: $scriptPath"
+            Write-Host "Contents of azure-enterprise-scale-ml:"
+            Get-ChildItem "azure-enterprise-scale-ml" | Format-Table Name, IsDirectory
+          }
+        } else {
+          Write-Host "❌ azure-enterprise-scale-ml directory NOT found"
+          Write-Host "Attempting manual submodule initialization..."
+          
+          git submodule init
+          git submodule update --recursive
+          
+          if (Test-Path "azure-enterprise-scale-ml") {
+            Write-Host "✅ Submodule successfully initialized"
+          } else {
+            Write-Host "❌ Failed to initialize submodule"
+            exit 1
+          }
+        }
+      } else {
+        Write-Host "❌ .gitmodules file NOT found"
+        exit 1
+      }
+      
+      Write-Host "Final directory contents:"
+      Get-ChildItem | Format-Table Name, IsDirectory
+      Write-Host "=== END SUBMODULE CHECK ==="
 
 - task: AzureCLI@2
   displayName: '00_pwsh_print_info'
@@ -119,6 +235,68 @@ steps:
       $override | ConvertTo-Json -Depth 5 | Out-File "$tempDir/temp-override.json" -Encoding UTF8
       
       Write-Host "Temporary JSON files created successfully"
+
+- task: PowerShell@2
+  displayName: '03c_validate_script_paths_before_execution'
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "=== VALIDATING PATHS BEFORE SCRIPT EXECUTION ==="
+      
+      $workingDir = "$(System.DefaultWorkingDirectory)"
+      $scriptPath = "$workingDir/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts"
+      $subnetScript = "$scriptPath/subnetCalc_v2.ps1"
+      
+      Write-Host "Working Directory: $workingDir"
+      Write-Host "Expected Script Path: $scriptPath"
+      Write-Host "Expected Script File: $subnetScript"
+      
+      # Check if working directory exists and show contents
+      if (Test-Path $workingDir) {
+        Write-Host "✅ Working directory exists"
+        Write-Host "Contents of working directory:"
+        Get-ChildItem $workingDir | Format-Table Name, IsDirectory
+      } else {
+        Write-Host "❌ Working directory does not exist: $workingDir"
+        exit 1
+      }
+      
+      # Check if azure-enterprise-scale-ml exists
+      $submodulePath = "$workingDir/azure-enterprise-scale-ml"
+      if (Test-Path $submodulePath) {
+        Write-Host "✅ Submodule directory exists: $submodulePath"
+      } else {
+        Write-Host "❌ Submodule directory does not exist: $submodulePath"
+        exit 1
+      }
+      
+      # Check if script directory exists
+      if (Test-Path $scriptPath) {
+        Write-Host "✅ Script directory exists: $scriptPath"
+        Write-Host "Contents of script directory:"
+        Get-ChildItem $scriptPath | Format-Table Name
+      } else {
+        Write-Host "❌ Script directory does not exist: $scriptPath"
+        Write-Host "Available paths in environment_setup/aifactory/bicep:"
+        $bicepPath = "$workingDir/azure-enterprise-scale-ml/environment_setup/aifactory/bicep"
+        if (Test-Path $bicepPath) {
+          Get-ChildItem $bicepPath | Format-Table Name, IsDirectory
+        }
+        exit 1
+      }
+      
+      # Check if the specific script exists
+      if (Test-Path $subnetScript) {
+        Write-Host "✅ subnetCalc_v2.ps1 script exists: $subnetScript"
+      } else {
+        Write-Host "❌ subnetCalc_v2.ps1 script does not exist: $subnetScript"
+        Write-Host "Available PowerShell scripts:"
+        Get-ChildItem $scriptPath -Filter "*.ps1" | Format-Table Name
+        exit 1
+      }
+      
+      Write-Host "=== ALL PATHS VALIDATED SUCCESSFULLY ==="
+
 - task: AzurePowerShell@4
   displayName: '04_pwsh_calculate_subnet_allocations'
   inputs:
@@ -127,7 +305,76 @@ steps:
     ScriptArguments: '-filePath "../../../../../aifactory/parameters/" -spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -useServicePrincipal -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_param)" -vnetNameFull_param "$(vnetNameFull_param)"'
     pwsh: true
     azurePowerShellVersion: 'LatestVersion' # 'LatestVersion' | 'OtherVersion' 
+    # preferredAzurePowerShellVersion: # ['4.251.1',' 5.251.1'] is downloaded.  This works on other pipeline: '4.248.1'. AllowClobber worked.
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
+- task: AzureCLI@2
+  displayName: '04b_check_subnet_exists_for_project'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      # Input parameters
+      projectNumber="$(project_number_000)"
+      
+      # Get vnet information from variables, with fallback to naming convention
+      VNET_NAME="$(vnetNameFull_param)"
+      VNET_RG="$(vnetResourceGroup_param)"
+      
+      # If VNET variables are not set, use naming convention
+      if [ -z "$VNET_NAME" ] || [ "$VNET_NAME" = "$(vnetNameFull_param)" ]; then
+        VNET_NAME="vnt-esmlcmn-$(admin_locationSuffix)-$(dev_test_prod)-001"
+        echo "VNET name not set, using naming convention: $VNET_NAME"
+      fi
+      
+      if [ -z "$VNET_RG" ] || [ "$VNET_RG" = "$(vnetResourceGroup_param)" ]; then
+        # Use the common resource group naming convention
+        VNET_RG="$(admin_aifactoryPrefixRG)esml-common-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "VNET resource group not set, using naming convention: $VNET_RG"
+      fi
+      
+      echo "Checking subnet existence in VNET: $VNET_NAME"
+      echo "VNET Resource Group: $VNET_RG"
+      echo "Project Number: $projectNumber"
+      
+      # Define subnet names based on naming convention: snt-prj[project_number_000]-[type]-[instance]
+      SNT_GENAI="snt-prj${projectNumber}-genai"
+      SNT_ACA="snt-prj${projectNumber}-aca"
+      SNT_ACA_002="snt-prj${projectNumber}-aca-002"
+      SNT_AKS="snt-prj${projectNumber}-aks"
+      SNT_AKS_002="snt-prj${projectNumber}-aks-002"
+      SNT_DATABRICKS_PRIV="snt-prj${projectNumber}-dbxpriv"
+      SNT_DATABRICKS_PUB="snt-prj${projectNumber}-dbxpub"
+      
+      # Function to check if subnet exists
+      check_subnet_exists() {
+        local subnet_name="$1"
+        local var_name="$2"
+        
+        echo "Checking subnet: $subnet_name"
+        if az network vnet subnet show --name "$subnet_name" --vnet-name "$VNET_NAME" --resource-group "$VNET_RG" &> /dev/null; then
+          echo "✅ Subnet '$subnet_name' exists."
+          echo "##vso[task.setvariable variable=$var_name]true"
+        else
+          echo "❌ Subnet '$subnet_name' does not exist."
+          echo "##vso[task.setvariable variable=$var_name]false"
+        fi
+      }
+      
+      # Check each subnet and set variables
+      check_subnet_exists "$SNT_GENAI" "sntGenaiExists"
+      check_subnet_exists "$SNT_ACA" "sntAcaExists"
+      check_subnet_exists "$SNT_ACA_002" "sntAca002Exists"
+      check_subnet_exists "$SNT_AKS" "sntAksExists"
+      check_subnet_exists "$SNT_AKS_002" "sntAks002Exists"
+      check_subnet_exists "$SNT_DATABRICKS_PRIV" "sntDatabricksPrivExists"
+      check_subnet_exists "$SNT_DATABRICKS_PUB" "sntDatabricksPubExists"
+      
+      echo "Subnet existence check completed."
 - task: AzureCLI@2
   displayName: '05_az_bicep_deploy_subnets_and_NSGs'
   inputs:
@@ -170,7 +417,14 @@ steps:
      --parameters byoASEv3="$(byoASEv3)" \
      --parameters byoAseFullResourceId="$(byoAseFullResourceId)" \
      --parameters byoAseAppServicePlanResourceId="$(byoAseAppServicePlanResourceId)" \
-     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)"
+     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters sntGenaiExists="$(sntGenaiExists)" \
+     --parameters sntAcaExists="$(sntAcaExists)" \
+     --parameters sntAca002Exists="$(sntAca002Exists)" \
+     --parameters sntAksExists="$(sntAksExists)" \
+     --parameters sntAks002Exists="$(sntAks002Exists)" \
+     --parameters sntDatabricksPrivExists="$(sntDatabricksPrivExists)" \
+     --parameters sntDatabricksPubExists="$(sntDatabricksPubExists)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@1

@@ -5,8 +5,71 @@ parameters:
     type: string
 
 steps:
+- task: AzureCLI@2
+  displayName: '00_validate_project_subnet_exists'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      # Construct subnet name based on project number
+      PROJECT_SUBNET_NAME="snt-prj$(project_number_000)-aks"
+      echo "Checking for subnet: $PROJECT_SUBNET_NAME"
+      
+      # Get vnet information from variables, with fallback to naming convention
+      VNET_NAME="$(vnetNameFull_param)"
+      VNET_RG="$(vnetResourceGroup_param)"
+      
+      # If VNET variables are not set, use naming convention
+      if [ -z "$VNET_NAME" ] || [ "$VNET_NAME" = "$(vnetNameFull_param)" ]; then
+        VNET_NAME="vnt-esmlcmn-$(admin_locationSuffix)-$(dev_test_prod)-001"
+        echo "VNET name not set, using naming convention: $VNET_NAME"
+      fi
+      
+      if [ -z "$VNET_RG" ] || [ "$VNET_RG" = "$(vnetResourceGroup_param)" ]; then
+        # Use the common resource group naming convention
+        VNET_RG="$(admin_aifactoryPrefixRG)esml-common-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "VNET resource group not set, using naming convention: $VNET_RG"
+      fi
+      
+      echo "VNET Name: $VNET_NAME"
+      echo "VNET Resource Group: $VNET_RG"
+      
+      # First check if VNET exists
+      if ! az network vnet show --name "$VNET_NAME" --resource-group "$VNET_RG" &> /dev/null; then
+        echo "❌ ERROR: VNET '$VNET_NAME' does not exist in resource group '$VNET_RG'"
+        echo "Please ensure the common networking infrastructure is deployed first."
+        exit 1
+      fi
+      
+      # Check if project AKS subnet exists
+      if az network vnet subnet show --name "$PROJECT_SUBNET_NAME" --vnet-name "$VNET_NAME" --resource-group "$VNET_RG" &> /dev/null; then
+        echo "✅ Subnet '$PROJECT_SUBNET_NAME' exists. Continuing with deployment."
+      else
+        echo "❌ ERROR: Subnet '$PROJECT_SUBNET_NAME' does not exist in vnet '$VNET_NAME'"
+        echo ""
+        echo "Required subnet missing for GenAI services deployment."
+        echo "Solutions:"
+        echo "1. Set 'runNetworkingVar' to 'true' if this is the first time setting up this project"
+        echo "2. Ensure project-specific networking has been deployed"
+        echo "3. Verify the project number $(project_number_000) is correct"
+        echo ""
+        echo "Expected subnet name: $PROJECT_SUBNET_NAME"
+        echo "Target VNET: $VNET_NAME"
+        echo "Target Resource Group: $VNET_RG"
+        echo ""
+        echo "Failing pipeline..."
+        exit 1
+      fi
+
 - task: PowerShell@2
   displayName: '00_check_for_submodule'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     targetType: 'inline'
     script: |
@@ -72,6 +135,7 @@ steps:
 
 - task: AzureCLI@2
   displayName: '00_pwsh_print_info'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: pscore
@@ -218,6 +282,7 @@ steps:
       Get-ChildItem -Path $tempDir -Filter "*.json" | ForEach-Object { Write-Host "  Found: $($_.FullName)" }
 - task: PowerShell@2
   displayName: '04_debug_check_files_and_paths'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     targetType: 'inline'
     script: |
@@ -263,7 +328,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
 - task: AzureCLI@2
   displayName: '05_Build default image offline, to private registry (ACR) if not exists'
-  condition: and(eq(variables['serviceSettingDeployContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'))
+  condition: and(eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -439,6 +504,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: '05a_Check if Private DNS Zones exist'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -617,8 +683,9 @@ steps:
       aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
       aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aiFoundryV2Name="aif2"
-      
-      amlName="aml-${projectName}-${locationSuffix}-${envName}"
+      dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
+      aksName="aks${projectNumber}-${locationSuffix}-${envName}"
+      amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
       openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
       safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
       dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}"
@@ -645,15 +712,20 @@ steps:
       sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}"
       acrProjectName="acr${projectName}genai${locationSuffix}"
       vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
+      logicAppsName="adf-${projectNumber}-${locationSuffix}-${envName}"
+      eventHubsName="eh-${projectNumber}-${locationSuffix}-${envName}"
+      databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
 
       # Check resources (fuzzy for those with randomSalt,unique, exact for others)
       echo "##vso[task.setvariable variable=aiHubExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=aifProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
-      
-      # echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_exact "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name")"
-      # echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$suffixStandardNoDash")"
       echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$noSuffix")"
-      
+
+      echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Azure.Databricks/workspaces" "$databricksName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=amlExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=openaiExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=aiSearchExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")"
@@ -687,6 +759,7 @@ steps:
       echo "Key Vault Name: $keyvaultName"
 - task: AzureCLI@2
   displayName: '05c_Validate Required Parameters'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -700,6 +773,12 @@ steps:
         ["aifProjectExists"]="$(aifProjectExists)"
         ["aiFoundryV2Exists"]="$(aiFoundryV2Exists)"
         ["amlExists"]="$(amlExists)"
+        ["datafactoryExists"]="$(datafactoryExists)"
+        ["logicAppsExists"]="$(logicAppsExists)"
+        ["databricksExists"]="$(databricksExists)"
+        ["aksExists"]="$(aksExists)"
+        ["openaiExists"]="$(openaiExists)"
+        ["eventHubsExists"]="$(eventHubsExists)"
         ["aiSearchExists"]="$(aiSearchExists)"
         ["dashboardInsightsExists"]="$(dashboardInsightsExists)"
         ["applicationInsightExists"]="$(applicationInsightExists)"
@@ -869,29 +948,29 @@ steps:
      --parameters DEBUG_enableAIFoundryHub="$(enableAIFoundryHub)" \
      --parameters DEBUG_enableAISearch="$(enableAISearch)" \
      --parameters DEBUG_enableAzureMachineLearning="$(enableAzureMachineLearning)" \
-     --parameters DEBUG_serviceSettingDeployFunction="$(serviceSettingDeployFunction)" \
+     --parameters DEBUG_enableFunction="$(enableFunction)" \
      --parameters DEBUG_functionRuntime="$(functionRuntime)" \
      --parameters DEBUG_functionVersion="$(functionVersion)" \
-     --parameters DEBUG_serviceSettingDeployWebApp="$(serviceSettingDeployWebApp)" \
+     --parameters DEBUG_enableWebApp="$(enableWebApp)" \
      --parameters DEBUG_webAppRuntime="$(webAppRuntime)" \
      --parameters DEBUG_webAppRuntimeVersion="$(webAppRuntimeVersion)" \
      --parameters DEBUG_aseSku="$(aseSku)" \
      --parameters DEBUG_aseSkuCode="$(aseSkuCode)" \
      --parameters DEBUG_aseSkuWorkers="$(aseSkuWorkers)" \
-     --parameters DEBUG_serviceSettingDeployContainerApps="$(serviceSettingDeployContainerApps)" \
-     --parameters DEBUG_serviceSettingDeployAppInsightsDashboard="$(serviceSettingDeployAppInsightsDashboard)" \
+     --parameters DEBUG_enableContainerApps="$(enableContainerApps)" \
+     --parameters DEBUG_enableAppInsightsDashboard="$(enableAppInsightsDashboard)" \
      --parameters DEBUG_aca_a_registry_image="$(aca_a_registry_image)" \
      --parameters DEBUG_aca_w_registry_image="$(aca_w_registry_image)" \
-     --parameters DEBUG_serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
-     --parameters DEBUG_serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
-     --parameters DEBUG_serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
-     --parameters DEBUG_serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
-     --parameters DEBUG_serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
-     --parameters DEBUG_serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
+     --parameters DEBUG_enableBingSearch="$(enableBingSearch)" \
+     --parameters DEBUG_enableCosmosDB="$(enableCosmosDB)" \
+     --parameters DEBUG_enableAzureOpenAI="$(enableAzureOpenAI)" \
+     --parameters DEBUG_enableAzureAIVision="$(enableAzureAIVision)" \
+     --parameters DEBUG_enableAzureSpeech="$(enableAzureSpeech)" \
+     --parameters DEBUG_enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters DEBUG_disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
-     --parameters DEBUG_serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
-     --parameters DEBUG_serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
-     --parameters DEBUG_serviceSettingDeploySQLDatabase="$(serviceSettingDeploySQLDatabase)" \
+     --parameters DEBUG_enablePostgreSQL="$(enablePostgreSQL)" \
+     --parameters DEBUG_enableRedisCache="$(enableRedisCache)" \
+     --parameters DEBUG_enableSQLDatabase="$(enableSQLDatabase)" \
      --parameters DEBUG_BYO_subnets="$(BYO_subnets)" \
      --parameters DEBUG_network_env_dev="$(network_env_dev)" \
      --parameters DEBUG_network_env_stage="$(network_env_stage)" \
@@ -931,6 +1010,7 @@ steps:
      --parameters DEBUG_deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters DEBUG_deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters DEBUG_deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --debug
@@ -995,7 +1075,7 @@ steps:
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
+     --parameters enableBingSearch="$(enableBingSearch)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
@@ -1006,7 +1086,8 @@ steps:
      --parameters acr_adminUserEnabled="$(acr_adminUserEnabled)" \
      --parameters acr_dedicated="$(acr_dedicated)" \
      --parameters containerRegistrySkuName="$(acr_SKU)" \
-     --parameters serviceSettingDeployProjectVM="$(serviceSettingDeployProjectVM)" \
+     --parameters enableProjectVM="$(enableProjectVM)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1057,11 +1138,11 @@ steps:
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters aiSearchSKUName="$(admin_aiSearchTier)" \
      --parameters semanticSearchTier="$(admin_semanticSearchTier)" \
-     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
-     --parameters serviceSettingDeployContentSafety="$(serviceSettingDeployContentSafety)" \
-     --parameters serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
-     --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
-     --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
+     --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
+     --parameters enableContentSafety="$(enableContentSafety)" \
+     --parameters enableAzureAIVision="$(enableAzureAIVision)" \
+     --parameters enableAzureSpeech="$(enableAzureSpeech)" \
+     --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
@@ -1080,6 +1161,7 @@ steps:
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1126,11 +1208,11 @@ steps:
      --parameters sqlServerExists="$(sqlServerExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
+     --parameters enableCosmosDB="$(enableCosmosDB)" \
      --parameters cosmosKind="$(cosmosKind)" \
-     --parameters serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
-     --parameters serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
-     --parameters serviceSettingDeploySQLDatabase="$(serviceSettingDeploySQLDatabase)" \
+     --parameters enablePostgreSQL="$(enablePostgreSQL)" \
+     --parameters enableRedisCache="$(enableRedisCache)" \
+     --parameters enableSQLDatabase="$(enableSQLDatabase)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
@@ -1138,6 +1220,7 @@ steps:
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1186,11 +1269,11 @@ steps:
      --parameters applicationInsightExists="$(applicationInsightExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters serviceSettingDeployContainerApps="$(serviceSettingDeployContainerApps)" \
-     --parameters serviceSettingDeployFunction="$(serviceSettingDeployFunction)" \
-     --parameters serviceSettingDeployWebApp="$(serviceSettingDeployWebApp)" \
-     --parameters serviceSettingDeployBingSearch="$(serviceSettingDeployBingSearch)" \
-     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
+     --parameters enableContainerApps="$(enableContainerApps)" \
+     --parameters enableFunction="$(enableFunction)" \
+     --parameters enableWebApp="$(enableWebApp)" \
+     --parameters enableBingSearch="$(enableBingSearch)" \
+     --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters functionRuntime="$(functionRuntime)" \
@@ -1200,7 +1283,7 @@ steps:
      --parameters aseSku="$(aseSku)" \
      --parameters aseSkuCode="$(aseSkuCode)" \
      --parameters aseSkuWorkers="$(aseSkuWorkers)" \
-     --parameters serviceSettingDeployAppInsightsDashboard="$(serviceSettingDeployAppInsightsDashboard)" \
+     --parameters enableAppInsightsDashboard="$(enableAppInsightsDashboard)" \
      --parameters aca_a_registry_image="$(aca_a_registry_image)" \
      --parameters aca_w_registry_image="$(aca_w_registry_image)" \
      --parameters tags='$(tags)' \
@@ -1212,6 +1295,7 @@ steps:
      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
      --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
      --parameters disableAgentNetworkInjection="$(disableAgentNetworkInjection)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1250,19 +1334,13 @@ steps:
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters aiHubExists="$(aiHubExists)" \
-     --parameters amlExists="$(amlExists)" \
      --parameters aifProjectExists="$(aifProjectExists)" \
-     --parameters aksExists="$(aksExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
      --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
-     --parameters enableAIFoundryV2="$(enableAIFoundryV2)" \
-     --parameters AMLStudioUIPrivate="$(AMLStudioUIPrivate)" \
-     --parameters serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
-     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
+     --parameters addAIFoundryHub="$(addAIFoundryHub)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
@@ -1290,13 +1368,16 @@ steps:
      --parameters common_subnet_name="$(common_subnet_name)" \
      --parameters subnetCommon="$(subnetCommon)" \
      --parameters subnetCommonScoring="$(subnetCommonScoring)" \
+     --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '68-rbac-security'
-  condition: and(ne(variables['debug_disable_68_rbac_security'], 'true'), succeeded())
+  displayName: '67-data_ml_platform'
+  condition: and(ne(variables['debug_disable_67_data_ml_platform'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1304,7 +1385,121 @@ steps:
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
      az deployment sub create \
-     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-67-rbac-security" \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-67-data-ml-platform" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-genai-1/07-ml-data-platform.bicep" \
+     --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
+     --parameters network_env="$(network_env)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetNameBase="$(vnetNameBase)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
+     --parameters aks_dev_sku_override="$(aks_dev_sku_override)" \
+     --parameters aks_test_prod_sku_override="$(aks_test_prod_sku_override)" \
+     --parameters aks_version_override="$(aks_version_override)" \
+     --parameters aml_ci_dev_sku_override="$(aml_ci_dev_sku_override)" \
+     --parameters aml_ci_test_prod_sku_override="$(aml_ci_test_prod_sku_override)" \
+     --parameters aml_cluster_dev_sku_override="$(aml_cluster_dev_sku_override)" \
+     --parameters aml_cluster_test_prod_sku_override="$(aml_cluster_test_prod_sku_override)" \
+     --parameters AMLStudioUIPrivate="$(AMLStudioUIPrivate)" \
+     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters useCommonACR="$(useCommonACR_override)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters IPwhiteList="$(project_IP_whitelist)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters amlExists="$(amlExists)" \
+     --parameters aksExists="$(aksExists)" \
+     --parameters dataFactoryExists="$(dataFactoryExists)" \
+     --parameters databricksExists="$(databricksExists)" \
+     --parameters enableDatafactory="$(enableDatafactory)" \
+     --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
+     --parameters enableDatabricks="$(enableDatabricks)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters addAzureMachineLearning="$(addAzureMachineLearning)"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '68-integration'
+  condition: and(ne(variables['debug_disable_68_integration'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az account set --subscription "$(dev_test_prod_sub_id)"
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-68-integration" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-genai-1/11-integration.bicep" \
+     --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
+     --parameters network_env="$(network_env)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetNameBase="$(vnetNameBase)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
+     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters useCommonACR="$(useCommonACR_override)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters IPwhiteList="$(project_IP_whitelist)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters enableLogicApps="$(enableLogicApps)" \
+     --parameters enableEventHubs="$(enableEventHubs)" \
+     --parameters logicAppsExists="$(logicAppsExists)" \
+     --parameters eventHubsExists="$(eventHubsExists)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '100-rbac-security'
+  condition: and(ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az account set --subscription "$(dev_test_prod_sub_id)"
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-100-rbac-security" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1/08-rbac-security.bicep" \
@@ -1334,24 +1529,25 @@ steps:
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
      --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
+     --parameters addAIFoundryHub="$(addAIFoundryHub)" \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters enableAIFoundryV2="$(enableAIFoundryV2)" \
      --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
      --parameters enableAISearch="$(enableAISearch)" \
-     --parameters serviceSettingDeployFunction="$(serviceSettingDeployFunction)" \
-     --parameters serviceSettingDeployWebApp="$(serviceSettingDeployWebApp)" \
-     --parameters serviceSettingDeployContainerApps="$(serviceSettingDeployContainerApps)" \
-     --parameters serviceSettingDeployAppInsightsDashboard="$(serviceSettingDeployAppInsightsDashboard)" \
-     --parameters serviceSettingDeployAzureOpenAI="$(serviceSettingDeployAzureOpenAI)" \
-     --parameters serviceSettingDeployAzureAIVision="$(serviceSettingDeployAzureAIVision)" \
-     --parameters serviceSettingDeployAzureSpeech="$(serviceSettingDeployAzureSpeech)" \
-     --parameters serviceSettingDeployAIDocIntelligence="$(serviceSettingDeployAIDocIntelligence)" \
+     --parameters enableFunction="$(enableFunction)" \
+     --parameters enableWebApp="$(enableWebApp)" \
+     --parameters enableContainerApps="$(enableContainerApps)" \
+     --parameters enableAppInsightsDashboard="$(enableAppInsightsDashboard)" \
+     --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
+     --parameters enableAzureAIVision="$(enableAzureAIVision)" \
+     --parameters enableAzureSpeech="$(enableAzureSpeech)" \
+     --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
      --parameters disableRBACAdminOnRGForUsers="$(disableRBACAdminOnRGForUsers)" \
-     --parameters serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
-     --parameters serviceSettingDeployPostgreSQL="$(serviceSettingDeployPostgreSQL)" \
-     --parameters serviceSettingDeployRedisCache="$(serviceSettingDeployRedisCache)" \
-     --parameters serviceSettingDeploySQLDatabase="$(serviceSettingDeploySQLDatabase)" \
+     --parameters enableCosmosDB="$(enableCosmosDB)" \
+     --parameters enablePostgreSQL="$(enablePostgreSQL)" \
+     --parameters enableRedisCache="$(enableRedisCache)" \
+     --parameters enableSQLDatabase="$(enableSQLDatabase)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
@@ -1361,6 +1557,14 @@ steps:
      --parameters tagsProject='$(tagsProject)' \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
+     --parameters dataFactoryExists="$(dataFactoryExists)" \
+     --parameters aksExists="$(aksExists)" \
+     --parameters amlExists="$(amlExists)" \
+     --parameters aiHubExists="$(aiHubExists)" \
+     --parameters aiServicesExists="$(aiServicesExists)" \
+     --parameters openaiExists="$(openaiExists)" \
+     --parameters updateRbac="$(updateRbac)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1384,10 +1588,9 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
-     --parameters enableAIFoundryV2="$(enableAIFoundryV2)" \
      --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
      --parameters enableAISearch="$(enableAISearch)" \
-     --parameters serviceSettingDeployCosmosDB="$(serviceSettingDeployCosmosDB)" \
+     --parameters enableCosmosDB="$(enableCosmosDB)" \
      --parameters deployModel_gpt_X="$(deployModel_gpt_X)" \
      --parameters modelGPTXName="$(modelGPTXName)" \
      --parameters modelGPTXVersion="$(modelGPTXVersion)" \
@@ -1438,666 +1641,59 @@ steps:
      --parameters containerAppsEnvExists="$(containerAppsEnvExists)" \
      --parameters updateAIFoundryV21="$(updateAIFoundryV21)" \
      --parameters enableCaphost="$(enableAFoundryCaphost)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '71_If_Error_AIFoundryHubAndProject_DeleteIt'
+  displayName: '101_generate_hosts_file_info'
+  condition: succeeded()
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/70_generate_hosts_file_info.sh'
+    arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '111_If_Error_AIFoundryHubAndProject_DeleteIt'
   condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-      
-      echo "=== AI Foundry Hub and Project Error Cleanup ==="
-      echo "This task runs only when 66-ai-platform task failed with AIFoundry Hub/Project related errors"
-      
-      az account set --subscription "$(dev_test_prod_sub_id)"
-      
-      # Input parameters - replicating the same logic from 05b_Check if resource exists
-      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-      projectNumber="$(project_number_000)"
-      projectName="prj${projectNumber}"
-      locationSuffix="$(admin_locationSuffix)"
-      envName="$(dev_test_prod)"
-      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      resourceSuffix="$(admin_prjResourceSuffix)"
-      
-      # Construct resource group name
-      projectNameReplaced="${projectName/prj/project}"
-      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-      
-      # Resource names (same as in 05b task)
-      aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
-      aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
-      
-      echo "Target Resource Group: $targetResourceGroup"
-      echo "AI Hub Name Pattern: $aiHubName"
-      echo "AI Project Name Pattern: $aifProjectName"
-      
-      # Check if this is specifically an AI Platform (66-ai-platform) related error
-      echo "Checking if error is related to AI Platform deployment (66-ai-platform)..."
-      
-      # Get the error details from recent deployments
-      DEPLOYMENT_NAME_PATTERN="06-aiHubModule"
-      AI_HUB_RESOURCE_PATTERN="$aiHubName"
-      AIF_PROJECT_RESOURCE_PATTERN="$aifProjectName"
-      
-      echo "Looking for deployment errors containing: $DEPLOYMENT_NAME_PATTERN"
-      echo "Looking for resource errors mentioning: $AI_HUB_RESOURCE_PATTERN or $AIF_PROJECT_RESOURCE_PATTERN"
-      
-      # Check recent deployment failures for AI Platform related patterns
-      echo "Checking recent deployments for AI Platform (66-ai-platform) related failures..."
-      recent_deployments=$(az deployment sub list \
-        --subscription "$(dev_test_prod_sub_id)" \
-        --query "[?starts_with(name, 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)') && contains(name, '66-ai-platform')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
-        --output json 2>/dev/null || echo "[]")
-      
-      echo "Recent AI Platform deployments: $recent_deployments"
-      
-      # Check if we should proceed with cleanup based on error patterns
-      should_cleanup="false"
-      
-      if echo "$recent_deployments" | grep -qi "06-aiHubModule\|$aiHubName\|$aifProjectName"; then
-        echo "Found AI Platform (66-ai-platform) related deployment errors"
-        should_cleanup="true"
-      fi
-      
-      # Alternative check: look for AI Hub/Project resources that might exist but be in error state
-      ai_hub_resources=$(az resource list \
-        --resource-group "$targetResourceGroup" \
-        --resource-type "Microsoft.MachineLearningServices/workspaces" \
-        --query "[?starts_with(name, '$aiHubName') || starts_with(name, '$aifProjectName')].name" \
-        --output tsv 2>/dev/null || echo "")
-      
-      if [ -n "$ai_hub_resources" ]; then
-        echo "Found existing AI Hub/Project resources that may need cleanup"
-        should_cleanup="true"
-      fi
-      
-      if [ "$should_cleanup" = "true" ]; then
-        echo "=== Proceeding with AI Foundry Hub and Project resource cleanup ==="
-      
-      # Function to delete resource and its related components with fuzzy endpoint matching
-      delete_ai_resource_and_endpoints() {
-        local resourceName="$1"
-        local resourceType="$2"
-        
-        echo "=== Processing resource: $resourceName ==="
-        
-        # Check if the resource exists
-        if az resource show --resource-group "$targetResourceGroup" --name "$resourceName" --resource-type "$resourceType" &> /dev/null; then
-          echo "Found resource: $resourceName"
-          
-          # Delete private endpoints and NICs using fuzzy matching (since they have random salt)
-          echo "Searching for private endpoints matching pattern: ${resourceName}*-pend"
-          privateEndpoints=$(az network private-endpoint list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend')].name" --output tsv)
-          
-          if [ -n "$privateEndpoints" ]; then
-            while IFS= read -r pendName; do
-              if [ -n "$pendName" ]; then
-                echo "Deleting private endpoint: $pendName"
-                az network private-endpoint delete \
-                  --resource-group "$targetResourceGroup" \
-                  --name "$pendName" \
-                  --yes || echo "Failed to delete private endpoint $pendName"
-              fi
-            done <<< "$privateEndpoints"
-          else
-            echo "No private endpoints found for resource $resourceName"
-          fi
-          
-          echo "Searching for NICs matching pattern: ${resourceName}*-pend-nic"
-          nics=$(az network nic list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend-nic')].name" --output tsv)
-          
-          if [ -n "$nics" ]; then
-            while IFS= read -r nicName; do
-              if [ -n "$nicName" ]; then
-                echo "Deleting NIC: $nicName"
-                az network nic delete \
-                  --resource-group "$targetResourceGroup" \
-                  --name "$nicName" \
-                  --yes || echo "Failed to delete NIC $nicName"
-              fi
-            done <<< "$nics"
-          else
-            echo "No NICs found for resource $resourceName"
-          fi
-          
-          # Delete the main resource
-          echo "Deleting main resource: $resourceName"
-          az resource delete \
-            --resource-group "$targetResourceGroup" \
-            --name "$resourceName" \
-            --resource-type "$resourceType" \
-            --yes || echo "Failed to delete resource $resourceName"
-            
-          echo "Cleanup completed for resource: $resourceName"
-        else
-          echo "Resource $resourceName not found, skipping"
-        fi
-      }
-      
-      # Look for AI Hub resources that match the pattern
-      echo "=== Searching for AI Hub resources ==="
-      aiHubResources=$(az resource list \
-        --resource-group "$targetResourceGroup" \
-        --resource-type "Microsoft.MachineLearningServices/workspaces" \
-        --query "[?starts_with(name, '$aiHubName')].name" \
-        --output tsv)
-      
-      if [ -n "$aiHubResources" ]; then
-        echo "Found AI Hub resources to clean up:"
-        echo "$aiHubResources"
-        while IFS= read -r hubName; do
-          if [ -n "$hubName" ]; then
-            delete_ai_resource_and_endpoints "$hubName" "Microsoft.MachineLearningServices/workspaces"
-          fi
-        done <<< "$aiHubResources"
-      else
-        echo "No AI Hub resources found matching pattern: $aiHubName"
-      fi
-      
-      # Look for AI Project resources that match the pattern
-      echo "=== Searching for AI Project resources ==="
-      aifProjectResources=$(az resource list \
-        --resource-group "$targetResourceGroup" \
-        --resource-type "Microsoft.MachineLearningServices/workspaces" \
-        --query "[?starts_with(name, '$aifProjectName')].name" \
-        --output tsv)
-      
-      if [ -n "$aifProjectResources" ]; then
-        echo "Found AI Project resources to clean up:"
-        echo "$aifProjectResources"
-        while IFS= read -r projectName; do
-          if [ -n "$projectName" ]; then
-            delete_ai_resource_and_endpoints "$projectName" "Microsoft.MachineLearningServices/workspaces"
-          fi
-        done <<< "$aifProjectResources"
-      else
-        echo "No AI Project resources found matching pattern: $aifProjectName"
-      fi
-      
-      else
-        echo "No AI Platform (66-ai-platform) related errors detected. Skipping cleanup."
-        echo "This cleanup only runs for errors related to:"
-        echo "- Resources mentioning '$aiHubName' or '$aifProjectName'"
-        echo "- Deployments containing '06-aiHubModule'"
-        echo "- Task '66-ai-platform' failures"
-      fi
-      
-      # Set variable to indicate task 71 performed deletions
-      if [ "$should_cleanup" = "true" ]; then
-        echo "##vso[task.setvariable variable=71_deleted]true"
-        echo "Set variable 71_deleted=true for purge task"
-      else
-        echo "##vso[task.setvariable variable=71_deleted]false"
-        echo "Set variable 71_deleted=false (no deletions performed)"
-      fi
-      
-      echo "=== AI Foundry Hub and Project Error Cleanup Completed ==="
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/71_If_Error_AIFoundryHubAndProject_DeleteIt.sh'
+    arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '72_If_Error_AIServices_DeleteIt'
+  displayName: '112_If_Error_AIServices_DeleteIt'
   condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-      
-      echo "=== AI Services Error Cleanup ==="
-      echo "This task runs only when 63-cognitive-services task failed with AI Services related errors"
-      
-      az account set --subscription "$(dev_test_prod_sub_id)"
-      
-      # Input parameters - replicating the same logic from 05b_Check if resource exists
-      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-      projectNumber="$(project_number_000)"
-      projectName="prj${projectNumber}"
-      locationSuffix="$(admin_locationSuffix)"
-      envName="$(dev_test_prod)"
-      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      
-      # Construct resource group name
-      projectNameReplaced="${projectName/prj/project}"
-      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-      
-      # AI Services name pattern (same as in 05b task)
-      aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
-      
-      echo "Target Resource Group: $targetResourceGroup"
-      echo "AI Services Name Pattern: $aiServicesPrefix"
-      
-      # Check if this is specifically a Cognitive Services (63-cognitive-services) related error
-      echo "Checking if error is related to Cognitive Services deployment (63-cognitive-services)..."
-      
-      # Get the error details from recent deployments
-      DEPLOYMENT_NAME_PATTERN="03-AIServices"
-      AI_SERVICES_RESOURCE_PATTERN="$aiServicesPrefix"
-      
-      echo "Looking for deployment errors containing: $DEPLOYMENT_NAME_PATTERN"
-      echo "Looking for resource errors mentioning: $AI_SERVICES_RESOURCE_PATTERN"
-      
-      # Check recent deployment failures for Cognitive Services related patterns
-      echo "Checking recent deployments for Cognitive Services (63-cognitive-services) related failures..."
-      recent_deployments=$(az deployment sub list \
-        --subscription "$(dev_test_prod_sub_id)" \
-        --query "[?starts_with(name, 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)') && contains(name, '63-cognitive-services')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
-        --output json 2>/dev/null || echo "[]")
-      
-      echo "Recent Cognitive Services deployments: $recent_deployments"
-      
-      # Check if we should proceed with cleanup based on error patterns
-      should_cleanup="false"
-      
-      if echo "$recent_deployments" | grep -qi "03-AIServices\|$aiServicesPrefix"; then
-        echo "Found Cognitive Services (63-cognitive-services) related deployment errors"
-        should_cleanup="true"
-      fi
-      
-      # Alternative check: look for AI Services resources that might exist but be in error state
-      ai_services_resources=$(az resource list \
-        --resource-group "$targetResourceGroup" \
-        --resource-type "Microsoft.CognitiveServices/accounts" \
-        --query "[?starts_with(name, '$aiServicesPrefix')].name" \
-        --output tsv 2>/dev/null || echo "")
-      
-      if [ -n "$ai_services_resources" ]; then
-        echo "Found existing AI Services resources that may need cleanup"
-        should_cleanup="true"
-      fi
-      
-      if [ "$should_cleanup" = "true" ]; then
-        echo "=== Proceeding with AI Services resource cleanup ==="
-      
-      # Function to delete AI Services resource and its related components with fuzzy endpoint matching
-      delete_ai_services_and_endpoints() {
-        local resourceName="$1"
-        local resourceType="$2"
-        
-        echo "=== Processing AI Services resource: $resourceName ==="
-        
-        # Check if the resource exists
-        if az resource show --resource-group "$targetResourceGroup" --name "$resourceName" --resource-type "$resourceType" &> /dev/null; then
-          echo "Found AI Services resource: $resourceName"
-          
-          # Delete private endpoints and NICs using fuzzy matching (since they have random salt)
-          echo "Searching for private endpoints matching pattern: ${resourceName}*-pend"
-          privateEndpoints=$(az network private-endpoint list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend')].name" --output tsv)
-          
-          if [ -n "$privateEndpoints" ]; then
-            while IFS= read -r pendName; do
-              if [ -n "$pendName" ]; then
-                echo "Deleting private endpoint: $pendName"
-                az network private-endpoint delete \
-                  --resource-group "$targetResourceGroup" \
-                  --name "$pendName" \
-                  --yes || echo "Failed to delete private endpoint $pendName"
-              fi
-            done <<< "$privateEndpoints"
-          else
-            echo "No private endpoints found for AI Services resource $resourceName"
-          fi
-          
-          echo "Searching for NICs matching pattern: ${resourceName}*-pend-nic"
-          nics=$(az network nic list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}') && contains(name, '-pend-nic')].name" --output tsv)
-          
-          if [ -n "$nics" ]; then
-            while IFS= read -r nicName; do
-              if [ -n "$nicName" ]; then
-                echo "Deleting NIC: $nicName"
-                az network nic delete \
-                  --resource-group "$targetResourceGroup" \
-                  --name "$nicName" \
-                  --yes || echo "Failed to delete NIC $nicName"
-              fi
-            done <<< "$nics"
-          else
-            echo "No NICs found for AI Services resource $resourceName"
-          fi
-          
-          # Delete the main AI Services resource
-          echo "Deleting AI Services resource: $resourceName"
-          az resource delete \
-            --resource-group "$targetResourceGroup" \
-            --name "$resourceName" \
-            --resource-type "$resourceType" \
-            --yes || echo "Failed to delete AI Services resource $resourceName"
-            
-          echo "Cleanup completed for AI Services resource: $resourceName"
-        else
-          echo "AI Services resource $resourceName not found, skipping"
-        fi
-      }
-      
-      # Look for AI Services resources that match the pattern
-      echo "=== Searching for AI Services resources ==="
-      aiServicesResources=$(az resource list \
-        --resource-group "$targetResourceGroup" \
-        --resource-type "Microsoft.CognitiveServices/accounts" \
-        --query "[?starts_with(name, '$aiServicesPrefix')].name" \
-        --output tsv)
-      
-      if [ -n "$aiServicesResources" ]; then
-        echo "Found AI Services resources to clean up:"
-        echo "$aiServicesResources"
-        while IFS= read -r serviceName; do
-          if [ -n "$serviceName" ]; then
-            delete_ai_services_and_endpoints "$serviceName" "Microsoft.CognitiveServices/accounts"
-          fi
-        done <<< "$aiServicesResources"
-      else
-        echo "No AI Services resources found matching pattern: $aiServicesPrefix"
-      fi
-      
-      else
-        echo "No Cognitive Services (63-cognitive-services) related errors detected. Skipping cleanup."
-        echo "This cleanup only runs for errors related to:"
-        echo "- Resources starting with '$aiServicesPrefix'"
-        echo "- Deployments containing '03-AIServices'"
-        echo "- Task '63-cognitive-services' failures"
-      fi
-      
-      # Set variable to indicate task 72 performed deletions
-      if [ "$should_cleanup" = "true" ]; then
-        echo "##vso[task.setvariable variable=72_deleted]true"
-        echo "Set variable 72_deleted=true for purge task"
-      else
-        echo "##vso[task.setvariable variable=72_deleted]false"
-        echo "Set variable 72_deleted=false (no deletions performed)"
-      fi
-      
-      echo "=== AI Services Error Cleanup Completed ==="
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/72_If_Error_AIServices_DeleteIt.sh'
+    arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '73_If_Error_AIFoundryProject_DeleteIt'
+  displayName: '113_If_Error_AIFoundryProject_DeleteIt'
   condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-      
-      echo "=== AI Foundry Project Error Cleanup ==="
-      echo "This task runs only when 69-aifoundry-2025 task failed with AIFoundry V2 related errors"
-      
-      az account set --subscription "$(dev_test_prod_sub_id)"
-      
-      # Input parameters - replicating the same logic from 05b_Check if resource exists
-      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-      projectNumber="$(project_number_000)"
-      projectName="prj${projectNumber}"
-      locationSuffix="$(admin_locationSuffix)"
-      envName="$(dev_test_prod)"
-      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      
-      # Construct resource group name
-      projectNameReplaced="${projectName/prj/project}"
-      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-      
-      # AI Foundry V2 name pattern (same as in 05b task)
-      aiFoundryV2Name="aif2"
-      
-      echo "Target Resource Group: $targetResourceGroup"
-      echo "AI Foundry V2 Name Pattern: $aiFoundryV2Name"
-      
-      # Check if this is specifically an AIFoundry V2 related error
-      echo "Checking if error is related to AIFoundry V2 resources..."
-      
-      # Get the error details from the pipeline (this will help identify if it's aif2 related)
-      DEPLOYMENT_NAME_PATTERN="09-AifV2-NoAvm_"
-      AIF2_RESOURCE_PATTERN="aif2"
-      
-      echo "Looking for deployment errors containing: $DEPLOYMENT_NAME_PATTERN"
-      echo "Looking for resource errors starting with: $AIF2_RESOURCE_PATTERN"
-      
-      # Check recent deployment failures for AIFoundry V2 patterns
-      echo "Checking recent deployments for AIFoundry V2 related failures..."
-      recent_deployments=$(az deployment sub list \
-        --subscription "$(dev_test_prod_sub_id)" \
-        --query "[?starts_with(name, 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)') && contains(name, '69-aifoundry-2025')].{name:name, provisioningState:properties.provisioningState, error:properties.error}" \
-        --output json 2>/dev/null || echo "[]")
-      
-      echo "Recent deployments: $recent_deployments"
-      
-      # Check if we should proceed with cleanup based on error patterns
-      should_cleanup="false"
-      
-      if echo "$recent_deployments" | grep -qi "09-AifV2-NoAvm_\|aif2"; then
-        echo "Found AIFoundry V2 related deployment errors"
-        should_cleanup="true"
-      fi
-      
-      # Alternative check: look for AIFoundry V2 resources that might exist but be in error state
-      aif2_resources=$(az resource list \
-        --resource-group "$targetResourceGroup" \
-        --resource-type "Microsoft.CognitiveServices/accounts" \
-        --query "[?starts_with(name, '$aiFoundryV2Name')].name" \
-        --output tsv 2>/dev/null || echo "")
-      
-      if [ -n "$aif2_resources" ]; then
-        echo "Found existing AIFoundry V2 resources that may need cleanup"
-        should_cleanup="true"
-      fi
-      
-      if [ "$should_cleanup" = "true" ]; then
-        echo "=== Proceeding with AIFoundry V2 resource cleanup ==="
-        
-        # Function to delete AIFoundry V2 resource and its related components with fuzzy endpoint matching
-        delete_aifoundry_v2_and_endpoints() {
-          local resourceName="$1"
-          local resourceType="$2"
-          
-          echo "=== Processing AIFoundry V2 resource: $resourceName ==="
-          
-          # Check if the resource exists
-          if az resource show --resource-group "$targetResourceGroup" --name "$resourceName" --resource-type "$resourceType" &> /dev/null; then
-            echo "Found AIFoundry V2 resource: $resourceName"
-            
-            # Delete private endpoints and NICs using fuzzy matching (since they have random salt)
-            echo "Searching for private endpoints matching pattern: ${resourceName}-pend"
-            privateEndpoints=$(az network private-endpoint list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}-pend')].name" --output tsv)
-            
-            if [ -n "$privateEndpoints" ]; then
-              while IFS= read -r pendName; do
-                if [ -n "$pendName" ]; then
-                  echo "Deleting private endpoint: $pendName"
-                  az network private-endpoint delete \
-                    --resource-group "$targetResourceGroup" \
-                    --name "$pendName" \
-                    --yes || echo "Failed to delete private endpoint $pendName"
-                fi
-              done <<< "$privateEndpoints"
-            else
-              echo "No private endpoints found for AIFoundry V2 resource $resourceName"
-            fi
-            
-            echo "Searching for NICs matching pattern: ${resourceName}-pend-nic"
-            nics=$(az network nic list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '${resourceName}-pend-nic')].name" --output tsv)
-            
-            if [ -n "$nics" ]; then
-              while IFS= read -r nicName; do
-                if [ -n "$nicName" ]; then
-                  echo "Deleting NIC: $nicName"
-                  az network nic delete \
-                    --resource-group "$targetResourceGroup" \
-                    --name "$nicName" \
-                    --yes || echo "Failed to delete NIC $nicName"
-                fi
-              done <<< "$nics"
-            else
-              echo "No NICs found for AIFoundry V2 resource $resourceName"
-            fi
-            
-            # Delete the main AIFoundry V2 resource
-            echo "Deleting AIFoundry V2 resource: $resourceName"
-            az resource delete \
-              --resource-group "$targetResourceGroup" \
-              --name "$resourceName" \
-              --resource-type "$resourceType" \
-              --yes || echo "Failed to delete AIFoundry V2 resource $resourceName"
-              
-            echo "Cleanup completed for AIFoundry V2 resource: $resourceName"
-          else
-            echo "AIFoundry V2 resource $resourceName not found, skipping"
-          fi
-        }
-        
-        # Look for AIFoundry V2 resources that match the pattern
-        echo "=== Searching for AIFoundry V2 resources ==="
-        aifoundryV2Resources=$(az resource list \
-          --resource-group "$targetResourceGroup" \
-          --resource-type "Microsoft.CognitiveServices/accounts" \
-          --query "[?starts_with(name, '$aiFoundryV2Name')].name" \
-          --output tsv)
-        
-        if [ -n "$aifoundryV2Resources" ]; then
-          echo "Found AIFoundry V2 resources to clean up:"
-          echo "$aifoundryV2Resources"
-          while IFS= read -r serviceName; do
-            if [ -n "$serviceName" ]; then
-              delete_aifoundry_v2_and_endpoints "$serviceName" "Microsoft.CognitiveServices/accounts"
-            fi
-          done <<< "$aifoundryV2Resources"
-        else
-          echo "No AIFoundry V2 resources found matching pattern: $aiFoundryV2Name"
-        fi
-        
-      else
-        echo "No AIFoundry V2 related errors detected. Skipping cleanup."
-        echo "This cleanup only runs for errors related to:"
-        echo "- Resources starting with 'aif2'"
-        echo "- Deployments containing '09-AifV2-NoAvm_'"
-      fi
-      
-      echo "=== AI Foundry Project Error Cleanup Completed ==="
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/73_If_Error_AIFoundryProject_DeleteIt.sh'
+    arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '79_Purge_If_SoftDeleted_71_72_After5minutes'
+  displayName: '114_Purge_If_SoftDeleted_71_72_After5minutes'
   condition: and(eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-      
-      echo "=== Purge Soft-Deleted Resources After 5 Minutes ==="
-      echo "This task purges soft-deleted resources from tasks 71-72 if they successfully deleted resources"
-      
-      az account set --subscription "$(dev_test_prod_sub_id)"
-      
-      # Check which tasks performed deletions
-      task_71_deleted="$(71_deleted)"
-      task_72_deleted="$(72_deleted)"
-      
-      echo "Task 71 deleted resources: $task_71_deleted"
-      echo "Task 72 deleted resources: $task_72_deleted"
-      
-      # Wait 5 minutes before attempting purge (soft-delete retention period)
-      echo "Waiting 5 minutes before attempting to purge soft-deleted resources..."
-      sleep 300
-      
-      # Input parameters - replicating the same logic from previous tasks
-      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-      projectNumber="$(project_number_000)"
-      projectName="prj${projectNumber}"
-      locationSuffix="$(admin_locationSuffix)"
-      envName="$(dev_test_prod)"
-      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      location="$(admin_location)"
-      
-      echo "Location: $location"
-      echo "Project: $projectName"
-      
-      # Function to purge soft-deleted Cognitive Services accounts
-      purge_cognitive_services() {
-        echo "=== Checking for soft-deleted Cognitive Services accounts to purge ==="
-        
-        # List soft-deleted accounts in the location
-        soft_deleted_accounts=$(az cognitiveservices account list-deleted \
-          --location "$location" \
-          --query "[].{name:name, location:location, deletionDate:deletionDate}" \
-          --output json 2>/dev/null || echo "[]")
-        
-        if [ "$soft_deleted_accounts" != "[]" ] && [ -n "$soft_deleted_accounts" ]; then
-          echo "Found soft-deleted Cognitive Services accounts:"
-          echo "$soft_deleted_accounts"
-          
-          # Extract account names and attempt to purge them
-          account_names=$(echo "$soft_deleted_accounts" | jq -r '.[].name' 2>/dev/null || echo "")
-          
-          if [ -n "$account_names" ]; then
-            while IFS= read -r account_name; do
-              if [ -n "$account_name" ]; then
-                echo "Attempting to purge soft-deleted Cognitive Services account: $account_name"
-                az cognitiveservices account purge \
-                  --location "$location" \
-                  --resource-group-name "deleted" \
-                  --account-name "$account_name" \
-                  --yes || echo "Failed to purge $account_name (may not exist or already purged)"
-              fi
-            done <<< "$account_names"
-          fi
-        else
-          echo "No soft-deleted Cognitive Services accounts found in location $location"
-        fi
-      }
-      
-      # Function to purge soft-deleted Machine Learning workspaces
-      purge_ml_workspaces() {
-        echo "=== Checking for soft-deleted Machine Learning workspaces to purge ==="
-        
-        # Construct resource group name for searching deleted workspaces
-        projectNameReplaced="${projectName/prj/project}"
-        targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-        
-        # List deleted ML workspaces in the subscription and location
-        deleted_workspaces=$(az ml workspace list-deleted \
-          --location "$location" \
-          --query "[?contains(name, '$projectName') || contains(name, 'aif-hub') || contains(name, 'aif-p')].{name:name, location:location, resourceGroup:resourceGroup}" \
-          --output json 2>/dev/null || echo "[]")
-        
-        if [ "$deleted_workspaces" != "[]" ] && [ -n "$deleted_workspaces" ]; then
-          echo "Found soft-deleted ML workspaces:"
-          echo "$deleted_workspaces"
-          
-          # Extract workspace details and attempt to purge them
-          echo "$deleted_workspaces" | jq -c '.[]' 2>/dev/null | while read -r workspace; do
-            workspace_name=$(echo "$workspace" | jq -r '.name' 2>/dev/null)
-            workspace_rg=$(echo "$workspace" | jq -r '.resourceGroup' 2>/dev/null)
-            
-            if [ -n "$workspace_name" ] && [ -n "$workspace_rg" ]; then
-              echo "Attempting to purge soft-deleted ML workspace: $workspace_name in RG: $workspace_rg"
-              az ml workspace delete \
-                --name "$workspace_name" \
-                --resource-group "$workspace_rg" \
-                --permanently-delete \
-                --yes || echo "Failed to purge $workspace_name (may not exist or already purged)"
-            fi
-          done
-        else
-          echo "No soft-deleted ML workspaces found for project $projectName in location $location"
-        fi
-      }
-      
-      # Purge resources based on which tasks performed deletions
-      if [ "$task_72_deleted" = "true" ]; then
-        echo "Task 72 deleted AI Services - attempting to purge soft-deleted Cognitive Services"
-        purge_cognitive_services
-      else
-        echo "Task 72 did not delete any resources - skipping Cognitive Services purge"
-      fi
-      
-      if [ "$task_71_deleted" = "true" ]; then
-        echo "Task 71 deleted AI Foundry Hub/Project - attempting to purge soft-deleted ML workspaces"
-        purge_ml_workspaces
-      else
-        echo "Task 71 did not delete any resources - skipping ML workspace purge"
-      fi
-      
-      echo "=== Purge Soft-Deleted Resources Completed ==="
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/79_Purge_If_SoftDeleted_71_72_After5minutes.sh'
+    arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix) $(71_deleted) $(72_deleted) $(admin_location)
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   inputs:
