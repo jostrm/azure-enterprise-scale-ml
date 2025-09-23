@@ -53,35 +53,24 @@ var silverLogs = []
 var bronzeLogs = []
 
 // Define log categories for storage services (blob, table, queue, file)
+// Use categoryGroup 'allLogs' as individual storage services support this
 var goldServiceLogs = [
   {
-    category: 'StorageRead'
-    enabled: true
-  }
-  {
-    category: 'StorageWrite'
-    enabled: true
-  }
-  {
-    category: 'StorageDelete'
+    categoryGroup: 'allLogs'
     enabled: true
   }
 ]
 
 var silverServiceLogs = [
   {
-    category: 'StorageWrite'
-    enabled: true
-  }
-  {
-    category: 'StorageDelete'
+    categoryGroup: 'allLogs'
     enabled: true
   }
 ]
 
 var bronzeServiceLogs = [
   {
-    category: 'StorageWrite'
+    categoryGroup: 'allLogs'
     enabled: true
   }
 ]
