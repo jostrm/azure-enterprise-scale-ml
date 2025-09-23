@@ -46,7 +46,14 @@ var bronzeMetrics = [
   }
 ]
 
-var goldLogs = [
+// Storage Account main resource doesn't support log categories
+// Only metrics are supported for the main storage account resource
+var goldLogs = []
+var silverLogs = []
+var bronzeLogs = []
+
+// Define log categories for storage services (blob, table, queue, file)
+var goldServiceLogs = [
   {
     category: 'StorageRead'
     enabled: true
@@ -61,7 +68,7 @@ var goldLogs = [
   }
 ]
 
-var silverLogs = [
+var silverServiceLogs = [
   {
     category: 'StorageWrite'
     enabled: true
@@ -72,7 +79,7 @@ var silverLogs = [
   }
 ]
 
-var bronzeLogs = [
+var bronzeServiceLogs = [
   {
     category: 'StorageWrite'
     enabled: true
@@ -82,6 +89,7 @@ var bronzeLogs = [
 // Select metrics and logs based on diagnostic level
 var selectedMetrics = diagnosticSettingLevel == 'gold' ? goldMetrics : diagnosticSettingLevel == 'silver' ? silverMetrics : bronzeMetrics
 var selectedLogs = diagnosticSettingLevel == 'gold' ? goldLogs : diagnosticSettingLevel == 'silver' ? silverLogs : bronzeLogs
+var selectedServiceLogs = diagnosticSettingLevel == 'gold' ? goldServiceLogs : diagnosticSettingLevel == 'silver' ? silverServiceLogs : bronzeServiceLogs
 
 // Storage Account Diagnostic Settings
 resource storageAccountDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
@@ -106,7 +114,7 @@ resource blobServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-0
   properties: {
     workspaceId: logAnalyticsWorkspaceId
     metrics: selectedMetrics
-    logs: selectedLogs
+    logs: selectedServiceLogs
   }
 }
 
@@ -122,7 +130,7 @@ resource tableServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-
   properties: {
     workspaceId: logAnalyticsWorkspaceId
     metrics: selectedMetrics
-    logs: selectedLogs
+    logs: selectedServiceLogs
   }
 }
 
@@ -138,7 +146,7 @@ resource queueServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-
   properties: {
     workspaceId: logAnalyticsWorkspaceId
     metrics: selectedMetrics
-    logs: selectedLogs
+    logs: selectedServiceLogs
   }
 }
 
@@ -154,7 +162,7 @@ resource fileServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-0
   properties: {
     workspaceId: logAnalyticsWorkspaceId
     metrics: selectedMetrics
-    logs: selectedLogs
+    logs: selectedServiceLogs
   }
 }
 
