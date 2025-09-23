@@ -122,6 +122,8 @@ param logicAppsExists bool = false
 param eventHubsExists bool = false
 @description('Enable public access with perimeter for Logic Apps')
 param enablePublicAccessWithPerimeter bool = false
+// Security / access
+param centralDnsZoneByPolicyInHub bool = false
 
 @description('Tags to apply to all resources')
 param tags object
