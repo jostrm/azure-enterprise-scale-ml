@@ -55,14 +55,14 @@ var goldLogs = [
 
 var silverLogs = [
   {
-    categoryGroup: 'audit'
+    category: 'AuditEvent'
     enabled: true
   }
 ]
 
 var bronzeLogs = [
   {
-    categoryGroup: 'audit'
+    category: 'AuditEvent'
     enabled: true
   }
 ]
