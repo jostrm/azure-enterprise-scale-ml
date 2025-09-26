@@ -335,7 +335,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
 
 // ============== APPLICATION INSIGHTS ==============
 
-module applicationInsightOtherType '../modules/applicationInsightsRGmode.bicep' = {
+module applicationInsights '../modules/applicationInsightsRGmode.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -776,9 +776,65 @@ module applicationInsightsDiagnostics '../modules/diagnostics/applicationInsight
     diagnosticSettingLevel: diagnosticSettingLevel
   }
   dependsOn: [
-    applicationInsightOtherType
+    applicationInsights
   ]
 }
+
+// ============================================================================
+// AMPLS Integration in Foundation Deployment
+// ============================================================================
+@description('Enable Azure Monitor Private Link Scope deployment')
+param enableAMPLS bool = false
+@description('Hub monitoring subnet name')
+param hubMonitoringSubnetName string = 'snet-monitoring'
+@description('Existing Application Insights resource IDs already connected to AMPLS')
+param existingAmplsApplicationInsightsIds array = []
+@description('Existing Log Analytics Workspace resource IDs already connected to AMPLS')
+param existingAmplsLogAnalyticsWorkspaceIds array = []
+
+// Deploy AMPLS in hub/spoke architecture if enabled
+module amplsIntegration '../modules/monitoring/amplsIntegration.bicep' = if (enableAMPLS) {
+  name: take('11-ampls-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    env: env
+    location: location
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    tags: tags
+    privDnsSubscription: privDnsSubscription
+    privDnsResourceGroup: privDnsResourceGroupName
+    hubVnetName: vnetNameFull
+    hubVnetResourceGroup: vnetResourceGroupName
+    monitoringSubnetName: hubMonitoringSubnetName
+    existingLogAnalyticsWorkspaceIds: union(existingAmplsLogAnalyticsWorkspaceIds, [logAnalyticsWorkspace.id])
+    existingApplicationInsightsIds: union(existingAmplsApplicationInsightsIds, [applicationInsights.outputs.ainsId])
+    ingestionAccessMode: 'PrivateOnly'
+    queryAccessMode: 'PrivateOnly'
+    deployToHubResourceGroup: true
+  }
+  dependsOn: [
+    applicationInsights
+    CmnZones
+  ]
+}
+
+// Add AMPLS outputs to foundation outputs
+@description('AMPLS deployment information (if enabled)')
+output amplsInfo object = enableAMPLS ? {
+  #disable-next-line BCP318
+  ampls: amplsIntegration.outputs.amplsInfo
+  #disable-next-line BCP318
+  dataCollectionEndpoint: amplsIntegration.outputs.dceInfo
+  #disable-next-line BCP318
+  privateEndpoint: amplsIntegration.outputs.privateEndpointInfo
+  #disable-next-line BCP318
+  resourceGroup: amplsIntegration.outputs.amplsResourceGroup
+  #disable-next-line BCP318
+  subscription: amplsIntegration.outputs.amplsSubscription
+  #disable-next-line BCP318
+  integrationComplete: amplsIntegration.outputs.integrationComplete
+} : {}
 
 // ============== OUTPUTS - Simplified ==============
 // Note: Outputs simplified to avoid conditional module reference issues

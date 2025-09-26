@@ -33,7 +33,7 @@ variables:
   admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 7 lowest. 0 is disabled. 90 days is recommended.
   azure_machinelearning_sp_oid: "TODO_ObjectID" # Azure Machine Learning service principle Object ID. Find it in Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
   use_ad_groups: "true" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
-
+  enableAMPLS: "false" # true, then AMPLS will be created in Hub subscription, AppInsights will be added, in private/private mode.
   # ============================================================================
   # OPTIONALLY (CHANGE ONCE) - Naming convention, on resource group
   # if projectPrefix='' and projectSuffix='' then mrvel-1-project001-eus2-dev-008
