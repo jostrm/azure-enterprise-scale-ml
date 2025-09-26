@@ -322,7 +322,6 @@ steps:
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: pscore
-    # scriptPath: 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
     ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
     arguments: '-spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -useServicePrincipal -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)"'
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
@@ -582,10 +581,26 @@ steps:
       resourceSuffix="$(admin_prjResourceSuffix)"
       prjResourceSuffixNoDash="${resourceSuffix#-}"
       twoNumbers="${resourceSuffix:2:2}"
+      
+      # Set project prefix and suffix from pipeline variables
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
 
       # Construct resource group name
       projectNameReplaced="${projectName/prj/project}"
       targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      # Debug resource group construction
+      echo "=== RESOURCE GROUP CONSTRUCTION DEBUG ==="
+      echo "commonRGNamePrefix: '$commonRGNamePrefix'"
+      echo "projectPrefix: '$projectPrefix'"
+      echo "projectNameReplaced: '$projectNameReplaced'"
+      echo "locationSuffix: '$locationSuffix'"
+      echo "envName: '$envName'"
+      echo "aifactorySuffixRG: '$aifactorySuffixRG'"
+      echo "projectSuffix: '$projectSuffix'"
+      echo "Final targetResourceGroup: '$targetResourceGroup'"
+      echo "================================================"
 
       # Check if target resource group exists
       echo "Checking if resource group exists: $targetResourceGroup"
@@ -636,22 +651,48 @@ steps:
         local prefix="$3"
         local suffix="$4"
 
+        # Debug output for managed identity checks (send to stderr so it doesn't interfere with return value)
+        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+          echo "DEBUG: Checking managed identity in RG: $rg" >&2
+          echo "DEBUG: Looking for prefix: $prefix" >&2
+        fi
+
         # Run the az resource list command and capture its output and exit status
         local output
-        output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix') ]" 2>&1)
+        # For managed identities and other resources with random salts, use more flexible matching
+        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+          # For managed identities, only check prefix since they have random salts
+          output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix')]" 2>&1)
+          echo "DEBUG: Command executed: az resource list --resource-group '$rg' --resource-type '$type' --query \"[?starts_with(name, '$prefix')]\"" >&2
+        else
+          # For other resources, use the original logic
+          output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix') ]" 2>&1)
+        fi
         local status=$?
+
+        # Debug output for managed identity checks (send to stderr)
+        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+          echo "DEBUG: Command status: $status" >&2
+          echo "DEBUG: Raw output: $output" >&2
+        fi
 
         # Check if the command succeeded
         if [ $status -ne 0 ]; then
-          echo "Error: Failed to list resources in resource group '$rg' with type '$type'."
-          echo "Details: $output"
+          echo "Error: Failed to list resources in resource group '$rg' with type '$type'." >&2
+          echo "Details: $output" >&2
           return 1
         fi
 
         # Check if the resource exists
         if echo "$output" | grep -q "$prefix"; then
+          if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+            echo "DEBUG: Found managed identity matching prefix" >&2
+          fi
           echo "true"
         else
+          if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+            echo "DEBUG: No managed identity found matching prefix" >&2
+          fi
           echo "false"
         fi
       }
@@ -743,6 +784,18 @@ steps:
       echo "##vso[task.setvariable variable=webAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName" "$suffixAppServicePlan")"
       echo "##vso[task.setvariable variable=keyvaultExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName" "$suffixKeyvault")"
       echo "##vso[task.setvariable variable=miACAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix" "$suffixStandard")"
+      
+      # Debug output for managed identity check
+      echo "=== DEBUGGING MANAGED IDENTITY CHECK ==="
+      echo "Target Resource Group: $targetResourceGroup"
+      echo "MI Project Prefix: $miPrjPrefix"
+      echo "Suffix Standard: $suffixStandard"
+      echo "Looking for managed identity with prefix: $miPrjPrefix"
+      
+      # List all managed identities in the resource group for debugging
+      echo "=== ALL MANAGED IDENTITIES IN RESOURCE GROUP ==="
+      az resource list --resource-group "$targetResourceGroup" --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" --query "[].name" -o table || echo "Failed to list managed identities or none found"
+      
       echo "##vso[task.setvariable variable=miPrjExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix" "$suffixStandard")"
       echo "##vso[task.setvariable variable=storageAccount1001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
       echo "##vso[task.setvariable variable=storageAccount2001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")"
@@ -854,6 +907,10 @@ steps:
         envName="$(dev_test_prod)"
         aifactorySuffixRG="$(admin_aifactorySuffixRG)"
         miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+        
+        # Set project prefix and suffix from pipeline variables
+        projectPrefix="$(projectPrefix)"
+        projectSuffix="$(projectSuffix)"
         
         # Construct resource group name
         projectNameReplaced="${projectName/prj/project}"

@@ -36,9 +36,11 @@ variables:
 
   # ============================================================================
   # OPTIONALLY (CHANGE ONCE) - Naming convention, on resource group
+  # if projectPrefix='' and projectSuffix='' then mrvel-1-project001-eus2-dev-008
+  # if projectPrefix='esml-' and projectSuffix='-rg' then mrvel-1-esml-project001-eus2-dev-008-rg
   # ============================================================================
-  projectPrefix: 'esml-' # mrvel-1-[esml-]project001-eus2-dev-008-rg "" -> mrvel-1-project001-eus2-dev-008-rg
-  projectSuffix: '-rg' # mrvel-1-esml-project001-eus2-dev-008[-rg] -> mrvel-1-project001-eus2-dev-008
+  projectPrefix: 'esml-' # default: esml-
+  projectSuffix: '-rg' # default: -rg
 
   # ============================================================================
   # MANDATORY(CHANGE ONCE):BASE PARAMETERS: v1.22 updates: Moved from .json to this YAML
@@ -211,7 +213,7 @@ variables:
   enableCosmosDB: "false" # true, if creating an own Capability host (enableAFoundryCaphost; "true"), then it is needed for AI Foundry V2 project, agents.
   cosmosKind: "GlobalDocumentDB" # "MongoDB", "GlobalDocumentDB"
   enablePostgreSQL: "false"
-  postGresAdminEmails: "MngEnvMCAP806050.onmicrosoft.com" # pass a commaseparated list of email addresses. or a single email address
+  postGresAdminEmails: "email_adress_only" # pass a commaseparated list of email addresses. or a single email address
   enableRedisCache: "false"
   enableSQLDatabase: "false"
   # === WebApp ===
@@ -240,7 +242,7 @@ variables:
   # Description: runNetworkingVar:"true"(default) 
   #  Set to true when creating a new project, "false" to UPDATE or ADD services
   # ============================================================================
-  runNetworkingVar: "false" # true, when creating a new project. set to false if you want to UPDATE or ADD services to a project. 
+  runNetworkingVar: "true" # true, when creating a new project. set to false if you want to UPDATE or ADD services to a project. 
 
 ## ============================================================================
 ## END - FOREACH PER PROJECT (MANDATORY)

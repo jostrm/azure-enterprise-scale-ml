@@ -280,8 +280,13 @@ module serverFarm 'br/public:avm/res/web/serverfarm:0.5.0' = if(empty(byoAseAppS
     skuName: appServicePlanSku
     // Add ASE integration if provided
     appServiceEnvironmentResourceId: byoASEv3 && !empty(byoAseFullResourceId) ? byoAseFullResourceId : ''
+    // Fix elastic worker count issues for Workflow Standard SKUs
+    // For WS* SKUs, set capacity and ensure maximumElasticWorkerCount > skuCapacity
+    skuCapacity: contains(appServicePlanSku, 'WS') ? 1 : contains(appServicePlanSku, 'EP') ? 1 : 1
+    maximumElasticWorkerCount: contains(appServicePlanSku, 'WS') ? 10 : contains(appServicePlanSku, 'EP') ? 20 : null
   }
 }
+
 
 // 2) Use the User assigned managed Identity "miPrjName", they keyvault with name "keyvaultName", "storageAccount1001Name"
 
