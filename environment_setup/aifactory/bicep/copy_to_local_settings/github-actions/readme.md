@@ -45,7 +45,7 @@ git config --system core.longpaths true
     
     **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
     ```
-    git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
+    git submodule foreach 'git checkout "release/v1.23" && git pull origin "release/v1.23"'
     ```
 
     **Option B)**
@@ -65,14 +65,14 @@ git config --system core.longpaths true
    bash ./01-aif-copy-aifactory-templates.sh
     ```
 4) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
-    - Note: Is is under the `aifactory` folder, you will configure your [base parameters](../../../../aifactory/parameters/) and other variables.
+    - Note: Is is under the `aifactory` folder, you will configure your variables, and the possibility to leverage BYOBicep when editing the GH workflow templates.
 5) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
     - Note: If you want to refresh the pipeline templates, but not overwrite the .env file, you may run `03-GH-bootstrap-files-no-env-overwrite.sh`
      ```
    bash ./02-GH-bootstrap-files.sh
     ```
 
-OUTPUT: The file structure should now look something like below: 
+OUTPUT: The file structure should now look something like below (except parameters folder, that is deprecated, should not be visible): 
 
 ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-byorepo.png)
 
@@ -104,9 +104,13 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
 
 -->
 
-7) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json)
-8) Edit the [.env] variables at your root. (These will override some of the base parameters)
-9) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
+<!--7) Edit the [base parameters](../../../../aifactory/parameters/). All files 12 files such as [10-esml-globals-1.json](../../../../aifactory/parameters/10-esml-globals-1.json) -->
+7) Edit the [.env] variables at your root.
+    - Choose naming convention: prefix, suffixes
+    - Choose which services to enable or disable
+    - BYOVNet, BYOSubnet, BYOAce, enableAIGateway
+    - etc
+8) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
     - NB! The below will use Github CLI (gh), if the command does not work, plese see PREREQUISITES.
     ```
    bash ./10-GH-create-or-update-github-variables.sh
@@ -126,7 +130,18 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
     - OUTPUT: The environment in Github should now look something like below (~21 variables in each environment: Dev,Stage, Prod)
     - ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-env-vars.png)
 
-10) Run the Github action workflows, start with `infra-aifactory-common.yaml` then you can run `infra-project-genai.yaml` or `infra-project-esml.yaml`
+9) Run the Github action workflows for `infra-aifactory-common.yaml`
+10) Set the variable in your .env file called `aifactory_salt`, and then run the script again, `10-GH-create-or-update-github-variables.sh`,  to update your GH variables. 
+
+```code yaml
+# Update with values from AI Factory COMMON Resource group.The aifactory_salt can be read from the AI Factory common resource group in names of services such as Azure Datafactory
+# - Example: the 'a4c2b'in "adf-cmn-weu-dev-a4c2b-001" and in Container registry, private endpoints: "pend-kv-cmndev-a4c2b-001-to-vnt-esmlcmn"
+# ...
+# ...
+```
+Read more information in the comment section of variables.yaml
+
+11) Run the workflow `infra-project-genai.yaml`
 
 ## Workflow: AIFactory Common 
 Start with setting up a common AIFactory environment, example, the DEV environment
