@@ -344,7 +344,7 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.12.4' = if(!eventHubsEx
         customNetworkInterfaceName: '${eventHubName}-pend-nic'
         subnetResourceId: resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, genaiSubnetName)
         privateDnsZoneResourceIds: [
-          privateLinksDnsZones.eventHubNamespaces
+          privateLinksDnsZones.namespace
         ]
         tags: tags
       }
@@ -518,7 +518,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
         customNetworkInterfaceName: '${logicAppsName}-pend-nic'
         subnetResourceId: resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, genaiSubnetName)
         privateDnsZoneResourceIds: [
-          privateLinksDnsZones.sites
+          privateLinksDnsZones.azurewebapps
         ]
         tags: tags
       }
