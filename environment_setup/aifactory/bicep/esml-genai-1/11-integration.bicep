@@ -500,9 +500,9 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
       {
         name: 'appsettings'
         properties: {
-          AzureWebJobsStorage: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=core.windows.net'
+          AzureWebJobsStorage: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=${environment().suffixes.storage}'
           APP_KIND: 'workflowapp'
-          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: '@Microsoft.KeyVault(VaultName=${keyvaultName};SecretName=stologicapp01-connectionstring)'
+          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=${environment().suffixes.storage}'
           WEBSITE_CONTENTSHARE: '${logicAppsName}-content'
           FUNCTIONS_EXTENSION_VERSION: '~4'
           FUNCTIONS_WORKER_RUNTIME: runtime == 'dotnet' ? 'dotnet-isolated' : runtime
