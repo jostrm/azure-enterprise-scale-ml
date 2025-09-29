@@ -503,6 +503,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
           AzureWebJobsStorage: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=core.windows.net'
           APP_KIND: 'workflowapp'
           WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: '@Microsoft.KeyVault(VaultName=${keyvaultName};SecretName=stologicapp01-connectionstring)'
+          WEBSITE_CONTENTSHARE: '${logicAppsName}-content'
           FUNCTIONS_EXTENSION_VERSION: '~4'
           FUNCTIONS_WORKER_RUNTIME: runtime == 'dotnet' ? 'dotnet-isolated' : runtime
           WEBSITE_RUN_FROM_PACKAGE: '1'
@@ -529,7 +530,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
         properties: {
           http20Enabled: true
           ftpsState: 'Disabled'
-          minimumElasticInstanceCount: 0
+          minimumElasticInstanceCount: 1
           preWarmedInstanceCount: 1
           alwaysOn: true
           linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}' : ''
