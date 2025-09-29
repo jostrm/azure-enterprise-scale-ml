@@ -120,6 +120,14 @@ param enableEventHubs bool = false
 @description('Create if not exists')
 param logicAppsExists bool = false
 param eventHubsExists bool = false
+@description('Enable Function App deployment')
+param enableFunction bool = false
+@description('Enable Web App deployment')
+param enableWebApp bool = false
+@description('Function App already exists (skip creation)')
+param functionAppExists bool = false
+@description('Web App already exists (skip creation)')
+param webAppExists bool = false
 @description('Enable public access with perimeter for Logic Apps')
 param enablePublicAccessWithPerimeter bool = false
 // Security / access
@@ -290,8 +298,9 @@ module serverFarm 'br/public:avm/res/web/serverfarm:0.5.0' = if(empty(byoAseAppS
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
-//module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3) {
-module subnetDelegationServerFarmLapps '../modules/subnetDelegation.bicep' = if(!logicAppsExists && enableLogicApps && !byoASEv3) {
+
+//module subnetDelegationServerFarmLapps '../modules/subnetDelegation.bicep' = if(!logicAppsExists && enableLogicApps && !byoASEv3) {
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!logicAppsExists && !functionAppExists && !webAppExists) && ((!enableWebApp && !enableFunction) && enableLogicApps) && !byoASEv3) {
   name: take('11-snetDelegSF1${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -337,7 +346,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2020-08
 }
 
 // Event Hub Namespace deployment using Azure verified modules (AVM)
-module eventHub 'br/public:avm/res/event-hub/namespace:0.12.4' = if(!eventHubsExists && enableEventHubs) {
+module eventHub 'br/public:avm/res/event-hub/namespace:0.12.5' = if(!eventHubsExists && enableEventHubs) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-EventHub-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -552,7 +561,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
   dependsOn: [
     serverFarm
     namingConvention
-    subnetDelegationServerFarmLapps
+    subnetDelegationServerFarm
   ]
 }
 
