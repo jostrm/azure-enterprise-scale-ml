@@ -6,6 +6,7 @@ parameters:
 steps:
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
+  condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -63,6 +64,7 @@ steps:
       fi
 - task: PowerShell@2
   displayName: '00_check_submodule_and_paths'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     targetType: 'inline'
     script: |
@@ -129,6 +131,7 @@ steps:
 
 - task: AzureCLI@2
   displayName: '00_pwsh_print_info'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: pscore
