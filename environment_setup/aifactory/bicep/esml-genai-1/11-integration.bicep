@@ -287,6 +287,28 @@ module serverFarm 'br/public:avm/res/web/serverfarm:0.5.0' = if(empty(byoAseAppS
   }
 }
 
+// ============== SUBNET DELEGATIONS ==============
+
+// Subnet delegation for Web Apps and Function Apps
+//module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3) {
+module subnetDelegationServerFarmLapps '../modules/subnetDelegation.bicep' = if(!logicAppsExists && enableLogicApps && !byoASEv3) {
+  name: take('11-snetDelegSF1${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(vnetResourceGroupName)
+  params: {
+    vnetName: vnetName
+    subnetName: aksSubnetName // TODO: Have a dedicated subnet for WebApp, FunctionApp, logicAppsExists
+    location: location
+    vnetResourceGroupName: vnetResourceGroupName
+    delegations: [
+      {
+        name: 'webapp-delegation'
+        properties: {
+          serviceName: 'Microsoft.Web/serverFarms'
+        }
+      }
+    ]
+  }
+}
 
 // 2) Use the User assigned managed Identity "miPrjName", they keyvault with name "keyvaultName", "storageAccount1001Name"
 
@@ -530,6 +552,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
   dependsOn: [
     serverFarm
     namingConvention
+    subnetDelegationServerFarmLapps
   ]
 }
 

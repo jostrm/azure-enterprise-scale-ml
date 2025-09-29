@@ -1743,7 +1743,7 @@ steps:
     arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '114_Purge_If_SoftDeleted_71_72_After5minutes'
+  displayName: '114_Purge_If_SoftDeleted_111_112_After5minutes'
   condition: and(eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
