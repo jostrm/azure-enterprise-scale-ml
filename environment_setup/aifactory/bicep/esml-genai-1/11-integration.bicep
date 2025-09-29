@@ -500,9 +500,13 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
       {
         name: 'appsettings'
         properties: {
-          AzureWebJobsStorage: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=${environment().suffixes.storage}'
+          AzureWebJobsStorage__accountName: storageAccount1001Name
+          AzureWebJobsStorage__blobServiceUri: 'https://${storageAccount1001Name}.blob.${environment().suffixes.storage}'
+          AzureWebJobsStorage__queueServiceUri: 'https://${storageAccount1001Name}.queue.${environment().suffixes.storage}'
+          AzureWebJobsStorage__credential: 'managedidentity'
           APP_KIND: 'workflowapp'
-          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=${environment().suffixes.storage}'
+          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__accountName: storageAccount1001Name
+          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__credential: 'managedidentity'
           WEBSITE_CONTENTSHARE: '${logicAppsName}-content'
           FUNCTIONS_EXTENSION_VERSION: '~4'
           FUNCTIONS_WORKER_RUNTIME: runtime == 'dotnet' ? 'dotnet-isolated' : runtime
@@ -563,6 +567,26 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
     serverFarm
     namingConvention
     subnetDelegationServerFarm
+  ]
+}
+
+// ============== STORAGE ROLE ASSIGNMENTS ==============
+// Get the Logic Apps resource after deployment to extract the principal ID
+resource deployedLogicApp 'Microsoft.Web/sites@2023-12-01' existing = {
+  name: logicAppsName
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
+// Use the existing storageRoleAssignments module for Logic Apps
+module logicAppsStorageRoles '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('11-LogicAppsStorageRoles-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    storageAccountName: storageAccount1001Name
+    principalId: deployedLogicApp.identity.principalId
+  }
+  dependsOn: [
+    logicAppStandard
   ]
 }
 
