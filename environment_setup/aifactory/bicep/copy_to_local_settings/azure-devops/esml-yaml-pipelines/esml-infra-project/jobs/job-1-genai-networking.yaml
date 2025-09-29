@@ -411,7 +411,9 @@ steps:
      --parameters subnetCommonPowerbiGw="$(subnetCommonPowerbiGw)" \
      --parameters subnetProjGenAI="$(subnetProjGenAI)" \
      --parameters subnetProjAKS="$(subnetProjAKS)" \
+     --parameters subnetProjAKS2="$(subnetProjAKS2)" \
      --parameters subnetProjACA="$(subnetProjACA)" \
+     --parameters subnetProjACA2="$(subnetProjACA2)" \
      --parameters subnetProjDatabricksPublic="$(subnetProjDatabricksPublic)" \
      --parameters subnetProjDatabricksPrivate="$(subnetProjDatabricksPrivate)" \
      --parameters byoASEv3="$(byoASEv3)" \

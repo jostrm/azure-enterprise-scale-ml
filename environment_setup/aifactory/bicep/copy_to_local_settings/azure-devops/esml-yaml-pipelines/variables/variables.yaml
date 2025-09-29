@@ -93,7 +93,12 @@ variables:
   # ============================================================================
   addBastionHost: "false" # COMMON resource group
   enableAdminVM: "false" # COMMON resource group
-  
+  # ============================================================================
+  # MANDATORY(CHANGE RARELY):Diagnostics - on all resources.
+  # ============================================================================
+  diagnosticSettingLevel: "gold" # gold, silver, bronze where gold has most info
+  # ============================================================================
+
   # ============================================================================
   # MANDATORY(CHANGE RARELY): AI Factory scale set.
   # WHAT: 

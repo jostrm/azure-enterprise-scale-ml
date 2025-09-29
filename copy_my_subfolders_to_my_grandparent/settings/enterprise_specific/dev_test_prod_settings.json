@@ -6,6 +6,7 @@
     "prod_subscription": "same_as_1_or_2_or_3",
     
     "common_rg_name": "acme-esml-common-weu-{}-001",
+    "common_vnet_rg_name": "mrvel-1-esml-common-eus2-{}",
     "common_vnet_name": "vnt-esmlcmn-weu-{}-001",
 
     "dev_common_subnet_name": "snet-esml-cmn-001",

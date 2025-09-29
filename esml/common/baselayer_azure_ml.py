@@ -466,9 +466,9 @@ class ComputeFactory():
                                 agent_count=self.aks_config['aks_agent_count'],
                                 location=self.aks_config['location']
                             )
-                    rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
+                    rg_name, vnet_name, subnet_name,common_vnet_rg_name = self.project.vNetForActiveEnvironment()
                     if((len(subnet_name) > 0)):
-                        prov_config.vnet_resourcegroup_name = rg_name
+                        prov_config.vnet_resourcegroup_name = common_vnet_rg_name
                         prov_config.vnet_name = vnet_name
                         prov_config.subnet_name = subnet_name
                         prov_config.service_cidr = self.aks_config['service_cidr']
@@ -605,14 +605,14 @@ class ComputeFactory():
         except ComputeTargetException:
             print('Creating new cluster - ' + name)
 
-            rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
+            rg_name, vnet_name, subnet_name, common_vnet_rg_name = self.project.vNetForActiveEnvironment()
 
             if((len(subnet_name) > 0)):
                 compute_config = AmlCompute.provisioning_configuration(vm_size=self.vm_size,
                                                                         vm_priority=self.vm_prio,  # 'dedicated', 'lowpriority'
                                                                         min_nodes=self.min_nodes,
                                                                         max_nodes=self.vm_maxnodes,
-                                                                        vnet_resourcegroup_name=rg_name,
+                                                                        vnet_resourcegroup_name=common_vnet_rg_name,
                                                                         vnet_name=vnet_name,
                                                                         subnet_name=subnet_name)
             else:
@@ -643,14 +643,14 @@ class ComputeFactory():
         except ComputeTargetException:
             print('Creating new cluster - ' + name)
 
-            rg_name, vnet_name, subnet_name = self.project.vNetForActiveEnvironment()
+            rg_name, vnet_name, subnet_name, common_vnet_rg_name = self.project.vNetForActiveEnvironment()
 
             if((len(subnet_name) > 0)):
                 compute_config = AmlCompute.provisioning_configuration(vm_size=self.batch_vm_size,
                                                                         vm_priority=self.batch_vm_prio,  # 'dedicated', 'lowpriority'
                                                                         min_nodes=self.batch_min_nodes,
                                                                         max_nodes=self.batch_vm_maxnodes,
-                                                                        vnet_resourcegroup_name=rg_name,
+                                                                        vnet_resourcegroup_name=common_vnet_rg_name,
                                                                         vnet_name=vnet_name,
                                                                         subnet_name=subnet_name)
             else:

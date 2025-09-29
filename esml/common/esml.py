@@ -103,6 +103,7 @@ class ESMLProject():
     lake_design_version = 3
     common_rg_name = ""
     common_vnet_name = ""
+    common_vnet_rg_name = ""
     common_subnet_name = ""
     active_common_subnet_name = ""
     use_aml_cluster_to_build_images = False
@@ -236,8 +237,9 @@ class ESMLProject():
         print("-",self.location)
         print("-", self.common_rg_name)
 
-        rg_name, vnet_name, subnet_name = self.vNetForActiveEnvironment()
+        rg_name, vnet_name, subnet_name,common_vnet_rg_name = self.vNetForActiveEnvironment()
         print("Active vNet:", vnet_name)
+        print("In vNet Resource group:",common_vnet_rg_name)
         print("Active SubNet:",subnet_name)
         print ("[USAGE] for the above: p.vNetForActiveEnvironment()")
 
@@ -560,7 +562,7 @@ class ESMLProject():
         return rg_name
 
     def vNetForActiveEnvironment(self):
-        rg_name,vnet_name, subnet_name = None,None,None
+        rg_name,vnet_name, subnet_name,common_vnet_rg_name = None,None,None,None
         self.set_active_common_subnet_name()
 
         if(self.lake_storage_accounts == 1): # 1 lake for all -> ignore dev_test_prod. 
@@ -571,8 +573,11 @@ class ESMLProject():
             vnet_name = self.common_vnet_name
             rg_name = self.common_rg_name
             subnet_name = self.active_common_subnet_name
+        
+        # Fallback: if enterprise config didn't populate common_vnet_rg_name, reuse the resolved rg_name
+        common_vnet_rg_name = self.common_vnet_rg_name if self.common_vnet_rg_name not in (None, '') else rg_name
 
-        return rg_name, vnet_name, subnet_name
+        return rg_name, vnet_name, subnet_name, common_vnet_rg_name
         
     def getLakeForActiveEnvironment(self):
         sa_name, rg_name, sub_id = None,None,None
@@ -620,6 +625,7 @@ class ESMLProject():
         self.lake_design_version = self.env_config['lake_design_version']
 
         self.common_rg_name = self.getResourceGroupName(self.dev_test_prod) # self.env_config['common_rg_name'].format(self.dev_test_prod.upper())
+        self.common_vnet_rg_name = self.env_config['common_vnet_rg_name'].format(self.dev_test_prod)
         self.common_vnet_name = self.env_config['common_vnet_name'].format(self.dev_test_prod)
         self.common_subnet_name = self.env_config['dev_common_subnet_name']
 

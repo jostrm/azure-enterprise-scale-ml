@@ -251,7 +251,7 @@ var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
 var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrProjectName
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
-var aksSubnetName = namingConvention.outputs.aksSubnetName
+var aks2SubnetName = namingConvention.outputs.aks2SubnetName
 var genaiName = namingConvention.outputs.projectTypeGenAIName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
@@ -408,7 +408,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     skuTier: mlWorkspaceSkuTier
     env: env
     aksSubnetId: aksExists ? '' : aks2SubnetId
-    aksSubnetName: aksExists ? '' : aksSubnetName
+    aksSubnetName: aksExists ? '' : aks2SubnetName
     aksDnsServiceIP: aksExists ? '' : aksDnsServiceIP
     aksServiceCidr: aksExists ? '' : aksServiceCidr
     tags: tagsProject

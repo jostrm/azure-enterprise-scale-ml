@@ -7,7 +7,7 @@ parameters:
 steps:
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1393,7 +1393,6 @@ steps:
      --parameters aiHubExists="$(aiHubExists)" \
      --parameters aifProjectExists="$(aifProjectExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
-     --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
