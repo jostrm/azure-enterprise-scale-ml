@@ -525,7 +525,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
     ]
     
     // VNet integration (only if not using ASE v3)
-    virtualNetworkSubnetResourceId: byoASEv3 ? '' : (enablePublicAccessWithPerimeter ? '' : resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, genaiSubnetName))
+    virtualNetworkSubnetResourceId: byoASEv3 ? '' : (enablePublicAccessWithPerimeter ? '' : resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, aksSubnetName))
   }
   dependsOn: [
     serverFarm
