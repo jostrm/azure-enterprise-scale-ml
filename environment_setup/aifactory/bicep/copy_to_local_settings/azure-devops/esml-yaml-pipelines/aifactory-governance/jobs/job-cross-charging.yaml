@@ -1,0 +1,110 @@
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: serviceConnectionSeeding
+    type: string
+
+steps:
+- task: AzureCLI@2
+  displayName: '00_pwsh_print_info'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+      Write-Host "=== Cross-Charging Report Generation ==="
+      Write-Host "Environment: $(dev_test_prod)"
+      Write-Host "Subscription ID: $(dev_test_prod_sub_id)"
+      Write-Host "AI Factory Prefix: $(admin_aifactoryPrefixRG)"
+      Write-Host "Location Suffix: $(admin_locationSuffix)"
+      Write-Host "AI Factory Suffix: $(admin_aifactorySuffixRG)"
+      Write-Host "Project Prefix: $(projectPrefix)"
+      Write-Host "Project Suffix: $(projectSuffix)"
+      Write-Host "Common Lake Prefix: $(commonLakeNamePrefixMax8chars)"
+      Write-Host "Lake Container: $(lakeContainerName)"
+      Write-Host "Current Date: $(date +%Y-%m-%d)"
+
+- task: AzureCLI@2
+  displayName: '01_generate_deployment_random_value'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+      # Generate a random deployment ID for this entire pipeline run
+      $randomValue = Get-Random -Minimum 100000 -Maximum 999999
+      Write-Host "Generated random value: $randomValue"
+      echo "##vso[task.setvariable variable=deployment_random_value]$randomValue"
+
+- task: AzureCLI@2
+  displayName: '02_set_environment_variables'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      # Set environment variables for the cross-charging scripts
+      export AIFACTORY_PREFIX_RG="$(admin_aifactoryPrefixRG)"
+      export LOCATION_SUFFIX="$(admin_locationSuffix)"
+      export AIFACTORY_SUFFIX_RG="$(admin_aifactorySuffixRG)"
+      export PROJECT_PREFIX="$(projectPrefix)"
+      export PROJECT_SUFFIX="$(projectSuffix)"
+      export ENVIRONMENT="$(dev_test_prod)"
+      export SUBSCRIPTION_ID="$(dev_test_prod_sub_id)"
+      export COMMON_LAKE_PREFIX="$(commonLakeNamePrefixMax8chars)"
+      export LAKE_CONTAINER_NAME="$(lakeContainerName)"
+      export DEPLOYMENT_RANDOM="$(deployment_random_value)"
+      
+      echo "Environment variables set successfully"
+      echo "AIFACTORY_PREFIX_RG: $AIFACTORY_PREFIX_RG"
+      echo "LOCATION_SUFFIX: $LOCATION_SUFFIX"
+      echo "ENVIRONMENT: $ENVIRONMENT"
+
+- task: AzureCLI@2
+  displayName: '03_discover_resource_groups'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/121_discover_resource_groups.sh'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado'
+
+- task: AzureCLI@2
+  displayName: '04_collect_cost_data'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/122_collect_cost_data.sh'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado'
+
+- task: AzureCLI@2
+  displayName: '05_upload_to_datalake'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/123_upload_to_datalake.sh'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado'
+
+- task: AzureCLI@2
+  displayName: '06_send_email_notifications'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/124_send_email_notifications.sh'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado'
+
+- task: AzureCLI@2
+  displayName: '07_cleanup_temp_files'
+  condition: always()
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      echo "Cleaning up temporary files..."
+      rm -f /tmp/resource_groups_*.txt
+      rm -f /tmp/cost_data_*.csv
+      rm -f /tmp/aifactory_cross_charging_*.csv
+      echo "Cleanup completed"
