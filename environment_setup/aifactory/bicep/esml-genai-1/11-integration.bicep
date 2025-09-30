@@ -10,6 +10,10 @@ targetScope = 'subscription'
 // - Key Vault integration for secure configuration
 // - Application Insights monitoring and telemetry
 // - VNet integration and private endpoint support
+// Logic Apps Permissions - What Logic Apps needs for keyless authentication:
+//✅ Blob access → Storage Blob Data Contributor ✓
+//✅ Queue access → Storage Queue Data Contributor ✓
+//✅ File share access → Storage File Data SMB Share Contributor ✓
 // ================================================================
 
 // ============== SKUs ==============
@@ -504,10 +508,12 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
           AzureWebJobsStorage__blobServiceUri: 'https://${storageAccount1001Name}.blob.${environment().suffixes.storage}'
           AzureWebJobsStorage__queueServiceUri: 'https://${storageAccount1001Name}.queue.${environment().suffixes.storage}'
           AzureWebJobsStorage__credential: 'managedidentity'
+          AzureWebJobsStorage__clientId: getProjectMIPrincipalId.outputs.clientId
           APP_KIND: 'workflowapp'
           WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=${environment().suffixes.storage};AccountKey='
           WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__accountName: storageAccount1001Name
           WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__credential: 'managedidentity'
+          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__clientId: getProjectMIPrincipalId.outputs.clientId
           WEBSITE_CONTENTSHARE: '${logicAppsName}-content'
           FUNCTIONS_EXTENSION_VERSION: '~4'
           FUNCTIONS_WORKER_RUNTIME: runtime == 'dotnet' ? 'dotnet-isolated' : runtime
