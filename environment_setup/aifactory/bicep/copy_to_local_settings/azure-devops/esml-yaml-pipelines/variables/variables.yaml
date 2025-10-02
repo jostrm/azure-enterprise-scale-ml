@@ -8,14 +8,13 @@ variables:
   # #### END - DO NOT TOUCH####
   # ============================================================================
 
-  # ============================================================================
+  # ============================================================================  
   # MANDATORY(CHANGE ONCE) - UPDATING submodule RELEASE version
   # If you want to upgrade the AIFactory (Long Term Support branches exists)
   # E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
   # ============================================================================
   aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
-  aifactory_version_minor: "22" # # 2025-05-23: 120_LTS
-
+  aifactory_version_minor: "23" # Minor version
   # ============================================================================
   # MANDATORY(CHANGE ONCE)
   # ============================================================================
@@ -355,9 +354,10 @@ variables:
   debug_disable_64_databases: "false" # CosmosDB, SQL Database, ...
   debug_disable_65_compute_services: "false" # ContainerApps, WebApp, FunctionApp
   debug_disable_66_ai_platform: "false" # AI Foundry Hub (V1) with default project, and connections to AISearch, Storage, ...
-  debug_disable_67_ml_platform: "false" # Azure Machine Learning, Datafactory, Databricks§
-  debug_disable_68_rbac_security: "false" # RBAC for 61-67
+  debug_disable_67_ml_platform: "false" # Azure Machine Learning, Datafactory, Databricks
+  debug_disable_68_integration: "true" # Logic Apps, Eventhubs
   debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage)
+  debug_disable_100_rbac_security: "false" # RBAC for 61-99
   debug_disable_10_aifactory_dashboards: "true" # AI Factory Dashboards
   # ============================================================================
   # DEBUG SETTINGS - Error Cleanup Tasks

@@ -8,7 +8,6 @@ NC='\033[0m' # No Color
 
 ################### VARIABLES ###################
 copy_notebooks=false
-init_parameters=true
 init_esml_util=true
 ################### VARIABLES ###################
 # 02. Copy template files to the new repository
@@ -44,11 +43,6 @@ if [ "$copy_notebooks" = true ]; then
 
     mkdir -p "$aif_dir/notebook_databricks/"
     cp "$start_dir/notebook_templates/notebook_databricks/" "$aif_dir/notebook_databricks/" -r
-fi
-
-if [ "$init_parameters" = true ]; then
-    ## PARAMETERS - BICEP/TERRAFORM/ADO/GHA
-    cp "$start_dir/environment_setup/aifactory/parameters/" "$aif_dir/parameters/" -r
 fi
 
 if [ "$init_esml_util" = true ]; then

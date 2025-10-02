@@ -1,8 +1,24 @@
+#
+#Dev_GenAI_Project:
+#✅ Runs automatically on CI triggers (release/project* branches and main)
+#✅ Runs on manual triggers
+#
+#Stage_GenAI_Project:
+#❌ Never runs automatically - requires manual trigger
+#✅ Only runs when manually triggered AND Dev succeeded
+#✅ Can be manually triggered from any branch (no branch restrictions)
+#
+#Prod_GenAI_Project:
+#❌ Never runs automatically - requires manual trigger
+#✅ Only runs when manually triggered AND (Stage succeeded/skipped OR Dev succeeded)
+#✅ Can be manually triggered from any branch
+#
+
 trigger:
   branches:
     include:
       - release/project*
-      - main
+      #- main
 variables:
   - template: ../variables/variables.yaml
 stages:
@@ -54,7 +70,7 @@ stages:
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
 - stage: Stage_GenAI_Project
   displayName: Stage GenAI Project
-  condition: and(ne(variables['Build.SourceBranch'], 'refs/heads/main'), succeeded('Dev_GenAI_Project'), eq(variables['deployToStage'], 'true'))
+  condition: and(eq(variables['Build.Reason'], 'Manual'), in(dependencies.Dev_GenAI_Project.result, 'Succeeded'))
   dependsOn: Dev_GenAI_Project
   variables:
     dev_test_prod: "test"
@@ -102,8 +118,10 @@ stages:
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
 - stage: Prod_GenAI_Project
   displayName: Prod GenAI Project
-  condition: and(ne(variables['Build.SourceBranch'], 'refs/heads/main'), succeeded('Stage_GenAI_Project'), eq(variables['deployToProd'], 'true'))
-  dependsOn: Stage_GenAI_Project
+  condition: and(eq(variables['Build.Reason'], 'Manual'), or(in(dependencies.Stage_GenAI_Project.result, 'Succeeded', 'Skipped'), in(dependencies.Dev_GenAI_Project.result, 'Succeeded')))
+  dependsOn: 
+    - Stage_GenAI_Project
+    - Dev_GenAI_Project
   variables:
     dev_test_prod: "prod"
     dev_test_prod_sub_id: "$(prod_sub_id)"

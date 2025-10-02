@@ -16,8 +16,8 @@ import { aifactoryNamingType } from '../modules/types/aifactoryNaming.bicep'
 
 @description('AI Factory version information')
 param aifactoryVersionMajor int = 1
-param aifactoryVersionMinor int = 22
-var activeVersion = 122
+param aifactoryVersionMinor int = 23
+var activeVersion = 123
 
 @description('Use Azure AD Groups for RBAC')
 param useAdGroups bool = false

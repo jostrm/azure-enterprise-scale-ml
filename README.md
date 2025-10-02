@@ -75,19 +75,21 @@ The services that can be added on top of the **BASELINE** can be seen in the ima
 -   `AI factory` - Technical BLOG
     - https://techcommunity.microsoft.com/t5/ai-machine-learning-blog/predict-steel-quality-with-azure-automl-in-manufacturing/ba-p/3616176
 
-## Feature Roadmap & Next Release: 1.21
-- **Next Release: 1.21** will include below up until 2024-05
+## Feature Roadmap & Next Release: 1.23
+- **Next Release: 1.23** will include below up until 2024-10
 - **Current release 1.20** includes all Done up until 2024-04
 
-### [Release 1.21](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_120) <br>
+### [Release 1.23](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_120) <br>
+- **ESML + GenAI merged into GenAI. enableServiceX=true, for all services. See [Variables.yaml file, lines: 178-240](./environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml)
+    - STATUS: Done (2025-08)
+- **New services: LogicApps **: Added as a service
+    - STATUS: Done (2025-10)
 - **OnlyCreateIfNotExists & more feature flags**: Dynamically adds services, via feature flags (workaround to avoid Bicep/ARM errors for private endpoints etc)
     - STATUS: Done (2025-05)
 - **BYOAppServiceEnv**: Deploy Azure function, Azure WebApp as usual via AIFactory, but connect to your own App services environment
     - STATUS: Done (2025-05)
 - **PostgreSQL (flexible servers), SQL Database, Redis Cache**: Add more Database engines, optionally to choose from
     - STATUS: Done (2025-05)
-- **MCP server - in AIFactory common**: To be able to register tools for AI foundry agents, and other agents in your AI Factory, an MCP Server is in progress.
-    - STATUS: Ongoing (2025-05)
 - **Advanced Personas**: Connect more `Personas` and `EntraID Security Groups` (within main personas: coreteam, project teams)
     - STATUS: Ongoing (2025-05)
 
