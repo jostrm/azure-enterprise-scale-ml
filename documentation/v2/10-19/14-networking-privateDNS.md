@@ -113,6 +113,11 @@ This depends on technical quota roofs on Subscription level. If you decide to ha
 
 Example: After ~15-20 projects you may hit the limit of depleded quota of max role assigments, hence you need to scale with subscriptions and AI Factory scale sets.
 
+Hence the AI Factory scales with Azure Subscriptions, which we call "AI Factory scale sets" - an automated way of scaling with Subscriptions. 
+
+At the same time, there is technical quota roofs in Azure about vNet peering, defaults to 500 peerings, but with Network manager a Hub-and-spoke can be have up to 1,000 spokes, peered. **Hence it is important to also not have only 1 *use case team* in 1 Subscription** - this will eat up the quota for peering to the hub, which is even worse - since you cannot easily add a new Hub. And your are sharing peering with other solutions besides the AI Factory scale setsa also. Hence the AI Factory have multiple use cases in each Azure subscription, where a vNet per environment and Subscription is peered. 
+- Example: 3 scale sets for AI Factory Dev environment, means 3 vNet to peer, but also supporting up to ~60 use cases (~20 per AI Factory scale set)
+
 > [!NOTE]
 > Below is just "ballpark numbers", e.g. rough estimation, based on projects from variuos customers since 2019:
 > We recommend to create at a new AI Factory scale set, before adding the 10th project. Even though it may scale to 20 or 40 before hitting the limit, it is good to be proactive. You may also create 3 scale sets per enviroment (dev, stage, prod) at one go, to be even more proactive.
