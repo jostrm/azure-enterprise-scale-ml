@@ -1,0 +1,518 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "1639351769351862146"
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the name of the NSG, network security group"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Specifies the location where the  network security group should be deployed. Defaults to resourceGroup.location"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "metadata": {
+        "description": "Specifies the tags that should be applied to the network security group"
+      }
+    },
+    "bastionIpRange": {
+      "type": "string",
+      "metadata": {
+        "description": "To lock INBOUND rule to only allow RDP anbd SSH ports from Azure Bastion  via private IP"
+      }
+    },
+    "enableFlowLogs": {
+      "type": "bool",
+      "defaultValue": true
+    },
+    "storageAccountId": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "networkWatcherName": {
+      "type": "string",
+      "defaultValue": "[format('NetworkWatcher_{0}', parameters('location'))]"
+    },
+    "networkWatcherResourceGroup": {
+      "type": "string",
+      "defaultValue": "NetworkWatcherRG"
+    },
+    "flowLogRetentionDays": {
+      "type": "int",
+      "defaultValue": 30
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2020-06-01",
+      "name": "[parameters('name')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "AML_CI_44224",
+            "properties": {
+              "description": "Required for Azure Machine Learning",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "44224",
+              "sourceAddressPrefix": "AzureMachineLearning",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 1200,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "AML_Port_29876-29877",
+            "properties": {
+              "description": "Required for Azure Machine Learning batch compute nodes",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "29876-29877",
+              "sourceAddressPrefix": "BatchNodeManagement",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 1100,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "Bastion_GetSessionInformation",
+            "properties": {
+              "description": "Bastion will reach to the VM (DSVM / jump server) over private IP. RDP/SSH ports 3389/22. NB! Change the IP range if not working",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "sourceAddressPrefix": "[parameters('bastionIpRange')]",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 1300,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [
+                "22",
+                "3389"
+              ],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "Allow_VNet_Inbound",
+            "properties": {
+              "description": "Allow traffic from other subnets in same VNet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 1400,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "DenyAllInboundExceptExplicit",
+            "properties": {
+              "description": "Deny all other inbound traffic not explicitly allowed above",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Deny",
+              "priority": 65000,
+              "direction": "Inbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "AzureDevOps_Allow_1",
+            "properties": {
+              "description": "Required for communication to Azure Devops. Needed to checkin code",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 2000,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": [
+                "13.107.6.0/24",
+                "13.107.9.0/24",
+                "13.107.42.0/24",
+                "13.107.43.0/24"
+              ]
+            }
+          },
+          {
+            "name": "AzureActiveDirectoryDomainServices_Allow",
+            "properties": {
+              "description": "Required for Azure Active Directory Domain Services communication",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "AzureActiveDirectoryDomainServices",
+              "access": "Allow",
+              "priority": 2050,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "AADLoginForWindows_Allow3services",
+            "properties": {
+              "description": "To enable Azure AD authentication for Windows VMs.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 2100,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "AADLoginForWindows_AllowServiceMeta",
+            "properties": {
+              "description": "To enable Azure AD authentication for Windows VMs.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "169.254.169.254",
+              "access": "Allow",
+              "priority": 2200,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          },
+          {
+            "name": "AzureActiveDirectory",
+            "properties": {
+              "description": "AML - Azure AD authentication (HTTPS only)",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "AzureActiveDirectory",
+              "access": "Allow",
+              "priority": 2300,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "AzureMachineLearningOutbound",
+            "properties": {
+              "description": "AML !!",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "AzureMachineLearning",
+              "access": "Allow",
+              "priority": 2400,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "AzureResourceManager",
+            "properties": {
+              "description": "AML !!",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "AzureResourceManager",
+              "access": "Allow",
+              "priority": 2500,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "AzureStorageAccount",
+            "properties": {
+              "description": "AML - Azure Storage (HTTPS and SMB)",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRanges": [
+                "443",
+                "445"
+              ],
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "[format('Storage.{0}', parameters('location'))]",
+              "access": "Allow",
+              "priority": 2600,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "AzureFrontDoor",
+            "properties": {
+              "description": "AML !!",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "AzureFrontDoor.FrontEnd",
+              "access": "Allow",
+              "priority": 2700,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "AzureContainerRegistry",
+            "properties": {
+              "description": "AML !!",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "[format('AzureContainerRegistry.{0}', parameters('location'))]",
+              "access": "Allow",
+              "priority": 2800,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "MicrosoftContainerRegistry",
+            "properties": {
+              "description": "AML !!",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "MicrosoftContainerRegistry",
+              "access": "Allow",
+              "priority": 2900,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "AKS_private_loadbalancer_call_from_DSVM_in_vNet",
+            "properties": {
+              "description": "Required for communication from private DSVM to call private AKS cluster endpoints. Needed for Azure ML inferencing.",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1600,
+              "direction": "Outbound",
+              "destinationAddressPrefix": "VirtualNetwork"
+            }
+          },
+          {
+            "name": "AzureMachineLearning_2023_sdkv2_1",
+            "properties": {
+              "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+              "protocol": "Udp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5831",
+              "sourceAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 3100,
+              "direction": "Outbound",
+              "destinationAddressPrefix": "AzureMachineLearning"
+            }
+          },
+          {
+            "name": "AzureMachineLearning_2023_sdkv2_2",
+            "properties": {
+              "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "5831",
+              "sourceAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 3300,
+              "direction": "Outbound",
+              "destinationAddressPrefix": "[format('BatchNodeManagement.{0}', parameters('location'))]"
+            }
+          },
+          {
+            "name": "AzureMachineLearning_2023_sdkv2_3",
+            "properties": {
+              "description": "Required for 2023 Mars update, to support Azure ML SDK v2",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRanges": [
+                "8787",
+                "18881"
+              ],
+              "sourceAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 3200,
+              "direction": "Outbound",
+              "destinationAddressPrefix": "AzureMachineLearning"
+            }
+          },
+          {
+            "name": "AzureDataFactory_Portal",
+            "properties": {
+              "description": "Required for Data Factory portal authoring and monitoring",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 3400,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": [
+                "adf.azure.com"
+              ]
+            }
+          },
+          {
+            "name": "AzureDataFactory_SelfHostedIR",
+            "properties": {
+              "description": "Required for self-hosted IR to connect to Data Factory",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "[format('DataFactory.{0}', parameters('location'))]",
+              "access": "Allow",
+              "priority": 3500,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "ServiceBus_InteractiveAuthoring",
+            "properties": {
+              "description": "Required for self-hosted IR interactive authoring",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "ServiceBus",
+              "access": "Allow",
+              "priority": 3600,
+              "direction": "Outbound"
+            }
+          },
+          {
+            "name": "Microsoft_Downloads",
+            "properties": {
+              "description": "Required for self-hosted IR updates from Microsoft",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 3700,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": [
+                "download.microsoft.com"
+              ]
+            }
+          },
+          {
+            "name": "Allow_VNet_Outbound",
+            "properties": {
+              "description": "Allow traffic to other subnets in same VNet",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "VirtualNetwork",
+              "access": "Allow",
+              "priority": 1500,
+              "direction": "Outbound",
+              "sourcePortRanges": [],
+              "destinationPortRanges": [],
+              "sourceAddressPrefixes": [],
+              "destinationAddressPrefixes": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "condition": "[and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId'))))]",
+      "type": "Microsoft.Network/networkWatchers/flowLogs",
+      "apiVersion": "2023-05-01",
+      "name": "[format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name'))]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "targetResourceId": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]",
+        "storageId": "[parameters('storageAccountId')]",
+        "enabled": true,
+        "retentionPolicy": {
+          "days": "[parameters('flowLogRetentionDays')]",
+          "enabled": true
+        },
+        "format": {
+          "type": "JSON",
+          "version": 2
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "nsgId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('name'))]"
+    },
+    "flowLogId": {
+      "type": "string",
+      "value": "[if(and(parameters('enableFlowLogs'), not(empty(parameters('storageAccountId')))), resourceId('Microsoft.Network/networkWatchers/flowLogs', split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[0], split(format('{0}/flowlog-{1}', parameters('networkWatcherName'), parameters('name')), '/')[1]), '')]"
+    }
+  }
+}

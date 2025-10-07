@@ -94,7 +94,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 4000
+            priority: 3999
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -131,7 +131,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Deny'
-            priority: 65000
+            priority: 4000
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -478,7 +478,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 4000
+            priority: 3998
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
