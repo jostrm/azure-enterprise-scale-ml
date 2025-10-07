@@ -20,7 +20,7 @@ stages:
     - deployment: AIFactory_CMN_Dev
       displayName: AIFactory_CMN_Dev
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Dev  
       strategy:
         runOnce:
@@ -41,7 +41,7 @@ stages:
     - deployment: AIFactory_CMN_Stage
       displayName: AIFactory_CMN_Stage
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Stage
       strategy:
         runOnce:
@@ -62,7 +62,7 @@ stages:
     - deployment: AIFactory_CMN_Prod
       displayName: AIFactory_CMN_Prod
       pool:
-        vmImage: windows-latest
+        vmImage: windows-2022
       environment: Prod
       strategy:
         runOnce:
