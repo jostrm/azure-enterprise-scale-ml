@@ -386,16 +386,14 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourcePortRange: '*'
           destinationPortRange: '443'
           sourceAddressPrefix: '*'
-          destinationAddressPrefix: '*'
+          destinationAddressPrefix: 'Internet'
           access: 'Allow'
           priority: 3400
           direction: 'Outbound'
           sourcePortRanges: []
           destinationPortRanges: []
           sourceAddressPrefixes: []
-          destinationAddressPrefixes: [
-            'adf.azure.com'
-          ]
+          destinationAddressPrefixes: []
         }
       }
       {// !!
@@ -434,16 +432,14 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourcePortRange: '*'
           destinationPortRange: '443'
           sourceAddressPrefix: '*'
-          destinationAddressPrefix: '*'
+          destinationAddressPrefix: 'Internet'
           access: 'Allow'
           priority: 3700
           direction: 'Outbound'
           sourcePortRanges: []
           destinationPortRanges: []
           sourceAddressPrefixes: []
-          destinationAddressPrefixes: [
-            'download.microsoft.com'
-          ]
+          destinationAddressPrefixes: []
         }
       }
       {
