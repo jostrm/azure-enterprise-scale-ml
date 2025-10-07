@@ -17,7 +17,7 @@ param flowLogRetentionDays int = 30
 
 // TODO: outbound connection to ports 443, 445 for storage service tag
 
-resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
+resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: name
   location: location
   tags: tags
@@ -34,7 +34,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'AzureMachineLearning'
           destinationAddressPrefix: '*'
           access: 'Allow'
-          priority: 4200
+          priority: 1200
           direction: 'Inbound'
           sourcePortRanges: []
           destinationPortRanges: []
@@ -52,7 +52,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'BatchNodeManagement'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 4100
+            priority: 1100
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -69,7 +69,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: bastionIpRange
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 4300
+            priority: 1300
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: [
@@ -113,7 +113,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 3900
+            priority: 1400
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -149,7 +149,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '*'
             sourceAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 4000
+            priority: 2000
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -172,7 +172,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: 'AzureActiveDirectoryDomainServices'
             access: 'Allow'
-            priority: 4050
+            priority: 2050
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -190,7 +190,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 4100
+            priority: 2100
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -209,7 +209,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: '169.254.169.254'
             access: 'Allow'
-            priority: 4200
+            priority: 2200
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -228,7 +228,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureActiveDirectory'
           access: 'Allow'
-          priority: 4300
+          priority: 2300
           direction: 'Outbound'
         }
       }
@@ -242,7 +242,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureMachineLearning'
           access: 'Allow'
-          priority: 4400
+          priority: 2400
           direction: 'Outbound'
         }
       }
@@ -256,7 +256,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureResourceManager'
           access: 'Allow'
-          priority: 4500
+          priority: 2500
           direction: 'Outbound'
         }
       }
@@ -273,7 +273,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'Storage.${location}'
           access: 'Allow'
-          priority: 4600
+          priority: 2600
           direction: 'Outbound'
         }
       }
@@ -287,7 +287,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureFrontDoor.FrontEnd'
           access: 'Allow'
-          priority: 4700
+          priority: 2700
           direction: 'Outbound'
         }
       }
@@ -301,7 +301,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureContainerRegistry.${location}'
           access: 'Allow'
-          priority: 4800
+          priority: 2800
           direction: 'Outbound'
         }
       }
@@ -315,7 +315,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'MicrosoftContainerRegistry'
           access: 'Allow'
-          priority: 4900
+          priority: 2900
           direction: 'Outbound'
         }
       }
@@ -328,7 +328,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '80'
             sourceAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 5000
+            priority: 1600
             direction: 'Outbound'
             destinationAddressPrefix: 'VirtualNetwork'
         }
@@ -342,7 +342,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '5831'
             sourceAddressPrefix: '*'
             access: 'Allow'
-            priority: 5100
+            priority: 3100
             direction: 'Outbound'
             destinationAddressPrefix: 'AzureMachineLearning'
         }
@@ -356,7 +356,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationPortRange: '5831'
             sourceAddressPrefix: '*'
             access: 'Allow'
-            priority: 5300
+            priority: 3300
             direction: 'Outbound'
             destinationAddressPrefix: 'BatchNodeManagement.${location}'
         }
@@ -373,9 +373,77 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             ]
             sourceAddressPrefix: '*'
             access: 'Allow'
-            priority: 5200
+            priority: 3200
             direction: 'Outbound'
             destinationAddressPrefix: 'AzureMachineLearning'
+        }
+      }
+      {// !! Data Factory Rules
+        name: 'AzureDataFactory_Portal'
+        properties: {
+          description: 'Required for Data Factory portal authoring and monitoring'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 3400
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: [
+            'adf.azure.com'
+          ]
+        }
+      }
+      {// !!
+        name: 'AzureDataFactory_SelfHostedIR'
+        properties: {
+          description: 'Required for self-hosted IR to connect to Data Factory'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'DataFactory.${location}'
+          access: 'Allow'
+          priority: 3500
+          direction: 'Outbound'
+        }
+      }
+      {// !!
+        name: 'ServiceBus_InteractiveAuthoring'
+        properties: {
+          description: 'Required for self-hosted IR interactive authoring'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'ServiceBus'
+          access: 'Allow'
+          priority: 3600
+          direction: 'Outbound'
+        }
+      }
+      {// !!
+        name: 'Microsoft_Downloads'
+        properties: {
+          description: 'Required for self-hosted IR updates from Microsoft'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 3700
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: [
+            'download.microsoft.com'
+          ]
         }
       }
       {
@@ -388,7 +456,7 @@ resource cmnNsgScoring 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: '*'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 3000
+            priority: 1500
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -429,7 +497,7 @@ resource nsgFlowLog 'Microsoft.Network/networkWatchers/flowLogs@2023-05-01' = if
   location: location
   tags: tags
   properties: {
-    targetResourceId: cmnNsgScoring.id
+    targetResourceId: cmnNsg.id
     storageId: storageAccountId
     enabled: true
     retentionPolicy: {
@@ -443,5 +511,5 @@ resource nsgFlowLog 'Microsoft.Network/networkWatchers/flowLogs@2023-05-01' = if
   }
 }
 
-output nsgId string = cmnNsgScoring.id
+output nsgId string = cmnNsg.id
 output flowLogId string = enableFlowLogs && !empty(storageAccountId) ? nsgFlowLog.id : ''
