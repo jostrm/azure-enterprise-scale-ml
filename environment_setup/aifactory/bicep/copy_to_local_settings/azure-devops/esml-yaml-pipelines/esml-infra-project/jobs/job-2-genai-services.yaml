@@ -1219,6 +1219,8 @@ steps:
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters enableBingCustomSearch="$(enableBingCustomSearch)" \
+     --parameters enableBing="$(enableBing)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
