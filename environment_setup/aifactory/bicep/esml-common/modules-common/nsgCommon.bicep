@@ -393,7 +393,6 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourcePortRanges: []
           destinationPortRanges: []
           sourceAddressPrefixes: []
-          destinationAddressPrefixes: []
         }
       }
       {// !!
@@ -439,7 +438,6 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourcePortRanges: []
           destinationPortRanges: []
           sourceAddressPrefixes: []
-          destinationAddressPrefixes: []
         }
       }
       {
