@@ -52,7 +52,7 @@ resource bingCustomSearch 'Microsoft.Bing/accounts@2020-06-10' = if(enableBingCu
     name: skuCustom
   }
   properties: {
-    responsibleAiNotice: 'Acknowledged'
+    //responsibleAiNotice: 'Acknowledged'
     statisticsEnabled: false
   }
 }
