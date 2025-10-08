@@ -47,6 +47,10 @@ param diagnosticSettingLevel string = 'silver'
 @allowed(['dev', 'test', 'prod'])
 param env string
 
+param enableBing bool = false
+param enableBingCustomSearch bool = false
+param bingCustomSearchSku string = 'G2' // ['G2'] G2 is custom search with grounding
+
 @description('Project number (e.g., "005")')
 param projectNumber string
 
@@ -369,6 +373,23 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(enableContentSafe
   ]
 }
 
+module bing '../modules/bing.bicep' = if(enableBing || enableBingCustomSearch) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('03-Bing4${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    name: 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    nameCustom: 'bing-custom-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+    location: 'global'
+    sku: 'G1'
+    skuCustom: bingCustomSearchSku
+    tags: tagsProject
+    enableBing: enableBing
+    enableBingCustomSearch: enableBingCustomSearch
+  }
+  dependsOn: [
+    projectResourceGroupExists
+  ]
+}
 // Vision Services
 module csVision '../modules/csVision.bicep' = if(enableAzureAIVision == true) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
