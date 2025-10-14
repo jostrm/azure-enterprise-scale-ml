@@ -75,7 +75,7 @@ param byoAseFullResourceId string = ''
 param byoAseAppServicePlanResourceId string = ''
 
 // To get TAGS from file: 10-esml-globals-1.json
-param tags object
+param tags object = {}
 param aifactorySuffixRG string = '' // dummy
 param commonRGNamePrefix string = '' // dummy
 
