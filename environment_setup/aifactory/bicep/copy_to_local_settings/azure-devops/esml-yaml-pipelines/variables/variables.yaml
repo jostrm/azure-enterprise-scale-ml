@@ -18,7 +18,8 @@ variables:
   # ============================================================================
   # MANDATORY(CHANGE ONCE)
   # ============================================================================
-  tags: '{"Environment":"$(dev_test_prod)","Project":"AIFactory","Owner":"$(technical_admins_email)","CostCenter":"TODO"}'
+  tag_costceter_common: '9999'
+  tags: '{"CostCenter":"$(tag_costceter_common)","Description":"AI Factory common","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
   admin_location: "eastus2"
   admin_locationSuffix: "eus2"
   admin_aiSearchTier: "standard" # ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']

@@ -378,59 +378,62 @@ steps:
       check_subnet_exists "$SNT_DATABRICKS_PUB" "sntDatabricksPubExists"
       
       echo "Subnet existence check completed."
-- task: AzureCLI@2
-  displayName: '05_az_bicep_deploy_subnets_and_NSGs'
+      echo "vnetResourceGroup: $(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      echo "vnetResourceGroup_param: $(vnetResourceGroup_param)"
+      echo "vnetNameBase: $(vnetNameBase)"
+
+- task: AzureResourceManagerTemplateDeployment@3
+  displayName: '05_arm_deploy_subnets_and_NSGs'
   inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: 'inlineScript'
-    inlineScript: |
-     echo "Deploying subnets and NSG to subscription: $(dev_test_prod_sub_id)"
-     az account set --subscription "$(dev_test_prod_sub_id)"
-     az deployment group create \
-     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj" \
-     --subscription "$(dev_test_prod_sub_id)" \
-     --resource-group "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)" \
-     --template-file "esml-genai-1\31-network.bicep" \
-     --parameters @"..\..\..\..\aifactory\parameters\subnetParameters.json" \
-     --parameters env="$(dev_test_prod)" \
-     --parameters projectNumber="$(project_number_000)" \
-     --parameters location="$(admin_location)" \
-     --parameters locationSuffix="$(admin_locationSuffix)" \
-     --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
-     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
-     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
-     --parameters tags='$(tags)' \
-     --parameters vnetResourceGroup="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
-     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
-     --parameters datalakeName_param="$(datalakeName_param)" \
-     --parameters kvNameFromCOMMON_param="$(kvNameFromCOMMON_param)" \
-     --parameters useCommonACR="$(useCommonACR_override)" \
-     --parameters subnetCommon="$(subnetCommon)" \
-     --parameters subnetCommonScoring="$(subnetCommonScoring)" \
-     --parameters subnetCommonPowerbiGw="$(subnetCommonPowerbiGw)" \
-     --parameters subnetProjGenAI="$(subnetProjGenAI)" \
-     --parameters subnetProjAKS="$(subnetProjAKS)" \
-     --parameters subnetProjAKS2="$(subnetProjAKS2)" \
-     --parameters subnetProjACA="$(subnetProjACA)" \
-     --parameters subnetProjACA2="$(subnetProjACA2)" \
-     --parameters subnetProjDatabricksPublic="$(subnetProjDatabricksPublic)" \
-     --parameters subnetProjDatabricksPrivate="$(subnetProjDatabricksPrivate)" \
-     --parameters byoASEv3="$(byoASEv3)" \
-     --parameters byoAseFullResourceId="$(byoAseFullResourceId)" \
-     --parameters byoAseAppServicePlanResourceId="$(byoAseAppServicePlanResourceId)" \
-     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
-     --parameters sntGenaiExists="$(sntGenaiExists)" \
-     --parameters sntAcaExists="$(sntAcaExists)" \
-     --parameters sntAca002Exists="$(sntAca002Exists)" \
-     --parameters sntAksExists="$(sntAksExists)" \
-     --parameters sntAks002Exists="$(sntAks002Exists)" \
-     --parameters sntDatabricksPrivExists="$(sntDatabricksPrivExists)" \
-     --parameters sntDatabricksPubExists="$(sntDatabricksPubExists)"
-    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+    deploymentScope: 'Resource Group'
+    azureResourceManagerConnection: ${{ parameters.serviceConnection }}
+    subscriptionId: '$(dev_test_prod_sub_id)'
+    action: 'Create Or Update Resource Group'
+    resourceGroupName: '$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)'
+    location: '$(admin_location)'
+    templateLocation: 'Linked artifact'
+    csmFile: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep'
+    csmParametersFile: '$(System.DefaultWorkingDirectory)/aifactory/parameters/subnetParameters.json'
+    overrideParameters: >
+      -env "$(dev_test_prod)"
+      -projectNumber "$(project_number_000)"
+      -location "$(admin_location)"
+      -locationSuffix "$(admin_locationSuffix)"
+      -vnetNameBase "$(vnetNameBase)"
+      -commonResourceSuffix "$(admin_commonResourceSuffix)"
+      -tags $(tags)
+      -aifactorySuffixRG "$(admin_aifactorySuffixRG)"
+      -commonRGNamePrefix "$(admin_aifactoryPrefixRG)"
+      -vnetResourceGroup "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      -vnetResourceGroup_param "$(vnetResourceGroup_param)"
+      -vnetNameFull_param "$(vnetNameFull_param)"
+      -commonResourceGroup_param "$(commonResourceGroup_param)"
+      -datalakeName_param "$(datalakeName_param)"
+      -kvNameFromCOMMON_param "$(kvNameFromCOMMON_param)"
+      -useCommonACR "$(useCommonACR_override)"
+      -subnetCommon "$(subnetCommon)"
+      -subnetCommonScoring "$(subnetCommonScoring)"
+      -subnetCommonPowerbiGw "$(subnetCommonPowerbiGw)"
+      -subnetProjGenAI "$(subnetProjGenAI)"
+      -subnetProjAKS "$(subnetProjAKS)"
+      -subnetProjAKS2 "$(subnetProjAKS2)"
+      -subnetProjACA "$(subnetProjACA)"
+      -subnetProjACA2 "$(subnetProjACA2)"
+      -subnetProjDatabricksPublic "$(subnetProjDatabricksPublic)"
+      -subnetProjDatabricksPrivate "$(subnetProjDatabricksPrivate)"
+      -byoASEv3 "$(byoASEv3)"
+      -byoAseFullResourceId "$(byoAseFullResourceId)"
+      -byoAseAppServicePlanResourceId "$(byoAseAppServicePlanResourceId)"
+      -centralDnsZoneByPolicyInHub "$(centralDnsZoneByPolicyInHub)"
+      -sntGenaiExists "$(sntGenaiExists)"
+      -sntAcaExists "$(sntAcaExists)"
+      -sntAca002Exists "$(sntAca002Exists)"
+      -sntAksExists "$(sntAksExists)"
+      -sntAks002Exists "$(sntAks002Exists)"
+      -sntDatabricksPrivExists "$(sntDatabricksPrivExists)"
+      -sntDatabricksPubExists "$(sntDatabricksPubExists)"
+    deploymentMode: 'Incremental'
+    deploymentName: 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj'
 
 - task: AzureCLI@1
   displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
