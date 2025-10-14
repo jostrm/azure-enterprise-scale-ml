@@ -79,8 +79,8 @@ param tags object
 param aifactorySuffixRG string = '' // dummy
 param commonRGNamePrefix string = '' // dummy
 
-var vnetNameFull = vnetNameFull_param  != '' ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
-var vnetResourceGroupScope = vnetResourceGroup_param != '' ? vnetResourceGroup_param : vnetResourceGroup
+var vnetNameFull = !empty(vnetNameFull_param) ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetResourceGroupScope = !empty(vnetResourceGroup_param) ? vnetResourceGroup_param : vnetResourceGroup
 
 var vNetSalt = substring(uniqueString(resourceGroup().id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${vNetSalt}${locationSuffix}-${env}${commonResourceSuffix}'
