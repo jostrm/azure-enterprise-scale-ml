@@ -110,8 +110,8 @@ var aks2SubnetSettings =  {
 }
 
 module nsgAKS '../modules/aksNsg.bicep' = if(!sntAksExists){
-  name: 'aksNsgAKS-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('aksNsgAKS-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'aks-nsg-${projectName}-${locationSuffix}-${env}' // AKS-NSG-PRJ001-EUS2-DEV in 'aks-nsg-prj001-eus2-dev'
     location: location
@@ -119,8 +119,8 @@ module nsgAKS '../modules/aksNsg.bicep' = if(!sntAksExists){
   }
 }
 module nsgAKS2 '../modules/aksNsg.bicep' = if (!empty(aks2SubnetCidr) && !sntAks002Exists) {
-  name: 'aks2Nsg-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('aks2Nsg-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'aks2-nsg-${projectName}-${locationSuffix}-${env}' // AKS-NSG-PRJ001-EUS2-DEV in 'aks-nsg-prj001-eus2-dev'
     location: location
@@ -130,8 +130,8 @@ module nsgAKS2 '../modules/aksNsg.bicep' = if (!empty(aks2SubnetCidr) && !sntAks
 
 
 module aksSnt '../modules/subnetWithNsg.bicep' = if(!sntAksExists){
-  name: 'aks-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('aks-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'snt-${projectName}-aks'
     virtualNetworkName: vnetNameFull
@@ -147,8 +147,8 @@ module aksSnt '../modules/subnetWithNsg.bicep' = if(!sntAksExists){
   ]
 }
 module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr) && !sntAks002Exists) {
-  name: 'aks2-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('aks2-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'snt-${projectName}-aks-002'
     virtualNetworkName: vnetNameFull
@@ -181,8 +181,8 @@ var genaiSubnetSettings =   {
 }
 
 module nsgGenAI '../modules/nsgGenAI.bicep' = if(!sntGenaiExists){
-  name: 'nsgGenAI-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('nsgGenAI-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'genai-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -191,8 +191,8 @@ module nsgGenAI '../modules/nsgGenAI.bicep' = if(!sntGenaiExists){
 }
 
 module genaiSnt '../modules/subnetWithNsg.bicep' = if(!sntGenaiExists){
-  name: 'genai-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('genai-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'snt-${projectName}-genai'
     virtualNetworkName: vnetNameFull
@@ -238,8 +238,8 @@ var aca2SubnetSettings =   {
 }
 
 module nsgAca '../modules/nsgGenAI.bicep' = if(!sntAcaExists){
-  name: 'nsgAca-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('nsgAca-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'aca-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -247,8 +247,8 @@ module nsgAca '../modules/nsgGenAI.bicep' = if(!sntAcaExists){
   }
 }
 module nsg2Aca '../modules/nsgGenAI.bicep' = if (!empty(aca2SubnetCidr) && !sntAca002Exists) {
-  name: 'nsgAca2-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('nsgAca2-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'aca2-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -256,8 +256,8 @@ module nsg2Aca '../modules/nsgGenAI.bicep' = if (!empty(aca2SubnetCidr) && !sntA
   }
 }
 module acaSnt '../modules/subnetWithNsg.bicep' = if(!sntAcaExists){
-  name: 'acaSnet-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('acaSnet-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'snt-${projectName}-aca'
     virtualNetworkName: vnetNameFull
@@ -275,8 +275,8 @@ module acaSnt '../modules/subnetWithNsg.bicep' = if(!sntAcaExists){
   ]
 }
 module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && !sntAca002Exists) {
-  name: 'acaSnet2-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('acaSnet2-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'snt-${projectName}-aca-002'
     virtualNetworkName: vnetNameFull
@@ -322,8 +322,8 @@ var dataBricksPublicSubnetSettings =   {
 }
 
 module nsgDbx '../modules/databricksNsg.bicep' = if(!empty(dbxPubSubnetCidr) && !sntDatabricksPubExists){
-  name: 'dbxNsg-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('dbxNsg-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'dbx-nsg-${projectName}-${locationSuffix}-${env}'
     location: location
@@ -332,8 +332,8 @@ module nsgDbx '../modules/databricksNsg.bicep' = if(!empty(dbxPubSubnetCidr) && 
 }
 
 module dbxPubSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPubSubnetCidr) && !sntDatabricksPubExists){
-  name: 'dbxpub-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('dbxpub-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'snt-${projectName}-dbxpub'
     virtualNetworkName: vnetNameFull
@@ -353,8 +353,8 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPubSubnetCidr) 
 }
 
 module dbxPrivSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPrivSubnetCidr) && !sntDatabricksPrivExists){
-  name: 'dbxpriv-${deploymentProjSpecificUniqueSuffix}'
-  scope: resourceGroup(subscription().id, vnetResourceGroupScope)
+  name: take('dbxpriv-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
   params: {
     name: 'snt-${projectName}-dbxpriv'
     virtualNetworkName: vnetNameFull
