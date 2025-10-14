@@ -163,13 +163,15 @@ param authClientSecretName string = 'aifactory-sample-app-1'
 @description('Authentication client secret value for sample applications')
 @secure()
 param authClientSecret string = ''
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
 
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
 // Calculated variables
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations
@@ -514,8 +516,8 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     skuName: containerRegistrySkuName
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
-    subnetName: commonSubnetName // snet-esml-cmn-001
-    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
+    subnetName: commonSubnetName // dynamic common subnet name
+    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-${vnetNameBase}' // dynamic based on vnet name
     tags: tagsProject
     location: location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter

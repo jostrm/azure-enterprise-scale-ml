@@ -78,7 +78,7 @@ param technicalContactId string=''
 @description('Common service principle keuvault secret key name for Object ID')
 param commonServicePrincipleOIDKey string
 param databricksOID string
-@description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
+@description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-{commonResourceName}-weu-dev-001"')
 param commonRGNamePrefix string = ''
 @description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')
 param technicalAdminsObjectID string = 'null'
@@ -88,7 +88,7 @@ param technicalAdminsEmail string = 'null'
 param IPwhiteList string = ''
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj 
-@description('Common resource group name. If not set, it will be created as "esml-common-weu-dev-001"')
+@description('Common resource group name. If not set, it will be created as "{commonResourceName}-weu-dev-001"')
 param commonResourceGroup_param string = ''
 param vnetResourceGroup_param string = ''
 param vnetNameFull_param string = ''
@@ -118,9 +118,15 @@ param byoAseAppServicePlanResourceId string = ''
 param allowPublicAccessWhenBehindVnet bool = false
 param acr_adminUserEnabled bool = false
 param acr_dedicated bool = true
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
+@description('Common resource abbreviation. Default is "esml"')
+param commonResourceAbbreviation string = 'esml'
+@description('Common resource abbreviation for short names. Default is "cmn"')
+param commonResourceShortName string = 'cmn'
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
-var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'  // esml-common-weu-dev-002
+var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'  // {commonResourceName}-weu-dev-002
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
 
 var privDnsResourceGroupName = (privDnsResourceGroup_param != '' && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
@@ -134,12 +140,13 @@ resource esmlCommonResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01'
 
 // Create a short, unique suffix, that will be unique to each AI Factorys common env (Dev,Test,Prod)
 var uniqueInAIFenv = substring(uniqueString(esmlCommonResourceGroup.id), 0, 5)
-var vnetNameFull = vnetNameFull_param != '' ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001
-var cmnName = 'cmn' // needs to be short. KV, ADF, LA, STORAGE needs to be globally unique
+var vnetNameFull = vnetNameFull_param != '' ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // {vnetNameBase}-weu-dev-001
+var cmnName = commonResourceShortName // needs to be short. KV, ADF, LA, STORAGE needs to be globally unique
 var kvNameCommon = 'kv-${cmnName}${env}-${uniqueInAIFenv}${commonResourceSuffix}' //kv-cmn-prod-12345-004 (21/24)
 var kvNameCommonAdmin = 'kv-${cmnName}adm${env}-${uniqueInAIFenv}${commonResourceSuffix}' // kv-cmnadm-prod-12345-004 (24, 24max)
 var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroupName}/providers/Microsoft.Network/virtualNetworks/${vnetNameFull}'
-var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: esml001lobguprod
+var vnetNameAbbreviation = vnetNameBase // Dynamic vnet name for private endpoints
+var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}${commonResourceAbbreviation}${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: {commonLakeNamePrefixMax8chars}001lobguprod
 
 // snets
 //param BYO_subnets bool = false
@@ -150,7 +157,7 @@ var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}esml${repla
 
 var defaultSubnet = (BYO_subnets)?replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 var commonSubnetScoring = (BYO_subnets)?replace(subnetCommonScoring, '<network_env>', network_env) : '${common_subnet_name}-scoring'
-var commonSubnetPowerBI = (BYO_subnets)?replace(subnetCommonPowerbiGw, '<network_env>', network_env) : 'snet-esml-cmn-pbi-001' // common_pbi_subnet_name
+var commonSubnetPowerBI = (BYO_subnets)?replace(subnetCommonPowerbiGw, '<network_env>', network_env) : 'snet-${commonResourceAbbreviation}-${commonResourceShortName}-pbi-001' // common_pbi_subnet_name
 
 // RBAC
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
@@ -470,7 +477,7 @@ module acrCommon '../../modules/containerRegistry.bicep' = if(!deployOnlyAIGatew
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
-    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-vnt-mlcmn' // snet-esml-cmn-001
+    privateEndpointName: 'pend-acr-${commonResourceShortName}${locationSuffix}-containerreg-to-${vnetNameAbbreviation}' // dynamic based on vnet name
     tags: tags
     location:location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
@@ -538,8 +545,8 @@ module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking
     location: location
     vnetId: vnetId
     subnetName: defaultSubnet
-    portalPrivateEndpointName: 'pend-${cmnName}-${env}-${uniqueInAIFenv}-adfportal-to-vnt-esmlcmn' // 64
-    runtimePrivateEndpointName: 'pend-${cmnName}-${env}-${uniqueInAIFenv}-adfruntime-to-vnt-esmlcmn'
+    portalPrivateEndpointName: 'pend-${cmnName}-${env}-${uniqueInAIFenv}-adfportal-to-${vnetNameAbbreviation}' // 64
+    runtimePrivateEndpointName: 'pend-${cmnName}-${env}-${uniqueInAIFenv}-adfruntime-to-${vnetNameAbbreviation}'
     tags: tags
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     managedIdentities: {
@@ -602,7 +609,7 @@ module kvCmn '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworking)
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
-    privateEndpointName: 'pend-${kvNameCommon}-to-vnt-esmlcmn'
+    privateEndpointName: 'pend-${kvNameCommon}-to-${vnetNameAbbreviation}'
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
     ]
@@ -745,7 +752,7 @@ module kvAdmin '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworkin
     subnetName: defaultSubnet
     enablePurgeProtection:enablePurgeProtection
     soft_delete_days:keyvaultSoftDeleteDays
-    privateEndpointName: 'pend-${kvNameCommonAdmin}-to-vnt-esmlcmn'
+    privateEndpointName: 'pend-${kvNameCommonAdmin}-to-${vnetNameAbbreviation}'
     keyvaultNetworkPolicySubnets: [
       '${vnetId}/subnets/${defaultSubnet}'
     ]
@@ -828,11 +835,11 @@ module dataLake '../../modules/dataLake.bicep' = if(!deployOnlyAIGatewayNetworki
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet
-    blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-vnt-esmlcmn'
-    filePrivateEndpointName: 'pend-${datalakeName}-file-to-vnt-esmlcmn'
-    dfsPrivateEndpointName: 'pend-${datalakeName}-dfs-to-vnt-esmlcmn'
-    queuePrivateEndpointName: 'pend-${datalakeName}-queue-to-vnt-esmlcmn'
-    tablePrivateEndpointName: 'pend-${datalakeName}-table-to-vnt-esmlcmn'
+    blobPrivateEndpointName: 'pend-${datalakeName}-blob-to-${vnetNameAbbreviation}'
+    filePrivateEndpointName: 'pend-${datalakeName}-file-to-${vnetNameAbbreviation}'
+    dfsPrivateEndpointName: 'pend-${datalakeName}-dfs-to-${vnetNameAbbreviation}'
+    queuePrivateEndpointName: 'pend-${datalakeName}-queue-to-${vnetNameAbbreviation}'
+    tablePrivateEndpointName: 'pend-${datalakeName}-table-to-${vnetNameAbbreviation}'
     tags: tags
     virtualNetworkRules:virtualNetworkRules2Add
     ipWhitelist_array:ipWhitelist_array

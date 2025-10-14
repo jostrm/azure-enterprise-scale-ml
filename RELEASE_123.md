@@ -36,6 +36,8 @@ Based on comparing release_120 with the current v1.23 branch, here's a comprehen
 ## 🚀 **Revolutionary Changes: Unified Architecture**
 The most significant change is the **merger of ESML and GenAI projects** into a single, unified GenAI project type. This represents a fundamental shift in the AI Factory architecture, eliminating the need for separate project types and creating a single, comprehensive solution.
 
+Another comprehensive change, is the removal of the PARAMETER folder with multiple .json files. All configuraiton are now in the Varaibles.yaml (.env file for Github) - makes it much easier governance wise to detect new variables, when new features arrives.
+
 ## 🎯 **New Modular Service Architecture**
 **24 Azure Services** can now be individually enabled/disabled via simple `enable*` flags in variables.yaml:
 

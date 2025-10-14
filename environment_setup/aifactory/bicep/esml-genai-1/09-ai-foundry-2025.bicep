@@ -145,6 +145,8 @@ param enablePublicGenAIAccess bool = false
 param allowPublicAccessWhenBehindVnet bool = false
 @description('Disable agent network injection even when agentSubnetResourceId is provided.')
 param disableAgentNetworkInjection bool = false
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
 
 // ============== VARIABLES ==============
 
@@ -155,7 +157,7 @@ param disableAgentNetworkInjection bool = false
 
 // Calculated variables
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations

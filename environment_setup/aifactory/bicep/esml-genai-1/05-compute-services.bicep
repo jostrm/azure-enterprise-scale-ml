@@ -267,12 +267,14 @@ param useCommonACR bool = true
 // Common names for referencing other resources
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
 
 // ============== VARIABLES ==============
 
 // Calculated variables
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations

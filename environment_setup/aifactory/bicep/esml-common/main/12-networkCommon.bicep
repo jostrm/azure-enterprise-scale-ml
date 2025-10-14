@@ -35,7 +35,7 @@ param common_bastion_subnet_cidr string
 param common_subnet_scoring_cidr string
 @description('CIDR range. xx.YY.x.x/16')
 param cidr_range string
-@description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
+@description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-{commonResourceName}-weu-dev-001"')
 param commonRGNamePrefix string = ''
 @description('Optional:Whitelist IP addresses from project members to see keyvault, and to connect via Bastion')
 param IPwhiteList string = ''
@@ -67,6 +67,8 @@ param ai_gateway_app_cidr string = ''
 param byoASEv3 bool = false
 param byoAseFullResourceId string = ''
 param byoAseAppServicePlanResourceId string = ''
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
@@ -77,10 +79,10 @@ var common_subnet_scoring_cidr_v = replace(common_subnet_scoring_cidr,'XX',cidr_
 var ai_gateway_apim_cidr_v = deployAIGatewayNetworking? replace(ai_gateway_apim_cidr,'XX',cidr_range): ''
 var ai_gateway_app_cidr_v = deployAIGatewayNetworking? replace(ai_gateway_app_cidr,'XX',cidr_range):''
 
-var commonResourceGroupName = '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // esml-common-weu-dev-002 // esml-common-weu-dev-002 // DEPENDENCIES - should exist
+var commonResourceGroupName = '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}' // {commonResourceName}-weu-dev-002 // DEPENDENCIES - should exist
 
 var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
-var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // vnt-esmlcmn-weu-dev-001 @
+var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // {vnetNameBase}-weu-dev-001 @
 
 var vNetRGsalt = substring(uniqueString(vnetResourceGroup.id), 0, 5)
 var commmonRGsalt = substring(uniqueString(commonResourceGroupName), 0, 5)

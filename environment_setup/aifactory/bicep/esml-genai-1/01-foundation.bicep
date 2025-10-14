@@ -257,7 +257,7 @@ param DEBUG_network_env_stage string = 'tst2-'
 @description('Network environment prefix for prod')
 param DEBUG_network_env_prod string = 'prd-'
 
-@description('VNet Resource Group parameter - BYOVNET example: esml-common-eus2-<network_env>001-rg')
+@description('VNet Resource Group parameter - BYOVNET example: {commonResourceName}-eus2-<network_env>001-rg')
 param DEBUG_vnetResourceGroup_param string = ''
 
 @description('VNet Name Full parameter')
@@ -328,6 +328,8 @@ param DEBUG_admin_prjResourceSuffix string = '-001'
 
 @description('AI Factory Salt')
 param DEBUG_aifactory_salt string = ''
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
 
 @description('Admin Project Type')
 param DEBUG_admin_projectType string = 'genai-1'
@@ -364,7 +366,7 @@ param DEBUG_deployModel_gpt_4o_mini bool = false
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // ============================================================================

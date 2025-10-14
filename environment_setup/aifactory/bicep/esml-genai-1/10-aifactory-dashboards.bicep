@@ -50,6 +50,9 @@ param resourceSuffix string
 @description('Common resource configuration')
 param commonResourceGroup_param string = ''
 
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
+
 @description('Project prefix for naming')
 param projectPrefix string = 'esml-'
 
@@ -99,7 +102,7 @@ param tagsProject object = {}
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Reference existing resource groups

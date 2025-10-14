@@ -169,6 +169,9 @@ param useCommonACR bool = true
 param useAdGroups bool = false
 param commonResourceGroup_param string = ''
 
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
+
 // Tags specific to project (separate from generic tags already present)
 param tagsProject object = {}
 
@@ -186,7 +189,7 @@ param projectServicePrincipleOID_SeedingKeyvaultName string
 var projectName = 'prj${projectNumber}'
 var cmnName_Static = 'cmn'
 #disable-next-line BCP318
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID of existing MI. Needs static name in existing
@@ -579,7 +582,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
 
 // ============== STORAGE ROLE ASSIGNMENTS ==============
 // Get the Logic Apps resource after deployment to extract the principal ID
-resource deployedLogicApp 'Microsoft.Web/sites@2023-12-01' existing = {
+resource deployedLogicApp 'Microsoft.Web/sites@2023-12-01' existing = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
   name: logicAppsName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
@@ -590,6 +593,7 @@ module logicAppsStorageRoles '../modules/storageRoleAssignments.bicep' = if (log
   name: take('11-LogicAppsStorageRoles-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
+    #disable-next-line BCP318
     principalId: deployedLogicApp.identity.principalId
   }
   dependsOn: [
@@ -599,7 +603,7 @@ module logicAppsStorageRoles '../modules/storageRoleAssignments.bicep' = if (log
 
 // Logic Apps Consumption is a serverless, multi-tenant service that doesn't support VNet integration or private endpoints. If you need private connectivity, you would need to use Logic Apps Standard instead.
 // Does not support: Private endpoints, VNet integration, Private connectivity
-module logicAppConsumption 'br/public:avm/res/logic/workflow:0.5.2' = if(logiAppType == 'Consumption' && !logicAppsExists && enableLogicApps) {
+module logicAppConsumption 'br/public:avm/res/logic/workflow:0.5.3' = if(logiAppType == 'Consumption' && !logicAppsExists && enableLogicApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-LogicAppsConsumption-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

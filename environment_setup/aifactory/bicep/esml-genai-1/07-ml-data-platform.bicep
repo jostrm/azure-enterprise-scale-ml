@@ -171,9 +171,11 @@ param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
 @description('Secret name in Key Vault that stores Service Principal ObjectId used for seeding')
 param projectServicePrincipleOID_SeedingKeyvaultName string
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
 
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 
 // ============================================================================
 // SPECIAL - Get PRINICPAL ID of existing MI. Needs static name in existing

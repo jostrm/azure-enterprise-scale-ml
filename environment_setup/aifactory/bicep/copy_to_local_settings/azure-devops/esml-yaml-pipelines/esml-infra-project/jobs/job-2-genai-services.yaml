@@ -27,13 +27,13 @@ steps:
       
       # If VNET variables are not set, use naming convention
       if [ -z "$VNET_NAME" ] || [ "$VNET_NAME" = "$(vnetNameFull_param)" ]; then
-        VNET_NAME="vnt-esmlcmn-$(admin_locationSuffix)-$(dev_test_prod)-001"
+        VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
         echo "VNET name not set, using naming convention: $VNET_NAME"
       fi
       
       if [ -z "$VNET_RG" ] || [ "$VNET_RG" = "$(vnetResourceGroup_param)" ]; then
         # Use the common resource group naming convention
-        VNET_RG="$(admin_aifactoryPrefixRG)esml-common-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
         echo "VNET resource group not set, using naming convention: $VNET_RG"
       fi
       
@@ -515,7 +515,7 @@ steps:
 
       # Input parameters
       privDnsSubscription="$(dev_test_prod_sub_id)"
-      privDnsResourceGroupName="$(admin_aifactoryPrefixRG)esml-common-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
       location="$(admin_location)"
 
       # Define key-value pairs for DNS Zones
@@ -972,6 +972,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
      --parameters vnetResourceGroupBase="$(vnetResourceGroupBase)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
@@ -1113,6 +1114,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters projectServicePrincipleAppID_SeedingKeyvaultName="$(project_service_principal_AppID_seeding_kv_name)" \
      --parameters projectServicePrincipleSecret_SeedingKeyvaultName="$(project_service_principal_Secret_seeding_kv_name)" \
@@ -1181,6 +1183,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters openaiExists="$(openaiExists)" \
      --parameters aiSearchExists="$(aiSearchExists)" \
@@ -1256,6 +1259,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
@@ -1316,6 +1320,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters containerAppsEnvExists="$(containerAppsEnvExists)" \
      --parameters containerAppAExists="$(containerAppAExists)" \
@@ -1391,6 +1396,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters aiHubExists="$(aiHubExists)" \
      --parameters aifProjectExists="$(aifProjectExists)" \
@@ -1468,6 +1474,7 @@ steps:
      --parameters vnetNameBase="$(vnetNameBase)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters aks_dev_sku_override="$(aks_dev_sku_override)" \
@@ -1531,6 +1538,7 @@ steps:
      --parameters vnetNameBase="$(vnetNameBase)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
@@ -1585,6 +1593,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters azureMachineLearningObjectId="$(azure_machinelearning_sp_oid)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters randomValue="$(deployment_random_value)" \
@@ -1685,6 +1694,7 @@ steps:
      --parameters tagsProject='$(tagsProject)' \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \

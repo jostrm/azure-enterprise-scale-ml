@@ -19,7 +19,7 @@ param tags object
 param technicalContactEmail string = ''
 @description('Specifies project owner objectId and will be used for tagging and RBAC')
 param technicalContactId string = ''
-@description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-esml-common-weu-dev-001"')
+@description('Resource group prefix. If "rg-msft-word" then "rg-msft-word-{commonResourceName}-weu-dev-001"')
 param commonRGNamePrefix string = ''
 @description('Optional input from Azure Devops variable - a semicolon separated string of AD users ObjectID to get RBAC on Resourcegroup "adsf,asdf" ')
 param technicalAdminsObjectID string = 'null'
@@ -28,6 +28,8 @@ param technicalAdminsEmail string = 'null'
 param commonResourceGroup_param string = ''
 param useAdGroups bool = false
 param enableAdminVM bool = false
+@description('Common resource name identifier. Default is "esml-common"')
+param esmlCommonOverride string = 'esml-common'
 
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
@@ -35,7 +37,7 @@ var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: 
 var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
-var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}' // aaa-bbb-esml-common-weu-dev-002 (31/90 chars)
+var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}${esmlCommonOverride}-${locationSuffix}-${env}${aifactorySuffixRG}' // aaa-bbb-{commonResourceName}-weu-dev-002 (31/90 chars)
 
 module rgCommon '../../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)

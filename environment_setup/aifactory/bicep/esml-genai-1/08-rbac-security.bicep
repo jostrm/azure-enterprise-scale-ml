@@ -214,6 +214,8 @@ param forceRecreateRoleAssignments bool = false
 
 @description('Unique deployment identifier to avoid conflicts')
 param deploymentId string = utcNow('yyyyMMddHHmmss')
+@description('Common resource name identifier. Default is "esml-common"')
+param commonResourceName string = 'esml-common'
 
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
 var cmnName = namingConvention.outputs.cmnName
@@ -305,7 +307,7 @@ var datalakeName = datalakeName_param != '' ? datalakeName_param : '${commonLake
 
 // Calculated variables
 var projectName = 'prj${projectNumber}'
-var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}'
+var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 
 // Networking calculations
@@ -718,7 +720,7 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(enableAIDocIntelligence) {
 
 // ============== RBAC MODULES - NETWORK AND VNET ACCESS ==============
 
-// RBAC - Read users to Bastion, IF Bastion is added in ESML-COMMON resource group
+// RBAC - Read users to Bastion, IF Bastion is added in common resource group
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost && empty(bastionSubscription)) {
   scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
   name: take('08-rbacGenAIUsVn${deploymentProjSpecificUniqueSuffix}', 64)
