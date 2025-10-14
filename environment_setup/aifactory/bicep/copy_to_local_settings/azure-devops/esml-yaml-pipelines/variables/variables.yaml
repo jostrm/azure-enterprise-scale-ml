@@ -25,9 +25,20 @@ variables:
   admin_aiSearchTier: "standard" # ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
   admin_semanticSearchTier: "disabled" # ['disabled', 'free', 'standard']
   admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
-  admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
-  admin_bicep_kv_fw_rg: "TODO_ResourceGourp" # Resource Group name for seeding Keyvault
-  admin_bicep_kv_fw: "TODO_Name" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  
+  # SEEDING KEYVAULT: One global (same values for all tripples), or one per environment (different values for dev,test,prod)
+  dev_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
+  dev_admin_bicep_kv_fw_rg: "TODO_ResourceGroup_DEV" # Resource Group name for seeding Keyvault
+  dev_admin_bicep_kv_fw: "TODO_Name_Dev" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  
+  test_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
+  test_admin_bicep_kv_fw_rg: "TODO_ResourceGroup_Test" # Resource Group name for seeding Keyvault
+  test_admin_bicep_kv_fw: "TODO_Name_Test" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  
+  prod_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
+  prod_admin_bicep_kv_fw_rg: "TODO_ResourceGroup_Prod" # Resource Group name for seeding Keyvault
+  prod_admin_bicep_kv_fw: "TODO_Name_Prod" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  # ===========================================================================
   useCommonACR: true # Use common Azure Container Registry (save cost), instead of each project having its own.
   admin_hybridBenefit: "true"
   admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 7 lowest. 0 is disabled. 90 days is recommended.

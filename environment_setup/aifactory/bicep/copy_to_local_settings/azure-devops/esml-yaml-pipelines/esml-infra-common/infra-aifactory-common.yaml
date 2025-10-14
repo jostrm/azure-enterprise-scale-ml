@@ -2,7 +2,6 @@ trigger:
   branches:
     include:
       - release/common*
-
 variables:
 - template: ../variables/variables.yaml
 - name: runNetworkingVar
@@ -16,6 +15,9 @@ stages:
     dev_test_prod_sub_id: $(dev_sub_id)
     cidr_range: $(dev_cidr_range)
     network_env: "$(network_env_dev)"
+    admin_bicep_input_keyvault_subscription: "$(dev_admin_bicep_input_keyvault_subscription)"
+    admin_bicep_kv_fw_rg: "$(dev_admin_bicep_kv_fw_rg)"
+    admin_bicep_kv_fw: "$(dev_admin_bicep_kv_fw)"
   jobs:
     - deployment: AIFactory_CMN_Dev
       displayName: AIFactory_CMN_Dev
@@ -37,6 +39,9 @@ stages:
     dev_test_prod_sub_id: $(test_sub_id)
     cidr_range: $(test_cidr_range)
     network_env: "$(network_env_dev)"
+    admin_bicep_input_keyvault_subscription: "$(test_admin_bicep_input_keyvault_subscription)"
+    admin_bicep_kv_fw_rg: "$(test_admin_bicep_kv_fw_rg)"
+    admin_bicep_kv_fw: "$(test_admin_bicep_kv_fw)"
   jobs:
     - deployment: AIFactory_CMN_Stage
       displayName: AIFactory_CMN_Stage
@@ -58,6 +63,9 @@ stages:
     dev_test_prod_sub_id: $(prod_sub_id)
     cidr_range: $(prod_cidr_range)
     network_env: "$(network_env_dev)"
+    admin_bicep_input_keyvault_subscription: "$(prod_admin_bicep_input_keyvault_subscription)"
+    admin_bicep_kv_fw_rg: "$(prod_admin_bicep_kv_fw_rg)"
+    admin_bicep_kv_fw: "$(prod_admin_bicep_kv_fw)"
   jobs:
     - deployment: AIFactory_CMN_Prod
       displayName: AIFactory_CMN_Prod
