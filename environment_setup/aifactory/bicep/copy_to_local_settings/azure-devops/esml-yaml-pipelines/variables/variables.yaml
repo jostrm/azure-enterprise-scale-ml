@@ -362,16 +362,17 @@ variables:
   # GenAI-DEBUG - Dont touch: infra AIFactory core team only. 
   # Purpose: To DISABLE full sections (for efficiency, if re-running pipeline)
   # ============================================================================
-  debug_disable_05_build_acr_image: "false" # Cannot be disabled if ContainerApps is enabled. It needs ACR  networking with whitelist to Azure Deveops/GHA IPs, that this closes in the end.
+  debug_disable_validation_tasks: "false" # OPTIMIZE: Disable validation tasks like subnet validation, submodule check, DNS zones check, etc.
+  debug_disable_05_build_acr_image: "false" # Cannot be disabled if ContainerApps is enabled.It needs ACR  networking with whitelist to Azure Deveops/GHA IPs, that this closes in the end.
   debug_disable_61_foundation: "false" # Resource group, UAMI's, VM
   debug_disable_62_core_infrastructure: "false" # Application Insights, Keyvault, Storage, ACR
   debug_disable_63_cognitive_services: "false" # AI Search, OpenAI Standalone, Vision standalone, Speech standalone, ...
   debug_disable_64_databases: "false" # CosmosDB, SQL Database, ...
   debug_disable_65_compute_services: "false" # ContainerApps, WebApp, FunctionApp
   debug_disable_66_ai_platform: "false" # AI Foundry Hub (V1) with default project, and connections to AISearch, Storage, ...
-  debug_disable_67_ml_platform: "false" # Azure Machine Learning, Datafactory, Databricks
-  debug_disable_68_integration: "true" # Logic Apps, Eventhubs
-  debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage)
+  debug_disable_67_data_ml_platform: "false" # Azure Machine Learning, Datafactory, Databricks
+  debug_disable_68_integration: "false" # Logic Apps, Eventhubs
+  debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage) 
   debug_disable_100_rbac_security: "false" # RBAC for 61-99
   debug_disable_10_aifactory_dashboards: "true" # AI Factory Dashboards
   # ============================================================================
