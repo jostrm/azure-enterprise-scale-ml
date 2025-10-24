@@ -271,6 +271,11 @@ param projectSuffix string = '-rg'
 param commonResourceName string = 'esml-common'
 
 // ============== VARIABLES ==============
+var aseIdNormalized = empty(byoAseFullResourceId)
+  ? ''
+  : (startsWith(byoAseFullResourceId, '/subscriptions/') || startsWith(byoAseFullResourceId, '/providers/'))
+    ? byoAseFullResourceId
+    : '/${byoAseFullResourceId}'
 
 // Calculated variables
 var projectName = 'prj${projectNumber}'
@@ -641,7 +646,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
     runtime: webAppRuntime
     redundancyMode: appRedundancyMode
     byoASEv3: byoASEv3
-    byoAseFullResourceId: byoAseFullResourceId
+    byoAseFullResourceId: aseIdNormalized
     byoAseAppServicePlanRID: byoAseAppServicePlanResourceId
     runtimeVersion: webAppRuntimeVersion
     ipRules: ipWhitelist_array
@@ -723,7 +728,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && enableFun
     logAnalyticsWorkspaceRG: commonResourceGroup
     redundancyMode: appRedundancyMode
     byoASEv3: byoASEv3
-    byoAseFullResourceId: byoAseFullResourceId
+    byoAseFullResourceId: aseIdNormalized
     byoAseAppServicePlanRID: byoAseAppServicePlanResourceId
     ipRules: ipWhitelist_array
     appSettings: [
