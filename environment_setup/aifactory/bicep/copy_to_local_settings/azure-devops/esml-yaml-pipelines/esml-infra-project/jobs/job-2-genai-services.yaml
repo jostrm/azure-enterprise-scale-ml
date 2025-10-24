@@ -1347,6 +1347,8 @@ steps:
      --parameters aseSku="$(aseSku)" \
      --parameters aseSkuCode="$(aseSkuCode)" \
      --parameters aseSkuWorkers="$(aseSkuWorkers)" \
+     --parameters byoASEv3="$(byoASEv3)" \
+     --parameters byoAseFullResourceId="$(byoAseFullResourceId)" \
      --parameters enableAppInsightsDashboard="$(enableAppInsightsDashboard)" \
      --parameters aca_a_registry_image="$(aca_a_registry_image)" \
      --parameters aca_w_registry_image="$(aca_w_registry_image)" \
