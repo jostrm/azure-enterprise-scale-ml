@@ -52,10 +52,6 @@ var goldLogs = [
     enabled: true
   }
   {
-    category: 'AppServiceHTTPLogs'
-    enabled: true
-  }
-  {
     category: 'AppServiceConsoleLogs'
     enabled: true
   }
@@ -83,10 +79,6 @@ var silverLogs = [
     enabled: true
   }
   {
-    category: 'AppServiceHTTPLogs'
-    enabled: true
-  }
-  {
     category: 'AppServiceAppLogs'
     enabled: true
   }
@@ -99,10 +91,6 @@ var silverLogs = [
 var bronzeLogs = [
   {
     category: 'FunctionAppLogs'
-    enabled: true
-  }
-  {
-    category: 'AppServiceHTTPLogs'
     enabled: true
   }
 ]
