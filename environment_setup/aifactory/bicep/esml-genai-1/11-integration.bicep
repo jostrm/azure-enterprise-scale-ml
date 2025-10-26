@@ -513,6 +513,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
           AzureWebJobsStorage__credential: 'managedidentity'
           AzureWebJobsStorage__clientId: getProjectMIPrincipalId.outputs.clientId
           APP_KIND: 'workflowapp'
+          WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount1001Name};EndpointSuffix=${environment().suffixes.storage};AccountKey='
           WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__accountName: storageAccount1001Name
           WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__credential: 'managedidentity'
           WEBSITE_CONTENTAZUREFILECONNECTIONSTRING__clientId: getProjectMIPrincipalId.outputs.clientId
