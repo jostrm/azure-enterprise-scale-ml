@@ -51,26 +51,6 @@ var goldLogs = [
     category: 'FunctionAppLogs'
     enabled: true
   }
-  {
-    category: 'AppServiceConsoleLogs'
-    enabled: true
-  }
-  {
-    category: 'AppServiceAppLogs'
-    enabled: true
-  }
-  {
-    category: 'AppServiceAuditLogs'
-    enabled: true
-  }
-  {
-    category: 'AppServiceIPSecAuditLogs'
-    enabled: true
-  }
-  {
-    category: 'AppServicePlatformLogs'
-    enabled: true
-  }
 ]
 
 var silverLogs = [
