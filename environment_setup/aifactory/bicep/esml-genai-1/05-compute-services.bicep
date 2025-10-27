@@ -695,10 +695,10 @@ module rbacForWebAppMSI '../modules/webappRbac.bicep' = if(!webAppExists && enab
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name // Using different storage account
-    aiSearchName: aiSearchName
+    aiSearchName: enableAISearch ? aiSearchName : ''
     webAppPrincipalId: var_webAppPrincipalId // Using computed variable for principal ID
-    openAIName: aoaiName
-    aiServicesName: aiServicesName
+    openAIName: enableAzureOpenAI ? aoaiName : ''
+    aiServicesName: enableAIServices ? aiServicesName : ''
   }
   dependsOn: [
     webapp
@@ -775,10 +775,10 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExist
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name // Using different storage account
-    aiSearchName: aiSearchName
+    aiSearchName: enableAISearch ? aiSearchName : ''
     functionPrincipalId: var_functionPrincipalId // Using computed variable for principal ID
-    openAIName: aoaiName
-    aiServicesName: aiServicesName
+    openAIName: enableAzureOpenAI ? aoaiName : ''
+    aiServicesName: enableAIServices ? aiServicesName : ''
   }
   dependsOn: [
     function
