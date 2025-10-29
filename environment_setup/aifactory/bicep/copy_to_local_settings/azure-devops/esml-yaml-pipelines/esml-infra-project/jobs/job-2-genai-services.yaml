@@ -25,16 +25,20 @@ steps:
       VNET_NAME="$(vnetNameFull_param)"
       VNET_RG="$(vnetResourceGroup_param)"
       
-      # If VNET variables are not set, use naming convention
-      if [ -z "$VNET_NAME" ] || [ "$VNET_NAME" = "$(vnetNameFull_param)" ]; then
+      # If VNET variables are not set (empty or unexpanded), use naming convention
+      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
         VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
         echo "VNET name not set, using naming convention: $VNET_NAME"
+      else
+        echo "Using provided VNET name: $VNET_NAME"
       fi
       
-      if [ -z "$VNET_RG" ] || [ "$VNET_RG" = "$(vnetResourceGroup_param)" ]; then
+      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_param\)* ]]; then
         # Use the common resource group naming convention
         VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
         echo "VNET resource group not set, using naming convention: $VNET_RG"
+      else
+        echo "Using provided VNET resource group: $VNET_RG"
       fi
       
       echo "VNET Name: $VNET_NAME"
