@@ -14,8 +14,8 @@ steps:
     scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
-      Write-Host "dev_test_prod is: $(dev_test_prod)"
-      Write-Host "parameters  serviceConnection is:  ${{ parameters.serviceConnection }}"
+      echo "dev_test_prod is: $(dev_test_prod)"
+      echo "parameters  serviceConnection is:  ${{ parameters.serviceConnection }}"
 - task: AzureCLI@2
   displayName: '01_az_bicep_common_rg'
   inputs:
