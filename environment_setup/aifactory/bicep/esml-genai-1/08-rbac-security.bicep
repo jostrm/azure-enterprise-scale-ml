@@ -610,17 +610,17 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
 }
 
 // RBAC for Users to AI Hub and Projects
-module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if (!aiHubExists && enableAIFoundryHub) {
+module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if ((!aiHubExists && enableAIFoundryHub) || (!aiServicesExists && enableAIServices)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacUsersAIHub${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    aiServicesName: aiServicesName
+    aiServicesName: enableAIServices? aiServicesName : ''
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     resourceGroupId: projectResourceGroup_rgId
     userObjectIds: userIdsUnique
-    aiHubName: aifV1HubName
-    aiHubProjectName: aifV1ProjectName
+    aiHubName: enableAIFoundryHub ? aifV1HubName : ''
+    aiHubProjectName: enableAIFoundryHub ? aifV1ProjectName : ''
     servicePrincipleAndMIArray: spAndMiUnique
     useAdGroups: useAdGroups
     disableContributorAccessForUsers: disableContributorAccessForUsers

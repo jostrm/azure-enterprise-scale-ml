@@ -9,7 +9,7 @@ var threadConnections = ['${cosmosDBConnection}']
 var storageConnections = ['${azureStorageConnection}']
 var vectorStoreConnections = ['${aiSearchConnection}']
 
-// AI Foundry resource (AI Services)
+// AI Foundry resource (AI Services): 2025-04-01-preview, 2025-06-01
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
    name: accountName
 }
@@ -24,7 +24,7 @@ resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityH
   ]
 }
 
-// AI foundry project
+// AI foundry project: 2025-04-01-preview, 2025-06-01
 resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
   name: projectName
   parent: account

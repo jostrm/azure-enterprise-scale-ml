@@ -387,6 +387,10 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
 // @2025-04-01-preview - name (32)
 // @2025-06-01: name (12)
 // 2025-09-11: prevalidation: InvalidTemplateDeployment, InvalidDomainName:  icrosoft.CognitiveServices/accounts@2025-06-01
+// As of 2025-10-30: 
+// AIF used: 2025-07-01-preview
+// AVM module uses: 2025-06-01 
+// GH AF uses: 2025-04-01-preview
 resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' = {
   name: name
   kind: kind
@@ -444,9 +448,9 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-previ
     migrationToken: migrationToken
     restore: restore
     restrictOutboundNetworkAccess: restrictOutboundNetworkAccess
-    userOwnedStorage: userOwnedStorage
+    userOwnedStorage: !empty(userOwnedStorage) ? userOwnedStorage : null // Accounting for [ ] not being a supported value
     dynamicThrottlingEnabled: dynamicThrottlingEnabled
-    storedCompletionsDisabled:true
+    storedCompletionsDisabled:false
   }
 }
 

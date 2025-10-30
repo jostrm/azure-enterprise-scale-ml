@@ -80,23 +80,23 @@ var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908' // User
 resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
-resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = if(!empty(storageAccountName2)) {
   name: storageAccountName2
 }
 
-resource existingAiServicesResource 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
+resource existingAiServicesResource 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = if(!empty(aiServicesName)) {
   name: aiServicesName
 }
-resource existingAIHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
+resource existingAIHub 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if(!empty(aiHubName)) {
   name: aiHubName
 }
-resource existingAIHubProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = {
+resource existingAIHubProject 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if(!empty(aiHubProjectName)) {
   name: aiHubProjectName
 }
 
 // Culprit.
 // Needed for Agents in AI Hub's AIproject
-resource aiDeveloperOnAIServicesFromAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource aiDeveloperOnAIServicesFromAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(!empty(aiHubProjectName) && !empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, azureAIDeveloperRoleId, existingAIHubProject.id)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
@@ -110,7 +110,7 @@ resource aiDeveloperOnAIServicesFromAIProject 'Microsoft.Authorization/roleAssig
 
 // 002
 @description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
-resource cognitiveServicesUsagesReaderU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource cognitiveServicesUsagesReaderU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
@@ -120,7 +120,7 @@ resource cognitiveServicesUsagesReaderU 'Microsoft.Authorization/roleAssignments
   }
   scope:existingAiServicesResource
 }]
-resource cognitiveServicesUsagesReaderSPU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource cognitiveServicesUsagesReaderSPU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
@@ -133,7 +133,7 @@ resource cognitiveServicesUsagesReaderSPU 'Microsoft.Authorization/roleAssignmen
 // 002
 
 @description('Users to Azure AI Services: Cognitive Services OpenAI Contributor for users. Full access including the ability to fine-tune, deploy and generate text')
-resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
@@ -143,7 +143,7 @@ resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleA
   }
   scope:existingAiServicesResource
 }]
-resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
@@ -155,7 +155,7 @@ resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssig
 }]
 
 @description('Users to Azure AI Services: Cognitive Services OpenAI User:Read access to view files, models, deployments. The ability to create completion and embedding calls.')
-resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
@@ -165,7 +165,7 @@ resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/rol
   }
   scope:existingAiServicesResource
 }]
-resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
@@ -224,7 +224,7 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributorSP 'Microsoft.Aut
 }]
 
 @description('Role Assignment for Azure Storage 2: StorageBlobDataContributor for users. Grants read/write/delete permissions to Blob storage resources')
-resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(storageAccountName2)) {
   name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
@@ -234,7 +234,7 @@ resource userStorageBlobDataContributorRole2 'Microsoft.Authorization/roleAssign
   }
   scope:existingStorageAccount2
 }]
-resource userStorageBlobDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource userStorageBlobDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(storageAccountName2)) {
   name: guid(existingStorageAccount2.id, storageBlobDataContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
@@ -246,7 +246,7 @@ resource userStorageBlobDataContributorRole2SP 'Microsoft.Authorization/roleAssi
 }]
 
 @description('Azure Storage 2: FileDataPrivilegedContributor. Allows for read, write, delete, and modify ACLs on files/directories in Azure file shares by overriding existing ACLs/NTFS permissions. This role has no built-in equivalent on Windows file servers.')
-resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(storageAccountName2)) {
   name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataContributorRoleId)
@@ -257,7 +257,7 @@ resource roleAssignmentStorageUserFileDataPrivilegedContributor2 'Microsoft.Auth
   scope:existingStorageAccount2
 }]
 
-resource roleAssignmentStorageUserFileDataPrivilegedContributor2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource roleAssignmentStorageUserFileDataPrivilegedContributor2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(storageAccountName2)) {
   name: guid(existingStorageAccount2.id, storageFileDataContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataContributorRoleId)
@@ -292,7 +292,7 @@ resource userStorageQueueDataContributorRoleSP 'Microsoft.Authorization/roleAssi
 }]
 
 @description('Role Assignment for Azure Storage 2: StorageQueueDataContributor for users. Grants read/write/delete permissions to Queue storage resources for Azure Functions')
-resource userStorageQueueDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource userStorageQueueDataContributorRole2 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(storageAccountName2)) {
   name: guid(existingStorageAccount2.id, storageQueueDataContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
@@ -303,7 +303,7 @@ resource userStorageQueueDataContributorRole2 'Microsoft.Authorization/roleAssig
   scope:existingStorageAccount2
 }]
 
-resource userStorageQueueDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource userStorageQueueDataContributorRole2SP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(storageAccountName2)) {
   name: guid(existingStorageAccount2.id, storageQueueDataContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
@@ -317,7 +317,7 @@ resource userStorageQueueDataContributorRole2SP 'Microsoft.Authorization/roleAss
 //  AI Hub & AI Project //
 // --------------- AI Hub - specific ---------------- //
 @description('')
-resource azureAIDeveloperRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource azureAIDeveloperRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiHubName)) {
   name: guid(existingAIHub.id, azureAIDeveloperRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
@@ -328,7 +328,7 @@ resource azureAIDeveloperRole 'Microsoft.Authorization/roleAssignments@2022-04-0
   scope:existingAIHub
 }]
 
-resource azureAIDeveloperRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01'  = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource azureAIDeveloperRoleSP 'Microsoft.Authorization/roleAssignments@2022-04-01'  = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiHubName)) {
   name: guid(existingAIHub.id, azureAIDeveloperRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
@@ -342,7 +342,7 @@ resource azureAIDeveloperRoleSP 'Microsoft.Authorization/roleAssignments@2022-04
 // --------------- AI Project - specific ---------------- //
 
 @description('AI Project: azureAIAdministrator:')
-resource azureAIAdministratorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource azureAIAdministratorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiHubProjectName)) {
   name: guid(existingAIHubProject.id, azureAIAdministrator, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
@@ -352,7 +352,7 @@ resource azureAIAdministratorAssignment 'Microsoft.Authorization/roleAssignments
   }
   scope:existingAIHubProject
 }]
-resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignments@2022-04-01'= [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignments@2022-04-01'= [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiHubProjectName)) {
   name: guid(existingAIHubProject.id, azureAIAdministrator, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIAdministrator)
@@ -365,7 +365,7 @@ resource azureAIAdministratorAssignmentSP 'Microsoft.Authorization/roleAssignmen
 
 // Azure AI Developer
 @description('AI Project: Azure AI Developer:')
-resource aiDevOnAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource aiDevOnAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiHubProjectName)) {
   name: guid(existingAIHubProject.id, azureAIDeveloperRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
@@ -375,7 +375,7 @@ resource aiDevOnAIProject 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   }
   scope:existingAIHubProject
 }]
-resource aiDevOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource aiDevOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiHubProjectName)) {
   name: guid(existingAIHubProject.id, azureAIDeveloperRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
@@ -389,7 +389,7 @@ resource aiDevOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01'
 // 2025-05-25 - cognitiveServicesContributorRoleId on AI FOUNDRY_v2 (AI Services)
 
 @description('AI Services: Azure Cognitive services contributor')
-resource cogServiceContribOnAIProjectUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+resource cogServiceContribOnAIProjectUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, userObjectIds[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
@@ -400,7 +400,7 @@ resource cogServiceContribOnAIProjectUser 'Microsoft.Authorization/roleAssignmen
   scope:existingAiServicesResource
 }]
 @description('AI Services: Azure Cognitive services contributor')
-resource cogServiceContribOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+resource cogServiceContribOnAIProjectSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesContributorRoleId, servicePrincipleAndMIArray[i])
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesContributorRoleId)
