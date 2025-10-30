@@ -292,7 +292,7 @@ param ci_devTest_defaults array = [
 ]
 
 // AKS default version from phase 06
-var aksDefaultVersion = '1.30.3'
+var aksDefaultVersion = '1.33.2'
 
 // Resolved compute parameters
 var aks_dev_sku_param = !empty(aks_dev_sku_override) ? aks_dev_sku_override : aks_dev_defaults[0]
