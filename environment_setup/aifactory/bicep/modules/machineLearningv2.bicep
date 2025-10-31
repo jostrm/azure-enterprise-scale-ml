@@ -102,6 +102,10 @@ param managedIdentities managedIdentityAllType?
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var aml_create_ci=false
 
+// Limit tags to maximum 12 to avoid AKS managed resource group errors
+var tagKeys = items(tags)
+var limitedTags = length(tagKeys) > 12 ? toObject(take(tagKeys, 12), item => item.key, item => item.value) : tags
+
 resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: saName
 }
@@ -259,7 +263,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists) {
   name: take('Amlv2-AKS-D${uniqueDepl}',64)
   params: {
     name: aksName // esml001-weu-prod
-    tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
+    tags: limitedTags // NB! Error if tags is more than 15, since managed RG inherits them
     location: location
     skuName: aksSkuName
     skuTier: aksSkuTier
@@ -292,7 +296,7 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
   name: take('Amlv2-AKS-TP${uniqueDepl}',64)
   params: {
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
-    tags: {} // NB! Error if tags is more than 15, since managed RG inherits them
+    tags: limitedTags // NB! Error if tags is more than 15, since managed RG inherits them
     location: location
     skuName: aksSkuName
     skuTier: aksSkuTier
