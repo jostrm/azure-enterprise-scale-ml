@@ -265,7 +265,9 @@ steps:
           subnetCommonPowerbiGw = @{ value = "$(subnetCommonPowerbiGw)" }
           subnetProjGenAI = @{ value = "$(subnetProjGenAI)" }
           subnetProjAKS = @{ value = "$(subnetProjAKS)" }
+          subnetProjAKS2 = @{ value = "$(subnetProjAKS2)" }
           subnetProjACA = @{ value = "$(subnetProjACA)" }
+          subnetProjACA2 = @{ value = "$(subnetProjACA2)" }
           subnetProjDatabricksPublic = @{ value = "$(subnetProjDatabricksPublic)" }
           subnetProjDatabricksPrivate = @{ value = "$(subnetProjDatabricksPrivate)" }
         }

@@ -259,7 +259,7 @@ var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // aks001-weu-prod 
 var aksResourceId = resourceId('Microsoft.ContainerService/managedClusters', aksName)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
-module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists) {
+module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksSubnetId)) {
   name: take('Amlv2-AKS-D${uniqueDepl}',64)
   params: {
     name: aksName // esml001-weu-prod
@@ -292,7 +292,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists) {
   }
 }
 
-module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && !aksExists) {
+module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && !aksExists && !empty(aksSubnetId)) {
   name: take('Amlv2-AKS-TP${uniqueDepl}',64)
   params: {
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
