@@ -157,7 +157,7 @@ variables:
   project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
-  admin_projectType: "genai-1" # Azure Devops: What project type to deploy? [esml,genai-1,genai-2] to fetch subnets from Bicep deployment.
+  admin_projectType: "all" # Azure Devops: What project type to deploy? Set "all" from v 1.23 Earlier versions [esml,genai-1,all] to fetch subnets from Bicep deployment.
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
   tag_costcenter: "1234"
   tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
