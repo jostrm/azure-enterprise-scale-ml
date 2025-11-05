@@ -337,11 +337,12 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
     #disable-next-line BCP318
     resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
-    properties: {
+    properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
       agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
       loadBalancerType: 'InternalLoadBalancer'
+    }, !aksExists ? {
       aksNetworkingConfiguration:  {
         subnetId: aksSubnetId
         dnsServiceIP:aksDnsServiceIP
@@ -349,8 +350,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
         serviceCidr:aksServiceCidr
       }
       loadBalancerSubnet: aksSubnetName // aks-subnet is default
-      
-    }
+    } : {})
   }
   dependsOn: [
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
@@ -368,11 +368,12 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
     #disable-next-line BCP318
     resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
-    properties: {
+    properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
       agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
       loadBalancerType: 'InternalLoadBalancer'
+    }, !aksExists ? {
       aksNetworkingConfiguration:  {
         subnetId: aksSubnetId
         dnsServiceIP:aksDnsServiceIP
@@ -380,8 +381,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
         serviceCidr:aksServiceCidr
       }
       loadBalancerSubnet: aksSubnetName // aks-subnet is default
-      
-    }
+    } : {})
   }
   dependsOn: [
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])

@@ -409,10 +409,10 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     skuName: mlWorkspaceSkuName
     skuTier: mlWorkspaceSkuTier
     env: env
-    aksSubnetId: aksExists ? '' : aks2SubnetId
-    aksSubnetName: aksExists ? '' : aks2SubnetName
-    aksDnsServiceIP: aksExists ? '' : aksDnsServiceIP
-    aksServiceCidr: aksExists ? '' : aksServiceCidr
+    aksSubnetId: aks2SubnetId
+    aksSubnetName: aks2SubnetName
+    aksDnsServiceIP: aksDnsServiceIP
+    aksServiceCidr: aksServiceCidr
     tags: tagsProject
     vnetId: vnet.id
     subnetName: defaultSubnet

@@ -177,7 +177,7 @@ variables:
   serviceSettingDeployProjectVM: "false" # VM Project resource group, to use with BASTION
 
   # ============================================================================
-  # MANDATORY (PRE SETUP of a PROJECT): AI Factory salt frp, COMMON RG
+  # MANDATORY (PRE SETUP of a PROJECT): AI Factory salt from COMMON RG
   # ============================================================================
   # Description: aifactory_salt:""(default) [5 chars] 
   # What: 
