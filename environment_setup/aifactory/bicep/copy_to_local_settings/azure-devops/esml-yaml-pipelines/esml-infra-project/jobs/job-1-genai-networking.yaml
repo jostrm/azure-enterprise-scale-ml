@@ -147,6 +147,7 @@ steps:
       Write-Output "PowerShell Version: $($PSVersionTable.PSVersion)"
 - task: AzureCLI@2
   displayName: '01_pwsh_get_IP_for_ADO_agent'
+  condition: ne(variables['disable_whitelisting_for_built_agents'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: ps
@@ -160,6 +161,7 @@ steps:
 
 - task: AzureCLI@2
   displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
+  condition: ne(variables['disable_whitelisting_for_built_agents'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -443,6 +445,7 @@ steps:
 
 - task: AzureCLI@1
   displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
+  condition: ne(variables['disable_whitelisting_for_built_agents'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptLocation: 'inlineScript'

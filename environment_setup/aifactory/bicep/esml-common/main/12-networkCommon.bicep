@@ -81,8 +81,8 @@ var ai_gateway_app_cidr_v = deployAIGatewayNetworking? replace(ai_gateway_app_ci
 
 var commonResourceGroupName = '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}' // {commonResourceName}-weu-dev-002 // DEPENDENCIES - should exist
 
-var vnetResourceGroupName = vnetResourceGroup_param != '' ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
-var vnetNameFull = vnetNameFull_param  != '' ?vnetNameFull_param: '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // {vnetNameBase}-weu-dev-001 @
+var vnetResourceGroupName = !empty(vnetResourceGroup_param) ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroupName
+var vnetNameFull = !empty(vnetNameFull_param) ? vnetNameFull_param : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'  // {vnetNameBase}-weu-dev-001 @
 
 var vNetRGsalt = substring(uniqueString(vnetResourceGroup.id), 0, 5)
 var commmonRGsalt = substring(uniqueString(commonResourceGroupName), 0, 5)
