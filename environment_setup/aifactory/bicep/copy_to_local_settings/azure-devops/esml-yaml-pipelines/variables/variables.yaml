@@ -15,11 +15,14 @@ variables:
   # ============================================================================
   aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
   aifactory_version_minor: "23" # Minor version
-  # ============================================================================
-  # MANDATORY(CHANGE ONCE)
+    # ============================================================================
+  # MANDATORY(CHANGE RARELY) per AI Factory scaleset
   # ============================================================================
   tag_costceter_common: '9999'
-  tags: '{"CostCenter":"$(tag_costceter_common)","Description":"AI Factory common","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
+  tag_repository: 'aifactory' # Repository name
+  tag_repository_branch: 'aifactory-001' # Can be per AI Factory scaleset 'aifactory-001' or 'aifactory-002', or per scaleset and project 'aifactory-001/project001-main'
+  tags: '{"CostCenter":"$(tag_costceter_common)","Description":"AI Factory common","AIF-Repo":"$(tag_repository)","AIF-Branch":"$(tag_repository_branch)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
+
   admin_location: "eastus2"
   admin_locationSuffix: "eus2"
   admin_aiSearchTier: "standard" # ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
@@ -157,10 +160,10 @@ variables:
   project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)
   project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
-  admin_projectType: "all" # Azure Devops: What project type to deploy? Set "all" from v 1.23 Earlier versions [esml,genai-1,all] to fetch subnets from Bicep deployment.
+  admin_projectType: "all" # Azure Devops related: Set "all" from v 1.23 Earlier versions [esml,genai-1,all] to fetch subnets from Bicep deployment.
   project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
   tag_costcenter: "1234"
-  tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
+  tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Branch":"$(tag_repository_branch)/project$(project_number_000)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
   project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. "10.123.456.10,124.56.78.0/24"
   
   # Container registry
