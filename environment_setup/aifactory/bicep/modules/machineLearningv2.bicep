@@ -405,7 +405,7 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
     properties: {
       vmPriority: 'Dedicated'
       vmSize: ((env =='dev') ? amlComputeDefaultVmSize_dev : amlComputeDefaultVmSize_testProd)
-      enableNodePublicIp: false
+      enableNodePublicIp: enablePublicAccessWithPerimeter ? true : false // Only disable public IP when using private endpoint
       isolatedNetwork: false
       osType: 'Linux'
       remoteLoginPortPublicAccess: 'Disabled'
@@ -440,7 +440,7 @@ resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/wo
     properties: {
       vmPriority: 'Dedicated'
       vmSize: ((env =='dev') ? amlComputeDefaultVmSize_dev : amlComputeDefaultVmSize_testProd)
-      enableNodePublicIp: false
+      enableNodePublicIp: enablePublicAccessWithPerimeter ? true : false // Only disable public IP when using private endpoint
       isolatedNetwork: false
       osType: 'Linux'
       remoteLoginPortPublicAccess: 'Disabled'
