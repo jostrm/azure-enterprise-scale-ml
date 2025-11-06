@@ -331,12 +331,6 @@ if ($null -ne $aifactorySuffixRGADO -and $aifactorySuffixRGADO -ne '') {
 $templateName = "dynamicNetworkParams.json"
 $deploymentPrefix = "esml-p$projectNumber-$env-$locationSuffix$aifactorySuffix" # esml-p001-dev-sdc-002
 
-write-host "PARAMETERS: Static and Dynamic used::"
-write-host "-STATIC (vnetResourceGroup): Static parameters: [commonRGNamePrefix,vnetResourceGroupBase, locationSuffix] (from PARAMETERS.json)"
-write-host "-DYNAMIC (vnetResourceGroup): Dynamic parameters as INPUT (from ADO parameters UI): [env,locationSuffixADO,aifactorySuffixRGADO] this Powershell generates(dynamicNetworkParams.json)"
-
-#$vnetResourceGroup =  "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffixADO-$env$aifactorySuffixRGADO" # msft[esml-common]-swc-dev-001
-
 $vnetResourceGroup = if ( $null -eq $vnetResourceGroup_param -or "" -eq $vnetResourceGroup_param )
 {
     "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix-$env$aifactorySuffix"
@@ -363,10 +357,12 @@ $BYO_subnets_bool = if ($null -eq $BYO_subnets -or "" -eq $BYO_subnets -or $BYO_
 }
 
 $aksSubnetId=""
+$aks2SubnetId=""
 $dbxPubSubnetName=""
 $dbxPrivSubnetName=""
 $genaiSubnetId=""
 $acaSubnetId=""
+$aca2SubnetId=""
 
 # Check if BYO_subnets is false
 if ($BYO_subnets_bool -eq $false) {
@@ -473,6 +469,10 @@ if ($BYO_subnets_bool -eq $false) {
 
     if ($null -ne $subnetCommon -and $subnetCommon -ne "") {
         # Common subnets
+        $subnetCommon = $subnetCommon -replace '<network_env>', $network_env
+        $subnetCommonScoring = $subnetCommonScoring -replace '<network_env>', $network_env
+        $subnetCommonPowerbiGw = $subnetCommonPowerbiGw -replace '<network_env>', $network_env
+
         $subnetCommonId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommon -networkEnv $network_env
         $subnetCommonScoringId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonScoring -networkEnv $network_env
         $subnetCommonPowerbiGwId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonPowerbiGw -networkEnv $network_env
@@ -487,7 +487,9 @@ if ($BYO_subnets_bool -eq $false) {
 
         write-host "Project type: esml - now generating subnet IDs for AKS and Databricks, via in-parameters BYOSnets"
         if ($null -ne $subnetProjAKS -and $subnetProjAKS -ne "") {
-            # ESML project subnets
+            # AKS
+            $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env
+            $subnetProjAKS = $subnetProjAKS -replace '<xxx>', $projectNumber
             $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
 
             $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
@@ -516,6 +518,8 @@ if ($BYO_subnets_bool -eq $false) {
         write-host "Project type: genai-1 : now generating subnet IDs for AKS and GenAI, via in-parameters BYOSnets"
 
         if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
+            $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
+            $subnetProjGenAI = $subnetProjGenAI -replace '<xxx>', $projectNumber
             $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
             write-host "genaiSubnetId: $genaiSubnetId"
 
@@ -539,13 +543,20 @@ if ($BYO_subnets_bool -eq $false) {
         write-host "Project type: all : now generating subnet IDs for AKS, AKS2, GenAI, via in-parameters BYOSnets"
 
         if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
+            $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
+            $subnetProjGenAI = $subnetProjGenAI -replace '<xxx>', $projectNumber
             $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
             write-host "genaiSubnetId: $genaiSubnetId"
 
             try {
+                $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env
+                $subnetProjAKS = $subnetProjAKS -replace '<xxx>', $projectNumber
+
                 $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
                 write-host "aksSubnetId: $aksSubnetId"
                 if ($null -ne $subnetProjAKS2 -and $subnetProjAKS2 -ne "") {
+                    $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env
+                    $subnetProjAKS2 = $subnetProjAKS2 -replace '<xxx>', $projectNumber
                     $aks2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS2 -projectNumber $projectNumber -networkEnv $network_env
                     write-host "aks2SubnetId: $aks2SubnetId"
                 }else{
@@ -557,9 +568,13 @@ if ($BYO_subnets_bool -eq $false) {
             }
 
             try {
+                $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env
+                $subnetProjACA = $subnetProjACA -replace '<xxx>', $projectNumber
                 $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
                 write-host "acaSubnetId: $acaSubnetId"
                 if ($null -ne $subnetProjACA2 -and $subnetProjACA2 -ne "") {
+                    $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env
+                    $subnetProjACA2 = $subnetProjACA2 -replace '<xxx>', $projectNumber
                     $aca2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA2 -projectNumber $projectNumber -networkEnv $network_env
                     write-host "aca2SubnetId: $aca2SubnetId"
                 }else{

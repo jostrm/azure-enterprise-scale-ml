@@ -331,6 +331,7 @@ $authSettings = @{
 }
 
 Connect-AzureContext @authSettings
+$vnetObj = $null
 
 if ($(Get-AzContext).Subscription -ne "") {
     write-host "Successfully logged in as $($(Get-AzContext).Account) to $($(Get-AzContext).Subscription)"
@@ -436,7 +437,6 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     Write-Host "vnetName: $($vnetName)"
     Write-Host "vnetResourceGroup: $($vnetResourceGroup)"
-
     $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
 
     $lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObj.Subnets | Sort-Object { $_.AddressPrefix.split("/")[0] -as [Version]} -Bottom 1)[0].AddressPrefix.split("/") # JOSTRM fixed sort (version and no CIDR, instead of "string sort" and CIDR)
