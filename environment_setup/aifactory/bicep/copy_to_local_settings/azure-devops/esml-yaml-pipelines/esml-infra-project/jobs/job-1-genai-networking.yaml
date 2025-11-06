@@ -23,6 +23,15 @@ steps:
       # Get vnet information from variables, with fallback to naming convention
       VNET_NAME="$(vnetNameFull_param)"
       VNET_RG="$(vnetResourceGroup_param)"
+      NETWORK_ENV="$(network_env)"
+      
+      # Replace <network_env> placeholder in VNET_RG if it exists
+      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetResourceGroup_param"
+        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+        echo "Updated VNET_RG: $VNET_RG"
+      fi
 
       # If VNET variables are not set (empty or unexpanded), use naming convention
       if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
