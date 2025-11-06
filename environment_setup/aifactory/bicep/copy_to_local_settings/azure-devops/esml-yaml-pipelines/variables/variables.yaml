@@ -150,9 +150,13 @@ variables:
   common_bastion_subnet_name: "AzureBastionSubnet"
   common_bastion_subnet_cidr: "172.16.XX.192/26"
 
-  dev_cidr_range: "61" # CIDR range for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
-  test_cidr_range: "62"
-  prod_cidr_range: "63"
+  # If vnet (common_vnet_cidr) of size /16 you may have subnets (such as common_subnet_cidr) within: 0–255
+  # If vnet of size /18 you may have subnets within: 0–63
+  # If vnet of size /19 you may have subnets within: 0–31
+  # If vnet of size /20 you may have subnets within: 0–15
+  dev_cidr_range: "61" # CIDR range (1)  for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
+  test_cidr_range: "62" # CIDR range (5)  for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
+  prod_cidr_range: "63" # CIDR range (10)  for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
 
 ## ============================================================================
 ## START - FOR EACH PROJECT (MANDATORY), PRE SETUP
@@ -329,7 +333,7 @@ variables:
   # ============================================================================
   # OPTIONAL: Built Agent: Azure Devops, or Github Actions Runners
   # ============================================================================
-  disable_whitelisting_for_built_agents: "false" # true, disable whitelisting of Azure Devops pipeline task/GHA, IPs in Keyvault.
+  disable_whitelisting_for_build_agents: "false" # true, disable whitelisting of Azure Devops pipeline task/GHA, IPs in Keyvault.
 
   # ============================================================================
   # OPTIONAL: BYO Overrides: Override AI Factory vanilla - BYOvNet, BYOsnet, BYOAse
