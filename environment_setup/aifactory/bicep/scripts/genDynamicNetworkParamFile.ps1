@@ -587,7 +587,7 @@ if ($BYO_subnets_bool -eq $false) {
                 write-host "AIF-WARNING: acaSubnetId or aca2SubnetId could not be generated(catch). Please check your Variables.json file."    
             }
             try{
-                if ($null -ne $dbxPubSubnetName -and $dbxPubSubnetName -ne "") {
+                if ($null -ne $subnetProjDatabricksPublic -and $subnetProjDatabricksPublic -ne "") {
                     $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
                     $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<xxx>', $projectNumber
                     # These can be full IDs if needed
