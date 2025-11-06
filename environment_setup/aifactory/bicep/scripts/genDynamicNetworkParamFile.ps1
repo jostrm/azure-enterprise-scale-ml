@@ -297,6 +297,8 @@ Set-DeployedOnTag -InputObject $jsonParameters4
 ConvertTo-Variables -InputObject $jsonParameters4
 
 $jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
+Write-Host "DEBUG: bicepPar5 10-esml-globals-override.json:" -ForegroundColor Cyan
+Write-Host ($jsonParameters5 | ConvertTo-Json -Depth 10) -ForegroundColor Yellow
 ConvertTo-Variables -InputObject $jsonParameters5
 
 ## $tenantId comes from Parameters.json  - the rest is INPUT, as ADO parameters (see top of file)
@@ -358,8 +360,8 @@ $BYO_subnets_bool = if ($null -eq $BYO_subnets -or "" -eq $BYO_subnets -or $BYO_
 
 $aksSubnetId=""
 $aks2SubnetId=""
-$dbxPubSubnetName=""
-$dbxPrivSubnetName=""
+$dbxPubSubnetId=""
+$dbxPrivSubnetId=""
 $genaiSubnetId=""
 $acaSubnetId=""
 $aca2SubnetId=""

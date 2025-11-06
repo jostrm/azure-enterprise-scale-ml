@@ -65,6 +65,7 @@ variables:
   commonLakeNamePrefixMax8chars: "mrvel"
   lakeContainerName: "lake3"
   adminUsername: "esmladmin"
+  # Standalone AI Factory, or centralized private DNS zones by Azure Policy in Hub.
   centralDnsZoneByPolicyInHub: "false" # false, will automatically "create if not exists" private dns zones in each spoke resource group. true, will use central private dns zones in HUB resource group, created by Azure Policy.
   privDnsSubscription_param: "TODO_SubID"
   privDnsResourceGroup_param: "TODO_rg_name"
@@ -349,22 +350,22 @@ variables:
   # OPTIONAL(CHANGE ONCE) - Bring your own vNet/subnets (BYO_subnets=true) 
   # Default: leave false and empty strings to disable, and pipeline will create new subnets based on the CIDR
   # ============================================================================
-  BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
+  BYO_subnets: "false" # false, the default subnets created by the pipeline. true then Azure Devops pipeline will not run Networking step - your subnets, with names as below is used.
   network_env_dev: "dev-" # used by both BYO_subnets, and vnetResourceGroup_param
   network_env_stage: "tst2-"
   network_env_prod: "prd-"
   # DOCS_byosnet_common_example: "acme-<network_env>common-eus2-subnet"
-  subnetCommon: ""
-  subnetCommonScoring: ""
-  subnetCommonPowerbiGw: ""
+  subnetCommon: "snet-dev-esml-cmn-001" # Example: with no replacement of <network_env>
+  subnetCommonScoring: "snet-<network_env>esml-cmn-001-scoring" # Example: Replacement of <network_env> that will get value "dev-" from network_env_dev
+  subnetCommonPowerbiGw: "snet-esml-cmn-pbi-001"
   # DOCS_byosnet_project_example: "acme-<network_env>prj<xxx>-genai-eus2-subnet"
-  subnetProjGenAI: ""
-  subnetProjAKS: ""
-  subnetProjAKS2: ""
-  subnetProjACA: ""
-  subnetProjACA2: ""
-  subnetProjDatabricksPublic: ""
-  subnetProjDatabricksPrivate: ""
+  subnetProjGenAI: "snt-dev-prj<xxx>-genai" # Example, with replacement of <xxx> but not with <network_env>
+  subnetProjAKS: "snt-prj<xxx>-aks"
+  subnetProjAKS2: "snt-<network_env>prj<xxx>-aks2" # Example, with replacement of <xxx> and <network_env> that will get value "dev-" from network_env_dev
+  subnetProjACA: "snt-prj<xxx>-aca"
+  subnetProjACA2: "snt-prj<xxx>-aca2"
+  subnetProjDatabricksPublic: "snt-prj001-dbxpub" # Example, no replacement of <xxx>
+  subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # Example, with replacement of <xxx>
   byoASEv3: "false"
   byoAseFullResourceId: "/subscriptions/...yourASEnameS2"
   byoAseAppServicePlanResourceId: ""
