@@ -6,6 +6,44 @@ parameters:
 
 steps:
 - task: AzureCLI@2
+  displayName: '00_resolve_network_env_placeholders'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      NETWORK_ENV="$(network_env)"
+      VNET_RG="$(vnetResourceGroup_param)"
+      VNET_NAME="$(vnetNameFull_param)"
+      
+      echo "Original vnetResourceGroup_param: $VNET_RG"
+      echo "Original vnetNameFull_param: $VNET_NAME"
+      echo "network_env value: $NETWORK_ENV"
+      
+      # Replace <network_env> placeholder in VNET_RG if it exists
+      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetResourceGroup_param"
+        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+      
+      # Replace <network_env> placeholder in VNET_NAME if it exists
+      if [[ "$VNET_NAME" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetNameFull_param"
+        VNET_NAME="${VNET_NAME//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+      
+      # Set resolved values as pipeline variables for reuse
+      echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
+      echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
+      
+      echo "Resolved vnetResourceGroup: $VNET_RG"
+      echo "Resolved vnetNameFull: $VNET_NAME"
+      echo "Variables set: vnetResourceGroup_resolved and vnetNameFull_resolved"
+- task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
   condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
   inputs:
@@ -23,17 +61,8 @@ steps:
       
       # Get vnet information from variables, with fallback to naming convention
       VNET_NAME="$(vnetNameFull_param)"
-      VNET_RG="$(vnetResourceGroup_param)"
-      NETWORK_ENV="$(network_env)"
-      
-      # Replace <network_env> placeholder in VNET_RG if it exists
-      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
-        echo "Found <network_env> placeholder in vnetResourceGroup_param"
-        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
-        echo "Replaced with network_env value: $NETWORK_ENV"
-        echo "Updated VNET_RG: $VNET_RG"
-      fi
-      
+      VNET_RG="$(vnetResourceGroup_resolved)"
+
       # If VNET variables are not set (empty or unexpanded), use naming convention
       if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
         VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
@@ -264,13 +293,13 @@ steps:
       }
       $project | ConvertTo-Json -Depth 5 | Out-File "$tempDir/21-22-esml-prj-parameters.json" -Encoding UTF8
       
-      # 10-esml-globals-override.json (bicepPar5)
+      # 10-esml-globals-override.json (bicepPar5) - Use resolved variables with <network_env> already replaced
       $override = @{
         '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
         contentVersion = "1.0.0.0"
         parameters = @{
-          vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_param)" }
-          vnetNameFull_param = @{ value = "$(vnetNameFull_param)" }
+          vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_resolved)" }
+          vnetNameFull_param = @{ value = "$(vnetNameFull_resolved)" }
           subnetCommon = @{ value = "$(subnetCommon)" }
           subnetCommonScoring = @{ value = "$(subnetCommonScoring)" }
           subnetCommonPowerbiGw = @{ value = "$(subnetCommonPowerbiGw)" }
@@ -528,11 +557,29 @@ steps:
     inlineScript: |
       #!/bin/bash
 
-      az account set --subscription "$(dev_test_prod_sub_id)"
-
       # Input parameters
-      privDnsSubscription="$(dev_test_prod_sub_id)"
-      privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      # Use privDnsSubscription_param if available, otherwise use dev_test_prod_sub_id
+      PRIV_DNS_SUB_PARAM="$(privDnsSubscription_param)"
+      if [ -n "$PRIV_DNS_SUB_PARAM" ] && [ "$PRIV_DNS_SUB_PARAM" != "\$(privDnsSubscription_param)" ]; then
+        privDnsSubscription="$PRIV_DNS_SUB_PARAM"
+        echo "Using privDnsSubscription_param: $privDnsSubscription"
+      else
+        privDnsSubscription="$(dev_test_prod_sub_id)"
+        echo "Using dev_test_prod_sub_id for Private DNS subscription: $privDnsSubscription"
+      fi
+
+      az account set --subscription "$privDnsSubscription"
+      
+      # Use privDnsResourceGroup_param if available, otherwise construct the name
+      PRIV_DNS_RG_PARAM="$(privDnsResourceGroup_param)"
+      if [ -n "$PRIV_DNS_RG_PARAM" ] && [ "$PRIV_DNS_RG_PARAM" != "\$(privDnsResourceGroup_param)" ]; then
+        privDnsResourceGroupName="$PRIV_DNS_RG_PARAM"
+        echo "Using privDnsResourceGroup_param for Private DNS: $privDnsResourceGroupName"
+      else
+        privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "Using constructed Private DNS resource group name: $privDnsResourceGroupName"
+      fi
+      
       location="$(admin_location)"
 
       # Define key-value pairs for DNS Zones
@@ -545,12 +592,22 @@ steps:
         [zoneServicesAi]="privatelink.services.ai.azure.com"
       )
 
+      # Print variables for debugging before checking
+      echo "=== DNS Zone Check Configuration ==="
+      echo "Private DNS Subscription: $privDnsSubscription"
+      echo "Private DNS Resource Group: $privDnsResourceGroupName"
+      echo "Location: $location"
+      echo "===================================="
+
       # Helper function to check if a Private DNS Zone exists
       dns_zone_exists() {
         local subscription="$1"
         local resourceGroup="$2"
         local dnsZoneName="$3"
 
+        # Send debug output to stderr so it doesn't interfere with the return value
+        echo "Checking DNS Zone: $dnsZoneName in RG: $resourceGroup, Subscription: $subscription" >&2
+        
         # Run the az network private-dns zone show command and capture its output and exit status
         local output
         output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
@@ -558,8 +615,11 @@ steps:
 
         # Check if the command succeeded
         if [ $status -ne 0 ]; then
+          echo "  ❌ Not found or error occurred" >&2
+          echo "  Error details: $output" >&2
           echo "false"
         else
+          echo "  ✅ Found" >&2
           echo "true"
         fi
       }
@@ -569,13 +629,8 @@ steps:
         dnsZoneName="${dnsZones[$key]}"
         exists=$(dns_zone_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName")
         echo "##vso[task.setvariable variable=${key}Exists]${exists}"
-        echo "Checked DNS Zone: $dnsZoneName, Exists: $exists"
+        echo "Result - DNS Zone: $dnsZoneName, Exists: $exists"
       done
-
-      # Print variables for debugging
-      echo "Private DNS Subscription: $privDnsSubscription"
-      echo "Private DNS Resource Group: $privDnsResourceGroupName"
-      echo "Location: $location"
 - task: AzureCLI@2
   displayName: '05b_Check if resource exists'
   inputs:
@@ -992,8 +1047,8 @@ steps:
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
      --parameters vnetResourceGroupBase="$(vnetResourceGroupBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privateDnsAndVnetLinkAllGlobalLocation="false" \
@@ -1050,8 +1105,8 @@ steps:
      --parameters DEBUG_network_env_dev="$(network_env_dev)" \
      --parameters DEBUG_network_env_stage="$(network_env_stage)" \
      --parameters DEBUG_network_env_prod="$(network_env_prod)" \
-     --parameters DEBUG_vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters DEBUG_vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters DEBUG_vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters DEBUG_vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters DEBUG_commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters DEBUG_datalakeName_param="$(datalakeName_param)" \
      --parameters DEBUG_kvNameFromCOMMON_param="$(kvNameFromCOMMON_param)" \
@@ -1118,8 +1173,8 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
      --parameters subnetCommon="$(subnetCommon)" \
@@ -1189,8 +1244,8 @@ steps:
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
@@ -1265,8 +1320,8 @@ steps:
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
@@ -1326,8 +1381,8 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
@@ -1404,8 +1459,8 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
@@ -1489,9 +1544,9 @@ steps:
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --parameters network_env="$(network_env)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectPrefix="$(projectPrefix)" \
@@ -1557,9 +1612,9 @@ steps:
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --parameters network_env="$(network_env)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectPrefix="$(projectPrefix)" \
@@ -1605,8 +1660,8 @@ steps:
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
@@ -1706,8 +1761,8 @@ steps:
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_param)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
      --parameters subnetCommon="$(subnetCommon)" \
@@ -1841,3 +1896,4 @@ steps:
       else
         echo "No registry name found - skipping public access disable"
       fi
+

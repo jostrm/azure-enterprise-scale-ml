@@ -5,6 +5,44 @@ parameters:
     type: string
 steps:
 - task: AzureCLI@2
+  displayName: '00_resolve_network_env_placeholders'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      NETWORK_ENV="$(network_env)"
+      VNET_RG="$(vnetResourceGroup_param)"
+      VNET_NAME="$(vnetNameFull_param)"
+      
+      echo "Original vnetResourceGroup_param: $VNET_RG"
+      echo "Original vnetNameFull_param: $VNET_NAME"
+      echo "network_env value: $NETWORK_ENV"
+      
+      # Replace <network_env> placeholder in VNET_RG if it exists
+      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetResourceGroup_param"
+        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+      
+      # Replace <network_env> placeholder in VNET_NAME if it exists
+      if [[ "$VNET_NAME" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetNameFull_param"
+        VNET_NAME="${VNET_NAME//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+      
+      # Set resolved values as pipeline variables for reuse
+      echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
+      echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
+      
+      echo "Resolved vnetResourceGroup: $VNET_RG"
+      echo "Resolved vnetNameFull: $VNET_NAME"
+      echo "Variables set: vnetResourceGroup_resolved and vnetNameFull_resolved"
+- task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
   condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
   inputs:
@@ -20,18 +58,21 @@ steps:
       PROJECT_SUBNET_NAME="snt-prj$(project_number_000)-aks"
       echo "Checking for subnet: $PROJECT_SUBNET_NAME"
       
-      # Get vnet information from variables, with fallback to naming convention
-      VNET_NAME="$(vnetNameFull_param)"
-      VNET_RG="$(vnetResourceGroup_param)"
-      NETWORK_ENV="$(network_env)"
+      # Get vnet information from variables (use resolved if available), with fallback to naming convention
+      VNET_NAME="$(vnetNameFull_resolved)"
+      VNET_RG="$(vnetResourceGroup_resolved)"
       
-      # Replace <network_env> placeholder in VNET_RG if it exists
-      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
-        echo "Found <network_env> placeholder in vnetResourceGroup_param"
-        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
-        echo "Replaced with network_env value: $NETWORK_ENV"
-        echo "Updated VNET_RG: $VNET_RG"
+      # Fallback to original params if resolved variables are empty
+      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_resolved\)* ]]; then
+        VNET_NAME="$(vnetNameFull_param)"
       fi
+      
+      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_resolved\)* ]]; then
+        VNET_RG="$(vnetResourceGroup_param)"
+      fi
+      
+      echo "Using VNET_NAME: $VNET_NAME"
+      echo "Using VNET_RG: $VNET_RG"
 
       # If VNET variables are not set (empty or unexpanded), use naming convention
       if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
@@ -183,7 +224,6 @@ steps:
   inputs:
     azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     KeyVaultName: '$(admin_bicep_kv_fw)'
-    
 - task: AzureCLI@2
   displayName: '03b_create_temp_json_files'
   inputs:
@@ -239,13 +279,13 @@ steps:
       }
       $project | ConvertTo-Json -Depth 5 | Out-File "$tempDir/temp-project.json" -Encoding UTF8
       
-      # temp-override.json (bicepPar5) - Only include parameters actually used by subnetCalc_v2.ps1
+      # temp-override.json (bicepPar5) - Use resolved variables with <network_env> already replaced
       $override = @{
         '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
         contentVersion = "1.0.0.0"
         parameters = @{
-          vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_param)" }
-          vnetNameFull_param = @{ value = "$(vnetNameFull_param)" }
+          vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_resolved)" }
+          vnetNameFull_param = @{ value = "$(vnetNameFull_resolved)" }
         }
       }
       $override | ConvertTo-Json -Depth 5 | Out-File "$tempDir/temp-override.json" -Encoding UTF8
@@ -318,7 +358,7 @@ steps:
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1'
-    ScriptArguments: '-filePath "../../../../../aifactory/parameters/" -spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -useServicePrincipal -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_param)" -vnetNameFull_param "$(vnetNameFull_param)"'
+    ScriptArguments: '-filePath "../../../../../aifactory/parameters/" -spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -useServicePrincipal -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_resolved)" -vnetNameFull_param "$(vnetNameFull_resolved)"'
     pwsh: true
     azurePowerShellVersion: 'LatestVersion' # 'LatestVersion' | 'OtherVersion' 
     # preferredAzurePowerShellVersion: # ['4.251.1',' 5.251.1'] is downloaded.  This works on other pipeline: '4.248.1'. AllowClobber worked.
@@ -337,10 +377,22 @@ steps:
       # Input parameters
       projectNumber="$(project_number_000)"
       
-      # Get vnet information from variables, with fallback to naming convention
-      VNET_NAME="$(vnetNameFull_param)"
-      VNET_RG="$(vnetResourceGroup_param)"
+      # Get vnet information from resolved variables (with <network_env> already replaced), with fallback to naming convention
+      VNET_NAME="$(vnetNameFull_resolved)"
+      VNET_RG="$(vnetResourceGroup_resolved)"
       
+      # Fallback to original params if resolved variables are empty
+      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_resolved\)* ]]; then
+        VNET_NAME="$(vnetNameFull_param)"
+      fi
+      
+      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_resolved\)* ]]; then
+        VNET_RG="$(vnetResourceGroup_param)"
+      fi
+      
+      echo "Using resolved VNET_NAME: $VNET_NAME"
+      echo "Using resolved VNET_RG: $VNET_RG"
+
       # If VNET variables are not set (empty or unexpanded), use naming convention
       if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
         VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
@@ -409,8 +461,8 @@ steps:
     resourceGroupName: '$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)'
     location: '$(admin_location)'
     templateLocation: 'Linked artifact'
-    csmFile: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep'
-    csmParametersFile: '$(System.DefaultWorkingDirectory)/aifactory/parameters/subnetParameters.json'
+    csmFile: '$(Build.SourcesDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep'
+    csmParametersFile: '$(Build.SourcesDirectory)/aifactory/parameters/subnetParameters.json'
     overrideParameters: >
       -env "$(dev_test_prod)"
       -projectNumber "$(project_number_000)"
@@ -422,8 +474,8 @@ steps:
       -aifactorySuffixRG "$(admin_aifactorySuffixRG)"
       -commonRGNamePrefix "$(admin_aifactoryPrefixRG)"
       -vnetResourceGroup "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-      -vnetResourceGroup_param "$(vnetResourceGroup_param)"
-      -vnetNameFull_param "$(vnetNameFull_param)"
+      -vnetResourceGroup_param "$(vnetResourceGroup_resolved)"
+      -vnetNameFull_param "$(vnetNameFull_resolved)"
       -commonResourceGroup_param "$(commonResourceGroup_param)"
       -datalakeName_param "$(datalakeName_param)"
       -kvNameFromCOMMON_param "$(kvNameFromCOMMON_param)"
