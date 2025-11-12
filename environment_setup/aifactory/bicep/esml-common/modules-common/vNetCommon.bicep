@@ -23,6 +23,8 @@ param common_bastion_subnet_cidr string
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false
 param deployOnlyAIGatewayNetworking bool = false
+param byoSubnet bool = false
+param byoVnet bool = false
 
 resource nsgCommon 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = {
   name: 'nsg-${common_subnet_name}'
@@ -47,7 +49,8 @@ var pbiSettings = {
   serviceEndpoints: []
 }
 
-resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = {
+// Create new vNet with subnets when byoVnet and byoSubnet are both false
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = if (!byoVnet && !byoSubnet) {
   name: vnetNameFull
   location: location
   tags: tags
@@ -148,6 +151,107 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2021-03-01' = {
     name: common_bastion_subnet_name
   }
 }
-output subnet1ResourceId string = virtualNetwork::subnet1.id
-output subnet2ResourceId string = virtualNetwork::subnet2.id
-output subnetBastionId string = virtualNetwork::subnet3.id
+
+// Reference existing vNet when byoVnet or byoSubnet is true
+resource virtualNetworkExisting 'Microsoft.Network/virtualNetworks@2021-03-01' existing = if (byoVnet || byoSubnet) {
+  name: vnetNameFull
+}
+
+// Create subnets in existing vNet when byoVnet or byoSubnet is true
+resource subnet1Byo 'Microsoft.Network/virtualNetworks/subnets@2021-03-01' = if (byoVnet || byoSubnet) {
+  parent: virtualNetworkExisting
+  name: common_subnet_name
+  properties: {
+    addressPrefix: common_subnet_cidr
+    serviceEndpoints: [
+      {
+        locations: [
+          location
+        ]
+        service: 'Microsoft.KeyVault'
+      }
+      {
+        service: 'Microsoft.Storage'
+      }
+      {
+        service: 'Microsoft.CognitiveServices'
+      }
+    ]
+    networkSecurityGroup: nsgCommon.id == '' ? null : {
+      id: nsgCommon.id
+    }   
+    privateEndpointNetworkPolicies: 'Disabled'
+    privateLinkServiceNetworkPolicies: 'Disabled'
+  }
+}
+
+resource subnet2Byo 'Microsoft.Network/virtualNetworks/subnets@2021-03-01' = if (byoVnet || byoSubnet) {
+  parent: virtualNetworkExisting
+  name: '${common_subnet_name}-scoring'
+  properties: {
+    addressPrefix: common_subnet_scoring_cidr
+    privateEndpointNetworkPolicies: 'Disabled'
+    privateLinkServiceNetworkPolicies: 'Disabled'
+    serviceEndpoints: [
+      {
+        service: 'Microsoft.KeyVault'
+      }
+      {
+        service: 'Microsoft.ContainerRegistry'
+      }
+      {
+        service: 'Microsoft.Storage'
+      }
+    ]
+    networkSecurityGroup: nsgCommonScoring.id == '' ? null : {
+      id: nsgCommonScoring.id
+    }  
+  }
+  dependsOn: [
+    subnet1Byo // Ensure sequential creation to avoid conflicts
+  ]
+}
+
+resource subnet3Byo 'Microsoft.Network/virtualNetworks/subnets@2021-03-01' = if (byoVnet || byoSubnet) {
+  parent: virtualNetworkExisting
+  name: common_pbi_subnet_name
+  properties: {
+    addressPrefix: common_pbi_subnet_cidr
+    serviceEndpoints: []
+    delegations: [
+      {
+        properties: {
+          serviceName: pbiSettings.delegations[0]
+        }
+        name: '${toLower(split(split(pbiSettings.delegations[0], '.')[0], '/')[0])}-del-${substring(uniqueString(common_pbi_subnet_name),0,12)}'
+      }
+    ]
+    networkSecurityGroup: nsgPBI.id == '' ? null : {
+      id: nsgPBI.id
+    }
+  }
+  dependsOn: [
+    subnet2Byo
+  ]
+}
+
+resource subnet4Byo 'Microsoft.Network/virtualNetworks/subnets@2021-03-01' = if (byoVnet || byoSubnet) {
+  parent: virtualNetworkExisting
+  name: common_bastion_subnet_name
+  properties: {
+    addressPrefix: common_bastion_subnet_cidr
+    serviceEndpoints: []
+    delegations: []
+    networkSecurityGroup: nsgBastion.id == '' ? null : {
+      id: nsgBastion.id
+    }
+  }
+  dependsOn: [
+    subnet3Byo
+  ]
+}
+
+// Outputs that work for both scenarios
+output subnet1ResourceId string = (byoVnet || byoSubnet) ? subnet1Byo.id : virtualNetwork::subnet1.id
+output subnet2ResourceId string = (byoVnet || byoSubnet) ? subnet3Byo.id : virtualNetwork::subnet2.id
+output subnetBastionId string = (byoVnet || byoSubnet) ? subnet4Byo.id : virtualNetwork::subnet3.id

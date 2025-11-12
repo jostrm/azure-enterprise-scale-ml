@@ -160,7 +160,8 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
     nsgBastion
   ]
 }
-module vNetCommon '../modules-common/vNetCommon.bicep' = if(empty(vnetNameFull_param)) {
+var byoVnet = !empty(vnetNameFull_param)
+module vNetCommon '../modules-common/vNetCommon.bicep' = if(byoVnet && !BYO_subnets) {
   scope: vnetResourceGroup
   name: '${vnetNameFull}depl${uniqueDetermenistic}'
   params: {
@@ -177,6 +178,8 @@ module vNetCommon '../modules-common/vNetCommon.bicep' = if(empty(vnetNameFull_p
     vnetNameFull: vnetNameFull
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     deployOnlyAIGatewayNetworking:deployOnlyAIGatewayNetworking
+    byoSubnet: BYO_subnets
+    byoVnet: byoVnet
   }
   dependsOn: [
     nsgCommon

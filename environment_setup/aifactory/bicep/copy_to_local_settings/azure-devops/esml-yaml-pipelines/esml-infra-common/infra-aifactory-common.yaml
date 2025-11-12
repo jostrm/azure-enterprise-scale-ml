@@ -1,13 +1,16 @@
-trigger:
-  branches:
-    include:
-      - release/common*
+trigger: none
+  # branches:
+    # include:
+      # - main*
 variables:
 - template: ../variables/variables.yaml
 - name: runNetworkingVar
   value: true
 
 stages:
+# Dev:
+# ✅ Runs automatically on CI triggers (main branch), if you uncomment code and remove "none" value
+# ✅ Runs on manual triggers
 - stage: Dev
   displayName: AIFactory_CMN_Dev
   variables:
@@ -31,8 +34,14 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
+
+# Stage:
+# ❌ Never runs automatically - requires manual trigger
+# ✅ Only runs when manually triggered AND Dev succeeded
+# ✅ Can be manually triggered from any branch (no branch restrictions)
 - stage: Stage
   dependsOn: Dev
+  condition: eq(variables['Build.Reason'], 'Manual')
   displayName: AIFactory_CMN_Stage
   variables:
     dev_test_prod: "test"
@@ -55,8 +64,23 @@ stages:
               - template: ./jobs/job-1-aif-cmn.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
+
+# Prod:
+# ❌ Never runs automatically - requires manual trigger
+# ✅ Only runs when manually triggered AND (Stage succeeded/skipped OR Dev succeeded)
+# ✅ Can be manually triggered from any branch
 - stage: Prod
-  dependsOn: Stage
+  dependsOn: 
+    - Dev
+    - Stage
+  condition: |
+    and(
+      eq(variables['Build.Reason'], 'Manual'),
+      or(
+        in(dependencies.Stage.result, 'Succeeded', 'Skipped'),
+        eq(dependencies.Dev.result, 'Succeeded')
+      )
+    )
   displayName: AIFactory_CMN_Prod
   variables:
     dev_test_prod: "prod"

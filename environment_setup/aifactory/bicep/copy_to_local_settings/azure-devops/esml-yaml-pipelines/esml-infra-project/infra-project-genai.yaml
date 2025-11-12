@@ -1,6 +1,6 @@
 #
 #Dev_GenAI_Project:
-#✅ Runs automatically on CI triggers (release/project* branches and main)
+#✅ Runs automatically on CI triggers (release/project* branches) if you uncomment code, and remove "none" value
 #✅ Runs on manual triggers
 #
 #Stage_GenAI_Project:
@@ -13,11 +13,10 @@
 #✅ Only runs when manually triggered AND (Stage succeeded/skipped OR Dev succeeded)
 #✅ Can be manually triggered from any branch
 
-trigger:
-  branches:
-    include:
-      - release/project*
-      # - main
+trigger: none
+  # branches:
+    # include:
+      # - release/project*
 variables:
   - template: ../variables/variables.yaml
 stages:
