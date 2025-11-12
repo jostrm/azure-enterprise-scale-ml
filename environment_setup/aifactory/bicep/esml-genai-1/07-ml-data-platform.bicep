@@ -256,7 +256,7 @@ var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var aks2SubnetName = namingConvention.outputs.aks2SubnetName
 var genaiName = namingConvention.outputs.projectTypeGenAIName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
-var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+//var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
@@ -435,7 +435,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     ciVmSku_testProd: aml_ci_test_prod_sku_param
     ipRules: empty(processedIpRulesAzureML) ? [] : processedIpRulesAzureML
     ipWhitelist_array: empty(ipWhitelist_normalized) ? [] : ipWhitelist_normalized
-    saName: storageAccount2001Name
+    saName: storageAccount1001Name
     kvName: keyvaultName
     acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR ? commonResourceGroup : targetResourceGroup
@@ -478,7 +478,7 @@ module rbacAmlv2Storage '../modules/rbacStorageAml.bicep' = if(!amlExists && ena
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('07-rbacAmlv2Storage${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    storageAccountName: storageAccount2001Name
+    storageAccountName: storageAccount1001Name
     userObjectIds: p011_genai_team_lead_array
     azureMLworkspaceName: amlName
     servicePrincipleAndMIArray: spAndMiArray
