@@ -160,7 +160,7 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
     nsgBastion
   ]
 }
-module vNetCommon '../modules-common/vNetCommon.bicep' = {
+module vNetCommon '../modules-common/vNetCommon.bicep' = if(empty(vnetNameFull_param)) {
   scope: vnetResourceGroup
   name: '${vnetNameFull}depl${uniqueDetermenistic}'
   params: {
@@ -210,8 +210,8 @@ module aiGatewayNetworking '../ai-gateway/14-add-networking-aigw.bicep' = if(dep
     CIDRApim: ai_gateway_apim_cidr_v
     CIDRFunctionApp: ai_gateway_app_cidr_v  
   }
-  dependsOn:[
+  dependsOn: empty(vnetNameFull_param) ? [
     vNetCommon
-  ]
+  ] : []
 }
 
