@@ -448,7 +448,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
 }
 
 // Added: Azure Databricks Workspace (AVM) deployment
-module databricks 'br/public:avm/res/databricks/workspace:0.11.5' = if(!databricksExists && enableDatabricks) {
+module databricks 'br/public:avm/res/databricks/workspace:0.12.0' = if(!databricksExists && enableDatabricks) {
   name: take('07-Dbx-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
