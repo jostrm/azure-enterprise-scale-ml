@@ -87,6 +87,7 @@ param technicalAdminsEmail string = ''
 @description('Enable deployments')
 param enableDatafactory bool = false
 param enableAzureMachineLearning bool = false
+param enableAksForAzureML bool = true
 param enableDatabricks bool = false
 
 @description('Enable public access with perimeter')
@@ -397,6 +398,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
       systemAssigned: true
     }
     aksExists:aksExists
+    enableAksForAzureML:enableAksForAzureML
     aksSkuName: aksSkuName
     aksSkuTier: aksSkuTier
     uniqueDepl: deploymentProjSpecificUniqueSuffix
