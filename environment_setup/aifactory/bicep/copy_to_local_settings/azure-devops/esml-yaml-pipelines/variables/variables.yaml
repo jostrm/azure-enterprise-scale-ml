@@ -226,6 +226,7 @@ variables:
   enableDatafactory: "false" # Datafactory
   enableAzureMachineLearning: "false" # Azure Machine Learning v2 (TODO Databricks, EventHubs, LA)
   addAzureMachineLearning: "false"
+  enableAksForAzureML: "true" # AKS for Azure ML compute
   enableDatabricks: "false"
   # === Cognitive Services ===
   enableAISearch: "true"

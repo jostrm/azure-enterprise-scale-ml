@@ -25,6 +25,7 @@ param projectNumber string
 param location string
 param env string
 param aksSubnetId string
+param enableAksForAzureML bool = true
 @description('Subnet name for aks')
 param aksSubnetName string
 param aksServiceCidr string = '10.0.0.0/16'
@@ -259,7 +260,7 @@ var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // aks001-weu-prod 
 var aksResourceId = resourceId('Microsoft.ContainerService/managedClusters', aksName)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 
-module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksSubnetId)) {
+module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
   name: take('Amlv2-AKS-D${uniqueDepl}',64)
   params: {
     name: aksName // esml001-weu-prod
@@ -292,7 +293,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
   }
 }
 
-module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && !aksExists && !empty(aksSubnetId)) {
+module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
   name: take('Amlv2-AKS-TP${uniqueDepl}',64)
   params: {
     name: aksName // 'aks${projectNumber}-${locationSuffix}-${env}$'
@@ -327,7 +328,7 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
 
 //AKS attach compute PRIVATE cluster, without SSL
 //Microsoft.MachineLearningServices/workspaces/computes@2022-10-01
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='dev' && !empty(aksSubnetId)) {	
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='dev' && !empty(aksSubnetId) && enableAksForAzureML) {	
   name: aksName
   parent: azureMLv2Dev
   location: location
@@ -358,7 +359,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   ]
 }
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='test' || env=='prod'  && !empty(aksSubnetId)) {	
+resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='test' || env=='prod'  && !empty(aksSubnetId) && enableAksForAzureML) {	
   name: aksName
   parent: amlv2TestProd
   location: location
