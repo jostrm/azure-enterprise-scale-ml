@@ -327,7 +327,7 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
 
 //AKS attach compute PRIVATE cluster, without SSL
 //Microsoft.MachineLearningServices/workspaces/computes@2022-10-01
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='dev') {	
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='dev' && !empty(aksSubnetId)) {	
   name: aksName
   parent: azureMLv2Dev
   location: location
@@ -358,7 +358,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   ]
 }
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='test' || env=='prod') {	
+resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='test' || env=='prod'  && !empty(aksSubnetId)) {	
   name: aksName
   parent: amlv2TestProd
   location: location
