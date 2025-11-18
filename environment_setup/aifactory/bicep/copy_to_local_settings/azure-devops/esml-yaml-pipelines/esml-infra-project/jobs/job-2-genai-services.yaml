@@ -1219,6 +1219,7 @@ steps:
      --parameters containerRegistrySkuName="$(acr_SKU)" \
      --parameters enableProjectVM="$(enableProjectVM)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
