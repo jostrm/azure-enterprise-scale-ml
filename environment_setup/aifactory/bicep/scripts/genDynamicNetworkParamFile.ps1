@@ -370,6 +370,7 @@ $aca2SubnetId=""
 if ($BYO_subnets_bool -eq $false) {
 
     write-host "The following parameters are added to template"
+    write-host "vnetResourceGroup is: $($vnetResourceGroup)"
 
     write-host "Project type all :  trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj for AKS name"
     $aksSubnetId=(Get-AzResourceGroupDeployment `
