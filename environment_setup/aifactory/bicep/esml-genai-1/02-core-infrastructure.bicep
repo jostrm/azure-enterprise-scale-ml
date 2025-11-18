@@ -18,7 +18,7 @@ param storageAccountSkuName string = 'Standard_LRS'
 @allowed(['Premium', 'Standard', 'Basic']) 
 param containerRegistrySkuName string = 'Premium' // NB! Basic and Standard ACR SKUs don't support private endpoints.
 param bingSearchSKU string = 'S1'
-
+param updateRbac bool = true
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
@@ -621,7 +621,7 @@ var keyVaultContributorRoleId = 'f25e0fa2-a7c8-4377-a976-54943a77a395' // Manage
 // Project key vault RBAC assignments for users and managed identities
 // FIX: Removed dependency on deprecated technicalContactId parameter
 // This ensures Container Apps and other services can access Key Vault
-module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultExists) {
+module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultExists || updateRbac) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-kvRbacPrj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

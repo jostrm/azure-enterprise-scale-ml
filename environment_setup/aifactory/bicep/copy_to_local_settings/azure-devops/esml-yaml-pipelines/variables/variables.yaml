@@ -208,6 +208,7 @@ variables:
   # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
   
+  updateRbac: "true" # true, enables you to update RBAC properties running the pipeline twice. false means "CreateIfNotExists"  
   # === AI Foundry 2023-2025+ ===
   enableAIServices: "true" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
   enableAIFoundryHub: "true" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
