@@ -351,6 +351,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
+// Extract only the service principal (first element) - MI already handled in file 02
+var servicePrincipalOnly = [spAndMiArray[0]]
 
 // De-duplicate principals to avoid duplicate role assignments
 // - Ensure user list is unique
@@ -493,6 +495,23 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
   dependsOn: [
     existingTargetRG
     rbacReadUsersToCmnVnetBastion
+  ]
+}
+
+// RBAC for Project Key Vault - Service Principals only (Managed Identities already handled in 02-core-infrastructure.bicep)
+module rbacKeyvaultProject '../modules/kvRbacAssignments.bicep' = {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('08-rbacPrjKV${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    keyVaultName: namingConvention.outputs.keyvaultName
+    userObjectIds: [] // Users already handled in 02-core-infrastructure.bicep
+    servicePrincipalIds: servicePrincipalOnly // Only the service principal from seeding KV
+    managedIdentityIds: [] // Managed identities (Project MI + ACA MI) already handled in 02-core-infrastructure.bicep
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    existingTargetRG
+    spAndMI2ArrayModule
   ]
 }
 

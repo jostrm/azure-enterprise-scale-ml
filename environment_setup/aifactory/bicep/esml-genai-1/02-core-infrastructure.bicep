@@ -618,15 +618,17 @@ var keyVaultSecretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7' // Can
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6' // Can get, list secrets
 var keyVaultContributorRoleId = 'f25e0fa2-a7c8-4377-a976-54943a77a395' // Management operations
 
-// Project key vault RBAC assignments for technical contact and team
-module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultExists && !empty(technicalContactId)) {
+// Project key vault RBAC assignments for users and managed identities
+// FIX: Removed dependency on deprecated technicalContactId parameter
+// This ensures Container Apps and other services can access Key Vault
+module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-kvRbacPrj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: keyvaultName
-    userObjectIds: p011_genai_team_lead_array
-    servicePrincipalIds: [] // Will be handled separately
-    managedIdentityIds: mi_principals_only // Both project and ACA managed identities
+    userObjectIds: p011_genai_team_lead_array // Assign users (team leads)
+    servicePrincipalIds: [] // Will be handled in 08-rbac-security.bicep to avoid circular dependencies
+    managedIdentityIds: mi_principals_only // Both project and ACA managed identities - CRITICAL for Container Apps
     useAdGroups: useAdGroups
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
