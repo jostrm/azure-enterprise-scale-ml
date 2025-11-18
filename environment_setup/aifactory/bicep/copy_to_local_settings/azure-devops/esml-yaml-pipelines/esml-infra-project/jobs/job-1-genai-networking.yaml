@@ -501,6 +501,8 @@ steps:
       -sntAks002Exists "$(sntAks002Exists)"
       -sntDatabricksPrivExists "$(sntDatabricksPrivExists)"
       -sntDatabricksPubExists "$(sntDatabricksPubExists)"
+      -outboundType "$(aksOutboundType)"
+      -azureFirewallPrivateIp "$(aksAzureFirewallPrivateIp)"
     deploymentMode: 'Incremental'
     deploymentName: 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj'
 

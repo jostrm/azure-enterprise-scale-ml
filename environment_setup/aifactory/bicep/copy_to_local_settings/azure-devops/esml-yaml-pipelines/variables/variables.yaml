@@ -226,7 +226,11 @@ variables:
   enableDatafactory: "false" # Datafactory
   enableAzureMachineLearning: "false" # Azure Machine Learning v2 (TODO Databricks, EventHubs, LA)
   addAzureMachineLearning: "false"
+  # === AKS for Azure ML ===
   enableAksForAzureML: "true" # AKS for Azure ML compute
+  aksOutboundType: "loadBalancer" # loadBalancer, userDefinedRouting
+  aksAzureFirewallPrivateIp: "" # Only needed if aksOutboundType is userDefinedRouting. Provide an IP from the subnet range of the subnet used for Azure Firewall.
+
   enableDatabricks: "false"
   # === Cognitive Services ===
   enableAISearch: "true"

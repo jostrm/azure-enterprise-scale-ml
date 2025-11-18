@@ -3,6 +3,16 @@ param genaiSubnetCidr string
 @description('Specifies cidr notation for aks subnet')
 param aksSubnetCidr string
 param aks2SubnetCidr string = ''
+@description('Optional. Resource ID of the route table for AKS2 subnet. Used for User Defined Routing (UDR) with private AKS.')
+param aks2RouteTableId string = ''
+@description('Specifies the outbound (egress) routing method for AKS2 cluster')
+@allowed([
+  'loadBalancer'
+  'userDefinedRouting'
+])
+param outboundType string = 'loadBalancer'
+@description('Optional. Azure Firewall private IP address for default route when using userDefinedRouting. Required if outboundType is userDefinedRouting and aks2RouteTableId is empty.')
+param azureFirewallPrivateIp string = ''
 @description('Specifies cidr notation for Azure Container Apps subnet')
 param acaSubnetCidr string = ''
 param aca2SubnetCidr string = ''
@@ -109,6 +119,29 @@ var aks2SubnetSettings =  {
   ]
 }
 
+// Create default route table for AKS2 if userDefinedRouting is used and no route table ID is provided
+resource aks2DefaultRouteTable 'Microsoft.Network/routeTables@2023-05-01' = if (!empty(aks2SubnetCidr) && outboundType == 'userDefinedRouting' && empty(aks2RouteTableId)) {
+  name: 'rt-${projectName}-aks2-${locationSuffix}-${env}'
+  location: location
+  tags: tags
+  properties: {
+    routes: [
+      {
+        name: 'default-route-to-azfw'
+        properties: {
+          addressPrefix: '0.0.0.0/0'
+          nextHopType: 'VirtualAppliance'
+          nextHopIpAddress: azureFirewallPrivateIp
+        }
+      }
+    ]
+    disableBgpRoutePropagation: false
+  }
+}
+
+// Determine which route table ID to use
+var aks2RouteTableIdToUse = !empty(aks2RouteTableId) ? aks2RouteTableId : (outboundType == 'userDefinedRouting' && !empty(aks2SubnetCidr) ? aks2DefaultRouteTable.id : '')
+
 module nsgAKS '../modules/aksNsg.bicep' = if(!sntAksExists){
   name: take('aksNsgAKS-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
   scope: resourceGroup(vnetResourceGroupScope)
@@ -157,6 +190,7 @@ module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr) && 
     serviceEndpoints: aks2SubnetSettings.serviceEndpoints
     delegations: aks2SubnetSettings.delegations
     nsgId: !empty(aks2SubnetCidr) ? nsgAKS2!.outputs.nsgId : ''
+    routeTableId: aks2RouteTableIdToUse // Use provided route table or auto-created one for UDR
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
   }
   dependsOn: [
@@ -164,6 +198,7 @@ module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr) && 
     ...(!sntAcaExists ? [acaSnt] : [])
     ...(!sntGenaiExists ? [genaiSnt] : [])    
     ...(!sntAksExists ? [aksSnt] : [])
+    ...(outboundType == 'userDefinedRouting' && empty(aks2RouteTableId) && !empty(aks2SubnetCidr) ? [aks2DefaultRouteTable] : [])
   ]
 }
 
@@ -384,3 +419,4 @@ output acaSubnetId string = !sntAcaExists ? acaSnt!.outputs.subnetId : resourceI
 output aca2SubnetId string = (!sntAca002Exists && !empty(aca2SubnetCidr)) ? acaSnt2!.outputs.subnetId : (sntAca002Exists ? resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull,!empty(subnetProjACA2) ? subnetProjACA2 :  'snt-${projectName}-aca-002') : '')
 output dbxPubSubnetName string = empty(dbxPubSubnetCidr) ? '' : (!empty(subnetProjDatabricksPublic) ? subnetProjDatabricksPublic : 'snt-${projectName}-dbxpub')
 output dbxPrivSubnetName string = empty(dbxPrivSubnetCidr) ? '' : (!empty(subnetProjDatabricksPrivate) ? subnetProjDatabricksPrivate : 'snt-${projectName}-dbxpriv')
+output aks2RouteTableId string = aks2RouteTableIdToUse

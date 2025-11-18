@@ -1,3 +1,23 @@
+// ============================================================================
+// AKS Cluster Module
+// ============================================================================
+// This module creates an Azure Kubernetes Service (AKS) cluster with support for:
+// - Private cluster configuration (API server accessible via private endpoint only)
+// - Flexible outbound connectivity options:
+//   * loadBalancer (default): Uses public IP for outbound traffic
+//   * userDefinedRouting: Fully private - requires Azure Firewall/NAT Gateway + UDR
+//   * managedNATGateway: Uses Azure-managed NAT Gateway
+//   * userAssignedNATGateway: Uses user-managed NAT Gateway
+//
+// For fully private AKS without any public IP using userDefinedRouting:
+// 1. Create a Route Table (UDR) with default route 0.0.0.0/0 -> Azure Firewall/NAT Gateway
+// 2. Associate the route table with the AKS subnet (via subnet resource or separate module)
+// 3. Set outboundType = 'userDefinedRouting' when calling this module
+// 4. Pass the subnet ID (with route table already associated) in agentPoolProfiles
+//
+// Note: Route table association happens at the subnet level, not within this AKS resource.
+// ============================================================================
+
 @description('Specifies the name of the AKS cluster')
 param name string
 // ============== SKUs ==============
@@ -34,12 +54,15 @@ param enableRbac bool = true
 param disableLocalAccounts bool = false
 @description('Specifies if AzureRbac accounts in kubernetes permission model should be enabled or not. 2022-11 needs to be false, since Azure ML')
 param enableAzureRbac bool = false
+
+@description('Specifies the outbound (egress) routing method for the AKS cluster')
 @allowed([
   'loadBalancer'
   'userDefinedRouting'
-  'none'
+  'managedNATGateway'
+  'userAssignedNATGateway'
 ])
-param outboundType string = 'loadBalancer' // 'userDefinedRouting' + Azure firewall on subnet if you want private IP: https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
+param outboundType string = 'loadBalancer' // 'userDefinedRouting' requires Azure Firewall/NAT Gateway + UDR for fully private AKS without public IP: https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
 
 @description('Specifies agent pool profile settings in a array with hashmaps format')
 param agentPoolProfiles array
@@ -76,14 +99,20 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     nodeResourceGroup: nodeResourceGroup
     networkProfile: {
       networkPlugin: 'azure'//'kubenet'
-      outboundType: outboundType // 'userDefinedRouting' if you want private IP
+      outboundType: outboundType // 'userDefinedRouting' for fully private AKS without public IP
       serviceCidr: aksServiceCidr
       dnsServiceIP: aksDnsServiceIP
       //dockerBridgeCidr: '172.17.0.1/16'
       loadBalancerSku: 'standard'
+      loadBalancerProfile: outboundType == 'loadBalancer' ? {
+        // Only configure load balancer when using loadBalancer outbound type
+        managedOutboundIPs: {
+          count: 1
+        }
+      } : null
     }
     apiServerAccessProfile: { // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
-      enablePrivateCluster: true // The egress mode is default ourbound_type=loadBalancer, which requires a public IP. you can change this with outbound_type=userDefinedRouting and Azure Firewall
+      enablePrivateCluster: true // Private cluster - API server only accessible via private endpoint
     }
   }
   
