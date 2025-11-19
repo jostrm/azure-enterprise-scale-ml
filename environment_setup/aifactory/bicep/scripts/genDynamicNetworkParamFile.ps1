@@ -365,12 +365,11 @@ $dbxPrivSubnetId=""
 $genaiSubnetId=""
 $acaSubnetId=""
 $aca2SubnetId=""
+write-host "The following parameters are added to template"
+write-host "vnetResourceGroup is: $($vnetResourceGroup)"
 
-# Check if BYO_subnets is false
-if ($BYO_subnets_bool -eq $false) {
-
-    write-host "The following parameters are added to template"
-    write-host "vnetResourceGroup is: $($vnetResourceGroup)"
+# Check if BYO_subnets is false and vnetResourceGroup_param is null or empty
+if ($BYO_subnets_bool -eq $false -and ([string]::IsNullOrEmpty($vnetResourceGroup_param))) {
 
     write-host "Project type all :  trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj for AKS name"
     $aksSubnetId=(Get-AzResourceGroupDeployment `
