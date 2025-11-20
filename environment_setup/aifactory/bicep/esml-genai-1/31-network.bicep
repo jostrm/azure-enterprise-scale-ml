@@ -10,8 +10,8 @@ param aks2RouteTableId string = ''
   'loadBalancer'
   'userDefinedRouting'
 ])
-param outboundType string = 'loadBalancer'
-@description('Optional. Azure Firewall private IP address for default route when using userDefinedRouting. Required if outboundType is userDefinedRouting and aks2RouteTableId is empty.')
+param aksOutboundType string = 'loadBalancer'
+@description('Optional. Azure Firewall private IP address for default route when using userDefinedRouting. Required if aksOutboundType is userDefinedRouting and aks2RouteTableId is empty.')
 param azureFirewallPrivateIp string = ''
 @description('Specifies cidr notation for Azure Container Apps subnet')
 param acaSubnetCidr string = ''
@@ -120,7 +120,7 @@ var aks2SubnetSettings =  {
 }
 
 // Create default route table for AKS2 if userDefinedRouting is used and no route table ID is provided
-resource aks2DefaultRouteTable 'Microsoft.Network/routeTables@2023-05-01' = if (!empty(aks2SubnetCidr) && outboundType == 'userDefinedRouting' && empty(aks2RouteTableId)) {
+resource aks2DefaultRouteTable 'Microsoft.Network/routeTables@2023-05-01' = if (!empty(aks2SubnetCidr) && aksOutboundType == 'userDefinedRouting' && empty(aks2RouteTableId)) {
   name: 'rt-${projectName}-aks2-${locationSuffix}-${env}'
   location: location
   tags: tags
@@ -140,7 +140,7 @@ resource aks2DefaultRouteTable 'Microsoft.Network/routeTables@2023-05-01' = if (
 }
 
 // Determine which route table ID to use
-var aks2RouteTableIdToUse = !empty(aks2RouteTableId) ? aks2RouteTableId : (outboundType == 'userDefinedRouting' && !empty(aks2SubnetCidr) ? aks2DefaultRouteTable.id : '')
+var aks2RouteTableIdToUse = !empty(aks2RouteTableId) ? aks2RouteTableId : (aksOutboundType == 'userDefinedRouting' && !empty(aks2SubnetCidr) ? aks2DefaultRouteTable.id : '')
 
 module nsgAKS '../modules/aksNsg.bicep' = if(!sntAksExists){
   name: take('aksNsgAKS-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
@@ -198,7 +198,7 @@ module aks2Snt '../modules/subnetWithNsg.bicep' = if (!empty(aks2SubnetCidr) && 
     ...(!sntAcaExists ? [acaSnt] : [])
     ...(!sntGenaiExists ? [genaiSnt] : [])    
     ...(!sntAksExists ? [aksSnt] : [])
-    ...(outboundType == 'userDefinedRouting' && empty(aks2RouteTableId) && !empty(aks2SubnetCidr) ? [aks2DefaultRouteTable] : [])
+    ...(aksOutboundType == 'userDefinedRouting' && empty(aks2RouteTableId) && !empty(aks2SubnetCidr) ? [aks2DefaultRouteTable] : [])
   ]
 }
 
