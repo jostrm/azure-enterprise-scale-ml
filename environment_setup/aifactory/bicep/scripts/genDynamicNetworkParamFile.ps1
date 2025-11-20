@@ -495,7 +495,9 @@ if ($BYO_subnets_bool -eq $false -and ([string]::IsNullOrEmpty($vnetResourceGrou
             $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
 
             $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
-            $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<xxx>', $projectNumber
+            $dbxPubSubnetName = $dbxPubSubnetName -replace '<xxx>', $projectNumber
+            $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
+            $dbxPrivSubnetName = $dbxPrivSubnetName -replace '<xxx>', $projectNumber
 
             # These can be full IDs if needed
             $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
@@ -589,7 +591,9 @@ if ($BYO_subnets_bool -eq $false -and ([string]::IsNullOrEmpty($vnetResourceGrou
             try{
                 if ($null -ne $subnetProjDatabricksPublic -and $subnetProjDatabricksPublic -ne "") {
                     $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
-                    $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<xxx>', $projectNumber
+                    $dbxPubSubnetName = $dbxPubSubnetName -replace '<xxx>', $projectNumber
+                    $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
+                    $dbxPrivSubnetName = $dbxPrivSubnetName -replace '<xxx>', $projectNumber
                     # These can be full IDs if needed
                     $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
                     $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
