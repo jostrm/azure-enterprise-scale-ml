@@ -14,7 +14,7 @@ targetScope = 'subscription'
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
 param env string
-
+param useAVMFoundry bool = true
 param updateAIFoundryV21 bool = false
 param addAIFoundryV21 bool = false
 param containerAppsEnvExists bool = false
@@ -188,6 +188,7 @@ var processedIpRules_remove32 = [for ip in filteredIpWhitelist_array: {
 }]
 
 // Get the subnet resource ID for the common subnet used for private endpoints
+#disable-next-line no-unused-existing-resources
 resource commonSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' existing = {
   name: '${vnetNameFull}/${commonSubnetPends}'
   scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
@@ -280,6 +281,7 @@ var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aif
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var projectCapHost= '${aifV2Name}caphost'
+var defaultProjectName = enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
@@ -430,6 +432,88 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
   ]
 }
 
+#disable-next-line BCP318
+var aiFoundryRoleAssignments = (enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) ? roleAssignmentsBuilder.outputs.roleAssignments : []
+
+var aiFoundryDeployments = [
+  for model in aiModels: {
+    name: model.modelName
+    model: {
+      name: model.modelName
+      format: 'OpenAI'
+      version: model.version
+    }
+    sku: {
+      name: model.skuLocation
+      capacity: model.capacity
+    }
+    raiPolicyName: 'Microsoft.DefaultV2'
+    versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+  }
+]
+
+var aiFoundryNetworkingConfig = union({
+  aiServicesPrivateDnsZoneResourceId: privateLinksDnsZones.servicesai.id
+  cognitiveServicesPrivateDnsZoneResourceId: cognitiveServicesDnsZoneId
+  openAiPrivateDnsZoneResourceId: openaiDnsZoneId
+}, (!disableAgentNetworkInjection && !empty(acaSubnetId)) ? {
+  agentServiceSubnetResourceId: acaSubnetId
+} : {})
+
+var aiFoundryDefinitionBase = {
+  baseName: aifV2Name
+  includeAssociatedResources: deployAvmFoundry
+  location: location
+  enableTelemetry: false
+  tags: tagsProject
+  privateEndpointSubnetResourceId: genaiSubnetId
+  aiModelDeployments: aiFoundryDeployments
+  aiFoundryConfiguration: {
+    accountName: aifV2Name
+    allowProjectManagement: false
+    createCapabilityHosts: enableCaphost
+    location: location
+    disableLocalAuth: true
+    networking: aiFoundryNetworkingConfig
+    project: {
+      name: defaultProjectName
+      displayName: defaultProjectName
+    }
+    roleAssignments: aiFoundryRoleAssignments
+    sku: 'S0'
+  }
+}
+
+var aiFoundryDefinition = union(
+  aiFoundryDefinitionBase,
+  deployAvmFoundry && enableAISearch ? {
+    aiSearchConfiguration: {
+      existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', namingConvention.outputs.safeNameAISearch)
+      privateDnsZoneResourceId: privateLinksDnsZones.searchService.id
+      roleAssignments: []
+    }
+  } : {},
+  deployAvmFoundry ? {
+    keyVaultConfiguration: {
+      existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.KeyVault/vaults', namingConvention.outputs.keyvaultName)
+      privateDnsZoneResourceId: privateLinksDnsZones.vault.id
+      roleAssignments: []
+    }
+    storageAccountConfiguration: {
+      existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount1001Name)
+      blobPrivateDnsZoneResourceId: privateLinksDnsZones.blob.id
+      roleAssignments: []
+    }
+  } : {},
+  deployAvmFoundry && enableCosmosDB ? {
+    cosmosDbConfiguration: {
+      existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName)
+      privateDnsZoneResourceId: privateLinksDnsZones.cosmosdbnosql.id
+      roleAssignments: []
+    }
+  } : {}
+)
+
 // Subnet delegation for Container Apps
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists) && (enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection)) {
@@ -540,8 +624,10 @@ var fqdnRaw = [
 var fqdnFiltered = filter(fqdnRaw, fqdnEntry => !empty(fqdnEntry))
 var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ? current : union(current, [next]))
 
+var deployAvmFoundry = useAVMFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)
+
 // AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
-module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(!deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -558,7 +644,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: enablePublicAccessWithPerimeter? true: disableAgentNetworkInjection
     allowProjectManagement: true
-    defaultProjectName: enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
+    defaultProjectName: defaultProjectName
     #disable-next-line BCP318
     roleAssignments: roleAssignmentsBuilder.outputs.roleAssignments
     networkAcls: shouldCreateNetworkAcls ? networkAclsObject : networkAclsEmpty
@@ -571,22 +657,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
       )
       */
     }
-    deployments: [
-      for model in aiModels: {
-        name: model.modelName
-        model: {
-          name: model.modelName
-          format: 'OpenAI'
-          version: model.version
-        }
-        sku: {
-          name: model.skuLocation
-          capacity: model.capacity
-        }
-        raiPolicyName: 'Microsoft.DefaultV2'
-        versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
-      }
-    ]
+    deployments: aiFoundryDeployments
     privateEndpointSubnetRID: genaiSubnetId
     privateLinksDnsZones: privateLinksDnsZones
     createPrivateEndpointsAIFactoryWay: true
@@ -612,8 +683,35 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
   ]
 }
 
+module aiFoundry2025Avm '../modules/csFoundry/aiFoundry2025AvmOn.bicep' = if(deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV2-Avm_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    aiFoundry: aiFoundryDefinition
+    enableTelemetry: false
+  }
+  dependsOn: [
+    existingTargetRG
+    roleAssignmentsBuilder
+    spAndMI2ArrayModule
+    namingConvention
+    ...(!disableAgentNetworkInjection && !containerAppsEnvExists ? [subnetDelegationAca] : [])
+  ]
+}
+resource aiFoundryAccountAvm 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = if(deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  name: aifV2Name
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
+#disable-next-line BCP318
+var aiFoundrySystemAssignedPrincipalId = deployAvmFoundry
+  ? (aiFoundryAccountAvm!.identity!.principalId ?? '')
+  : (enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) ? aiFoundry2025NoAvm!.outputs.systemAssignedMIPrincipalId! : '')
+
 // Add the new FDP cognitive services module
-module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+var projectModuleEnabled = enableAIFactoryCreatedDefaultProjectForAIFv2
+
+module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_Prj_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -622,19 +720,19 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if((enable
     storageName: namingConvention.outputs.storageAccount1001Name
     storageName2: namingConvention.outputs.storageAccount2001Name
     #disable-next-line BCP318
-    aiFoundryV2Name: aiFoundry2025NoAvm.outputs.name
+    aiFoundryV2Name: aiFoundryAccountNameOutput
     aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
     cosmosDBname: enableCosmosDB? namingConvention.outputs.cosmosDBName : ''
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     }
     dependsOn: [
       existingTargetRG
-      aiFoundry2025NoAvm
+      ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     ]
 }
 
 // AI Foundry Private Endpoints - deployed after main service
-module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(!enablePublicAccessWithPerimeter && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(!enablePublicAccessWithPerimeter && !deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21-PrivateEndpoints_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -660,20 +758,20 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
 }
 
 #disable-next-line BCP318
-var projectPrincipal = projectV21.outputs.projectPrincipalId
+var projectPrincipal = (projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) ? projectV21.outputs.projectPrincipalId : ''
 #disable-next-line BCP318
-var projectWorkspaceId = projectV21.outputs.projectWorkspaceId
+var projectWorkspaceId = (projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) ? projectV21.outputs.projectWorkspaceId : ''
 
 // Function to assign roles to users and service principals for a cognitive services account
 @description('Function to assign roles to users and service principals for a cognitive services account')
-module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if((enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2) && (!aiFoundryV2Exists)) {
+module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !aiFoundryV2Exists) {
   name: '07-AifV21_UserRBAC-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     userObjectIds: p011_genai_team_lead_array
     servicePrincipalIds: spAndMiArray
     projectPrincipalId: projectPrincipal
-    cognitiveServicesAccountName: aifV2Name
+    cognitiveServicesAccountName: aiFoundryAccountNameOutput
     cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
     cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
@@ -683,12 +781,12 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   dependsOn: [
     spAndMI2ArrayModule
     namingConvention
-    aiFoundry2025NoAvm
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     projectV21
   ]
 }
 
-module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_RBACpreCH_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -699,7 +797,7 @@ module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = i
 }
 
 // This module creates the capability host for the project and account
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -718,7 +816,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   ]
 }
 
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -732,7 +830,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if((
 // START CAPHOST RBAC: Some RBAC for COSMOS & STORAGE must be assigned AFTER the CAPABILITY HOST is created
 // - The Storage Blob Data Owner role must be assigned after.
 // - The Cosmos Built-In Data Contributor role must be assigned after.
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if((enableCaphost && enableAIFoundryV21 && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -749,17 +847,16 @@ module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = 
 }
 // END CAPHOST RBAC
 
-// Sets RBAC roles: Search Service Contributor, Search Index Data Reader,Search Index Data Contributor on AI Search, for aiFoundry2025NoAvm.systemAssignedMIPrincipalId
+// Sets RBAC roles: Search Service Contributor, Search Index Data Reader, Search Index Data Contributor on AI Search for the AI Foundry system-assigned identity
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
-module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if((enableAISearch && enableAIFoundryV21) && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(enableAISearch && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     aiSearchName: namingConvention.outputs.safeNameAISearch
-    #disable-next-line BCP318
-    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    principalId: aiFoundrySystemAssignedPrincipalId
     projectPrincipalId: projectPrincipal
     searchServiceContributorRoleId: searchServiceContributorRoleId
     searchIndexDataReaderRoleId: searchIndexDataReaderRoleId
@@ -767,12 +864,13 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
     azureAIDeveloperRoleId: azureAIDeveloperRoleId
   }
   dependsOn: [
-    aiFoundry2025NoAvm
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
+    ...(projectModuleEnabled ? [projectV21] : [])
   ]
 }
 
-// Sets RBAC roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor, Storage Queue Data Contributor on Azure Storage accounts, for aiFoundry2025NoAvm.systemAssignedMIPrincipalId
+// Sets RBAC roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor, Storage Queue Data Contributor on Azure Storage accounts for the AI Foundry system-assigned identity
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
@@ -782,16 +880,16 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: namingConvention.outputs.storageAccount2001Name
-    #disable-next-line BCP318
-    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    principalId: aiFoundrySystemAssignedPrincipalId
     projectPrincipalId: projectPrincipal
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [
-    aiFoundry2025NoAvm
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
+    ...(projectModuleEnabled ? [projectV21] : [])
   ]
 }
 
@@ -801,35 +899,44 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
   name: take('09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
-    #disable-next-line BCP318
-    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    principalId: aiFoundrySystemAssignedPrincipalId
     projectPrincipalId: projectPrincipal
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
     keyVaultContributorRoleId: keyVaultContributorRoleId
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
   }
   dependsOn: [
-    aiFoundry2025NoAvm
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
+    ...(projectModuleEnabled ? [projectV21] : [])
   ]
 }
 
-// ADDITIONAL: Assign specific Key Vault roles to AI Foundry MI for project Key Vault 
+// ADDITIONAL: Assign specific Key Vault roles to the AI Foundry managed identity for the project Key Vault 
 module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
-    #disable-next-line BCP318
-    principalId: aiFoundry2025NoAvm.outputs.systemAssignedMIPrincipalId!
+    principalId: aiFoundrySystemAssignedPrincipalId
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }
   dependsOn: [
-    aiFoundry2025NoAvm
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
   ]
 }
+
+#disable-next-line BCP318
+var aiFoundryAccountNameOutput = useAVMFoundry ? aiFoundry2025Avm.outputs.aiServicesName : aiFoundry2025NoAvm!.outputs.name
+
+#disable-next-line BCP318
+var aiFoundryResourceGroupOutput = useAVMFoundry ? aiFoundry2025Avm.outputs.resourceGroupName : targetResourceGroup
+
+var aiFoundryResourceIdOutput = useAVMFoundry
+  ? resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameOutput)
+  : aiFoundry2025NoAvm!.outputs.resourceId
 
 // ============== OUTPUTS ==============
 
@@ -840,10 +947,10 @@ output aiModelsConfiguration array = aiModels
 output aiFoundryV2Deployed bool = enableAIFoundryV21
 
 @description('AI Foundry V2 name')
-output aiFoundryV2Name string = enableAIFoundryV21 ? aiFoundry2025NoAvm!.outputs.name : ''
+output aiFoundryV2Name string = enableAIFoundryV21 ? aiFoundryAccountNameOutput : ''
 
 @description('AI Foundry V2 resource ID')
-output aiFoundryV2ResourceId string = enableAIFoundryV21 ? aiFoundry2025NoAvm!.outputs.resourceId : ''
+output aiFoundryV2ResourceId string = enableAIFoundryV21 ? aiFoundryResourceIdOutput : ''
 
 @description('AI Foundry Project deployment status')
 output aiFoundryProjectDeployed bool = enableAIFoundryV21
