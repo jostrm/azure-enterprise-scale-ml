@@ -141,6 +141,14 @@ param aks_test_prod_sku_override string = ''
 param aks_version_override string = ''
 param aks_dev_nodes_override int = -1
 param aks_test_prod_nodes_override int = -1
+@description('Specifies the outbound (egress) routing method for the AKS cluster')
+@allowed([
+  'loadBalancer'
+  'userDefinedRouting'
+  'managedNATGateway'
+  'userAssignedNATGateway'
+])
+param aksOutboundType string = 'loadBalancer'
 
 // Compute Instance overrides
 param aml_ci_dev_sku_override string = ''
@@ -398,6 +406,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
       systemAssigned: true
     }
     aksExists:aksExists
+    aksOutboundType: aksOutboundType
     enableAksForAzureML:enableAksForAzureML
     aksSkuName: aksSkuName
     aksSkuTier: aksSkuTier

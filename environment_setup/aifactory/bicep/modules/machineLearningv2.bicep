@@ -84,6 +84,9 @@ param aksVmSku_testProd string
 param aksNodes_dev int
 @description('Dev Agentpool agents/nodes: 3 as default for Test or Prod')
 param aksNodes_testProd int
+@description('AKS outbound type')
+@allowed(['loadBalancer', 'userDefinedRouting', 'managedNATGateway', 'userAssignedNATGateway'])
+param aksOutboundType string = 'loadBalancer'
 @description('DEV default VM size for the default Compute Instance cluster:Standard_D4_v3(4,16,100)')
 param ciVmSku_dev string
 @description('TestProd default VM size for the default Compute Instance cluster:Standard_D4_v3. More: Standard_D14 (16 cores,112 ram)')
@@ -275,6 +278,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
     nodeResourceGroup: nodeResourceGroupName // 'esml-${replace(projectName, 'prj', 'project')}-aksnode-${env}-rg'
     aksDnsServiceIP:aksDnsServiceIP
     aksServiceCidr:aksServiceCidr
+    outboundType: aksOutboundType
     agentPoolProfiles: [
       {
         name: toLower('agentpool')
@@ -308,6 +312,7 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
     nodeResourceGroup: nodeResourceGroupName //'esml-${replace(projectName, 'prj', 'project')}-aksnode-${env}-rg'
     aksDnsServiceIP:aksDnsServiceIP
     aksServiceCidr:aksServiceCidr
+    outboundType: aksOutboundType
     agentPoolProfiles: [
       {
         name: 'agentpool'

@@ -12,14 +12,12 @@ The pipelines will automate the execution of BICEP/Terraform, Powershell, Azure 
 In the central submodule the pipeline templates exists here:
 - Option A) [Setup AIFactory - Infra Automation (AzureDevops+BICEP)](../10-19/13-setup-aifactory.md)
     - [Azure Devops - YAML](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
-    - [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
 - Option B) [Setup AIFactory - Infra Automation (GithubActions+BICEP)](../10-19/13-setup-aifactory-gha.md)
     - [Github Actions](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
 
 **In your local repo**, after you have done STEP 3 and copied the files you will see the templates here. 
 
 - Azure Devops - Yaml [aifactory/esml-infra/azure-devops/bicep/yaml](../../../../aifactory/esml-infra/azure-devops/bicep/yaml/readme.md)
-- Azure Devops - Classic [aifactory/esml-infra/azure-devops/bicep/classic](../../../../aifactory/esml-infra/azure-devops/bicep/classic/readme.md)
 - Github Actions  [aifactory/esml-infra/github-actions/bicep/readme.md](../../../../aifactory/esml-infra/github-actions/bicep/readme.md)
 
 > [!IMPORTANT]

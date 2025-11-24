@@ -102,7 +102,6 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
       outboundType: outboundType // 'userDefinedRouting' for fully private AKS without public IP
       serviceCidr: aksServiceCidr
       dnsServiceIP: aksDnsServiceIP
-      //dockerBridgeCidr: '172.17.0.1/16'
       loadBalancerSku: 'standard'
       loadBalancerProfile: outboundType == 'loadBalancer' ? {
         // Only configure load balancer when using loadBalancer outbound type

@@ -28,8 +28,8 @@
                 - Projects: ACL on Datalake for project folders, to run pipelines that reads/writes data.
                 - Core team: Connect from Azure Data factory to certain services.
                 - Core team: Github workflows, needs Service principle information.
-        - **Object ID's** and **EMAIL-addressess**, for all end-users to be onboarded to the AI Factory project
-            - Format: Comma-separated list
+        - **Object ID's** for Entra ID Security groups for team (or for end-users to be onboarded to the AI Factory project)
+            - Format: Comma-separated list "asd234234f,asdf4525" is object id's for users. Usually 1 object ID per AI Factory project if Entra ID security group.
         - **IP-addresses** for all end-users to be onboarded to the AI Factory project. 
             - Format: Comma-separated list
             - Note: Only Needed for AI Factory standalone mode. And only if not using VPN in Standalone mode.

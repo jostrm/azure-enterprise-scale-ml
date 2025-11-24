@@ -3,7 +3,7 @@ Edit the [Variables](./variables/variables.yaml) file, and import Build pipeline
 
 ## See [prerequisites](../../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
-[prerequisites](../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
+[prerequisites](../../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
 ### Prerequisite setup tools:  on your laptop (for both option A) Azure Devops and B) Github):
 - **Git Bash**: https://git-scm.com/downloads e.g. GNU bash, version 5.2.37 or above

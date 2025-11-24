@@ -1581,7 +1581,8 @@ steps:
      --parameters enableDatabricks="$(enableDatabricks)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
-     --parameters enableAksForAzureML="$(enableAksForAzureML)"
+     --parameters enableAksForAzureML="$(enableAksForAzureML)" \
+     --parameters aksOutboundType="$(aksOutboundType)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '68-integration'
