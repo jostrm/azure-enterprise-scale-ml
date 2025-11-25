@@ -462,7 +462,7 @@ var aiFoundryNetworkingConfig = union({
 
 var aiFoundryDefinitionBase = {
   baseName: aifV2Name
-  includeAssociatedResources: deployAvmFoundry
+  includeAssociatedResources: false
   location: location
   enableTelemetry: false
   tags: tagsProject
