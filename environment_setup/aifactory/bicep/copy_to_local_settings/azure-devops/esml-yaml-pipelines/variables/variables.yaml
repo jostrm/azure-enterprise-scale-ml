@@ -230,6 +230,7 @@ variables:
   # === AKS for Azure ML ===
   enableAksForAzureML: "true" # AKS for Azure ML compute
   aksOutboundType: "loadBalancer" # loadBalancer, userDefinedRouting
+  aksPrivateDNSZone: "system" # "none", "system" or resource ID
   aksAzureFirewallPrivateIp: "" # Only needed if aksOutboundType is userDefinedRouting. Provide an IP from the subnet range of the subnet used for Azure Firewall.
 
   enableDatabricks: "false"

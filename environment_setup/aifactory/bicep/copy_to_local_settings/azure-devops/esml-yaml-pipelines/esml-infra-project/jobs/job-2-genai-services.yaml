@@ -1583,6 +1583,7 @@ steps:
      --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
      --parameters enableAksForAzureML="$(enableAksForAzureML)" \
      --parameters aksOutboundType="$(aksOutboundType)"
+     --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '68-integration'
