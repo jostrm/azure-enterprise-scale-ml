@@ -879,9 +879,9 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   name: take('09-rbacStorage-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
-    storageAccountName2: namingConvention.outputs.storageAccount2001Name
+    storageAccountName2: storageAccount2001Name
     principalId: aiFoundrySystemAssignedPrincipalId
-    projectPrincipalId: projectPrincipal
+    projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
