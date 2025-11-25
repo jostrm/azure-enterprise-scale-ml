@@ -73,12 +73,8 @@ param nodeResourceGroup string
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksExists bool = false
-//param privateDNSZone string
-//param authorizedIPRanges array
+param privateDNSZone string = 'system' // 'none', 'system' or resource ID
 
-//skuName: 'basic' // basic -> 2023-02-01: 'base'
-//skuTier: 'paid' // free, paid -> 2023-02-01: free, standard
-// Microsoft.ContainerService/managedClusters@2021-03-01
 resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if(!aksExists) {
   name: name
   tags: tags
@@ -100,7 +96,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     networkProfile: {
       networkPlugin: 'azure'//'kubenet'
       outboundType: outboundType // 'userDefinedRouting' for fully private AKS without public IP
-      serviceCidr: aksServiceCidr
+      serviceCidr: aksServiceCidr      
       dnsServiceIP: aksDnsServiceIP
       loadBalancerSku: 'standard'
       loadBalancerProfile: outboundType == 'loadBalancer' ? {
@@ -112,6 +108,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     }
     apiServerAccessProfile: { // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
       enablePrivateCluster: true // Private cluster - API server only accessible via private endpoint
+      privateDNSZone: privateDNSZone
     }
   }
   

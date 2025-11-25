@@ -470,7 +470,7 @@ var aiFoundryDefinitionBase = {
   aiModelDeployments: aiFoundryDeployments
   aiFoundryConfiguration: {
     accountName: aifV2Name
-    allowProjectManagement: false
+    allowProjectManagement: true
     createCapabilityHosts: enableCaphost
     location: location
     disableLocalAuth: true

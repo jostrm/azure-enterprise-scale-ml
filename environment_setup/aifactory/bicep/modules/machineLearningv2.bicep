@@ -87,6 +87,7 @@ param aksNodes_testProd int
 @description('AKS outbound type')
 @allowed(['loadBalancer', 'userDefinedRouting', 'managedNATGateway', 'userAssignedNATGateway'])
 param aksOutboundType string = 'loadBalancer'
+param aksPrivateDNSZone string = 'system' // 'none', 'system' or resource ID
 @description('DEV default VM size for the default Compute Instance cluster:Standard_D4_v3(4,16,100)')
 param ciVmSku_dev string
 @description('TestProd default VM size for the default Compute Instance cluster:Standard_D4_v3. More: Standard_D14 (16 cores,112 ram)')
@@ -279,6 +280,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
     aksDnsServiceIP:aksDnsServiceIP
     aksServiceCidr:aksServiceCidr
     outboundType: aksOutboundType
+    privateDNSZone: aksPrivateDNSZone
     agentPoolProfiles: [
       {
         name: toLower('agentpool')
@@ -313,6 +315,7 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
     aksDnsServiceIP:aksDnsServiceIP
     aksServiceCidr:aksServiceCidr
     outboundType: aksOutboundType
+    privateDNSZone: aksPrivateDNSZone
     agentPoolProfiles: [
       {
         name: 'agentpool'

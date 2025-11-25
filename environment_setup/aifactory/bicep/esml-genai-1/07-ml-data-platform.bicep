@@ -149,6 +149,7 @@ param aks_test_prod_nodes_override int = -1
   'userAssignedNATGateway'
 ])
 param aksOutboundType string = 'loadBalancer'
+param aksPrivateDNSZone string = 'system' // 'none', 'system' or resource ID
 
 // Compute Instance overrides
 param aml_ci_dev_sku_override string = ''
@@ -407,6 +408,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     }
     aksExists:aksExists
     aksOutboundType: aksOutboundType
+    aksPrivateDNSZone: aksPrivateDNSZone
     enableAksForAzureML:enableAksForAzureML
     aksSkuName: aksSkuName
     aksSkuTier: aksSkuTier
