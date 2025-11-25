@@ -856,8 +856,8 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
   name: take('09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     aiSearchName: namingConvention.outputs.safeNameAISearch
-    principalId: aiFoundrySystemAssignedPrincipalId
-    projectPrincipalId: projectPrincipal
+    aiFoundryAccountName: aifV2Name
+    projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     searchServiceContributorRoleId: searchServiceContributorRoleId
     searchIndexDataReaderRoleId: searchIndexDataReaderRoleId
     searchIndexDataContributorRoleId: searchIndexDataContributorRoleId
@@ -899,8 +899,8 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
   name: take('09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
-    principalId: aiFoundrySystemAssignedPrincipalId
-    projectPrincipalId: projectPrincipal
+    aiFoundryAccountName: aifV2Name
+    projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
     keyVaultContributorRoleId: keyVaultContributorRoleId
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
@@ -908,6 +908,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
+    ...(projectModuleEnabled ? [projectV21] : [])
     ...(projectModuleEnabled ? [projectV21] : [])
   ]
 }
@@ -918,7 +919,7 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
   name: take('09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
-    principalId: aiFoundrySystemAssignedPrincipalId
+    aiFoundryAccountName: aifV2Name
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }
