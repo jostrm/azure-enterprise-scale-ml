@@ -2,7 +2,7 @@ param aiSearchMIObjectId string // Object ID of the Managed Identity for Azure A
 // Parameters for resource
 param storageAccountName string // Name of Azure Storage Account
 param storageAccountName2 string // Name of Azure Storage Account
-param aiServicesName string // AIServices name, e.g. AIStudio name
+param aiServicesName string = '' // AIServices name, e.g. AIStudio name (optional)
 
 // Role Definition IDs: Cognitive Services OpenAI Contributor
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -16,7 +16,7 @@ resource existingStorageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' e
 resource existingStorageAccount2 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName2
 }
-resource existingAiServicesResource 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = {
+resource existingAiServicesResource 'Microsoft.CognitiveServices/accounts@2024-04-01-preview' existing = if (!empty(aiServicesName)) {
   name: aiServicesName
 }
 
@@ -41,8 +41,8 @@ resource roleAssignmentStorageBlobDataContributor2 'Microsoft.Authorization/role
   }
   scope: existingStorageAccount2
 }
-// Search -> AIServices
-resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+// Search -> AIServices (only if AI Services exists)
+resource roleAssignmentCognitiveServicesOpenAIContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiServicesName)) {
   name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, aiSearchMIObjectId)
   properties: {
     principalId: aiSearchMIObjectId

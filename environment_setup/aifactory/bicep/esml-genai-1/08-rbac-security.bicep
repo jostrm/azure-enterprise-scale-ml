@@ -601,7 +601,7 @@ module rbacModuleAISearch '../modules/aihubRbacAISearch.bicep' = if(!aiSearchExi
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
-    aiServicesName: aiServicesName
+    aiServicesName: enableAIServices ? aiServicesName : '' // Only pass AI Services name if enabled
     aiSearchMIObjectId: var_aiSearchPrincipalId // Using computed variable for AI Search principal ID
   }
   dependsOn: [
