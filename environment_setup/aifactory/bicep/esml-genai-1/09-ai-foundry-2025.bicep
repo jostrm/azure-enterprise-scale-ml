@@ -880,7 +880,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
-    principalId: aiFoundrySystemAssignedPrincipalId
+    aiFoundryAccountName: aifV2Name
     projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
