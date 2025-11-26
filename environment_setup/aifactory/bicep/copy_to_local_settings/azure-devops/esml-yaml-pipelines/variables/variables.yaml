@@ -236,6 +236,7 @@ variables:
   enableDatabricks: "false"
   # === Cognitive Services ===
   enableAISearch: "true"
+  enableAISearchSharedPrivateLink: "true" # true, will create a shared private endpoint link in common vNet. false, private endpoint in project vNet
   enableAzureOpenAI: "false"
   enableAzureAIVision: "false"
   enableAzureSpeech: "false"

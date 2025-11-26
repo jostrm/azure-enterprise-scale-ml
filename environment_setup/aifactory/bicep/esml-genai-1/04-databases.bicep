@@ -68,6 +68,12 @@ param enableRedisCache bool = false
 @description('Enable SQL Database deployment')
 param enableSQLDatabase bool = false
 
+@description('Enable AI Foundry Caphost feature')
+param enableAFoundryCaphost bool = false
+
+@description('Enable AI Foundry V2.1')
+param enableAIFoundryV21 bool = false
+
 // Security and networking
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
@@ -306,7 +312,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 
 // ============== COSMOS DB ==============
 
-module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && enableCosmosDB) {
+module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundryV21))) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-CosmosDB4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -331,7 +337,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
       genaiSubnetId
       aksSubnetId
     ]
-    kind: cosmosKind
+    kind: (enableAFoundryCaphost && enableAIFoundryV21) ? 'GlobalDocumentDB' : cosmosKind
     minimalTlsVersion: cosmosMinimalTlsVersion
     tags: tagsProject
     corsRules: [
@@ -391,7 +397,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
   ]
 }
 
-module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmosDBExists && enableCosmosDB) {
+module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundryV21))) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-cosmosRbac${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -404,7 +410,7 @@ module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmo
   ]
 }
 
-module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !centralDnsZoneByPolicyInHub && enableCosmosDB && !enablePublicAccessWithPerimeter) {
+module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !centralDnsZoneByPolicyInHub && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundryV21)) && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-privDnsCosmos${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -573,7 +579,7 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !cen
 // ============== DIAGNOSTIC SETTINGS ==============
 
 // Cosmos DB Diagnostic Settings
-module cosmosDbDiagnostics '../modules/diagnostics/cosmosDbDiagnostics.bicep' = if (!cosmosDBExists && enableCosmosDB) {
+module cosmosDbDiagnostics '../modules/diagnostics/cosmosDbDiagnostics.bicep' = if (!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundryV21))) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-diagCosmosDB-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -634,7 +640,7 @@ module sqlDatabaseDiagnostics '../modules/diagnostics/sqlDatabaseDiagnostics.bic
 // Resource information should be retrieved through Azure CLI queries after deployment
 
 @description('Cosmos DB deployment status')
-output cosmosDBDeployed bool = (!cosmosDBExists && enableCosmosDB)
+output cosmosDBDeployed bool = (!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundryV21)))
 
 @description('PostgreSQL deployment status')
 output postgreSQLDeployed bool = (!postgreSQLExists && enablePostgreSQL)

@@ -1297,6 +1297,8 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters enableBingCustomSearch="$(enableBingCustomSearch)" \
      --parameters enableBing="$(enableBing)" \
+     --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
+     --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1357,6 +1359,8 @@ steps:
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
+     --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1582,7 +1586,7 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
      --parameters enableAksForAzureML="$(enableAksForAzureML)" \
-     --parameters aksOutboundType="$(aksOutboundType)"
+     --parameters aksOutboundType="$(aksOutboundType)" \
      --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
