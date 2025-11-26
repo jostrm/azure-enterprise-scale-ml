@@ -1299,6 +1299,7 @@ steps:
      --parameters enableBing="$(enableBing)" \
      --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
      --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
+     --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
