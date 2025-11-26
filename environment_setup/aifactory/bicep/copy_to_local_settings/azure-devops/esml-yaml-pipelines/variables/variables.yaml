@@ -214,12 +214,13 @@ variables:
   enableAIFoundryHub: "true" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
   addAIFoundryHub: "false"  # Add new AI Foundry Hub with project, with a new random name (Solution, if deletion, and Enterprise application is not deleted as it should)
   # === AI foundry 2025 ===
+  # https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
   enableAIFoundryV21: "true" # AI Foundry with default project. Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
   updateAIFoundryV21: "true" # true, enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false means "CreateIfNotExists"
   addAIFoundryV21: "false" # Add new AI foundry with project, with a new random name (can be used for debugging, or running pipeline twice directly, not wating for deletion)
-  enableAFoundryCaphost: "false" # Ensures Agents metadata, and history/threads is saved in your subscription and network, using CosmosDB, Storage, AI Search
+  enableAFoundryCaphost: "true" # Ensures Agents metadata, and history/threads is saved in your subscription and network, using CosmosDB, Storage, AI Search
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # true, only connections is created to AIFactory created services. false, Azure will create a default project, with additional CosmosDB, Storage Account, AI Search, and connections
-  disableAgentNetworkInjection: "true" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
+  disableAgentNetworkInjection: "false" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
   # NetworkInjection -> Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
 
@@ -237,6 +238,7 @@ variables:
   # === Cognitive Services ===
   enableAISearch: "true"
   enableAISearchSharedPrivateLink: "true" # true, will create a shared private endpoint link in common vNet. false, private endpoint in project vNet
+  # Note: Basic tier and higher: Shared private links are supported from Basic tier, BUT for indexers with skillsets (e.g., AI enrichment or embedding skills), the minimum tier is Standard 1 (S1)
   enableAzureOpenAI: "false"
   enableAzureAIVision: "false"
   enableAzureSpeech: "false"

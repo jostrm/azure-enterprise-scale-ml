@@ -14,7 +14,7 @@ targetScope = 'subscription'
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
 param env string
-param useAVMFoundry bool = true
+param useAVMFoundry bool = true // https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
 param updateAIFoundryV21 bool = false
 param addAIFoundryV21 bool = false
 param containerAppsEnvExists bool = false

@@ -23,10 +23,10 @@ param sharedPrivateLinks array = []
 @allowed(['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'])
 param skuName string = 'standard' 
 @allowed([
-  'default'
-  'highDensity'
+  'Default'
+  'HighDensity'
 ])
-param hostingMode string = 'default'
+param hostingMode string = 'Default'
 param replicaCount int = 1
 param partitionCount int = 1
 param privateEndpointName string
@@ -66,39 +66,10 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-resource aiSearchSharedPend 'Microsoft.Search/searchServices@2024-03-01-preview' = if(enableSharedPrivateLink == true) {
-  name: aiSearchName
-  location: location
-  tags: tags
-  sku: {
-    name: 'standard2' // Neends to be standard2 or higher (You may not have quota for this. You need to apply if so)
-  }
-  identity: identity
-  properties: {
-    authOptions: {
-      aadOrApiKey: {
-        aadAuthFailureMode:'http401WithBearerChallenge' // or 'http403'
-      }
-    }
-    replicaCount: replicaCount
-    hostingMode: hostingMode
-    partitionCount: partitionCount
-    publicNetworkAccess:(enablePublicAccessWithPerimeter || publicNetworkAccess)? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
-    networkRuleSet: {
-      bypass: 'AzureServices' //'None', 'AzureServices', 'None', 'AzurePortal'
-      ipRules: ipRules
-    }
-    semanticSearch: semanticSearchTier
-  }
-  @batchSize(1)
-  resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2024-06-01-preview' =  [for (sharedPL, i) in sharedPrivateLinks: {
-        name: '${aiSearchName}-shared-pe-${i}' //  'search-shared-private-link-${i}'
-        properties: sharedPL
-    }]
-}
-
 // To add Azure Portal. ipRules and add: nslookup on stamp2.ext.search.windows.net (Non-authorative answer)
-resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(!enableSharedPrivateLink) {
+// 2025-05-01
+//resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
+resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
   name: aiSearchName
   location: location
   tags: tags
@@ -123,7 +94,12 @@ resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = if(!ena
     
     semanticSearch: semanticSearchTier
   }
-
+  
+  @batchSize(1)
+  resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2025-05-01' = [for (sharedPL, i) in (enableSharedPrivateLink ? sharedPrivateLinks : []): {
+    name: '${aiSearchName}-shared-pe-${i}'
+    properties: sharedPL
+  }]
 }
 
 resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
