@@ -5,44 +5,66 @@ param projectName string
 param accountName string
 param projectCapHost string
 
-var threadConnections = ['${cosmosDBConnection}']
-var storageConnections = ['${azureStorageConnection}']
-var vectorStoreConnections = ['${aiSearchConnection}']
-
-// AI Foundry resource (AI Services): 2025-04-01-preview, 2025-06-01
+// CRITICAL: Use API version 2025-07-01-preview for capability hosts (per AVM module)
+// AI Foundry resource (AI Services)
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
    name: accountName
 }
 
-resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-06-01' = {
-  name: '${projectCapHost}acc'
-  parent: account
-  properties: {
-  }
-  dependsOn: [
-    account  // Explicit dependency to ensure account is fetched first
-  ]
-}
-
-// AI foundry project: 2025-04-01-preview, 2025-06-01
-resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
+// AI Foundry project - Use 2025-07-01-preview for projects with capability hosts
+resource project 'Microsoft.CognitiveServices/accounts/projects@2025-07-01-preview' existing = {
   name: projectName
   parent: account
 }
 
-resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-06-01' = {
-  name: projectCapHost
+// Get existing connection resources to reference them properly
+resource cosmosDbConnectionResource 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' existing = {
+  name: cosmosDBConnection
+  parent: project
+}
+
+resource storageAccountConnectionResource 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' existing = {
+  name: azureStorageConnection
+  parent: project
+}
+
+resource aiSearchConnectionResource 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' existing = {
+  name: aiSearchConnection
+  parent: project
+}
+
+// Account-level capability host - Must be created BEFORE project capability host
+// NOTE: Name format follows AVM pattern - remove dashes from account name
+resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-07-01-preview' = {
+  name: 'chagent${replace(accountName, '-', '')}'
+  parent: account
+  properties: {
+    capabilityHostKind: 'Agents'
+  }
+  dependsOn: [
+    project  // Ensure project exists first
+    cosmosDbConnectionResource
+    storageAccountConnectionResource
+    aiSearchConnectionResource
+  ]
+}
+
+// Project-level capability host - Created AFTER account capability host
+// NOTE: Name format follows AVM pattern - remove dashes from project name
+resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-07-01-preview' = {
+  name: 'chagent${replace(projectName, '-', '')}'
   parent: project
   properties: {
     capabilityHostKind: 'Agents'
-    vectorStoreConnections: vectorStoreConnections
-    storageConnections: storageConnections
-    threadStorageConnections: threadConnections
+    threadStorageConnections: ['${cosmosDbConnectionResource.name}']
+    vectorStoreConnections: ['${aiSearchConnectionResource.name}']
+    storageConnections: ['${storageAccountConnectionResource.name}']
   }
   dependsOn: [
-    account              //  Ensure account is fetched
-    project              // Ensure project is fetched  
-    accountCapabilityHost // Ensure account capability host is created first
+    accountCapabilityHost  // CRITICAL: Must wait for account capability host
+    cosmosDbConnectionResource
+    storageAccountConnectionResource
+    aiSearchConnectionResource
   ]
 }
 
