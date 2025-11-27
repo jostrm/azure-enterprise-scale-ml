@@ -280,7 +280,7 @@ var aifV2Name = addAIFoundryV21? aifRandom: namingConvention.outputs.aifV2Name /
 var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
-var projectCapHost= '${aifV2Name}caphost'
+var projectCapHostName  = '${aifV2Name}caphost'
 var defaultProjectName = enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
 
 // Private DNS zones
@@ -809,10 +809,12 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     azureStorageConnection: namingConvention.outputs.storageAccount1001Name
     #disable-next-line BCP318
     aiSearchConnection: namingConvention.outputs.safeNameAISearch
-    projectCapHost: projectCapHost
+    projectCapHost: enableCaphost
+    projectCapHostName: projectCapHostName
   }
   dependsOn: [
     rbacPreCaphost
+    projectV21  // CRITICAL: Must wait for project and all connections to be fully created
   ]
 }
 

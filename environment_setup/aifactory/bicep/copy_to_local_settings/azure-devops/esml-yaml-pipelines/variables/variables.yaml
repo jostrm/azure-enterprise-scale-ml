@@ -14,14 +14,15 @@ variables:
   # E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
   # ============================================================================
   aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
-  aifactory_version_minor: "23" # Minor version
-    # ============================================================================
+  aifactory_version_minor: "23" # Minor version. 2025-05-23: 20_LTS, 2025-09-20: 23
+  aifactory_branch_chosen: "release/v.1.23"
+  # ============================================================================
   # MANDATORY(CHANGE RARELY) per AI Factory scaleset
   # ============================================================================
   tag_costceter_common: '9999'
   tag_repository: 'aifactory' # Repository name
   tag_repository_branch: 'aifactory-001' # Can be per AI Factory scaleset 'aifactory-001' or 'aifactory-002', or per scaleset and project 'aifactory-001/project001-main'
-  tags: '{"CostCenter":"$(tag_costceter_common)","Description":"AI Factory common","AIF-Repo":"$(tag_repository)","AIF-Branch":"$(tag_repository_branch)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
+  tags: '{"CostCenter":"$(tag_costceter_common)","Description":"AI Factory common","AIF-Repo":"$(tag_repository)","AIF-Branch":"$(tag_repository_branch)","AIF-Version":"$(aifactory_version_major).$(aifactory_version_minor)","AIF-Submodule-Chosen-Branch":"$(aifactory_branch_chosen)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
 
   admin_location: "eastus2"
   admin_locationSuffix: "eus2"

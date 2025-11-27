@@ -3,11 +3,13 @@ param azureStorageConnection string
 param aiSearchConnection string
 param projectName string
 param accountName string
-param projectCapHost string
+@description('Set to true to create project capability host')
+param projectCapHost bool = true
+param projectCapHostName string = ''
 
 // CRITICAL: Use API version 2025-07-01-preview for capability hosts (per AVM module)
-// AI Foundry resource (AI Services)
-resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+// AI Foundry resource (AI Services) - must use 2025-07-01-preview for capability host support
+resource account 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
    name: accountName
 }
 
@@ -18,6 +20,7 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-07-01-previ
 }
 
 // Get existing connection resources to reference them properly
+// These connections must already be deployed by the aiFoundry2025project.bicep module
 resource cosmosDbConnectionResource 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' existing = {
   name: cosmosDBConnection
   parent: project
@@ -35,18 +38,14 @@ resource aiSearchConnectionResource 'Microsoft.CognitiveServices/accounts/projec
 
 // Account-level capability host - Must be created BEFORE project capability host
 // NOTE: Name format follows AVM pattern - remove dashes from account name
+// IMPORTANT: Account capability host is at ACCOUNT level, not project level
+// It should NOT depend on project or connections - it's independent
 resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-07-01-preview' = {
   name: 'chagent${replace(accountName, '-', '')}'
   parent: account
   properties: {
     capabilityHostKind: 'Agents'
   }
-  dependsOn: [
-    project  // Ensure project exists first
-    cosmosDbConnectionResource
-    storageAccountConnectionResource
-    aiSearchConnectionResource
-  ]
 }
 
 // Project-level capability host - Created AFTER account capability host

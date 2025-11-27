@@ -1800,6 +1800,7 @@ steps:
      --parameters containerAppsEnvExists="$(containerAppsEnvExists)" \
      --parameters updateAIFoundryV21="$(updateAIFoundryV21)" \
      --parameters enableCaphost="$(enableAFoundryCaphost)" \
+     --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
