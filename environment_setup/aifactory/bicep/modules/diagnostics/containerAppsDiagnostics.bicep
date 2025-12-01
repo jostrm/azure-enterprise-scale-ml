@@ -47,32 +47,32 @@ var bronzeMetrics = [
 ]
 
 var goldLogs = [
-  {
-    category: 'ContainerAppConsoleLogs'
-    enabled: true
-  }
-  {
-    category: 'ContainerAppSystemLogs'
-    enabled: true
-  }
+  // {
+  //   category: 'ContainerAppConsoleLogs'
+  //   enabled: true
+  // }
+  // {
+  //   category: 'ContainerAppSystemLogs'
+  //   enabled: true
+  // }
 ]
 
 var silverLogs = [
-  {
-    category: 'ContainerAppConsoleLogs'
-    enabled: true
-  }
-  {
-    category: 'ContainerAppSystemLogs'
-    enabled: true
-  }
+  // {
+  //   category: 'ContainerAppConsoleLogs'
+  //   enabled: true
+  // }
+  // {
+  //   category: 'ContainerAppSystemLogs'
+  //   enabled: true
+  // }
 ]
 
 var bronzeLogs = [
-  {
-    category: 'ContainerAppSystemLogs'
-    enabled: true
-  }
+  // {
+  //   category: 'ContainerAppSystemLogs'
+  //   enabled: true
+  // }
 ]
 
 // Select metrics and logs based on diagnostic level

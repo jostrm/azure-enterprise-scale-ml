@@ -6,6 +6,13 @@ And after this is done, you can setup as many AIFactory's you want, with configu
 > See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
 > [Enterprise Scale AIFactory - Template repo, using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
 
+## Tip - how to create service principals for PROJECTS, and add to SEEDING KEYVAULT
+
+1) Copy this file to your local computer, e.g. under your "aifactory" folder
+- [29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh)
+2) Edit the variables: 
+3) Run it, and 
+
 ## Goal: Automation to use: Pipelines described
 The pipelines will automate the execution of BICEP/Terraform, Powershell, Azure CLI. The goal of this documentation page, is to configure and run at least the two pipelines: 
 

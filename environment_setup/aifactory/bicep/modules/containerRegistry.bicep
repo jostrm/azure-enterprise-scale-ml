@@ -83,7 +83,8 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
         type: 'Notary'
       }
       exportPolicy: {
-        status: exportEnabled
+        //status: exportEnabled
+        status: enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet ? 'enabled' : 'disabled'
       }
     }
     publicNetworkAccess: enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet?'Enabled': 'Disabled'
@@ -91,7 +92,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
   }
 }
 
-resource pendAcr 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+resource pendAcr 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
   name: privateEndpointName
   location: location
   tags: tags
@@ -126,7 +127,7 @@ output containerRegistryName string = containerRegistry.name
 output registryLoginServer string = containerRegistry.properties.loginServer
 output dnsConfig array = [
   {
-    name: pendAcr.name
+    name: !enablePublicAccessWithPerimeter? pendAcr.name: ''
     type: 'registry'
     id:containerRegistry.id
   }
