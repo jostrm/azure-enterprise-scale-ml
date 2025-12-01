@@ -75,6 +75,12 @@ param aksDnsServiceIP string = '10.0.0.10'
 param aksExists bool = false
 param privateDNSZone string = 'system' // 'none', 'system' or resource ID
 
+@description('Enable Customer Managed Keys (CMK) encryption for AKS')
+param cmk bool = false
+
+@description('Resource ID of the Disk Encryption Set for CMK')
+param diskEncryptionSetID string = ''
+
 resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if(!aksExists) {
   name: name
   tags: tags
@@ -93,6 +99,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     enableRBAC: enableRbac
     agentPoolProfiles: agentPoolProfiles
     nodeResourceGroup: nodeResourceGroup
+    diskEncryptionSetID: cmk && !empty(diskEncryptionSetID) ? diskEncryptionSetID : null
     networkProfile: {
       networkPlugin: 'azure'//'kubenet'
       outboundType: outboundType // 'userDefinedRouting' for fully private AKS without public IP

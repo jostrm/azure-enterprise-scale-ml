@@ -292,6 +292,58 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = if(!enabl
 var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // aks001-weu-prod (20/16) VS aks001-weu-prod (16/16)
 var aksResourceId = resourceId('Microsoft.ContainerService/managedClusters', aksName)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
+var desName = 'des-${name}'
+var desKeyName = '${cmk_key_name}-des'
+
+// ============== AKS CMK: Disk Encryption Set Configuration ==============
+// Create Key Vault key specifically for Disk Encryption Set
+module aksDesKey 'keyVaultKey.bicep' = if (cmk && !empty(cmk_key_name) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
+  name: take('AKS-DES-Key-${uniqueDepl}', 64)
+  params: {
+    keyVaultName: kvName
+    keyName: desKeyName
+    kty: 'RSA'
+    keySize: 2048
+    keyOps: [
+      'encrypt'
+      'decrypt'
+      'wrapKey'
+      'unwrapKey'
+    ]
+  }
+}
+
+// Create Disk Encryption Set with SystemAssigned identity
+module aksDiskEncryptionSet 'diskEncryptionSet.bicep' = if (cmk && !empty(cmk_key_name) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
+  name: take('AKS-DES-${uniqueDepl}', 64)
+  params: {
+    desName: desName
+    location: location
+    keyVaultId: existingKeyvault.id
+    keyUrl: aksDesKey!.outputs.keyUriWithVersion
+    tags: tags
+  }
+  dependsOn: [
+    aksDesKey
+  ]
+}
+
+// Grant DES identity 'Key Vault Crypto Service Encryption User' role on Key Vault
+// Role ID: e147488a-f6f5-4113-8e2d-b22465e65bf6
+module aksDesKvRbac 'kvRbacSingleAssignment.bicep' = if (cmk && !empty(cmk_key_name) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
+  name: take('AKS-DES-RBAC-${uniqueDepl}', 64)
+  params: {
+    keyVaultName: kvName
+    principalId: aksDiskEncryptionSet!.outputs.desPrincipalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    principalType: 'ServicePrincipal'
+    assignmentName: 'aks-des-kv-${uniqueSalt5char}'
+    roleDescription: 'Allows Disk Encryption Set to access Key Vault for AKS disk encryption'
+  }
+  dependsOn: [
+    aksDiskEncryptionSet
+  ]
+}
 
 module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
   name: take('Amlv2-AKS-D${uniqueDepl}',64)
@@ -310,6 +362,8 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
     aksServiceCidr:aksServiceCidr
     outboundType: aksOutboundType
     privateDNSZone: aksPrivateDNSZone
+    cmk: cmk
+    diskEncryptionSetID: cmk && !empty(cmk_key_name) ? aksDiskEncryptionSet!.outputs.desId : ''
     agentPoolProfiles: [
       {
         name: toLower('agentpool')
@@ -326,6 +380,9 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
       }
     ]
   }
+  dependsOn: [
+    ...(cmk && !empty(cmk_key_name) ? [aksDesKvRbac] : [])
+  ]
 }
 
 module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
@@ -345,6 +402,8 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
     aksServiceCidr:aksServiceCidr
     outboundType: aksOutboundType
     privateDNSZone: aksPrivateDNSZone
+    cmk: cmk
+    diskEncryptionSetID: cmk && !empty(cmk_key_name) ? aksDiskEncryptionSet!.outputs.desId : ''
     agentPoolProfiles: [
       {
         name: 'agentpool'
@@ -360,7 +419,9 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
       }
     ]
   }
-
+  dependsOn: [
+    ...(cmk && !empty(cmk_key_name) ? [aksDesKvRbac] : [])
+  ]
 }
 
 //AKS attach compute PRIVATE cluster, without SSL
