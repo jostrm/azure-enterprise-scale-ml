@@ -28,6 +28,13 @@ param sqlServerTier_DTU string = 'Standard'
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+// CMK Parameters
+param cmk bool = false
+param cmkKeyName string = ''
+param admin_bicep_kv_fw string = ''
+param admin_bicep_kv_fw_rg string = ''
+param admin_bicep_input_keyvault_subscription string = ''
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -310,6 +317,34 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
   scope: subscription(subscriptionIdDevTestProd)
 }
 
+// ============== CMK CONFIGURATION ==============
+// Create Key in the external Key Vault
+module cmkKey '../modules/keyVaultKey.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('04-cmkKey-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
+  params: {
+    keyVaultName: admin_bicep_kv_fw
+    keyName: cmkKeyName
+    kty: 'RSA'
+    keySize: 2048
+  }
+}]
+
+// Assign "Key Vault Crypto Service Encryption User" to the Project Managed Identity
+module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('04-cmkRbac-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
+  params: {
+    keyVaultName: admin_bicep_kv_fw
+    principalId: var_miPrj_PrincipalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-${miPrjName}-${i}'
+    principalType: 'ServicePrincipal'
+  }
+}]
+
+var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
+
 // ============== COSMOS DB ==============
 
 module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundryV21))) {
@@ -323,6 +358,9 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
     }
     name: cosmosDBName
     location: location
+    useCMK: cmk
+    keyVaultKeyUri: cmk ? cmkKey[0].outputs.keyUri : ''
+    cmkUserAssignedIdentityId: cmk ? cmkIdentityId : ''
     // Removed provisionedThroughput - using defaults from module
     enablePublicGenAIAccess: enablePublicGenAIAccess
     ipRules: (empty(ipWhitelist_array) || !enablePublicGenAIAccess || enablePublicAccessWithPerimeter) ? [] : ipWhitelist_array
@@ -394,6 +432,8 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
   }
   dependsOn: [
     existingTargetRG
+    cmkKey
+    cmkRbac
   ]
 }
 
@@ -444,10 +484,14 @@ module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(
     useAdGroups: useAdGroups
     highAvailability: postgreSQLHighAvailability
     availabilityZone: postgresAvailabilityZone
-    useCMK: postgresEnableCustomerManagedKey
+    useCMK: cmk
+    keyVaultKeyId: cmk ? cmkKey[0].outputs.keyUri : ''
+    cmkUserAssignedIdentityId: cmk ? cmkIdentityId : ''
   }
   dependsOn: [
     existingTargetRG
+    cmkKey
+    cmkRbac
   ]
 }
 
@@ -537,6 +581,9 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlS
     databaseName: sqlDBName
     location: location
     tags: tagsProject
+    useCMK: cmk
+    keyVaultKeyUri: cmk ? cmkKey[0].outputs.keyUri : ''
+    cmkUserAssignedIdentityId: cmk ? cmkIdentityId : ''
     skuObject: empty(sqlServerSKUObject_DTU) ? {} : sqlServerSKUObject_DTU
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull
@@ -546,6 +593,8 @@ module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlS
   }
   dependsOn: [
     existingTargetRG
+    cmkKey
+    cmkRbac
   ]
 }
 

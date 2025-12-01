@@ -64,6 +64,12 @@ param aifactorySuffixRG string
 @description('Subscription ID for dev/test/prod')
 param subscriptionIdDevTestProd string
 
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmk_key_name string = ''
+
 // ============================================================================
 // PS-Networking: Needs to be here, even if not used, since .JSON file
 // ============================================================================
@@ -376,7 +382,32 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   scope: resourceGroup(vnetResourceGroupName)
 }
 
-// Azure Data Factory deployment
+// ============== CMK CONFIGURATION ==============
+// Create Key in the external Key Vault
+module cmkKey '../modules/keyVaultKey.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('07-cmkKey-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  params: {
+    keyVaultName: inputKeyvault
+    keyName: cmk_key_name
+    kty: 'RSA'
+    keySize: 2048
+  }
+}]
+
+// Assign "Key Vault Crypto Service Encryption User" to the Project Managed Identity
+module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('07-cmkRbac-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  params: {
+    keyVaultName: inputKeyvault
+    principalId: var_miPrj_PrincipalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-${miPrjName}-${i}'
+    principalType: 'ServicePrincipal'
+  }
+}]
+
 module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && enableDatafactory) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('06-Datafactory-${deploymentProjSpecificUniqueSuffix}', 64)
@@ -392,6 +423,9 @@ module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && en
     managedIdentities: {
       systemAssigned: true
     }
+    cmk: cmk
+    cmk_key_name: cmk_key_name
+    keyVaultUri: externalKv.properties.vaultUri
   }
 }
 
@@ -406,6 +440,8 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     managedIdentities: {
       systemAssigned: true
     }
+    cmk: cmk
+    cmk_key_name: cmk_key_name
     aksExists:aksExists
     aksOutboundType: aksOutboundType
     aksPrivateDNSZone: aksPrivateDNSZone

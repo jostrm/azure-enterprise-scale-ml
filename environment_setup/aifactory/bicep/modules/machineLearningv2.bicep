@@ -46,6 +46,11 @@ param skuName string
 param skuTier string
 @description('Specifies the tags that should be applied to machine learning studio resources')
 param tags object
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmk_key_name string = ''
 @description('(Required) Specifies the private endpoint name')
 param privateEndpointName string
 @description('(Required) Specifies the virtual network id associated with private endpoint')
@@ -163,6 +168,18 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
     containerRegistry: existingAcr.id
     applicationInsights: existingAppInsights.id
 
+    encryption: cmk ? {
+      status: 'Enabled'
+      identity: {
+        userAssignedIdentity: managedIdentities!.userAssignedResourceIds![0]
+      }
+      keyVaultProperties: {
+        keyVaultArmId: existingKeyvault.id
+        keyIdentifier: '${existingKeyvault.properties.vaultUri}keys/${cmk_key_name}'
+        identityClientId: ''
+      }
+    } : null
+
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
@@ -211,6 +228,18 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
     keyVault: existingKeyvault.id
     containerRegistry: existingAcr.id
     applicationInsights: existingAppInsights.id
+
+    encryption: cmk ? {
+      status: 'Enabled'
+      identity: {
+        userAssignedIdentity: managedIdentities!.userAssignedResourceIds![0]
+      }
+      keyVaultProperties: {
+        keyVaultArmId: existingKeyvault.id
+        keyIdentifier: '${existingKeyvault.properties.vaultUri}keys/${cmk_key_name}'
+        identityClientId: ''
+      }
+    } : null
 
     // configuration
     systemDatastoresAuthMode: 'identity'

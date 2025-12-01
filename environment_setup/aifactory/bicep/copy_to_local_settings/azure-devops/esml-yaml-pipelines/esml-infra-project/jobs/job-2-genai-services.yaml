@@ -781,8 +781,6 @@ steps:
         fi
       }
 
-      # ...existing code...
-
       # Resource name variables
       noSuffix=""
       suffixStandard="${resourceSuffix}"
@@ -1193,6 +1191,11 @@ steps:
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
+     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
+     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
@@ -1214,12 +1217,6 @@ steps:
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
-     --parameters acr_adminUserEnabled="$(acr_adminUserEnabled)" \
-     --parameters acr_dedicated="$(acr_dedicated)" \
-     --parameters containerRegistrySkuName="$(acr_SKU)" \
-     --parameters enableProjectVM="$(enableProjectVM)" \
-     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
-     --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1257,6 +1254,11 @@ steps:
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
+     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
+     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters openaiExists="$(openaiExists)" \
      --parameters aiSearchExists="$(aiSearchExists)" \
@@ -1295,11 +1297,6 @@ steps:
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
-     --parameters enableBingCustomSearch="$(enableBingCustomSearch)" \
-     --parameters enableBing="$(enableBing)" \
-     --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
-     --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
-     --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1340,6 +1337,11 @@ steps:
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
+     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
+     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters cosmosDBExists="$(cosmosDBExists)" \
      --parameters redisExists="$(redisExists)" \
@@ -1415,6 +1417,8 @@ steps:
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
      --parameters enableBingSearch="$(enableBingSearch)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \
@@ -1487,6 +1491,8 @@ steps:
      --parameters addAIFoundryHub="$(addAIFoundryHub)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
@@ -1572,6 +1578,8 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
@@ -1640,6 +1648,8 @@ steps:
      --parameters enableEventHubs="$(enableEventHubs)" \
      --parameters logicAppsExists="$(logicAppsExists)" \
      --parameters eventHubsExists="$(eventHubsExists)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters functionAppExists="$(functionAppExists)" \
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
@@ -1712,8 +1722,6 @@ steps:
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters commonLakeNamePrefixMax8chars="$(commonLakeNamePrefixMax8chars)" \
      --parameters tags='$(tags)' \
-     --parameters tagsProject='$(tagsProject)' \
-     --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters dataFactoryExists="$(dataFactoryExists)" \
      --parameters aksExists="$(aksExists)" \
@@ -1758,10 +1766,9 @@ steps:
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters default_embedding_capacity="$(default_embedding_capacity)" \
-     --parameters default_gpt_capacity="$(default_gpt_capacity)" \
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
-     --parameters default_gpt_4o_version="$(default_gpt_4o_version)" \
      --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters default_gpt_4o_version="$(default_gpt_4o_version)" \
      --parameters default_gpt_4o_mini_version="$(default_gpt_4o_mini_version)" \
      --parameters default_model_sku="$(default_model_sku)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
@@ -1791,6 +1798,8 @@ steps:
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters useAdGroups="$(use_ad_groups)" \

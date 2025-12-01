@@ -48,6 +48,13 @@ var activeVersion = 122
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+// CMK Parameters
+param cmk bool = false
+param cmkKeyName string = ''
+param admin_bicep_kv_fw string = ''
+param admin_bicep_kv_fw_rg string = ''
+param admin_bicep_input_keyvault_subscription string = ''
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -491,6 +498,42 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIn
   ]
 }
 
+// ============== CMK CONFIGURATION ==============
+// Create Key in the external Key Vault
+module cmkKey '../modules/keyVaultKey.bicep' = if (cmk) {
+  name: take('03-cmkKey-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
+  params: {
+    keyVaultName: admin_bicep_kv_fw
+    keyName: cmkKeyName
+    kty: 'RSA'
+    keySize: 2048
+  }
+}
+
+module getCmkIdentityInfo '../modules/get-managed-identity-info.bicep' = {
+  name: take('03-getCmkIdentityInfo-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    managedIdentityName: miPrjName
+  }
+}
+
+// Assign "Key Vault Crypto Service Encryption User" to the Project Managed Identity
+module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (cmk) {
+  name: take('03-cmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
+  params: {
+    keyVaultName: admin_bicep_kv_fw
+    principalId: getCmkIdentityInfo.outputs.principalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-${storageAccount2001Name}'
+    principalType: 'ServicePrincipal'
+  }
+}
+
+var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
+
 // Storage for AI Search
 module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -510,6 +553,10 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
     tablePrivateEndpointName: '${storageAccount2001Name}-table-pend'
     tags: tagsProject
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
+    cmk: cmk
+    cmkIdentityId: cmkIdentityId
+    cmkKeyName: cmk ? cmkKeyName : ''
+    cmkKeyVaultUri: cmk ? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri : ''
     containers: [
       {
         name: 'default'
@@ -578,6 +625,8 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
   }
   dependsOn: [
     projectResourceGroupExists
+    ...(cmk ? [cmkKey] : [])
+    ...(cmk ? [cmkRbac] : [])
   ]
 }
 

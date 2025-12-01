@@ -24,6 +24,14 @@ import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types
 @description('Optional. The managed identity definition for this resource.')
 param managedIdentities managedIdentityAllType?
 param enablePublicAccessWithPerimeter bool = false
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmk_key_name string = ''
+
+@description('URI of the Key Vault for CMK')
+param keyVaultUri string = ''
 var subnetRef = '${vnetId}/subnets/${subnetName}'
 
 var groupIds = [
@@ -60,6 +68,14 @@ resource adf 'Microsoft.DataFactory/factories@2018-06-01' = {
   properties: {
     globalParameters: {}
     publicNetworkAccess: enablePublicAccessWithPerimeter ? 'Enabled': 'Disabled'
+    encryption: cmk ? {
+      identity: {
+        userAssignedIdentity: managedIdentities!.userAssignedResourceIds![0]
+      }
+      keyName: cmk_key_name
+      keyVersion: ''
+      vaultBaseUrl: keyVaultUri
+    } : null
   }
 
 }

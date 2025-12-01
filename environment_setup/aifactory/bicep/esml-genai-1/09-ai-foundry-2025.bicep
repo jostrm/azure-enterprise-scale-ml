@@ -49,6 +49,12 @@ param enableCaphost bool = true
 @description('Enable AI Search integration')
 param enableAISearch bool = true
 
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmk_key_name string = ''
+
 @description('Enable Cosmos DB integration')
 param enableCosmosDB bool = false
 
@@ -489,26 +495,26 @@ var aiFoundryDefinition = union(
   deployAvmFoundry && enableAISearch ? {
     aiSearchConfiguration: {
       existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', namingConvention.outputs.safeNameAISearch)
-      privateDnsZoneResourceId: privateLinksDnsZones.searchService.id
+      // privateDnsZoneResourceId: privateLinksDnsZones.searchService.id // Disabled to prevent duplicate PE creation
       roleAssignments: []
     }
   } : {},
   deployAvmFoundry ? {
     keyVaultConfiguration: {
       existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.KeyVault/vaults', namingConvention.outputs.keyvaultName)
-      privateDnsZoneResourceId: privateLinksDnsZones.vault.id
+      // privateDnsZoneResourceId: privateLinksDnsZones.vault.id // Disabled to prevent duplicate PE creation
       roleAssignments: []
     }
     storageAccountConfiguration: {
       existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount1001Name)
-      blobPrivateDnsZoneResourceId: privateLinksDnsZones.blob.id
+      // blobPrivateDnsZoneResourceId: privateLinksDnsZones.blob.id // Disabled to prevent duplicate PE creation
       roleAssignments: []
     }
   } : {},
   deployAvmFoundry && enableCosmosDB ? {
     cosmosDbConfiguration: {
       existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName)
-      privateDnsZoneResourceId: privateLinksDnsZones.cosmosdbnosql.id
+      // privateDnsZoneResourceId: privateLinksDnsZones.cosmosdbnosql.id // Disabled to prevent duplicate PE creation
       roleAssignments: []
     }
   } : {}
@@ -662,6 +668,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     privateLinksDnsZones: privateLinksDnsZones
     createPrivateEndpointsAIFactoryWay: true
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    customerManagedKey: customerManagedKey
     /*
     privateEndpoints: !enablePublicAccessWithPerimeter ? [
       {
@@ -942,6 +949,37 @@ var aiFoundryResourceGroupOutput = useAVMFoundry ? aiFoundry2025Avm.outputs.reso
 var aiFoundryResourceIdOutput = useAVMFoundry
   ? resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameOutput)
   : aiFoundry2025NoAvm!.outputs.resourceId
+
+// ============== AI FOUNDRY HUB ==============
+
+module cmkKey '../modules/keyVaultKey.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('09-cmkKey-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  params: {
+    keyVaultName: inputKeyvault
+    keyName: cmk_key_name
+    kty: 'RSA'
+    keySize: 2048
+  }
+}]
+
+module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('09-cmkRbac-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  params: {
+    keyVaultName: inputKeyvault
+    principalId: getProjectMIPrincipalId.outputs.principalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-${miPrjName}-${i}'
+    principalType: 'ServicePrincipal'
+  }
+}]
+
+var customerManagedKey = cmk ? {
+  keyName: cmk_key_name
+  keyVaultResourceId: resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault)
+  userAssignedIdentityResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
+} : null
 
 // ============== OUTPUTS ==============
 

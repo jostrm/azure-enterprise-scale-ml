@@ -23,6 +23,13 @@ param updateKeyvaultRbac bool = true
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+// CMK Parameters
+param cmk bool = false
+param cmkKeyName string = ''
+param admin_bicep_kv_fw string = ''
+param admin_bicep_kv_fw_rg string = ''
+param admin_bicep_input_keyvault_subscription string = ''
+
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
@@ -353,6 +360,34 @@ module applicationInsights '../modules/applicationInsightsRGmode.bicep' = {
   ]
 }
 
+// ============== CMK CONFIGURATION ==============
+// Create Key in the external Key Vault
+module cmkKey '../modules/keyVaultKey.bicep' = if (cmk) {
+  name: take('02-cmkKey-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
+  params: {
+    keyVaultName: admin_bicep_kv_fw
+    keyName: cmkKeyName
+    kty: 'RSA'
+    keySize: 2048
+  }
+}
+
+// Assign "Key Vault Crypto Service Encryption User" to the Project Managed Identity
+module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (cmk) {
+  name: take('02-cmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
+  params: {
+    keyVaultName: admin_bicep_kv_fw
+    principalId: miPrjPrincipalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-${storageAccount1001Name}'
+    principalType: 'ServicePrincipal'
+  }
+}
+
+var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
+
 // ============== STORAGE ACCOUNTS ==============
 
 #disable-next-line BCP318
@@ -392,6 +427,10 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
       aksSubnetId
     ]
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
+    cmk: cmk
+    cmkIdentityId: cmkIdentityId
+    cmkKeyName: cmk ? cmkKeyName : ''
+    cmkKeyVaultUri: cmk ? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri : ''
     corsRules: [
       {
         allowedOrigins: [
@@ -415,6 +454,8 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
   }
   dependsOn: [
     existingTargetRG
+    cmkKey
+    cmkRbac
   ]
 }
 

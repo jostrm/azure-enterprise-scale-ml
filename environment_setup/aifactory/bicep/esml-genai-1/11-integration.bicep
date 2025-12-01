@@ -98,6 +98,12 @@ param randomValue string
 @description('AI Factory suffix for resource groups')
 param aifactorySuffixRG string
 
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmk_key_name string = ''
+
 @description('Subscription ID for dev/test/prod')
 param subscriptionIdDevTestProd string
 

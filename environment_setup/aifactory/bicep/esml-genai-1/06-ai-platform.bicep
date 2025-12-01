@@ -41,6 +41,12 @@ param enableAIServices bool = false
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmk_key_name string = ''
+
 // AI Models deployment parameters
 @description('Whether to deploy GPT-X model')
 param deployModel_gpt_X bool = false
@@ -381,6 +387,30 @@ var aiModels = concat(
 )
 
 // ============== AI FOUNDRY HUB ==============
+
+module cmkKey '../modules/keyVaultKey.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('06-cmkKey-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  params: {
+    keyVaultName: inputKeyvault
+    keyName: cmk_key_name
+    kty: 'RSA'
+    keySize: 2048
+  }
+}]
+
+module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = [for i in range(0, cmk ? 1 : 0): {
+  name: take('06-cmkRbac-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  params: {
+    keyVaultName: inputKeyvault
+    principalId: getProjectMIPrincipalId.outputs.principalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-${miPrjName}-${i}'
+    principalType: 'ServicePrincipal'
+  }
+}]
+
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('06-aiHubModule${deploymentProjSpecificUniqueSuffix}', 64)
@@ -398,12 +428,14 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     defaultProjectName: aifV1ProjectName
     aiHubExists:aiHubExists
     location: location
+    cmk: cmk
+    cmk_key_name: cmk_key_name
+    env: env
     tags: tagsProject
     aifactorySuffix: aifactorySuffixRG
     applicationInsightsName: applicationInsightName
     acrName: var_acr_cmn_or_prj
     acrRGName: useCommonACR ? commonResourceGroup : targetResourceGroup
-    env: env
     keyVaultName: keyvaultName
     privateEndpointName: 'p-aihub-${projectName}${locationSuffix}${env}${genaiName}amlworkspace'
     aifactoryProjectNumber: projectNumber

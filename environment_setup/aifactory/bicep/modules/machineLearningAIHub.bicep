@@ -49,6 +49,11 @@ param applicationInsightsName string
 param ipWhitelist_array array = []
 param acrName string
 param acrRGName string
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmk_key_name string = ''
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var privateDnsZoneName =  {
@@ -189,6 +194,18 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     containerRegistry:existingAcr.id // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
 
+    encryption: cmk ? {
+      status: 'Enabled'
+      identity: {
+        userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
+      }
+      keyVaultProperties: {
+        keyVaultArmId: keyVault.id
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        identityClientId: ''
+      }
+    } : null
+
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
@@ -316,6 +333,17 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     v1LegacyMode: false
     hbiWorkspace: false
     hubResourceId:aiHub2.id
+    encryption: cmk ? {
+      status: 'Enabled'
+      identity: {
+        userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
+      }
+      keyVaultProperties: {
+        keyVaultArmId: keyVault.id
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        identityClientId: ''
+      }
+    } : null
     //enableDataIsolation: enablePublicAccessWithPerimeter?false:true
     publicNetworkAccess: enablePublicGenAIAccess?'Enabled':'Disabled'
     //allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
@@ -438,6 +466,18 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     containerRegistry:existingAcr.id // resourceId('Microsoft.ContainerRegistry/registries', containerRegistry)
     keyVault: keyVault.id
 
+    encryption: cmk ? {
+      status: 'Enabled'
+      identity: {
+        userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
+      }
+      keyVaultProperties: {
+        keyVaultArmId: keyVault.id
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        identityClientId: ''
+      }
+    } : null
+
     // configuration
     systemDatastoresAuthMode: 'identity'
     hbiWorkspace:false
@@ -553,6 +593,17 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
     hbiWorkspace: false
     publicNetworkAccess:enablePublicGenAIAccess?'Enabled':'Disabled' //enablePublicGenAIAccess?'Enabled':'Disabled' // Allow public endpoint connectivity when a workspace is private link enabled.
     hubResourceId: aiHub.id
+    encryption: cmk ? {
+      status: 'Enabled'
+      identity: {
+        userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
+      }
+      keyVaultProperties: {
+        keyVaultArmId: keyVault.id
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        identityClientId: ''
+      }
+    } : null
   }
   /*
   resource blob 'connections' = if(!enablePublicAccessWithPerimeter) {

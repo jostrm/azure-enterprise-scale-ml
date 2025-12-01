@@ -49,6 +49,12 @@ param location string
 param vnetName string
 param vnetResourceGroupName string
 
+// CMK Parameters
+param cmk bool = false
+param cmkIdentityId string = ''
+param cmkKeyName string = ''
+param cmkKeyVaultUri string = ''
+
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var groupIds = [
   {
@@ -73,14 +79,18 @@ var formattedUserAssignedIdentities = reduce(
   {},
   (cur, next) => union(cur, next)
 ) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
-var identity = !empty(managedIdentities)
+
+var cmkIdentity = cmk && !empty(cmkIdentityId) ? { '${cmkIdentityId}': {} } : {}
+var allUserAssignedIdentities = union(formattedUserAssignedIdentities, cmkIdentity)
+
+var identity = !empty(managedIdentities) || !empty(cmkIdentity)
   ? {
-      type: (managedIdentities.?systemAssigned ?? false)
-        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
-        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : 'None')
-      userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
+      type: (managedIdentities.?systemAssigned ?? false) // Default to true if managedIdentities is null? No, default to false.
+        ? (!empty(allUserAssignedIdentities) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(allUserAssignedIdentities) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(allUserAssignedIdentities) ? allUserAssignedIdentities : null
     }
-  : {type:'SystemAssigned'}
+  : {type:'SystemAssigned'} // Default fallback if nothing provided
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -116,7 +126,12 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicG
     enableExtendedGroups: false
     supportsHttpsTrafficOnly: true
     encryption: {
-      keySource: 'Microsoft.Storage'
+      keySource: cmk ? 'Microsoft.Keyvault' : 'Microsoft.Storage'
+      identity: cmk ? { userAssignedIdentity: cmkIdentityId } : null
+      keyvaultproperties: cmk ? {
+          keyname: cmkKeyName
+          keyvaulturi: cmkKeyVaultUri
+      } : null
       requireInfrastructureEncryption: false
       services: {
         blob: {
@@ -214,7 +229,12 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-01-01' = if(!enablePublicG
     enableExtendedGroups: false
     supportsHttpsTrafficOnly: true
     encryption: {
-      keySource: 'Microsoft.Storage'
+      keySource: cmk ? 'Microsoft.Keyvault' : 'Microsoft.Storage'
+      identity: cmk ? { userAssignedIdentity: cmkIdentityId } : null
+      keyvaultproperties: cmk ? {
+          keyname: cmkKeyName
+          keyvaulturi: cmkKeyVaultUri
+      } : null
       requireInfrastructureEncryption: false
       services: {
         blob: {

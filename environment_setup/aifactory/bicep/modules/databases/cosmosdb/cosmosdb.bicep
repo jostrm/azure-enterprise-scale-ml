@@ -37,6 +37,10 @@ import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types
 @description('Optional. The managed identity definition for this resource.')
 param managedIdentities managedIdentityAllType?
 
+param useCMK bool = false
+param keyVaultKeyUri string = ''
+param cmkUserAssignedIdentityId string = ''
+
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
   scope: resourceGroup(vnetResourceGroupName)
@@ -56,17 +60,21 @@ var rules = [for rule in vNetRules: {
   ignoreMissingVNetServiceEndpoint: true
 }]
 
-var formattedUserAssignedIdentities = reduce(
+var cmkIdentityDict = useCMK ? {
+  '${cmkUserAssignedIdentityId}': {}
+} : {}
+
+var formattedUserAssignedIdentities = union(reduce(
   map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
   {},
   (cur, next) => union(cur, next)
-) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+), cmkIdentityDict)
 
-var identity = !empty(managedIdentities)
+var identity = (!empty(managedIdentities) || useCMK)
   ? {
       type: (managedIdentities.?systemAssigned ?? false)
-        ? (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
-        : (!empty(managedIdentities.?userAssignedResourceIds ?? {}) ? 'UserAssigned' : null)
+        ? (!empty(formattedUserAssignedIdentities) ? 'SystemAssigned,UserAssigned' : 'SystemAssigned')
+        : (!empty(formattedUserAssignedIdentities) ? 'UserAssigned' : null)
       userAssignedIdentities: !empty(formattedUserAssignedIdentities) ? formattedUserAssignedIdentities : null
     }
   : null
@@ -81,6 +89,8 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
   identity: identity
   tags: tags
   properties: {
+    keyVaultKeyUri: useCMK ? keyVaultKeyUri : null
+    defaultIdentity: useCMK ? 'UserAssignedIdentity=${cmkUserAssignedIdentityId}' : null
     consistencyPolicy: { defaultConsistencyLevel: 'Session' }
     locations: [
       {

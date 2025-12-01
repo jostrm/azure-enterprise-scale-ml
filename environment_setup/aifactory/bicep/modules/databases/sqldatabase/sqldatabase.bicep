@@ -21,6 +21,10 @@ param sqlAdminPassword string = ''
 @secure()
 param appUserPassword string = ''
 
+param useCMK bool = false
+param keyVaultKeyUri string = ''
+param cmkUserAssignedIdentityId string = ''
+
 @description('An array of IP firewall rules to apply. Example: [ { "name": "AllowAzureServices", "startIpAddress": "0.0.0.0", "endIpAddress": "0.0.0.0" }, { "name": "AllowMyDevIP", "startIpAddress": "YOUR_IP", "endIpAddress": "YOUR_IP" } ]')
 param sqlServerAllowedIpRules array = []
 param allowAzureIPsFirewall bool = !createPrivateEndpoint
@@ -43,14 +47,21 @@ var defaultSku = {
   capacity: 10 // Default capacity
 }
 
+var keyVaultNameFromUri = useCMK ? split(split(keyVaultKeyUri, '/')[2], '.')[0] : ''
+var keyNameFromUri = useCMK ? split(keyVaultKeyUri, '/')[4] : ''
+var keyVersionFromUri = useCMK ? split(keyVaultKeyUri, '/')[5] : ''
+var sqlServerKeyName = '${keyVaultNameFromUri}_${keyNameFromUri}_${keyVersionFromUri}'
+
 resource sqlServer 'Microsoft.Sql/servers@2024-05-01-preview' = {
   name: serverName
   location: location
   tags: tags
   identity: {
-    type: 'SystemAssigned'
+    type: useCMK ? 'SystemAssigned, UserAssigned' : 'SystemAssigned'
+    userAssignedIdentities: useCMK ? { '${cmkUserAssignedIdentityId}': {} } : null
   }
   properties: {
+    primaryUserAssignedIdentityId: useCMK ? cmkUserAssignedIdentityId : null
     version: version
     minimalTlsVersion: minimalTlsVersion
     publicNetworkAccess: createPrivateEndpoint? 'Disabled': 'Enabled'
@@ -191,6 +202,25 @@ resource pendSQLServer 'Microsoft.Network/privateEndpoints@2024-05-01' = if(crea
         }
       }
     ]
+  }
+}
+
+resource sqlServerKey 'Microsoft.Sql/servers/keys@2024-05-01-preview' = if (useCMK) {
+  parent: sqlServer
+  name: sqlServerKeyName
+  properties: {
+    serverKeyType: 'AzureKeyVault'
+    uri: keyVaultKeyUri
+  }
+}
+
+resource encryptionProtector 'Microsoft.Sql/servers/encryptionProtector@2024-05-01-preview' = if (useCMK) {
+  parent: sqlServer
+  name: 'current'
+  properties: {
+    serverKeyName: sqlServerKey.name
+    serverKeyType: 'AzureKeyVault'
+    autoRotationEnabled: false
   }
 }
 
