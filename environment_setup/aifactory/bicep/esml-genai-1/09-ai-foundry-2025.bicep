@@ -796,59 +796,6 @@ module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = i
   dependsOn: [projectV21]
 }
 
-// This module creates the capability host for the project and account
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    accountName: aifV2Name
-    projectName: aifV2ProjectName
-    #disable-next-line BCP318
-    cosmosDBConnection: namingConvention.outputs.cosmosDBName
-    #disable-next-line BCP318
-    azureStorageConnection: namingConvention.outputs.storageAccount1001Name
-    #disable-next-line BCP318
-    aiSearchConnection: namingConvention.outputs.safeNameAISearch
-    projectCapHost: enableCaphost
-    projectCapHostName: projectCapHostName
-  }
-  dependsOn: [
-    rbacPreCaphost
-    projectV21  // CRITICAL: Must wait for project and all connections to be fully created
-  ]
-}
-
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    projectWorkspaceId: projectWorkspaceId
-  }
-  dependsOn: [
-    addProjectCapabilityHost
-  ]
-}
-
-// START CAPHOST RBAC: Some RBAC for COSMOS & STORAGE must be assigned AFTER the CAPABILITY HOST is created
-// - The Storage Blob Data Owner role must be assigned after.
-// - The Cosmos Built-In Data Contributor role must be assigned after.
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
-  name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  params: {
-    projectPrincipalId: projectPrincipal
-    storageName: storageAccount1001Name
-    #disable-next-line BCP318
-    projectWorkspaceId: formatProjectWorkspaceId.outputs.projectWorkspaceIdGuid
-    cosmosAccountName: namingConvention.outputs.cosmosDBName
-  }
-  dependsOn: [
-    addProjectCapabilityHost
-    formatProjectWorkspaceId
-  ]
-}
-// END CAPHOST RBAC
-
 // Sets RBAC roles: Search Service Contributor, Search Index Data Reader, Search Index Data Contributor on AI Search for the AI Foundry system-assigned identity
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
@@ -894,6 +841,61 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     ...(projectModuleEnabled ? [projectV21] : [])
   ]
 }
+
+// This module creates the capability host for the project and account
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    accountName: aifV2Name
+    projectName: aifV2ProjectName
+    #disable-next-line BCP318
+    cosmosDBConnection: namingConvention.outputs.cosmosDBName
+    #disable-next-line BCP318
+    azureStorageConnection: namingConvention.outputs.storageAccount1001Name
+    #disable-next-line BCP318
+    aiSearchConnection: namingConvention.outputs.safeNameAISearch
+    projectCapHost: enableCaphost
+    projectCapHostName: projectCapHostName
+  }
+  dependsOn: [
+    rbacPreCaphost
+    projectV21  // CRITICAL: Must wait for project and all connections to be fully created
+    rbacAISearchForAIFv21
+    rbacAIStorageAccountsForAIFv21
+  ]
+}
+
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    projectWorkspaceId: projectWorkspaceId
+  }
+  dependsOn: [
+    addProjectCapabilityHost
+  ]
+}
+
+// START CAPHOST RBAC: Some RBAC for COSMOS & STORAGE must be assigned AFTER the CAPABILITY HOST is created
+// - The Storage Blob Data Owner role must be assigned after.
+// - The Cosmos Built-In Data Contributor role must be assigned after.
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    projectPrincipalId: projectPrincipal
+    storageName: storageAccount1001Name
+    #disable-next-line BCP318
+    projectWorkspaceId: formatProjectWorkspaceId.outputs.projectWorkspaceIdGuid
+    cosmosAccountName: namingConvention.outputs.cosmosDBName
+  }
+  dependsOn: [
+    addProjectCapabilityHost
+    formatProjectWorkspaceId
+  ]
+}
+// END CAPHOST RBAC
 
 // CRITICAL: Add Key Vault RBAC for Agent playground functionality
 module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {

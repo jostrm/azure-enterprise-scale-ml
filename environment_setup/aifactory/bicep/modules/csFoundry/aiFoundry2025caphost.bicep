@@ -38,14 +38,19 @@ resource aiSearchConnectionResource 'Microsoft.CognitiveServices/accounts/projec
 
 // Account-level capability host - Must be created BEFORE project capability host
 // NOTE: Name format follows AVM pattern - remove dashes from account name
-// IMPORTANT: Account capability host is at ACCOUNT level, not project level
-// It should NOT depend on project or connections - it's independent
+// IMPORTANT: Account capability host depends on project and connections per AVM pattern
 resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-07-01-preview' = {
   name: 'chagent${replace(accountName, '-', '')}'
   parent: account
   properties: {
     capabilityHostKind: 'Agents'
   }
+  dependsOn: [
+    project
+    cosmosDbConnectionResource
+    storageAccountConnectionResource
+    aiSearchConnectionResource
+  ]
 }
 
 // Project-level capability host - Created AFTER account capability host
