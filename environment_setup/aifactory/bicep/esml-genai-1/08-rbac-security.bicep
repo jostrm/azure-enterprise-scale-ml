@@ -827,6 +827,68 @@ module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExist
   ]
 }
 
+// ============== RBAC MODULES - AZURE ML COMPUTE CLUSTER PERMISSIONS ==============
+
+// Parse subnet resource ID to extract VNet details
+var subnetIdParts = split(genaiSubnetId, '/')
+var subnetSubscriptionId = subnetIdParts[2]
+var subnetResourceGroup = subnetIdParts[4]
+var subnetVNetName = subnetIdParts[8]
+var subnetName = subnetIdParts[10]
+
+// RBAC for Azure ML Compute Cluster Creation - Workspace-level roles
+// Assigns: Azure ML Compute Operator and Azure ML Registry User roles
+module rbacAmlComputeOperator '../modules/amlComputeRbac.bicep' = if(!amlExists && enableAzureMachineLearning) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('08-rbacAmlCompute${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    projectTeamGroupOrUser: p011_genai_team_lead_array
+    servicePrincipleAndMIArray: spAndMiArray
+    useAdGroups: useAdGroups
+    amlWorkspaceName: amlName_Static
+  }
+  dependsOn: [
+    existingTargetRG
+    rbacModuleUsers
+  ]
+}
+
+// RBAC for Network Contributor on GenAI Subnet - Azure ML scenario
+// Required for: Joining compute clusters to VNet subnet
+module rbacSubnetNetworkContributorAml '../modules/subnetRbacNetworkContributor.bicep' = if(!amlExists && enableAzureMachineLearning) {
+  scope: resourceGroup(subnetSubscriptionId, subnetResourceGroup)
+  name: take('08-rbacSubnetAml${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    vNetName: subnetVNetName
+    subnetName: subnetName
+    servicePrincipleAndMIArray: spAndMiArray
+    user_object_ids: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    existingTargetRG
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+
+// RBAC for Network Contributor on GenAI Subnet - AI Foundry Hub scenario
+// Required for: Joining AI Foundry compute clusters to VNet subnet
+module rbacSubnetNetworkContributorHub '../modules/subnetRbacNetworkContributor.bicep' = if(!aiHubExists && enableAIFoundryHub) {
+  scope: resourceGroup(subnetSubscriptionId, subnetResourceGroup)
+  name: take('08-rbacSubnetHub${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    vNetName: subnetVNetName
+    subnetName: subnetName
+    servicePrincipleAndMIArray: spAndMiArray
+    user_object_ids: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    existingTargetRG
+    rbacReadUsersToCmnVnetBastion
+  ]
+}
+
 // ============== OUTPUTS - Simplified ==============
 // Note: Outputs simplified to avoid conditional module reference issues
 // RBAC deployment status information

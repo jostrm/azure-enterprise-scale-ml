@@ -523,6 +523,37 @@ resource machineLearningCluster001 'Microsoft.MachineLearningServices/workspaces
     azureMLv2Dev
   ]
 }
+
+// Assign Storage Blob Data Contributor role to Dev compute cluster MI
+resource computeCluster001StorageRbacDev 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(env =='dev') {
+  name: guid(existingStorageAccount.id, machineLearningCluster001.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+  scope: existingStorageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe') // Storage Blob Data Contributor
+    principalId: machineLearningCluster001!.identity.principalId
+    principalType: 'ServicePrincipal'
+    description: 'Allows Azure ML compute cluster to read/write blob data'
+  }
+  dependsOn: [
+    machineLearningCluster001
+  ]
+}
+
+// Assign Storage File Data Privileged Contributor role to Dev compute cluster MI
+resource computeCluster001FileStorageRbacDev 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(env =='dev') {
+  name: guid(existingStorageAccount.id, machineLearningCluster001.id, '69566ab7-960f-475b-8e7c-b3118f30c6bd')
+  scope: existingStorageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '69566ab7-960f-475b-8e7c-b3118f30c6bd') // Storage File Data Privileged Contributor
+    principalId: machineLearningCluster001!.identity.principalId
+    principalType: 'ServicePrincipal'
+    description: 'Allows Azure ML compute cluster to read/write/delete file share data with full permissions'
+  }
+  dependsOn: [
+    machineLearningCluster001
+  ]
+}
+
 resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(env =='test' || env =='prod') {
   name: take('p${projectNumber}-m01${locationSuffix}-${env}',16) // p001-m1-weu-prod (16/16...or 24)
   parent: amlv2TestProd
@@ -556,6 +587,36 @@ resource machineLearningCluster001TestProd 'Microsoft.MachineLearningServices/wo
   dependsOn:[
     machineLearningPrivateEndpoint
     amlv2TestProd
+  ]
+}
+
+// Assign Storage Blob Data Contributor role to Test/Prod compute cluster MI
+resource computeCluster001StorageRbacTestProd 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(env =='test' || env =='prod') {
+  name: guid(existingStorageAccount.id, machineLearningCluster001TestProd.id, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+  scope: existingStorageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe') // Storage Blob Data Contributor
+    principalId: machineLearningCluster001TestProd!.identity.principalId
+    principalType: 'ServicePrincipal'
+    description: 'Allows Azure ML compute cluster to read/write blob data'
+  }
+  dependsOn: [
+    machineLearningCluster001TestProd
+  ]
+}
+
+// Assign Storage File Data Privileged Contributor role to Test/Prod compute cluster MI
+resource computeCluster001FileStorageRbacTestProd 'Microsoft.Authorization/roleAssignments@2022-04-01' = if(env =='test' || env =='prod') {
+  name: guid(existingStorageAccount.id, machineLearningCluster001TestProd.id, '69566ab7-960f-475b-8e7c-b3118f30c6bd')
+  scope: existingStorageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '69566ab7-960f-475b-8e7c-b3118f30c6bd') // Storage File Data Privileged Contributor
+    principalId: machineLearningCluster001TestProd!.identity.principalId
+    principalType: 'ServicePrincipal'
+    description: 'Allows Azure ML compute cluster to read/write/delete file share data with full permissions'
+  }
+  dependsOn: [
+    machineLearningCluster001TestProd
   ]
 }
 
