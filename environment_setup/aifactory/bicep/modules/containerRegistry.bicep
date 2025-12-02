@@ -26,6 +26,16 @@ param existingIpRules array = []
 param exportEnabled string = 'disabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
 param retentionDays int = 7 // days
 
+import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The managed identity definition for this resource.')
+param managedIdentities managedIdentityAllType?
+
+// CMK Parameters
+param cmk bool = false
+param cmkIdentityId string = ''
+param cmkKeyName string = ''
+param cmkKeyVaultUri string = ''
+
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
 var policyOn = 'disabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
 var containerRegistryNameCleaned = replace(containerRegistryName, '-', '')
@@ -42,6 +52,24 @@ var normalizedIpRules = map(allIpRules, rule => {
 // Remove duplicates by creating a unique set based on the normalized 'value' property
 var uniqueIpRulesMap = reduce(normalizedIpRules, {}, (acc, rule) => union(acc, { '${rule.value}': rule }))
 var uniqueIpRules = map(items(uniqueIpRulesMap), item => item.value)
+
+var formattedUserAssignedIdentities = reduce(
+  map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
+  {},
+  (cur, next) => union(cur, next)
+) // Converts the flat array to an object like { '${id1}': {}, '${id2}': {} }
+
+var cmkIdentity = cmk && !empty(cmkIdentityId) ? { '${cmkIdentityId}': {} } : {}
+var allUserAssignedIdentities = union(formattedUserAssignedIdentities, cmkIdentity)
+
+var identity = !empty(managedIdentities) || !empty(cmkIdentity)
+  ? {
+      type: (managedIdentities.?systemAssigned ?? false)
+        ? (!empty(allUserAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned')
+        : (!empty(allUserAssignedIdentities) ? 'UserAssigned' : 'None')
+      userAssignedIdentities: !empty(allUserAssignedIdentities) ? allUserAssignedIdentities : null
+    }
+  : {type:'SystemAssigned'} // Default fallback if nothing provided
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -61,7 +89,15 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
   sku: {
     name: skuName
   }
+  identity: identity
   properties: {
+    encryption: cmk ? {
+      status: 'enabled'
+      keyVaultProperties: {
+        identity: cmkIdentityId
+        keyIdentifier: '${cmkKeyVaultUri}keys/${cmkKeyName}'
+      }
+    } : null
     adminUserEnabled: adminUserEnabled
     networkRuleSet: !enablePublicAccessWithPerimeter ? {
       defaultAction: 'Deny'

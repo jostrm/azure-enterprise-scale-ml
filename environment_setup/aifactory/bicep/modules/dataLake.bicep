@@ -93,6 +93,20 @@ param corsRules array = [
   }
 ]
 
+// CMK Parameters
+param cmk bool = false
+param cmkIdentityId string = ''
+param cmkKeyName string = ''
+param cmkKeyVaultUri string = ''
+
+var cmkIdentity = cmk && !empty(cmkIdentityId) ? { '${cmkIdentityId}': {} } : {}
+var identity = !empty(cmkIdentity)
+  ? {
+      type: 'UserAssigned'
+      userAssignedIdentities: cmkIdentity
+    }
+  : {type:'None'}
+
 var groupIds = [
   {
     name: blobPrivateEndpointName
@@ -136,6 +150,7 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   kind: 'StorageV2'
   tags: tags
   location: location
+  identity: identity
   properties:{
     allowBlobPublicAccess: false
     publicNetworkAccess:'Disabled'
@@ -145,7 +160,14 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     // isNfsV3Enabled: false // Not supported if DATALAKE
     allowSharedKeyAccess: true
     encryption: {
-      keySource: 'Microsoft.Storage'
+      keySource: cmk ? 'Microsoft.Keyvault' : 'Microsoft.Storage'
+      identity: cmk ? {
+        userAssignedIdentity: cmkIdentityId
+      } : null
+      keyvaultproperties: cmk ? {
+        keyname: cmkKeyName
+        keyvaulturi: cmkKeyVaultUri
+      } : null
       services: {
         blob: {
           enabled: true
