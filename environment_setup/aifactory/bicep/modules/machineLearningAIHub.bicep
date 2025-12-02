@@ -197,6 +197,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
     encryption: cmk ? {
       status: 'Enabled'
       identity: {
+        #disable-next-line BCP318
         userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
       }
       keyVaultProperties: {
@@ -336,6 +337,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
     encryption: cmk ? {
       status: 'Enabled'
       identity: {
+        #disable-next-line BCP318
         userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
       }
       keyVaultProperties: {
@@ -469,6 +471,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
     encryption: cmk ? {
       status: 'Enabled'
       identity: {
+        #disable-next-line BCP318
         userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
       }
       keyVaultProperties: {
@@ -596,6 +599,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
     encryption: cmk ? {
       status: 'Enabled'
       identity: {
+        #disable-next-line BCP318
         userAssignedIdentity: managedIdentities.userAssignedResourceIds[0]
       }
       keyVaultProperties: {
