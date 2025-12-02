@@ -1811,6 +1811,7 @@ steps:
      --parameters enableCaphost="$(enableAFoundryCaphost)" \
      --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

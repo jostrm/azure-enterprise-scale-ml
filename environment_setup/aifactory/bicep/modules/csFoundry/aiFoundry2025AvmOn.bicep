@@ -27,6 +27,7 @@ module inner 'br/public:avm/ptn/ai-ml/ai-foundry:0.6.0' = {
     cosmosDbConfiguration: aiFoundry.?cosmosDbConfiguration
     keyVaultConfiguration: aiFoundry.?keyVaultConfiguration
     storageAccountConfiguration: aiFoundry.?storageAccountConfiguration
+    //managedVirtualNetwork: null // Not supported in AVM module yet
   }
 }
 

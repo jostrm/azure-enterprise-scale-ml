@@ -25,9 +25,9 @@ param defaultProjectName string = name
 param defaultProjectDisplayName string = name
 param defaultProjectDescription string = 'AI Factory created this default project for AI Foundry with enterprise grade security and your corp networking.'
 
-resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = {
   name: aiFoundryV2Name
-  }
+}
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' existing = {
   name: storageName
@@ -44,7 +44,7 @@ resource cosmosDBAccount 'Microsoft.DocumentDB/databaseAccounts@2025-05-01-previ
   name: cosmosDBname
 }
 
-resource project 'Microsoft.CognitiveServices/accounts/projects@2025-07-01-preview' = {
+resource project 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-preview' = {
   name: defaultProjectName
   parent: foundryAccount
   location: location
@@ -57,7 +57,7 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-07-01-previ
   }
 }
 
-resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' = {
+resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
   name: storageName
   parent: project
   properties: {
@@ -79,7 +79,7 @@ resource project_connection_azure_storage 'Microsoft.CognitiveServices/accounts/
     project
   ]
 }
-resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' = {
+resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
   name: storageName2
   parent: project
   properties: {
@@ -104,7 +104,7 @@ resource project_connection_azure_storage2 'Microsoft.CognitiveServices/accounts
   ]
 }
 
-resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' = if (!empty(aiSearchName)) {
+resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (!empty(aiSearchName)) {
   name: aiSearchService.name
   parent: project
   properties: {
@@ -127,7 +127,7 @@ resource project_connection_azureai_search 'Microsoft.CognitiveServices/accounts
   ]
 }
 
-resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' = if  (!empty(cosmosDBname)) {
+resource project_connection_cosmosdb 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if  (!empty(cosmosDBname)) {
   name: cosmosDBname
   parent: project
   properties: {

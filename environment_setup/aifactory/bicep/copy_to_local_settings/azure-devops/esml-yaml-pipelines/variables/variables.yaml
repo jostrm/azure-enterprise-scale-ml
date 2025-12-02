@@ -228,6 +228,7 @@ variables:
   disableAgentNetworkInjection: "false" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
   # NetworkInjection -> Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
+  foundryApiManagementResourceId: "" # Optional, provide an existing API Management resource ID to integrate with Microsoft Foundry V22
 
   # === Data & Machine Learning ===
   enableDatafactory: "false" # Datafactory

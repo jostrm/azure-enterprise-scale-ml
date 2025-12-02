@@ -14,7 +14,7 @@ targetScope = 'subscription'
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
 param env string
-param useAVMFoundry bool = true // https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
+param useAVMFoundry bool = false // https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
 param updateAIFoundryV21 bool = false
 param addAIFoundryV21 bool = false
 param containerAppsEnvExists bool = false
@@ -38,6 +38,7 @@ param resourceSuffix string
 @description('Enable AI Foundry 2 features')
 param enableAIFoundryV2 bool = false
 param enableAIFoundryV21 bool = false
+param enableAIFoundryV22 bool = true
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
@@ -153,6 +154,8 @@ param allowPublicAccessWhenBehindVnet bool = false
 param disableAgentNetworkInjection bool = false
 @description('Common resource name identifier. Default is "esml-common"')
 param commonResourceName string = 'esml-common'
+@description('Optional existing API Management resource ID used for private endpoint wiring.')
+param apiManagementResourceId string = ''
 
 // ============== VARIABLES ==============
 
@@ -288,6 +291,7 @@ var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var projectCapHostName  = '${aifV2Name}caphost'
 var defaultProjectName = enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
+var defaultProjectDescription = 'Enterprise Scale AI Factory (Foundry v1.22) creation of project for with enterprise grade security and your corp networking.'
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {
@@ -457,6 +461,28 @@ var aiFoundryDeployments = [
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
   }
 ]
+
+var hasModelDeploymentsV22 = length(aiFoundryDeployments) > 0
+var defaultModelDeploymentV22 = hasModelDeploymentsV22 ? aiFoundryDeployments[0] : {
+  name: 'gpt-4o'
+  model: {
+    name: 'gpt-4o'
+    format: 'OpenAI'
+    version: default_gpt_4o_version
+  }
+  sku: {
+    name: default_model_sku
+    capacity: default_gpt_capacity
+  }
+  raiPolicyName: 'Microsoft.DefaultV2'
+  versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
+}
+var extraModelDeploymentsV22 = (hasModelDeploymentsV22 && length(aiFoundryDeployments) > 1) ? skip(aiFoundryDeployments, 1) : []
+var defaultModelNameV22 = string(defaultModelDeploymentV22.model.name)
+var defaultModelFormatV22 = string(defaultModelDeploymentV22.model.format)
+var defaultModelVersionV22 = string(defaultModelDeploymentV22.model.version)
+var defaultModelSkuNameV22 = string(defaultModelDeploymentV22.sku.name)
+var defaultModelCapacityV22 = int(defaultModelDeploymentV22.sku.capacity)
 
 var aiFoundryNetworkingConfig = union({
   aiServicesPrivateDnsZoneResourceId: privateLinksDnsZones.servicesai.id
@@ -632,8 +658,51 @@ var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ?
 
 var deployAvmFoundry = useAVMFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)
 
+module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(enableAIFoundryV22 && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    location: location
+    aiAccountName: aifV2Name
+    firstProjectName: defaultProjectName
+    projectDescription: defaultProjectDescription
+    displayName: defaultProjectName
+    privateEndpointSubnetResourceId: genaiSubnetId
+    agentSubnetResourceId: (!disableAgentNetworkInjection && !empty(acaSubnetId)) ? acaSubnetId : ''
+    disableAgentNetworkInjection: disableAgentNetworkInjection
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    ipAllowList: filteredIpWhitelist_array
+    enableCapabilityHost: enableCaphost
+    projectCapHost: projectCapHostName
+    userRoleObjectIds: p011_genai_team_lead_array
+    servicePrincipalIds: spAndMiArray
+    useAdGroups: useAdGroups
+    extraModelDeployments: extraModelDeploymentsV22
+    modelName: defaultModelNameV22
+    modelFormat: defaultModelFormatV22
+    modelVersion: defaultModelVersionV22
+    modelSkuName: defaultModelSkuNameV22
+    modelCapacity: defaultModelCapacityV22
+    enableCosmosDb: enableCosmosDB
+    enableAISearch: enableAISearch
+    enableProject: enableAIFactoryCreatedDefaultProjectForAIFv2
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    restrictOutboundNetworkAccess: false
+    tags: tagsProject
+    privateLinksDnsZones: privateLinksDnsZones
+    apiManagementResourceId: apiManagementResourceId
+  }
+  dependsOn: [
+    existingTargetRG
+    namingConvention
+    spAndMI2ArrayModule
+    CmnZones
+  ]
+}
+
 // AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
-module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(!deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(!enableAIFoundryV22 && !deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -713,7 +782,11 @@ resource aiFoundryAccountAvm 'Microsoft.CognitiveServices/accounts@2025-07-01-pr
 #disable-next-line BCP318
 var aiFoundrySystemAssignedPrincipalId = deployAvmFoundry
   ? (aiFoundryAccountAvm!.identity!.principalId ?? '')
-  : (enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) ? aiFoundry2025NoAvm!.outputs.systemAssignedMIPrincipalId! : '')
+  : (enableAIFoundryV22
+      ? aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId
+      : (enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)
+          ? aiFoundry2025NoAvm!.outputs.systemAssignedMIPrincipalId!
+          : ''))
 
 // Add the new FDP cognitive services module
 var projectModuleEnabled = enableAIFactoryCreatedDefaultProjectForAIFv2
@@ -734,7 +807,9 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
     }
     dependsOn: [
       existingTargetRG
-      ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+      ...(deployAvmFoundry
+        ? [aiFoundry2025Avm]
+        : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     ]
 }
 
@@ -745,7 +820,9 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
   params: {
     cognitiveServiceName: aifV2Name
     #disable-next-line BCP318
-    cognitiveServiceId: aiFoundry2025NoAvm.outputs.resourceId
+    cognitiveServiceId: enableAIFoundryV22
+      ? aiFoundry2025NoAvmV22!.outputs.aiAccountId
+      : aiFoundry2025NoAvm!.outputs.resourceId
     location: location
     tags: tagsProject
     privateEndpointSubnetRID: genaiSubnetId
@@ -754,7 +831,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
   }
   dependsOn: [
-    aiFoundry2025NoAvm
+    ...(enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm])
     existingTargetRG
     projectV21
     assignCognitiveServicesRoles // Add... some extra dependencies, to not having AI Foundry "Account in state accepted" errror
@@ -788,7 +865,9 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   dependsOn: [
     spAndMI2ArrayModule
     namingConvention
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+    ...(deployAvmFoundry
+      ? [aiFoundry2025Avm]
+      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     projectV21
   ]
 }
@@ -820,7 +899,9 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
     azureAIDeveloperRoleId: azureAIDeveloperRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+    ...(deployAvmFoundry
+      ? [aiFoundry2025Avm]
+      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
   ]
@@ -843,7 +924,9 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+    ...(deployAvmFoundry
+      ? [aiFoundry2025Avm]
+      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
   ]
@@ -862,7 +945,6 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     azureStorageConnection: namingConvention.outputs.storageAccount1001Name
     #disable-next-line BCP318
     aiSearchConnection: namingConvention.outputs.safeNameAISearch
-    projectCapHost: enableCaphost
     projectCapHostName: projectCapHostName
   }
   dependsOn: [
@@ -917,7 +999,9 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+    ...(deployAvmFoundry
+      ? [aiFoundry2025Avm]
+      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(projectModuleEnabled ? [projectV21] : [])
@@ -935,20 +1019,37 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+    ...(deployAvmFoundry
+      ? [aiFoundry2025Avm]
+      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     namingConvention
   ]
 }
 
 #disable-next-line BCP318
-var aiFoundryAccountNameOutput = useAVMFoundry ? aiFoundry2025Avm.outputs.aiServicesName : aiFoundry2025NoAvm!.outputs.name
+var aiFoundryAccountNameAvm = aiFoundry2025Avm.outputs.aiServicesName
+#disable-next-line BCP318
+var aiFoundryAccountNameLegacy = aiFoundry2025NoAvm!.outputs.name
+#disable-next-line BCP318
+var aiFoundryAccountNameV22 = aiFoundry2025NoAvmV22!.outputs.aiAccountName
+
+var aiFoundryAccountNameOutput = useAVMFoundry
+  ? aiFoundryAccountNameAvm
+  : (enableAIFoundryV22 ? aiFoundryAccountNameV22 : aiFoundryAccountNameLegacy)
 
 #disable-next-line BCP318
 var aiFoundryResourceGroupOutput = useAVMFoundry ? aiFoundry2025Avm.outputs.resourceGroupName : targetResourceGroup
 
+#disable-next-line BCP318
+var aiFoundryResourceIdAvm = resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameAvm)
+#disable-next-line BCP318
+var aiFoundryResourceIdLegacy = aiFoundry2025NoAvm!.outputs.resourceId
+#disable-next-line BCP318
+var aiFoundryResourceIdV22 = aiFoundry2025NoAvmV22!.outputs.aiAccountId
+
 var aiFoundryResourceIdOutput = useAVMFoundry
-  ? resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameOutput)
-  : aiFoundry2025NoAvm!.outputs.resourceId
+  ? aiFoundryResourceIdAvm
+  : (enableAIFoundryV22 ? aiFoundryResourceIdV22 : aiFoundryResourceIdLegacy)
 
 // ============== AI FOUNDRY HUB ==============
 
@@ -987,16 +1088,18 @@ var customerManagedKey = cmk ? {
 output aiModelsConfiguration array = aiModels
 
 @description('AI Foundry V2 deployment status')
-output aiFoundryV2Deployed bool = enableAIFoundryV21
+output aiFoundryV2Deployed bool = enableAIFoundryV21 || enableAIFoundryV22
 
 @description('AI Foundry V2 name')
-output aiFoundryV2Name string = enableAIFoundryV21 ? aiFoundryAccountNameOutput : ''
+output aiFoundryV2Name string = (enableAIFoundryV21 || enableAIFoundryV22) ? aiFoundryAccountNameOutput : ''
 
 @description('AI Foundry V2 resource ID')
-output aiFoundryV2ResourceId string = enableAIFoundryV21 ? aiFoundryResourceIdOutput : ''
+output aiFoundryV2ResourceId string = (enableAIFoundryV21 || enableAIFoundryV22) ? aiFoundryResourceIdOutput : ''
 
 @description('AI Foundry Project deployment status')
-output aiFoundryProjectDeployed bool = enableAIFoundryV21
+output aiFoundryProjectDeployed bool = enableAIFoundryV22
+  ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed
+  : enableAIFoundryV21
 
 @description('AI Models deployed count')
 output aiModelsDeployed int = length(aiModels)
