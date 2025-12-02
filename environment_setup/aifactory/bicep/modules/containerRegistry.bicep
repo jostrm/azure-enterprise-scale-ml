@@ -23,7 +23,7 @@ param dedicatedDataPoint bool = true
 param zoneRedundancy string = 'Disabled'
 param ipRules array = []
 param existingIpRules array = []
-param exportEnabled string = 'disabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
+param exportEnabled string = 'enabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
 param retentionDays int = 7 // days
 
 //var subnetRef = '${vnetId}/subnets/${subnetName}'
