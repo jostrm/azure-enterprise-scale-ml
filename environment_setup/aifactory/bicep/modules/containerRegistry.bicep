@@ -23,7 +23,7 @@ param dedicatedDataPoint bool = true
 param zoneRedundancy string = 'Disabled'
 param ipRules array = []
 param existingIpRules array = []
-param exportEnabled string = 'disabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
+param exportEnabled string = 'enabled' // 'enabled' // 'disabled' GET https:: IMAGE_QUARANTINED: The image is quarantined
 param retentionDays int = 7 // days
 
 import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
@@ -119,8 +119,8 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
         type: 'Notary'
       }
       exportPolicy: {
-        //status: exportEnabled
-        status: enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet ? 'enabled' : 'disabled'
+        status: exportEnabled
+        // status: enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet ? 'enabled' : 'disabled'
       }
     }
     publicNetworkAccess: enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet?'Enabled': 'Disabled'
