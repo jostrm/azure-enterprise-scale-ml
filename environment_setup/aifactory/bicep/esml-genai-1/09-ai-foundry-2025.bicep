@@ -365,14 +365,24 @@ var aiFoundryZones = !enablePublicAccessWithPerimeter? [
 // Only create networkAcls when there are IP rules OR when public access is explicitly enabled
 var shouldCreateNetworkAcls = !empty(processedIpRules_remove32) || enablePublicGenAIAccess || enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet
 
-var networkAcls = shouldCreateNetworkAcls ? {
-  defaultAction: enablePublicGenAIAccess && empty(processedIpRules_remove32) ? 'Allow' : 'Deny'
-  virtualNetworkRules: [
+var networkAclVirtualNetworkRules = concat(
+  [
     {
       id: genaiSubnetId
-      ignoreMissingVnetServiceEndpoint: false
+      ignoreMissingVnetServiceEndpoint: true // keep true so service endpoint isn’t required
     }
-  ]
+  ],
+  !empty(aca2SubnetId) ? [
+    {
+      id: aca2SubnetId
+      ignoreMissingVnetServiceEndpoint: true
+    }
+  ] : []
+)
+
+var networkAcls = shouldCreateNetworkAcls ? {
+  defaultAction: enablePublicGenAIAccess && empty(processedIpRules_remove32) ? 'Allow' : 'Deny'
+  virtualNetworkRules: networkAclVirtualNetworkRules
   ipRules: empty(processedIpRules_remove32) ? [] : processedIpRules_remove32
 } : null
 
@@ -671,6 +681,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    allowedFqdnList: fqdn // Now properly filtered to exclude empty strings
     location: location
     foundryV22AccountOnly: foundryV22AccountOnly
     aiAccountName: aifV2Name
@@ -720,6 +731,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
+    allowedFqdnList: fqdn // Now properly filtered to exclude empty strings
     location: location
     foundryV22AccountOnly: foundryV22AccountOnly
     aiAccountName: aifV2Name

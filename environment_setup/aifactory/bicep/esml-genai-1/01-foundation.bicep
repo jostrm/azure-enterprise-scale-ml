@@ -58,6 +58,7 @@ param zoneSqlExists bool = false
 param zoneMongoExists bool = false
 param zoneRedisExists bool = false
 param zoneServicesAiExists bool = false
+param zoneAPIMExists bool = false
 
 var resourceExists = {
   miACA: miACAExists
@@ -618,6 +619,11 @@ var privateLinksDnsZonesArray = [
     id: privateLinksDnsZones.cosmosdbmongo.id
     exists: zoneMongoExists
   } // 2025-05-30: Added above in Common
+  {
+    name: privateLinksDnsZones.apim.name
+    id: privateLinksDnsZones.apim.id
+    exists: zoneAPIMExists
+  }
 ]
 
 // ============================================================================

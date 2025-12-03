@@ -402,7 +402,7 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-previ
   }
   properties: {
     allowProjectManagement: allowProjectManagement
-    defaultProject: defaultProjectName
+    //defaultProject: defaultProjectName
     customSubDomainName: customSubDomainName
     networkAcls: !empty(networkAcls ?? {})
       ? {
@@ -448,9 +448,9 @@ resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-previ
     migrationToken: migrationToken
     restore: restore
     restrictOutboundNetworkAccess: restrictOutboundNetworkAccess
-    userOwnedStorage: !empty(userOwnedStorage) ? userOwnedStorage : null // Accounting for [ ] not being a supported value
     dynamicThrottlingEnabled: dynamicThrottlingEnabled
     storedCompletionsDisabled:false
+    //userOwnedStorage: !empty(userOwnedStorage) ? userOwnedStorage : null // Accounting for [ ] not being a supported value
   }
 }
 

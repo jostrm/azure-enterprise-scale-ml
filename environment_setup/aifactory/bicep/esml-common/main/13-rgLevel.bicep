@@ -329,6 +329,10 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.mongo.cosmos.azure.com'
     name:'privatelink.mongo.cosmos.azure.com'
   }
+  apim: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net'
+    name:'privatelink.azure-api.net'
+  } 
 }
 
 // 20250211 NEW: [privatelink.services.ai.azure.com]
@@ -458,6 +462,10 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.cosmosdbmongo.name
     id: privateLinksDnsZones.cosmosdbmongo.id
+  }
+  {
+    name: privateLinksDnsZones.apim.name
+    id: privateLinksDnsZones.apim.id
   }
 ]
 

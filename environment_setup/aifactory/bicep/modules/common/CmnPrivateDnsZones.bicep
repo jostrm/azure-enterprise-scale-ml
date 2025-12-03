@@ -138,6 +138,10 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.mongo.cosmos.azure.com'
     name:'privatelink.mongo.cosmos.azure.com'
   }
+  apim: {
+    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azure-api.net'
+    name:'privatelink.azure-api.net'
+  } 
 }
 
 output privateLinksDnsZones object = privateLinksDnsZones

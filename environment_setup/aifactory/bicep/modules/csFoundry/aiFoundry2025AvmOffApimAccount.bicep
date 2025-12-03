@@ -11,6 +11,10 @@ param aiServices string = 'aiservices'
 @minLength(2)
 @maxLength(64)
 param aiAccountName string
+@description('Optional. List of allowed FQDN.')
+param allowedFqdnList array?
+@description('Optional. The API properties for special APIs.')
+param apiProperties object?
 
 @description('Timestamp used to generate deterministic resource names (format yyyyMMddHHmmss).')
 param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
@@ -144,14 +148,30 @@ var overrideAccountName = take(toLower(aiAccountName), 63)
 var accountName = length(overrideAccountName) >= 2 ? overrideAccountName : fallbackAccountName
 var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agentSubnetResourceId)
 
+
 var ipRules = [for ip in ipAllowList: {
   value: contains(ip, '/') ? toLower(ip) : '${toLower(ip)}/32'
 }]
-var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet
+var networkAclVirtualNetworkRules = concat(
+  !empty(privateEndpointSubnetResourceId) ? [
+    {
+      id: privateEndpointSubnetResourceId
+      ignoreMissingVnetServiceEndpoint: true // allow listed VNet without requiring service endpoint
+    }
+  ] : [],
+  agentNetworkInjectionEnabled ? [
+    {
+      id: agentSubnetResourceId
+      ignoreMissingVnetServiceEndpoint: true
+    }
+  ] : []
+)
+var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(networkAclVirtualNetworkRules)
 var networkAcls = hasNetworkAcls ? {
   defaultAction: enablePublicGenAIAccess && empty(ipRules) ? 'Allow' : 'Deny'
-  virtualNetworkRules: []
+  virtualNetworkRules: networkAclVirtualNetworkRules
   ipRules: ipRules
+  bypass:'AzureServices'
 } : null
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 
@@ -168,6 +188,9 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
     type: 'SystemAssigned'
   }
   properties: {
+    allowedFqdnList: allowedFqdnList
+    apiProperties: apiProperties
+    allowProjectManagement: true
     customSubDomainName: accountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess

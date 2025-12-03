@@ -9,7 +9,11 @@ param aiServices string = 'aiservices'
 
 @description('Optional override for the AI Services account name. When empty a unique name is generated.')
 param aiAccountName string = ''
+@description('Optional. List of allowed FQDN.')
+param allowedFqdnList array?
 
+@description('Optional. The API properties for special APIs.')
+param apiProperties object?
 @description('Timestamp used to generate deterministic resource names (format yyyyMMddHHmmss).')
 param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
 
@@ -187,11 +191,26 @@ var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agent
 var ipRules = [for ip in ipAllowList: {
   value: contains(ip, '/') ? toLower(ip) : '${toLower(ip)}/32'
 }]
-var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet
+var networkAclVirtualNetworkRules = concat(
+  !empty(privateEndpointSubnetResourceId) ? [
+    {
+      id: privateEndpointSubnetResourceId
+      ignoreMissingVnetServiceEndpoint: true // allow listed VNet without requiring service endpoint
+    }
+  ] : [],
+  agentNetworkInjectionEnabled ? [
+    {
+      id: agentSubnetResourceId
+      ignoreMissingVnetServiceEndpoint: true
+    }
+  ] : []
+)
+var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(networkAclVirtualNetworkRules)
 var networkAcls = hasNetworkAcls ? {
   defaultAction: enablePublicGenAIAccess && empty(ipRules) ? 'Allow' : 'Deny'
-  virtualNetworkRules: []
+  virtualNetworkRules: networkAclVirtualNetworkRules
   ipRules: ipRules
+  bypass:'AzureServices'
 } : null
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 
@@ -370,8 +389,10 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
     type: 'SystemAssigned'
   }
   properties: {
+    allowedFqdnList: allowedFqdnList
+    apiProperties: apiProperties
     allowProjectManagement: enableProject
-    defaultProject: enableProject ? projectName : null
+    //defaultProject: enableProject ? projectName : null
     customSubDomainName: accountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
