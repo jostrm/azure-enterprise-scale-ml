@@ -374,8 +374,8 @@ if ($(Get-AzContext).Subscription -ne "") {
                 genaiSubnetCidr   = '25'
                 aksSubnetCidr     = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 aks2SubnetCidr    = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
-                acaSubnetCidr     = '25' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
-                aca2SubnetCidr    = '24' # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment.
+                acaSubnetCidr     = '23' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
+                aca2SubnetCidr    = '23' # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment. Subnets smaller than /23 are rejected at provisioning time—the control plane can’t allocate enough addresses for the infrastructure scale sets—so the Cognitive Services RP keeps the account in Creating
                 dbxPubSubnetCidr  = '26' # 23-26
                 dbxPrivSubnetCidr = '26' # 23-26
             }

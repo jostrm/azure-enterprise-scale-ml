@@ -2,7 +2,7 @@ targetScope = 'resourceGroup'
 
 @description('Location for all resources.')
 param location string
-
+param foundryV22AccountOnly bool = false
 @description('Base name prefix for new AI Services resources when new resources are created.')
 @minLength(3)
 param aiServices string = 'aiservices'
@@ -137,8 +137,9 @@ param tags object = {}
 param aiAccountSku string = 'S0'
 
 var uniqueSuffix = substring(uniqueString('${resourceGroup().id}-${deploymentTimestamp}'), 0, 4)
-var baseAccountName = empty(aiAccountName) ? toLower('${aiServices}${uniqueSuffix}') : toLower(aiAccountName)
-var accountName = take(baseAccountName, 63)
+var fallbackAccountName = take(toLower('${aiServices}${uniqueSuffix}'), 63)
+var overrideAccountName = take(toLower(aiAccountName), 63)
+var accountName = length(overrideAccountName) >= 2 ? overrideAccountName : fallbackAccountName
 var projectName = toLower('${firstProjectName}${uniqueSuffix}')
 
 var storagePassedIn = !empty(azureStorageAccountResourceId)
@@ -357,7 +358,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = if (
 }
 
 #disable-next-line BCP036
-resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
+resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
   name: accountName
   kind: 'AIServices'
   location: location
@@ -388,6 +389,12 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
   }
 }
 
+resource aiAccountExisting 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(!foundryV22AccountOnly) {
+  name: length(accountName) >= 2 ? accountName : take('${accountName}aa', 63)
+}
+
+var aiAccountResourceId = foundryV22AccountOnly ? aiAccountCreate.id : aiAccountExisting.id
+
 resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = {
   name: '${accountName}/${defaultDeploymentName}'
   properties: {
@@ -402,7 +409,7 @@ resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
     capacity: modelCapacity
   }
   dependsOn: [
-    aiAccount
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
   ]
 }
 
@@ -418,7 +425,7 @@ resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/de
     capacity: modelCapacity
   }
   dependsOn: [
-    aiAccount
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
   ]
 }]
 
@@ -587,7 +594,7 @@ resource privateEndpointAccount 'Microsoft.Network/privateEndpoints@2024-05-01' 
       {
         name: '${take(accountName, 40)}-account'
         properties: {
-          privateLinkServiceId: aiAccount.id
+          privateLinkServiceId: aiAccountResourceId
           groupIds: [
             'account'
           ]
@@ -596,7 +603,7 @@ resource privateEndpointAccount 'Microsoft.Network/privateEndpoints@2024-05-01' 
     ]
   }
   dependsOn: [
-    aiAccount
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
   ]
 }
 
@@ -824,7 +831,7 @@ module projectModule 'aiFoundry2025project.bicep' = if (enableProject) {
     defaultProjectDescription: projectDescription
   }
   dependsOn: [
-    aiAccount
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
     privateEndpointAccount
     privateEndpointStorage
     ...(!storagePassedIn ? [storageAccountPrimary] : [])
@@ -894,7 +901,7 @@ module aiFoundryRbac 'aiFoundry2025rbac.bicep' = if (!empty(userRoleObjectIds) |
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    aiAccount
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
     ...(enableProject ? [projectModule] : [])
   ]
 }
@@ -910,7 +917,7 @@ module searchRbac 'rbacAISearchForAIFv2.bicep' = if (enableAISearch && searchInC
     searchIndexDataContributorRoleId: searchIndexDataContributorRoleId
   }
   dependsOn: [
-    aiAccount
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
     ...(enableProject ? [projectModule] : [])
     ...((enableAISearch && !searchPassedIn) ? [aiSearchService] : [])
   ]
@@ -928,7 +935,7 @@ module storageRbac 'rbacAIStorageAccountsForAIFv2.bicep' = if (storageInCurrentR
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [
-    aiAccount
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
     ...(!storagePassedIn ? [storageAccountPrimary] : [])
     ...(!storageSecondPassedIn ? [storageAccountSecondary] : [])
     ...(enableProject ? [projectModule] : [])
@@ -962,9 +969,9 @@ module caphostRbacPost 'aiFoundry2025caphostRbac2.bicep' = if (enableCapabilityH
   ]
 }
 
-var aiAccountId = aiAccount.id
-var aiAccountEndpoint = aiAccount.properties.endpoint
-var aiAccountPrincipalId = aiAccount.identity.principalId
+var aiAccountIdValue = aiAccountResourceId
+var aiAccountEndpointValue = !foundryV22AccountOnly ? reference(aiAccountResourceId, '2025-04-01-preview', 'full').endpoint : ''
+var aiAccountPrincipalIdValue = !foundryV22AccountOnly ? reference(aiAccountResourceId, '2025-04-01-preview', 'full').identity.principalId : ''
 
 var storageAccountSubscriptionId = storageSubscriptionId
 var storageAccountResourceGroup = storageResourceGroupName
@@ -983,16 +990,16 @@ var dnsZoneValidation = [
 ]
 
 @description('The name of the cognitive services account.')
-output aiAccountName string = accountName
+output aiAccountName string = !foundryV22AccountOnly? accountName : ''
 
 @description('The resource ID of the cognitive services account.')
-output aiAccountId string = aiAccountId
+output aiAccountId string =  !foundryV22AccountOnly? aiAccountIdValue : ''
 
 @description('The service endpoint of the cognitive services account.')
-output aiAccountEndpoint string = aiAccountEndpoint
+output aiAccountEndpoint string = !foundryV22AccountOnly? aiAccountEndpointValue : ''
 
 @description('The principal ID of the system assigned identity.')
-output aiAccountPrincipalId string = aiAccountPrincipalId
+output aiAccountPrincipalId string = !foundryV22AccountOnly? aiAccountPrincipalIdValue : ''
 
 @description('Indicates whether the default project was deployed.')
 output aiFoundryProjectDeployed bool = enableProject

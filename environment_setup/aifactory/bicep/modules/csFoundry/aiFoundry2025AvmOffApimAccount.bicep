@@ -2,7 +2,7 @@ targetScope = 'resourceGroup'
 
 @description('Location for all resources.')
 param location string
-
+param foundryV22AccountOnly bool = false
 @description('Base name prefix for new AI Services resources when new resources are created.')
 @minLength(3)
 param aiServices string = 'aiservices'
@@ -156,7 +156,7 @@ var networkAcls = hasNetworkAcls ? {
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 
 #disable-next-line BCP036
-resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
+resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
   name: accountName
   kind: 'AIServices'
   location: location
@@ -185,9 +185,9 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = {
   }
 }
 
-var aiAccountId = aiAccount.id
-var aiAccountEndpoint = aiAccount.properties.endpoint
-var aiAccountPrincipalId = aiAccount.identity.principalId
+var aiAccountId = foundryV22AccountOnly ? aiAccount.id : ''
+var aiAccountEndpoint = foundryV22AccountOnly ? aiAccount.properties.endpoint : ''
+var aiAccountPrincipalId = foundryV22AccountOnly? aiAccount.identity.principalId: ''
 
 @description('The name of the cognitive services account.')
 output aiAccountName string = accountName

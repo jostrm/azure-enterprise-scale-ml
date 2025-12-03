@@ -440,6 +440,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
   dependsOn: [
     spAndMI2ArrayModule
     namingConvention
+    subnetDelegationAca
   ]
 }
 
@@ -553,13 +554,14 @@ var aiFoundryDefinition = union(
 )
 
 // Subnet delegation for Container Apps
-var acaSubnetName = namingConvention.outputs.acaSubnetName
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists) && (enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection) && !foundryV22AccountOnly) {
+var aca2SubnetName = namingConvention.outputs.aca2SubnetName
+var requiresAcaDelegation = (!containerAppsEnvExists) && enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection && !foundryV22AccountOnly
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (requiresAcaDelegation) {
   name: take('09-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
     vnetName: vnetNameFull
-    subnetName: acaSubnetName
+    subnetName: aca2SubnetName
     location: location
     vnetResourceGroupName: vnetResourceGroupName
     delegations: [
@@ -674,7 +676,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     projectDescription: defaultProjectDescription
     displayName: defaultProjectName
     privateEndpointSubnetResourceId: genaiSubnetId
-    agentSubnetResourceId: (!disableAgentNetworkInjection && !empty(acaSubnetId)) ? acaSubnetId : ''
+    agentSubnetResourceId: (!disableAgentNetworkInjection && !empty(aca2SubnetId)) ? aca2SubnetId : ''
     disableAgentNetworkInjection: disableAgentNetworkInjection
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
@@ -708,6 +710,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     namingConvention
     spAndMI2ArrayModule
     CmnZones
+    subnetDelegationAca
   ]
 }
 
@@ -721,7 +724,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     projectDescription: defaultProjectDescription
     displayName: defaultProjectName
     privateEndpointSubnetResourceId: genaiSubnetId
-    agentSubnetResourceId: (!disableAgentNetworkInjection && !empty(acaSubnetId)) ? acaSubnetId : ''
+    agentSubnetResourceId: (!disableAgentNetworkInjection && !empty(aca2SubnetId)) ? aca2SubnetId : ''
     disableAgentNetworkInjection: disableAgentNetworkInjection
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
@@ -755,6 +758,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     namingConvention
     spAndMI2ArrayModule
     CmnZones
+    subnetDelegationAca
   ]
 }
 
@@ -773,7 +777,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     allowedFqdnList: fqdn // Now properly filtered to exclude empty strings
     restrictOutboundNetworkAccess: false // Agents need outbound access for various services such as AI Search, Key Vault, Storage, etc.
     publicNetworkAccess: enablePublicAccessWithPerimeter || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(processedIpRules_remove32) ? 'Enabled' : 'Disabled'
-    agentSubnetResourceId: acaSubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
+    agentSubnetResourceId: aca2SubnetId // Delegated to Microsoft.App/environment due to ContainerApps hosting agents.
     disableAgentNetworkInjection: enablePublicAccessWithPerimeter? true: disableAgentNetworkInjection
     allowProjectManagement: true
     defaultProjectName: defaultProjectName
@@ -812,7 +816,7 @@ module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(
     roleAssignmentsBuilder
     spAndMI2ArrayModule
     namingConvention
-    ...(!disableAgentNetworkInjection && !containerAppsEnvExists ? [subnetDelegationAca] : [])
+    subnetDelegationAca
   ]
 }
 
@@ -828,7 +832,7 @@ module aiFoundry2025Avm '../modules/csFoundry/aiFoundry2025AvmOn.bicep' = if(dep
     roleAssignmentsBuilder
     spAndMI2ArrayModule
     namingConvention
-    ...(!disableAgentNetworkInjection && !containerAppsEnvExists ? [subnetDelegationAca] : [])
+    subnetDelegationAca
   ]
 }
 resource aiFoundryAccountAvm 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = if(deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)) {
@@ -869,6 +873,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
       ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
       ...(!deployAvmFoundry && enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : [])
       ...(!deployAvmFoundry && (!enableAIFoundryV22 || foundryV22AccountOnly) ? [aiFoundry2025NoAvm] : [])
+      subnetDelegationAca
     ]
 }
 
@@ -897,6 +902,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     rbacAISearchForAIFv21 // Add..
     rbacAIStorageAccountsForAIFv21 // Add
     rbacProjectKeyVaultForAIFoundry // Add
+    subnetDelegationAca
   ]
 }
 
@@ -928,6 +934,7 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
       ? [aiFoundry2025Avm]
       : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     projectV21
+    subnetDelegationAca
   ]
 }
 
@@ -938,7 +945,10 @@ module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = i
     projectPrincipalId: projectPrincipal
     cosmosAccountName: namingConvention.outputs.cosmosDBName
   }
-  dependsOn: [projectV21]
+  dependsOn: [
+    projectV21
+    subnetDelegationAca
+  ]
 }
 
 // Sets RBAC roles: Search Service Contributor, Search Index Data Reader, Search Index Data Contributor on AI Search for the AI Foundry system-assigned identity
@@ -963,6 +973,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
       : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
+    subnetDelegationAca
   ]
 }
 
@@ -988,6 +999,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
       : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
+    subnetDelegationAca
   ]
 }
 
@@ -1011,6 +1023,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     projectV21  // CRITICAL: Must wait for project and all connections to be fully created
     rbacAISearchForAIFv21
     rbacAIStorageAccountsForAIFv21
+    subnetDelegationAca
   ]
 }
 
@@ -1022,6 +1035,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
   }
   dependsOn: [
     addProjectCapabilityHost
+    subnetDelegationAca
   ]
 }
 
@@ -1041,6 +1055,7 @@ module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = 
   dependsOn: [
     addProjectCapabilityHost
     formatProjectWorkspaceId
+    subnetDelegationAca
   ]
 }
 // END CAPHOST RBAC
@@ -1064,6 +1079,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(projectModuleEnabled ? [projectV21] : [])
+    subnetDelegationAca
   ]
 }
 
