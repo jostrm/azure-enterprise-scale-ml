@@ -671,6 +671,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
   name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     location: location
+    foundryV22AccountOnly: foundryV22AccountOnly
     aiAccountName: aifV2Name
     firstProjectName: defaultProjectName
     projectDescription: defaultProjectDescription
@@ -719,6 +720,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
   name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     location: location
+    foundryV22AccountOnly: foundryV22AccountOnly
     aiAccountName: aifV2Name
     firstProjectName: defaultProjectName
     projectDescription: defaultProjectDescription
