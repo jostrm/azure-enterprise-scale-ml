@@ -536,6 +536,11 @@ var aiFoundryDefinition = union(
       // blobPrivateDnsZoneResourceId: privateLinksDnsZones.blob.id // Disabled to prevent duplicate PE creation
       roleAssignments: []
     }
+    storageAccountSecondaryConfiguration: {
+      existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount2001Name)
+      // blobPrivateDnsZoneResourceId: privateLinksDnsZones.blob.id // Disabled to prevent duplicate PE creation
+      roleAssignments: []
+    }
   } : {},
   deployAvmFoundry && enableCosmosDB ? {
     cosmosDbConfiguration: {
@@ -692,6 +697,10 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     tags: tagsProject
     privateLinksDnsZones: privateLinksDnsZones
     apiManagementResourceId: apiManagementResourceId
+    azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
+    azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
+    azureCosmosDBAccountResourceId: enableCosmosDB ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
+    aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', namingConvention.outputs.safeNameAISearch) : ''
   }
   dependsOn: [
     existingTargetRG
