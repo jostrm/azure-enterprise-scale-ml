@@ -556,7 +556,7 @@ var aiFoundryDefinition = union(
 // Subnet delegation for Container Apps
 var aca2SubnetName = namingConvention.outputs.aca2SubnetName
 //var requiresAcaDelegation = (!containerAppsEnvExists) && enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection && !foundryV22AccountOnly
-var requiresAcaDelegation = enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection && !foundryV22AccountOnly
+var requiresAcaDelegation = enableAIFoundryV21 && !aiFoundryV2Exists && !disableAgentNetworkInjection
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (requiresAcaDelegation) {
   name: take('09-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
