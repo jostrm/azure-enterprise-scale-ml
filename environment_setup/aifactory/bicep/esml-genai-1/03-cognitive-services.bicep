@@ -173,9 +173,6 @@ param commonResourceGroup_param string = ''
 
 param aifactorySalt10char string = ''
 
-// AI Search specific settings
-param aiSearchEnableSharedPrivateLink bool = false
-
 // Override regions
 param serviceSettingOverrideRegionAzureAIVision string = ''
 param serviceSettingOverrideRegionAzureAIVisionShort string = ''
@@ -678,7 +675,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (ena
     semanticSearchTier: semanticSearchTier
     publicNetworkAccess: enablePublicGenAIAccess
     skuName: aiSearchSKUName
-    enableSharedPrivateLink: aiSearchEnableSharedPrivateLink
+    enableSharedPrivateLink: !empty(sharedPrivateLinksForAISearch)? true: false
     sharedPrivateLinks: sharedPrivateLinksForAISearch
     ipRules: empty(processedIpRulesAISearch) ? [] : processedIpRulesAISearch
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
