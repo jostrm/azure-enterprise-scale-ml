@@ -490,8 +490,8 @@ var aiFoundryNetworkingConfig = union({
   aiServicesPrivateDnsZoneResourceId: privateLinksDnsZones.servicesai.id
   cognitiveServicesPrivateDnsZoneResourceId: cognitiveServicesDnsZoneId
   openAiPrivateDnsZoneResourceId: openaiDnsZoneId
-}, (!disableAgentNetworkInjection && !empty(acaSubnetId)) ? {
-  agentServiceSubnetResourceId: acaSubnetId
+}, (!disableAgentNetworkInjection && !empty(aca2SubnetId)) ? {
+  agentServiceSubnetResourceId: aca2SubnetId
 } : {})
 
 var aiFoundryDefinitionBase = {
