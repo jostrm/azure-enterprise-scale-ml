@@ -677,9 +677,9 @@ var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ?
 
 var deployAvmFoundry = useAVMFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21)
 
-module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(foundryV22AccountOnly && enableAIFoundryV22 && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundryV21)) {
+module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOffApimAccount.bicep' = if(foundryV22AccountOnly && enableAIFoundryV22 && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundryV21)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
+  name: take('09-AifV22-NoAvmAccountOnly_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     allowedFqdnList: fqdn // Now properly filtered to exclude empty strings
     location: location

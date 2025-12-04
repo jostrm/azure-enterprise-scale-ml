@@ -341,6 +341,7 @@ resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
   ]
 }
 
+@batchSize(1)
 resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = [for (deployment, index) in extraModelDeployments: {
   name: '${accountName}/${take(string(deployment.name ?? 'deployment${index}'), 64)}'
   properties: {
@@ -354,6 +355,7 @@ resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/de
   }
   dependsOn: [
     ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
+    aiAccountDeployment
   ]
 }]
 
