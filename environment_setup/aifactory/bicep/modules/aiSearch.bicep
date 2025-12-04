@@ -12,6 +12,10 @@ import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types
 param managedIdentities managedIdentityAllType?
 
 param sharedPrivateLinks array = []
+param approveStorageSharedLinks bool = false
+param storageAccountNameForSharedLinks string = ''
+param approveAiServicesSharedLink bool = false
+param aiServicesNameForSharedLink string = ''
 
 //@allowed([
 //  'S0' // 'Free': Invalid SKU name
@@ -145,3 +149,54 @@ output dnsConfig array = [
     id:aiSearch.id
   }
 ]
+
+// Auto-approve shared private link requests when requested
+resource storageAccountForSharedLinks 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (approveStorageSharedLinks && enableSharedPrivateLink) {
+  name: storageAccountNameForSharedLinks
+}
+
+resource approveSharedPrivateLinkBlob 'Microsoft.Storage/storageAccounts/privateEndpointConnections@2024-01-01' = if (approveStorageSharedLinks && enableSharedPrivateLink) {
+  name: '${aiSearch.name}-shared-pe-0'
+  parent: storageAccountForSharedLinks
+  properties: {
+    privateLinkServiceConnectionState: {
+      status: 'Approved'
+      description: 'Approved during deployment'
+    }
+  }
+  dependsOn: [
+    aiSearch::sharedPrivateLinkResource[0]
+  ]
+}
+
+resource approveSharedPrivateLinkFile 'Microsoft.Storage/storageAccounts/privateEndpointConnections@2024-01-01' = if (approveStorageSharedLinks && enableSharedPrivateLink) {
+  name: '${aiSearch.name}-shared-pe-1'
+  parent: storageAccountForSharedLinks
+  properties: {
+    privateLinkServiceConnectionState: {
+      status: 'Approved'
+      description: 'Approved during deployment'
+    }
+  }
+  dependsOn: [
+    aiSearch::sharedPrivateLinkResource[1]
+  ]
+}
+
+resource aiServicesAccountForSharedLink 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (approveAiServicesSharedLink && enableSharedPrivateLink) {
+  name: aiServicesNameForSharedLink
+}
+
+resource approveSharedPrivateLinkAiServices 'Microsoft.CognitiveServices/accounts/privateEndpointConnections@2024-10-01' = if (approveAiServicesSharedLink && enableSharedPrivateLink) {
+  name: '${aiSearch.name}-shared-pe-2'
+  parent: aiServicesAccountForSharedLink
+  properties: {
+    privateLinkServiceConnectionState: {
+      status: 'Approved'
+      description: 'Approved during deployment'
+    }
+  }
+  dependsOn: [
+    aiSearch::sharedPrivateLinkResource[2]
+  ]
+}

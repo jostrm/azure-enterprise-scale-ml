@@ -642,6 +642,10 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (ena
     skuName: aiSearchSKUName
     enableSharedPrivateLink: !empty(sharedPrivateLinksForAISearch)? true: false
     sharedPrivateLinks: sharedPrivateLinksForAISearch
+    approveStorageSharedLinks: enableAISearchSharedPrivateLink
+    storageAccountNameForSharedLinks: enableAISearchSharedPrivateLink ? storageAccount2001Name : ''
+    approveAiServicesSharedLink: (enableAISearchSharedPrivateLink && enableAIServices)
+    aiServicesNameForSharedLink: (enableAISearchSharedPrivateLink && enableAIServices) ? aiServicesName : ''
     ipRules: empty(processedIpRulesAISearch) ? [] : processedIpRulesAISearch
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     managedIdentities: {
