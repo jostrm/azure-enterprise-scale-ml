@@ -25,6 +25,12 @@ param createPrivateEndpointsAIFactoryWay bool = true
 
 @description('Optional. Whether central DNS zone is managed by policy in hub.')
 param centralDnsZoneByPolicyInHub bool = false
+@description('Existing API Management resource ID (for optional private endpoint).')
+param apiManagementResourceId string = ''
+
+var apiManagementProvided = !empty(apiManagementResourceId)
+var apiManagementParts = apiManagementProvided ? split(apiManagementResourceId, '/') : split('', '/')
+var apiManagementName = apiManagementProvided ? last(apiManagementParts) : ''
 
 resource pendCogServiceAIF 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpointsAIFactoryWay) {
   name: '${cognitiveServiceName}-pend' //'${privateEndpointName}-2'
@@ -81,6 +87,50 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
   }
 }
 
+resource privateEndpointApiManagement 'Microsoft.Network/privateEndpoints@2024-05-01' = if (apiManagementProvided) {
+  name: '${take(apiManagementName, 40)}-pend'
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: privateEndpointSubnetRID
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${take(apiManagementName, 40)}-pend-nic'
+        properties: {
+          privateLinkServiceId: apiManagementResourceId
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
+          groupIds: [
+            'Gateway'
+          ]
+        }
+
+      }
+    ]
+  }
+  dependsOn: [
+    pendCogServiceAIF
+  ]
+}
+resource privateEndpointDnsAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay) {
+  name: '${privateEndpointApiManagement.name}DnsZone'
+  parent: privateEndpointApiManagement
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateLinksDnsZones.apim.name
+        properties:{
+          privateDnsZoneId: privateLinksDnsZones.apim.id
+        }
+      }
+    ]
+  }
+}
 @description('The name of the private endpoint.')
 output privateEndpointName string = createPrivateEndpointsAIFactoryWay ? pendCogServiceAIF.name : ''
 

@@ -283,99 +283,6 @@ var cosmosInCurrentRg = cosmosResourceGroupName == resourceGroup().name
 
 var defaultDeploymentName = take('${modelName}-${uniqueSuffix}', 64)
 
-resource storageAccountPrimary 'Microsoft.Storage/storageAccounts@2023-05-01' = if (!storagePassedIn) {
-  name: storageAccountName
-  location: location
-  tags: tags
-  sku: {
-    name: 'Standard_ZRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    minimumTlsVersion: 'TLS1_2'
-    allowBlobPublicAccess: false
-    allowSharedKeyAccess: false
-    publicNetworkAccess: 'Disabled'
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Deny'
-      virtualNetworkRules: []
-      ipRules: []
-    }
-  }
-}
-
-resource storageAccountSecondary 'Microsoft.Storage/storageAccounts@2023-05-01' = if (!storageSecondPassedIn) {
-  name: storageAccountNameSecondary
-  location: location
-  tags: tags
-  sku: {
-    name: 'Standard_ZRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    minimumTlsVersion: 'TLS1_2'
-    allowBlobPublicAccess: false
-    allowSharedKeyAccess: false
-    publicNetworkAccess: 'Disabled'
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Deny'
-      virtualNetworkRules: []
-      ipRules: []
-    }
-  }
-}
-
-resource aiSearchService 'Microsoft.Search/searchServices@2023-11-01' = if (enableAISearch && !searchPassedIn) {
-  name: aiSearchName
-  location: location
-  tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
-  sku: {
-    name: 'standard'
-  }
-  properties: {
-    disableLocalAuth: false
-    hostingMode: 'default'
-    publicNetworkAccess: 'disabled'
-    semanticSearch: 'disabled'
-    networkRuleSet: {
-      ipRules: []
-    }
-    encryptionWithCmk: {
-      enforcement: 'Unspecified'
-    }
-  }
-}
-
-resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = if (enableCosmosDb && !cosmosPassedIn) {
-  name: cosmosAccountName
-  location: location
-  tags: tags
-  kind: 'GlobalDocumentDB'
-  properties: {
-    databaseAccountOfferType: 'Standard'
-    consistencyPolicy: {
-      defaultConsistencyLevel: 'Session'
-    }
-    disableLocalAuth: true
-    enableAutomaticFailover: false
-    enableMultipleWriteLocations: false
-    enableFreeTier: false
-    publicNetworkAccess: 'Disabled'
-    locations: [
-      {
-        locationName: location
-        failoverPriority: 0
-        isZoneRedundant: false
-      }
-    ]
-  }
-}
-
 #disable-next-line BCP036
 resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
   name: accountName
@@ -450,392 +357,6 @@ resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/de
   ]
 }]
 
-resource aiServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (empty(string(existingDnsZones[aiServicesDnsZoneName])) && !centralDnsZoneByPolicyInHub && empty(servicesAiZoneFromLanding)) {
-  name: aiServicesDnsZoneName
-  location: 'global'
-}
-
-resource openAiDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (empty(string(existingDnsZones[openAiDnsZoneName])) && !centralDnsZoneByPolicyInHub && empty(openAiZoneFromLanding)) {
-  name: openAiDnsZoneName
-  location: 'global'
-}
-
-resource cognitiveServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (empty(string(existingDnsZones[cognitiveServicesDnsZoneName])) && !centralDnsZoneByPolicyInHub && empty(cognitiveServicesZoneFromLanding)) {
-  name: cognitiveServicesDnsZoneName
-  location: 'global'
-}
-
-resource searchDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (empty(string(existingDnsZones[searchDnsZoneName])) && !centralDnsZoneByPolicyInHub && empty(searchZoneFromLanding)) {
-  name: searchDnsZoneName
-  location: 'global'
-}
-
-resource storageDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (empty(string(existingDnsZones[storageDnsZoneName])) && !centralDnsZoneByPolicyInHub && empty(storageZoneFromLanding)) {
-  name: storageDnsZoneName
-  location: 'global'
-}
-
-resource cosmosDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (empty(string(existingDnsZones[cosmosDnsZoneName])) && !centralDnsZoneByPolicyInHub && empty(cosmosZoneFromLanding)) {
-  name: cosmosDnsZoneName
-  location: 'global'
-}
-
-resource apimDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = if (empty(string(existingDnsZones[apiManagementDnsZoneName])) && !centralDnsZoneByPolicyInHub && apiManagementProvided && empty(apiManagementZoneFromLanding)) {
-  name: apiManagementDnsZoneName
-  location: 'global'
-}
-
-resource aiServicesDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (!centralDnsZoneByPolicyInHub && empty(string(existingDnsZones[aiServicesDnsZoneName])) && empty(servicesAiZoneFromLanding)) {
-  name: '${aiServicesDnsZoneName}/${virtualNetworkName}-link'
-  properties: {
-    virtualNetwork: {
-      id: virtualNetworkId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    aiServicesDnsZone
-  ]
-}
-
-resource openAiDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (!centralDnsZoneByPolicyInHub && empty(string(existingDnsZones[openAiDnsZoneName])) && empty(openAiZoneFromLanding)) {
-  name: '${openAiDnsZoneName}/${virtualNetworkName}-link'
-  properties: {
-    virtualNetwork: {
-      id: virtualNetworkId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    openAiDnsZone
-  ]
-}
-
-resource cognitiveServicesDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (!centralDnsZoneByPolicyInHub && empty(string(existingDnsZones[cognitiveServicesDnsZoneName])) && empty(cognitiveServicesZoneFromLanding)) {
-  name: '${cognitiveServicesDnsZoneName}/${virtualNetworkName}-link'
-  properties: {
-    virtualNetwork: {
-      id: virtualNetworkId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    cognitiveServicesDnsZone
-  ]
-}
-
-resource searchDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (!centralDnsZoneByPolicyInHub && empty(string(existingDnsZones[searchDnsZoneName])) && empty(searchZoneFromLanding)) {
-  name: '${searchDnsZoneName}/${virtualNetworkName}-link'
-  properties: {
-    virtualNetwork: {
-      id: virtualNetworkId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    searchDnsZone
-  ]
-}
-
-resource storageDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (!centralDnsZoneByPolicyInHub && empty(string(existingDnsZones[storageDnsZoneName])) && empty(storageZoneFromLanding)) {
-  name: '${storageDnsZoneName}/${virtualNetworkName}-link'
-  properties: {
-    virtualNetwork: {
-      id: virtualNetworkId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    storageDnsZone
-  ]
-}
-
-resource cosmosDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (!centralDnsZoneByPolicyInHub && empty(string(existingDnsZones[cosmosDnsZoneName])) && empty(cosmosZoneFromLanding)) {
-  name: '${cosmosDnsZoneName}/${virtualNetworkName}-link'
-  properties: {
-    virtualNetwork: {
-      id: virtualNetworkId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    cosmosDnsZone
-  ]
-}
-
-resource apimDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (!centralDnsZoneByPolicyInHub && apiManagementProvided && empty(string(existingDnsZones[apiManagementDnsZoneName])) && empty(apiManagementZoneFromLanding)) {
-  name: '${apiManagementDnsZoneName}/${virtualNetworkName}-link'
-  properties: {
-    virtualNetwork: {
-      id: virtualNetworkId
-    }
-    registrationEnabled: false
-  }
-  dependsOn: [
-    apimDnsZone
-  ]
-}
-
-var aiAccountDnsConfigs = concat(
-  !empty(aiServicesDnsZoneId) && !centralDnsZoneByPolicyInHub ? [
-    {
-      name: 'aiservices'
-      properties: {
-        privateDnsZoneId: aiServicesDnsZoneId
-      }
-    }
-  ] : [],
-  !empty(openAiDnsZoneId) && !centralDnsZoneByPolicyInHub ? [
-    {
-      name: 'openai'
-      properties: {
-        privateDnsZoneId: openAiDnsZoneId
-      }
-    }
-  ] : [],
-  !empty(cognitiveServicesDnsZoneId) && !centralDnsZoneByPolicyInHub ? [
-    {
-      name: 'cognitiveservices'
-      properties: {
-        privateDnsZoneId: cognitiveServicesDnsZoneId
-      }
-    }
-  ] : []
-)
-
-resource privateEndpointAccount 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: '${take(accountName, 40)}-pe'
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: privateEndpointSubnetResourceId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: '${take(accountName, 40)}-account'
-        properties: {
-          privateLinkServiceId: aiAccountResourceId
-          groupIds: [
-            'account'
-          ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
-  ]
-}
-
-resource privateEndpointAccountDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && !empty(aiAccountDnsConfigs)) {
-  name: '${privateEndpointAccount.name}/cognitiveservices-dns'
-  properties: {
-    privateDnsZoneConfigs: aiAccountDnsConfigs
-  }
-}
-
-var storageAccountId = storagePassedIn ? azureStorageAccountResourceId : storageAccountPrimary.id
-var storageAccountSecondaryId = storageSecondPassedIn ? azureStorageAccountResourceIdSecondary : storageAccountSecondary.id
-var aiSearchResourceIdEffective = searchPassedIn ? aiSearchResourceId : (enableAISearch ? aiSearchService.id : '')
-var cosmosResourceIdEffective = cosmosPassedIn ? azureCosmosDBAccountResourceId : (enableCosmosDb ? cosmosAccount.id : '')
-
-resource privateEndpointStorage 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: '${take(storageAccountName, 40)}-blob-pe'
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: privateEndpointSubnetResourceId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: '${take(storageAccountName, 40)}-blob'
-        properties: {
-          privateLinkServiceId: storageAccountId
-          groupIds: [
-            'blob'
-          ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    privateEndpointAccount
-  ]
-}
-
-resource privateEndpointStorageDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub) {
-  name: '${privateEndpointStorage.name}/blob-dns'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'blob'
-        properties: {
-          privateDnsZoneId: storageDnsZoneId
-        }
-      }
-    ]
-  }
-}
-
-resource privateEndpointStorageSecondary 'Microsoft.Network/privateEndpoints@2024-05-01' = if (enableCapabilityHost) {
-  name: '${take(storageAccountNameSecondary, 40)}-blob-pe'
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: privateEndpointSubnetResourceId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: '${take(storageAccountNameSecondary, 40)}-blob'
-        properties: {
-          privateLinkServiceId: storageAccountSecondaryId
-          groupIds: [
-            'blob'
-          ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    privateEndpointStorage
-  ]
-}
-
-resource privateEndpointStorageSecondaryDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && enableCapabilityHost) {
-  name: '${privateEndpointStorageSecondary.name}/blob-dns'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'blob'
-        properties: {
-          privateDnsZoneId: storageDnsZoneId
-        }
-      }
-    ]
-  }
-}
-
-resource privateEndpointSearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if (enableAISearch) {
-  name: '${take(aiSearchName, 40)}-search-pe'
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: privateEndpointSubnetResourceId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: '${take(aiSearchName, 40)}-search'
-        properties: {
-          privateLinkServiceId: aiSearchResourceIdEffective
-          groupIds: [
-            'searchService'
-          ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    privateEndpointStorage
-  ]
-}
-
-resource privateEndpointSearchDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && enableAISearch) {
-  name: '${privateEndpointSearch.name}/search-dns'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'search'
-        properties: {
-          privateDnsZoneId: searchDnsZoneId
-        }
-      }
-    ]
-  }
-}
-
-resource privateEndpointCosmos 'Microsoft.Network/privateEndpoints@2024-05-01' = if (enableCosmosDb) {
-  name: '${take(cosmosAccountName, 40)}-cosmos-pe'
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: privateEndpointSubnetResourceId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: '${take(cosmosAccountName, 40)}-cosmos'
-        properties: {
-          privateLinkServiceId: cosmosResourceIdEffective
-          groupIds: [
-            'Sql'
-          ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    privateEndpointStorage
-  ]
-}
-
-resource privateEndpointCosmosDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && enableCosmosDb) {
-  name: '${privateEndpointCosmos.name}/cosmos-dns'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'cosmos'
-        properties: {
-          privateDnsZoneId: cosmosDnsZoneId
-        }
-      }
-    ]
-  }
-}
-
-resource privateEndpointApiManagement 'Microsoft.Network/privateEndpoints@2024-05-01' = if (apiManagementProvided) {
-  name: '${take(apiManagementName, 40)}-apim-pe'
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: privateEndpointSubnetResourceId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: '${take(apiManagementName, 40)}-apim'
-        properties: {
-          privateLinkServiceId: apiManagementResourceId
-          groupIds: [
-            'Gateway'
-          ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    privateEndpointStorage
-  ]
-}
-
-resource privateEndpointApiManagementDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && apiManagementProvided) {
-  name: '${privateEndpointApiManagement.name}/apim-dns'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'apim'
-        properties: {
-          privateDnsZoneId: apiManagementDnsZoneId
-        }
-      }
-    ]
-  }
-}
-
-
 module projectModule 'aiFoundry2025project.bicep' = if (enableProject) {
   name: take('aifoundry-project-${uniqueSuffix}', 64)
   params: {
@@ -853,16 +374,6 @@ module projectModule 'aiFoundry2025project.bicep' = if (enableProject) {
   }
   dependsOn: [
     ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
-    privateEndpointAccount
-    privateEndpointStorage
-    ...(!storagePassedIn ? [storageAccountPrimary] : [])
-    ...(!storageSecondPassedIn ? [storageAccountSecondary] : [])
-    ...((enableAISearch && !searchPassedIn) ? [aiSearchService] : [])
-    ...((enableCosmosDb && !cosmosPassedIn) ? [cosmosAccount] : [])
-    ...(enableAISearch ? [privateEndpointSearch] : [])
-    ...(enableCosmosDb ? [privateEndpointCosmos] : [])
-    ...(enableCapabilityHost ? [privateEndpointStorageSecondary] : [])
-    ...(apiManagementProvided ? [privateEndpointApiManagement] : [])
   ]
 }
 
@@ -890,10 +401,6 @@ module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost &&
   }
   dependsOn: [
     projectModule
-    privateEndpointAccount
-    privateEndpointStorage
-    ...(enableAISearch ? [privateEndpointSearch] : [])
-    ...(enableCosmosDb ? [privateEndpointCosmos] : [])
   ]
 }
 
@@ -940,7 +447,6 @@ module searchRbac 'rbacAISearchForAIFv2.bicep' = if (enableAISearch && searchInC
   dependsOn: [
     ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
     ...(enableProject ? [projectModule] : [])
-    ...((enableAISearch && !searchPassedIn) ? [aiSearchService] : [])
   ]
 }
 
@@ -957,8 +463,6 @@ module storageRbac 'rbacAIStorageAccountsForAIFv2.bicep' = if (storageInCurrentR
   }
   dependsOn: [
     ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
-    ...(!storagePassedIn ? [storageAccountPrimary] : [])
-    ...(!storageSecondPassedIn ? [storageAccountSecondary] : [])
     ...(enableProject ? [projectModule] : [])
   ]
 }
@@ -971,7 +475,6 @@ module caphostRbacPre 'aiFoundry2025caphostRbac1.bicep' = if (enableCapabilityHo
   }
   dependsOn: [
     projectModule
-    ...((enableCosmosDb && !cosmosPassedIn) ? [cosmosAccount] : [])
   ]
 }
 
@@ -985,8 +488,6 @@ module caphostRbacPost 'aiFoundry2025caphostRbac2.bicep' = if (enableCapabilityH
   }
   dependsOn: [
     capabilityHost
-    ...((enableCosmosDb && !cosmosPassedIn) ? [cosmosAccount] : [])
-    ...(!storagePassedIn ? [storageAccountPrimary] : [])
   ]
 }
 

@@ -644,7 +644,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (ena
     sharedPrivateLinks: sharedPrivateLinksForAISearch
     approveStorageSharedLinks: enableAISearchSharedPrivateLink
     storageAccountNameForSharedLinks: enableAISearchSharedPrivateLink ? storageAccount2001Name : ''
-    approveAiServicesSharedLink: (enableAISearchSharedPrivateLink && enableAIServices)
+    approveAiServicesSharedLink: false // need to be done last in pipeline...(enableAISearchSharedPrivateLink && enableAIServices)
     aiServicesNameForSharedLink: (enableAISearchSharedPrivateLink && enableAIServices) ? aiServicesName : ''
     ipRules: empty(processedIpRulesAISearch) ? [] : processedIpRulesAISearch
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter

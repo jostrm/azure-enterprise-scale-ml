@@ -16,6 +16,10 @@ param allowedFqdnList array?
 @description('Optional. The API properties for special APIs.')
 param apiProperties object?
 
+import { customerManagedKeyType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+@description('Optional. The customer managed key definition.')
+param customerManagedKey customerManagedKeyType?
+
 @description('Timestamp used to generate deterministic resource names (format yyyyMMddHHmmss).')
 param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
 
@@ -175,6 +179,26 @@ var networkAcls = hasNetworkAcls ? {
 } : null
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 
+resource cMKKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (!empty(customerManagedKey.?keyVaultResourceId)) {
+  name: last(split(customerManagedKey.?keyVaultResourceId!, '/'))
+  scope: resourceGroup(
+    split(customerManagedKey.?keyVaultResourceId!, '/')[2],
+    split(customerManagedKey.?keyVaultResourceId!, '/')[4]
+  )
+
+  resource cMKKey 'keys@2024-11-01' existing = if (!empty(customerManagedKey.?keyVaultResourceId) && !empty(customerManagedKey.?keyName)) {
+    name: customerManagedKey.?keyName!
+  }
+}
+
+resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2025-01-31-preview' existing = if (!empty(customerManagedKey.?userAssignedIdentityResourceId)) {
+  name: last(split(customerManagedKey.?userAssignedIdentityResourceId!, '/'))
+  scope: resourceGroup(
+    split(customerManagedKey.?userAssignedIdentityResourceId!, '/')[2],
+    split(customerManagedKey.?userAssignedIdentityResourceId!, '/')[4]
+  )
+}
+
 #disable-next-line BCP036
 resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
   name: accountName
@@ -205,6 +229,24 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
     ] : null
     restrictOutboundNetworkAccess: restrictOutboundNetworkAccess
     dynamicThrottlingEnabled: false
+    encryption: !empty(customerManagedKey)
+      ? {
+          keySource: 'Microsoft.KeyVault'
+          keyVaultProperties: {
+            identityClientId: !empty(customerManagedKey.?userAssignedIdentityResourceId ?? '')
+            #disable-next-line BCP318
+              ? cMKUserAssignedIdentity.properties.clientId
+              : null
+            #disable-next-line BCP318
+            keyVaultUri: cMKKeyVault.properties.vaultUri
+            keyName: customerManagedKey!.keyName
+            keyVersion: !empty(customerManagedKey.?keyVersion ?? '')
+              ? customerManagedKey!.?keyVersion
+              #disable-next-line BCP318
+              : last(split(cMKKeyVault::cMKKey.properties.keyUriWithVersion, '/'))
+          }
+        }
+      : null
   }
 }
 
