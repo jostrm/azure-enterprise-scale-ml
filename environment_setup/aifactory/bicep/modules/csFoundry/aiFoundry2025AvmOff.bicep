@@ -197,7 +197,7 @@ var hasSystemAssignedIdentity = (managedIdentities.?systemAssigned ?? false)
 
 var identityType = !empty(managedIdentities)
   ? (hasSystemAssignedIdentity && hasUserAssignedIdentities)
-    ? 'SystemAssigned,UserAssigned'
+    ? 'SystemAssigned, UserAssigned'
     : hasSystemAssignedIdentity
     ? 'SystemAssigned'
     : hasUserAssignedIdentities
@@ -206,7 +206,7 @@ var identityType = !empty(managedIdentities)
   : 'SystemAssigned'
 
 // Build identity object with conditional properties
-var identity = identityType == 'UserAssigned' || identityType == 'SystemAssigned,UserAssigned'
+var identity = identityType == 'UserAssigned' || identityType == 'SystemAssigned, UserAssigned'
   ? {
       type: identityType
       userAssignedIdentities: formattedUserAssignedIdentities
