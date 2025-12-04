@@ -55,7 +55,7 @@ param enableAISearch bool = true
 param cmk bool = false
 
 @description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
+param cmkKeyName string = ''
 
 @description('Enable Cosmos DB integration')
 param enableCosmosDB bool = false
@@ -1152,7 +1152,7 @@ var aiFoundryResourceIdOutput = useAVMFoundry
 
 // ============== AI FOUNDRY HUB ==============
 var customerManagedKey = cmk ? {
-  keyName: cmk_key_name
+  keyName: cmkKeyName
   keyVaultResourceId: resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault)
   userAssignedIdentityResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
 } : null
