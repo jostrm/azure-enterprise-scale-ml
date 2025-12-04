@@ -598,6 +598,7 @@ steps:
         [zonesql]="privatelink.database.windows.net"
         [zoneMongo]="privatelink.mongo.cosmos.azure.com"
         [zoneServicesAi]="privatelink.services.ai.azure.com"
+        [zoneAPIM]="privatelink.azure-api.net"
       )
 
       # Print variables for debugging before checking
@@ -1150,8 +1151,7 @@ steps:
      --parameters DEBUG_deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters tags='$(tags)' \
-     --parameters tagsProject='$(tagsProject)' \
-     --parameters addAISearch="$(addAISearch)" \
+     --parameters tagsProject='$(tagsProject)' \     
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
