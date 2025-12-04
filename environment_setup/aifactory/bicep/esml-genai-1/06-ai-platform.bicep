@@ -36,6 +36,7 @@ param addAIFoundryHub bool = false
 param enableAzureOpenAI bool = false
 param enableAISearch bool = false
 param enableAIServices bool = false
+param addAISearch bool = false
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
@@ -231,7 +232,36 @@ var aifV2ProjectName = namingConvention.outputs.aifV2Name
 var aifV2Name = namingConvention.outputs.aifV2PrjName
 
 // Optional dependencies: AI Search, AI Services
-var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+
+var cleanRandomValue = take(
+  !empty(randomValue)
+    ? toLower(replace(replace(randomValue, '-', ''), '_', ''))
+    : namingConvention.outputs.randomSalt,
+  2
+)
+
+var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
+  : ''
+
+var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? substring(
+      safeNameAISearchOrg,
+      max(length(safeNameAISearchOrg) - 3, 0),
+      min(3, length(safeNameAISearchOrg))
+    )
+  : ''
+
+var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(
+      addAISearch
+        ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
+        : safeNameAISearchOrg,
+      60
+    )
+  : ''
+
 var aiServicesName = enableAIServices? namingConvention.outputs.aiServicesName: ''
 
 // Common: AML, AI Fondry Hub

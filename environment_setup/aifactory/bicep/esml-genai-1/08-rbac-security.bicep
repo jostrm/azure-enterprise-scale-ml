@@ -107,7 +107,7 @@ param addAzureMachineLearning bool = false
 param enableAIFoundryV2 bool = false
 @description('Enable AI Foundry V21 deployment')
 param enableAIFoundryV21 bool = false
-
+param addAISearch bool = false
 @description('Enable AI Services deployment')
 param enableAIServices bool = false
 
@@ -262,37 +262,29 @@ var aiServicesName = namingConvention.outputs.aiServicesName
 var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}-${deploymentId}'
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
-var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
 var openAIName = namingConvention.outputs.aoaiName
 
-//var aifV2Name = namingConvention.outputs.aifV2Name
-//var twoNumbers = namingConvention.outputs.twoNumbers
-//var aifProjectName = namingConvention.outputs.aifProjectName
-//var amlName = namingConvention.outputs.amlName
-//var dashboardInsightsName = namingConvention.outputs.dashboardInsightsName
-//var applicationInsightName = namingConvention.outputs.applicationInsightName
-//var bingName = namingConvention.outputs.bingName
-//var containerAppsEnvName = namingConvention.outputs.containerAppsEnvName
-//var containerAppAName = namingConvention.outputs.containerAppAName
-//var containerAppWName = namingConvention.outputs.containerAppWName
-//var cosmosDBName = namingConvention.outputs.cosmosDBName
-//var functionAppName = namingConvention.outputs.functionAppName
-//var webAppName = namingConvention.outputs.webAppName
-//var funcAppServicePlanName = namingConvention.outputs.funcAppServicePlanName
-//var webbAppServicePlanName = namingConvention.outputs.webbAppServicePlanName
-//var keyvaultName = namingConvention.outputs.keyvaultName
-//var acrProjectName = namingConvention.outputs.acrProjectName
-//var redisName = namingConvention.outputs.redisName
-//var postgreSQLName = namingConvention.outputs.postgreSQLName
-//var sqlServerName = namingConvention.outputs.sqlServerName
-//var sqlDBName = namingConvention.outputs.sqlDBName
-//var vmName = namingConvention.outputs.vmName
-//var aifName = namingConvention.outputs.aifName
-//var aifPrjName = namingConvention.outputs.aifPrjName
-//var miACAName = namingConvention.outputs.miACAName
-//var miPrjName = namingConvention.outputs.miPrjName
-//var acrCommonName = namingConvention.outputs.acrCommonName
-//var laWorkspaceName = namingConvention.outputs.laWorkspaceName
+var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
+  : ''
+
+var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? substring(
+      safeNameAISearchOrg,
+      max(length(safeNameAISearchOrg) - 3, 0),
+      min(3, length(safeNameAISearchOrg))
+    )
+  : ''
+
+var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(
+      addAISearch
+        ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
+        : safeNameAISearchOrg,
+      60
+    )
+  : ''
 
 // ============================================================================
 // Resource definitions
@@ -369,7 +361,13 @@ var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0
 
 // ============== SHARED NAMING VARIABLES ==============
 // Shared random value processing for dynamic naming (matches CmnAIfactoryNaming.bicep)
-var cleanRandomValue = toLower(replace(replace(randomSalt, '-', ''), '_', ''))
+var cleanRandomValue = take(
+  !empty(randomValue)
+    ? toLower(replace(replace(randomValue, '-', ''), '_', ''))
+    : namingConvention.outputs.randomSalt,
+  2
+)
+
 var aifRandom = take(cleanRandomValue,2)
 
 // ============== AML Principal ID ==============

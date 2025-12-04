@@ -140,6 +140,7 @@ param technicalAdminsEmail string = ''
 param subscriptionIdDevTestProd string = subscription().subscriptionId
 param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
+param addAISearch bool = false
 
 // Seeding Key Vault parameters
 param inputKeyvault string
@@ -417,12 +418,34 @@ var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader - for resour
 @description('RBAC Security Phase 7 deployment completed successfully')
 output rbacSecurityPhaseCompleted bool = true
 
+var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
+  : ''
+
+var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? substring(
+      safeNameAISearchOrg,
+      max(length(safeNameAISearchOrg) - 3, 0),
+      min(3, length(safeNameAISearchOrg))
+    )
+  : ''
+
+var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(
+      addAISearch
+        ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
+        : safeNameAISearchOrg,
+      60
+    )
+  : ''
+
 // Get AI Search principal ID conditionally
 module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearch && !foundryV22AccountOnly) {
   name: take('09-getAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
-    aiSearchName: namingConvention.outputs.safeNameAISearch
+    aiSearchName: aiSearchName
   }
 }
 
@@ -532,7 +555,7 @@ var aiFoundryDefinition = union(
   aiFoundryDefinitionBase,
   deployAvmFoundry && enableAISearch ? {
     aiSearchConfiguration: {
-      existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', namingConvention.outputs.safeNameAISearch)
+      existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName)
       // privateDnsZoneResourceId: privateLinksDnsZones.searchService.id // Disabled to prevent duplicate PE creation
       roleAssignments: []
     }
@@ -616,7 +639,7 @@ var fqdnRaw = [
   '${namingConvention.outputs.storageAccount2001Name}.queue.${environment().suffixes.storage}'
   
   // AI Search endpoint (conditionally included)
-  enableAISearch ? '${namingConvention.outputs.safeNameAISearch}.search.windows.net' : ''
+  enableAISearch ? '${aiSearchName}.search.windows.net' : ''
   
   // Key Vault endpoint
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
@@ -716,7 +739,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
     azureCosmosDBAccountResourceId: enableCosmosDB ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
-    aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', namingConvention.outputs.safeNameAISearch) : ''
+    aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
   }
   dependsOn: [
     existingTargetRG
@@ -766,7 +789,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
     azureCosmosDBAccountResourceId: enableCosmosDB ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
-    aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', namingConvention.outputs.safeNameAISearch) : ''
+    aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
   }
   dependsOn: [
     existingTargetRG
@@ -879,7 +902,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
     storageName2: namingConvention.outputs.storageAccount2001Name
     #disable-next-line BCP318
     aiFoundryV2Name: aiFoundryAccountNameOutput
-    aiSearchName: enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
+    aiSearchName: enableAISearch ? aiSearchName : ''
     cosmosDBname: enableCosmosDB? namingConvention.outputs.cosmosDBName : ''
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     }
@@ -975,7 +998,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    aiSearchName: namingConvention.outputs.safeNameAISearch
+    aiSearchName: aiSearchName
     aiFoundryAccountName: aifV2Name
     projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     searchServiceContributorRoleId: searchServiceContributorRoleId
@@ -1031,7 +1054,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     #disable-next-line BCP318
     azureStorageConnection: namingConvention.outputs.storageAccount1001Name
     #disable-next-line BCP318
-    aiSearchConnection: namingConvention.outputs.safeNameAISearch
+    aiSearchConnection: aiSearchName
     projectCapHostName: projectCapHostName
   }
   dependsOn: [

@@ -38,6 +38,7 @@ param enableAFoundryCaphost bool = false
 @description('Enable AI Foundry V2.1')
 param enableAIFoundryV21 bool = false
 param enableAISearchSharedPrivateLink bool = true
+param addAISearch bool = false
 
 @description('AI Factory version information')
 param aifactoryVersionMajor int = 1
@@ -281,18 +282,41 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var genaiName = namingConvention.outputs.genaiName
 var aoaiName = namingConvention.outputs.aoaiName
-var safeNameAISearch = namingConvention.outputs.safeNameAISearch
+var safeNameAISearchOrg = enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
 var aiServicesName = namingConvention.outputs.aiServicesName
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var miACAName = namingConvention.outputs.miACAName
 var miPrjName = namingConvention.outputs.miPrjName
-//var p011_genai_team_lead_email_array = namingConvention.outputs.p011_genai_team_lead_email_array
-//var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
-//var aksSubnetName = namingConvention.outputs.aksSubnetName
-//var acaSubnetName = namingConvention.outputs.acaSubnetName
-//var randomSalt = namingConvention.outputs.randomSalt
+
+var cleanRandomValue = take(
+  !empty(randomValue)
+    ? toLower(replace(replace(randomValue, '-', ''), '_', ''))
+    : namingConvention.outputs.randomSalt,
+  2
+)
+
+var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
+  : ''
+
+var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? substring(
+      safeNameAISearchOrg,
+      max(length(safeNameAISearchOrg) - 3, 0),
+      min(3, length(safeNameAISearchOrg))
+    )
+  : ''
+
+var safeNameAISearch = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(
+      addAISearch
+        ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
+        : safeNameAISearchOrg,
+      60
+    )
+  : ''
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []

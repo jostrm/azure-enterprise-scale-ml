@@ -103,6 +103,7 @@ param enableWebApp bool = false
 param enableAzureOpenAI bool = false
 param enableAISearch bool = false
 param enableAIServices bool = false
+param addAISearch bool = false
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
@@ -333,7 +334,7 @@ var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var acrProjectName = namingConvention.outputs.acrProjectName
 var acrCommonName = namingConvention.outputs.acrCommonName
-var aiSearchName = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
 var aoaiName = enableAzureOpenAI? namingConvention.outputs.aoaiName: ''
 var aiServicesName = enableAIServices? namingConvention.outputs.aiServicesName: ''
 var bingName = namingConvention.outputs.bingName
@@ -341,6 +342,35 @@ var applicationInsightName = namingConvention.outputs.applicationInsightName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var keyvaultName = namingConvention.outputs.keyvaultName
 
+// AI Search name construction
+var cleanRandomValue = take(
+  !empty(randomValue)
+    ? toLower(replace(replace(randomValue, '-', ''), '_', ''))
+    : namingConvention.outputs.randomSalt,
+  2
+)
+
+var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
+  : ''
+
+var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? substring(
+      safeNameAISearchOrg,
+      max(length(safeNameAISearchOrg) - 3, 0),
+      min(3, length(safeNameAISearchOrg))
+    )
+  : ''
+
+var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(
+      addAISearch
+        ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
+        : safeNameAISearchOrg,
+      60
+    )
+  : ''
+  
 // AI Foundry Hub
 var aifV1HubName = namingConvention.outputs.aifV1HubName
 var aifV1ProjectName = namingConvention.outputs.aifV1ProjectName
@@ -392,7 +422,7 @@ var fqdnRaw = [
   '${namingConvention.outputs.storageAccount2001Name}.queue.${environment().suffixes.storage}'
   
   // AI Search endpoint (conditionally included)
-  enableAISearch ? '${namingConvention.outputs.safeNameAISearch}.search.windows.net' : ''
+  enableAISearch ? '${aiSearchName}.search.windows.net' : ''
   
   // Key Vault endpoint
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
