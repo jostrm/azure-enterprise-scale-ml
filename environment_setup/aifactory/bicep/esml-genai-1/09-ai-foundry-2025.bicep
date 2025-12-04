@@ -694,7 +694,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
     ipAllowList: filteredIpWhitelist_array
-    enableCapabilityHost: false // account-only pass skips capability host orchestration
+    enableCapabilityHost: enableCaphost
     projectCapHost: projectCapHostName
     userRoleObjectIds: p011_genai_team_lead_array
     servicePrincipalIds: spAndMiArray
@@ -705,9 +705,9 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     modelVersion: defaultModelVersionV22
     modelSkuName: defaultModelSkuNameV22
     modelCapacity: defaultModelCapacityV22
-    enableCosmosDb: false // delay Cosmos wiring until full deployment run
-    enableAISearch: false // defer AI Search integration to second deployment
-    enableProject: false // prevent project creation in account-only run
+    enableCosmosDb: enableCosmosDB
+    enableAISearch: enableAISearch
+    enableProject: enableAIFactoryCreatedDefaultProjectForAIFv2
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     restrictOutboundNetworkAccess: false
     tags: tagsProject
