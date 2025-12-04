@@ -53,7 +53,7 @@ param acrRGName string
 param cmk bool = false
 
 @description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
+param cmkKeyName string = ''
 
 var aiFactoryNumber = substring(aifactorySuffix,1,3) // -001 to 001
 var privateDnsZoneName =  {
@@ -202,7 +202,7 @@ resource aiHub2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview
       }
       keyVaultProperties: {
         keyVaultArmId: keyVault.id
-        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmkKeyName}'
         identityClientId: ''
       }
     } : null
@@ -342,7 +342,7 @@ resource aiProject2 'Microsoft.MachineLearningServices/workspaces@2025-07-01-pre
       }
       keyVaultProperties: {
         keyVaultArmId: keyVault.id
-        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmkKeyName}'
         identityClientId: ''
       }
     } : null
@@ -476,7 +476,7 @@ resource aiHub 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'
       }
       keyVaultProperties: {
         keyVaultArmId: keyVault.id
-        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmkKeyName}'
         identityClientId: ''
       }
     } : null
@@ -604,7 +604,7 @@ resource aiProject 'Microsoft.MachineLearningServices/workspaces@2025-07-01-prev
       }
       keyVaultProperties: {
         keyVaultArmId: keyVault.id
-        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmk_key_name}'
+        keyIdentifier: '${keyVault.properties.vaultUri}keys/${cmkKeyName}'
         identityClientId: ''
       }
     } : null

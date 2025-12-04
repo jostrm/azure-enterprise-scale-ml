@@ -1202,7 +1202,7 @@ steps:
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters cmkKeyName="$(cmkKeyName)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
@@ -1311,7 +1311,7 @@ steps:
      --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
      --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
      --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters cmkKeyName="$(cmkKeyName)" \
      --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
@@ -1378,7 +1378,7 @@ steps:
      --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
      --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
      --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters cmkKeyName="$(cmkKeyName)" \
      --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
@@ -1538,7 +1538,7 @@ steps:
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters cmkKeyName="$(cmkKeyName)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1612,7 +1612,7 @@ steps:
      --parameters aksOutboundType="$(aksOutboundType)" \
      --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)" \
      --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)"
+     --parameters cmkKeyName="$(cmkKeyName)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '68-integration'
@@ -1828,7 +1828,7 @@ steps:
      --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
      --parameters foundryV22AccountOnly="true" \
      --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)"
+     --parameters cmkKeyName="$(cmkKeyName)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025'
@@ -1909,7 +1909,7 @@ steps:
      --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
      --parameters foundryV22AccountOnly="false" \
      --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)"
+     --parameters cmkKeyName="$(cmkKeyName)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'

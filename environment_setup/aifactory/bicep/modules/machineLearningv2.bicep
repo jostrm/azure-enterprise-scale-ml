@@ -50,7 +50,7 @@ param tags object
 param cmk bool = false
 
 @description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
+param cmkKeyName string = ''
 @description('(Required) Specifies the private endpoint name')
 param privateEndpointName string
 @description('(Required) Specifies the virtual network id associated with private endpoint')
@@ -175,7 +175,7 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
       }
       keyVaultProperties: {
         keyVaultArmId: existingKeyvault.id
-        keyIdentifier: '${existingKeyvault.properties.vaultUri}keys/${cmk_key_name}'
+        keyIdentifier: '${existingKeyvault.properties.vaultUri}keys/${cmkKeyName}'
         identityClientId: ''
       }
     } : null
@@ -236,7 +236,7 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
       }
       keyVaultProperties: {
         keyVaultArmId: existingKeyvault.id
-        keyIdentifier: '${existingKeyvault.properties.vaultUri}keys/${cmk_key_name}'
+        keyIdentifier: '${existingKeyvault.properties.vaultUri}keys/${cmkKeyName}'
         identityClientId: ''
       }
     } : null
@@ -293,11 +293,11 @@ var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // aks001-weu-prod 
 var aksResourceId = resourceId('Microsoft.ContainerService/managedClusters', aksName)
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 var desName = 'des-${name}'
-var desKeyName = '${cmk_key_name}-des'
+var desKeyName = '${cmkKeyName}-des'
 
 // ============== AKS CMK: Disk Encryption Set Configuration ==============
 // Create Key Vault key specifically for Disk Encryption Set
-module aksDesKey 'keyVaultKey.bicep' = if (cmk && !empty(cmk_key_name) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
+module aksDesKey 'keyVaultKey.bicep' = if (cmk && !empty(cmkKeyName) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
   name: take('AKS-DES-Key-${uniqueDepl}', 64)
   params: {
     keyVaultName: kvName
@@ -314,7 +314,7 @@ module aksDesKey 'keyVaultKey.bicep' = if (cmk && !empty(cmk_key_name) && !aksEx
 }
 
 // Create Disk Encryption Set with SystemAssigned identity
-module aksDiskEncryptionSet 'diskEncryptionSet.bicep' = if (cmk && !empty(cmk_key_name) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
+module aksDiskEncryptionSet 'diskEncryptionSet.bicep' = if (cmk && !empty(cmkKeyName) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
   name: take('AKS-DES-${uniqueDepl}', 64)
   params: {
     desName: desName
@@ -330,7 +330,7 @@ module aksDiskEncryptionSet 'diskEncryptionSet.bicep' = if (cmk && !empty(cmk_ke
 
 // Grant DES identity 'Key Vault Crypto Service Encryption User' role on Key Vault
 // Role ID: e147488a-f6f5-4113-8e2d-b22465e65bf6
-module aksDesKvRbac 'kvRbacSingleAssignment.bicep' = if (cmk && !empty(cmk_key_name) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
+module aksDesKvRbac 'kvRbacSingleAssignment.bicep' = if (cmk && !empty(cmkKeyName) && !aksExists && !empty(aksSubnetId) && enableAksForAzureML) {
   name: take('AKS-DES-RBAC-${uniqueDepl}', 64)
   params: {
     keyVaultName: kvName
@@ -363,7 +363,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
     outboundType: aksOutboundType
     privateDNSZone: aksPrivateDNSZone
     cmk: cmk
-    diskEncryptionSetID: cmk && !empty(cmk_key_name) ? aksDiskEncryptionSet!.outputs.desId : ''
+    diskEncryptionSetID: cmk && !empty(cmkKeyName) ? aksDiskEncryptionSet!.outputs.desId : ''
     agentPoolProfiles: [
       {
         name: toLower('agentpool')
@@ -381,7 +381,7 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
     ]
   }
   dependsOn: [
-    ...(cmk && !empty(cmk_key_name) ? [aksDesKvRbac] : [])
+    ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])
   ]
 }
 
@@ -403,7 +403,7 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
     outboundType: aksOutboundType
     privateDNSZone: aksPrivateDNSZone
     cmk: cmk
-    diskEncryptionSetID: cmk && !empty(cmk_key_name) ? aksDiskEncryptionSet!.outputs.desId : ''
+    diskEncryptionSetID: cmk && !empty(cmkKeyName) ? aksDiskEncryptionSet!.outputs.desId : ''
     agentPoolProfiles: [
       {
         name: 'agentpool'
@@ -420,7 +420,7 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
     ]
   }
   dependsOn: [
-    ...(cmk && !empty(cmk_key_name) ? [aksDesKvRbac] : [])
+    ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])
   ]
 }
 

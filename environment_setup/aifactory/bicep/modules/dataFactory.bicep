@@ -28,7 +28,7 @@ param enablePublicAccessWithPerimeter bool = false
 param cmk bool = false
 
 @description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
+param cmkKeyName string = ''
 
 @description('URI of the Key Vault for CMK')
 param keyVaultUri string = ''
@@ -72,7 +72,7 @@ resource adf 'Microsoft.DataFactory/factories@2018-06-01' = {
       identity: {
         userAssignedIdentity: managedIdentities!.userAssignedResourceIds![0]
       }
-      keyName: cmk_key_name
+      keyName: cmkKeyName
       keyVersion: ''
       vaultBaseUrl: keyVaultUri
     } : null

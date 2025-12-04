@@ -576,7 +576,7 @@ module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking
     tags: tags
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     cmk: cmk
-    cmk_key_name: cmk ? cmkKeyName : ''
+    cmkKeyName: cmk ? cmkKeyName : ''
     keyVaultUri: cmk ? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri : ''
     managedIdentities: {
       systemAssigned: true

@@ -45,7 +45,7 @@ param diagnosticSettingLevel string = 'silver'
 param cmk bool = false
 
 @description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
+param cmkKeyName string = ''
 
 // AI Models deployment parameters
 @description('Whether to deploy GPT-X model')
@@ -406,7 +406,7 @@ module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enable
     aiHubExists:aiHubExists
     location: location
     cmk: cmk
-    cmk_key_name: cmk_key_name
+    cmkKeyName: cmkKeyName
     env: env
     tags: tagsProject
     aifactorySuffix: aifactorySuffixRG

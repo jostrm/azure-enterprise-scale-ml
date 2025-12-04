@@ -68,7 +68,7 @@ param subscriptionIdDevTestProd string
 param cmk bool = false
 
 @description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
+param cmkKeyName string = ''
 
 // ============================================================================
 // PS-Networking: Needs to be here, even if not used, since .JSON file
@@ -400,7 +400,7 @@ module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && en
       systemAssigned: true
     }
     cmk: cmk
-    cmk_key_name: cmk_key_name
+    cmkKeyName: cmkKeyName
     keyVaultUri: externalKv.properties.vaultUri
   }
 }
@@ -417,7 +417,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
       systemAssigned: true
     }
     cmk: cmk
-    cmk_key_name: cmk_key_name
+    cmkKeyName: cmkKeyName
     aksExists:aksExists
     aksOutboundType: aksOutboundType
     aksPrivateDNSZone: aksPrivateDNSZone

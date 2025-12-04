@@ -122,7 +122,7 @@
         "description": "Enable Customer Managed Keys (CMK) encryption"
       }
     },
-    "cmk_key_name": {
+    "cmkKeyName": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
@@ -4716,7 +4716,7 @@
           "centralDnsZoneByPolicyInHub": {
             "value": "[parameters('centralDnsZoneByPolicyInHub')]"
           },
-          "customerManagedKey": "[if(parameters('cmk'), createObject('value', createObject('keyName', parameters('cmk_key_name'), 'keyVaultResourceId', resourceId(parameters('inputKeyvaultSubscription'), parameters('inputKeyvaultResourcegroup'), 'Microsoft.KeyVault/vaults', parameters('inputKeyvault')), 'userAssignedIdentityResourceId', resourceId(parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup'), 'Microsoft.ManagedIdentity/userAssignedIdentities', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.miPrjName.value))), createObject('value', null()))]"
+          "customerManagedKey": "[if(parameters('cmk'), createObject('value', createObject('keyName', parameters('cmkKeyName'), 'keyVaultResourceId', resourceId(parameters('inputKeyvaultSubscription'), parameters('inputKeyvaultResourcegroup'), 'Microsoft.KeyVault/vaults', parameters('inputKeyvault')), 'userAssignedIdentityResourceId', resourceId(parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup'), 'Microsoft.ManagedIdentity/userAssignedIdentities', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.miPrjName.value))), createObject('value', null()))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -34213,7 +34213,7 @@
             "value": "[parameters('inputKeyvault')]"
           },
           "keyName": {
-            "value": "[parameters('cmk_key_name')]"
+            "value": "[parameters('cmkKeyName')]"
           },
           "kty": {
             "value": "RSA"

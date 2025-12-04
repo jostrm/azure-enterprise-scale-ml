@@ -31,7 +31,7 @@ variables:
   admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   
   cmk: "false" # Enable Customer Managed Keys (CMK) for Storage Accounts, etc.
-  cmk_key_name: "esml-cmk-key" # Common key name for all services in this environment
+  cmkKeyName: "esml-cmk-key" # Common key name for all services in this environment
 
   # SEEDING KEYVAULT: One global (same values for all tripples), or one per environment (different values for dev,test,prod)
   dev_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
