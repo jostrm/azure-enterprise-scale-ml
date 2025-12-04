@@ -38,7 +38,7 @@ param resourceSuffix string
 @description('Enable AI Foundry 2 features')
 param enableAIFoundryV2 bool = false
 param enableAIFoundryV21 bool = false
-param enableAIFoundryV22 bool = true
+param enableAIFoundryV22 bool = false // TODO
 param foundryV22AccountOnly bool = false
 
 @description('Diagnostic setting level for monitoring and logging')
