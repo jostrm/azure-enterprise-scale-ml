@@ -197,8 +197,6 @@ variables:
   #   Example: the 'a4c2b'in "adf-cmn-weu-dev-a4c2b-001" and in Container registry, private endpoints: "pend-kv-cmndev-a4c2b-001-to-vnt-esmlcmn"
   # Usage: aifactory_salt will be used in Project resource groups 'abcde' for resources such as Managed Identity  'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
   # ============================================================================
-  
-  cmk: "false" # Customer Managed Key encryption for Keyvault, Storage accounts, etc.  true, enable CMK. false, use platform managed keys.
   aifactory_salt: "" # 5 characters.  A deteministic unique value, from COMMON RG
 
   # ============================================================================
@@ -213,7 +211,13 @@ variables:
   # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
   
+  # === CMK - Customer Managed Key for encryption at rest, for all services that supports CMK ===
+  cmk: "false" # Customer Managed Key encryption for Keyvault, Storage accounts, etc.  true, enable CMK. false, use platform managed keys.
+  cmkKeyName: "aifactory-cmk-key" # Name of the Key in Keyvault to be used for CMK encryption
+
+  # === Keyvault RBAC ===
   updateKeyvaultRbac: "false" # true, enables you to update RBAC properties running the pipeline twice. false means "CreateIfNotExists"  
+
   # === AI Foundry 2023-2025+ ===
   enableAIServices: "true" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
   enableAIFoundryHub: "true" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
@@ -228,6 +232,8 @@ variables:
   disableAgentNetworkInjection: "false" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
   # NetworkInjection -> Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
+  
+  # === API AI Gateway from Microsoft Foundry V22 ===
   foundryApiManagementResourceId: "" # Optional, provide an existing API Management resource ID to integrate with Microsoft Foundry V22
 
   # === Data & Machine Learning ===
