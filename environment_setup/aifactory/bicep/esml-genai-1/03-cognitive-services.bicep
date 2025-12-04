@@ -622,8 +622,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
   }
   dependsOn: [
     projectResourceGroupExists
-    ...(cmk ? [cmkKey] : [])
-    ...(cmk ? [cmkRbac] : [])
   ]
 }
 
