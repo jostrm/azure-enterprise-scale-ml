@@ -394,10 +394,18 @@ steps:
       # Set registry name for cleanup task
       echo "##vso[task.setvariable variable=acr_registry_name]$registryName"
 
+      # Configure ACR export policy using REST API
+      echo "Enabling ACR export policy"
+      acrResourceGroup=$(az acr show --name $registryName --query resourceGroup -o tsv)
+      echo "ACR Resource Group: $acrResourceGroup"
+      az rest --method patch \
+        --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/$acrResourceGroup/providers/Microsoft.ContainerRegistry/registries/$registryName?api-version=2023-07-01" \
+        --body '{"properties":{"policies":{"exportPolicy":{"status":"enabled"}}}}'
+
       # Configure ACR for selective network access first
       echo "Configuring ACR for selective network access"
       az acr update --name $registryName --public-network-enabled true --default-action Deny
-
+      
       # Wait for network rules to propagate
       echo "Waiting for network rules to propagate..."
       sleep 15
@@ -780,6 +788,8 @@ steps:
           echo "false"
         fi
       }
+
+      # ...existing code...
 
       # Resource name variables
       noSuffix=""
@@ -1193,9 +1203,6 @@ steps:
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmk_key_name)" \
-     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
-     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
-     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
@@ -1217,6 +1224,12 @@ steps:
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
+     --parameters acr_adminUserEnabled="$(acr_adminUserEnabled)" \
+     --parameters acr_dedicated="$(acr_dedicated)" \
+     --parameters containerRegistrySkuName="$(acr_SKU)" \
+     --parameters enableProjectVM="$(enableProjectVM)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1254,11 +1267,6 @@ steps:
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
-     --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)" \
-     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
-     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
-     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters openaiExists="$(openaiExists)" \
      --parameters aiSearchExists="$(aiSearchExists)" \
@@ -1297,6 +1305,16 @@ steps:
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters enableBingCustomSearch="$(enableBingCustomSearch)" \
+     --parameters enableBing="$(enableBing)" \
+     --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
+     --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
+     --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
+     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
+     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1337,11 +1355,6 @@ steps:
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
-     --parameters cmk="$(cmk)" \
-     --parameters cmkKeyName="$(cmk_key_name)" \
-     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
-     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
-     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters cosmosDBExists="$(cosmosDBExists)" \
      --parameters redisExists="$(redisExists)" \
@@ -1364,6 +1377,11 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
      --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)" \
+     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
+     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
+     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1417,8 +1435,6 @@ steps:
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
      --parameters enableBingSearch="$(enableBingSearch)" \
-     --parameters cmk="$(cmk)" \
-     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \
@@ -1491,8 +1507,6 @@ steps:
      --parameters addAIFoundryHub="$(addAIFoundryHub)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \
-     --parameters cmk="$(cmk)" \
-     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
@@ -1523,6 +1537,8 @@ steps:
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1578,8 +1594,6 @@ steps:
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
      --parameters useAdGroups="$(use_ad_groups)" \
-     --parameters cmk="$(cmk)" \
-     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
@@ -1596,7 +1610,9 @@ steps:
      --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
      --parameters enableAksForAzureML="$(enableAksForAzureML)" \
      --parameters aksOutboundType="$(aksOutboundType)" \
-     --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)"
+     --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '68-integration'
@@ -1648,8 +1664,6 @@ steps:
      --parameters enableEventHubs="$(enableEventHubs)" \
      --parameters logicAppsExists="$(logicAppsExists)" \
      --parameters eventHubsExists="$(eventHubsExists)" \
-     --parameters cmk="$(cmk)" \
-     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters functionAppExists="$(functionAppExists)" \
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
@@ -1722,6 +1736,8 @@ steps:
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters commonLakeNamePrefixMax8chars="$(commonLakeNamePrefixMax8chars)" \
      --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)' \
+     --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters dataFactoryExists="$(dataFactoryExists)" \
      --parameters aksExists="$(aksExists)" \
@@ -1732,6 +1748,87 @@ steps:
      --parameters updateRbac="$(updateRbac)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --debug
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '69-aifoundry-2025-Account'
+  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az account set --subscription "$(dev_test_prod_sub_id)"
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aifoundry-2025-account" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-genai-1/09-ai-foundry-2025.bicep" \
+     --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters enableAIFoundryV21="$(enableAIFoundryV21)" \
+     --parameters enableAISearch="$(enableAISearch)" \
+     --parameters enableCosmosDB="$(enableCosmosDB)" \
+     --parameters deployModel_gpt_X="$(deployModel_gpt_X)" \
+     --parameters modelGPTXName="$(modelGPTXName)" \
+     --parameters modelGPTXVersion="$(modelGPTXVersion)" \
+     --parameters modelGPTXSku="$(modelGPTXSku)" \
+     --parameters modelGPTXCapacity="$(modelGPTXCapacity)" \
+     --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
+     --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
+     --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
+     --parameters default_embedding_capacity="$(default_embedding_capacity)" \
+     --parameters default_gpt_capacity="$(default_gpt_capacity)" \
+     --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
+     --parameters default_gpt_4o_version="$(default_gpt_4o_version)" \
+     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters default_gpt_4o_mini_version="$(default_gpt_4o_mini_version)" \
+     --parameters default_model_sku="$(default_model_sku)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
+     --parameters IPwhiteList="$(project_IP_whitelist)" \
+     --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+     --parameters vnetNameBase="$(vnetNameBase)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
+     --parameters network_env="$(network_env)" \
+     --parameters common_subnet_name="$(common_subnet_name)" \
+     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
+     --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
+     --parameters tagsProject='$(tagsProject)' \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters disableAgentNetworkInjection="$(disableAgentNetworkInjection)" \
+     --parameters enableAIFactoryCreatedDefaultProjectForAIFv2="$(enableAIFactoryCreatedDefaultProjectForAIFv2)" \
+     --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
+     --parameters containerAppsEnvExists="$(containerAppsEnvExists)" \
+     --parameters updateAIFoundryV21="$(updateAIFoundryV21)" \
+     --parameters enableCaphost="$(enableAFoundryCaphost)" \
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
+     --parameters foundryV22AccountOnly="true" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025'
@@ -1766,9 +1863,10 @@ steps:
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters default_embedding_capacity="$(default_embedding_capacity)" \
+     --parameters default_gpt_capacity="$(default_gpt_capacity)" \
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
-     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
      --parameters default_gpt_4o_version="$(default_gpt_4o_version)" \
+     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
      --parameters default_gpt_4o_mini_version="$(default_gpt_4o_mini_version)" \
      --parameters default_model_sku="$(default_model_sku)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
@@ -1798,8 +1896,6 @@ steps:
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
-     --parameters cmk="$(cmk)" \
-     --parameters cmk_key_name="$(cmk_key_name)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters useAdGroups="$(use_ad_groups)" \
@@ -1809,10 +1905,11 @@ steps:
      --parameters containerAppsEnvExists="$(containerAppsEnvExists)" \
      --parameters updateAIFoundryV21="$(updateAIFoundryV21)" \
      --parameters enableCaphost="$(enableAFoundryCaphost)" \
-     --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
-     --debug
+     --parameters foundryV22AccountOnly="false" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmk_key_name)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'
@@ -1885,6 +1982,9 @@ steps:
       # Get the registry name and IPs from previous task
       registryName="$(acr_registry_name)"
       added_ips_string="$(acr_added_ips)"
+      
+      # Debug flag to skip export policy disable (for testing)
+      debug_keep_exportPolicy=true
 
       echo "Registry name: $registryName"
       echo "IPs to remove: $added_ips_string"
@@ -1913,7 +2013,25 @@ steps:
         echo "Disabling public network access for ACR: $registryName"
         az acr update --name "$registryName" --public-network-enabled false || echo "Failed to disable public access for $registryName"
         echo "ACR public network access disabled for security."
+        
+        # Configure ACR export policy using REST API - only disable if fully private and debug flag is false
+        if [ "$debug_keep_exportPolicy" = "false" ] && [ "$(allowPublicAccessWhenBehindVnet)" = "false" ] && [ "$(enablePublicGenAIAccess)" = "false" ] && [ "$(enablePublicAccessWithPerimeter)" = "false" ]; then
+          echo "Disabling ACR export policy (fully private configuration)"
+          acrResourceGroup=$(az acr show --name "$registryName" --query resourceGroup -o tsv)
+          echo "ACR Resource Group: $acrResourceGroup"
+          az rest --method patch \
+            --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/$acrResourceGroup/providers/Microsoft.ContainerRegistry/registries/$registryName?api-version=2023-07-01" \
+            --body '{"properties":{"policies":{"exportPolicy":{"status":"disabled"}}}}'
+        else
+          if [ "$debug_keep_exportPolicy" = "true" ]; then
+            echo "Skipping ACR export policy disable - debug_keep_exportPolicy is set to true"
+          else
+            echo "Skipping ACR export policy disable - public access is enabled"
+          fi
+        fi
       else
         echo "No registry name found - skipping public access disable"
       fi
+
+
 

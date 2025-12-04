@@ -383,30 +383,6 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 }
 
 // ============== CMK CONFIGURATION ==============
-// Create Key in the external Key Vault
-module cmkKey '../modules/keyVaultKey.bicep' = [for i in range(0, cmk ? 1 : 0): {
-  name: take('07-cmkKey-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-  params: {
-    keyVaultName: inputKeyvault
-    keyName: cmk_key_name
-    kty: 'RSA'
-    keySize: 2048
-  }
-}]
-
-// Assign "Key Vault Crypto Service Encryption User" to the Project Managed Identity
-module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = [for i in range(0, cmk ? 1 : 0): {
-  name: take('07-cmkRbac-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-  params: {
-    keyVaultName: inputKeyvault
-    principalId: var_miPrj_PrincipalId
-    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-rbac-${miPrjName}-${i}'
-    principalType: 'ServicePrincipal'
-  }
-}]
 
 module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && enableDatafactory) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)

@@ -14,6 +14,7 @@ targetScope = 'subscription'
 //✅ Blob access → Storage Blob Data Contributor ✓
 //✅ Queue access → Storage Queue Data Contributor ✓
 //✅ File share access → Storage File Data SMB Share Contributor ✓
+// CMK: Is not supported for these services. But storage, and keyvault for App services packages uses CMK, from other bicep.
 // ================================================================
 
 // ============== SKUs ==============
@@ -97,12 +98,6 @@ param randomValue string
 
 @description('AI Factory suffix for resource groups')
 param aifactorySuffixRG string
-
-@description('Enable Customer Managed Keys (CMK) encryption')
-param cmk bool = false
-
-@description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
 
 @description('Subscription ID for dev/test/prod')
 param subscriptionIdDevTestProd string

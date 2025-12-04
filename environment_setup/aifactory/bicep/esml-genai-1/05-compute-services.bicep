@@ -10,7 +10,7 @@ targetScope = 'subscription'
 // - Managed Identity for Container Apps
 // - Subnet delegations for compute services
 // ================================================================
-
+// CMK: Is not supported for these services. But storage, and keyvault for App services packages uses CMK, from other bicep.
 // ============================================================================
 // SKU for services
 // ============================================================================
@@ -89,12 +89,6 @@ param disableAgentNetworkInjection bool = true
 
 param enableAppInsightsDashboard bool = true
 param enableBingSearch bool = false
-
-@description('Enable Customer Managed Keys (CMK) encryption')
-param cmk bool = false
-
-@description('Name of the Customer Managed Key in Key Vault')
-param cmk_key_name string = ''
 
 // Enable flags from parameter files
 @description('Enable Container Apps deployment')

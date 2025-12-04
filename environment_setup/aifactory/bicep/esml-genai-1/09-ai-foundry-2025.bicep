@@ -1150,30 +1150,6 @@ var aiFoundryResourceIdOutput = useAVMFoundry
       : aiFoundryResourceIdLegacy)
 
 // ============== AI FOUNDRY HUB ==============
-
-module cmkKey '../modules/keyVaultKey.bicep' = if (cmk && !foundryV22AccountOnly) {
-  name: take('09-cmkKey-${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-  params: {
-    keyVaultName: inputKeyvault
-    keyName: cmk_key_name
-    kty: 'RSA'
-    keySize: 2048
-  }
-}
-
-module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (cmk && !foundryV22AccountOnly) {
-  name: take('09-cmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-  params: {
-    keyVaultName: inputKeyvault
-    principalId: getProjectMIPrincipalId.outputs.principalId
-    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-rbac-${miPrjName}'
-    principalType: 'ServicePrincipal'
-  }
-}
-
 var customerManagedKey = cmk ? {
   keyName: cmk_key_name
   keyVaultResourceId: resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault)

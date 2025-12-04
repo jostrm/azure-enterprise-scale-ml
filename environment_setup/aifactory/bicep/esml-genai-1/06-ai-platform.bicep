@@ -388,29 +388,6 @@ var aiModels = concat(
 
 // ============== AI FOUNDRY HUB ==============
 
-module cmkKey '../modules/keyVaultKey.bicep' = [for i in range(0, cmk ? 1 : 0): {
-  name: take('06-cmkKey-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-  params: {
-    keyVaultName: inputKeyvault
-    keyName: cmk_key_name
-    kty: 'RSA'
-    keySize: 2048
-  }
-}]
-
-module cmkRbac '../modules/kvRbacSingleAssignment.bicep' = [for i in range(0, cmk ? 1 : 0): {
-  name: take('06-cmkRbac-${deploymentProjSpecificUniqueSuffix}-${i}', 64)
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-  params: {
-    keyVaultName: inputKeyvault
-    principalId: getProjectMIPrincipalId.outputs.principalId
-    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-rbac-${miPrjName}-${i}'
-    principalType: 'ServicePrincipal'
-  }
-}]
-
 module aiHub '../modules/machineLearningAIHub.bicep' = if(!aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('06-aiHubModule${deploymentProjSpecificUniqueSuffix}', 64)
