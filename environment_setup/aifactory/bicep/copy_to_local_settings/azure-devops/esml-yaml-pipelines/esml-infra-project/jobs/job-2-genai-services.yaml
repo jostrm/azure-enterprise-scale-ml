@@ -394,10 +394,18 @@ steps:
       # Set registry name for cleanup task
       echo "##vso[task.setvariable variable=acr_registry_name]$registryName"
 
+      # Configure ACR export policy using REST API
+      echo "Enabling ACR export policy"
+      acrResourceGroup=$(az acr show --name $registryName --query resourceGroup -o tsv)
+      echo "ACR Resource Group: $acrResourceGroup"
+      az rest --method patch \
+        --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/$acrResourceGroup/providers/Microsoft.ContainerRegistry/registries/$registryName?api-version=2023-07-01" \
+        --body '{"properties":{"policies":{"exportPolicy":{"status":"enabled"}}}}'
+
       # Configure ACR for selective network access first
       echo "Configuring ACR for selective network access"
       az acr update --name $registryName --public-network-enabled true --default-action Deny
-
+      
       # Wait for network rules to propagate
       echo "Waiting for network rules to propagate..."
       sleep 15
@@ -1868,6 +1876,9 @@ steps:
       # Get the registry name and IPs from previous task
       registryName="$(acr_registry_name)"
       added_ips_string="$(acr_added_ips)"
+      
+      # Debug flag to skip export policy disable (for testing)
+      debug_keep_exportPolicy=true
 
       echo "Registry name: $registryName"
       echo "IPs to remove: $added_ips_string"
@@ -1896,7 +1907,22 @@ steps:
         echo "Disabling public network access for ACR: $registryName"
         az acr update --name "$registryName" --public-network-enabled false || echo "Failed to disable public access for $registryName"
         echo "ACR public network access disabled for security."
+        
+        # Configure ACR export policy using REST API - only disable if fully private and debug flag is false
+        if [ "$debug_keep_exportPolicy" = "false" ] && [ "$(allowPublicAccessWhenBehindVnet)" = "false" ] && [ "$(enablePublicGenAIAccess)" = "false" ] && [ "$(enablePublicAccessWithPerimeter)" = "false" ]; then
+          echo "Disabling ACR export policy (fully private configuration)"
+          acrResourceGroup=$(az acr show --name "$registryName" --query resourceGroup -o tsv)
+          echo "ACR Resource Group: $acrResourceGroup"
+          az rest --method patch \
+            --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/$acrResourceGroup/providers/Microsoft.ContainerRegistry/registries/$registryName?api-version=2023-07-01" \
+            --body '{"properties":{"policies":{"exportPolicy":{"status":"disabled"}}}}'
+        else
+          if [ "$debug_keep_exportPolicy" = "true" ]; then
+            echo "Skipping ACR export policy disable - debug_keep_exportPolicy is set to true"
+          else
+            echo "Skipping ACR export policy disable - public access is enabled"
+          fi
+        fi
       else
         echo "No registry name found - skipping public access disable"
       fi
-
