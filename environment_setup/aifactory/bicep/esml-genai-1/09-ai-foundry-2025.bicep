@@ -14,7 +14,6 @@ targetScope = 'subscription'
 @description('Environment: dev, test, prod')
 @allowed(['dev', 'test', 'prod'])
 param env string
-param useAVMFoundry bool = false // https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
 param updateAIFoundryV21 bool = false
 param addAIFoundryV21 bool = false
 param containerAppsEnvExists bool = false
@@ -40,6 +39,7 @@ param enableAIFoundryV2 bool = false
 param enableAIFoundryV21 bool = false
 param enableAIFoundryV22 bool = false // TODO
 param foundryV22AccountOnly bool = false
+param useAVMFoundry bool = true // https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
