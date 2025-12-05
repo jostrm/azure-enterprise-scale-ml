@@ -234,7 +234,7 @@ var aifV2Name = namingConvention.outputs.aifV2PrjName
 // Optional dependencies: AI Search, AI Services
 var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
 
-var cleanRandomValue = namingConvention.outputs.randomSalt
+var cleanRandomValue = take(namingConvention.outputs.randomSalt,2)
 
 var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))

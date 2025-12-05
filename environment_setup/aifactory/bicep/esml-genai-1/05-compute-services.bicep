@@ -343,7 +343,7 @@ var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var keyvaultName = namingConvention.outputs.keyvaultName
 
 // AI Search name construction
-var cleanRandomValue = namingConvention.outputs.randomSalt
+var cleanRandomValue = take(namingConvention.outputs.randomSalt,2)
 
 var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))

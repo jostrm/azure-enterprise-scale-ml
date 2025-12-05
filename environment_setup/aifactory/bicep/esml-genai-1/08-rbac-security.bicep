@@ -361,13 +361,12 @@ var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0
 
 // ============== SHARED NAMING VARIABLES ==============
 // Shared random value processing for dynamic naming (matches CmnAIfactoryNaming.bicep)
-var cleanRandomValue = namingConvention.outputs.randomSalt
-var aifRandom = take(cleanRandomValue,2)
+var cleanRandomValue = take(namingConvention.outputs.randomSalt,2)
 
 // ============== AML Principal ID ==============
 // Azure Machine Learning dynamic naming logic (matches CmnAIfactoryNaming.bicep)
 // aml-001-eus2-dev-qoygy-001 (28) + 2 = 30
-var amlWithRandom = take('aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${aifRandom}${resourceSuffix}',64)
+var amlWithRandom = take('aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${cleanRandomValue}${resourceSuffix}',64)
 var amlName_Static = addAzureMachineLearning ? amlWithRandom : 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
 resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!amlExists && enableAzureMachineLearning) {
@@ -380,7 +379,7 @@ var var_amlPrincipalId = (!amlExists && enableAzureMachineLearning) ? amlREF.ide
 // ============== AI HUB Principal ID ==============
 // AI Foundry Hub dynamic naming logic (matches CmnAIfactoryNaming.bicep)
 // aif-hub-001-eus2-dev-qoygy-001 (30) + 2 = 32
-var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${aifRandom}${resourceSuffix}',64)
+var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${cleanRandomValue}${resourceSuffix}',64)
 var aiHubName_Static = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
 // aif-p-002-1-eus2-dev-qoygy-001
