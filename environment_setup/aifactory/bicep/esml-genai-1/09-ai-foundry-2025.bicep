@@ -50,6 +50,8 @@ param aiFoundryV2Exists bool = false
 param enableCaphost bool = true
 @description('Enable AI Search integration')
 param enableAISearch bool = true
+@description('Enable shared private link connections from Azure AI Search')
+param enableAISearchSharedPrivateLink bool = true
 
 @description('Enable Customer Managed Keys (CMK) encryption')
 param cmk bool = false
@@ -1179,6 +1181,26 @@ var customerManagedKey = cmk ? {
   keyVaultResourceId: resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault)
   userAssignedIdentityResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
 } : null
+
+// ==== Shared private link Azure AI Search to foundry
+var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && enableAISearch && (enableAIFoundryV21 || enableAIFoundryV22)
+
+module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bicep' = if (enableSharedLinkDeployment) {
+  name: take('09-aiSearchSPL-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    aiSearchName: aiSearchName
+    aiFoundryResourceId: aiFoundryResourceIdOutput
+    location: location
+  }
+  dependsOn: [
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!deployAvmFoundry && enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : [])
+    ...(!deployAvmFoundry && enableAIFoundryV22 && foundryV22AccountOnly ? [aiFoundry2025NoAvmV22AccountOnly] : [])
+    ...(!deployAvmFoundry && !enableAIFoundryV22 ? [aiFoundry2025NoAvm] : [])
+  ]
+}
+// Approve the shared private link request on the Azure AI Foundry account after deployment.
 
 // ============== OUTPUTS ==============
 

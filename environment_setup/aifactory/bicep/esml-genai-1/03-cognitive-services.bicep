@@ -666,7 +666,7 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (ena
     skuName: aiSearchSKUName
     enableSharedPrivateLink: !empty(sharedPrivateLinksForAISearch)? true: false
     sharedPrivateLinks: sharedPrivateLinksForAISearch
-    approveStorageSharedLinks: enableAISearchSharedPrivateLink
+    approveStorageSharedLinks: false //enableAISearchSharedPrivateLink
     storageAccountNameForSharedLinks: enableAISearchSharedPrivateLink ? storageAccount2001Name : ''
     approveAiServicesSharedLink: false // need to be done last in pipeline...(enableAISearchSharedPrivateLink && enableAIServices)
     aiServicesNameForSharedLink: (enableAISearchSharedPrivateLink && enableAIServices) ? aiServicesName : ''
