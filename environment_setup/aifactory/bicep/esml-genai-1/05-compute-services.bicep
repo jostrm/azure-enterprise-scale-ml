@@ -343,12 +343,7 @@ var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var keyvaultName = namingConvention.outputs.keyvaultName
 
 // AI Search name construction
-var cleanRandomValue = take(
-  !empty(randomValue)
-    ? toLower(replace(replace(randomValue, '-', ''), '_', ''))
-    : namingConvention.outputs.randomSalt,
-  2
-)
+var cleanRandomValue = namingConvention.outputs.randomSalt
 
 var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
@@ -370,7 +365,7 @@ var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
       60
     )
   : ''
-  
+
 // AI Foundry Hub
 var aifV1HubName = namingConvention.outputs.aifV1HubName
 var aifV1ProjectName = namingConvention.outputs.aifV1ProjectName

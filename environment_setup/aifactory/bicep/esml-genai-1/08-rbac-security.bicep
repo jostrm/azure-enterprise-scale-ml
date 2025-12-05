@@ -361,13 +361,7 @@ var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0
 
 // ============== SHARED NAMING VARIABLES ==============
 // Shared random value processing for dynamic naming (matches CmnAIfactoryNaming.bicep)
-var cleanRandomValue = take(
-  !empty(randomValue)
-    ? toLower(replace(replace(randomValue, '-', ''), '_', ''))
-    : namingConvention.outputs.randomSalt,
-  2
-)
-
+var cleanRandomValue = namingConvention.outputs.randomSalt
 var aifRandom = take(cleanRandomValue,2)
 
 // ============== AML Principal ID ==============

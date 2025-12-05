@@ -290,12 +290,7 @@ var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 var miACAName = namingConvention.outputs.miACAName
 var miPrjName = namingConvention.outputs.miPrjName
 
-var cleanRandomValue = take(
-  !empty(randomValue)
-    ? toLower(replace(replace(randomValue, '-', ''), '_', ''))
-    : namingConvention.outputs.randomSalt,
-  2
-)
+var cleanRandomValue = namingConvention.outputs.randomSalt
 
 var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
