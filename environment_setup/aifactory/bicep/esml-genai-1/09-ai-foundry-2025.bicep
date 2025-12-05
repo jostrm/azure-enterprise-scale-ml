@@ -295,7 +295,7 @@ var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var projectCapHostName  = '${aifV2Name}caphost'
 var defaultProjectName = enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
-var defaultProjectDescription = 'Enterprise Scale AI Factory (Foundry v1.22) creation of project for with enterprise grade security and your corp networking.'
+var defaultProjectDescription = 'Enterprise Scale AI Factory (v1.24) Foundry creation of project for with enterprise grade security and your corp networking.'
 
 // Private DNS zones
 module CmnZones '../modules/common/CmnPrivateDnsZones.bicep' = {

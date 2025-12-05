@@ -1672,8 +1672,7 @@ steps:
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
      --parameters webAppExists="$(webAppExists)" \
-     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
-     --parameters addAISearch="$(addAISearch)"
+     --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '100-rbac-security'
@@ -1752,6 +1751,7 @@ steps:
      --parameters openaiExists="$(openaiExists)" \
      --parameters updateRbac="$(updateRbac)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
+     --parameters addAISearch="$(addAISearch)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
