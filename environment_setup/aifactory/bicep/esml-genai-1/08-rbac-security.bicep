@@ -265,6 +265,8 @@ var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
 var openAIName = namingConvention.outputs.aoaiName
 
+var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
+
 var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
   : ''
@@ -280,12 +282,11 @@ var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
 var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(
       addAISearch
-        ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
+        ? '${safeNameAISearchBase}${cleanRandomValue2}${safeNameAISearchSuffix}'
         : safeNameAISearchOrg,
       60
     )
   : ''
-
 // ============================================================================
 // Resource definitions
 // ============================================================================

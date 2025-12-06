@@ -420,6 +420,8 @@ var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader - for resour
 @description('RBAC Security Phase 7 deployment completed successfully')
 output rbacSecurityPhaseCompleted bool = true
 
+
+var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
 var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
 var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
@@ -436,7 +438,7 @@ var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
 var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(
       addAISearch
-        ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
+        ? '${safeNameAISearchBase}${cleanRandomValue2}${safeNameAISearchSuffix}'
         : safeNameAISearchOrg,
       60
     )
