@@ -1755,6 +1755,45 @@ steps:
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
+  displayName: '69-aifoundry-2025-DE'
+  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az account set --subscription "$(dev_test_prod_sub_id)"
+     az deployment sub create \
+      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aifoundry-2025-account" \
+      --subscription "$(dev_test_prod_sub_id)" \
+      --location "$(admin_location)" \
+      --template-file "esml-genai-1/09-ai-foundry-2025-v2.bicep" \
+      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
+      --parameters targetSubscriptionId="$(dev_test_prod_sub_id)" \
+      --parameters targetResourceGroupName="$(commonResourceGroup_param)" \
+      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
+      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+      --parameters commonResourceName="$(vnetResourceGroupBase)" \
+      --parameters locationSuffix="$(admin_locationSuffix)" \
+      --parameters env="$(dev_test_prod)" \
+      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+      --parameters location='swedencentral' \
+      --parameters existingVnetResourceId="$(foundry_existing_vnet_resource_id)" \
+      --parameters vnetName="$(foundry_vnet_name)" \
+      --parameters vnetAddressPrefix="$(foundry_vnet_address_prefix)" \
+      --parameters agentSubnetName="$(foundry_agent_subnet_name)" \
+      --parameters peSubnetName="$(foundry_pe_subnet_name)" \
+      --parameters agentSubnetPrefix="$(foundry_agent_subnet_prefix)" \
+      --parameters peSubnetPrefix="$(foundry_pe_subnet_prefix)" \
+      --parameters aiSearchResourceId="$(foundry_ai_search_resource_id)" \
+      --parameters azureStorageAccountResourceId="$(foundry_storage_account_resource_id)" \
+      --parameters azureCosmosDBAccountResourceId="$(foundry_cosmos_account_resource_id)" \
+      --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
+      --parameters existingDnsZones="$(foundry_existing_dns_zones)" \
+      --parameters dnsZoneNames="$(foundry_dns_zone_names)" \
+      --debug
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
   displayName: '69-aifoundry-2025-Account'
   condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded())
   inputs:

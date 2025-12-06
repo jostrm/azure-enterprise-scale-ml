@@ -419,7 +419,8 @@ resource aiServicesREF 'Microsoft.CognitiveServices/accounts@2024-10-01' existin
 var var_aiServicesPrincipalId = (!aiServicesExists && enableAIServices) ? aiServicesREF.identity.principalId : ''
 
 // ============== AI SEARCH Principal ID ==============
-var aiSearchName_Static = replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomSalt}${resourceSuffix}'), '-', '')
+var aiSearchName_Static = addAISearch?replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomSalt}${cleanRandomValue}${resourceSuffix}'), '-', ''): replace(toLower('aisearch${projectName}${locationSuffix}${env}${uniqueInAIFenv_Static}${randomSalt}${resourceSuffix}'), '-', '')
+
 resource aiSearchREF 'Microsoft.Search/searchServices@2024-06-01-preview' existing = if (!aiSearchExists && enableAISearch) {
   name: aiSearchName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
