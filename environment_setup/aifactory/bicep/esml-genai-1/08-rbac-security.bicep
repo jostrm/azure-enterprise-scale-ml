@@ -265,7 +265,7 @@ var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
 var openAIName = namingConvention.outputs.aoaiName
 
-var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
+var cleanRandomValue2 = take(randomSalt, 2)
 
 var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
@@ -362,7 +362,7 @@ var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0
 
 // ============== SHARED NAMING VARIABLES ==============
 // Shared random value processing for dynamic naming (matches CmnAIfactoryNaming.bicep)
-var cleanRandomValue = take(namingConvention.outputs.randomSalt,2)
+var cleanRandomValue = take(randomSalt, 2)
 
 // ============== AML Principal ID ==============
 // Azure Machine Learning dynamic naming logic (matches CmnAIfactoryNaming.bicep)

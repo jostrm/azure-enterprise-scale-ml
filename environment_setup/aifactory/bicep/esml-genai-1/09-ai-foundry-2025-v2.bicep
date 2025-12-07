@@ -19,7 +19,21 @@ param commonResourceName string = 'esml-common'
 param locationSuffix string = ''
 
 @description('Deployment environment moniker such as dev, test, or prod.')
-param env string = ''
+@allowed([
+	'dev'
+	'test'
+	'prod'
+])
+param env string
+
+@description('Project number (three digits) used in naming, for example "001".')
+param projectNumber string
+
+@description('Suffix used for shared/common resources (for example "-001").')
+param commonResourceSuffix string
+
+@description('Suffix appended to project specific resources (for example "-001").')
+param resourceSuffix string
 
 @description('Suffix appended to resource group names (for example "-rg").')
 param aifactorySuffixRG string = ''
@@ -27,7 +41,22 @@ param aifactorySuffixRG string = ''
 @description('Azure region for all resources. Defaults to swedencentral per design guidance.')
 param location string = 'swedencentral'
 
-@description('Existing virtual network Resource ID. Leave empty to create a new network using the provided prefixes.')
+@description('Optional deterministic salt (10 chars) used for naming. Leave empty to derive from randomValue.')
+param aifactorySalt10char string = ''
+
+@description('Random value used for deterministic naming fallback.')
+param randomValue string = uniqueString(subscription().subscriptionId, locationSuffix, env)
+
+@description('Comma separated list of technical admin object IDs.')
+param technicalAdminsObjectID string = ''
+
+@description('Comma separated list of technical admin emails.')
+param technicalAdminsEmail string = ''
+
+@description('Subscription that hosts the project resources. Defaults to the deployment subscription when not provided.')
+param subscriptionIdDevTestProd string = targetSubscriptionId
+
+@description('Existing virtual network Resource ID. Leave empty to derive from project subnet inputs.')
 param existingVnetResourceId string = ''
 
 @description('Virtual network name when creating a new network.')
@@ -48,69 +77,153 @@ param agentSubnetPrefix string = ''
 @description('CIDR prefix for the private endpoint subnet.')
 param peSubnetPrefix string = ''
 
-@description('Existing Azure AI Search resource ID. Leave empty to create a new search service.')
+@description('Existing Azure AI Search resource ID override. Leave empty to derive from the naming module output.')
 param aiSearchResourceId string = ''
 
-@description('Existing Azure Storage Account resource ID. Leave empty to create a new account.')
+@description('Existing Azure Storage Account resource ID override. Leave empty to derive from the naming module output.')
 param azureStorageAccountResourceId string = ''
 
-@description('Existing Azure Cosmos DB resource ID. Leave empty to create a new account.')
+@description('Existing Azure Cosmos DB resource ID override. Leave empty to derive from the naming module output.')
 param azureCosmosDBAccountResourceId string = ''
 
 @description('Existing API Management instance resource ID. Optional input that can remain empty.')
 param apiManagementResourceId string = ''
 
-@description('JSON encoded object describing existing DNS zones keyed by zone name. Leave blank to allow creation of new zones.')
+@description('JSON encoded object describing existing DNS zones keyed by zone name. Leave blank to auto-resolve.')
 param existingDnsZones string = ''
 
-@description('JSON encoded array identifying DNS zones that should be validated. Defaults to the standard AI Foundry zones when blank.')
+@description('JSON encoded array identifying DNS zones that should be validated. Leave blank to auto-resolve.')
 param dnsZoneNames string = ''
 
-var storagePrivateDnsZone = 'privatelink.blob.${environment().suffixes.storage}'
+@description('Subscription hosting private DNS zones when centrally managed.')
+param privDnsSubscription_param string = ''
 
-var defaultDnsZones = {
-	'privatelink.services.ai.azure.com': ''
-	'privatelink.openai.azure.com': ''
-	'privatelink.cognitiveservices.azure.com': ''
-	'privatelink.search.windows.net': ''
-	'${storagePrivateDnsZone}': ''
-	'privatelink.documents.azure.com': ''
-	'privatelink.azure-api.net': ''
-}
+@description('Resource group hosting private DNS zones when centrally managed.')
+param privDnsResourceGroup_param string = ''
 
-var defaultDnsZoneNames = [
-	'privatelink.services.ai.azure.com'
-	'privatelink.openai.azure.com'
-	'privatelink.cognitiveservices.azure.com'
-	'privatelink.search.windows.net'
-	storagePrivateDnsZone
-	'privatelink.documents.azure.com'
-	'privatelink.azure-api.net'
-]
+@description('Set to true when private DNS zones are enforced centrally via policy.')
+param centralDnsZoneByPolicyInHub bool = false
+
+@description('Subnet resource ID dedicated to private endpoints (genai subnet).')
+param genaiSubnetId string = ''
+
+@description('Primary AKS subnet resource ID.')
+param aksSubnetId string = ''
+
+@description('Primary ACA subnet resource ID used for agents.')
+param acaSubnetId string = ''
+
+@description('Optional secondary ACA subnet resource ID.')
+param aca2SubnetId string = ''
+
+@description('Optional secondary AKS subnet resource ID.')
+param aks2SubnetId string = ''
 
 var resolvedCommonResourceGroup = !empty(trim(commonResourceGroup_param)) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var resolvedTargetResourceGroup = !empty(trim(targetResourceGroupName)) ? targetResourceGroupName : resolvedCommonResourceGroup
-var parsedExistingDnsZones = empty(trim(existingDnsZones)) ? defaultDnsZones : json(existingDnsZones)
-var parsedDnsZoneNames = empty(trim(dnsZoneNames)) ? defaultDnsZoneNames : json(dnsZoneNames)
-var moduleDeploymentSuffix = uniqueString(targetSubscriptionId, resolvedTargetResourceGroup, location)
+var resolvedSubscriptionId = !empty(trim(subscriptionIdDevTestProd)) ? subscriptionIdDevTestProd : targetSubscriptionId
+var moduleDeploymentSuffix = uniqueString(resolvedSubscriptionId, resolvedTargetResourceGroup, location)
+
+var resolvedPrivDnsSubscription = !empty(trim(privDnsSubscription_param)) ? privDnsSubscription_param : resolvedSubscriptionId
+var resolvedPrivDnsResourceGroup = (!empty(trim(privDnsResourceGroup_param)) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : resolvedTargetResourceGroup
+
+var subnetSourceForVnet = !empty(trim(genaiSubnetId)) ? genaiSubnetId : (!empty(trim(acaSubnetId)) ? acaSubnetId : '')
+var vnetResourceIdFromSubnet = !empty(subnetSourceForVnet) ? split(subnetSourceForVnet, '/subnets/')[0] : ''
+var resolvedExistingVnetResourceId = !empty(trim(existingVnetResourceId)) ? existingVnetResourceId : vnetResourceIdFromSubnet
+var resolvedVnetName = !empty(trim(vnetName)) ? vnetName : (!empty(resolvedExistingVnetResourceId) ? last(split(resolvedExistingVnetResourceId, '/')) : vnetName)
+
+var resolvedAgentSubnetId = !empty(trim(acaSubnetId)) ? acaSubnetId : subnetSourceForVnet
+var resolvedPeSubnetId = !empty(trim(genaiSubnetId)) ? genaiSubnetId : resolvedAgentSubnetId
+var resolvedAgentSubnetName = !empty(trim(agentSubnetName)) ? agentSubnetName : (!empty(resolvedAgentSubnetId) ? last(split(resolvedAgentSubnetId, '/')) : agentSubnetName)
+var resolvedPeSubnetName = !empty(trim(peSubnetName)) ? peSubnetName : (!empty(resolvedPeSubnetId) ? last(split(resolvedPeSubnetId, '/')) : peSubnetName)
+
+module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
+	name: take('foundryv2-naming-${resolvedTargetResourceGroup}', 64)
+	scope: resourceGroup(resolvedSubscriptionId, resolvedTargetResourceGroup)
+	params: {
+		env: env
+		projectNumber: projectNumber
+		locationSuffix: locationSuffix
+		commonResourceSuffix: commonResourceSuffix
+		resourceSuffix: resourceSuffix
+		aifactorySalt10char: aifactorySalt10char
+		randomValue: randomValue
+		aifactorySuffixRG: aifactorySuffixRG
+		commonRGNamePrefix: commonRGNamePrefix
+		technicalAdminsObjectID: technicalAdminsObjectID
+		technicalAdminsEmail: technicalAdminsEmail
+		commonResourceGroupName: resolvedCommonResourceGroup
+		subscriptionIdDevTestProd: resolvedSubscriptionId
+		genaiSubnetId: genaiSubnetId
+		aksSubnetId: aksSubnetId
+		acaSubnetId: acaSubnetId
+		aca2SubnetId: aca2SubnetId
+		aks2SubnetId: aks2SubnetId
+	}
+}
+
+var aiSearchName = namingConvention.outputs.safeNameAISearch
+var storageAccountName = namingConvention.outputs.storageAccount1001Name
+var cosmosDbName = namingConvention.outputs.cosmosDBName
+
+var computedAiSearchResourceId = !empty(aiSearchName) ? resourceId(resolvedSubscriptionId, resolvedTargetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
+var computedAzureStorageAccountResourceId = !empty(storageAccountName) ? resourceId(resolvedSubscriptionId, resolvedTargetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccountName) : ''
+var computedAzureCosmosDbResourceId = !empty(cosmosDbName) ? resourceId(resolvedSubscriptionId, resolvedTargetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', cosmosDbName) : ''
+
+var resolvedAiSearchResourceId = !empty(trim(aiSearchResourceId)) ? aiSearchResourceId : computedAiSearchResourceId
+var resolvedAzureStorageAccountResourceId = !empty(trim(azureStorageAccountResourceId)) ? azureStorageAccountResourceId : computedAzureStorageAccountResourceId
+var resolvedAzureCosmosDbResourceId = !empty(trim(azureCosmosDBAccountResourceId)) ? azureCosmosDBAccountResourceId : computedAzureCosmosDbResourceId
+
+module privateDns '../modules/common/CmnPrivateDnsZones.bicep' = {
+	name: take('foundryv2-dns-${resolvedTargetResourceGroup}', 64)
+	scope: resourceGroup(resolvedSubscriptionId, resolvedTargetResourceGroup)
+	params: {
+		location: location
+		privDnsResourceGroupName: resolvedPrivDnsResourceGroup
+		privDnsSubscription: resolvedPrivDnsSubscription
+	}
+}
+
+var privateLinksDnsZones = privateDns.outputs.privateLinksDnsZones
+var computedExistingDnsZones = {
+	'${privateLinksDnsZones.servicesai.name}': resolvedPrivDnsResourceGroup
+	'${privateLinksDnsZones.openai.name}': resolvedPrivDnsResourceGroup
+	'${privateLinksDnsZones.cognitiveservices.name}': resolvedPrivDnsResourceGroup
+	'${privateLinksDnsZones.searchService.name}': resolvedPrivDnsResourceGroup
+	'${privateLinksDnsZones.blob.name}': resolvedPrivDnsResourceGroup
+	'${privateLinksDnsZones.cosmosdbnosql.name}': resolvedPrivDnsResourceGroup
+	'${privateLinksDnsZones.apim.name}': resolvedPrivDnsResourceGroup
+}
+var computedDnsZoneNames = [
+	privateLinksDnsZones.servicesai.name
+	privateLinksDnsZones.openai.name
+	privateLinksDnsZones.cognitiveservices.name
+	privateLinksDnsZones.searchService.name
+	privateLinksDnsZones.blob.name
+	privateLinksDnsZones.cosmosdbnosql.name
+	privateLinksDnsZones.apim.name
+]
+
+var resolvedExistingDnsZones = !empty(trim(existingDnsZones)) ? json(existingDnsZones) : computedExistingDnsZones
+var resolvedDnsZoneNames = !empty(trim(dnsZoneNames)) ? json(dnsZoneNames) : computedDnsZoneNames
 
 module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
 	name: take('foundry-apim-${moduleDeploymentSuffix}', 64)
-	scope: resourceGroup(targetSubscriptionId, resolvedTargetResourceGroup)
+	scope: resourceGroup(resolvedSubscriptionId, resolvedTargetResourceGroup)
 	params: {
 		location: location
-		existingVnetResourceId: existingVnetResourceId
-		vnetName: vnetName
+		existingVnetResourceId: resolvedExistingVnetResourceId
+		vnetName: resolvedVnetName
 		vnetAddressPrefix: vnetAddressPrefix
-		agentSubnetName: agentSubnetName
-		peSubnetName: peSubnetName
+		agentSubnetName: resolvedAgentSubnetName
+		peSubnetName: resolvedPeSubnetName
 		agentSubnetPrefix: agentSubnetPrefix
 		peSubnetPrefix: peSubnetPrefix
-		aiSearchResourceId: aiSearchResourceId
-		azureStorageAccountResourceId: azureStorageAccountResourceId
-		azureCosmosDBAccountResourceId: azureCosmosDBAccountResourceId
+		aiSearchResourceId: resolvedAiSearchResourceId
+		azureStorageAccountResourceId: resolvedAzureStorageAccountResourceId
+		azureCosmosDBAccountResourceId: resolvedAzureCosmosDbResourceId
 		apiManagementResourceId: apiManagementResourceId
-		existingDnsZones: parsedExistingDnsZones
-		dnsZoneNames: parsedDnsZoneNames
+		existingDnsZones: resolvedExistingDnsZones
+		dnsZoneNames: resolvedDnsZoneNames
 	}
 }

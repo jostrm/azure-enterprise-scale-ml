@@ -1776,21 +1776,20 @@ steps:
       --parameters commonResourceName="$(vnetResourceGroupBase)" \
       --parameters locationSuffix="$(admin_locationSuffix)" \
       --parameters env="$(dev_test_prod)" \
+      --parameters projectNumber="$(project_number_000)" \
+      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
       --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
-      --parameters location='swedencentral' \
-      --parameters existingVnetResourceId="$(foundry_existing_vnet_resource_id)" \
-      --parameters vnetName="$(foundry_vnet_name)" \
-      --parameters vnetAddressPrefix="$(foundry_vnet_address_prefix)" \
-      --parameters agentSubnetName="$(foundry_agent_subnet_name)" \
-      --parameters peSubnetName="$(foundry_pe_subnet_name)" \
-      --parameters agentSubnetPrefix="$(foundry_agent_subnet_prefix)" \
-      --parameters peSubnetPrefix="$(foundry_pe_subnet_prefix)" \
-      --parameters aiSearchResourceId="$(foundry_ai_search_resource_id)" \
-      --parameters azureStorageAccountResourceId="$(foundry_storage_account_resource_id)" \
-      --parameters azureCosmosDBAccountResourceId="$(foundry_cosmos_account_resource_id)" \
+      --parameters location="$(admin_location)" \
+      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+      --parameters randomValue="$(deployment_random_value)" \
+      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+      --parameters technicalAdminsEmail="$(technical_admins_email)" \
+      --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
       --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
-      --parameters existingDnsZones="$(foundry_existing_dns_zones)" \
-      --parameters dnsZoneNames="$(foundry_dns_zone_names)" \
+      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
+      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
+      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
       --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
