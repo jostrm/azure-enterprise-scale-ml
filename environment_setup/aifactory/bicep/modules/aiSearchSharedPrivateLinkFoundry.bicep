@@ -17,14 +17,26 @@ resource aiSearchService 'Microsoft.Search/searchServices@2025-05-01' existing =
 }
 
 resource sharedPrivateLink 'Microsoft.Search/searchServices/sharedPrivateLinkResources@2025-05-01' = if (!empty(aiFoundryResourceId) && !empty(aiSearchName)) {
-  name: 'shared-pe-foundry'
+  name: 'shared-pe-foundry-openai'
   parent: aiSearchService
   properties: {
     privateLinkResourceId: aiFoundryResourceId
-    groupId: 'account'
+    groupId: 'openai_account'
+    requestMessage: requestMessage
+    resourceRegion: location
+  }
+}
+resource sharedPrivateLink2 'Microsoft.Search/searchServices/sharedPrivateLinkResources@2025-05-01' = if (!empty(aiFoundryResourceId) && !empty(aiSearchName)) {
+  name: 'shared-pe-foundry-cogsvc'
+  parent: aiSearchService
+  properties: {
+    privateLinkResourceId: aiFoundryResourceId
+    groupId: 'cognitiveservices_account'
     requestMessage: requestMessage
     resourceRegion: location
   }
 }
 
+
 output sharedPrivateLinkName string = !empty(aiFoundryResourceId) && !empty(aiSearchName) ? sharedPrivateLink.name : ''
+output sharedPrivateLinkName2 string = !empty(aiFoundryResourceId) && !empty(aiSearchName) ? sharedPrivateLink2.name : ''

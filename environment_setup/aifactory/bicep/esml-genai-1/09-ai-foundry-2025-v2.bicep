@@ -95,6 +95,12 @@ param existingDnsZones string = ''
 @description('JSON encoded array identifying DNS zones that should be validated. Leave blank to auto-resolve.')
 param dnsZoneNames string = ''
 
+@description('Optional Databricks public subnet name, retained for compatibility with legacy parameter files.')
+param dbxPubSubnetName string = ''
+
+@description('Optional Databricks private subnet name, retained for compatibility with legacy parameter files.')
+param dbxPrivSubnetName string = ''
+
 @description('Subscription hosting private DNS zones when centrally managed.')
 param privDnsSubscription_param string = ''
 
