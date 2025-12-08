@@ -159,6 +159,9 @@ resource aiSearchPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01'
       }
     ]
   }
+  dependsOn: [
+    aiAccountPrivateEndpoint
+  ]
 }
 
 /* -------------------------------------------- Storage Private Endpoint -------------------------------------------- */
@@ -181,6 +184,9 @@ resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' 
       }
     ]
   }
+  dependsOn: [
+    aiSearchPrivateEndpoint
+  ]
 }
 
 /*--------------------------------------------- Cosmos DB Private Endpoint -------------------------------------*/
@@ -200,6 +206,9 @@ resource cosmosDBPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01'
       }
     ]
   }
+  dependsOn: [
+    storagePrivateEndpoint
+  ]
 }
 
 /*--------------------------------------------- API Management Private Endpoint -------------------------------------*/
@@ -219,6 +228,9 @@ resource apiManagementPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-0
       }
     ]
   }
+  dependsOn: [
+    cosmosDBPrivateEndpoint
+  ]
 }
 
 /* -------------------------------------------- Private DNS Zones -------------------------------------------- */
