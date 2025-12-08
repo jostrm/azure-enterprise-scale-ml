@@ -60,16 +60,16 @@ param subscriptionIdDevTestProd string = targetSubscriptionId
 param existingVnetResourceId string = ''
 
 @description('Virtual network name when creating a new network.')
-param vnetName string = 'agent-vnet-test'
+param vnetName string = ''
 
 @description('Address space for the VNet when creating a new network.')
 param vnetAddressPrefix string = ''
 
 @description('Subnet name dedicated to agents.')
-param agentSubnetName string = 'agent-subnet'
+param agentSubnetName string = ''
 
 @description('Subnet name dedicated to private endpoints.')
-param peSubnetName string = 'pe-subnet'
+param peSubnetName string = ''
 
 @description('CIDR prefix for the agent subnet.')
 param agentSubnetPrefix string = ''
@@ -119,6 +119,9 @@ param aca2SubnetId string = ''
 @description('Optional secondary AKS subnet resource ID.')
 param aks2SubnetId string = ''
 
+@description('Disable agent network injection even when agent subnet inputs are provided.')
+param disableAgentNetworkInjection bool = false
+
 var resolvedCommonResourceGroup = !empty(trim(commonResourceGroup_param)) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var resolvedTargetResourceGroup = !empty(trim(targetResourceGroupName)) ? targetResourceGroupName : resolvedCommonResourceGroup
 var resolvedSubscriptionId = !empty(trim(subscriptionIdDevTestProd)) ? subscriptionIdDevTestProd : targetSubscriptionId
@@ -127,15 +130,45 @@ var moduleDeploymentSuffix = uniqueString(resolvedSubscriptionId, resolvedTarget
 var resolvedPrivDnsSubscription = !empty(trim(privDnsSubscription_param)) ? privDnsSubscription_param : resolvedSubscriptionId
 var resolvedPrivDnsResourceGroup = (!empty(trim(privDnsResourceGroup_param)) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : resolvedTargetResourceGroup
 
-var subnetSourceForVnet = !empty(trim(genaiSubnetId)) ? genaiSubnetId : (!empty(trim(acaSubnetId)) ? acaSubnetId : '')
+var normalizedGenaiSubnetId = trim(genaiSubnetId)
+var normalizedAcaSubnetId = trim(acaSubnetId)
+var normalizedAca2SubnetId = trim(aca2SubnetId)
+
+var subnetSourceForVnet = !empty(normalizedGenaiSubnetId) ? normalizedGenaiSubnetId : (!empty(normalizedAca2SubnetId) ? normalizedAca2SubnetId : (!empty(normalizedAcaSubnetId) ? normalizedAcaSubnetId : ''))
 var vnetResourceIdFromSubnet = !empty(subnetSourceForVnet) ? split(subnetSourceForVnet, '/subnets/')[0] : ''
 var resolvedExistingVnetResourceId = !empty(trim(existingVnetResourceId)) ? existingVnetResourceId : vnetResourceIdFromSubnet
 var resolvedVnetName = !empty(trim(vnetName)) ? vnetName : (!empty(resolvedExistingVnetResourceId) ? last(split(resolvedExistingVnetResourceId, '/')) : vnetName)
 
-var resolvedAgentSubnetId = !empty(trim(acaSubnetId)) ? acaSubnetId : subnetSourceForVnet
-var resolvedPeSubnetId = !empty(trim(genaiSubnetId)) ? genaiSubnetId : resolvedAgentSubnetId
-var resolvedAgentSubnetName = !empty(trim(agentSubnetName)) ? agentSubnetName : (!empty(resolvedAgentSubnetId) ? last(split(resolvedAgentSubnetId, '/')) : agentSubnetName)
-var resolvedPeSubnetName = !empty(trim(peSubnetName)) ? peSubnetName : (!empty(resolvedPeSubnetId) ? last(split(resolvedPeSubnetId, '/')) : peSubnetName)
+var candidateAgentSubnetId = (!disableAgentNetworkInjection && !empty(normalizedAca2SubnetId)) ? normalizedAca2SubnetId : ((!disableAgentNetworkInjection && empty(normalizedAca2SubnetId) && !empty(normalizedAcaSubnetId)) ? normalizedAcaSubnetId : '')
+var candidatePeSubnetId = !empty(normalizedGenaiSubnetId) ? normalizedGenaiSubnetId : (!empty(subnetSourceForVnet) ? subnetSourceForVnet : '')
+
+var agentSubnetSubscriptionId = !empty(candidateAgentSubnetId) ? split(candidateAgentSubnetId, '/')[2] : resolvedSubscriptionId
+var agentSubnetResourceGroupName = !empty(candidateAgentSubnetId) ? split(candidateAgentSubnetId, '/')[4] : resolvedTargetResourceGroup
+var agentSubnetVnetName = !empty(candidateAgentSubnetId) ? split(candidateAgentSubnetId, '/')[8] : resolvedVnetName
+var agentSubnetNameFromId = !empty(candidateAgentSubnetId) ? split(candidateAgentSubnetId, '/')[10] : ''
+
+var peSubnetSubscriptionId = !empty(candidatePeSubnetId) ? split(candidatePeSubnetId, '/')[2] : resolvedSubscriptionId
+var peSubnetResourceGroupName = !empty(candidatePeSubnetId) ? split(candidatePeSubnetId, '/')[4] : resolvedTargetResourceGroup
+var peSubnetVnetName = !empty(candidatePeSubnetId) ? split(candidatePeSubnetId, '/')[8] : resolvedVnetName
+var peSubnetNameFromId = !empty(candidatePeSubnetId) ? split(candidatePeSubnetId, '/')[10] : ''
+
+resource agentSubnetExisting 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' existing = if (!empty(candidateAgentSubnetId)) {
+	name: '${agentSubnetVnetName}/${agentSubnetNameFromId}'
+	scope: resourceGroup(agentSubnetSubscriptionId, agentSubnetResourceGroupName)
+}
+
+resource peSubnetExisting 'Microsoft.Network/virtualNetworks/subnets@2023-04-01' existing = if (!empty(candidatePeSubnetId)) {
+	name: '${peSubnetVnetName}/${peSubnetNameFromId}'
+	scope: resourceGroup(peSubnetSubscriptionId, peSubnetResourceGroupName)
+}
+
+var derivedAgentSubnetPrefix = !empty(candidateAgentSubnetId) ? agentSubnetExisting!.properties.addressPrefix : ''
+var derivedPeSubnetPrefix = !empty(candidatePeSubnetId) ? peSubnetExisting!.properties.addressPrefix : ''
+
+var resolvedAgentSubnetName = !empty(trim(agentSubnetName)) ? agentSubnetName : (!empty(agentSubnetNameFromId) ? agentSubnetNameFromId : 'agent-subnet')
+var resolvedPeSubnetName = !empty(trim(peSubnetName)) ? peSubnetName : (!empty(peSubnetNameFromId) ? peSubnetNameFromId : 'pe-subnet')
+var resolvedAgentSubnetPrefix = !empty(trim(agentSubnetPrefix)) ? agentSubnetPrefix : derivedAgentSubnetPrefix
+var resolvedPeSubnetPrefix = !empty(trim(peSubnetPrefix)) ? peSubnetPrefix : derivedPeSubnetPrefix
 
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 	name: take('foundryv2-naming-${resolvedTargetResourceGroup}', 64)
@@ -217,8 +250,8 @@ module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
 		vnetAddressPrefix: vnetAddressPrefix
 		agentSubnetName: resolvedAgentSubnetName
 		peSubnetName: resolvedPeSubnetName
-		agentSubnetPrefix: agentSubnetPrefix
-		peSubnetPrefix: peSubnetPrefix
+		agentSubnetPrefix: resolvedAgentSubnetPrefix
+		peSubnetPrefix: resolvedPeSubnetPrefix
 		aiSearchResourceId: resolvedAiSearchResourceId
 		azureStorageAccountResourceId: resolvedAzureStorageAccountResourceId
 		azureCosmosDBAccountResourceId: resolvedAzureCosmosDbResourceId

@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "1477020545186117311"
+      "templateHash": "11072132323910080244"
     }
   },
   "parameters": {
@@ -138,7 +138,7 @@
     },
     "vnetName": {
       "type": "string",
-      "defaultValue": "agent-vnet-test",
+      "defaultValue": "",
       "metadata": {
         "description": "Virtual network name when creating a new network."
       }
@@ -152,14 +152,14 @@
     },
     "agentSubnetName": {
       "type": "string",
-      "defaultValue": "agent-subnet",
+      "defaultValue": "",
       "metadata": {
         "description": "Subnet name dedicated to agents."
       }
     },
     "peSubnetName": {
       "type": "string",
-      "defaultValue": "pe-subnet",
+      "defaultValue": "",
       "metadata": {
         "description": "Subnet name dedicated to private endpoints."
       }
@@ -275,6 +275,13 @@
       "metadata": {
         "description": "Optional secondary AKS subnet resource ID."
       }
+    },
+    "disableAgentNetworkInjection": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Disable agent network injection even when agent subnet inputs are provided."
+      }
     }
   },
   "variables": {
@@ -284,14 +291,25 @@
     "moduleDeploymentSuffix": "[uniqueString(variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup'), parameters('location'))]",
     "resolvedPrivDnsSubscription": "[if(not(empty(trim(parameters('privDnsSubscription_param')))), parameters('privDnsSubscription_param'), variables('resolvedSubscriptionId'))]",
     "resolvedPrivDnsResourceGroup": "[if(and(not(empty(trim(parameters('privDnsResourceGroup_param')))), parameters('centralDnsZoneByPolicyInHub')), parameters('privDnsResourceGroup_param'), variables('resolvedTargetResourceGroup'))]",
-    "subnetSourceForVnet": "[if(not(empty(trim(parameters('genaiSubnetId')))), parameters('genaiSubnetId'), if(not(empty(trim(parameters('acaSubnetId')))), parameters('acaSubnetId'), ''))]",
+    "normalizedGenaiSubnetId": "[trim(parameters('genaiSubnetId'))]",
+    "normalizedAcaSubnetId": "[trim(parameters('acaSubnetId'))]",
+    "normalizedAca2SubnetId": "[trim(parameters('aca2SubnetId'))]",
+    "subnetSourceForVnet": "[if(not(empty(variables('normalizedGenaiSubnetId'))), variables('normalizedGenaiSubnetId'), if(not(empty(variables('normalizedAca2SubnetId'))), variables('normalizedAca2SubnetId'), if(not(empty(variables('normalizedAcaSubnetId'))), variables('normalizedAcaSubnetId'), '')))]",
     "vnetResourceIdFromSubnet": "[if(not(empty(variables('subnetSourceForVnet'))), split(variables('subnetSourceForVnet'), '/subnets/')[0], '')]",
     "resolvedExistingVnetResourceId": "[if(not(empty(trim(parameters('existingVnetResourceId')))), parameters('existingVnetResourceId'), variables('vnetResourceIdFromSubnet'))]",
     "resolvedVnetName": "[if(not(empty(trim(parameters('vnetName')))), parameters('vnetName'), if(not(empty(variables('resolvedExistingVnetResourceId'))), last(split(variables('resolvedExistingVnetResourceId'), '/')), parameters('vnetName')))]",
-    "resolvedAgentSubnetId": "[if(not(empty(trim(parameters('acaSubnetId')))), parameters('acaSubnetId'), variables('subnetSourceForVnet'))]",
-    "resolvedPeSubnetId": "[if(not(empty(trim(parameters('genaiSubnetId')))), parameters('genaiSubnetId'), variables('resolvedAgentSubnetId'))]",
-    "resolvedAgentSubnetName": "[if(not(empty(trim(parameters('agentSubnetName')))), parameters('agentSubnetName'), if(not(empty(variables('resolvedAgentSubnetId'))), last(split(variables('resolvedAgentSubnetId'), '/')), parameters('agentSubnetName')))]",
-    "resolvedPeSubnetName": "[if(not(empty(trim(parameters('peSubnetName')))), parameters('peSubnetName'), if(not(empty(variables('resolvedPeSubnetId'))), last(split(variables('resolvedPeSubnetId'), '/')), parameters('peSubnetName')))]"
+    "candidateAgentSubnetId": "[if(and(not(parameters('disableAgentNetworkInjection')), not(empty(variables('normalizedAca2SubnetId')))), variables('normalizedAca2SubnetId'), if(and(and(not(parameters('disableAgentNetworkInjection')), empty(variables('normalizedAca2SubnetId'))), not(empty(variables('normalizedAcaSubnetId')))), variables('normalizedAcaSubnetId'), ''))]",
+    "candidatePeSubnetId": "[if(not(empty(variables('normalizedGenaiSubnetId'))), variables('normalizedGenaiSubnetId'), if(not(empty(variables('subnetSourceForVnet'))), variables('subnetSourceForVnet'), ''))]",
+    "agentSubnetSubscriptionId": "[if(not(empty(variables('candidateAgentSubnetId'))), split(variables('candidateAgentSubnetId'), '/')[2], variables('resolvedSubscriptionId'))]",
+    "agentSubnetResourceGroupName": "[if(not(empty(variables('candidateAgentSubnetId'))), split(variables('candidateAgentSubnetId'), '/')[4], variables('resolvedTargetResourceGroup'))]",
+    "agentSubnetVnetName": "[if(not(empty(variables('candidateAgentSubnetId'))), split(variables('candidateAgentSubnetId'), '/')[8], variables('resolvedVnetName'))]",
+    "agentSubnetNameFromId": "[if(not(empty(variables('candidateAgentSubnetId'))), split(variables('candidateAgentSubnetId'), '/')[10], '')]",
+    "peSubnetSubscriptionId": "[if(not(empty(variables('candidatePeSubnetId'))), split(variables('candidatePeSubnetId'), '/')[2], variables('resolvedSubscriptionId'))]",
+    "peSubnetResourceGroupName": "[if(not(empty(variables('candidatePeSubnetId'))), split(variables('candidatePeSubnetId'), '/')[4], variables('resolvedTargetResourceGroup'))]",
+    "peSubnetVnetName": "[if(not(empty(variables('candidatePeSubnetId'))), split(variables('candidatePeSubnetId'), '/')[8], variables('resolvedVnetName'))]",
+    "peSubnetNameFromId": "[if(not(empty(variables('candidatePeSubnetId'))), split(variables('candidatePeSubnetId'), '/')[10], '')]",
+    "resolvedAgentSubnetName": "[if(not(empty(trim(parameters('agentSubnetName')))), parameters('agentSubnetName'), if(not(empty(variables('agentSubnetNameFromId'))), variables('agentSubnetNameFromId'), 'agent-subnet'))]",
+    "resolvedPeSubnetName": "[if(not(empty(trim(parameters('peSubnetName')))), parameters('peSubnetName'), if(not(empty(variables('peSubnetNameFromId'))), variables('peSubnetNameFromId'), 'pe-subnet'))]"
   },
   "resources": [
     {
@@ -1232,12 +1250,8 @@
           "peSubnetName": {
             "value": "[variables('resolvedPeSubnetName')]"
           },
-          "agentSubnetPrefix": {
-            "value": "[parameters('agentSubnetPrefix')]"
-          },
-          "peSubnetPrefix": {
-            "value": "[parameters('peSubnetPrefix')]"
-          },
+          "agentSubnetPrefix": "[if(not(empty(trim(parameters('agentSubnetPrefix')))), createObject('value', parameters('agentSubnetPrefix')), if(not(empty(variables('candidateAgentSubnetId'))), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('agentSubnetSubscriptionId'), variables('agentSubnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', split(format('{0}/{1}', variables('agentSubnetVnetName'), variables('agentSubnetNameFromId')), '/')[0], split(format('{0}/{1}', variables('agentSubnetVnetName'), variables('agentSubnetNameFromId')), '/')[1]), '2023-04-01').addressPrefix), createObject('value', '')))]",
+          "peSubnetPrefix": "[if(not(empty(trim(parameters('peSubnetPrefix')))), createObject('value', parameters('peSubnetPrefix')), if(not(empty(variables('candidatePeSubnetId'))), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('peSubnetSubscriptionId'), variables('peSubnetResourceGroupName')), 'Microsoft.Network/virtualNetworks/subnets', split(format('{0}/{1}', variables('peSubnetVnetName'), variables('peSubnetNameFromId')), '/')[0], split(format('{0}/{1}', variables('peSubnetVnetName'), variables('peSubnetNameFromId')), '/')[1]), '2023-04-01').addressPrefix), createObject('value', '')))]",
           "aiSearchResourceId": "[if(not(empty(trim(parameters('aiSearchResourceId')))), createObject('value', parameters('aiSearchResourceId')), if(not(empty(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup')), 'Microsoft.Resources/deployments', take(format('foundryv2-naming-{0}', variables('resolvedTargetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value)), createObject('value', resourceId(variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup'), 'Microsoft.Search/searchServices', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup')), 'Microsoft.Resources/deployments', take(format('foundryv2-naming-{0}', variables('resolvedTargetResourceGroup')), 64)), '2022-09-01').outputs.safeNameAISearch.value)), createObject('value', '')))]",
           "azureStorageAccountResourceId": "[if(not(empty(trim(parameters('azureStorageAccountResourceId')))), createObject('value', parameters('azureStorageAccountResourceId')), if(not(empty(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup')), 'Microsoft.Resources/deployments', take(format('foundryv2-naming-{0}', variables('resolvedTargetResourceGroup')), 64)), '2022-09-01').outputs.storageAccount1001Name.value)), createObject('value', resourceId(variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup'), 'Microsoft.Storage/storageAccounts', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup')), 'Microsoft.Resources/deployments', take(format('foundryv2-naming-{0}', variables('resolvedTargetResourceGroup')), 64)), '2022-09-01').outputs.storageAccount1001Name.value)), createObject('value', '')))]",
           "azureCosmosDBAccountResourceId": "[if(not(empty(trim(parameters('azureCosmosDBAccountResourceId')))), createObject('value', parameters('azureCosmosDBAccountResourceId')), if(not(empty(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup')), 'Microsoft.Resources/deployments', take(format('foundryv2-naming-{0}', variables('resolvedTargetResourceGroup')), 64)), '2022-09-01').outputs.cosmosDBName.value)), createObject('value', resourceId(variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup'), 'Microsoft.DocumentDB/databaseAccounts', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', variables('resolvedSubscriptionId'), variables('resolvedTargetResourceGroup')), 'Microsoft.Resources/deployments', take(format('foundryv2-naming-{0}', variables('resolvedTargetResourceGroup')), 64)), '2022-09-01').outputs.cosmosDBName.value)), createObject('value', '')))]",
