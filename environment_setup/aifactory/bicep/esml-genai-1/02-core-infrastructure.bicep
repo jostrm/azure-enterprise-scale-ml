@@ -58,7 +58,7 @@ param bingExists bool = false
 param miACAExists bool = false
 param miPrjExists bool = false
 
-// Enable flags from parameter files
+// TODO: not uses there, remove later to v.1.24
 @description('Enable Bing Search deployment')
 param enableBingSearch bool = false
 

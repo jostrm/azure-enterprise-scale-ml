@@ -186,11 +186,14 @@ resource cMKKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (!empt
     split(customerManagedKey.?keyVaultResourceId!, '/')[4]
   )
 
-  resource cMKKey 'keys@2024-11-01' existing = if (!empty(customerManagedKey.?keyVaultResourceId) && !empty(customerManagedKey.?keyName)) {
-    name: customerManagedKey.?keyName!
-  }
 }
-
+resource cMKKey 'Microsoft.KeyVault/vaults/keys@2024-11-01' existing = if (!empty(customerManagedKey.?keyVaultResourceId) && !empty(customerManagedKey.?keyName)) {
+  name: '${cMKKeyVault.name}/${customerManagedKey.?keyName!}'
+  scope: resourceGroup(
+    split(customerManagedKey.?keyVaultResourceId!, '/')[2],
+    split(customerManagedKey.?keyVaultResourceId!, '/')[4]
+  )
+}
 resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2025-01-31-preview' existing = if (!empty(customerManagedKey.?userAssignedIdentityResourceId)) {
   name: last(split(customerManagedKey.?userAssignedIdentityResourceId!, '/'))
   scope: resourceGroup(
@@ -233,17 +236,12 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
       ? {
           keySource: 'Microsoft.KeyVault'
           keyVaultProperties: {
-            identityClientId: !empty(customerManagedKey.?userAssignedIdentityResourceId ?? '')
+            identityClientId: !empty(customerManagedKey) && !empty(cMKUserAssignedIdentity) ? cMKUserAssignedIdentity.properties.clientId : null
             #disable-next-line BCP318
-              ? cMKUserAssignedIdentity.properties.clientId
-              : null
-            #disable-next-line BCP318
-            keyVaultUri: cMKKeyVault.properties.vaultUri
-            keyName: customerManagedKey!.keyName
-            keyVersion: !empty(customerManagedKey.?keyVersion ?? '')
-              ? customerManagedKey!.?keyVersion
-              #disable-next-line BCP318
-              : last(split(cMKKeyVault::cMKKey.properties.keyUriWithVersion, '/'))
+            keyVaultUri: !empty(customerManagedKey) ? cMKKeyVault!.properties.vaultUri : ''
+            keyVersion: (!empty(customerManagedKey) && !empty(customerManagedKey.?keyVersion ?? ''))
+              ? customerManagedKey!.keyVersion
+              : (!empty(customerManagedKey) ? last(split(cMKKey!.properties.keyUriWithVersion, '/')) : '')
           }
         }
       : null

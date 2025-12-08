@@ -1145,35 +1145,35 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
 }
 
 #disable-next-line BCP318
-var aiFoundryAccountNameAvm = aiFoundry2025Avm.outputs.aiServicesName
+var aiFoundryAccountNameAvm = (deployAvmFoundry && !foundryV22AccountOnly) ? aiFoundry2025Avm.outputs.aiServicesName : ''
 #disable-next-line BCP318
-var aiFoundryAccountNameLegacy = aiFoundry2025NoAvm!.outputs.name
+var aiFoundryResourceGroupOutput = (deployAvmFoundry && !foundryV22AccountOnly) ? aiFoundry2025Avm.outputs.resourceGroupName : targetResourceGroup
 #disable-next-line BCP318
-var aiFoundryAccountNameV22 = (!foundryV22AccountOnly && enableAIFoundryV22) ? aiFoundry2025NoAvmV22!.outputs.aiAccountName : ''
+var aiFoundryResourceIdAvm = (deployAvmFoundry && !foundryV22AccountOnly)
+  ? resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameAvm)
+  : ''
 #disable-next-line BCP318
-var aiFoundryAccountNameV22AccountOnly = (foundryV22AccountOnly && enableAIFoundryV22) ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName : ''
+var aiFoundryAccountNameLegacy = (!enableAIFoundryV22 && !deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly) ? aiFoundry2025NoAvm!.outputs.name : '' 
+#disable-next-line BCP318
+var aiFoundryAccountNameV22 = (!foundryV22AccountOnly && enableAIFoundryV22 && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundryV21)) ? aiFoundry2025NoAvmV22!.outputs.aiAccountName : ''
+#disable-next-line BCP318
+var aiFoundryAccountNameV22AccountOnly = (foundryV22AccountOnly && enableAIFoundryV22 && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundryV21)) ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName : ''
 
-var aiFoundryAccountNameOutput = useAVMFoundry && deployAvmFoundry
+var aiFoundryAccountNameOutput = (deployAvmFoundry && !foundryV22AccountOnly)
   ? aiFoundryAccountNameAvm
   : (enableAIFoundryV22
       ? (foundryV22AccountOnly ? aiFoundryAccountNameV22AccountOnly : aiFoundryAccountNameV22)
       : aiFoundryAccountNameLegacy)
 
-#disable-next-line BCP318
-var aiFoundryResourceGroupOutput = deployAvmFoundry? aiFoundry2025Avm.outputs.resourceGroupName : targetResourceGroup
 
 #disable-next-line BCP318
-var aiFoundryResourceIdAvm = deployAvmFoundry
-  ? resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameAvm)
-  : ''
+var aiFoundryResourceIdLegacy = (!enableAIFoundryV22 && !deployAvmFoundry && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly) ? aiFoundry2025NoAvm!.outputs.resourceId : ''
 #disable-next-line BCP318
-var aiFoundryResourceIdLegacy = aiFoundry2025NoAvm!.outputs.resourceId
+var aiFoundryResourceIdV22 = (!foundryV22AccountOnly && enableAIFoundryV22 && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundryV21)) ? aiFoundry2025NoAvmV22!.outputs.aiAccountId : ''
 #disable-next-line BCP318
-var aiFoundryResourceIdV22 = (!foundryV22AccountOnly && enableAIFoundryV22) ? aiFoundry2025NoAvmV22!.outputs.aiAccountId : ''
-#disable-next-line BCP318
-var aiFoundryResourceIdV22AccountOnly = (foundryV22AccountOnly && enableAIFoundryV22) ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountId : ''
+var aiFoundryResourceIdV22AccountOnly = (foundryV22AccountOnly && enableAIFoundryV22 && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundryV21)) ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountId : ''
 
-var aiFoundryResourceIdOutput = useAVMFoundry
+var aiFoundryResourceIdOutput = (deployAvmFoundry && !foundryV22AccountOnly)
   ? aiFoundryResourceIdAvm
   : (enableAIFoundryV22
       ? (foundryV22AccountOnly ? aiFoundryResourceIdV22AccountOnly : aiFoundryResourceIdV22)
