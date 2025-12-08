@@ -1153,17 +1153,19 @@ var aiFoundryAccountNameV22 = (!foundryV22AccountOnly && enableAIFoundryV22) ? a
 #disable-next-line BCP318
 var aiFoundryAccountNameV22AccountOnly = (foundryV22AccountOnly && enableAIFoundryV22) ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName : ''
 
-var aiFoundryAccountNameOutput = useAVMFoundry
+var aiFoundryAccountNameOutput = useAVMFoundry && deployAvmFoundry
   ? aiFoundryAccountNameAvm
   : (enableAIFoundryV22
       ? (foundryV22AccountOnly ? aiFoundryAccountNameV22AccountOnly : aiFoundryAccountNameV22)
       : aiFoundryAccountNameLegacy)
 
 #disable-next-line BCP318
-var aiFoundryResourceGroupOutput = useAVMFoundry ? aiFoundry2025Avm.outputs.resourceGroupName : targetResourceGroup
+var aiFoundryResourceGroupOutput = deployAvmFoundry? aiFoundry2025Avm.outputs.resourceGroupName : targetResourceGroup
 
 #disable-next-line BCP318
-var aiFoundryResourceIdAvm = resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameAvm)
+var aiFoundryResourceIdAvm = deployAvmFoundry
+  ? resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameAvm)
+  : ''
 #disable-next-line BCP318
 var aiFoundryResourceIdLegacy = aiFoundry2025NoAvm!.outputs.resourceId
 #disable-next-line BCP318
