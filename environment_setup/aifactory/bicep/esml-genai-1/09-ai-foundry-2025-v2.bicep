@@ -141,7 +141,7 @@ var resolvedSubscriptionId = !empty(trim(subscriptionIdDevTestProd)) ? subscript
 var moduleDeploymentSuffix = uniqueString(resolvedSubscriptionId, resolvedTargetResourceGroup, location)
 
 var resolvedPrivDnsSubscription = !empty(trim(privDnsSubscription_param)) ? privDnsSubscription_param : resolvedSubscriptionId
-var resolvedPrivDnsResourceGroup = (!empty(trim(privDnsResourceGroup_param)) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : resolvedTargetResourceGroup
+var resolvedPrivDnsResourceGroup = (!empty(trim(privDnsResourceGroup_param)) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : resolvedCommonResourceGroup
 
 var normalizedGenaiSubnetId = trim(genaiSubnetId)
 var normalizedAcaSubnetId = trim(acaSubnetId)
