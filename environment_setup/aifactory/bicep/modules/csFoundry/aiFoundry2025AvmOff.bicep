@@ -391,6 +391,7 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
 // AIF used: 2025-07-01-preview
 // AVM module uses: 2025-06-01 
 // GH AF uses: 2025-04-01-preview
+#disable-next-line BCP081
 resource cognitiveService 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' = {
   name: name
   kind: kind

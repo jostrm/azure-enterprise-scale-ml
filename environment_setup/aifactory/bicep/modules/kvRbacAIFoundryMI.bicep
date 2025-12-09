@@ -17,6 +17,7 @@ param keyVaultSecretsOfficerRoleId string = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd
 param keyVaultSecretsUserRoleId string = '4633458b-17de-408a-b874-0445c86b69e6'
 
 // Reference the AI Foundry account to get its system-assigned managed identity
+#disable-next-line BCP081
 resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
   name: aiFoundryAccountName
 }

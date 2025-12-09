@@ -27,6 +27,7 @@ param searchIndexDataContributorRoleId string
 param azureAIDeveloperRoleId string = '64702f94-c441-49e6-a78b-ef80e0188fee'
 
 // Reference the AI Foundry account to get its system-assigned managed identity
+#disable-next-line BCP081
 resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
   name: aiFoundryAccountName
 }

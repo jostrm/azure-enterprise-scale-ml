@@ -236,6 +236,7 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
       ? {
           keySource: 'Microsoft.KeyVault'
           keyVaultProperties: {
+            #disable-next-line BCP318
             identityClientId: !empty(customerManagedKey) && !empty(cMKUserAssignedIdentity) ? cMKUserAssignedIdentity.properties.clientId : null
             #disable-next-line BCP318
             keyVaultUri: !empty(customerManagedKey) ? cMKKeyVault!.properties.vaultUri : ''
@@ -248,8 +249,11 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
   }
 }
 
+#disable-next-line BCP318
 var aiAccountId = foundryV22AccountOnly ? aiAccount.id : ''
+#disable-next-line BCP318
 var aiAccountEndpoint = foundryV22AccountOnly ? aiAccount.properties.endpoint : ''
+#disable-next-line BCP318
 var aiAccountPrincipalId = foundryV22AccountOnly? aiAccount.identity.principalId: ''
 
 @description('The name of the cognitive services account.')

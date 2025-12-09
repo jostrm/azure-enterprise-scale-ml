@@ -26,6 +26,7 @@ param storageFileDataPrivilegedContributorRoleId string
 param storageQueueDataContributorRoleId string = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 
 // Reference the AI Foundry account to get its system-assigned managed identity
+#disable-next-line BCP081
 resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
   name: aiFoundryAccountName
 }

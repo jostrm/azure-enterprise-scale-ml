@@ -15,6 +15,7 @@ var resolvedAccountCapabilityHostName = empty(projectCapHostName) ? defaultAccou
 
 // CRITICAL: Use API version 2025-07-01-preview for capability hosts (per AVM module)
 // AI Foundry resource (AI Services) - must use 2025-07-01-preview for capability host support
+#disable-next-line BCP081
 resource account 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
    name: accountName
 }
@@ -27,16 +28,19 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-previ
 
 // Get existing connection resources to reference them properly
 // These connections must already be deployed by the aiFoundry2025project.bicep module
+#disable-next-line BCP081
 resource cosmosDbConnectionResource 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' existing = {
   name: cosmosDBConnection
   parent: project
 }
 
+#disable-next-line BCP081
 resource storageAccountConnectionResource 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' existing = {
   name: azureStorageConnection
   parent: project
 }
 
+#disable-next-line BCP081
 resource aiSearchConnectionResource 'Microsoft.CognitiveServices/accounts/projects/connections@2025-07-01-preview' existing = {
   name: aiSearchConnection
   parent: project
@@ -45,6 +49,7 @@ resource aiSearchConnectionResource 'Microsoft.CognitiveServices/accounts/projec
 // Account-level capability host - Must be created BEFORE project capability host
 // NOTE: Name format follows AVM pattern - remove dashes from account name
 // IMPORTANT: Account capability host depends on project and connections per AVM pattern
+#disable-next-line BCP081
 resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-07-01-preview' = if (accountLevel) {
   name: resolvedAccountCapabilityHostName
   parent: account
@@ -55,6 +60,7 @@ resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityH
 
 // Project-level capability host - Created AFTER account capability host
 // NOTE: Name format follows AVM pattern - remove dashes from project name
+#disable-next-line BCP081
 resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-07-01-preview' = if (!accountLevel) {
   name: resolvedProjectCapabilityHostName
   parent: project
