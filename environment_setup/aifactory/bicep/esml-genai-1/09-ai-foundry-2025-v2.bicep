@@ -35,6 +35,12 @@ param commonResourceSuffix string
 @description('Suffix appended to project specific resources (for example "-001").')
 param resourceSuffix string
 
+@description('Prefix applied to project resource groups (for example "esml-").')
+param projectPrefix string = 'esml-'
+
+@description('Suffix applied to project resource groups (for example "-rg").')
+param projectSuffix string = '-rg'
+
 @description('Suffix appended to resource group names (for example "-rg").')
 param aifactorySuffixRG string = ''
 
@@ -128,8 +134,9 @@ param aks2SubnetId string = ''
 @description('Disable agent network injection even when agent subnet inputs are provided.')
 param disableAgentNetworkInjection bool = false
 
+var projectName = 'prj${projectNumber}'
 var resolvedCommonResourceGroup = !empty(trim(commonResourceGroup_param)) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
-var resolvedTargetResourceGroup = !empty(trim(targetResourceGroupName)) ? targetResourceGroupName : resolvedCommonResourceGroup
+var resolvedTargetResourceGroup = !empty(trim(targetResourceGroupName)) ? targetResourceGroupName : '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 var resolvedSubscriptionId = !empty(trim(subscriptionIdDevTestProd)) ? subscriptionIdDevTestProd : targetSubscriptionId
 var moduleDeploymentSuffix = uniqueString(resolvedSubscriptionId, resolvedTargetResourceGroup, location)
 
