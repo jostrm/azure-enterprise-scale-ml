@@ -959,7 +959,7 @@ var projectWorkspaceId = (projectModuleEnabled && enableAIFoundryV21 && (!aiFoun
 
 // Function to assign roles to users and service principals for a cognitive services account
 @description('Function to assign roles to users and service principals for a cognitive services account')
-module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !aiFoundryV2Exists && !foundryV22AccountOnly) {
+module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if(projectModuleEnabled && enableAIFoundryV21 && !aiFoundryV2Exists && !foundryV22AccountOnly) {
   name: '07-AifV21_UserRBAC-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -984,7 +984,7 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   ]
 }
 
-module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && !aiFoundryV2Exists && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_RBACpreCH_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1001,7 +1001,7 @@ module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = i
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
-module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(enableAISearch && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(enableAISearch && enableAIFoundryV21 && !aiFoundryV2Exists && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1027,7 +1027,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
-module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(enableAIFoundryV21 && !aiFoundryV2Exists && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacStorage-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1088,7 +1088,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
 // START CAPHOST RBAC: Some RBAC for COSMOS & STORAGE must be assigned AFTER the CAPABILITY HOST is created
 // - The Storage Blob Data Owner role must be assigned after.
 // - The Cosmos Built-In Data Contributor role must be assigned after.
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundryV21 && !aiFoundryV2Exists && !foundryV22AccountOnly) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -1107,7 +1107,7 @@ module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = 
 // END CAPHOST RBAC
 
 // CRITICAL: Add Key Vault RBAC for Agent playground functionality
-module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundryV21 && !aiFoundryV2Exists && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1130,7 +1130,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
 }
 
 // ADDITIONAL: Assign specific Key Vault roles to the AI Foundry managed identity for the project Key Vault 
-module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundryV21 && !aiFoundryV2Exists && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1190,7 +1190,7 @@ var customerManagedKey = cmk ? {
 } : null
 
 // ==== Shared private link Azure AI Search to foundry
-var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && enableAISearch && (enableAIFoundryV21 || enableAIFoundryV22)
+var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && enableAISearch && (enableAIFoundryV21 || enableAIFoundryV22) && !aiFoundryV2Exists
 
 module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bicep' = if (enableSharedLinkDeployment) {
   name: take('09-aiSearchSPL-${deploymentProjSpecificUniqueSuffix}', 64)

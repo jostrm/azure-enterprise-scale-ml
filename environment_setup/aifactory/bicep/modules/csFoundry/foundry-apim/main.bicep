@@ -95,31 +95,8 @@ param azureCosmosDBAccountResourceId string = ''
 @description('The API Management Service full ARM Resource ID. This is an optional field for existing API Management services.')
 param apiManagementResourceId string = ''
 
-//New Param for resource group of Private DNS zones
-//@description('Optional: Resource group containing existing private DNS zones. If specified, DNS zones will not be created.')
-//param existingDnsZonesResourceGroup string = ''
-
-@description('Object mapping DNS zone names to an existing zone reference. Values can be full private DNS zone resource IDs (recommended when zones live in another subscription) or legacy resource group names in the current subscription. Leave empty to create the zone.')
-param existingDnsZones object = {
-  'privatelink.services.ai.azure.com': ''
-  'privatelink.openai.azure.com': ''
-  'privatelink.cognitiveservices.azure.com': ''               
-  'privatelink.search.windows.net': ''           
-  'privatelink.blob.core.windows.net': ''                            
-  'privatelink.documents.azure.com': ''
-  'privatelink.azure-api.net': ''                       
-}
-
-@description('Zone Names for Validation of existing Private Dns Zones')
-param dnsZoneNames array = [
-  'privatelink.services.ai.azure.com'
-  'privatelink.openai.azure.com'
-  'privatelink.cognitiveservices.azure.com'
-  'privatelink.search.windows.net'
-  'privatelink.blob.core.windows.net'
-  'privatelink.documents.azure.com'
-  'privatelink.azure-api.net'
-]
+@description('Full privateLinksDnsZones object emitted by CmnPrivateDnsZones, providing consistent names and resource IDs for all private DNS zones.')
+param privateLinksDnsZones object
 
 
 var projectName = toLower('${firstProjectName}${uniqueSuffix}')
@@ -201,8 +178,6 @@ module validateExistingResources 'modules-network-secured/validate-existing-reso
     azureStorageAccountResourceId: azureStorageAccountResourceId
     azureCosmosDBAccountResourceId: azureCosmosDBAccountResourceId
     apiManagementResourceId: apiManagementResourceId
-    existingDnsZones: existingDnsZones
-    dnsZoneNames: dnsZoneNames
   }
 }
 
@@ -273,7 +248,7 @@ module privateEndpointAndDNS 'modules-network-secured/private-endpoint-and-dns.b
       storageAccountSubscriptionId: azureStorageSubscriptionId // Subscription ID for Storage Account
       apiManagementResourceGroupName: validateExistingResources.outputs.apiManagementResourceGroupName // Resource Group for API Management (if provided)
       apiManagementSubscriptionId: validateExistingResources.outputs.apiManagementSubscriptionId // Subscription ID for API Management (if provided)
-      existingDnsZones: existingDnsZones
+      privateLinksDnsZones: privateLinksDnsZones
     }
     dependsOn: [
     aiSearch      // Ensure AI Search exists

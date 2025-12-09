@@ -95,12 +95,6 @@ param azureCosmosDBAccountResourceId string = ''
 @description('Existing API Management instance resource ID. Optional input that can remain empty.')
 param apiManagementResourceId string = ''
 
-@description('JSON encoded object describing existing DNS zones keyed by zone name. Values can be full private DNS zone resource IDs or legacy resource group names; leave blank to auto-resolve.')
-param existingDnsZones string = ''
-
-@description('JSON encoded array identifying DNS zones that should be validated. Leave blank to auto-resolve.')
-param dnsZoneNames string = ''
-
 @description('Optional Databricks public subnet name, retained for compatibility with legacy parameter files.')
 param dbxPubSubnetName string = ''
 
@@ -236,27 +230,6 @@ module privateDns '../modules/common/CmnPrivateDnsZones.bicep' = {
 }
 
 var privateLinksDnsZones = privateDns.outputs.privateLinksDnsZones
-var computedExistingDnsZones = {
-	'${privateLinksDnsZones.servicesai.name}': privateLinksDnsZones.servicesai.id
-	'${privateLinksDnsZones.openai.name}': privateLinksDnsZones.openai.id
-	'${privateLinksDnsZones.cognitiveservices.name}': privateLinksDnsZones.cognitiveservices.id
-	'${privateLinksDnsZones.searchService.name}': privateLinksDnsZones.searchService.id
-	'${privateLinksDnsZones.blob.name}': privateLinksDnsZones.blob.id
-	'${privateLinksDnsZones.cosmosdbnosql.name}': privateLinksDnsZones.cosmosdbnosql.id
-	'${privateLinksDnsZones.apim.name}': privateLinksDnsZones.apim.id
-}
-var computedDnsZoneNames = [
-	privateLinksDnsZones.servicesai.name
-	privateLinksDnsZones.openai.name
-	privateLinksDnsZones.cognitiveservices.name
-	privateLinksDnsZones.searchService.name
-	privateLinksDnsZones.blob.name
-	privateLinksDnsZones.cosmosdbnosql.name
-	privateLinksDnsZones.apim.name
-]
-
-var resolvedExistingDnsZones = !empty(trim(existingDnsZones)) ? json(existingDnsZones) : computedExistingDnsZones
-var resolvedDnsZoneNames = !empty(trim(dnsZoneNames)) ? json(dnsZoneNames) : computedDnsZoneNames
 
 module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
 	name: take('foundry-apim-${moduleDeploymentSuffix}', 64)
@@ -274,7 +247,6 @@ module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
 		azureStorageAccountResourceId: resolvedAzureStorageAccountResourceId
 		azureCosmosDBAccountResourceId: resolvedAzureCosmosDbResourceId
 		apiManagementResourceId: apiManagementResourceId
-		existingDnsZones: resolvedExistingDnsZones
-		dnsZoneNames: resolvedDnsZoneNames
+		privateLinksDnsZones: privateLinksDnsZones
 	}
 }

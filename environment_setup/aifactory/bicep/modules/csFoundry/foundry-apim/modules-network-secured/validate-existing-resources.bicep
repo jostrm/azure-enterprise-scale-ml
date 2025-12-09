@@ -77,34 +77,3 @@ output azureStorageResourceGroupName string = azureStorageResourceGroupName
 
 output apiManagementSubscriptionId string = apiManagementSubscriptionId
 output apiManagementResourceGroupName string = apiManagementResourceGroupName
-
-// Adding DNS Zone Check
-
-@description('Object mapping DNS zone names to their resource group, or empty string to indicate creation')
-param existingDnsZones object
-
-@description('List of private DNS zone names to validate')
-param dnsZoneNames array
-
-var dnsZoneTypes = [
-  'Microsoft.Network/privateDnsZones'
-]
-
-// Output whether each DNS zone exists
-output dnsZoneExists array = [
-  for zoneName in dnsZoneNames: {
-    name: zoneName
-    exists: !empty(existingDnsZones[zoneName])
-  }
-]
-
-/*
-// Helper function to check existence
-function resourceExists(resourceType: string, name: string, rg: string): bool {
-  // Use the existing resource reference to check
-  var res = existing resource dnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-    name: name
-    scope: resourceGroup(rg)
-  }
-  return !empty(res.id)
-}*/
