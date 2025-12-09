@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "6982150860712094827"
+      "templateHash": "13011732161357993560"
     }
   },
   "parameters": {
@@ -32799,7 +32799,7 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "cognitiveServiceName": "[if(parameters('addAIFoundryV21'), createObject('value', take(format('aif{0}', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.randomSalt.value), 12)), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-naming-{0}', variables('targetResourceGroup')), 64)), '2022-09-01').outputs.aifV2Name.value))]",
+          "cognitiveServiceName": "[if(parameters('enableAIFoundryV22'), if(parameters('foundryV22AccountOnly'), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV22-NoAvmAccountOnly_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)), '2022-09-01').outputs.aiAccountName.value), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV22-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)), '2022-09-01').outputs.aiAccountName.value)), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV2-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)), '2022-09-01').outputs.name.value))]",
           "cognitiveServiceId": "[if(parameters('enableAIFoundryV22'), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV22-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)), '2022-09-01').outputs.aiAccountId.value), createObject('value', reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV2-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)), '2022-09-01').outputs.resourceId.value))]",
           "location": {
             "value": "[parameters('location')]"
@@ -33041,9 +33041,9 @@
       "dependsOn": [
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV2-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV22-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV22-NoAvmAccountOnly_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', format('07-AifV21_UserRBAC-{0}', variables('deploymentProjSpecificUniqueSuffix')))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-getPrivDnsZ-{0}', variables('targetResourceGroup')), 64))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-naming-{0}', variables('targetResourceGroup')), 64))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV21_Prj_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-rbacAISearch-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-rbacStorage-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
@@ -34482,7 +34482,9 @@
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV2-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV22-NoAvm_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
         "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV22-NoAvmAccountOnly_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-naming-{0}', variables('targetResourceGroup')), 64))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-AifV21-PrivateEndpoints_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-naming-{0}', variables('targetResourceGroup')), 64))]",
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('subscriptionIdDevTestProd'), variables('targetResourceGroup')), 'Microsoft.Resources/deployments', take(format('09-rbacAISearch-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64))]"
       ]
     }
   ],
