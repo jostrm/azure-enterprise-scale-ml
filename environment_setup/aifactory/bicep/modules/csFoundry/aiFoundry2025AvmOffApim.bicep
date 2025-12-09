@@ -50,7 +50,7 @@ param azureCosmosDBAccountResourceId string = ''
 @description('Existing API Management resource ID (for optional private endpoint).')
 param apiManagementResourceId string = ''
 
-@description('Object mapping Private DNS zone names to their resource group. Leave value empty to create the zone in the current resource group.')
+@description('Object mapping private DNS zone names to either a full resource ID (preferred) or a legacy resource group name in the current subscription. Leave value empty to deploy a new zone alongside this module.')
 param existingDnsZones object = {
   'privatelink.services.ai.azure.com': ''
   'privatelink.openai.azure.com': ''
@@ -240,42 +240,86 @@ var storageZoneFromLanding = contains(privateLinksDnsZones, 'blob') ? string(pri
 var cosmosZoneFromLanding = contains(privateLinksDnsZones, 'cosmosdbnosql') ? string(privateLinksDnsZones.cosmosdbnosql.id) : ''
 var apiManagementZoneFromLanding = contains(privateLinksDnsZones, 'azureApiManagement') ? string(privateLinksDnsZones.azureApiManagement.id) : ''
 
+var aiServicesDnsZoneInput = contains(existingDnsZones, aiServicesDnsZoneName) ? string(existingDnsZones[aiServicesDnsZoneName]) : ''
+var openAiDnsZoneInput = contains(existingDnsZones, openAiDnsZoneName) ? string(existingDnsZones[openAiDnsZoneName]) : ''
+var cognitiveServicesDnsZoneInput = contains(existingDnsZones, cognitiveServicesDnsZoneName) ? string(existingDnsZones[cognitiveServicesDnsZoneName]) : ''
+var searchDnsZoneInput = contains(existingDnsZones, searchDnsZoneName) ? string(existingDnsZones[searchDnsZoneName]) : ''
+var storageDnsZoneInput = contains(existingDnsZones, storageDnsZoneName) ? string(existingDnsZones[storageDnsZoneName]) : ''
+var cosmosDnsZoneInput = contains(existingDnsZones, cosmosDnsZoneName) ? string(existingDnsZones[cosmosDnsZoneName]) : ''
+var apiManagementDnsZoneInput = contains(existingDnsZones, apiManagementDnsZoneName) ? string(existingDnsZones[apiManagementDnsZoneName]) : ''
+
+var aiServicesDnsZoneExistingId = !empty(aiServicesDnsZoneInput)
+  ? (startsWith(toLower(aiServicesDnsZoneInput), '/subscriptions/')
+      ? aiServicesDnsZoneInput
+      : resourceId(subscription().subscriptionId, aiServicesDnsZoneInput, 'Microsoft.Network/privateDnsZones', aiServicesDnsZoneName))
+  : ''
+var openAiDnsZoneExistingId = !empty(openAiDnsZoneInput)
+  ? (startsWith(toLower(openAiDnsZoneInput), '/subscriptions/')
+      ? openAiDnsZoneInput
+      : resourceId(subscription().subscriptionId, openAiDnsZoneInput, 'Microsoft.Network/privateDnsZones', openAiDnsZoneName))
+  : ''
+var cognitiveServicesDnsZoneExistingId = !empty(cognitiveServicesDnsZoneInput)
+  ? (startsWith(toLower(cognitiveServicesDnsZoneInput), '/subscriptions/')
+      ? cognitiveServicesDnsZoneInput
+      : resourceId(subscription().subscriptionId, cognitiveServicesDnsZoneInput, 'Microsoft.Network/privateDnsZones', cognitiveServicesDnsZoneName))
+  : ''
+var searchDnsZoneExistingId = !empty(searchDnsZoneInput)
+  ? (startsWith(toLower(searchDnsZoneInput), '/subscriptions/')
+      ? searchDnsZoneInput
+      : resourceId(subscription().subscriptionId, searchDnsZoneInput, 'Microsoft.Network/privateDnsZones', searchDnsZoneName))
+  : ''
+var storageDnsZoneExistingId = !empty(storageDnsZoneInput)
+  ? (startsWith(toLower(storageDnsZoneInput), '/subscriptions/')
+      ? storageDnsZoneInput
+      : resourceId(subscription().subscriptionId, storageDnsZoneInput, 'Microsoft.Network/privateDnsZones', storageDnsZoneName))
+  : ''
+var cosmosDnsZoneExistingId = !empty(cosmosDnsZoneInput)
+  ? (startsWith(toLower(cosmosDnsZoneInput), '/subscriptions/')
+      ? cosmosDnsZoneInput
+      : resourceId(subscription().subscriptionId, cosmosDnsZoneInput, 'Microsoft.Network/privateDnsZones', cosmosDnsZoneName))
+  : ''
+var apiManagementDnsZoneExistingId = !empty(apiManagementDnsZoneInput)
+  ? (startsWith(toLower(apiManagementDnsZoneInput), '/subscriptions/')
+      ? apiManagementDnsZoneInput
+      : resourceId(subscription().subscriptionId, apiManagementDnsZoneInput, 'Microsoft.Network/privateDnsZones', apiManagementDnsZoneName))
+  : ''
+
 var aiServicesDnsZoneId = !empty(servicesAiZoneFromLanding)
   ? servicesAiZoneFromLanding
-  : (empty(string(existingDnsZones[aiServicesDnsZoneName]))
-      ? resourceId('Microsoft.Network/privateDnsZones', aiServicesDnsZoneName)
-      : resourceId(subscription().subscriptionId, string(existingDnsZones[aiServicesDnsZoneName]), 'Microsoft.Network/privateDnsZones', aiServicesDnsZoneName))
+  : (!empty(aiServicesDnsZoneExistingId)
+      ? aiServicesDnsZoneExistingId
+      : resourceId('Microsoft.Network/privateDnsZones', aiServicesDnsZoneName))
 var openAiDnsZoneId = !empty(openAiZoneFromLanding)
   ? openAiZoneFromLanding
-  : (empty(string(existingDnsZones[openAiDnsZoneName]))
-      ? resourceId('Microsoft.Network/privateDnsZones', openAiDnsZoneName)
-      : resourceId(subscription().subscriptionId, string(existingDnsZones[openAiDnsZoneName]), 'Microsoft.Network/privateDnsZones', openAiDnsZoneName))
+  : (!empty(openAiDnsZoneExistingId)
+      ? openAiDnsZoneExistingId
+      : resourceId('Microsoft.Network/privateDnsZones', openAiDnsZoneName))
 var cognitiveServicesDnsZoneId = !empty(cognitiveServicesZoneFromLanding)
   ? cognitiveServicesZoneFromLanding
-  : (empty(string(existingDnsZones[cognitiveServicesDnsZoneName]))
-      ? resourceId('Microsoft.Network/privateDnsZones', cognitiveServicesDnsZoneName)
-      : resourceId(subscription().subscriptionId, string(existingDnsZones[cognitiveServicesDnsZoneName]), 'Microsoft.Network/privateDnsZones', cognitiveServicesDnsZoneName))
+  : (!empty(cognitiveServicesDnsZoneExistingId)
+      ? cognitiveServicesDnsZoneExistingId
+      : resourceId('Microsoft.Network/privateDnsZones', cognitiveServicesDnsZoneName))
 
 var searchDnsZoneId = !empty(searchZoneFromLanding)
   ? searchZoneFromLanding
-  : (empty(string(existingDnsZones[searchDnsZoneName]))
-      ? resourceId('Microsoft.Network/privateDnsZones', searchDnsZoneName)
-      : resourceId(subscription().subscriptionId, string(existingDnsZones[searchDnsZoneName]), 'Microsoft.Network/privateDnsZones', searchDnsZoneName))
+  : (!empty(searchDnsZoneExistingId)
+      ? searchDnsZoneExistingId
+      : resourceId('Microsoft.Network/privateDnsZones', searchDnsZoneName))
 var storageDnsZoneId = !empty(storageZoneFromLanding)
   ? storageZoneFromLanding
-  : (empty(string(existingDnsZones[storageDnsZoneName]))
-      ? resourceId('Microsoft.Network/privateDnsZones', storageDnsZoneName)
-      : resourceId(subscription().subscriptionId, string(existingDnsZones[storageDnsZoneName]), 'Microsoft.Network/privateDnsZones', storageDnsZoneName))
+  : (!empty(storageDnsZoneExistingId)
+      ? storageDnsZoneExistingId
+      : resourceId('Microsoft.Network/privateDnsZones', storageDnsZoneName))
 var cosmosDnsZoneId = !empty(cosmosZoneFromLanding)
   ? cosmosZoneFromLanding
-  : (empty(string(existingDnsZones[cosmosDnsZoneName]))
-      ? resourceId('Microsoft.Network/privateDnsZones', cosmosDnsZoneName)
-      : resourceId(subscription().subscriptionId, string(existingDnsZones[cosmosDnsZoneName]), 'Microsoft.Network/privateDnsZones', cosmosDnsZoneName))
+  : (!empty(cosmosDnsZoneExistingId)
+      ? cosmosDnsZoneExistingId
+      : resourceId('Microsoft.Network/privateDnsZones', cosmosDnsZoneName))
 var apiManagementDnsZoneId = !empty(apiManagementZoneFromLanding)
   ? apiManagementZoneFromLanding
-  : (empty(string(existingDnsZones[apiManagementDnsZoneName]))
-      ? resourceId('Microsoft.Network/privateDnsZones', apiManagementDnsZoneName)
-      : resourceId(subscription().subscriptionId, string(existingDnsZones[apiManagementDnsZoneName]), 'Microsoft.Network/privateDnsZones', apiManagementDnsZoneName))
+  : (!empty(apiManagementDnsZoneExistingId)
+      ? apiManagementDnsZoneExistingId
+      : resourceId('Microsoft.Network/privateDnsZones', apiManagementDnsZoneName))
 
 var storageInCurrentRg = storageResourceGroupName == resourceGroup().name && storageSecondResourceGroupName == resourceGroup().name
 var searchInCurrentRg = aiSearchServiceResourceGroupName == resourceGroup().name

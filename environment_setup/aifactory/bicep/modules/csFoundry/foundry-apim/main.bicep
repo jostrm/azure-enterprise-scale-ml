@@ -99,7 +99,7 @@ param apiManagementResourceId string = ''
 //@description('Optional: Resource group containing existing private DNS zones. If specified, DNS zones will not be created.')
 //param existingDnsZonesResourceGroup string = ''
 
-@description('Object mapping DNS zone names to their resource group, or empty string to indicate creation')
+@description('Object mapping DNS zone names to an existing zone reference. Values can be full private DNS zone resource IDs (recommended when zones live in another subscription) or legacy resource group names in the current subscription. Leave empty to create the zone.')
 param existingDnsZones object = {
   'privatelink.services.ai.azure.com': ''
   'privatelink.openai.azure.com': ''

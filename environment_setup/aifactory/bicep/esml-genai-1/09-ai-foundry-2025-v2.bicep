@@ -95,7 +95,7 @@ param azureCosmosDBAccountResourceId string = ''
 @description('Existing API Management instance resource ID. Optional input that can remain empty.')
 param apiManagementResourceId string = ''
 
-@description('JSON encoded object describing existing DNS zones keyed by zone name. Leave blank to auto-resolve.')
+@description('JSON encoded object describing existing DNS zones keyed by zone name. Values can be full private DNS zone resource IDs or legacy resource group names; leave blank to auto-resolve.')
 param existingDnsZones string = ''
 
 @description('JSON encoded array identifying DNS zones that should be validated. Leave blank to auto-resolve.')
@@ -142,6 +142,11 @@ var moduleDeploymentSuffix = uniqueString(resolvedSubscriptionId, resolvedTarget
 
 var resolvedPrivDnsSubscription = !empty(trim(privDnsSubscription_param)) ? privDnsSubscription_param : resolvedSubscriptionId
 var resolvedPrivDnsResourceGroup = (!empty(trim(privDnsResourceGroup_param)) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : resolvedCommonResourceGroup
+
+// Legacy-friendly aliases used by downstream modules and Azure DevOps parameter files
+var targetResourceGroup = resolvedTargetResourceGroup
+var privDnsSubscription = resolvedPrivDnsSubscription
+var privDnsResourceGroupName = resolvedPrivDnsResourceGroup
 
 var normalizedGenaiSubnetId = trim(genaiSubnetId)
 var normalizedAcaSubnetId = trim(acaSubnetId)
@@ -221,24 +226,24 @@ var resolvedAzureStorageAccountResourceId = !empty(trim(azureStorageAccountResou
 var resolvedAzureCosmosDbResourceId = !empty(trim(azureCosmosDBAccountResourceId)) ? azureCosmosDBAccountResourceId : computedAzureCosmosDbResourceId
 
 module privateDns '../modules/common/CmnPrivateDnsZones.bicep' = {
-	name: take('foundryv2-dns-${resolvedTargetResourceGroup}', 64)
-	scope: resourceGroup(resolvedSubscriptionId, resolvedTargetResourceGroup)
+	name: take('foundryv2-dns-${targetResourceGroup}', 64)
+	scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 	params: {
 		location: location
-		privDnsResourceGroupName: resolvedPrivDnsResourceGroup
-		privDnsSubscription: resolvedPrivDnsSubscription
+		privDnsResourceGroupName: privDnsResourceGroupName
+		privDnsSubscription: privDnsSubscription
 	}
 }
 
 var privateLinksDnsZones = privateDns.outputs.privateLinksDnsZones
 var computedExistingDnsZones = {
-	'${privateLinksDnsZones.servicesai.name}': resolvedPrivDnsResourceGroup
-	'${privateLinksDnsZones.openai.name}': resolvedPrivDnsResourceGroup
-	'${privateLinksDnsZones.cognitiveservices.name}': resolvedPrivDnsResourceGroup
-	'${privateLinksDnsZones.searchService.name}': resolvedPrivDnsResourceGroup
-	'${privateLinksDnsZones.blob.name}': resolvedPrivDnsResourceGroup
-	'${privateLinksDnsZones.cosmosdbnosql.name}': resolvedPrivDnsResourceGroup
-	'${privateLinksDnsZones.apim.name}': resolvedPrivDnsResourceGroup
+	'${privateLinksDnsZones.servicesai.name}': privateLinksDnsZones.servicesai.id
+	'${privateLinksDnsZones.openai.name}': privateLinksDnsZones.openai.id
+	'${privateLinksDnsZones.cognitiveservices.name}': privateLinksDnsZones.cognitiveservices.id
+	'${privateLinksDnsZones.searchService.name}': privateLinksDnsZones.searchService.id
+	'${privateLinksDnsZones.blob.name}': privateLinksDnsZones.blob.id
+	'${privateLinksDnsZones.cosmosdbnosql.name}': privateLinksDnsZones.cosmosdbnosql.id
+	'${privateLinksDnsZones.apim.name}': privateLinksDnsZones.apim.id
 }
 var computedDnsZoneNames = [
 	privateLinksDnsZones.servicesai.name

@@ -1790,6 +1790,8 @@ steps:
       --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
       --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
       --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
+      --parameters projectPrefix="$(projectPrefix)" \
+      --parameters projectSuffix="$(projectSuffix)" \
       --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
