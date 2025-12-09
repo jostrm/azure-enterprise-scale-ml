@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "11819546429073786698"
+      "templateHash": "6982150860712094827"
     }
   },
   "parameters": {
@@ -510,7 +510,7 @@
     "storageBlobDataContributorRoleId": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
     "storageFileDataPrivilegedContributorRoleId": "69566ab7-960f-475b-8e7c-b3118f30c6bd",
     "storageQueueDataContributorRoleId": "974c5e8b-45b9-4653-ba55-5f855dd0fb88",
-    "enableSharedLinkDeployment": "[and(and(parameters('enableAISearchSharedPrivateLink'), parameters('enableAISearch')), or(parameters('enableAIFoundryV21'), parameters('enableAIFoundryV22')))]"
+    "enableSharedLinkDeployment": "[and(and(and(parameters('enableAISearchSharedPrivateLink'), parameters('enableAISearch')), or(parameters('enableAIFoundryV21'), parameters('enableAIFoundryV22'))), not(parameters('foundryV22AccountOnly')))]"
   },
   "resources": [
     {
@@ -2885,7 +2885,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.37.4.10188",
-              "templateHash": "12534410308438743548"
+              "templateHash": "7878458439509830868"
             }
           },
           "parameters": {
@@ -3023,7 +3023,7 @@
                 "privatelink.azure-api.net": ""
               },
               "metadata": {
-                "description": "Object mapping Private DNS zone names to their resource group. Leave value empty to create the zone in the current resource group."
+                "description": "Object mapping private DNS zone names to either a full resource ID (preferred) or a legacy resource group name in the current subscription. Leave value empty to deploy a new zone alongside this module."
               }
             },
             "privateLinksDnsZones": {
@@ -3277,13 +3277,27 @@
             "storageZoneFromLanding": "[if(contains(parameters('privateLinksDnsZones'), 'blob'), string(parameters('privateLinksDnsZones').blob.id), '')]",
             "cosmosZoneFromLanding": "[if(contains(parameters('privateLinksDnsZones'), 'cosmosdbnosql'), string(parameters('privateLinksDnsZones').cosmosdbnosql.id), '')]",
             "apiManagementZoneFromLanding": "[if(contains(parameters('privateLinksDnsZones'), 'azureApiManagement'), string(parameters('privateLinksDnsZones').azureApiManagement.id), '')]",
-            "aiServicesDnsZoneId": "[if(not(empty(variables('servicesAiZoneFromLanding'))), variables('servicesAiZoneFromLanding'), if(empty(string(parameters('existingDnsZones')[variables('aiServicesDnsZoneName')])), resourceId('Microsoft.Network/privateDnsZones', variables('aiServicesDnsZoneName')), resourceId(subscription().subscriptionId, string(parameters('existingDnsZones')[variables('aiServicesDnsZoneName')]), 'Microsoft.Network/privateDnsZones', variables('aiServicesDnsZoneName'))))]",
-            "openAiDnsZoneId": "[if(not(empty(variables('openAiZoneFromLanding'))), variables('openAiZoneFromLanding'), if(empty(string(parameters('existingDnsZones')[variables('openAiDnsZoneName')])), resourceId('Microsoft.Network/privateDnsZones', variables('openAiDnsZoneName')), resourceId(subscription().subscriptionId, string(parameters('existingDnsZones')[variables('openAiDnsZoneName')]), 'Microsoft.Network/privateDnsZones', variables('openAiDnsZoneName'))))]",
-            "cognitiveServicesDnsZoneId": "[if(not(empty(variables('cognitiveServicesZoneFromLanding'))), variables('cognitiveServicesZoneFromLanding'), if(empty(string(parameters('existingDnsZones')[variables('cognitiveServicesDnsZoneName')])), resourceId('Microsoft.Network/privateDnsZones', variables('cognitiveServicesDnsZoneName')), resourceId(subscription().subscriptionId, string(parameters('existingDnsZones')[variables('cognitiveServicesDnsZoneName')]), 'Microsoft.Network/privateDnsZones', variables('cognitiveServicesDnsZoneName'))))]",
-            "searchDnsZoneId": "[if(not(empty(variables('searchZoneFromLanding'))), variables('searchZoneFromLanding'), if(empty(string(parameters('existingDnsZones')[variables('searchDnsZoneName')])), resourceId('Microsoft.Network/privateDnsZones', variables('searchDnsZoneName')), resourceId(subscription().subscriptionId, string(parameters('existingDnsZones')[variables('searchDnsZoneName')]), 'Microsoft.Network/privateDnsZones', variables('searchDnsZoneName'))))]",
-            "storageDnsZoneId": "[if(not(empty(variables('storageZoneFromLanding'))), variables('storageZoneFromLanding'), if(empty(string(parameters('existingDnsZones')[variables('storageDnsZoneName')])), resourceId('Microsoft.Network/privateDnsZones', variables('storageDnsZoneName')), resourceId(subscription().subscriptionId, string(parameters('existingDnsZones')[variables('storageDnsZoneName')]), 'Microsoft.Network/privateDnsZones', variables('storageDnsZoneName'))))]",
-            "cosmosDnsZoneId": "[if(not(empty(variables('cosmosZoneFromLanding'))), variables('cosmosZoneFromLanding'), if(empty(string(parameters('existingDnsZones')[variables('cosmosDnsZoneName')])), resourceId('Microsoft.Network/privateDnsZones', variables('cosmosDnsZoneName')), resourceId(subscription().subscriptionId, string(parameters('existingDnsZones')[variables('cosmosDnsZoneName')]), 'Microsoft.Network/privateDnsZones', variables('cosmosDnsZoneName'))))]",
-            "apiManagementDnsZoneId": "[if(not(empty(variables('apiManagementZoneFromLanding'))), variables('apiManagementZoneFromLanding'), if(empty(string(parameters('existingDnsZones')[variables('apiManagementDnsZoneName')])), resourceId('Microsoft.Network/privateDnsZones', variables('apiManagementDnsZoneName')), resourceId(subscription().subscriptionId, string(parameters('existingDnsZones')[variables('apiManagementDnsZoneName')]), 'Microsoft.Network/privateDnsZones', variables('apiManagementDnsZoneName'))))]",
+            "aiServicesDnsZoneInput": "[if(contains(parameters('existingDnsZones'), variables('aiServicesDnsZoneName')), string(parameters('existingDnsZones')[variables('aiServicesDnsZoneName')]), '')]",
+            "openAiDnsZoneInput": "[if(contains(parameters('existingDnsZones'), variables('openAiDnsZoneName')), string(parameters('existingDnsZones')[variables('openAiDnsZoneName')]), '')]",
+            "cognitiveServicesDnsZoneInput": "[if(contains(parameters('existingDnsZones'), variables('cognitiveServicesDnsZoneName')), string(parameters('existingDnsZones')[variables('cognitiveServicesDnsZoneName')]), '')]",
+            "searchDnsZoneInput": "[if(contains(parameters('existingDnsZones'), variables('searchDnsZoneName')), string(parameters('existingDnsZones')[variables('searchDnsZoneName')]), '')]",
+            "storageDnsZoneInput": "[if(contains(parameters('existingDnsZones'), variables('storageDnsZoneName')), string(parameters('existingDnsZones')[variables('storageDnsZoneName')]), '')]",
+            "cosmosDnsZoneInput": "[if(contains(parameters('existingDnsZones'), variables('cosmosDnsZoneName')), string(parameters('existingDnsZones')[variables('cosmosDnsZoneName')]), '')]",
+            "apiManagementDnsZoneInput": "[if(contains(parameters('existingDnsZones'), variables('apiManagementDnsZoneName')), string(parameters('existingDnsZones')[variables('apiManagementDnsZoneName')]), '')]",
+            "aiServicesDnsZoneExistingId": "[if(not(empty(variables('aiServicesDnsZoneInput'))), if(startsWith(toLower(variables('aiServicesDnsZoneInput')), '/subscriptions/'), variables('aiServicesDnsZoneInput'), resourceId(subscription().subscriptionId, variables('aiServicesDnsZoneInput'), 'Microsoft.Network/privateDnsZones', variables('aiServicesDnsZoneName'))), '')]",
+            "openAiDnsZoneExistingId": "[if(not(empty(variables('openAiDnsZoneInput'))), if(startsWith(toLower(variables('openAiDnsZoneInput')), '/subscriptions/'), variables('openAiDnsZoneInput'), resourceId(subscription().subscriptionId, variables('openAiDnsZoneInput'), 'Microsoft.Network/privateDnsZones', variables('openAiDnsZoneName'))), '')]",
+            "cognitiveServicesDnsZoneExistingId": "[if(not(empty(variables('cognitiveServicesDnsZoneInput'))), if(startsWith(toLower(variables('cognitiveServicesDnsZoneInput')), '/subscriptions/'), variables('cognitiveServicesDnsZoneInput'), resourceId(subscription().subscriptionId, variables('cognitiveServicesDnsZoneInput'), 'Microsoft.Network/privateDnsZones', variables('cognitiveServicesDnsZoneName'))), '')]",
+            "searchDnsZoneExistingId": "[if(not(empty(variables('searchDnsZoneInput'))), if(startsWith(toLower(variables('searchDnsZoneInput')), '/subscriptions/'), variables('searchDnsZoneInput'), resourceId(subscription().subscriptionId, variables('searchDnsZoneInput'), 'Microsoft.Network/privateDnsZones', variables('searchDnsZoneName'))), '')]",
+            "storageDnsZoneExistingId": "[if(not(empty(variables('storageDnsZoneInput'))), if(startsWith(toLower(variables('storageDnsZoneInput')), '/subscriptions/'), variables('storageDnsZoneInput'), resourceId(subscription().subscriptionId, variables('storageDnsZoneInput'), 'Microsoft.Network/privateDnsZones', variables('storageDnsZoneName'))), '')]",
+            "cosmosDnsZoneExistingId": "[if(not(empty(variables('cosmosDnsZoneInput'))), if(startsWith(toLower(variables('cosmosDnsZoneInput')), '/subscriptions/'), variables('cosmosDnsZoneInput'), resourceId(subscription().subscriptionId, variables('cosmosDnsZoneInput'), 'Microsoft.Network/privateDnsZones', variables('cosmosDnsZoneName'))), '')]",
+            "apiManagementDnsZoneExistingId": "[if(not(empty(variables('apiManagementDnsZoneInput'))), if(startsWith(toLower(variables('apiManagementDnsZoneInput')), '/subscriptions/'), variables('apiManagementDnsZoneInput'), resourceId(subscription().subscriptionId, variables('apiManagementDnsZoneInput'), 'Microsoft.Network/privateDnsZones', variables('apiManagementDnsZoneName'))), '')]",
+            "aiServicesDnsZoneId": "[if(not(empty(variables('servicesAiZoneFromLanding'))), variables('servicesAiZoneFromLanding'), if(not(empty(variables('aiServicesDnsZoneExistingId'))), variables('aiServicesDnsZoneExistingId'), resourceId('Microsoft.Network/privateDnsZones', variables('aiServicesDnsZoneName'))))]",
+            "openAiDnsZoneId": "[if(not(empty(variables('openAiZoneFromLanding'))), variables('openAiZoneFromLanding'), if(not(empty(variables('openAiDnsZoneExistingId'))), variables('openAiDnsZoneExistingId'), resourceId('Microsoft.Network/privateDnsZones', variables('openAiDnsZoneName'))))]",
+            "cognitiveServicesDnsZoneId": "[if(not(empty(variables('cognitiveServicesZoneFromLanding'))), variables('cognitiveServicesZoneFromLanding'), if(not(empty(variables('cognitiveServicesDnsZoneExistingId'))), variables('cognitiveServicesDnsZoneExistingId'), resourceId('Microsoft.Network/privateDnsZones', variables('cognitiveServicesDnsZoneName'))))]",
+            "searchDnsZoneId": "[if(not(empty(variables('searchZoneFromLanding'))), variables('searchZoneFromLanding'), if(not(empty(variables('searchDnsZoneExistingId'))), variables('searchDnsZoneExistingId'), resourceId('Microsoft.Network/privateDnsZones', variables('searchDnsZoneName'))))]",
+            "storageDnsZoneId": "[if(not(empty(variables('storageZoneFromLanding'))), variables('storageZoneFromLanding'), if(not(empty(variables('storageDnsZoneExistingId'))), variables('storageDnsZoneExistingId'), resourceId('Microsoft.Network/privateDnsZones', variables('storageDnsZoneName'))))]",
+            "cosmosDnsZoneId": "[if(not(empty(variables('cosmosZoneFromLanding'))), variables('cosmosZoneFromLanding'), if(not(empty(variables('cosmosDnsZoneExistingId'))), variables('cosmosDnsZoneExistingId'), resourceId('Microsoft.Network/privateDnsZones', variables('cosmosDnsZoneName'))))]",
+            "apiManagementDnsZoneId": "[if(not(empty(variables('apiManagementZoneFromLanding'))), variables('apiManagementZoneFromLanding'), if(not(empty(variables('apiManagementDnsZoneExistingId'))), variables('apiManagementDnsZoneExistingId'), resourceId('Microsoft.Network/privateDnsZones', variables('apiManagementDnsZoneName'))))]",
             "storageInCurrentRg": "[and(equals(variables('storageResourceGroupName'), resourceGroup().name), equals(variables('storageSecondResourceGroupName'), resourceGroup().name))]",
             "searchInCurrentRg": "[equals(variables('aiSearchServiceResourceGroupName'), resourceGroup().name)]",
             "cosmosInCurrentRg": "[equals(variables('cosmosResourceGroupName'), resourceGroup().name)]",
@@ -32773,7 +32787,7 @@
       ]
     },
     {
-      "condition": "[and(and(and(not(parameters('enablePublicAccessWithPerimeter')), not(variables('deployAvmFoundry'))), variables('shouldDeployFoundryPrivateEndpoints')), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly'))))]",
+      "condition": "[and(and(and(not(parameters('enablePublicAccessWithPerimeter')), not(variables('deployAvmFoundry'))), variables('shouldDeployFoundryPrivateEndpoints')), or(parameters('updateAIFoundryV21'), not(parameters('foundryV22AccountOnly'))))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('09-AifV21-PrivateEndpoints_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
@@ -33038,7 +33052,7 @@
       ]
     },
     {
-      "condition": "[and(and(and(and(variables('projectModuleEnabled'), parameters('enableAIFoundryV21')), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly')))), not(parameters('aiFoundryV2Exists'))), not(parameters('foundryV22AccountOnly')))]",
+      "condition": "[and(and(variables('projectModuleEnabled'), parameters('enableAIFoundryV21')), not(parameters('foundryV22AccountOnly')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[format('07-AifV21_UserRBAC-{0}', variables('deploymentProjSpecificUniqueSuffix'))]",
@@ -33277,7 +33291,7 @@
       }
     },
     {
-      "condition": "[and(and(and(and(and(and(parameters('enableCaphost'), parameters('enableAIFactoryCreatedDefaultProjectForAIFv2')), parameters('enableAISearch')), parameters('enableCosmosDB')), parameters('enableAIFoundryV21')), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly')))), not(parameters('foundryV22AccountOnly')))]",
+      "condition": "[and(and(and(and(and(parameters('enableCaphost'), parameters('enableAIFactoryCreatedDefaultProjectForAIFv2')), parameters('enableAISearch')), parameters('enableCosmosDB')), parameters('enableAIFoundryV21')), not(parameters('foundryV22AccountOnly')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('09-AifV21_RBACpreCH_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
@@ -33347,7 +33361,7 @@
       ]
     },
     {
-      "condition": "[and(and(and(parameters('enableAISearch'), parameters('enableAIFoundryV21')), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly')))), not(parameters('foundryV22AccountOnly')))]",
+      "condition": "[and(and(parameters('enableAISearch'), parameters('enableAIFoundryV21')), not(parameters('foundryV22AccountOnly')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('09-rbacAISearch-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
@@ -33553,7 +33567,7 @@
       ]
     },
     {
-      "condition": "[and(and(parameters('enableAIFoundryV21'), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly')))), not(parameters('foundryV22AccountOnly')))]",
+      "condition": "[and(parameters('enableAIFoundryV21'), not(parameters('foundryV22AccountOnly')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('09-rbacStorage-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
@@ -33980,7 +33994,7 @@
       ]
     },
     {
-      "condition": "[and(and(and(and(and(and(parameters('enableCaphost'), parameters('enableAIFactoryCreatedDefaultProjectForAIFv2')), parameters('enableAISearch')), parameters('enableCosmosDB')), parameters('enableAIFoundryV21')), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly')))), not(parameters('foundryV22AccountOnly')))]",
+      "condition": "[and(and(and(and(and(parameters('enableCaphost'), parameters('enableAIFactoryCreatedDefaultProjectForAIFv2')), parameters('enableAISearch')), parameters('enableCosmosDB')), parameters('enableAIFoundryV21')), not(parameters('foundryV22AccountOnly')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('09-AifV21_RBACpostCH_{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
@@ -34112,7 +34126,7 @@
       ]
     },
     {
-      "condition": "[and(and(parameters('enableAIFoundryV21'), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly')))), not(parameters('foundryV22AccountOnly')))]",
+      "condition": "[and(parameters('enableAIFoundryV21'), not(parameters('foundryV22AccountOnly')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('09-rbacKeyVault-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
@@ -34269,7 +34283,7 @@
       ]
     },
     {
-      "condition": "[and(and(parameters('enableAIFoundryV21'), or(or(not(parameters('aiFoundryV2Exists')), parameters('updateAIFoundryV21')), not(parameters('foundryV22AccountOnly')))), not(parameters('foundryV22AccountOnly')))]",
+      "condition": "[and(parameters('enableAIFoundryV21'), not(parameters('foundryV22AccountOnly')))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
       "name": "[take(format('09-rbacPrjKV-{0}', variables('deploymentProjSpecificUniqueSuffix')), 64)]",
