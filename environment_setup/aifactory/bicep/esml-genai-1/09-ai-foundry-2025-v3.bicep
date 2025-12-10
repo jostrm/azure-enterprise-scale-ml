@@ -287,7 +287,7 @@ var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 // Ensure domain name compliance: lowercase, no special chars, proper length
 var cleanRandomValue = namingConvention.outputs.randomSalt
 var aifRandom = take('aif${cleanRandomValue}',12)
-var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',16)
+var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',12)
 
 var aifV2Name = addAIFoundryV21? aifRandom: namingConvention.outputs.aifV2Name // aif2qoygyc7e
 var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2-p001-pqoygyc7
