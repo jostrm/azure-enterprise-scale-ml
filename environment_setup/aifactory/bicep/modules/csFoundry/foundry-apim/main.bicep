@@ -165,6 +165,9 @@ module vnet 'modules-network-secured/network-agent-vnet.bicep' = {
 
 /*
   Create the AI Services account and gpt-4o model deployment
+  Error
+  caphostproj-hd2q
+  ai-aif2oenb4ee7-hd2q-deployment
 */
 module aiAccount 'modules-network-secured/ai-account-identity.bicep' = {
   name: 'ai-${accountName}-${uniqueSuffix}-deployment'
