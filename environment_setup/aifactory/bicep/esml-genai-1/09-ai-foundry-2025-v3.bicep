@@ -477,7 +477,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
   dependsOn: [
     spAndMI2ArrayModule
     namingConvention
-    subnetDelegationAca
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -916,8 +916,8 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
       existingTargetRG
       ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
       ...(!deployAvmFoundry && enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : [])
-      ...(!deployAvmFoundry && (!enableAIFoundryV22 || foundryV22AccountOnly) ? [aiFoundry2025NoAvm] : [])
-      subnetDelegationAca
+      ...(!deployAvmFoundry && !enableAIFoundryV22 && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])
+      ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
     ]
 }
 
@@ -988,11 +988,11 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   dependsOn: [
     spAndMI2ArrayModule
     namingConvention
-    ...(deployAvmFoundry
+    ...(deployAvmFoundry && !foundryV22AccountOnly
       ? [aiFoundry2025Avm]
-      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
-    projectV21
-    subnetDelegationAca
+      : (enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : (!enableAIFoundryV22 && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
+    ...(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1005,7 +1005,7 @@ module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = i
   }
   dependsOn: [
     projectV21
-    subnetDelegationAca
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1027,12 +1027,12 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
     azureAIDeveloperRoleId: azureAIDeveloperRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry
+    ...(deployAvmFoundry && !foundryV22AccountOnly
       ? [aiFoundry2025Avm]
-      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
+      : (enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : (!enableAIFoundryV22 && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
     namingConvention
-    ...(projectModuleEnabled ? [projectV21] : [])
-    subnetDelegationAca
+    ...(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1054,12 +1054,12 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry
+    ...(deployAvmFoundry && !foundryV22AccountOnly
       ? [aiFoundry2025Avm]
-      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
+      : (enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : (!enableAIFoundryV22 && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
     namingConvention
-    ...(projectModuleEnabled ? [projectV21] : [])
-    subnetDelegationAca
+    ...(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1083,7 +1083,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     projectV21  // CRITICAL: Must wait for project and all connections to be fully created
     rbacAISearchForAIFv21
     rbacAIStorageAccountsForAIFv21
-    subnetDelegationAca
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1095,7 +1095,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
   }
   dependsOn: [
     addProjectCapabilityHost
-    subnetDelegationAca
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1115,7 +1115,7 @@ module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = 
   dependsOn: [
     addProjectCapabilityHost
     formatProjectWorkspaceId
-    subnetDelegationAca
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 // END CAPHOST RBAC
@@ -1134,13 +1134,12 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry
+    ...(deployAvmFoundry && !foundryV22AccountOnly
       ? [aiFoundry2025Avm]
-      : (enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
+      : (enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : (!enableAIFoundryV22 && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
     namingConvention
-    ...(projectModuleEnabled ? [projectV21] : [])
-    ...(projectModuleEnabled ? [projectV21] : [])
-    subnetDelegationAca
+    ...(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1156,10 +1155,11 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(deployAvmFoundry && !foundryV22AccountOnly ? [aiFoundry2025Avm] : [])
     ...(!deployAvmFoundry && enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : [])
-    ...(!deployAvmFoundry && (!enableAIFoundryV22 || foundryV22AccountOnly) ? [aiFoundry2025NoAvm] : [])
+    ...(!deployAvmFoundry && !enableAIFoundryV22 && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])
     namingConvention
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
