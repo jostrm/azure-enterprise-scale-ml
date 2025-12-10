@@ -420,6 +420,7 @@ module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmo
   }
   dependsOn: [
     cosmosdb
+    spAndMI2Array
   ]
 }
 
@@ -478,6 +479,7 @@ module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bice
   }
   dependsOn: [
     postgreSQL
+    spAndMI2Array
   ]
 }
 
@@ -526,6 +528,7 @@ module redisCacheRbac '../modules/databases/redis/redisRbac.bicep' = if(!redisEx
   }
   dependsOn: [
     redisCache
+    spAndMI2Array
   ]
 }
 
@@ -578,6 +581,7 @@ module sqlRbac '../modules/databases/sqldatabase/sqldatabaseRbac.bicep' = if(!sq
   }
   dependsOn: [
     sqlServer
+    spAndMI2Array
   ]
 }
 
