@@ -431,6 +431,9 @@ var projectWorkspaceGuid = enableProject && !empty(projectWorkspaceRawId)
   ? format('{0}-{1}-{2}-{3}-{4}', substring(projectWorkspaceRawId, 0, 8), substring(projectWorkspaceRawId, 8, 4), substring(projectWorkspaceRawId, 12, 4), substring(projectWorkspaceRawId, 16, 4), substring(projectWorkspaceRawId, 20, 12))
   : ''
 
+
+var projectCapHostUnique = '${projectCapHost}-${uniqueSuffix}'
+
 module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost && enableProject && enableAISearch && enableCosmosDb) {
   name: take('aifoundry-caphost-${uniqueSuffix}', 64)
   params: {
@@ -443,7 +446,7 @@ module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost &&
     #disable-next-line BCP318
     projectName: projectModule.outputs.projectName
     accountName: accountName
-    projectCapHostName: projectCapHost
+    projectCapHostName: projectCapHostUnique
   }
   dependsOn: [
     projectModule

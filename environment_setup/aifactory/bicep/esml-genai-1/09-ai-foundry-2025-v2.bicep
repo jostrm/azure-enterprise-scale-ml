@@ -212,7 +212,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 
 var cleanRandomValue = namingConvention.outputs.randomSalt
 var aifRandom = take('aif${cleanRandomValue}',12)
-var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',16)
+var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',12)
 var aifV2Name = addAIFoundry? aifRandom: namingConvention.outputs.aifV2Name 
 var aifV2ProjectName = addAIFoundry? aifpRandom: namingConvention.outputs.aifV2PrjName 
 
