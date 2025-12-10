@@ -242,7 +242,7 @@ resource pendCognitiveServices 'Microsoft.Network/privateEndpoints@2023-04-01' =
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (centralDnsZoneByPolicyInHub == false && !enablePublicAccessWithPerimeter) {
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (centralDnsZoneByPolicyInHub == false && !enablePublicAccessWithPerimeter) {
   name: '${pendCognitiveServices.name}DnsZone'
   parent: pendCognitiveServices
   properties:{

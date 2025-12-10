@@ -66,7 +66,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
 }
 
 // Create private DNS zone group for automatic DNS integration
-resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = if (enablePrivateDnsZoneGroup) {
+resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (enablePrivateDnsZoneGroup) {
   name: 'default'
   parent: privateEndpoint
   properties: {

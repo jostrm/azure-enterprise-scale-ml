@@ -484,7 +484,7 @@ resource pendCogServiceAIF 'Microsoft.Network/privateEndpoints@2024-05-01' = if(
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay) {
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay) {
   name: '${pendCogServiceAIF.name}DnsZone'
   parent: pendCogServiceAIF
   properties:{

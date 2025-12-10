@@ -831,7 +831,7 @@ resource pendAIHub 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enableP
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && !enablePublicAccessWithPerimeter) {
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && !enablePublicAccessWithPerimeter) {
   name: '${pendAIHub.name}DnsZone'
   parent: pendAIHub
   properties:{
@@ -1015,7 +1015,7 @@ resource pendAIHub2 'Microsoft.Network/privateEndpoints@2024-05-01' = if(enableP
   }
 }
 
-resource privateEndpointDns2 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2020-06-01' = if (!centralDnsZoneByPolicyInHub && enablePublicAccessWithPerimeter && createPrivateEndpoint) {
+resource privateEndpointDns2 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && enablePublicAccessWithPerimeter && createPrivateEndpoint) {
   name: '${pendAIHub2.name}DnsZone'
   parent: pendAIHub2
   properties:{
