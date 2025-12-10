@@ -5,6 +5,7 @@
   'Standard'
 ])
 param aksSkuName string = 'Base'
+param aksLoadBalancerSku string = 'standard' // 'basic' or 'standard'
 
 @description('Specifies the SKU tier for the AKS cluster')
 @allowed([
@@ -14,7 +15,7 @@ param aksSkuName string = 'Base'
 ])
 param aksSkuTier string = 'Standard'
 // ============== SKUs ==============
-@description('Specifies the name of the new machine learning studio resources')
+@description('Specifies the name of the new machine learning resources')
 param name string
 param uniqueDepl string
 param uniqueSalt5char string
@@ -32,7 +33,9 @@ param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
 param aksExists bool = false
-@description('AKS own SSL on private cluster. MS auto SSL is not possible since private cluster')
+param aksEnablePrivateCluster bool = true
+param aksManagedOutboundIPs int = 1
+@description('AKS own SSL on private cluster. MS auto SSL is not possible if private cluster')
 param ownSSL string = 'disabled' //enabled
 param aksCert string = ''
 param aksCname string = ''
@@ -379,6 +382,9 @@ module aksDev 'aksCluster.bicep'  = if(env == 'dev' && !aksExists && !empty(aksS
         osDiskSizeGB: 128
       }
     ]
+    enablePrivateCluster: aksEnablePrivateCluster
+    managedOutboundIPs: aksManagedOutboundIPs
+    loadBalancerSku: aksLoadBalancerSku
   }
   dependsOn: [
     ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])
@@ -418,6 +424,9 @@ module aksTestProd 'aksCluster.bicep'  = if((env == 'test' || env == 'prod') && 
         orchestratorVersion: kubernetesVersionAndOrchestrator // in Westeurope '1.21.2'  is not allowed/supported
       }
     ]
+    enablePrivateCluster: aksEnablePrivateCluster
+    managedOutboundIPs: aksManagedOutboundIPs
+    loadBalancerSku: aksLoadBalancerSku
   }
   dependsOn: [
     ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])

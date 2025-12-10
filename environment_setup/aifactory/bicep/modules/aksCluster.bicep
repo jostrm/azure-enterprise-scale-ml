@@ -18,6 +18,15 @@
 // Note: Route table association happens at the subnet level, not within this AKS resource.
 // ============================================================================
 
+param loadBalancerSku string = 'standard' // 'basic' or 'standard'
+@description('Specifies the SKU tier for the AKS cluster')
+@allowed([
+  'Free'
+  'Standard'
+  'Premium'
+])
+param skuTier string = 'Standard'
+
 @description('Specifies the name of the AKS cluster')
 param name string
 // ============== SKUs ==============
@@ -28,13 +37,7 @@ param name string
 ])
 param skuName string = 'Base'
 
-@description('Specifies the SKU tier for the AKS cluster')
-@allowed([
-  'Free'
-  'Standard'
-  'Premium'
-])
-param skuTier string = 'Standard'
+
 // ============== SKUs ==============
 @description('Specifies the tags that should be applied to aks resources')
 param tags object
@@ -54,7 +57,8 @@ param enableRbac bool = true
 param disableLocalAccounts bool = false
 @description('Specifies if AzureRbac accounts in kubernetes permission model should be enabled or not. 2022-11 needs to be false, since Azure ML')
 param enableAzureRbac bool = false
-
+param enablePrivateCluster bool = true
+param managedOutboundIPs int = 1
 @description('Specifies the outbound (egress) routing method for the AKS cluster')
 @allowed([
   'loadBalancer'
@@ -66,10 +70,9 @@ param outboundType string = 'loadBalancer' // 'userDefinedRouting' requires Azur
 
 @description('Specifies agent pool profile settings in a array with hashmaps format')
 param agentPoolProfiles array
-
+param networkPlugin string = 'azure' //'kubenet'
 @description('Specifies the name of the resource group that is used for node pool resources')
 param nodeResourceGroup string
-
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksExists bool = false
@@ -101,20 +104,20 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     nodeResourceGroup: nodeResourceGroup
     diskEncryptionSetID: cmk && !empty(diskEncryptionSetID) ? diskEncryptionSetID : null
     networkProfile: {
-      networkPlugin: 'azure'//'kubenet'
+      networkPlugin: networkPlugin
       outboundType: outboundType // 'userDefinedRouting' for fully private AKS without public IP
       serviceCidr: aksServiceCidr      
       dnsServiceIP: aksDnsServiceIP
-      loadBalancerSku: 'standard'
+      loadBalancerSku: loadBalancerSku
       loadBalancerProfile: outboundType == 'loadBalancer' ? {
         // Only configure load balancer when using loadBalancer outbound type
         managedOutboundIPs: {
-          count: 1
+          count: managedOutboundIPs
         }
       } : null
     }
     apiServerAccessProfile: { // https://learn.microsoft.com/en-us/azure/aks/egress-outboundtype
-      enablePrivateCluster: true // Private cluster - API server only accessible via private endpoint
+      enablePrivateCluster: enablePrivateCluster // Private cluster - API server only accessible via private endpoint
       privateDNSZone: privateDNSZone
     }
   }

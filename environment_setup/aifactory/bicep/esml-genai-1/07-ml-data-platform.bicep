@@ -29,7 +29,10 @@ param aksSkuName string = 'Base'
   'Premium'
 ])
 param aksSkuTier string = 'Standard'
+param aksLoadBalancerSku string = 'standard' // 'basic' or 'standard'
 param addAzureMachineLearning bool = false
+param aksEnablePrivateCluster bool = true
+param aksManagedOutboundIPs int = 1
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
@@ -424,6 +427,9 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
     enableAksForAzureML:enableAksForAzureML
     aksSkuName: aksSkuName
     aksSkuTier: aksSkuTier
+    aksLoadBalancerSku: aksLoadBalancerSku
+    aksEnablePrivateCluster: aksEnablePrivateCluster
+    aksManagedOutboundIPs:aksManagedOutboundIPs
     uniqueDepl: deploymentProjSpecificUniqueSuffix
     uniqueSalt5char: namingConvention.outputs.uniqueInAIFenv
     projectName: projectName
