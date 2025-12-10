@@ -129,6 +129,7 @@ param aks2SubnetId string = ''
 
 @description('Disable agent network injection even when agent subnet inputs are provided.')
 param disableAgentNetworkInjection bool = false
+param addAIFoundry bool = false
 
 var projectName = 'prj${projectNumber}'
 var resolvedCommonResourceGroup = !empty(trim(commonResourceGroup_param)) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
@@ -209,6 +210,12 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 	}
 }
 
+var cleanRandomValue = namingConvention.outputs.randomSalt
+var aifRandom = take('aif${cleanRandomValue}',12)
+var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',16)
+var aifV2Name = addAIFoundry? aifRandom: namingConvention.outputs.aifV2Name 
+var aifV2ProjectName = addAIFoundry? aifpRandom: namingConvention.outputs.aifV2PrjName 
+
 var aiSearchName = namingConvention.outputs.safeNameAISearch
 var storageAccountName = namingConvention.outputs.storageAccount1001Name
 var cosmosDbName = namingConvention.outputs.cosmosDBName
@@ -237,6 +244,8 @@ module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
 	name: take('foundry-apim-${moduleDeploymentSuffix}', 64)
 	scope: resourceGroup(resolvedSubscriptionId, resolvedTargetResourceGroup)
 	params: {
+		aifV2Name:aifV2Name
+		aifV2ProjectName:aifV2ProjectName
 		location: location
 		existingVnetResourceId: resolvedExistingVnetResourceId
 		vnetName: resolvedVnetName

@@ -34,8 +34,10 @@ https://github.com/azure-ai-foundry/foundry-samples/tree/main/infrastructure/inf
 ])
 param location string = 'eastus2'
 
-@description('Name for your AI Services resource.')
-param aiServices string = 'aiservices'
+param aifV2Name string
+param aifV2ProjectName string
+
+@description('Name for your AI Services/Foundry resource.')
 param targetSubscriptionId string
 param targetResourceGroup string
 param tags object = {}
@@ -56,7 +58,7 @@ param modelCapacity int = 30
 // Create a short, unique suffix, that will be unique to each resource group
 param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
 var uniqueSuffix = substring(uniqueString('${resourceGroup().id}-${deploymentTimestamp}'), 0, 4)
-var accountName = toLower('${aiServices}${uniqueSuffix}')
+var accountName = aifV2Name // toLower('${aiServices}${uniqueSuffix}')
 
 @description('Name for your project resource.')
 param firstProjectName string = 'project'
@@ -109,10 +111,10 @@ param privDnsSubscription string = subscription().subscriptionId
 param privDnsResourceGroupName string = resourceGroup().name
 
 
-var projectName = toLower('${firstProjectName}${uniqueSuffix}')
-var cosmosDBName = toLower('${aiServices}${uniqueSuffix}cosmosdb')
-var aiSearchName = toLower('${aiServices}${uniqueSuffix}search')
-var azureStorageName = toLower('${aiServices}${uniqueSuffix}storage')
+var projectName = aifV2ProjectName //toLower('${firstProjectName}${uniqueSuffix}')
+var cosmosDBName = toLower('${aifV2Name}${uniqueSuffix}cosmosdb')
+var aiSearchName = toLower('${aifV2Name}${uniqueSuffix}search')
+var azureStorageName = toLower('${aifV2Name}${uniqueSuffix}storage')
 
 // Check if existing resources have been passed in
 var storagePassedIn = azureStorageAccountResourceId != ''

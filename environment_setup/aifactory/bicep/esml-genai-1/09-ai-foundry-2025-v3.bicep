@@ -287,11 +287,10 @@ var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 // Ensure domain name compliance: lowercase, no special chars, proper length
 var cleanRandomValue = namingConvention.outputs.randomSalt
 var aifRandom = take('aif${cleanRandomValue}',12)
-var aifpRandom = take('aifp${cleanRandomValue}',12)
+var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',16)
 
-var aif2SubdomainName = cleanRandomValue
 var aifV2Name = addAIFoundryV21? aifRandom: namingConvention.outputs.aifV2Name // aif2qoygyc7e
-var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2pqoygyc7
+var aifV2ProjectName = addAIFoundryV21? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2-p001-pqoygyc7
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var projectCapHostName  = '${aifV2Name}caphost'
