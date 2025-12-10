@@ -1221,8 +1221,8 @@ module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bi
     ...(!deployAvmFoundry && enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : [])
     ...(!deployAvmFoundry && enableAIFoundryV22 && foundryV22AccountOnly ? [aiFoundry2025NoAvmV22AccountOnly] : [])
     ...(!deployAvmFoundry && !enableAIFoundryV22 ? [aiFoundry2025NoAvm] : [])
-    rbacAISearchForAIFv21  // Wait for RBAC to complete before creating shared private link
-    aiFoundryPrivateEndpoints  // Wait for private endpoints to complete
+    ...(enableAISearch && enableAIFoundryV21 && !foundryV22AccountOnly ? [rbacAISearchForAIFv21] : [])  // Wait for RBAC to complete before creating shared private link
+    ...(!enablePublicAccessWithPerimeter && !deployAvmFoundry && shouldDeployFoundryPrivateEndpoints && (updateAIFoundryV21 || !foundryV22AccountOnly) ? [aiFoundryPrivateEndpoints] : [])  // Wait for private endpoints to complete
   ]
 }
 // Approve the shared private link request on the Azure AI Foundry account after deployment.
