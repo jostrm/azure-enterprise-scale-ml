@@ -927,7 +927,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21-PrivateEndpoints_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    cognitiveServiceName: deployedAifV2Name
+    cognitiveServiceName: aifV2Name
     #disable-next-line BCP318
     cognitiveServiceId: enableAIFoundryV22
       ? aiFoundry2025NoAvmV22!.outputs.aiAccountId
@@ -959,11 +959,15 @@ var projectWorkspaceId = (projectModuleEnabled && enableAIFoundryV21 && (!aiFoun
 
 // Get the actual deployed AI Foundry account name from module outputs (prevents empty name causing '-pend' error)
 #disable-next-line BCP318
-var deployedAifV2Name = enableAIFoundryV22 
+
+
+/*
+var deployedAifV2Name =  enableAIFoundryV22 
   ? (foundryV22AccountOnly 
       ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName 
       : aiFoundry2025NoAvmV22!.outputs.aiAccountName)
   : aiFoundry2025NoAvm!.outputs.name
+*/
 
 // Function to assign roles to users and service principals for a cognitive services account
 @description('Function to assign roles to users and service principals for a cognitive services account')
