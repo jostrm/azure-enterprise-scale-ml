@@ -229,7 +229,7 @@ resource apiManagementDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZon
 }
 */
 
-resource privateEndpointDnsGroupAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub) {
+resource privateEndpointDnsGroupAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && !empty(apiManagementName)) {
   name: '${apiManagementPrivateEndpoint.name}DnsZone'
   parent: apiManagementPrivateEndpoint
   properties:{

@@ -927,7 +927,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21-PrivateEndpoints_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    cognitiveServiceName: aifV2Name
+    cognitiveServiceName: aiFoundryAccountNameOutput
     #disable-next-line BCP318
     cognitiveServiceId: enableAIFoundryV22
       ? aiFoundry2025NoAvmV22!.outputs.aiAccountId
@@ -941,14 +941,14 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     apiManagementResourceId: apiManagementResourceId
   }
   dependsOn: [
-    ...(enableAIFoundryV22 ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm])
+    ...(enableAIFoundryV22 && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : (!enableAIFoundryV22 && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : []))
     existingTargetRG
-    projectV21
-    assignCognitiveServicesRoles // Add... some extra dependencies, to not having AI Foundry "Account in state accepted" errror
-    rbacAISearchForAIFv21 // Add..
-    rbacAIStorageAccountsForAIFv21 // Add
-    rbacProjectKeyVaultForAIFoundry // Add
-    subnetDelegationAca
+    ...(projectModuleEnabled && enableAIFoundryV21 && (!aiFoundryV2Exists || updateAIFoundryV21 || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(projectModuleEnabled && enableAIFoundryV21 && !foundryV22AccountOnly ? [assignCognitiveServicesRoles] : []) // Add... some extra dependencies, to not having AI Foundry "Account in state accepted" errror
+    ...(enableAISearch && enableAIFoundryV21 && !foundryV22AccountOnly ? [rbacAISearchForAIFv21] : []) // Add..
+    ...(enableAIFoundryV21 && !foundryV22AccountOnly ? [rbacAIStorageAccountsForAIFv21] : []) // Add
+    ...(enableAIFoundryV21 && !foundryV22AccountOnly ? [rbacProjectKeyVaultForAIFoundry] : []) // Add
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
