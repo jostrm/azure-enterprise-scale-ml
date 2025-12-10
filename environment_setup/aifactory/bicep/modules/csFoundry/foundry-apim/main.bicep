@@ -36,6 +36,10 @@ param location string = 'eastus2'
 
 @description('Name for your AI Services resource.')
 param aiServices string = 'aiservices'
+param targetSubscriptionId string
+param targetResourceGroup string
+param tags object = {}
+param centralDnsZoneByPolicyInHub bool = false
 
 // Model deployment parameters
 @description('The name of the model you want to deploy')
@@ -97,6 +101,12 @@ param apiManagementResourceId string = ''
 
 @description('Full privateLinksDnsZones object emitted by CmnPrivateDnsZones, providing consistent names and resource IDs for all private DNS zones.')
 param privateLinksDnsZones object
+
+@description('Subscription hosting private DNS zones when centrally managed.')
+param privDnsSubscription string = subscription().subscriptionId
+
+@description('Resource group hosting private DNS zones when centrally managed.')
+param privDnsResourceGroupName string = resourceGroup().name
 
 
 var projectName = toLower('${firstProjectName}${uniqueSuffix}')
@@ -228,6 +238,7 @@ resource cosmosDB 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing = 
 // 3. Links private DNS zones to the VNet for name resolution
 // 4. Configures network policies to restrict access to private endpoints only
 module privateEndpointAndDNS 'modules-network-secured/private-endpoint-and-dns.bicep' = {
+    scope: resourceGroup(targetSubscriptionId, targetResourceGroup)
     name: '${uniqueSuffix}-private-endpoint'
     params: {
       aiAccountName: aiAccount.outputs.accountName    // AI Services to secure
@@ -249,6 +260,13 @@ module privateEndpointAndDNS 'modules-network-secured/private-endpoint-and-dns.b
       apiManagementResourceGroupName: validateExistingResources.outputs.apiManagementResourceGroupName // Resource Group for API Management (if provided)
       apiManagementSubscriptionId: validateExistingResources.outputs.apiManagementSubscriptionId // Subscription ID for API Management (if provided)
       privateLinksDnsZones: privateLinksDnsZones
+      privDnsSubscription: privDnsSubscription
+      privDnsResourceGroupName: privDnsResourceGroupName
+      targetSubscriptionId: targetSubscriptionId
+      targetResourceGroup:targetResourceGroup
+      tags: tags
+      createPrivateEndpointsAIFactoryWay: true
+      centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     }
     dependsOn: [
     aiSearch      // Ensure AI Search exists

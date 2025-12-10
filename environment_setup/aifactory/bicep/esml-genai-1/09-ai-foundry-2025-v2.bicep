@@ -1,5 +1,7 @@
 targetScope = 'subscription'
 
+param tags object = {}
+
 @description('Subscription that hosts the target resource group. Defaults to the current subscription when omitted.')
 param targetSubscriptionId string = subscription().subscriptionId
 
@@ -248,5 +250,12 @@ module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
 		azureCosmosDBAccountResourceId: resolvedAzureCosmosDbResourceId
 		apiManagementResourceId: apiManagementResourceId
 		privateLinksDnsZones: privateLinksDnsZones
+		privDnsSubscription: privDnsSubscription
+		privDnsResourceGroupName: privDnsResourceGroupName
+    targetSubscriptionId: resolvedSubscriptionId
+    targetResourceGroup: resolvedTargetResourceGroup
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    tags: tags
+
 	}
 }

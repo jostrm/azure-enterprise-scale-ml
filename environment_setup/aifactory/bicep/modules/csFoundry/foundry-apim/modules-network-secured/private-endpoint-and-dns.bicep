@@ -21,7 +21,11 @@ Security Benefits:
 - Enables secure access from within VNet
 - Prevents data exfiltration through network
 */
-
+param centralDnsZoneByPolicyInHub bool = false
+param createPrivateEndpointsAIFactoryWay bool = true
+param tags object = {}
+param targetSubscriptionId string
+param targetResourceGroup string
 // Resource names and identifiers
 @description('Name of the AI Foundry account')
 param aiAccountName string
@@ -73,25 +77,16 @@ param apiManagementResourceGroupName string = resourceGroup().name
 @description('Full privateLinksDnsZones object emitted by CmnPrivateDnsZones; provides consistent names and resource IDs for all required private DNS zones.')
 param privateLinksDnsZones object
 
+@description('Subscription hosting private DNS zones when centrally managed.')
+param privDnsSubscription string = subscription().subscriptionId
+
+@description('Resource group hosting private DNS zones when centrally managed.')
+param privDnsResourceGroupName string = resourceGroup().name
+
 // ---- Resource references ----
 resource aiAccount 'Microsoft.CognitiveServices/accounts@2023-05-01' existing = {
   name: aiAccountName
   scope: resourceGroup()
-}
-
-resource aiSearch 'Microsoft.Search/searchServices@2023-11-01' existing = {
-  name: aiSearchName
-  scope: resourceGroup(aiSearchSubscriptionId, aiSearchResourceGroupName)
-}
-
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
-  name: storageName
-  scope: resourceGroup(storageAccountSubscriptionId, storageAccountResourceGroupName)
-}
-
-resource cosmosDBAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' existing = {
-  name: cosmosDBName
-  scope: resourceGroup(cosmosDBSubscriptionId, cosmosDBResourceGroupName)
 }
 
 resource apiManagementService 'Microsoft.ApiManagement/service@2023-05-01-preview' existing = if (!empty(apiManagementName)) {
@@ -114,7 +109,7 @@ resource peSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existin
 // Private endpoint for AI Services account
 // - Creates network interface in customer hub subnet
 // - Establishes private connection to AI Services account
-resource aiAccountPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+resource aiAccountPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!createPrivateEndpointsAIFactoryWay) {
   name: '${aiAccountName}-private-endpoint'
   location: resourceGroup().location
   properties: {
@@ -126,81 +121,38 @@ resource aiAccountPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01
           privateLinkServiceId: aiAccount.id
           groupIds: [ 'account' ] // Target AI Services account
         }
+        
       }
     ]
   }
 }
 
-/* -------------------------------------------- AI Search Private Endpoint -------------------------------------------- */
-
-// Private endpoint for AI Search
-// - Creates network interface in customer hub subnet
-// - Establishes private connection to AI Search service
-resource aiSearchPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: '${aiSearchName}-private-endpoint'
+resource pendCogServiceAIF 'Microsoft.Network/privateEndpoints@2024-05-01' = if(createPrivateEndpointsAIFactoryWay) {
+  name: '${aiAccountName}-pend' //'${privateEndpointName}-2'
   location: resourceGroup().location
+  tags: tags
   properties: {
-    subnet: { id: peSubnet.id } // Deploy in customer hub subnet
+    customNetworkInterfaceName: '${aiAccountName}-pend-nic'
     privateLinkServiceConnections: [
       {
-        name: '${aiSearchName}-private-link-service-connection'
+        name: '${aiAccountName}-pend'
         properties: {
-          privateLinkServiceId: aiSearch.id
-          groupIds: [ 'searchService' ] // Target search service
+          groupIds: [
+            'account'
+          ]
+          privateLinkServiceId: aiAccount.id
+          privateLinkServiceConnectionState: {
+            status: 'Approved'
+            description: 'Auto-Approved'
+            actionsRequired: 'None'
+          }
         }
       }
     ]
+    subnet: {
+      id: peSubnet.id 
+    }
   }
-  dependsOn: [
-    aiAccountPrivateEndpoint
-  ]
-}
-
-/* -------------------------------------------- Storage Private Endpoint -------------------------------------------- */
-
-// Private endpoint for Storage Account
-// - Creates network interface in customer hub subnet
-// - Establishes private connection to blob storage
-resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: '${storageName}-private-endpoint'
-  location: resourceGroup().location
-  properties: {
-    subnet: { id: peSubnet.id } // Deploy in customer hub subnet
-    privateLinkServiceConnections: [
-      {
-        name: '${storageName}-private-link-service-connection'
-        properties: {
-          privateLinkServiceId: storageAccount.id // Target blob storage
-          groupIds: [ 'blob' ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    aiSearchPrivateEndpoint
-  ]
-}
-
-/*--------------------------------------------- Cosmos DB Private Endpoint -------------------------------------*/
-
-resource cosmosDBPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: '${cosmosDBName}-private-endpoint'
-  location: resourceGroup().location
-  properties: {
-    subnet: { id: peSubnet.id } // Deploy in customer hub subnet
-    privateLinkServiceConnections: [
-      {
-        name: '${cosmosDBName}-private-link-service-connection'
-        properties: {
-          privateLinkServiceId: cosmosDBAccount.id // Target Cosmos DB account
-          groupIds: [ 'Sql' ]
-        }
-      }
-    ]
-  }
-  dependsOn: [
-    storagePrivateEndpoint
-  ]
 }
 
 /*--------------------------------------------- API Management Private Endpoint -------------------------------------*/
@@ -221,22 +173,40 @@ resource apiManagementPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-0
     ]
   }
   dependsOn: [
-    cosmosDBPrivateEndpoint
+    aiAccountPrivateEndpoint
   ]
 }
 
 /* -------------------------------------------- Private DNS Zones -------------------------------------------- */
 
-// IDs sourced directly from CmnPrivateDnsZones output to avoid deriving or reformatting values downstream
-var aiServicesDnsZoneId = string(privateLinksDnsZones.servicesai.id)
-var openAiDnsZoneId = string(privateLinksDnsZones.openai.id)
-var cognitiveServicesDnsZoneId = string(privateLinksDnsZones.cognitiveservices.id)
-var aiSearchDnsZoneId = string(privateLinksDnsZones.searchService.id)
-var storageDnsZoneId = string(privateLinksDnsZones.blob.id)
-var cosmosDBDnsZoneId = string(privateLinksDnsZones.cosmosdbnosql.id)
-var apiManagementDnsZoneId = !empty(apiManagementName) ? string(privateLinksDnsZones.apim.id) : ''
+// Reference existing private DNS zones from the central DNS resource group
+resource aiServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.servicesai.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
 
-// ---- DNS Zone Groups ----
+resource openAiDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.openai.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
+
+resource cognitiveServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.cognitiveservices.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
+
+resource apiManagementDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = if (!empty(apiManagementName)) {
+  name: string(privateLinksDnsZones.apim.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
+
+// IDs sourced from existing resource references with correct subscription/resource group scope
+var aiServicesDnsZoneId = aiServicesDnsZone.id
+var openAiDnsZoneId = openAiDnsZone.id
+var cognitiveServicesDnsZoneId = cognitiveServicesDnsZone.id
+var apiManagementDnsZoneId = !empty(apiManagementName) ? apiManagementDnsZone.id : ''
+
+/* ---- DNS Zone Groups ----
 resource aiServicesDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   parent: aiAccountPrivateEndpoint
   name: '${aiAccountName}-dns-group'
@@ -245,33 +215,6 @@ resource aiServicesDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
       { name: '${aiAccountName}-dns-aiserv-config', properties: { privateDnsZoneId: aiServicesDnsZoneId } }
       { name: '${aiAccountName}-dns-openai-config', properties: { privateDnsZoneId: openAiDnsZoneId } }
       { name: '${aiAccountName}-dns-cogserv-config', properties: { privateDnsZoneId: cognitiveServicesDnsZoneId } }
-    ]
-  }
-}
-resource aiSearchDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: aiSearchPrivateEndpoint
-  name: '${aiSearchName}-dns-group'
-  properties: {
-    privateDnsZoneConfigs: [
-      { name: '${aiSearchName}-dns-config', properties: { privateDnsZoneId: aiSearchDnsZoneId } }
-    ]
-  }
-}
-resource storageDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: storagePrivateEndpoint
-  name: '${storageName}-dns-group'
-  properties: {
-    privateDnsZoneConfigs: [
-      { name: '${storageName}-dns-config', properties: { privateDnsZoneId: storageDnsZoneId } }
-    ]
-  }
-}
-resource cosmosDBDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: cosmosDBPrivateEndpoint
-  name: '${cosmosDBName}-dns-group'
-  properties: {
-    privateDnsZoneConfigs: [
-      { name: '${cosmosDBName}-dns-config', properties: { privateDnsZoneId: cosmosDBDnsZoneId } }
     ]
   }
 }
@@ -284,3 +227,47 @@ resource apiManagementDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZon
     ]
   }
 }
+*/
+
+resource privateEndpointDnsGroupAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub) {
+  name: '${apiManagementPrivateEndpoint.name}DnsZone'
+  parent: apiManagementPrivateEndpoint
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateLinksDnsZones.apim.name
+        properties:{
+          privateDnsZoneId: apiManagementDnsZoneId // privateLinksDnsZones.apim.id
+        }
+      }
+    ]
+  }
+}
+
+resource privateEndpointDnsGroupAIF 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub) {
+  name: '${pendCogServiceAIF.name}DnsZone'
+  parent: pendCogServiceAIF
+  properties:{
+    privateDnsZoneConfigs: [
+      {
+        name: privateLinksDnsZones.openai.name
+        properties:{
+          privateDnsZoneId: openAiDnsZoneId // privateLinksDnsZones.openai.id
+        }
+      }
+      {
+        name: privateLinksDnsZones.cognitiveservices.name
+        properties:{
+          privateDnsZoneId: cognitiveServicesDnsZoneId //privateLinksDnsZones.cognitiveservices.id
+        }
+      }
+      {
+        name: privateLinksDnsZones.servicesai.name
+        properties:{
+          privateDnsZoneId: aiServicesDnsZoneId // privateLinksDnsZones.servicesai.id
+        }
+      }
+    ]
+  }
+}
+
