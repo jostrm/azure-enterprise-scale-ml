@@ -17,31 +17,6 @@ targetScope = 'subscription'
 // 4. For ResourceNotFound errors, ensure resources exist before running this template
 // ================================================================
 
-/*
-================ TROUBLESHOOTING: RoleAssignmentExists: rbacModuleUsers ================
-
-Problem
-- Azure won’t let a second assignment for the same (principal, role, scope) be created with a different,
-  hence good practice to keep ALL assigments in one file, and one go, avoiding that another file assigns the role with different name than guid().
-
-Reason
-- Most conflicts in practice come from re-running deployments,
-  when a role assignment already exists but was created before with a different name (e.g., portal/CLI/another template).
-
-This template
-- ASSIGNS many roles across different scopes (RG, AI Hub, AI Project, Storage, AI Services).
-- SERVICES: aiServicesName, aifV1HubName, aifV1ProjectName, storageAccount1001Name, storageAccount2001Name:
-- DISTINCT NAMES: All these come from naming conventions in the AIFactory and should be distinct (CmnAIFactoryNaming.bicep)
-- INPUT HANDLING: It De-duplicate arrays before assignment.
-- VERIFIED: The template does NOT have same role+same scope+same principal defined twice in the template itself.
-
-HOW TO TROUBLE SHOOT and fix "RoleAssignmentExists":
-1) Note which role+scope+principal combination fails: RG, AI Hub, AI Project, Storage, AI Services, storageAccount1001Name, storageAccount2001Name
-2) Check in Azure portal, if that role is already assigned, remove the assigment.
-
-================ END ==================================================
-*/
-
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
@@ -188,13 +163,13 @@ param commonLakeNamePrefixMax8chars string
 
 // Common ACR usage
 param useCommonACR bool = true
-
 // Tags
 param tagsProject object = {}
 param tags object = {}
 
 // Resource exists flags from Azure DevOps
 param updateRbac bool = false
+param miPrjExists bool = false
 param amlExists bool = false
 param aksExists bool = false
 param aiHubExists bool = false
@@ -202,13 +177,6 @@ param aiServicesExists bool = false
 param aiSearchExists bool = false
 param dataFactoryExists bool = false
 param openaiExists bool = false
-
-// Additional deployment control flags to prevent duplicate role assignments
-@description('Skip role assignments if they already exist (helps with re-runs)')
-param skipExistingRoleAssignments bool = true
-
-@description('Force recreation of role assignments (use with caution)')
-param forceRecreateRoleAssignments bool = false
 
 @description('Unique deployment identifier to avoid conflicts')
 param deploymentId string = utcNow('yyyyMMddHHmmss')
@@ -339,6 +307,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
       getProjectMIPrincipalId
   ]
 }
+
+var skipACRRoleAssignments = miPrjExists
 
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
@@ -747,7 +717,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
 }
 
 // Bastion VNet Externally (Connectivity subscription and RG || AI Factory Common RG)
-module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost && !empty(bastionSubscription)) {
+module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(addBastionHost && !empty(bastionSubscription) && !skipACRRoleAssignments) {
   scope: resourceGroup(bastionSubscription, bastionResourceGroup)
   name: take('08-rbacUseVnet${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -765,7 +735,8 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
 // ============== RBAC MODULES - COMMON RESOURCE GROUP ACCESS ==============
 
 // RBAC on ACR Push/Pull for users in Common Resource group
-module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
+// Note: If you get RoleAssignmentExists errors, set skipACRRoleAssignments=true in your parameter file
+module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR && !skipACRRoleAssignments) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('08-rbacUsCmnACR${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
