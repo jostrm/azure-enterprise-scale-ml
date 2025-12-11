@@ -923,7 +923,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
 
 // AI Foundry Private Endpoints - deployed after main service
 // Deploys when: not using public access, not using AVM, and either updating existing OR in phase 2 (foundryV22AccountOnly=false)
-module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(!enablePublicAccessWithPerimeter && !deployAvmFoundry && shouldDeployFoundryPrivateEndpoints && (updateAIFoundryV21 || !foundryV22AccountOnly)) {
+module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(!enablePublicAccessWithPerimeter && !deployAvmFoundry && shouldDeployFoundryPrivateEndpoints && (updateAIFoundryV21 || !foundryV22AccountOnly) && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21-PrivateEndpoints_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
