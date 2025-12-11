@@ -61,6 +61,12 @@ param existingDnsZones object = {
 @description('Private DNS zones configuration emitted from the networking landing zone.')
 param privateLinksDnsZones object = {}
 
+@description('Subscription ID for the central private DNS zones.')
+param privDnsSubscription string = subscription().subscriptionId
+
+@description('Resource group name for the central private DNS zones.')
+param privDnsResourceGroupName string = resourceGroup().name
+
 @description('Allow public HTTP access while traffic flows through perimeter controls.')
 param allowPublicAccessWhenBehindVnet bool = false
 
@@ -83,7 +89,7 @@ param userRoleObjectIds array = []
 param servicePrincipalIds array = []
 
 @description('Treat entries in userRoleObjectIds as Azure AD groups instead of users.')
-param useAdGroups bool = false
+param useAdGroups bool = true
 
 @description('Optional list of additional model deployments to create. Expected shape matches Microsoft.CognitiveServices/accounts/deployments properties.')
 param extraModelDeployments array = []
@@ -208,112 +214,52 @@ var networkAcls = hasNetworkAcls ? {
 } : null
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 
-var aiServicesDnsZoneName = 'privatelink.services.ai.azure.com'
-var openAiDnsZoneName = 'privatelink.openai.azure.com'
-var cognitiveServicesDnsZoneName = 'privatelink.cognitiveservices.azure.com'
-var searchDnsZoneName = 'privatelink.search.windows.net'
-var storageDnsZoneName = 'privatelink.blob.${environment().suffixes.storage}'
-var cosmosDnsZoneName = 'privatelink.documents.azure.com'
-var apiManagementDnsZoneName = 'privatelink.azure-api.net'
+/* -------------------------------------------- Private DNS Zones -------------------------------------------- */
 
-var dnsZoneNames = [
-  aiServicesDnsZoneName
-  openAiDnsZoneName
-  cognitiveServicesDnsZoneName
-  searchDnsZoneName
-  storageDnsZoneName
-  cosmosDnsZoneName
-  apiManagementDnsZoneName
-]
+// Reference existing private DNS zones from the central DNS resource group
+resource aiServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.servicesai.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
 
-var servicesAiZoneFromLanding = contains(privateLinksDnsZones, 'servicesai') ? string(privateLinksDnsZones.servicesai.id) : ''
-var openAiZoneFromLanding = contains(privateLinksDnsZones, 'openai') ? string(privateLinksDnsZones.openai.id) : ''
-var cognitiveServicesZoneFromLanding = contains(privateLinksDnsZones, 'cognitiveservices') ? string(privateLinksDnsZones.cognitiveservices.id) : ''
-var searchZoneFromLanding = contains(privateLinksDnsZones, 'searchService') ? string(privateLinksDnsZones.searchService.id) : ''
-var storageZoneFromLanding = contains(privateLinksDnsZones, 'blob') ? string(privateLinksDnsZones.blob.id) : ''
-var cosmosZoneFromLanding = contains(privateLinksDnsZones, 'cosmosdbnosql') ? string(privateLinksDnsZones.cosmosdbnosql.id) : ''
-var apiManagementZoneFromLanding = contains(privateLinksDnsZones, 'azureApiManagement') ? string(privateLinksDnsZones.azureApiManagement.id) : ''
+resource openAiDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.openai.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
 
-var aiServicesDnsZoneInput = contains(existingDnsZones, aiServicesDnsZoneName) ? string(existingDnsZones[aiServicesDnsZoneName]) : ''
-var openAiDnsZoneInput = contains(existingDnsZones, openAiDnsZoneName) ? string(existingDnsZones[openAiDnsZoneName]) : ''
-var cognitiveServicesDnsZoneInput = contains(existingDnsZones, cognitiveServicesDnsZoneName) ? string(existingDnsZones[cognitiveServicesDnsZoneName]) : ''
-var searchDnsZoneInput = contains(existingDnsZones, searchDnsZoneName) ? string(existingDnsZones[searchDnsZoneName]) : ''
-var storageDnsZoneInput = contains(existingDnsZones, storageDnsZoneName) ? string(existingDnsZones[storageDnsZoneName]) : ''
-var cosmosDnsZoneInput = contains(existingDnsZones, cosmosDnsZoneName) ? string(existingDnsZones[cosmosDnsZoneName]) : ''
-var apiManagementDnsZoneInput = contains(existingDnsZones, apiManagementDnsZoneName) ? string(existingDnsZones[apiManagementDnsZoneName]) : ''
+resource cognitiveServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.cognitiveservices.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
 
-var aiServicesDnsZoneExistingId = !empty(aiServicesDnsZoneInput)
-  ? (startsWith(toLower(aiServicesDnsZoneInput), '/subscriptions/')
-      ? aiServicesDnsZoneInput
-      : resourceId(subscription().subscriptionId, aiServicesDnsZoneInput, 'Microsoft.Network/privateDnsZones', aiServicesDnsZoneName))
-  : ''
-var openAiDnsZoneExistingId = !empty(openAiDnsZoneInput)
-  ? (startsWith(toLower(openAiDnsZoneInput), '/subscriptions/')
-      ? openAiDnsZoneInput
-      : resourceId(subscription().subscriptionId, openAiDnsZoneInput, 'Microsoft.Network/privateDnsZones', openAiDnsZoneName))
-  : ''
-var cognitiveServicesDnsZoneExistingId = !empty(cognitiveServicesDnsZoneInput)
-  ? (startsWith(toLower(cognitiveServicesDnsZoneInput), '/subscriptions/')
-      ? cognitiveServicesDnsZoneInput
-      : resourceId(subscription().subscriptionId, cognitiveServicesDnsZoneInput, 'Microsoft.Network/privateDnsZones', cognitiveServicesDnsZoneName))
-  : ''
-var searchDnsZoneExistingId = !empty(searchDnsZoneInput)
-  ? (startsWith(toLower(searchDnsZoneInput), '/subscriptions/')
-      ? searchDnsZoneInput
-      : resourceId(subscription().subscriptionId, searchDnsZoneInput, 'Microsoft.Network/privateDnsZones', searchDnsZoneName))
-  : ''
-var storageDnsZoneExistingId = !empty(storageDnsZoneInput)
-  ? (startsWith(toLower(storageDnsZoneInput), '/subscriptions/')
-      ? storageDnsZoneInput
-      : resourceId(subscription().subscriptionId, storageDnsZoneInput, 'Microsoft.Network/privateDnsZones', storageDnsZoneName))
-  : ''
-var cosmosDnsZoneExistingId = !empty(cosmosDnsZoneInput)
-  ? (startsWith(toLower(cosmosDnsZoneInput), '/subscriptions/')
-      ? cosmosDnsZoneInput
-      : resourceId(subscription().subscriptionId, cosmosDnsZoneInput, 'Microsoft.Network/privateDnsZones', cosmosDnsZoneName))
-  : ''
-var apiManagementDnsZoneExistingId = !empty(apiManagementDnsZoneInput)
-  ? (startsWith(toLower(apiManagementDnsZoneInput), '/subscriptions/')
-      ? apiManagementDnsZoneInput
-      : resourceId(subscription().subscriptionId, apiManagementDnsZoneInput, 'Microsoft.Network/privateDnsZones', apiManagementDnsZoneName))
-  : ''
+resource searchServiceDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.searchService.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
 
-var aiServicesDnsZoneId = !empty(servicesAiZoneFromLanding)
-  ? servicesAiZoneFromLanding
-  : (!empty(aiServicesDnsZoneExistingId)
-      ? aiServicesDnsZoneExistingId
-      : resourceId('Microsoft.Network/privateDnsZones', aiServicesDnsZoneName))
-var openAiDnsZoneId = !empty(openAiZoneFromLanding)
-  ? openAiZoneFromLanding
-  : (!empty(openAiDnsZoneExistingId)
-      ? openAiDnsZoneExistingId
-      : resourceId('Microsoft.Network/privateDnsZones', openAiDnsZoneName))
-var cognitiveServicesDnsZoneId = !empty(cognitiveServicesZoneFromLanding)
-  ? cognitiveServicesZoneFromLanding
-  : (!empty(cognitiveServicesDnsZoneExistingId)
-      ? cognitiveServicesDnsZoneExistingId
-      : resourceId('Microsoft.Network/privateDnsZones', cognitiveServicesDnsZoneName))
+resource storageBlobDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.blob.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
 
-var searchDnsZoneId = !empty(searchZoneFromLanding)
-  ? searchZoneFromLanding
-  : (!empty(searchDnsZoneExistingId)
-      ? searchDnsZoneExistingId
-      : resourceId('Microsoft.Network/privateDnsZones', searchDnsZoneName))
-var storageDnsZoneId = !empty(storageZoneFromLanding)
-  ? storageZoneFromLanding
-  : (!empty(storageDnsZoneExistingId)
-      ? storageDnsZoneExistingId
-      : resourceId('Microsoft.Network/privateDnsZones', storageDnsZoneName))
-var cosmosDnsZoneId = !empty(cosmosZoneFromLanding)
-  ? cosmosZoneFromLanding
-  : (!empty(cosmosDnsZoneExistingId)
-      ? cosmosDnsZoneExistingId
-      : resourceId('Microsoft.Network/privateDnsZones', cosmosDnsZoneName))
-var apiManagementDnsZoneId = !empty(apiManagementZoneFromLanding)
-  ? apiManagementZoneFromLanding
-  : (!empty(apiManagementDnsZoneExistingId)
-      ? apiManagementDnsZoneExistingId
-      : resourceId('Microsoft.Network/privateDnsZones', apiManagementDnsZoneName))
+resource cosmosDbDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
+  name: string(privateLinksDnsZones.cosmosdbnosql.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
+
+resource apiManagementDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = if (!empty(apiManagementName)) {
+  name: string(privateLinksDnsZones.apim.name)
+  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
+}
+
+// IDs sourced from existing resource references with correct subscription/resource group scope
+var servicesAiZoneFromLanding = aiServicesDnsZone.id
+var openAiZoneFromLanding = openAiDnsZone.id
+var cognitiveServicesZoneFromLanding = cognitiveServicesDnsZone.id
+var searchZoneFromLanding = searchServiceDnsZone.id
+var storageZoneFromLanding = storageBlobDnsZone.id
+var cosmosZoneFromLanding = cosmosDbDnsZone.id
+var apiManagementZoneFromLanding = !empty(apiManagementName) ? apiManagementDnsZone.id : ''
 
 var storageInCurrentRg = storageResourceGroupName == resourceGroup().name && storageSecondResourceGroupName == resourceGroup().name
 var searchInCurrentRg = aiSearchServiceResourceGroupName == resourceGroup().name
@@ -531,6 +477,7 @@ module caphostRbacPost 'aiFoundry2025caphostRbac2.bicep' = if (enableCapabilityH
   }
   dependsOn: [
     capabilityHost
+    caphostRbacPre
   ]
 }
 
@@ -546,13 +493,6 @@ var cosmosAccountSubscriptionId = cosmosSubscriptionId
 var cosmosAccountResourceGroup = cosmosResourceGroupName
 var aiSearchSubscriptionEffective = aiSearchSubscriptionId
 var aiSearchResourceGroupEffective = aiSearchServiceResourceGroupName
-
-var dnsZoneValidation = [
-  for zoneName in dnsZoneNames: {
-    name: zoneName
-    exists: !empty(string(existingDnsZones[zoneName]))
-  }
-]
 
 @description('The name of the cognitive services account.')
 output aiAccountName string = !foundryV22AccountOnly? aiAccountName : ''
@@ -618,6 +558,3 @@ output aiSearchService object = enableAISearch ? {
   subscriptionId: ''
   resourceGroup: ''
 }
-
-@description('Validation summary for expected private DNS zones.')
-output dnsZoneValidation array = dnsZoneValidation

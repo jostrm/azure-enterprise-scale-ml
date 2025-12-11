@@ -457,7 +457,7 @@ module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearc
 var aiSearchPrincipalId = enableAISearch ? getAISearchInfo!.outputs.principalId : ''
 
 // Create role assignments module to build the dynamic array
-module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = if(enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = if(enableAIFoundry && !foundryV22AccountOnly && (!aiFoundryV2Exists || updateAIFoundry)) {
   name: take('09-roleBuilder-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -790,6 +790,8 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     restrictOutboundNetworkAccess: false
     tags: tagsProject
     privateLinksDnsZones: privateLinksDnsZones
+    privDnsSubscription: privDnsSubscription_param
+    privDnsResourceGroupName: privDnsResourceGroupName
     apiManagementResourceId: apiManagementResourceId
     azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)

@@ -1,0 +1,9 @@
+.git*
+.vscode
+.venv
+__pycache__
+*.py[cod]
+*$py.class
+.python_version
+.DS_Store
+azure_func.py
