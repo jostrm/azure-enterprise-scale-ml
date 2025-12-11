@@ -210,6 +210,9 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 	}
 }
 
+//param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
+//var uniqueSuffix10 = substring(uniqueString('${targetResourceGroupName}-${deploymentTimestamp}'), 0, 10)
+
 var cleanRandomValue = namingConvention.outputs.randomSalt
 var aifRandom = take('aif${cleanRandomValue}',12)
 var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',12)

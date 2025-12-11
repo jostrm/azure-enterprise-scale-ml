@@ -146,10 +146,11 @@ param tags object = {}
 ])
 param aiAccountSku string = 'S0'
 
-var uniqueSuffix = substring(uniqueString('${resourceGroup().id}-${deploymentTimestamp}'), 0, 4)
-var fallbackAccountName = take(toLower('${aiServices}${uniqueSuffix}'), 63)
-var overrideAccountName = take(toLower(aiAccountName), 63)
-var accountName = length(overrideAccountName) >= 2 ? overrideAccountName : fallbackAccountName
+//var uniqueSuffix = substring(uniqueString('${resourceGroup().id}-${deploymentTimestamp}'), 0, 4)
+//var fallbackAccountName = take(toLower('${aiServices}${uniqueSuffix}'), 63)
+//var overrideAccountName = take(toLower(aiAccountName), 63)
+//var accountName = length(overrideAccountName) >= 2 ? overrideAccountName : fallbackAccountName
+var accountName = aiAccountName
 var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agentSubnetResourceId)
 
 
