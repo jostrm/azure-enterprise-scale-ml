@@ -166,7 +166,7 @@ var acrProjectName = 'acr${projectName}${genaiName}${locationSuffix}${uniqueInAI
 var acrCommonName = replace('acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}','-','')
 
 // Managed Identities (with random salt for uniqueness)
-var miSuffix = keepMIandKVsuffixAs001 ? '001' : resourceSuffix
+var miSuffix = keepMIandKVsuffixAs001 ? '-001' : resourceSuffix
 var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'
 var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'
 
