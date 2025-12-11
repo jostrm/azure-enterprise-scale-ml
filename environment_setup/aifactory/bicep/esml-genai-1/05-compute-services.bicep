@@ -84,7 +84,7 @@ param webAppServicePlanExists bool = false
 param bingExists bool = false
 
 param aiFoundryV2Exists bool = false
-param enableAIFoundryV21 bool = false
+param enableAIFoundry bool = false
 param disableAgentNetworkInjection bool = true
 
 param enableAppInsightsDashboard bool = true

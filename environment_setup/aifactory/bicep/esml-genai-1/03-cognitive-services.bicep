@@ -36,7 +36,7 @@ param storageAccountSkuName string = 'Standard_LRS'
 @description('Enable AI Foundry Caphost feature')
 param enableAFoundryCaphost bool = false
 @description('Enable AI Foundry V2.1')
-param enableAIFoundryV21 bool = false
+param enableAIFoundry bool = false
 param enableAISearchSharedPrivateLink bool = true
 param addAISearch bool = false
 
@@ -369,7 +369,7 @@ var var_csDocIntelligence_dnsConfig = csDocIntelligence.outputs.dnsConfig
 var var_csAzureOpenAI_dnsConfig = csAzureOpenAI.outputs.dnsConfig
 
 #disable-next-line BCP318
-var var_aiSearchService_dnsConfig = (enableAISearch || (enableAFoundryCaphost && enableAIFoundryV21)) ? (!empty(aiSearchService.outputs.dnsConfig[0].name) ? aiSearchService.outputs.dnsConfig : []) : []
+var var_aiSearchService_dnsConfig = (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) ? (!empty(aiSearchService.outputs.dnsConfig[0].name) ? aiSearchService.outputs.dnsConfig : []) : []
 
 #disable-next-line BCP318
 var var_sa4AIsearch_dnsConfig = sa4AIsearch.outputs.dnsConfig
@@ -644,7 +644,7 @@ var sharedPrivateLinksForAISearch = enableAISearchSharedPrivateLink ? union(
 ) : []
 
 // AI Search Service
-module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundryV21))) {
+module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry))) {
   name: take('03-AzureAISearch4${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -857,7 +857,7 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists &&
 }
 
 // AI Search Service Private DNS
-module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExists && !centralDnsZoneByPolicyInHub && (enableAISearch || (enableAFoundryCaphost && enableAIFoundryV21))) {
+module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExists && !centralDnsZoneByPolicyInHub && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry))) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-privDnsAISearch${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -971,7 +971,7 @@ module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagn
 }
 
 // AI Search Diagnostic Settings
-module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundryV21))) {
+module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry))) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

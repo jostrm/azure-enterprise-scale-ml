@@ -103,10 +103,8 @@ param enableAIFoundryHub bool = false
 param addAIFoundryHub bool = false
 @description('Add Azure Machine Learning with random naming for debugging/testing')
 param addAzureMachineLearning bool = false
-@description('Enable AI Foundry V2 deployment')
-param enableAIFoundryV2 bool = false
 @description('Enable AI Foundry V21 deployment')
-param enableAIFoundryV21 bool = false
+param enableAIFoundry bool = false
 param addAISearch bool = false
 @description('Enable AI Services deployment')
 param enableAIServices bool = false
