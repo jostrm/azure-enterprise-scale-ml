@@ -518,6 +518,9 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIn
 // ============== CMK CONFIGURATION ==============
 var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
 
+// Construct Key Vault URI properly (avoid reference() function which causes deployment issues)
+var cmkKeyVaultUri = cmk ? 'https://${admin_bicep_kv_fw}${environment().suffixes.keyvaultDns}/' : ''
+
 // Storage for AI Search
 module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -540,7 +543,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
     cmk: cmk
     cmkIdentityId: cmkIdentityId
     cmkKeyName: cmk ? cmkKeyName : ''
-    cmkKeyVaultUri: cmk ? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri : ''
+    cmkKeyVaultUri: cmkKeyVaultUri
     containers: [
       {
         name: 'default'
