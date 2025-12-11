@@ -3,9 +3,6 @@ targetScope = 'resourceGroup'
 @description('Location for all resources.')
 param location string
 param foundryV22AccountOnly bool = false
-@description('Base name prefix for new AI Services resources when new resources are created.')
-@minLength(3)
-param aiServices string = 'aiservices'
 
 @description('Optional override for the AI Services account name. When empty a unique name is generated.')
 param aiAccountName string = ''
@@ -141,16 +138,13 @@ param tags object = {}
 param aiAccountSku string = 'S0'
 
 var uniqueSuffix = substring(uniqueString('${resourceGroup().id}-${deploymentTimestamp}'), 0, 4)
-var fallbackAccountName = take(toLower('${aiServices}${uniqueSuffix}'), 63)
-var overrideAccountName = take(toLower(aiAccountName), 63)
-var accountName = length(overrideAccountName) >= 2 ? overrideAccountName : fallbackAccountName
-var projectName = toLower('${firstProjectName}${uniqueSuffix}')
+
 
 var storagePassedIn = !empty(azureStorageAccountResourceId)
 var storageParts = storagePassedIn ? split(azureStorageAccountResourceId, '/') : split('', '/')
 var storageSubscriptionId = storagePassedIn ? storageParts[2] : subscription().subscriptionId
 var storageResourceGroupName = storagePassedIn ? storageParts[4] : resourceGroup().name
-var storageAccountName = storagePassedIn ? last(storageParts) : take(replace(toLower('${aiServices}${uniqueSuffix}storage'), '-', ''), 24)
+var storageAccountName = storagePassedIn ? last(storageParts) : take(replace(toLower('${aiAccountName}${uniqueSuffix}storage'), '-', ''), 24)
 
 var storageSecondPassedIn = !empty(azureStorageAccountResourceIdSecondary)
 var storageSecondParts = storageSecondPassedIn ? split(azureStorageAccountResourceIdSecondary, '/') : split('', '/')
@@ -158,19 +152,19 @@ var storageSecondSubscriptionId = storageSecondPassedIn ? storageSecondParts[2] 
 var storageSecondResourceGroupName = storageSecondPassedIn ? storageSecondParts[4] : resourceGroup().name
 var storageAccountNameSecondary = storageSecondPassedIn
   ? last(storageSecondParts)
-  : take(replace(toLower('${aiServices}${uniqueSuffix}stor2'), '-', ''), 24)
+  : take(replace(toLower('${aiAccountName}${uniqueSuffix}stor2'), '-', ''), 24)
 
 var searchPassedIn = !empty(aiSearchResourceId)
 var searchParts = searchPassedIn ? split(aiSearchResourceId, '/') : split('', '/')
 var aiSearchSubscriptionId = searchPassedIn ? searchParts[2] : subscription().subscriptionId
 var aiSearchServiceResourceGroupName = searchPassedIn ? searchParts[4] : resourceGroup().name
-var aiSearchName = searchPassedIn ? last(searchParts) : take(replace(toLower('${aiServices}${uniqueSuffix}search'), '-', ''), 24)
+var aiSearchName = searchPassedIn ? last(searchParts) : take(replace(toLower('${aiAccountName}${uniqueSuffix}search'), '-', ''), 24)
 
 var cosmosPassedIn = !empty(azureCosmosDBAccountResourceId)
 var cosmosParts = cosmosPassedIn ? split(azureCosmosDBAccountResourceId, '/') : split('', '/')
 var cosmosSubscriptionId = cosmosPassedIn ? cosmosParts[2] : subscription().subscriptionId
 var cosmosResourceGroupName = cosmosPassedIn ? cosmosParts[4] : resourceGroup().name
-var cosmosAccountName = cosmosPassedIn ? last(cosmosParts) : take(replace(toLower('${aiServices}${uniqueSuffix}cosmosdb'), '-', ''), 44)
+var cosmosAccountName = cosmosPassedIn ? last(cosmosParts) : take(replace(toLower('${aiAccountName}${uniqueSuffix}cosmosdb'), '-', ''), 44)
 
 var apiManagementProvided = !empty(apiManagementResourceId)
 var apiManagementParts = apiManagementProvided ? split(apiManagementResourceId, '/') : split('', '/')
@@ -329,7 +323,7 @@ var defaultDeploymentName = take('${modelName}-${uniqueSuffix}', 64)
 
 #disable-next-line BCP036
 resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
-  name: accountName
+  name: aiAccountName
   kind: 'AIServices'
   location: location
   tags: tags
@@ -344,7 +338,7 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
     apiProperties: apiProperties
     allowProjectManagement: enableProject
     //defaultProject: enableProject ? projectName : null
-    customSubDomainName: accountName
+    customSubDomainName: aiAccountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
     disableLocalAuth: false
@@ -362,13 +356,13 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
 }
 
 resource aiAccountExisting 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(!foundryV22AccountOnly) {
-  name: length(accountName) >= 2 ? accountName : take('${accountName}aa', 63)
+  name: aiAccountName
 }
 
 var aiAccountResourceId = foundryV22AccountOnly ? aiAccountCreate.id : aiAccountExisting.id
 
 resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = {
-  name: '${accountName}/${defaultDeploymentName}'
+  name: '${aiAccountName}/${defaultDeploymentName}'
   properties: {
     model: {
       name: modelName
@@ -387,7 +381,7 @@ resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
 
 @batchSize(1)
 resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = [for (deployment, index) in extraModelDeployments: {
-  name: '${accountName}/${take(string(deployment.name ?? 'deployment${index}'), 64)}'
+  name: '${aiAccountName}/${take(string(deployment.name ?? 'deployment${index}'), 64)}'
   properties: {
     model: deployment.model
     raiPolicyName: deployment.raiPolicyName
@@ -406,15 +400,15 @@ resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/de
 module projectModule 'aiFoundry2025project.bicep' = if (enableProject) {
   name: take('aifoundry-project-${uniqueSuffix}', 64)
   params: {
-    name: projectName
+    name: firstProjectName
     location: location
     cosmosDBname: enableCosmosDb ? cosmosAccountName : ''
     storageName: storageAccountName
     storageName2: storageAccountNameSecondary
-    aiFoundryV2Name: accountName
+    aiFoundryV2Name: aiAccountName
     aiSearchName: enableAISearch ? aiSearchName : ''
     enablePublicAccessWithPerimeter: allowPublicAccessWhenBehindVnet
-    defaultProjectName: projectName
+    defaultProjectName: firstProjectName
     defaultProjectDisplayName: displayName
     defaultProjectDescription: projectDescription
   }
@@ -445,7 +439,7 @@ module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost &&
     aiSearchConnection: string(projectModule.outputs.aiSearchConnection)
     #disable-next-line BCP318
     projectName: projectModule.outputs.projectName
-    accountName: accountName
+    accountName: aiAccountName
     projectCapHostName: projectCapHostUnique
   }
   dependsOn: [
@@ -470,7 +464,7 @@ module aiFoundryRbac 'aiFoundry2025rbac.bicep' = if (!empty(userRoleObjectIds) |
     userObjectIds: userRoleObjectIds
     servicePrincipalIds: servicePrincipalIds
     projectPrincipalId: projectPrincipalId
-    cognitiveServicesAccountName: accountName
+    cognitiveServicesAccountName: aiAccountName
     cognitiveServicesContributorRoleId: cognitiveServicesContributorRoleId
     cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
@@ -487,7 +481,7 @@ module searchRbac 'rbacAISearchForAIFv2.bicep' = if (enableAISearch && searchInC
   name: take('aifoundry-rbacsearch-${uniqueSuffix}', 64)
   params: {
     aiSearchName: aiSearchName
-    aiFoundryAccountName: accountName
+    aiFoundryAccountName: aiAccountName
     projectPrincipalId: projectPrincipalId
     searchServiceContributorRoleId: searchServiceContributorRoleId
     searchIndexDataReaderRoleId: searchIndexDataReaderRoleId
@@ -504,7 +498,7 @@ module storageRbac 'rbacAIStorageAccountsForAIFv2.bicep' = if (storageInCurrentR
   params: {
     storageAccountName: storageAccountName
     storageAccountName2: storageAccountNameSecondary
-    aiFoundryAccountName: accountName
+    aiFoundryAccountName: aiAccountName
     projectPrincipalId: projectPrincipalId
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
@@ -561,7 +555,7 @@ var dnsZoneValidation = [
 ]
 
 @description('The name of the cognitive services account.')
-output aiAccountName string = !foundryV22AccountOnly? accountName : ''
+output aiAccountName string = !foundryV22AccountOnly? aiAccountName : ''
 
 @description('The resource ID of the cognitive services account.')
 output aiAccountId string =  !foundryV22AccountOnly? aiAccountIdValue : ''
