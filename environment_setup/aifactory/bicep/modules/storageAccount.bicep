@@ -37,7 +37,6 @@ param skuName string
 
 //@description('Specifies the id of the virtual network used for private endpoints')
 //param vnetId string
-
 @description('Specifies the id of the subnet used for the private endpoints')
 param subnetName string
 
@@ -101,7 +100,9 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   name: subnetName
   parent: vnet
 }
-var rules = [for rule in vnetRules:{
+var cleanedVnetRules = [for rule in vnetRules: trim(rule)]
+var filteredVnetRuleIds = filter(cleanedVnetRules, rule => !empty(rule))
+var effectiveVnetRules = [for rule in filteredVnetRuleIds: {
   action: 'Allow'
   id: rule
 }]
@@ -161,19 +162,19 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicG
       // Scenario 2: Fully public with vnetRules but no ipRules
       bypass: 'AzureServices'
       defaultAction: 'Allow'
-      virtualNetworkRules: rules
+      virtualNetworkRules: effectiveVnetRules
       ipRules: []
     } : (!enablePublicAccessWithPerimeter && enablePublicGenAIAccess) ? {
       // Scenario 1: IP-whitelisting with both vnetRules and ipRules
       bypass: 'AzureServices'
       defaultAction: 'Deny'
-      virtualNetworkRules: rules
+      virtualNetworkRules: effectiveVnetRules
       ipRules: empty(ipRules) ? [] : ipRules
     } : (enablePublicGenAIAccess || !empty(ipRules) || !empty(vnetRules)) ? {
       // Other scenarios
       bypass: 'AzureServices' 
       defaultAction: enablePublicGenAIAccess && empty(ipRules) && empty(vnetRules) ? 'Allow' : 'Deny'
-      virtualNetworkRules: rules
+      virtualNetworkRules: effectiveVnetRules
       ipRules: empty(ipRules) ? [] : ipRules
     } : null
   }
@@ -263,7 +264,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-01-01' = if(!enablePublicG
     networkAcls:{
       bypass: 'AzureServices' 
       defaultAction: 'Deny' 
-      virtualNetworkRules:rules
+      virtualNetworkRules:effectiveVnetRules
       ipRules:empty(ipRules)?[]:ipRules
     }
   }
