@@ -155,7 +155,7 @@ var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agent
 
 
 var ipRules = [for ip in ipAllowList: {
-  value: contains(ip, '/') ? toLower(ip) : '${toLower(ip)}/32'
+  value: contains(ip, '/') ? toLower(ip) : '${toLower(ip)}/24'
 }]
 var networkAclVirtualNetworkRules = concat(
   !empty(privateEndpointSubnetResourceId) ? [
