@@ -15,8 +15,6 @@ targetScope = 'subscription'
 @allowed(['dev', 'test', 'prod'])
 param env string
 param containerAppsEnvExists bool = false
-param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = true
-param aiFoundryV2ProjectExists bool = false
 @description('Project number (e.g., "005")')
 param projectNumber string
 
@@ -32,12 +30,15 @@ param commonResourceSuffix string
 @description('Project-specific resource suffix')
 param resourceSuffix string
 
-// Enable flags
+// FOUNDRY
 @description('Enable AI Foundry 2 features')
 param enableAIFoundry bool = false
+param aiFoundryV2Exists bool = false
+param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = true
+param aiFoundryV2ProjectExists bool = false
+// 2 phase logic & flags
 param foundryV22AccountOnly bool = false
 param useAVMFoundry bool = false // https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
-param aiFoundryV2Exists bool = false
 param updateAIFoundry bool = false
 param addAIFoundry bool = false
 param NoAVM_APIM bool = true
