@@ -425,7 +425,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     ]
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa
     cmk: cmk
-    cmkIdentityId: cmkIdentityId
+    cmkIdentityId: cmk ? cmkIdentityId : ''
     cmkKeyName: cmk ? cmkKeyName : ''
     cmkKeyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
     corsRules: [
