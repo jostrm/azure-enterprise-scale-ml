@@ -13,7 +13,7 @@ import { aifactoryNamingType } from '../types/aifactoryNaming.bicep'
 @allowed(['dev', 'test', 'prod'])
 param env string
 
-param keepMIandKVsuffixAs001 bool = true
+param keepMIandKVsuffixAs001 bool = false
 @description('Project number (e.g., "005")')
 param projectNumber string
 
