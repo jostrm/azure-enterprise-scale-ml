@@ -408,7 +408,10 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     filePrivateEndpointName: '${storageAccount1001Name}-file-pend'
     queuePrivateEndpointName: '${storageAccount1001Name}-queue-pend'
     tablePrivateEndpointName: '${storageAccount1001Name}-table-pend'
-    tags: tagsProject
+    tags: {
+      Environment: env
+      Project: projectNumber
+    }
     containers: [
       {
         name: 'default'
