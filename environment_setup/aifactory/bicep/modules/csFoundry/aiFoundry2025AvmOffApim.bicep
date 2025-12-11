@@ -213,54 +213,6 @@ var networkAcls = hasNetworkAcls ? {
   bypass:'AzureServices'
 } : null
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
-
-/* -------------------------------------------- Private DNS Zones -------------------------------------------- */
-
-// Reference existing private DNS zones from the central DNS resource group
-resource aiServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
-  name: string(privateLinksDnsZones.servicesai.name)
-  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-}
-
-resource openAiDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
-  name: string(privateLinksDnsZones.openai.name)
-  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-}
-
-resource cognitiveServicesDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
-  name: string(privateLinksDnsZones.cognitiveservices.name)
-  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-}
-
-resource searchServiceDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
-  name: string(privateLinksDnsZones.searchService.name)
-  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-}
-
-resource storageBlobDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
-  name: string(privateLinksDnsZones.blob.name)
-  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-}
-
-resource cosmosDbDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = {
-  name: string(privateLinksDnsZones.cosmosdbnosql.name)
-  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-}
-
-resource apiManagementDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' existing = if (!empty(apiManagementName)) {
-  name: string(privateLinksDnsZones.apim.name)
-  scope: resourceGroup(privDnsSubscription, privDnsResourceGroupName)
-}
-
-// IDs sourced from existing resource references with correct subscription/resource group scope
-var servicesAiZoneFromLanding = aiServicesDnsZone.id
-var openAiZoneFromLanding = openAiDnsZone.id
-var cognitiveServicesZoneFromLanding = cognitiveServicesDnsZone.id
-var searchZoneFromLanding = searchServiceDnsZone.id
-var storageZoneFromLanding = storageBlobDnsZone.id
-var cosmosZoneFromLanding = cosmosDbDnsZone.id
-var apiManagementZoneFromLanding = !empty(apiManagementName) ? apiManagementDnsZone.id : ''
-
 var storageInCurrentRg = storageResourceGroupName == resourceGroup().name && storageSecondResourceGroupName == resourceGroup().name
 var searchInCurrentRg = aiSearchServiceResourceGroupName == resourceGroup().name
 var cosmosInCurrentRg = cosmosResourceGroupName == resourceGroup().name
@@ -342,6 +294,7 @@ resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/de
     aiAccountDeployment
   ]
 }]
+
 
 module projectModule 'aiFoundry2025project.bicep' = if (enableProject) {
   name: take('aifoundry-project-${uniqueSuffix}', 64)

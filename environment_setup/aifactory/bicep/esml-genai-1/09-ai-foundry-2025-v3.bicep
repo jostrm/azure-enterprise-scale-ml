@@ -41,7 +41,7 @@ param foundryV22AccountOnly bool = false
 param useAVMFoundry bool = false // https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
 param updateAIFoundry bool = false
 param addAIFoundry bool = false
-param NoAVM_APIM bool = true
+param Use_APIM_Project bool = true
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
@@ -502,6 +502,13 @@ var aiFoundryDeployments = [
   }
 ]
 
+// Customer Managed Key (CMK) configuration - applies to all AI Foundry deployments
+var customerManagedKey = cmk ? {
+  keyName: cmkKeyName
+  keyVaultResourceId: resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault)
+  userAssignedIdentityResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
+} : null
+
 var hasModelDeploymentsV22 = length(aiFoundryDeployments) > 0
 var defaultModelDeploymentV22 = hasModelDeploymentsV22 ? aiFoundryDeployments[0] : {
   name: 'gpt-4o'
@@ -705,7 +712,7 @@ var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ?
 var deployAvmFoundry = useAVMFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)
 var shouldDeployFoundryPrivateEndpoints = !foundryV22AccountOnly && enableAIFoundry // ensures PE creation for full V21/V22 builds
 
-module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOffApimAccount.bicep' = if(NoAVM_APIM && foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists) {
+module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOffApimAccount.bicep' = if(Use_APIM_Project && foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV22-NoAvmAccountOnly_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -745,6 +752,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
     azureCosmosDBAccountResourceId: enableCosmosDB ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
     aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
+    customerManagedKey: customerManagedKey
   }
   dependsOn: [
     existingTargetRG
@@ -755,7 +763,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
   ]
 }
 
-module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(NoAVM_APIM && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry)) {
+module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -808,7 +816,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
 }
 
 // AI Foundry V2.1 - AI factory (Alternative Implementation, customer high regulatory reqs enforcement on top of WAF)
-module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(!NoAVM_APIM && !foundryV22AccountOnly && !deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry)) {
+module aiFoundry2025NoAvm '../modules/csFoundry/aiFoundry2025AvmOff.bicep' = if(!Use_APIM_Project && !foundryV22AccountOnly && !deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV2-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -887,21 +895,21 @@ resource aiFoundryAccountAvm 'Microsoft.CognitiveServices/accounts@2025-07-01-pr
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
+// Simplified: Get system-assigned managed identity principal ID based on deployment scenario
 #disable-next-line BCP318
-var aiFoundrySystemAssignedPrincipalId = deployAvmFoundry
-  ? (aiFoundryAccountAvm!.identity!.principalId ?? '')
-  : (foundryV22AccountOnly
-      ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountPrincipalId
-      : ((!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry))
-          ? aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId
-          : (enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)
-              ? aiFoundry2025NoAvm!.outputs.systemAssignedMIPrincipalId!
-              : '')))
+var aiFoundrySystemAssignedPrincipalId = foundryV22AccountOnly
+  ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountPrincipalId
+  : (Use_APIM_Project
+      ? aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId
+      : (deployAvmFoundry
+          ? (aiFoundryAccountAvm!.identity!.principalId ?? '')
+          : aiFoundry2025NoAvm!.outputs.systemAssignedMIPrincipalId!))
 
-// Add the new FDP cognitive services module
+// Project module - only for scenario 2b (non-APIM)
+// Scenario 2a (APIM) creates project internally within aiFoundry2025NoAvmV22
 var projectModuleEnabled = enableAIFactoryCreatedDefaultProjectForAIFv2
 
-module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(!Use_APIM_Project && projectModuleEnabled && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_Prj_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -917,22 +925,22 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
     }
     dependsOn: [
       existingTargetRG
-      ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
-      ...(!deployAvmFoundry && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
-      ...(!deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])
+      // Scenario 2b: depends on aiFoundry2025NoAvm or deployAvmFoundry path
+      ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
       ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
     ]
 }
 
 // AI Foundry Private Endpoints - deployed after main service
-// Deploys when: not using public access, not using AVM, and either updating existing OR in phase 2 (foundryV22AccountOnly=false)
+// Deploys when: not using public access, not using AVM, and in phase 2 (foundryV22AccountOnly=false)
+// Executes last in both scenario 2a (APIM) and 2b (non-APIM)
 module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' = if(!enablePublicAccessWithPerimeter && !deployAvmFoundry && shouldDeployFoundryPrivateEndpoints && (updateAIFoundry || !foundryV22AccountOnly) && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21-PrivateEndpoints_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     cognitiveServiceName: aiFoundryAccountNameOutput
     #disable-next-line BCP318
-    cognitiveServiceId: (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry))
+    cognitiveServiceId: Use_APIM_Project
       ? aiFoundry2025NoAvmV22!.outputs.aiAccountId
       : aiFoundry2025NoAvm!.outputs.resourceId
     location: location
@@ -944,13 +952,15 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     apiManagementResourceId: apiManagementResourceId
   }
   dependsOn: [
-    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : (enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : []))
+    // Primary AI Foundry account deployment (scenario 2a or 2b)
+    ...(Use_APIM_Project ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm])
     existingTargetRG
-    ...(projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
-    ...(projectModuleEnabled && enableAIFoundry && !foundryV22AccountOnly ? [assignCognitiveServicesRoles] : []) // Add... some extra dependencies, to not having AI Foundry "Account in state accepted" errror
-    ...(enableAISearch && enableAIFoundry && !foundryV22AccountOnly ? [rbacAISearchForAIFv21] : []) // Add..
-    ...(enableAIFoundry && !foundryV22AccountOnly ? [rbacAIStorageAccountsForAIFv21] : []) // Add
-    ...(enableAIFoundry && !foundryV22AccountOnly ? [rbacProjectKeyVaultForAIFoundry] : []) // Add
+    // For scenario 2b (non-APIM), wait for external project/RBAC modules
+    ...(!Use_APIM_Project && projectModuleEnabled ? [projectV21] : [])
+    ...(!Use_APIM_Project && projectModuleEnabled ? [assignCognitiveServicesRoles] : [])
+    ...(!Use_APIM_Project && enableAISearch ? [rbacAISearchForAIFv21] : [])
+    ...(!Use_APIM_Project ? [rbacAIStorageAccountsForAIFv21] : [])
+    ...(!Use_APIM_Project ? [rbacProjectKeyVaultForAIFoundry] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
@@ -960,21 +970,10 @@ var projectPrincipal = (projectModuleEnabled && enableAIFoundry && (!aiFoundryV2
 #disable-next-line BCP318
 var projectWorkspaceId = (projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) ? projectV21.outputs.projectWorkspaceId : ''
 
-// Get the actual deployed AI Foundry account name from module outputs (prevents empty name causing '-pend' error)
-#disable-next-line BCP318
-
-
-/*
-var deployedAifV2Name =  enableAIFoundryV22 
-  ? (foundryV22AccountOnly 
-      ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName 
-      : aiFoundry2025NoAvmV22!.outputs.aiAccountName)
-  : aiFoundry2025NoAvm!.outputs.name
-*/
-
 // Function to assign roles to users and service principals for a cognitive services account
+// Only executes in scenario 2b (non-APIM), as scenario 2a handles RBAC internally
 @description('Function to assign roles to users and service principals for a cognitive services account')
-module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if(projectModuleEnabled && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bicep' = if(!Use_APIM_Project && projectModuleEnabled && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   name: '07-AifV21_UserRBAC-${deploymentProjSpecificUniqueSuffix}'
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -991,15 +990,14 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   dependsOn: [
     spAndMI2ArrayModule
     namingConvention
-    ...(deployAvmFoundry && !foundryV22AccountOnly
-      ? [aiFoundry2025Avm]
-      : (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : (enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
-    ...(projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    // Scenario 2b: depends on aiFoundry2025NoAvm or deployAvmFoundry path
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+    projectV21
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
-module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(!Use_APIM_Project && enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_RBACpreCH_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1017,7 +1015,8 @@ var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' // User, SP, AI Services, etc -> AI Search
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
 // Assign RBAC in Task 2 (when foundryV22AccountOnly=false)
-module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(enableAISearch && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// Only executes in scenario 2b (non-APIM)
+module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(!Use_APIM_Project && enableAISearch && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1030,11 +1029,10 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
     azureAIDeveloperRoleId: azureAIDeveloperRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry && !foundryV22AccountOnly
-      ? [aiFoundry2025Avm]
-      : (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : (enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
+    // Scenario 2b: depends on aiFoundry2025NoAvm or deployAvmFoundry path
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
-    ...(projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
@@ -1044,7 +1042,8 @@ var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 // Assign RBAC in Task 2 (when foundryV22AccountOnly=false)
-module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// Only executes in scenario 2b (non-APIM)
+module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccountsForAIFv2.bicep'= if(!Use_APIM_Project && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacStorage-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1057,17 +1056,17 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry && !foundryV22AccountOnly
-      ? [aiFoundry2025Avm]
-      : (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : (enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
+    // Scenario 2b: depends on aiFoundry2025NoAvm or deployAvmFoundry path
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
-    ...(projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
 // This module creates the capability host for the project and account
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+// Only executes in scenario 2b (non-APIM)
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(!Use_APIM_Project && enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1090,7 +1089,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   ]
 }
 
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) {
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(!Use_APIM_Project && enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1105,7 +1104,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
 // START CAPHOST RBAC: Some RBAC for COSMOS & STORAGE must be assigned AFTER the CAPABILITY HOST is created
 // - The Storage Blob Data Owner role must be assigned after.
 // - The Cosmos Built-In Data Contributor role must be assigned after.
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(!Use_APIM_Project && enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -1125,7 +1124,8 @@ module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = 
 
 // CRITICAL: Add Key Vault RBAC for Agent playground functionality
 // Assign RBAC in Task 2 (when foundryV22AccountOnly=false)
-module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// Only executes in scenario 2b (non-APIM)
+module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' = if(!Use_APIM_Project && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacKeyVault-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1137,18 +1137,18 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry && !foundryV22AccountOnly
-      ? [aiFoundry2025Avm]
-      : (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : (enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])))
+    // Scenario 2b: depends on aiFoundry2025NoAvm or deployAvmFoundry path
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
-    ...(projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly ? [projectV21] : [])
+    ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
 // ADDITIONAL: Assign specific Key Vault roles to the AI Foundry managed identity for the project Key Vault 
 // Assign RBAC in Task 2 (when foundryV22AccountOnly=false)
-module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// Only executes in scenario 2b (non-APIM)
+module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if(!Use_APIM_Project && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacPrjKV-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1158,51 +1158,38 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry && !foundryV22AccountOnly ? [aiFoundry2025Avm] : [])
-    ...(!deployAvmFoundry && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
-    ...(!deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])
+    // Scenario 2b: depends on aiFoundry2025NoAvm or deployAvmFoundry path
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
     namingConvention
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
-#disable-next-line BCP318
-var aiFoundryAccountNameAvm = (deployAvmFoundry && !foundryV22AccountOnly) ? aiFoundry2025Avm.outputs.aiServicesName : ''
-#disable-next-line BCP318
-var aiFoundryResourceGroupOutput = (deployAvmFoundry && !foundryV22AccountOnly) ? aiFoundry2025Avm.outputs.resourceGroupName : targetResourceGroup
-#disable-next-line BCP318
-var aiFoundryResourceIdAvm = (deployAvmFoundry && !foundryV22AccountOnly)
-  ? resourceId(subscriptionIdDevTestProd, aiFoundryResourceGroupOutput, 'Microsoft.CognitiveServices/accounts', aiFoundryAccountNameAvm)
-  : ''
-#disable-next-line BCP318
-var aiFoundryAccountNameLegacy = (!deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) ? aiFoundry2025NoAvm!.outputs.name : '' 
-#disable-next-line BCP318
-var aiFoundryAccountNameV22 = (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)) ? aiFoundry2025NoAvmV22!.outputs.aiAccountName : ''
-#disable-next-line BCP318
-var aiFoundryAccountNameV22AccountOnly = (foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)) ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName : ''
-
-var aiFoundryAccountNameOutput = (deployAvmFoundry && !foundryV22AccountOnly)
-  ? aiFoundryAccountNameAvm
-  : (foundryV22AccountOnly ? aiFoundryAccountNameV22AccountOnly : ((!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry)) ? aiFoundryAccountNameV22 : aiFoundryAccountNameLegacy))
-
+// Simplified: Determine which module was deployed based on scenario
+// Scenario 1: foundryV22AccountOnly=true -> aiFoundry2025NoAvmV22AccountOnly
+// Scenario 2a: Use_APIM_Project=true && foundryV22AccountOnly=false -> aiFoundry2025NoAvmV22
+// Scenario 2b: Use_APIM_Project=false && foundryV22AccountOnly=false -> aiFoundry2025NoAvm
+// AVM is separate path (deployAvmFoundry)
 
 #disable-next-line BCP318
-var aiFoundryResourceIdLegacy = (!deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) ? aiFoundry2025NoAvm!.outputs.resourceId : ''
-#disable-next-line BCP318
-var aiFoundryResourceIdV22 = (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)) ? aiFoundry2025NoAvmV22!.outputs.aiAccountId : ''
-#disable-next-line BCP318
-var aiFoundryResourceIdV22AccountOnly = (foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)) ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountId : ''
+var aiFoundryAccountNameOutput = foundryV22AccountOnly
+  ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName
+  : (Use_APIM_Project
+      ? aiFoundry2025NoAvmV22!.outputs.aiAccountName
+      : (deployAvmFoundry
+          ? aiFoundry2025Avm!.outputs.aiServicesName
+          : aiFoundry2025NoAvm!.outputs.name))
 
-var aiFoundryResourceIdOutput = (deployAvmFoundry && !foundryV22AccountOnly)
-  ? aiFoundryResourceIdAvm
-  : (foundryV22AccountOnly ? aiFoundryResourceIdV22AccountOnly : ((!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry)) ? aiFoundryResourceIdV22 : aiFoundryResourceIdLegacy))
+#disable-next-line BCP318
+var aiFoundryResourceIdOutput = foundryV22AccountOnly
+  ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountId
+  : (Use_APIM_Project
+      ? aiFoundry2025NoAvmV22!.outputs.aiAccountId
+      : (deployAvmFoundry
+          ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.CognitiveServices/accounts', aiFoundry2025Avm!.outputs.aiServicesName)
+          : aiFoundry2025NoAvm!.outputs.resourceId))
 
 // ============== AI FOUNDRY HUB ==============
-var customerManagedKey = cmk ? {
-  keyName: cmkKeyName
-  keyVaultResourceId: resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault)
-  userAssignedIdentityResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
-} : null
 
 // ==== Shared private link Azure AI Search to foundry
 var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && enableAISearch && enableAIFoundry && !foundryV22AccountOnly
@@ -1216,12 +1203,12 @@ module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bi
     location: location
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
-    ...(!deployAvmFoundry && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
-    ...(!deployAvmFoundry && foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists ? [aiFoundry2025NoAvmV22AccountOnly] : [])
-    ...(!deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) && !foundryV22AccountOnly ? [aiFoundry2025NoAvm] : [])
-    ...(enableAISearch && enableAIFoundry && !foundryV22AccountOnly ? [rbacAISearchForAIFv21] : [])  // Wait for RBAC to complete before creating shared private link
-    ...(!enablePublicAccessWithPerimeter && !deployAvmFoundry && shouldDeployFoundryPrivateEndpoints && (updateAIFoundry || !foundryV22AccountOnly) ? [aiFoundryPrivateEndpoints] : [])  // Wait for private endpoints to complete
+    // Primary AI Foundry deployment based on scenario
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : (Use_APIM_Project ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
+    // Scenario 2b only: wait for RBAC
+    ...(!Use_APIM_Project && enableAISearch ? [rbacAISearchForAIFv21] : [])
+    // Wait for private endpoints if they are being deployed
+    ...(!enablePublicAccessWithPerimeter && shouldDeployFoundryPrivateEndpoints ? [aiFoundryPrivateEndpoints] : [])
   ]
 }
 // Approve the shared private link request on the Azure AI Foundry account after deployment.
@@ -1243,9 +1230,9 @@ output aiFoundryV2ResourceId string = enableAIFoundry ? aiFoundryResourceIdOutpu
 @description('AI Foundry Project deployment status')
 output aiFoundryProjectDeployed bool = foundryV22AccountOnly
   ? false
-  : ((!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry))
+  : (Use_APIM_Project
       ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed
-      : (enableAIFoundry && !foundryV22AccountOnly))
+      : (enableAIFoundry && projectModuleEnabled))
 
 @description('AI Models deployed count')
 output aiModelsDeployed int = length(aiModels)
