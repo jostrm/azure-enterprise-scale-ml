@@ -87,7 +87,7 @@ resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGr
   }
 }
 
-resource privateEndpointApiManagement 'Microsoft.Network/privateEndpoints@2024-05-01' = if (apiManagementProvided) {
+resource privateEndpointApiManagement 'Microsoft.Network/privateEndpoints@2024-05-01' = if (apiManagementProvided && createPrivateEndpointsAIFactoryWay) {
   name: '${take(apiManagementName, 40)}-pend'
   location: location
   tags: tags
@@ -117,7 +117,7 @@ resource privateEndpointApiManagement 'Microsoft.Network/privateEndpoints@2024-0
     pendCogServiceAIF
   ]
 }
-resource privateEndpointDnsAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay) {
+resource privateEndpointDnsAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && apiManagementProvided && createPrivateEndpointsAIFactoryWay) {
   name: '${privateEndpointApiManagement.name}DnsZone'
   parent: privateEndpointApiManagement
   properties:{
