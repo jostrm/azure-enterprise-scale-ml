@@ -35,6 +35,9 @@ resource sharedPrivateLink2 'Microsoft.Search/searchServices/sharedPrivateLinkRe
     requestMessage: requestMessage
     resourceRegion: location
   }
+  dependsOn: [
+    sharedPrivateLink
+  ]
 }
 
 
