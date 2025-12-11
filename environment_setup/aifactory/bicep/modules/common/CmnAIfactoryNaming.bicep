@@ -13,6 +13,7 @@ import { aifactoryNamingType } from '../types/aifactoryNaming.bicep'
 @allowed(['dev', 'test', 'prod'])
 param env string
 
+param keepMIandKVsuffixAs001 bool = true
 @description('Project number (e.g., "005")')
 param projectNumber string
 
@@ -60,6 +61,8 @@ var projectName = 'prj${projectNumber}'
 var cmnName = 'cmn'
 var genaiName = 'genai'
 var prjResourceSuffixNoDash = replace(resourceSuffix,'-','')
+
+//var kvSuffix = keepMIandKVsuffixAs001 ? '01' : substring(resourceSuffix,2,2)
 var twoNumbers = substring(resourceSuffix,2,2) // -001 -> 01
 var resourceSuffixPlusOne = '-${padLeft(string(int(substring(resourceSuffix,1,3)) + 1), 3, '0')}'
 
@@ -163,8 +166,9 @@ var acrProjectName = 'acr${projectName}${genaiName}${locationSuffix}${uniqueInAI
 var acrCommonName = replace('acrcommon${uniqueInAIFenv}${locationSuffix}${commonResourceSuffix}${env}','-','')
 
 // Managed Identities (with random salt for uniqueness)
-var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
-var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${resourceSuffix}'
+var miSuffix = keepMIandKVsuffixAs001 ? '001' : resourceSuffix
+var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'
+var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'
 
 // Common Resource Group Services
 var laWorkspaceName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
