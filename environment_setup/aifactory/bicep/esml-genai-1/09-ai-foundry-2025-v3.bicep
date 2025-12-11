@@ -286,7 +286,7 @@ var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
 // AI Foundry V2 specific names (12)
 // Ensure domain name compliance: lowercase, no special chars, proper length
-var cleanRandomValue = namingConvention.outputs.randomSalt
+var cleanRandomValue = replace(namingConvention.outputs.randomSalt, '-', '')
 var aifRandom = take('aifr${cleanRandomValue}',11)
 var aifpRandom = take('aifr-p${projectNumber}-${cleanRandomValue}',11)
 
