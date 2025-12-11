@@ -89,7 +89,7 @@ var identity = !empty(managedIdentities) || !empty(cmkIdentity)
         : (!empty(allUserAssignedIdentities) ? 'UserAssigned' : 'None')
       userAssignedIdentities: !empty(allUserAssignedIdentities) ? allUserAssignedIdentities : null
     }
-  : {type:'SystemAssigned'} // Default fallback if nothing provided
+  : null
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName
@@ -107,7 +107,7 @@ var effectiveVnetRules = [for rule in filteredVnetRuleIds: {
   id: rule
 }]
 
-resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicGenAIAccess||enablePublicAccessWithPerimeter) {
+resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicGenAIAccess||enablePublicAccessWithPerimeter) {
   name: storageAccountName
   tags: tags
   location: location
@@ -210,7 +210,7 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-01-01' = if(enablePublicG
   }
   
 }
-resource sacc 'Microsoft.Storage/storageAccounts@2025-01-01' = if(!enablePublicGenAIAccess) {
+resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicGenAIAccess) {
   name: storageAccountName
   tags: tags
   location: location
