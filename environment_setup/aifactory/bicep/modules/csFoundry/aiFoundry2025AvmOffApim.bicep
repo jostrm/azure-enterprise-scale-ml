@@ -62,10 +62,10 @@ param existingDnsZones object = {
 param privateLinksDnsZones object = {}
 
 @description('Subscription ID for the central private DNS zones.')
-param privDnsSubscription string = subscription().subscriptionId
+param privDnsSubscription string = ''
 
 @description('Resource group name for the central private DNS zones.')
-param privDnsResourceGroupName string = resourceGroup().name
+param privDnsResourceGroupName string = ''
 
 @description('Allow public HTTP access while traffic flows through perimeter controls.')
 param allowPublicAccessWhenBehindVnet bool = false
