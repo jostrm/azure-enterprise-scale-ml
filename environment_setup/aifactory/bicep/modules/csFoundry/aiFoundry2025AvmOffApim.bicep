@@ -354,7 +354,7 @@ var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
-var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-4753-8033-0f276bb0955b'
+var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 
 module aiFoundryRbac 'aiFoundry2025rbac.bicep' = if (!empty(userRoleObjectIds) || !empty(servicePrincipalIds) || enableProject) {
