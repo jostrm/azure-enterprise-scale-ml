@@ -1040,6 +1040,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
 // Sets RBAC roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor, Storage Queue Data Contributor on Azure Storage accounts for the AI Foundry system-assigned identity
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
+var storageFileDataSMBPrivilegedContributorRoleId = '0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 // Assign RBAC in Task 2 (when foundryV22AccountOnly=false)
 // Only executes in scenario 2b (non-APIM)
@@ -1053,6 +1054,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
+    storageFileDataSMBPrivilegedContributorRoleId: storageFileDataSMBPrivilegedContributorRoleId
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [

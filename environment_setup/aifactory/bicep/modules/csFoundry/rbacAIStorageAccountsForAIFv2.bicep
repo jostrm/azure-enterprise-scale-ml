@@ -21,6 +21,7 @@ param storageBlobDataContributorRoleId string
 
 @description('Storage File Data Privileged Contributor role ID')
 param storageFileDataPrivilegedContributorRoleId string
+param storageFileDataSMBPrivilegedContributorRoleId string
 
 @description('Storage Queue Data Contributor role ID')
 param storageQueueDataContributorRoleId string = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
@@ -61,6 +62,15 @@ resource storageFileDataPrivilegedContributorAssignment 'Microsoft.Authorization
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+resource storageFileDataSMBPrivilegedContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, aiFoundryAccount.id, storageFileDataSMBPrivilegedContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataSMBPrivilegedContributorRoleId)
     principalId: principalId
     principalType: 'ServicePrincipal'
   }
