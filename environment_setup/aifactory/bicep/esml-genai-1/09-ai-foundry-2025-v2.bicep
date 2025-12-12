@@ -138,7 +138,7 @@ var resolvedSubscriptionId = !empty(trim(subscriptionIdDevTestProd)) ? subscript
 var moduleDeploymentSuffix = uniqueString(resolvedSubscriptionId, resolvedTargetResourceGroup, location)
 
 var resolvedPrivDnsSubscription = !empty(trim(privDnsSubscription_param)) ? privDnsSubscription_param : resolvedSubscriptionId
-var resolvedPrivDnsResourceGroup = (!empty(trim(privDnsResourceGroup_param)) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : resolvedCommonResourceGroup
+var resolvedPrivDnsResourceGroup = !empty(trim(privDnsResourceGroup_param)) ? privDnsResourceGroup_param : resolvedCommonResourceGroup
 
 // Legacy-friendly aliases used by downstream modules and Azure DevOps parameter files
 var targetResourceGroup = resolvedTargetResourceGroup
