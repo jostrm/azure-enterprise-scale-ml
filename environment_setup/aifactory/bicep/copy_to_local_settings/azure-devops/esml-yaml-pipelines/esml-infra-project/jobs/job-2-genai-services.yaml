@@ -805,6 +805,8 @@ steps:
       aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
       aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aiFoundryV2Name="aif2"
+      aiFoundryV2ProjectName="aif2-p${projectNumber}-"
+
       dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
       aksName="aks${projectNumber}-${locationSuffix}-${envName}"
       amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
@@ -842,6 +844,7 @@ steps:
       echo "##vso[task.setvariable variable=aiHubExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=aifProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$noSuffix")"
+      echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts/projects" "$aiFoundryV2ProjectName" "$noSuffix")"
 
       echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Azure.Databricks/workspaces" "$databricksName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
@@ -906,6 +909,7 @@ steps:
         ["aiHubExists"]="$(aiHubExists)"
         ["aifProjectExists"]="$(aifProjectExists)"
         ["aiFoundryV2Exists"]="$(aiFoundryV2Exists)"
+        ["aiFoundryV2ProjectExists"]="$(aiFoundryV2ProjectExists)"
         ["amlExists"]="$(amlExists)"
         ["datafactoryExists"]="$(datafactoryExists)"
         ["logicAppsExists"]="$(logicAppsExists)"
@@ -1884,6 +1888,7 @@ steps:
      --parameters addAISearch="$(addAISearch)" \
      --parameters enableAIFoundry="$(enableAIFoundry)" \
      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
+     --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
      --parameters useAVMFoundry="false" \
      --parameters updateAIFoundry="$(updateAIFoundry)" \
      --parameters addAIFoundry="true"
