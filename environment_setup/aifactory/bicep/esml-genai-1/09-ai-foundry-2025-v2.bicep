@@ -130,6 +130,10 @@ param aks2SubnetId string = ''
 @description('Disable agent network injection even when agent subnet inputs are provided.')
 param disableAgentNetworkInjection bool = false
 param addAIFoundry bool = false
+param enableAISearch bool = true
+param enableAISearchSharedPrivateLink bool = false
+param aiFoundryV2Exists bool = false
+param aiFoundryV2ProjectExists bool = false
 
 var projectName = 'prj${projectNumber}'
 var resolvedCommonResourceGroup = !empty(trim(commonResourceGroup_param)) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
@@ -270,4 +274,20 @@ module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
     tags: tags
 
 	}
+}
+
+// ==== Shared private link Azure AI Search to foundry
+var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && enableAISearch
+var foundryResourceId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.CognitiveServices/accounts', aifV2Name)
+module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bicep' = if (enableSharedLinkDeployment && !aiFoundryV2ProjectExists) {
+  name: take('09-aiSearchSPL-${moduleDeploymentSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    aiSearchName: aiSearchName
+    aiFoundryResourceId: foundryResourceId
+    location: location
+  }
+  dependsOn: [
+   foundryApim
+  ]
 }
