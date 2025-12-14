@@ -147,6 +147,7 @@ param projectCapHost string = 'caphostproj'
 var projectCapHostUnique = '${projectCapHost}-${uniqueSuffix}'
 
 // Create Virtual Network and Subnets
+
 module vnet 'modules-network-secured/network-agent-vnet.bicep' = {
   name: 'vnet-${trimVnetName}-${uniqueSuffix}-deployment'
   params: {
