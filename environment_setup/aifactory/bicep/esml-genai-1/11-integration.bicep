@@ -737,11 +737,11 @@ module botService '../modules/botService.bicep' = if(!botServiceExists && enable
     botDescription: 'AI Foundry Agent integrated with Microsoft Teams for ${env} environment'
     location: location
     sku: botServiceSku
-    // Leave empty to auto-create App Registration, or pass AI Foundry agent's App ID
+    // Leave empty to auto-create managed identity (UserAssignedMSI), or pass AI Foundry agent's App ID (SingleTenant)
     microsoftAppId: botMicrosoftAppId
-    autoCreateAppRegistration: empty(botMicrosoftAppId)
-    microsoftAppType: 'SingleTenant' // MultiTenant is deprecated
+    microsoftAppType: empty(botMicrosoftAppId) ? 'UserAssignedMSI' : 'SingleTenant'
     microsoftAppTenantId: tenant().tenantId
+    userAssignedManagedIdentityResourceId: '' // Auto-create if empty
     agentEndpoint: botAgentEndpoint
     messagingEndpoint: botAgentEndpoint
     tags: tags

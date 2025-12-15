@@ -65,20 +65,17 @@ param location string = resourceGroup().location
 @allowed(['F0', 'S1'])
 param sku string = 'F0' // F0 = Free, S1 = Standard
 
-@description('Microsoft App ID (Client ID) for bot authentication. Leave EMPTY to auto-create, or provide AI Foundry agent App ID, or your own App Registration ID.')
+@description('Microsoft App ID (Client ID) for bot authentication. REQUIRED for SingleTenant. Leave EMPTY for UserAssignedMSI (recommended).')
 param microsoftAppId string = ''
 
-@description('Type of Microsoft App authentication. MultiTenant is deprecated - use SingleTenant or UserAssignedMSI')
+@description('Type of Microsoft App authentication. MultiTenant is deprecated. UserAssignedMSI is recommended for new deployments.')
 @allowed(['SingleTenant', 'UserAssignedMSI'])
-param microsoftAppType string = 'SingleTenant'
-
-@description('Auto-create Microsoft App Registration if microsoftAppId is empty')
-param autoCreateAppRegistration bool = true
+param microsoftAppType string = 'UserAssignedMSI'
 
 @description('Tenant ID for SingleTenant apps')
 param microsoftAppTenantId string = tenant().tenantId
 
-@description('User-assigned managed identity resource ID for UserAssignedMSI type')
+@description('User-assigned managed identity resource ID. Auto-created if empty and microsoftAppType is UserAssignedMSI.')
 param userAssignedManagedIdentityResourceId string = ''
 
 @description('AI Foundry agent endpoint URL')
@@ -154,6 +151,20 @@ param developerAppInsightsAppId string = ''
 param developerAppInsightsApiKey string = ''
 
 // ============================================================================
+// MANAGED IDENTITY (for UserAssignedMSI authentication type)
+// ============================================================================
+
+resource botManagedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (microsoftAppType == 'UserAssignedMSI' && empty(userAssignedManagedIdentityResourceId)) {
+  name: '${botName}-identity'
+  location: location
+  tags: tags
+}
+
+// Determine which identity to use
+var identityResourceId = microsoftAppType == 'UserAssignedMSI' ? (empty(userAssignedManagedIdentityResourceId) ? botManagedIdentity.id : userAssignedManagedIdentityResourceId) : ''
+var appId = microsoftAppType == 'UserAssignedMSI' ? (empty(userAssignedManagedIdentityResourceId) ? botManagedIdentity.properties.clientId : microsoftAppId) : microsoftAppId
+
+// ============================================================================
 // AZURE BOT SERVICE
 // ============================================================================
 
@@ -169,12 +180,10 @@ resource botService 'Microsoft.BotService/botServices@2023-09-15-preview' = {
     displayName: botDisplayName
     description: botDescription
     endpoint: messagingEndpoint
-    // When empty and autoCreateAppRegistration=true, Azure creates the App Registration automatically
-    // Use AI Foundry agent's App ID, or leave empty for auto-creation, or provide your own App Registration ID
-    msaAppId: microsoftAppId
+    msaAppId: appId
     msaAppType: microsoftAppType
     msaAppTenantId: microsoftAppTenantId
-    msaAppMSIResourceId: microsoftAppType == 'UserAssignedMSI' ? userAssignedManagedIdentityResourceId : null
+    msaAppMSIResourceId: identityResourceId != '' ? identityResourceId : null
     iconUrl: iconUrl
     isStreamingSupported: isStreamingSupported
     developerAppInsightKey: !empty(developerAppInsightsKey) ? developerAppInsightsKey : null
