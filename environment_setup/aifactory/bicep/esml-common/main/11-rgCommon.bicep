@@ -30,6 +30,8 @@ param useAdGroups bool = false
 param enableAdminVM bool = false
 @description('Common resource name identifier. Default is "esml-common"')
 param esmlCommonOverride string = 'esml-common'
+param enableDefenderforAISubLevel bool = false
+param enableDefenderforAIResourceLevel bool = false
 
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
@@ -63,7 +65,7 @@ module contributorPermissions '../../modules/contributorRbac.bicep' = {
     rgCommon
   ]
 }
-module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = {
+module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = if (enableAdminVM) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'VMAdminLoginPermissions-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
@@ -72,6 +74,30 @@ module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = {
     additionalUserIds: technicalAdminsObjectID_array_safe
     additionalUserEmails: technicalAdminsEmail_array_safe
     useAdGroups: useAdGroups
+  }
+  dependsOn:[
+    rgCommon
+  ]
+}
+
+// Deploy Microsoft Defender for Cloud at subscription level
+module defenderForCloud '../security/defender.bicep' = if (enableDefenderforAISubLevel) {
+  scope: subscription(subscriptionIdDevTestProd)
+  name: 'DefenderForCloud-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
+  params: {
+    enableAll: true
+    pricingTier: 'Free'
+    advancedPricingTier: 'Standard'
+    enableDefenderForAI: enableDefenderforAISubLevel
+    enableDefenderForKeyVault: true
+    enableDefenderForStorage: true
+    enableDefenderForContainers: false
+    enableDefenderForCloudPosture: false
+    enableDefenderForVirtualMachines: enableAdminVM
+    enforce: 'False'
+    enableAIPromptEvidence: false
+    enableStorageMalwareScanning: true
+    enableStorageSensitiveDataDiscovery: true
   }
   dependsOn:[
     rgCommon

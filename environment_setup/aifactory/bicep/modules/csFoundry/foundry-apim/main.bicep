@@ -98,6 +98,13 @@ param aiSearchResourceId string = ''
 param azureStorageAccountResourceId string = ''
 @description('The Cosmos DB Account full ARM Resource ID. This is an optional field, and if not provided, the resource will be created.')
 param azureCosmosDBAccountResourceId string = ''
+
+@description('The resource ID of the Log Analytics workspace for diagnostics')
+param logAnalyticsWorkspaceId string = ''
+
+@description('Diagnostic setting level - determines metrics and logs collected')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
 @description('The API Management Service full ARM Resource ID. This is an optional field for existing API Management services.')
 param apiManagementResourceId string = ''
 
@@ -182,6 +189,8 @@ module aiAccount 'modules-network-secured/ai-account-identity.bicep' = {
     modelSkuName: modelSkuName
     modelCapacity: modelCapacity
     agentSubnetId: vnet.outputs.agentSubnetId
+    logAnalyticsWorkspaceId: logAnalyticsWorkspaceId
+    diagnosticSettingLevel: diagnosticSettingLevel
   }
 }
 /*

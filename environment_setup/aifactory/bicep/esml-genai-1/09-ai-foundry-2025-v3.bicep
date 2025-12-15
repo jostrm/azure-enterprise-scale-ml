@@ -162,6 +162,8 @@ param disableAgentNetworkInjection bool = false
 param commonResourceName string = 'esml-common'
 @description('Optional existing API Management resource ID used for private endpoint wiring.')
 param apiManagementResourceId string = ''
+param enableDefenderforAISubLevel bool = false
+param enableDefenderforAIResourceLevel bool = false
 
 // ============== VARIABLES ==============
 
@@ -235,6 +237,15 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     aca2SubnetId: aca2SubnetId
     aks2SubnetId: aks2SubnetId
   }
+}
+
+// ============================================================================
+// LOG ANALYTICS WORKSPACE - Fetch existing for diagnostic settings
+// ============================================================================
+var laName = 'la-${commonResourceName}-${locationSuffix}-${env}-${aifactorySalt10char}${commonResourceSuffix}'
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
 // ============================================================================
@@ -961,6 +972,26 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
   ]
 }
 
+// ============================================================================
+// AI FOUNDRY ACCOUNT DIAGNOSTIC SETTINGS
+// ============================================================================
+module aiFoundryAccountDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if(enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry)) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV2-Diagnostics_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    cognitiveServiceName: aifV2Name
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    // Wait for AI Foundry account to be created in any scenario
+    ...(foundryV22AccountOnly ? [aiFoundry2025NoAvmV22AccountOnly] : [])
+    ...(Use_APIM_Project && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : [])
+    ...(!Use_APIM_Project && !deployAvmFoundry ? [aiFoundry2025NoAvm] : [])
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+  ]
+}
+
 #disable-next-line BCP318
 var projectPrincipal = (projectModuleEnabled && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly) && !foundryV22AccountOnly) ? projectV21.outputs.projectPrincipalId : ''
 #disable-next-line BCP318
@@ -1210,6 +1241,19 @@ module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bi
   ]
 }
 // Approve the shared private link request on the Azure AI Foundry account after deployment.
+
+	// Enables Defender for AI, if not enabled already on Subscription level
+module defenderForAIAccount '../modules/security/defender-for-cs.bicep' = if(!enableDefenderforAISubLevel && enableDefenderforAIResourceLevel) {
+	name: take('defender-for-ai-${deploymentProjSpecificUniqueSuffix}', 64)
+	scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+	params: {
+		aiAccountName: aifV2Name
+		profileName: 'default'
+	}
+	dependsOn: [
+		rbacKeyVaultForAgents
+	]
+}
 
 // ============== OUTPUTS ==============
 

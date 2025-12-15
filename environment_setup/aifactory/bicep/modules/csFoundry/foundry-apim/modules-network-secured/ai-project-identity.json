@@ -1,0 +1,240 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "5714737742432666538"
+    }
+  },
+  "parameters": {
+    "accountName": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "projectName": {
+      "type": "string"
+    },
+    "projectDescription": {
+      "type": "string"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "The resource ID of the Log Analytics workspace for diagnostics"
+      }
+    },
+    "diagnosticSettingLevel": {
+      "type": "string",
+      "defaultValue": "silver",
+      "allowedValues": [
+        "gold",
+        "silver",
+        "bronze"
+      ],
+      "metadata": {
+        "description": "Diagnostic setting level - determines metrics and logs collected"
+      }
+    },
+    "aiSearchName": {
+      "type": "string"
+    },
+    "aiSearchServiceResourceGroupName": {
+      "type": "string"
+    },
+    "aiSearchServiceSubscriptionId": {
+      "type": "string"
+    },
+    "cosmosDBName": {
+      "type": "string"
+    },
+    "cosmosDBSubscriptionId": {
+      "type": "string"
+    },
+    "cosmosDBResourceGroupName": {
+      "type": "string"
+    },
+    "azureStorageName": {
+      "type": "string"
+    },
+    "azureStorageSubscriptionId": {
+      "type": "string"
+    },
+    "azureStorageResourceGroupName": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "goldMetrics": [
+      {
+        "category": "AllMetrics",
+        "enabled": true
+      }
+    ],
+    "silverMetrics": [
+      {
+        "category": "AllMetrics",
+        "enabled": true
+      }
+    ],
+    "bronzeMetrics": [
+      {
+        "category": "AllMetrics",
+        "enabled": true
+      }
+    ],
+    "goldLogs": [
+      {
+        "category": "Audit",
+        "enabled": true
+      },
+      {
+        "category": "RequestResponse",
+        "enabled": true
+      },
+      {
+        "category": "Trace",
+        "enabled": true
+      }
+    ],
+    "silverLogs": [
+      {
+        "category": "Audit",
+        "enabled": true
+      },
+      {
+        "category": "RequestResponse",
+        "enabled": true
+      }
+    ],
+    "bronzeLogs": [
+      {
+        "category": "Audit",
+        "enabled": true
+      }
+    ],
+    "selectedMetrics": "[if(equals(parameters('diagnosticSettingLevel'), 'gold'), variables('goldMetrics'), if(equals(parameters('diagnosticSettingLevel'), 'silver'), variables('silverMetrics'), variables('bronzeMetrics')))]",
+    "selectedLogs": "[if(equals(parameters('diagnosticSettingLevel'), 'gold'), variables('goldLogs'), if(equals(parameters('diagnosticSettingLevel'), 'silver'), variables('silverLogs'), variables('bronzeLogs')))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.CognitiveServices/accounts/projects/connections",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('accountName'), parameters('projectName'), parameters('cosmosDBName'))]",
+      "properties": {
+        "category": "CosmosDB",
+        "target": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('cosmosDBSubscriptionId'), parameters('cosmosDBResourceGroupName')), 'Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDBName')), '2024-12-01-preview').documentEndpoint]",
+        "authType": "AAD",
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('cosmosDBSubscriptionId'), parameters('cosmosDBResourceGroupName')), 'Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDBName'))]",
+          "location": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('cosmosDBSubscriptionId'), parameters('cosmosDBResourceGroupName')), 'Microsoft.DocumentDB/databaseAccounts', parameters('cosmosDBName')), '2024-12-01-preview', 'full').location]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/projects/connections",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('accountName'), parameters('projectName'), parameters('azureStorageName'))]",
+      "properties": {
+        "category": "AzureStorageAccount",
+        "target": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('azureStorageSubscriptionId'), parameters('azureStorageResourceGroupName')), 'Microsoft.Storage/storageAccounts', parameters('azureStorageName')), '2023-05-01').primaryEndpoints.blob]",
+        "authType": "AAD",
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('azureStorageSubscriptionId'), parameters('azureStorageResourceGroupName')), 'Microsoft.Storage/storageAccounts', parameters('azureStorageName'))]",
+          "location": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('azureStorageSubscriptionId'), parameters('azureStorageResourceGroupName')), 'Microsoft.Storage/storageAccounts', parameters('azureStorageName')), '2023-05-01', 'full').location]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/projects/connections",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}/{2}', parameters('accountName'), parameters('projectName'), parameters('aiSearchName'))]",
+      "properties": {
+        "category": "CognitiveSearch",
+        "target": "[format('https://{0}.search.windows.net', parameters('aiSearchName'))]",
+        "authType": "AAD",
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('aiSearchServiceSubscriptionId'), parameters('aiSearchServiceResourceGroupName')), 'Microsoft.Search/searchServices', parameters('aiSearchName'))]",
+          "location": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('aiSearchServiceSubscriptionId'), parameters('aiSearchServiceResourceGroupName')), 'Microsoft.Search/searchServices', parameters('aiSearchName')), '2024-06-01-preview', 'full').location]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.CognitiveServices/accounts/projects",
+      "apiVersion": "2025-04-01-preview",
+      "name": "[format('{0}/{1}', parameters('accountName'), parameters('projectName'))]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "description": "[parameters('projectDescription')]",
+        "displayName": "[parameters('displayName')]"
+      }
+    },
+    {
+      "condition": "[not(empty(parameters('logAnalyticsWorkspaceId')))]",
+      "type": "Microsoft.Insights/diagnosticSettings",
+      "apiVersion": "2021-05-01-preview",
+      "scope": "[format('Microsoft.CognitiveServices/accounts/{0}/projects/{1}', parameters('accountName'), parameters('projectName'))]",
+      "name": "[format('diag-{0}', parameters('projectName'))]",
+      "properties": {
+        "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+        "metrics": "[variables('selectedMetrics')]",
+        "logs": "[variables('selectedLogs')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "projectName": {
+      "type": "string",
+      "value": "[parameters('projectName')]"
+    },
+    "projectId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName'))]"
+    },
+    "projectPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName')), '2025-04-01-preview', 'full').identity.principalId]"
+    },
+    "projectWorkspaceId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('accountName'), parameters('projectName')), '2025-04-01-preview').internalId]"
+    },
+    "cosmosDBConnection": {
+      "type": "string",
+      "value": "[parameters('cosmosDBName')]"
+    },
+    "azureStorageConnection": {
+      "type": "string",
+      "value": "[parameters('azureStorageName')]"
+    },
+    "aiSearchConnection": {
+      "type": "string",
+      "value": "[parameters('aiSearchName')]"
+    }
+  }
+}

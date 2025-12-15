@@ -39,6 +39,8 @@ steps:
      --parameters env="$(dev_test_prod)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
+     --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 

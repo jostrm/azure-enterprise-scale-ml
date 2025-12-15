@@ -135,6 +135,12 @@ param enableAISearch bool = true
 param enableAISearchSharedPrivateLink bool = false
 param aiFoundryV2Exists bool = false
 param aiFoundryV2ProjectExists bool = false
+param enableDefenderforAISubLevel bool = false
+param enableDefenderforAIResourceLevel bool = false
+
+@description('Diagnostic setting level for AI Foundry resources - determines metrics and logs collected')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'silver'
 
 var projectName = 'prj${projectNumber}'
 var resolvedCommonResourceGroup = !empty(trim(commonResourceGroup_param)) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
@@ -215,7 +221,14 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 	}
 }
 var aifV2Name = addAIFoundry? namingConvention.outputs.aifV2NameAdd: namingConvention.outputs.aifV2Name
-var aifV2ProjectName = addAIFoundry? namingConvention.outputs.aifV2PrjNameAdd: namingConvention.outputs.aifV2PrjName 
+var aifV2ProjectName = addAIFoundry? namingConvention.outputs.aifV2PrjNameAdd: namingConvention.outputs.aifV2PrjName
+
+// Fetch existing Log Analytics workspace for diagnostic settings
+var laName = 'la-${commonResourceName}-${locationSuffix}-${env}-${aifactorySalt10char}${commonResourceSuffix}'
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: laName
+  scope: resourceGroup(resolvedSubscriptionId, resolvedCommonResourceGroup)
+} 
 
 var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
 var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
@@ -289,6 +302,8 @@ module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
     targetResourceGroup: resolvedTargetResourceGroup
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     tags: tags
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
 
 	}
 }
@@ -307,4 +322,17 @@ module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bi
   dependsOn: [
    foundryApim
   ]
+}
+
+	// Enables Defender for AI, if not enabled already on Subscription level
+module defenderForAIAccount '../modules/security/defender-for-cs.bicep' = if(!enableDefenderforAISubLevel && enableDefenderforAIResourceLevel) {
+	name: take('defender-for-ai-${moduleDeploymentSuffix}', 64)
+	scope: resourceGroup(resolvedSubscriptionId, resolvedTargetResourceGroup)
+	params: {
+		aiAccountName: aifV2Name
+		profileName: 'default'
+	}
+	dependsOn: [
+		foundryApim
+	]
 }
