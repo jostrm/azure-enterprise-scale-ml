@@ -68,9 +68,9 @@ param sku string = 'F0' // F0 = Free, S1 = Standard
 @description('Microsoft App ID (Client ID) for bot authentication. Leave EMPTY to auto-create, or provide AI Foundry agent App ID, or your own App Registration ID.')
 param microsoftAppId string = ''
 
-@description('Type of Microsoft App authentication')
+@description('Type of Microsoft App authentication. MultiTenant is deprecated - use SingleTenant or UserAssignedMSI')
 @allowed(['MultiTenant', 'SingleTenant', 'UserAssignedMSI'])
-param microsoftAppType string = 'MultiTenant'
+param microsoftAppType string = 'SingleTenant'
 
 @description('Auto-create Microsoft App Registration if microsoftAppId is empty')
 param autoCreateAppRegistration bool = true
