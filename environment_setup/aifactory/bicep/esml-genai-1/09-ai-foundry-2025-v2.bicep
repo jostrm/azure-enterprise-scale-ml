@@ -126,6 +126,7 @@ param aca2SubnetId string = ''
 
 @description('Optional secondary AKS subnet resource ID.')
 param aks2SubnetId string = ''
+param addAISearch bool = false
 
 @description('Disable agent network injection even when agent subnet inputs are provided.')
 param disableAgentNetworkInjection bool = false
@@ -223,7 +224,30 @@ var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',12)
 var aifV2Name = addAIFoundry? aifRandom: namingConvention.outputs.aifV2Name 
 var aifV2ProjectName = addAIFoundry? aifpRandom: namingConvention.outputs.aifV2PrjName 
 
-var aiSearchName = namingConvention.outputs.safeNameAISearch
+var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
+var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
+var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
+  : ''
+
+var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? substring(
+      safeNameAISearchOrg,
+      max(length(safeNameAISearchOrg) - 3, 0),
+      min(3, length(safeNameAISearchOrg))
+    )
+  : ''
+
+var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
+  ? take(
+      addAISearch
+        ? '${safeNameAISearchBase}${cleanRandomValue2}${safeNameAISearchSuffix}'
+        : safeNameAISearchOrg,
+      60
+    )
+  : ''
+
+  
 var storageAccountName = namingConvention.outputs.storageAccount1001Name
 var cosmosDbName = namingConvention.outputs.cosmosDBName
 

@@ -445,6 +445,7 @@ var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
     )
   : ''
 
+  
 // Get AI Search principal ID conditionally
 module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearch && !foundryV22AccountOnly) {
   name: take('09-getAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
