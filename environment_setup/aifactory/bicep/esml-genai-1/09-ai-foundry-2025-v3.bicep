@@ -3,8 +3,8 @@ targetScope = 'subscription'
 // ================================================================
 // AI FOUNDRY 2025 DEPLOYMENT - Phase 9 Implementation
 // This file deploys the latest AI Foundry 2025 platform including:
-// - AI Foundry Hub with advanced capabilities
-// - AI Foundry Projects
+// - Microsoft Foundry Hub with advanced capabilities: Agents. AI Gateway with private integration, Defender for AI, Capabilty host for private Agents.
+// - Foundry Project: Default
 // - Model deployments (GPT, embedding models)
 // - Private endpoints and networking
 // - RBAC and security configurations

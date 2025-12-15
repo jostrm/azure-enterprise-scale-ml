@@ -138,6 +138,19 @@ param enablePublicAccessWithPerimeter bool = false
 // Security / access
 param centralDnsZoneByPolicyInHub bool = false
 
+// Bot Service parameters
+@description('Enable Azure Bot Service deployment')
+param enableBotService bool = false
+@description('Bot Service already exists (skip creation)')
+param botServiceExists bool = false
+@description('Microsoft App ID (Client ID) for bot authentication')
+param botMicrosoftAppId string = ''
+@description('AI Foundry agent endpoint URL for bot messaging')
+param botAgentEndpoint string = ''
+@description('Bot Service SKU')
+@allowed(['F0', 'S1'])
+param botServiceSku string = 'F0'
+
 @description('Tags to apply to all resources')
 param tags object
 
@@ -208,6 +221,7 @@ var vnetName = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<networ
 var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
 var eventHubName = 'eh-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 var logicAppsName = 'lapp-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
+var botServiceName = 'bot-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 // Azure ML already has built-in job queuing and pipeline orchestration, can handle most ML workload queuing
 // var serviceBusName = 'sb-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
@@ -708,5 +722,38 @@ module logicAppConsumption 'br/public:avm/res/logic/workflow:0.5.3' = if(logiApp
   }
   dependsOn: [
     namingConvention
+  ]
+}
+
+// ============================================================================
+// AZURE BOT SERVICE - for Microsoft Teams integration with AI Foundry agents
+// ============================================================================
+module botService '../modules/botService.bicep' = if(!botServiceExists && enableBotService) {
+  name: take('11-bot-${targetResourceGroup}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    botName: botServiceName
+    botDisplayName: 'AI Agent Bot - ${projectNumber}'
+    botDescription: 'AI Foundry Agent integrated with Microsoft Teams for ${env} environment'
+    location: location
+    sku: botServiceSku
+    // Leave empty to auto-create App Registration, or pass AI Foundry agent's App ID
+    microsoftAppId: botMicrosoftAppId
+    autoCreateAppRegistration: empty(botMicrosoftAppId)
+    microsoftAppType: 'MultiTenant'
+    microsoftAppTenantId: tenant().tenantId
+    agentEndpoint: botAgentEndpoint
+    messagingEndpoint: botAgentEndpoint
+    tags: tags
+    enableTeamsChannel: true
+    enableDirectLineChannel: true
+    enableWebChatChannel: true
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+    isStreamingSupported: false
+  }
+  dependsOn: [
+    namingConvention
+    logAnalyticsWorkspace
   ]
 }
