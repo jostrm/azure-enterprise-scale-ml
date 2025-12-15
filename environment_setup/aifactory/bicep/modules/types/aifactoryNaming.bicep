@@ -20,6 +20,8 @@ type aifactoryNamingType = {
   // AI Foundry V2 (2025-)
   aifV2Name: string
   aifV2PrjName: string
+  aifV2NameAdd: string
+  aifV2PrjNameAdd: string
 
   aoaiName: string
   amlName: string

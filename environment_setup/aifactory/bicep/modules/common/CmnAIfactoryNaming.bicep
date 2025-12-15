@@ -109,15 +109,17 @@ var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${un
 var aifV1HubName = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // TODO=DONE
 
-// AI Foundry V2 (2025):aif-V2-001-eus-dev-12345-001 = 28
-//var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // ->pend error
-//var aifV2Name = take('aifV2${projectNumber}${locationSuffix}${env}',12) // (12) aifV2001eusd -> worked!
-
-// @2025-04-01-preview
-//var aifV2Name = 'aif-V2-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // @2025-04-01-preview (32)
+// AI Foundry V2 (2025)
 var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${randomSalt}'), '-', ''),12) // @2025-06-01: name (12)
-//var aifV2PrjName ='aif2-prj-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${prjResourceSuffixNoDash}' // Does this work?
 var aifV2PrjName =take(toLower('aif2-p${projectNumber}-${uniqueInAIFenv}${randomSalt}'),12) // 64 according to doc. but is 12 chars max for project name
+
+//param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
+//var uniqueSuffix10 = substring(uniqueString('${targetResourceGroupName}-${deploymentTimestamp}'), 0, 10)
+var lastSuffixChar = (!empty(resourceSuffix) && length(resourceSuffix) > 0) ? substring(resourceSuffix, max(0, length(resourceSuffix) - 1), 1) : '' // Extract last character: -001 → 1
+var aif2Random = take('aif2${lastSuffixChar}${cleanRandomValue}',12)
+var aifp2Random = take('aif2-p${projectNumber}-${lastSuffixChar}${cleanRandomValue}',12)
+var aifV2NameAdd = aif2Random
+var aifV2PrjNameAdd = aifp2Random
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
@@ -239,6 +241,8 @@ output aifV1ProjectName string = aifV1ProjectName
 // AI Foundry V2
 output aifV2Name string = aifV2Name
 output aifV2PrjName string = aifV2PrjName
+output aifV2NameAdd string = aifV2NameAdd
+output aifV2PrjNameAdd string = aifV2PrjNameAdd
 
 // Storage and Keys
 output keyvaultName string = keyvaultName
@@ -289,6 +293,8 @@ output namingConvention aifactoryNamingType = {
   // AI Foundry V2 (2025-)
   aifV2Name: aifV2Name
   aifV2PrjName: aifV2PrjName
+  aifV2NameAdd: aifV2NameAdd
+  aifV2PrjNameAdd: aifV2PrjNameAdd
 
   aoaiName: aoaiName
   amlName: amlName

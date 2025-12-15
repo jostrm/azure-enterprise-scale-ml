@@ -214,15 +214,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 		aks2SubnetId: aks2SubnetId
 	}
 }
-
-//param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
-//var uniqueSuffix10 = substring(uniqueString('${targetResourceGroupName}-${deploymentTimestamp}'), 0, 10)
-
-var cleanRandomValue = namingConvention.outputs.randomSalt
-var aifRandom = take('aif${cleanRandomValue}',12)
-var aifpRandom = take('aif2-p${projectNumber}-${cleanRandomValue}',12)
-var aifV2Name = addAIFoundry? aifRandom: namingConvention.outputs.aifV2Name 
-var aifV2ProjectName = addAIFoundry? aifpRandom: namingConvention.outputs.aifV2PrjName 
+var aifV2Name = addAIFoundry? namingConvention.outputs.aifV2NameAdd: namingConvention.outputs.aifV2Name
+var aifV2ProjectName = addAIFoundry? namingConvention.outputs.aifV2PrjNameAdd: namingConvention.outputs.aifV2PrjName 
 
 var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
 var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''

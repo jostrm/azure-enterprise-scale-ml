@@ -284,14 +284,9 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
-// AI Foundry V2 specific names (12)
-// Ensure domain name compliance: lowercase, no special chars, proper length
-var cleanRandomValue = replace(namingConvention.outputs.randomSalt, '-', '')
-var aifRandom = take('aif2r${cleanRandomValue}',12)
-var aifpRandom = take('aif2-p${projectNumber}-r${cleanRandomValue}',12)
+var aifV2Name = addAIFoundry? namingConvention.outputs.aifV2NameAdd: namingConvention.outputs.aifV2Name
+var aifV2ProjectName = addAIFoundry? namingConvention.outputs.aifV2PrjNameAdd: namingConvention.outputs.aifV2PrjName 
 
-var aifV2Name = addAIFoundry? aifRandom: namingConvention.outputs.aifV2Name // aif2qoygyc7e
-var aifV2ProjectName = addAIFoundry? aifpRandom: namingConvention.outputs.aifV2PrjName // aif2-p001-pqoygyc7
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var projectCapHostName  = '${aifV2Name}caphost'
