@@ -740,7 +740,7 @@ module botService '../modules/botService.bicep' = if(!botServiceExists && enable
     // Leave empty to auto-create App Registration, or pass AI Foundry agent's App ID
     microsoftAppId: botMicrosoftAppId
     autoCreateAppRegistration: empty(botMicrosoftAppId)
-    microsoftAppType: 'MultiTenant'
+    microsoftAppType: 'SingleTenant' // MultiTenant is deprecated
     microsoftAppTenantId: tenant().tenantId
     agentEndpoint: botAgentEndpoint
     messagingEndpoint: botAgentEndpoint

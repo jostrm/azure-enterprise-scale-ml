@@ -69,7 +69,7 @@ param sku string = 'F0' // F0 = Free, S1 = Standard
 param microsoftAppId string = ''
 
 @description('Type of Microsoft App authentication. MultiTenant is deprecated - use SingleTenant or UserAssignedMSI')
-@allowed(['MultiTenant', 'SingleTenant', 'UserAssignedMSI'])
+@allowed(['SingleTenant', 'UserAssignedMSI'])
 param microsoftAppType string = 'SingleTenant'
 
 @description('Auto-create Microsoft App Registration if microsoftAppId is empty')
