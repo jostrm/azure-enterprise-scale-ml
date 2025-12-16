@@ -13,16 +13,14 @@ param delegations array = []
 @description('Resource group where the VNet exists')
 param vnetResourceGroupName string = resourceGroup().name
 
-// Get existing VNet
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  name: vnetName
+// Use a helper module to get existing subnet properties (avoids circular dependency)
+module getSubnetProps '../../../subnetGetProps.bicep' = {
+  name: 'get-subnet-props-${uniqueString(deployment().name, subnetName)}'
   scope: resourceGroup(vnetResourceGroupName)
-}
-
-// Get existing subnet properties to preserve them
-resource existingSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  parent: vnet
-  name: subnetName
+  params: {
+    vnetName: vnetName
+    subnetName: subnetName
+  }
 }
 
 // Update subnet while preserving existing NSG, service endpoints, route tables, etc.
@@ -31,25 +29,28 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = {
   properties: {
     addressPrefix: addressPrefix
     // Preserve existing service endpoints
-    serviceEndpoints: contains(existingSubnet.properties, 'serviceEndpoints') ? existingSubnet.properties.serviceEndpoints : null
+    serviceEndpoints: !empty(getSubnetProps.outputs.serviceEndpoints) ? getSubnetProps.outputs.serviceEndpoints : null
     // Preserve existing NSG - critical!
-    networkSecurityGroup: contains(existingSubnet.properties, 'networkSecurityGroup') ? {
-      id: existingSubnet.properties.networkSecurityGroup.id
+    networkSecurityGroup: !empty(getSubnetProps.outputs.networkSecurityGroupId) ? {
+      id: getSubnetProps.outputs.networkSecurityGroupId
     } : null
     // Preserve existing route table
-    routeTable: contains(existingSubnet.properties, 'routeTable') ? {
-      id: existingSubnet.properties.routeTable.id
+    routeTable: !empty(getSubnetProps.outputs.routeTableId) ? {
+      id: getSubnetProps.outputs.routeTableId
     } : null
     // Preserve existing NAT gateway
-    natGateway: contains(existingSubnet.properties, 'natGateway') ? {
-      id: existingSubnet.properties.natGateway.id
+    natGateway: !empty(getSubnetProps.outputs.natGatewayId) ? {
+      id: getSubnetProps.outputs.natGatewayId
     } : null
     // Set delegations (new or updated)
     delegations: delegations
     // Preserve network policies
-    privateEndpointNetworkPolicies: contains(existingSubnet.properties, 'privateEndpointNetworkPolicies') ? existingSubnet.properties.privateEndpointNetworkPolicies : 'Disabled'
-    privateLinkServiceNetworkPolicies: contains(existingSubnet.properties, 'privateLinkServiceNetworkPolicies') ? existingSubnet.properties.privateLinkServiceNetworkPolicies : 'Enabled'
+    privateEndpointNetworkPolicies: getSubnetProps.outputs.privateEndpointNetworkPolicies
+    privateLinkServiceNetworkPolicies: getSubnetProps.outputs.privateLinkServiceNetworkPolicies
   }
+  dependsOn: [
+    getSubnetProps
+  ]
 }
 
 output subnetId string = subnet.id
