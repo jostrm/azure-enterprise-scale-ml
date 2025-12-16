@@ -11,11 +11,11 @@ resource existingSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' e
 }
 
 output addressPrefix string = existingSubnet.properties.addressPrefix
-output serviceEndpoints array = existingSubnet.properties.serviceEndpoints ?? []
-output delegations array = existingSubnet.properties.delegations ?? []
-output networkSecurityGroupId string = existingSubnet.properties.networkSecurityGroup.id ?? ''
+output serviceEndpoints array = contains(existingSubnet.properties, 'serviceEndpoints') ? existingSubnet.properties.serviceEndpoints : []
+output delegations array = contains(existingSubnet.properties, 'delegations') ? existingSubnet.properties.delegations : []
+output networkSecurityGroupId string = contains(existingSubnet.properties, 'networkSecurityGroup') ? existingSubnet.properties.networkSecurityGroup.id : ''
 output routeTableId string = contains(existingSubnet.properties, 'routeTable') ? existingSubnet.properties.routeTable.id : ''
 output natGatewayId string = contains(existingSubnet.properties, 'natGateway') ? existingSubnet.properties.natGateway.id : ''
-output privateEndpointNetworkPolicies string = existingSubnet.properties.privateEndpointNetworkPolicies ?? ''
-output privateLinkServiceNetworkPolicies string = existingSubnet.properties.privateLinkServiceNetworkPolicies ?? ''
+output privateEndpointNetworkPolicies string = contains(existingSubnet.properties, 'privateEndpointNetworkPolicies') ? existingSubnet.properties.privateEndpointNetworkPolicies : 'Disabled'
+output privateLinkServiceNetworkPolicies string = contains(existingSubnet.properties, 'privateLinkServiceNetworkPolicies') ? existingSubnet.properties.privateLinkServiceNetworkPolicies : 'Enabled'
 

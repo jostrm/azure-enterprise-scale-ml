@@ -55,6 +55,7 @@ module agentSubnet 'subnet.bicep' = {
     vnetName: vnetName
     subnetName: agentSubnetName
     addressPrefix: agentSubnetSpaces
+    vnetResourceGroupName: vnetResourceGroupName
     delegations: [
       {
         name: 'Microsoft.App/environments'
@@ -74,6 +75,7 @@ module peSubnet 'subnet.bicep' = {
     vnetName: vnetName
     subnetName: peSubnetName
     addressPrefix: peSubnetSpaces
+    vnetResourceGroupName: vnetResourceGroupName
     delegations: []
   }
 }

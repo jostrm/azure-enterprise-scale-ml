@@ -29,10 +29,13 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   name: subnetName
   properties: {
     addressPrefix: !empty(addressPrefix) ? addressPrefix : (!empty(existingAddressPrefix) ? existingAddressPrefix : existingSnet.outputs.addressPrefix)
-    serviceEndpoints: !empty(serviceEndpoints) ? serviceEndpoints : existingSnet.outputs.serviceEndpoints
+    // Preserve existing service endpoints - only override if explicitly provided (non-empty array passed as param)
+    serviceEndpoints: !empty(serviceEndpoints) ? serviceEndpoints : (!empty(existingSnet.outputs.serviceEndpoints) ? existingSnet.outputs.serviceEndpoints : null)
+    // Preserve existing route table
     routeTable: !empty(existingSnet.outputs.routeTableId)?{
       id:existingSnet.outputs.routeTableId
     }:null
+    // Preserve existing NSG - critical to not remove if it exists
     networkSecurityGroup: !empty(existingSnet.outputs.networkSecurityGroupId)?{
       id:existingSnet.outputs.networkSecurityGroupId
     }:null
