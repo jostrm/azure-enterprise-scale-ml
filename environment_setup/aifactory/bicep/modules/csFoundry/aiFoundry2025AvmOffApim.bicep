@@ -437,7 +437,7 @@ module caphostRbacPost 'aiFoundry2025caphostRbac2.bicep' = if (enableCapabilityH
 }
 
 var aiAccountIdValue = aiAccountResourceId
-var aiAccountEndpointValue = !foundryV22AccountOnly ? reference(aiAccountResourceId, '2025-04-01-preview', 'full').endpoint : ''
+var aiAccountEndpointValue = !foundryV22AccountOnly ? reference(aiAccountResourceId, '2025-04-01-preview', 'full').properties.endpoint : ''
 var aiAccountPrincipalIdValue = !foundryV22AccountOnly ? reference(aiAccountResourceId, '2025-04-01-preview', 'full').identity.principalId : ''
 
 var storageAccountSubscriptionId = storageSubscriptionId
