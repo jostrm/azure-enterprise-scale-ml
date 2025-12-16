@@ -108,6 +108,13 @@ param diagnosticSettingLevel string = 'silver'
 @description('The API Management Service full ARM Resource ID. This is an optional field for existing API Management services.')
 param apiManagementResourceId string = ''
 
+// CMK Parameters for customer-managed key encryption
+param cmk bool = false
+param cmkKeyName string = ''
+param inputKeyvault string = ''
+param inputKeyvaultResourcegroup string = ''
+param inputKeyvaultSubscription string = ''
+
 @description('Full privateLinksDnsZones object emitted by CmnPrivateDnsZones, providing consistent names and resource IDs for all private DNS zones.')
 param privateLinksDnsZones object
 
@@ -193,6 +200,27 @@ module aiAccount 'modules-network-secured/ai-account-identity.bicep' = {
     diagnosticSettingLevel: diagnosticSettingLevel
   }
 }
+
+// ============== CMK ENCRYPTION FOR AI ACCOUNT ==============
+// Apply customer-managed key encryption to AI Account if CMK is enabled
+// This module updates the account post-creation with encryption settings
+module aiAccountEncryption 'modules-network-secured/ai-account-encryption.bicep' = if (cmk) {
+  name: 'ai-account-encryption-${uniqueSuffix}-deployment'
+  scope: resourceGroup(targetSubscriptionId, targetResourceGroup)
+  params: {
+    aiFoundryName: accountName
+    aiFoundryPrincipalId: aiAccount.outputs.accountPrincipalId
+    location: location
+    keyVaultName: inputKeyvault
+    keyVaultUri: 'https://${inputKeyvault}${environment().suffixes.keyvaultDns}/'
+    keyName: cmkKeyName
+    keyVersion: '' // Use latest version
+  }
+  dependsOn: [
+    aiAccount
+  ]
+}
+
 /*
   Validate existing resources
   This module will check if the AI Search Service, Storage Account, and Cosmos DB Account already exist.
@@ -426,5 +454,23 @@ module cosmosContainerRoleAssignments 'modules-network-secured/cosmos-container-
 dependsOn: [
   addProjectCapabilityHost
   storageContainersRoleAssignment
+  ]
+}
+
+// ============== CMK KEY VAULT PERMISSIONS FOR AI PROJECT ==============
+// Assign Key Vault permissions to AI Project managed identity (for project-level encryption)
+module aiProjectKeyVaultRbac '../../kvRbacSingleAssignment.bicep' = if (cmk) {
+  name: take('kv-rbac-aiproject-${uniqueSuffix}', 64)
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  params: {
+    keyVaultName: inputKeyvault
+    principalId: aiProject.outputs.projectPrincipalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-aiproject-${projectName}'
+    principalType: 'ServicePrincipal'
+    roleDescription: 'CMK encryption permissions for AI Foundry project'
+  }
+  dependsOn: [
+    aiProject
   ]
 }

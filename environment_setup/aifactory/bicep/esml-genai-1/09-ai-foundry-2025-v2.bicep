@@ -142,6 +142,13 @@ param enableDefenderforAIResourceLevel bool = false
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+// CMK Parameters
+param cmk bool = false
+param cmkKeyName string = ''
+param inputKeyvault string = ''
+param inputKeyvaultResourcegroup string = ''
+param inputKeyvaultSubscription string = ''
+
 var projectName = 'prj${projectNumber}'
 var resolvedCommonResourceGroup = !empty(trim(commonResourceGroup_param)) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
 var resolvedTargetResourceGroup = !empty(trim(targetResourceGroupName)) ? targetResourceGroupName : '${commonRGNamePrefix}${projectPrefix}${replace(projectName, 'prj', 'project')}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
@@ -313,6 +320,11 @@ module foundryApim '../modules/csFoundry/foundry-apim/main.bicep' = {
     tags: tags
     logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
     diagnosticSettingLevel: diagnosticSettingLevel
+    cmk: cmk
+    cmkKeyName: cmkKeyName
+    inputKeyvault: inputKeyvault
+    inputKeyvaultResourcegroup: inputKeyvaultResourcegroup
+    inputKeyvaultSubscription: inputKeyvaultSubscription
 
 	}
 }

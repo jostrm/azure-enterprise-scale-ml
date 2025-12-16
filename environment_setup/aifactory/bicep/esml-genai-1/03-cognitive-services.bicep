@@ -678,6 +678,11 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (ena
       !empty(miACAName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)] : []
       )
     }
+    // CMK encryption parameters
+    cmk: cmk
+    cmkKeyName: cmk ? cmkKeyName : ''
+    cmkKeyVaultUri: cmkKeyVaultUri
+    cmkIdentityId: cmkIdentityId
   }
   dependsOn: [
     projectResourceGroupExists
@@ -747,6 +752,23 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
     aiSearchName: safeNameAISearch
     aiSearchExists: aiSearchExists
   }
+}
+
+// CMK RBAC: Assign Key Vault Crypto Service Encryption User role to AI Search System-Assigned MI
+module aiSearchCmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && cmk) {
+  name: take('03-aiSearchCmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
+  params: {
+    keyVaultName: admin_bicep_kv_fw
+    principalId: getAISearchInfo.outputs.principalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-aisearch-${safeNameAISearch}'
+    principalType: 'ServicePrincipal'
+  }
+  dependsOn: [
+    aiSearchService
+    getAISearchInfo
+  ]
 }
 
 // Azure OpenAI - with conditional AI Search principal ID

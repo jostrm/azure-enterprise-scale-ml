@@ -30,7 +30,15 @@ variables:
   admin_semanticSearchTier: "disabled" # ['disabled', 'free', 'standard']
   admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   
-  cmk: "false" # Enable Customer Managed Keys (CMK) for Storage Accounts, etc.
+  # CMK (Customer Managed Key) REQUIREMENTS when enabled (cmk=true) on Seeding Keyvault: dev_admin_bicep_kv_fw, test_admin_bicep_kv_fw, prod_admin_bicep_kv_fw
+  # - Key Vault MUST have enableSoftDelete=true and enablePurgeProtection=true (see admin_keyvaultSoftDeleteDays below)
+  # - Key Vault firewall MUST allow trusted Microsoft services (bypass: AzureServices) - already configured
+  # - Managed identities MUST have Key Vault Crypto Service Encryption User role (get key, wrap key, unwrap key permissions)
+  # - Only RSA and RSA-HSM keys of size 2048 are supported
+  # - If you use the Key Vault firewall, you must allow trusted Microsoft services to access the Azure Key Vault.
+  # - The AI Factory will grant your Microsoft Foundry resource and project system-assigned managed identity the following permissions on your key vault: get key, wrap key, unwrap key.
+  # - Only RSA and RSA-HSM keys of size 2048 are supported.
+  cmk: "false" # Enable Customer Managed Keys (CMK) for Storage Accounts, AI Services, etc.
   cmkKeyName: "esml-cmk-key" # Common key name for all services in this environment
 
   # SEEDING KEYVAULT: One global (same values for all tripples), or one per environment (different values for dev,test,prod)
@@ -48,7 +56,7 @@ variables:
   # ===========================================================================
   useCommonACR: true # Use common Azure Container Registry (save cost), instead of each project having its own.
   admin_hybridBenefit: "true"
-  admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 7 lowest. 0 is disabled. 90 days is recommended.
+  admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 7 lowest. 0 is disabled. 90 days is recommended. NOTE: When CMK is enabled, purge protection is REQUIRED.
   azure_machinelearning_sp_oid: "TODO_ObjectID" # Azure Machine Learning service principle Object ID. Find it in Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
   use_ad_groups: "true" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
   enableAMPLS: "false" # true, then AMPLS will be created in Hub subscription, AppInsights will be added, in private/private mode.
@@ -211,30 +219,29 @@ variables:
   # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
   
+  # === Defender for Cloud: Defender for AI ===
+  enableDefenderforAISubLevel: "false"
+  enableDefenderforAIResourceLevel: "false"
   # === CMK - Customer Managed Key for encryption at rest, for all services that supports CMK ===
   cmk: "false" # Customer Managed Key encryption for Keyvault, Storage accounts, etc.  true, enable CMK. false, use platform managed keys.
   cmkKeyName: "aifactory-cmk-key" # Name of the Key in Keyvault to be used for CMK encryption
-
   # === Keyvault RBAC ===
   updateKeyvaultRbac: "false" # true, enables you to update RBAC properties running the pipeline twice. false means "CreateIfNotExists"  
-
+  
   # === AI Foundry 2023-2025+ ===
-  enableAIServices: "true" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
-  enableAIFoundryHub: "true" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
+  enableAIServices: "false" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
+  enableAIFoundryHub: "false" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
   addAIFoundryHub: "false"  # Add new AI Foundry Hub with project, with a new random name (Solution, if deletion, and Enterprise application is not deleted as it should)
   # === AI foundry 2025 ===
-  # https://github.com/Azure/bicep-registry-modules/tree/main/avm/ptn/ai-ml/ai-foundry#example-5-waf-aligned
-  enableAIFoundryV21: "true" # AI Foundry with default project. Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
-  updateAIFoundryV21: "true" # true, enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false means "CreateIfNotExists"
-  addAIFoundryV21: "false" # Add new AI foundry with project, with a new random name (can be used for debugging, or running pipeline twice directly, not wating for deletion)
+  enableAIFoundry: "true" # AI Foundry with default project. Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
+  updateAIFoundry: "false" # true, enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false means "CreateIfNotExists"
+  addAIFoundry: "false" # Add new AI foundry with project, with a new random name (can be used for debugging, or running pipeline twice directly, not wating for deletion)
   enableAFoundryCaphost: "true" # Ensures Agents metadata, and history/threads is saved in your subscription and network, using CosmosDB, Storage, AI Search
+  foundryDeploymentType: "1" # "1" = AI Factory based on PG, "2" = AI Factory based on AVM, "3" = Both. Where 1 is tested, and if fails, it uses 2
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # true, only connections is created to AIFactory created services. false, Azure will create a default project, with additional CosmosDB, Storage Account, AI Search, and connections
   disableAgentNetworkInjection: "false" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
   # NetworkInjection -> Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
-  
-  # === API AI Gateway from Microsoft Foundry V22 ===
-  foundryApiManagementResourceId: "" # Optional, provide an existing API Management resource ID to integrate with Microsoft Foundry V22
 
   # === Data & Machine Learning ===
   enableDatafactory: "false" # Datafactory
@@ -285,7 +292,9 @@ variables:
   # === Integration ===
   enableLogicApps: "false"
   enableEventHubs: "false"
-    
+  enableBotService: "true" # === AI: Bot Service - for Microsoft Foundry ===
+  foundryApiManagementResourceId: "" # === AI: API AI Gateway - for Microsoft Foundry === Optional, provide an existing API Management resource ID to integrate with Microsoft Foundry V22
+
   # ============================================================================
   # MANDATORY (POST SETUP of a PROJECT): runNetworkingVar
   # ============================================================================

@@ -46,6 +46,12 @@ param enablePublicAccessWithPerimeter bool = false
 param vnetName string
 param vnetResourceGroupName string
 
+// CMK parameters
+param cmk bool = false
+param cmkKeyName string = ''
+param cmkKeyVaultUri string = ''
+param cmkIdentityId string = ''
+
 var formattedUserAssignedIdentities = reduce(
   map((managedIdentities.?userAssignedResourceIds ?? []), (id) => { '${id}': {} }),
   {},
@@ -97,6 +103,11 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
     }:null
     
     semanticSearch: semanticSearchTier
+    
+    // Customer-Managed Key encryption
+    encryptionWithCmk: cmk ? {
+      enforcement: 'Enabled'
+    } : null
   }
   
   @batchSize(1)

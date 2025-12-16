@@ -257,6 +257,42 @@ var aiAccountEndpoint = foundryV22AccountOnly ? aiAccount.properties.endpoint : 
 #disable-next-line BCP318
 var aiAccountPrincipalId = foundryV22AccountOnly? aiAccount.identity.principalId: ''
 
+// ============== CMK RBAC ASSIGNMENTS ==============
+// Assign Key Vault Crypto Service Encryption User role to AI Account System-Assigned MI
+// This allows the AI Account to access the CMK for encryption at rest
+module kvRbacForAiAccount '../kvRbacSingleAssignment.bicep' = if (foundryV22AccountOnly && !empty(customerManagedKey)) {
+  name: take('kvRbac-ai-${accountName}', 64)
+  scope: resourceGroup(
+    split(customerManagedKey.?keyVaultResourceId!, '/')[2],
+    split(customerManagedKey.?keyVaultResourceId!, '/')[4]
+  )
+  params: {
+    keyVaultName: cMKKeyVault.name
+    principalId: aiAccountPrincipalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-ai-${accountName}'
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Assign Key Vault Crypto Service Encryption User role to Cosmos DB global service principal
+// This is required for Cosmos DB encryption when using CMK
+// Cosmos DB global principal ID: a232010e-820c-4083-83bb-3ace5fc29d0b
+module kvRbacForCosmosDb '../kvRbacSingleAssignment.bicep' = if (foundryV22AccountOnly && !empty(customerManagedKey) && enableCosmosDb) {
+  name: take('kvRbac-cosmos-${accountName}', 64)
+  scope: resourceGroup(
+    split(customerManagedKey.?keyVaultResourceId!, '/')[2],
+    split(customerManagedKey.?keyVaultResourceId!, '/')[4]
+  )
+  params: {
+    keyVaultName: cMKKeyVault.name
+    principalId: 'a232010e-820c-4083-83bb-3ace5fc29d0b' // Cosmos DB global service principal
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-rbac-cosmos-${accountName}'
+    principalType: 'ServicePrincipal'
+  }
+}
+
 @description('The name of the cognitive services account.')
 output aiAccountName string = accountName
 

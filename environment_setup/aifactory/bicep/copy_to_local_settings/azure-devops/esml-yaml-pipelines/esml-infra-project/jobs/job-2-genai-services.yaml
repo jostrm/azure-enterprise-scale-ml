@@ -807,6 +807,7 @@ steps:
       aiFoundryV2Name="aif2"
       aiFoundryV2ProjectName="aif2-p${projectNumber}-"
 
+      botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
       dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
       aksName="aks${projectNumber}-${locationSuffix}-${envName}"
       amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
@@ -850,6 +851,7 @@ steps:
       echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=botServiceExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=aksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=amlExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=openaiExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
@@ -927,6 +929,7 @@ steps:
         ["cosmosDBExists"]="$(cosmosDBExists)"
         ["functionAppExists"]="$(functionAppExists)"
         ["webAppExists"]="$(webAppExists)"
+        ["botServiceExists"]="$(botServiceExists)"
         ["funcAppServicePlanExists"]="$(funcAppServicePlanExists)"
         ["webAppServicePlanExists"]="$(webAppServicePlanExists)"
         ["keyvaultExists"]="$(keyvaultExists)"
@@ -1676,6 +1679,8 @@ steps:
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
      --parameters webAppExists="$(webAppExists)" \
+     --parameters enableBotService="$(enableBotService)" \
+     --parameters botServiceExists="$(botServiceExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -1761,8 +1766,8 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025-1stOption'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded())
-  continueOnError: true
+  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), or(eq(variables['foundryDeploymentType'], '1'), eq(variables['foundryDeploymentType'], '3')))
+  # continueOnError: true
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1776,7 +1781,6 @@ steps:
       --template-file "esml-genai-1/09-ai-foundry-2025-v2.bicep" \
       --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
       --parameters targetSubscriptionId="$(dev_test_prod_sub_id)" \
-      --parameters targetResourceGroupName="$(commonResourceGroup_param)" \
       --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
       --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
       --parameters commonResourceName="$(vnetResourceGroupBase)" \
@@ -1800,6 +1804,12 @@ steps:
       --parameters projectSuffix="$(projectSuffix)" \
       --parameters tags='$(tagsProject)' \
       --parameters addAIFoundry="$(addAIFoundry)" \
+      --parameters enableAISearch="$(enableAISearch)" \
+      --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
+      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
+      --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
+      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
+      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
       --debug
       
       # If the deployment succeeded, set a variable to skip the fallback option
@@ -1810,7 +1820,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), in(variables['Agent.JobStatus'], 'SucceededWithIssues', 'Failed'), ne(variables['aiFoundryV2Exists'], 'true'))
+  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), in(variables['Agent.JobStatus'], 'SucceededWithIssues', 'Failed'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1891,11 +1901,13 @@ steps:
      --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
      --parameters useAVMFoundry="false" \
      --parameters updateAIFoundry="$(updateAIFoundry)" \
+     --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
+     --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters addAIFoundry="true"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-Rehydrate'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['aiFoundryV2Exists'], 'true'))
+  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1906,7 +1918,7 @@ steps:
      sleep 15
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'))
+  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1987,6 +1999,8 @@ steps:
      --parameters updateAIFoundry="$(updateAIFoundry)" \
      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
      --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
+     --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
+     --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters addAIFoundry="true"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -2110,6 +2124,3 @@ steps:
       else
         echo "No registry name found - skipping public access disable"
       fi
-
-
-

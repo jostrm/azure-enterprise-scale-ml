@@ -108,6 +108,7 @@ param commonResourceGroup_param string = ''
 
 // Key Vault specific
 param keyvaultSoftDeleteDays int = 90
+// NOTE: When CMK is enabled, purge protection MUST be true (Azure requirement)
 param keyvaultEnablePurgeProtection bool = true
 
 // VM specific
@@ -358,6 +359,16 @@ module applicationInsights '../modules/applicationInsightsRGmode.bicep' = {
 }
 
 // ============== CMK CONFIGURATION ==============
+// CMK Requirements:
+// - Key Vault must have enableSoftDelete=true and enablePurgeProtection=true
+// - Key Vault firewall must allow trusted Microsoft services (bypass: AzureServices)
+// - Only RSA and RSA-HSM keys of size 2048 are supported
+// - Managed identities need Key Vault Crypto Service Encryption User role
+
+// Validation: Ensure purge protection is enabled when CMK is used
+// This validates the external/seeding Key Vault configuration
+var _ = cmk && !keyvaultEnablePurgeProtection ? fail('DEPLOYMENT FAILED: When CMK is enabled (cmk=true), the seeding Key Vault MUST have purge protection enabled (keyvaultEnablePurgeProtection=true). This is an Azure requirement for customer-managed keys.') : null
+
 // Create Key in the external Key Vault
 module cmkKey '../modules/keyVaultKey.bicep' = if (cmk) {
   name: take('02-cmkKey-${deploymentProjSpecificUniqueSuffix}', 64)
