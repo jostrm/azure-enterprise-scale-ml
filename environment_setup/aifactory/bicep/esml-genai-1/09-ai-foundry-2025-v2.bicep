@@ -9,10 +9,10 @@ param targetSubscriptionId string = subscription().subscriptionId
 param targetResourceGroupName string = ''
 
 @description('Optional pre-calculated common resource group name.')
-param commonResourceGroup_param string = ''
+param commonResourceGroup_param string
 
 @description('Prefix for common resource groups (for example "esml-").')
-param commonRGNamePrefix string = ''
+param commonRGNamePrefix string
 
 @description('Common resource base name (for example "common").')
 param commonResourceName string = 'esml-common'
@@ -44,7 +44,7 @@ param projectPrefix string = 'esml-'
 param projectSuffix string = '-rg'
 
 @description('Suffix appended to resource group names (for example "-rg").')
-param aifactorySuffixRG string = ''
+param aifactorySuffixRG string
 
 @description('Azure region for all resources. Defaults to swedencentral per design guidance.')
 param location string = 'swedencentral'
@@ -223,10 +223,19 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 var aifV2Name = addAIFoundry? namingConvention.outputs.aifV2NameAdd: namingConvention.outputs.aifV2Name
 var aifV2ProjectName = addAIFoundry? namingConvention.outputs.aifV2PrjNameAdd: namingConvention.outputs.aifV2PrjName
 
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: resolvedCommonResourceGroup
+  scope: subscription(subscriptionIdDevTestProd)
+}
+
 // Fetch existing Log Analytics workspace for diagnostic settings
-var laName = 'la-${commonResourceName}-${locationSuffix}-${env}-${aifactorySalt10char}${commonResourceSuffix}'
+#disable-next-line BCP318
+var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+var cmnName_Static = 'cmn'
+var laWorkspaceName_Static = 'la-${cmnName_Static}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
+
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-  name: laName
+  name: laWorkspaceName_Static
   scope: resourceGroup(resolvedSubscriptionId, resolvedCommonResourceGroup)
 } 
 

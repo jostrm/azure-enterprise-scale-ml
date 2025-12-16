@@ -239,12 +239,19 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   }
 }
 
+resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
+  name: commonResourceGroup
+  scope: subscription(subscriptionIdDevTestProd)
+}
+
 // ============================================================================
 // LOG ANALYTICS WORKSPACE - Fetch existing for diagnostic settings
 // ============================================================================
-var laName = 'la-${commonResourceName}-${locationSuffix}-${env}-${aifactorySalt10char}${commonResourceSuffix}'
+var cmnName_Static = 'cmn'
+var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
+var laWorkspaceName_Static = 'la-${cmnName_Static}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${commonResourceSuffix}'
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
-  name: laName
+  name: laWorkspaceName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
