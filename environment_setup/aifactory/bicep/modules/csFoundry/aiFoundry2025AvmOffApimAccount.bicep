@@ -203,6 +203,13 @@ resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentiti
   )
 }
 
+// Remove trailing slash from Key Vault URI for AI Services encryption
+#disable-next-line BCP318
+var cmkKeyVaultUriRaw = !empty(customerManagedKey) ? cMKKeyVault!.properties.vaultUri : ''
+var cmkKeyVaultUri = !empty(cmkKeyVaultUriRaw) && length(cmkKeyVaultUriRaw) > 1 && endsWith(cmkKeyVaultUriRaw, '/') 
+  ? substring(cmkKeyVaultUriRaw, 0, max(0, length(cmkKeyVaultUriRaw) - 1)) 
+  : cmkKeyVaultUriRaw
+
 #disable-next-line BCP036
 resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
   name: accountName
@@ -240,7 +247,9 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
             #disable-next-line BCP318
             identityClientId: !empty(customerManagedKey) && !empty(cMKUserAssignedIdentity) ? cMKUserAssignedIdentity.properties.clientId : null
             #disable-next-line BCP318
-            keyVaultUri: !empty(customerManagedKey) ? cMKKeyVault!.properties.vaultUri : ''
+            keyName: !empty(customerManagedKey) ? customerManagedKey!.keyName : ''
+            #disable-next-line BCP318
+            keyVaultUri: cmkKeyVaultUri
             keyVersion: (!empty(customerManagedKey) && !empty(customerManagedKey.?keyVersion ?? ''))
               ? customerManagedKey!.keyVersion
               : (!empty(customerManagedKey) ? last(split(cMKKey!.properties.keyUriWithVersion, '/')) : '')
