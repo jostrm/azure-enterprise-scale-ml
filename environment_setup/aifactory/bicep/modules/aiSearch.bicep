@@ -118,7 +118,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
 }
 
 resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
-  name: aiSearch.name
+  name: privateEndpointName
   location: location
   tags: tags
   properties: {

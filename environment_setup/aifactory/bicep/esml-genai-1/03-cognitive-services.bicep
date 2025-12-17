@@ -689,6 +689,8 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (ena
     ...(!storageAccount2001Exists ? [sa4AIsearch] : [])
     ...(!miPrjExists ? [getProjectMIPrincipalId] : [])
     ...(!miACAExists ? [getACAMIPrincipalId] : [])
+    // AI Search shared private link to AI Services requires AI Services to exist first
+    ...((enableAISearchSharedPrivateLink && enableAIServices && !aiServicesExists) ? [aiServices] : [])
   ]
 }
 
@@ -755,19 +757,20 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
 }
 
 // CMK RBAC: Assign Key Vault Crypto Service Encryption User role to AI Search System-Assigned MI
+// Only runs when AI Search is newly deployed (!aiSearchExists) and CMK is enabled
+#disable-next-line BCP073
 module aiSearchCmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && cmk) {
   name: take('03-aiSearchCmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
   params: {
     keyVaultName: admin_bicep_kv_fw
-    principalId: getAISearchInfo.outputs.principalId
+    principalId: aiSearchService!.outputs.principalId
     keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
     assignmentName: 'cmk-rbac-aisearch-${safeNameAISearch}'
     principalType: 'ServicePrincipal'
   }
   dependsOn: [
     aiSearchService
-    getAISearchInfo
   ]
 }
 
