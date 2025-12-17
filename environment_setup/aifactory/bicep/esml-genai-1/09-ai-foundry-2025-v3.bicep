@@ -967,7 +967,11 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
   }
   dependsOn: [
     // Primary AI Foundry account deployment (scenario 2a or 2b)
-    ...(Use_APIM_Project ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm])
+    //     TODO Jocke (1st work IA) ...(Use_APIM_Project ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm])
+    // Match exact deployment conditions to avoid referencing non-existent modules
+    ...(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(!Use_APIM_Project && !foundryV22AccountOnly && !deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvm] : [])
+    // TODO Jocke end
     existingTargetRG
     // For scenario 2b (non-APIM), wait for external project/RBAC modules
     ...(!Use_APIM_Project && projectModuleEnabled ? [projectV21] : [])
@@ -991,10 +995,10 @@ module aiFoundryAccountDiagnostics '../modules/diagnostics/cognitiveServicesDiag
     diagnosticSettingLevel: diagnosticSettingLevel
   }
   dependsOn: [
-    // Wait for AI Foundry account to be created in any scenario
-    ...(foundryV22AccountOnly ? [aiFoundry2025NoAvmV22AccountOnly] : [])
-    ...(Use_APIM_Project && !foundryV22AccountOnly ? [aiFoundry2025NoAvmV22] : [])
-    ...(!Use_APIM_Project && !deployAvmFoundry ? [aiFoundry2025NoAvm] : [])
+    // Wait for AI Foundry account to be created in any scenario - match exact deployment conditions
+    ...(Use_APIM_Project && foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists ? [aiFoundry2025NoAvmV22AccountOnly] : [])
+    ...(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(!Use_APIM_Project && !foundryV22AccountOnly && !deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvm] : [])
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
   ]
 }
@@ -1239,8 +1243,10 @@ module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bi
     location: location
   }
   dependsOn: [
-    // Primary AI Foundry deployment based on scenario
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : (Use_APIM_Project ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm]))
+    // Primary AI Foundry deployment based on scenario - match exact deployment conditions
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(!Use_APIM_Project && !foundryV22AccountOnly && !deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvm] : [])
     // Scenario 2b only: wait for RBAC
     ...(!Use_APIM_Project && enableAISearch ? [rbacAISearchForAIFv21] : [])
     // Wait for private endpoints if they are being deployed
