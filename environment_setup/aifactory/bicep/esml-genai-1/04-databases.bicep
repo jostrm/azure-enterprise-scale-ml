@@ -319,9 +319,11 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existi
 
 // ============== CMK CONFIGURATION ==============
 var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
-// Remove trailing slash from Key Vault URI - Cosmos DB requires URI without trailing slash
-var cmkKvUriRaw = cmk? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri: ''
-var cmkKvUri = cmk && endsWith(cmkKvUriRaw, '/') ? substring(cmkKvUriRaw, 0, length(cmkKvUriRaw) - 1) : cmkKvUriRaw
+// Get Key Vault base URI and construct full key URI for Cosmos DB
+var cmkKvBaseUriRaw = cmk? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri: ''
+var cmkKvBaseUri = cmk && endsWith(cmkKvBaseUriRaw, '/') ? substring(cmkKvBaseUriRaw, 0, length(cmkKvBaseUriRaw) - 1) : cmkKvBaseUriRaw
+// Full key URI format: https://<vault>.vault.azure.net/keys/<keyname> (no version for auto-rotation)
+var cmkKvUri = cmk ? '${cmkKvBaseUri}/keys/${cmkKeyName}' : ''
 // ============== COSMOS DB ==============
 
 module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry))) {
