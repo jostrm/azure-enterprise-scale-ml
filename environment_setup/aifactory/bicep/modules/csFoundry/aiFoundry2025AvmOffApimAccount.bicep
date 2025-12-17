@@ -17,6 +17,19 @@ param allowedFqdnList array?
 param apiProperties object?
 
 import { customerManagedKeyType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
+
+// ============================================================================
+// IMPORTANT CMK REQUIREMENT:
+// The Key Vault specified in customerManagedKey.keyVaultResourceId MUST have 
+// enableRbacAuthorization=true (RBAC model, not Access Policy model).
+// 
+// If you see "AccessPolicyNotConfiguredForKeyVault" errors despite having RBAC
+// assignments, run this command to enable RBAC on the Key Vault:
+//   az keyvault update --name <vault-name> --enable-rbac-authorization true
+//
+// The User-Assigned MI specified in customerManagedKey.userAssignedIdentityResourceId
+// must have the "Key Vault Crypto Service Encryption User" role assigned.
+// ============================================================================
 @description('Optional. The customer managed key definition.')
 param customerManagedKey customerManagedKeyType?
 
@@ -219,7 +232,13 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
   sku: {
     name: aiAccountSku
   }
-  identity: {
+  identity: !empty(customerManagedKey) ? {
+    // When using CMK, need both System-Assigned (for general operations) and User-Assigned (for CMK access)
+    type: 'SystemAssigned,UserAssigned'
+    userAssignedIdentities: {
+      '${customerManagedKey!.userAssignedIdentityResourceId}': {}
+    }
+  } : {
     type: 'SystemAssigned'
   }
   properties: {
