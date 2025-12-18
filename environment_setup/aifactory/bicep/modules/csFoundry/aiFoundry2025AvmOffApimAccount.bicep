@@ -19,16 +19,17 @@ param apiProperties object?
 import { customerManagedKeyType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
 
 // ============================================================================
-// IMPORTANT CMK REQUIREMENT:
-// The Key Vault specified in customerManagedKey.keyVaultResourceId MUST have 
-// enableRbacAuthorization=true (RBAC model, not Access Policy model).
-// 
-// If you see "AccessPolicyNotConfiguredForKeyVault" errors despite having RBAC
-// assignments, run this command to enable RBAC on the Key Vault:
-//   az keyvault update --name <vault-name> --enable-rbac-authorization true
+// IMPORTANT CMK REQUIREMENTS:
+// 1. The Key Vault specified in customerManagedKey.keyVaultResourceId MUST have 
+//    enableRbacAuthorization=true (RBAC model, not Access Policy model).
+//    Run: az keyvault update --name <vault-name> --enable-rbac-authorization true
 //
-// The User-Assigned MI specified in customerManagedKey.userAssignedIdentityResourceId
-// must have the "Key Vault Crypto Service Encryption User" role assigned.
+// 2. AI Services (Cognitive Services) accounts only support SYSTEM-ASSIGNED identities
+//    for CMK encryption, NOT User-Assigned identities.
+//    The System-Assigned MI will be automatically created and assigned RBAC permissions.
+//
+// 3. There will be a 30-60 second delay after RBAC assignment before the AI Account
+//    can successfully access the CMK. This is normal RBAC propagation delay.
 // ============================================================================
 @description('Optional. The customer managed key definition.')
 param customerManagedKey customerManagedKeyType?
@@ -208,13 +209,6 @@ resource cMKKey 'Microsoft.KeyVault/vaults/keys@2024-11-01' existing = if (!empt
     split(customerManagedKey.?keyVaultResourceId!, '/')[4]
   )
 }
-resource cMKUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2025-01-31-preview' existing = if (!empty(customerManagedKey.?userAssignedIdentityResourceId)) {
-  name: last(split(customerManagedKey.?userAssignedIdentityResourceId!, '/'))
-  scope: resourceGroup(
-    split(customerManagedKey.?userAssignedIdentityResourceId!, '/')[2],
-    split(customerManagedKey.?userAssignedIdentityResourceId!, '/')[4]
-  )
-}
 
 // Remove trailing slash from Key Vault URI for AI Services encryption
 #disable-next-line BCP318
@@ -232,13 +226,7 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
   sku: {
     name: aiAccountSku
   }
-  identity: !empty(customerManagedKey) ? {
-    // When using CMK, need both System-Assigned (for general operations) and User-Assigned (for CMK access)
-    type: 'SystemAssigned,UserAssigned'
-    userAssignedIdentities: {
-      '${customerManagedKey!.userAssignedIdentityResourceId}': {}
-    }
-  } : {
+  identity: {
     type: 'SystemAssigned'
   }
   properties: {
@@ -263,8 +251,8 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
       ? {
           keySource: 'Microsoft.KeyVault'
           keyVaultProperties: {
-            #disable-next-line BCP318
-            identityClientId: !empty(customerManagedKey) && !empty(cMKUserAssignedIdentity) ? cMKUserAssignedIdentity.properties.clientId : null
+            // Note: AI Services only supports System-Assigned MI for CMK, not User-Assigned
+            // identityClientId is omitted - System-Assigned MI is used automatically
             #disable-next-line BCP318
             keyName: !empty(customerManagedKey) ? customerManagedKey!.keyName : ''
             #disable-next-line BCP318
@@ -288,6 +276,7 @@ var aiAccountPrincipalId = foundryV22AccountOnly? aiAccount.identity.principalId
 // ============== CMK RBAC ASSIGNMENTS ==============
 // Assign Key Vault Crypto Service Encryption User role to AI Account System-Assigned MI
 // This allows the AI Account to access the CMK for encryption at rest
+// NOTE: This must run AFTER the AI Account is created but encryption won't work until RBAC propagates (30-60 sec delay)
 module kvRbacForAiAccount '../kvRbacSingleAssignment.bicep' = if (foundryV22AccountOnly && !empty(customerManagedKey)) {
   name: take('kvRbac-ai-${accountName}', 64)
   scope: resourceGroup(
@@ -301,6 +290,9 @@ module kvRbacForAiAccount '../kvRbacSingleAssignment.bicep' = if (foundryV22Acco
     assignmentName: 'cmk-rbac-ai-${accountName}'
     principalType: 'ServicePrincipal'
   }
+  dependsOn: [
+    aiAccount  // Must wait for AI Account to be created to get its System-Assigned MI principal ID
+  ]
 }
 
 // Assign Key Vault Crypto Service Encryption User role to Cosmos DB global service principal
