@@ -127,6 +127,15 @@ param restrictOutboundNetworkAccess bool = true
 @description('Optional tags applied to newly created resources.')
 param tags object = {}
 
+@description('Enable Customer-Managed Key (CMK) encryption for the AI Account.')
+param cmk bool = false
+
+@description('CMK Key name in the Key Vault.')
+param cmkKeyName string = ''
+
+@description('CMK Key Vault resource ID.')
+param cmkKeyVaultResourceId string = ''
+
 @description('SKU tier for the AI Services account.')
 @allowed([
   'S0'
@@ -255,6 +264,69 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
 
 resource aiAccountExisting 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(!foundryV22AccountOnly) {
   name: aiAccountName
+}
+
+// Key Vault reference for CMK
+resource cMKKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (!foundryV22AccountOnly && cmk && !empty(cmkKeyVaultResourceId)) {
+  name: last(split(cmkKeyVaultResourceId, '/'))
+  scope: resourceGroup(
+    split(cmkKeyVaultResourceId, '/')[2],
+    split(cmkKeyVaultResourceId, '/')[4]
+  )
+}
+
+// Remove trailing slash from Key Vault URI
+#disable-next-line BCP318
+var cmkKeyVaultUriRaw = (!foundryV22AccountOnly && cmk && !empty(cmkKeyVaultResourceId)) ? cMKKeyVault.properties.vaultUri : ''
+var cmkKeyVaultUri = !empty(cmkKeyVaultUriRaw) && length(cmkKeyVaultUriRaw) > 1 && endsWith(cmkKeyVaultUriRaw, '/') 
+  ? substring(cmkKeyVaultUriRaw, 0, max(0, length(cmkKeyVaultUriRaw) - 1)) 
+  : cmkKeyVaultUriRaw
+
+// Second deployment: Update existing AI Account with CMK encryption
+// This runs when foundryV22AccountOnly=false (after 3 minute RBAC propagation delay)
+#disable-next-line BCP036
+resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(!foundryV22AccountOnly && cmk) {
+  name: aiAccountName
+  kind: 'AIServices'
+  location: location
+  tags: tags
+  sku: {
+    name: aiAccountSku
+  }
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    allowedFqdnList: allowedFqdnList
+    apiProperties: apiProperties
+    allowProjectManagement: true
+    customSubDomainName: aiAccountName
+    networkAcls: networkAcls
+    publicNetworkAccess: publicNetworkAccess
+    disableLocalAuth: false
+    #disable-next-line BCP036
+    networkInjections: agentNetworkInjectionEnabled ? [
+      {
+        scenario: 'agent'
+        subnetArmId: agentSubnetResourceId
+        useMicrosoftManagedNetwork: false
+      }
+    ] : null
+    restrictOutboundNetworkAccess: restrictOutboundNetworkAccess
+    dynamicThrottlingEnabled: false
+    // NOW configure encryption - RBAC has had 3 minutes to propagate
+    encryption: {
+      keySource: 'Microsoft.KeyVault'
+      keyVaultProperties: {
+        // System-Assigned MI is used automatically
+        keyName: cmkKeyName
+        keyVaultUri: cmkKeyVaultUri
+      }
+    }
+  }
+  dependsOn: [
+    aiAccountExisting  // Ensure the account exists
+  ]
 }
 
 var aiAccountResourceId = foundryV22AccountOnly ? aiAccountCreate.id : aiAccountExisting.id

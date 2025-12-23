@@ -19,21 +19,21 @@ param apiProperties object?
 import { customerManagedKeyType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
 
 // ============================================================================
-// IMPORTANT CMK REQUIREMENTS & DEPLOYMENT PROCESS:
+// DEPLOYMENT STRATEGY FOR CMK WITH SYSTEM-ASSIGNED IDENTITY:
 // 
-// 1. The Key Vault specified in customerManagedKey.keyVaultResourceId MUST have 
-//    enableRbacAuthorization=true (RBAC model, not Access Policy model).
-//    Run: az keyvault update --name <vault-name> --enable-rbac-authorization true
+// Azure DevOps pipeline calls this deployment TWICE:
+// 1. First call: foundryV22AccountOnly=true
+//    - Creates AI Account WITHOUT encryption
+//    - System-Assigned MI is created
+//    - RBAC "Key Vault Crypto Service Encryption User" is assigned to the MI
+// 2. Sleep 3 minutes (RBAC propagation)
+// 3. Second call: foundryV22AccountOnly=false  
+//    - Uses aiFoundry2025AvmOffApim.bicep (full deployment)
+//    - Updates account WITH encryption
+//    - CMK now works because RBAC has propagated
 //
-// 2. AI Services (Cognitive Services) accounts only support SYSTEM-ASSIGNED identities
-//    for CMK encryption, NOT User-Assigned identities.
-//
-// 3. TWO-STEP DEPLOYMENT PROCESS (required for System-Assigned MI + CMK):
-//    a) Create AI Account WITHOUT encryption (aiAccount resource)
-//    b) Assign RBAC "Key Vault Crypto Service Encryption User" to the System-Assigned MI
-//    c) Update AI Account WITH encryption (aiAccountEncryption resource)
-//    This avoids the chicken-and-egg problem where Azure validates CMK access during
-//    creation but the System-Assigned MI doesn't exist until after creation.
+// IMPORTANT: This module (Account-only) does NOT configure encryption.
+// Encryption is configured in the second deployment by the full module.
 // ============================================================================
 @description('Optional. The customer managed key definition.')
 param customerManagedKey customerManagedKeyType?
@@ -204,22 +204,7 @@ resource cMKKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (!empt
     split(customerManagedKey.?keyVaultResourceId!, '/')[2],
     split(customerManagedKey.?keyVaultResourceId!, '/')[4]
   )
-
 }
-resource cMKKey 'Microsoft.KeyVault/vaults/keys@2024-11-01' existing = if (!empty(customerManagedKey.?keyVaultResourceId) && !empty(customerManagedKey.?keyName)) {
-  name: '${cMKKeyVault.name}/${customerManagedKey.?keyName!}'
-  scope: resourceGroup(
-    split(customerManagedKey.?keyVaultResourceId!, '/')[2],
-    split(customerManagedKey.?keyVaultResourceId!, '/')[4]
-  )
-}
-
-// Remove trailing slash from Key Vault URI for AI Services encryption
-#disable-next-line BCP318
-var cmkKeyVaultUriRaw = !empty(customerManagedKey) ? cMKKeyVault!.properties.vaultUri : ''
-var cmkKeyVaultUri = !empty(cmkKeyVaultUriRaw) && length(cmkKeyVaultUriRaw) > 1 && endsWith(cmkKeyVaultUriRaw, '/') 
-  ? substring(cmkKeyVaultUriRaw, 0, max(0, length(cmkKeyVaultUriRaw) - 1)) 
-  : cmkKeyVaultUriRaw
 
 #disable-next-line BCP036
 resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
@@ -251,62 +236,9 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
     ] : null
     restrictOutboundNetworkAccess: restrictOutboundNetworkAccess
     dynamicThrottlingEnabled: false
-    // Note: encryption is NOT set here because System-Assigned MI doesn't exist yet
-    // Encryption will be configured in a separate update resource after RBAC is assigned
+    // DO NOT configure encryption here - it will be configured in the second deployment
+    // when foundryV22AccountOnly=false (after RBAC has propagated)
   }
-}
-
-// Step 2: Update AI Account with CMK encryption after RBAC assignment completes
-// This is a separate resource that updates the existing account
-#disable-next-line BCP036
-resource aiAccountEncryption 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly && !empty(customerManagedKey)) {
-  name: accountName
-  kind: 'AIServices'
-  location: location
-  tags: tags
-  sku: {
-    name: aiAccountSku
-  }
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    allowedFqdnList: allowedFqdnList
-    apiProperties: apiProperties
-    allowProjectManagement: true
-    customSubDomainName: accountName
-    networkAcls: networkAcls
-    publicNetworkAccess: publicNetworkAccess
-    disableLocalAuth: false
-    #disable-next-line BCP036
-    networkInjections: agentNetworkInjectionEnabled ? [
-      {
-        scenario: 'agent'
-        subnetArmId: agentSubnetResourceId
-        useMicrosoftManagedNetwork: false
-      }
-    ] : null
-    restrictOutboundNetworkAccess: restrictOutboundNetworkAccess
-    dynamicThrottlingEnabled: false
-    // NOW we can configure encryption because RBAC has been assigned
-    encryption: {
-      keySource: 'Microsoft.KeyVault'
-      keyVaultProperties: {
-        // System-Assigned MI is used automatically (no identityClientId needed)
-        #disable-next-line BCP318
-        keyName: customerManagedKey!.keyName
-        #disable-next-line BCP318
-        keyVaultUri: cmkKeyVaultUri
-        keyVersion: (!empty(customerManagedKey.?keyVersion ?? ''))
-          ? customerManagedKey!.keyVersion
-          : last(split(cMKKey!.properties.keyUriWithVersion, '/'))
-      }
-    }
-  }
-  dependsOn: [
-    aiAccount  // Must exist first
-    kvRbacForAiAccount  // RBAC must be assigned before encryption can work
-  ]
 }
 
 #disable-next-line BCP318

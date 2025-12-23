@@ -819,6 +819,9 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
     azureCosmosDBAccountResourceId: enableCosmosDB ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
     aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
+    cmk: cmk
+    cmkKeyName: cmkKeyName
+    cmkKeyVaultResourceId: cmk ? resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault) : ''
   }
   dependsOn: [
     existingTargetRG
