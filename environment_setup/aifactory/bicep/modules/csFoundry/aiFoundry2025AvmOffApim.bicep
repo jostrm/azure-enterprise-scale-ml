@@ -262,7 +262,9 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
   }
 }
 
-resource aiAccountExisting 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(!foundryV22AccountOnly) {
+// Reference to existing account when CMK is NOT enabled
+// When CMK is enabled, aiAccountUpdateWithCMK will handle the account update
+resource aiAccountExisting 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(!foundryV22AccountOnly && !cmk) {
   name: aiAccountName
 }
 
@@ -324,12 +326,11 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
       }
     }
   }
-  dependsOn: [
-    aiAccountExisting  // Ensure the account exists
-  ]
+  // No dependsOn needed - updating existing account by name automatically
 }
 
-var aiAccountResourceId = foundryV22AccountOnly ? aiAccountCreate.id : aiAccountExisting.id
+// Use the CMK-updated account if CMK is enabled, otherwise use the existing reference
+var aiAccountResourceId = foundryV22AccountOnly ? aiAccountCreate.id : (cmk ? aiAccountUpdateWithCMK.id : aiAccountExisting.id)
 
 resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = {
   name: '${aiAccountName}/${defaultDeploymentName}'
