@@ -1895,6 +1895,7 @@ steps:
      --parameters foundryV22AccountOnly="true" \
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmkKeyName)" \
+     --parameters cmkKeyVersion="$(cmkKeyVersion)" \
      --parameters addAISearch="$(addAISearch)" \
      --parameters enableAIFoundry="$(enableAIFoundry)" \
      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
@@ -1994,6 +1995,7 @@ steps:
      --parameters foundryV22AccountOnly="false" \
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmkKeyName)" \
+     --parameters cmkKeyVersion="$(cmkKeyVersion)" \
      --parameters addAISearch="$(addAISearch)" \
      --parameters useAVMFoundry="false" \
      --parameters updateAIFoundry="$(updateAIFoundry)" \

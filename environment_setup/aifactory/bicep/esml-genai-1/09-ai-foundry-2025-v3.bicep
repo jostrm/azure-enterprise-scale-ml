@@ -61,6 +61,9 @@ param cmk bool = false
 @description('Name of the Customer Managed Key in Key Vault')
 param cmkKeyName string = ''
 
+@description('Version of the Customer Managed Key in Key Vault')
+param cmkKeyVersion string = ''
+
 @description('Enable Cosmos DB integration')
 param enableCosmosDB bool = false
 
@@ -829,6 +832,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
     cmk: cmk
     cmkKeyName: cmkKeyName
+    cmkKeyVersion: cmkKeyVersion
     cmkKeyVaultResourceId: cmk ? resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault) : ''
   }
   dependsOn: [

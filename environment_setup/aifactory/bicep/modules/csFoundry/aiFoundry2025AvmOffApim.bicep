@@ -280,12 +280,26 @@ resource cMKKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (!foun
   )
 }
 
+// Key Vault Key reference for getting latest version if not specified
+resource cMKKey 'Microsoft.KeyVault/vaults/keys@2024-11-01' existing = if (!foundryV22AccountOnly && cmk && !empty(cmkKeyVaultResourceId) && !empty(cmkKeyName)) {
+  name: '${last(split(cmkKeyVaultResourceId, '/'))}/${cmkKeyName}'
+  scope: resourceGroup(
+    split(cmkKeyVaultResourceId, '/')[2],
+    split(cmkKeyVaultResourceId, '/')[4]
+  )
+}
+
 // Remove trailing slash from Key Vault URI
 #disable-next-line BCP318
 var cmkKeyVaultUriRaw = (!foundryV22AccountOnly && cmk && !empty(cmkKeyVaultResourceId)) ? cMKKeyVault.properties.vaultUri : ''
 var cmkKeyVaultUri = !empty(cmkKeyVaultUriRaw) && length(cmkKeyVaultUriRaw) > 1 && endsWith(cmkKeyVaultUriRaw, '/') 
   ? substring(cmkKeyVaultUriRaw, 0, max(0, length(cmkKeyVaultUriRaw) - 1)) 
   : cmkKeyVaultUriRaw
+
+// Use provided key version or get latest version from Key Vault
+var cmkKeyVersionToUse = (!foundryV22AccountOnly && cmk && !empty(cmkKeyName)) 
+  ? (empty(cmkKeyVersion) ? last(split(cMKKey!.properties.keyUriWithVersion, '/')) : cmkKeyVersion)
+  : ''
 
 // Second deployment: Update existing AI Account with CMK encryption
 // This runs when foundryV22AccountOnly=false (after 3 minute RBAC propagation delay)
@@ -325,7 +339,7 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
       keyVaultProperties: {
         // System-Assigned MI is used automatically
         keyName: cmkKeyName
-        keyVersion: cmkKeyVersion
+        keyVersion: cmkKeyVersionToUse
         keyVaultUri: cmkKeyVaultUri
       }
     }
@@ -553,7 +567,8 @@ output cmkUpdateAttempted bool = !foundryV22AccountOnly && cmk
 output cmkDebugInfo object = {
   cmkEnabled: cmk
   cmkKeyName: cmkKeyName
-  cmkKeyVersion: cmkKeyVersion
+  cmkKeyVersionProvided: cmkKeyVersion
+  cmkKeyVersionUsed: cmkKeyVersionToUse
   cmkKeyVaultResourceId: cmkKeyVaultResourceId
   foundryV22AccountOnly: foundryV22AccountOnly
   shouldUpdateWithCMK: !foundryV22AccountOnly && cmk

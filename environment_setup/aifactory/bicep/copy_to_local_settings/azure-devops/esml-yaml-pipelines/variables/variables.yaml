@@ -225,6 +225,7 @@ variables:
   # === CMK - Customer Managed Key for encryption at rest, for all services that supports CMK ===
   cmk: "false" # Customer Managed Key encryption for Keyvault, Storage accounts, etc.  true, enable CMK. false, use platform managed keys.
   cmkKeyName: "aifactory-cmk-key" # Name of the Key in Keyvault to be used for CMK encryption
+  cmkKeyVersion: "" # Version of the Key in Keyvault (GUID format). Leave empty to automatically use the LATEST version from Key Vault.
   # === Keyvault RBAC ===
   updateKeyvaultRbac: "false" # true, enables you to update RBAC properties running the pipeline twice. false means "CreateIfNotExists"  
   
