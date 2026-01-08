@@ -200,8 +200,9 @@ var virtualNetworkSubscriptionId = vnetSegments[2]
 
 var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agentSubnetResourceId)
 
+// For Cognitive Services, IP rules should be just the IP or IP/CIDR range without /32 suffix for single IPs
 var ipRules = [for ip in ipAllowList: {
-  value: contains(ip, '/') ? toLower(ip) : '${toLower(ip)}/32'
+  value: contains(ip, '/') ? toLower(ip) : toLower(ip)
 }]
 var networkAclVirtualNetworkRules = concat(
   !empty(privateEndpointSubnetResourceId) ? [
