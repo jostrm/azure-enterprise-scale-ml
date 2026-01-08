@@ -726,6 +726,14 @@ var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ?
 var deployAvmFoundry = useAVMFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)
 var shouldDeployFoundryPrivateEndpoints = !foundryV22AccountOnly && enableAIFoundry // ensures PE creation for full V21/V22 builds
 
+// Reference to existing AI Account created in first deployment (when foundryV22AccountOnly was true)
+// Used in second deployment to get principal ID without relying on module outputs from previous deployment
+#disable-next-line BCP081
+resource aiAccountExistingFromFirstDeployment 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && aiFoundryV2Exists) {
+  name: aifV2Name
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+}
+
 module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOffApimAccount.bicep' = if(Use_APIM_Project && foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV22-NoAvmAccountOnly_${deploymentProjSpecificUniqueSuffix}', 64)
@@ -917,7 +925,8 @@ resource aiFoundryAccountAvm 'Microsoft.CognitiveServices/accounts@2025-07-01-pr
 var aiFoundrySystemAssignedPrincipalId = foundryV22AccountOnly
   ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountPrincipalId
   : (Use_APIM_Project
-      ? aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId
+      // In second deployment, use existing resource if account was created in first deployment
+      ? (aiFoundryV2Exists ? (aiAccountExistingFromFirstDeployment!.identity!.principalId ?? '') : aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId)
       : (deployAvmFoundry
           ? (aiFoundryAccountAvm!.identity!.principalId ?? '')
           : aiFoundry2025NoAvm!.outputs.systemAssignedMIPrincipalId!))
@@ -958,7 +967,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     cognitiveServiceName: aiFoundryAccountNameOutput
     #disable-next-line BCP318
     cognitiveServiceId: Use_APIM_Project
-      ? aiFoundry2025NoAvmV22!.outputs.aiAccountId
+      ? (aiFoundryV2Exists ? aiAccountExistingFromFirstDeployment!.id : aiFoundry2025NoAvmV22!.outputs.aiAccountId)
       : aiFoundry2025NoAvm!.outputs.resourceId
     location: location
     tags: tagsProject
@@ -1218,7 +1227,7 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
 var aiFoundryAccountNameOutput = foundryV22AccountOnly
   ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountName
   : (Use_APIM_Project
-      ? aiFoundry2025NoAvmV22!.outputs.aiAccountName
+      ? (aiFoundryV2Exists ? aiAccountExistingFromFirstDeployment!.name : aiFoundry2025NoAvmV22!.outputs.aiAccountName)
       : (deployAvmFoundry
           ? aiFoundry2025Avm!.outputs.aiServicesName
           : aiFoundry2025NoAvm!.outputs.name))
@@ -1227,7 +1236,7 @@ var aiFoundryAccountNameOutput = foundryV22AccountOnly
 var aiFoundryResourceIdOutput = foundryV22AccountOnly
   ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountId
   : (Use_APIM_Project
-      ? aiFoundry2025NoAvmV22!.outputs.aiAccountId
+      ? (aiFoundryV2Exists ? aiAccountExistingFromFirstDeployment!.id : aiFoundry2025NoAvmV22!.outputs.aiAccountId)
       : (deployAvmFoundry
           ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.CognitiveServices/accounts', aiFoundry2025Avm!.outputs.aiServicesName)
           : aiFoundry2025NoAvm!.outputs.resourceId))
@@ -1289,7 +1298,7 @@ output aiFoundryV2ResourceId string = enableAIFoundry ? aiFoundryResourceIdOutpu
 output aiFoundryProjectDeployed bool = foundryV22AccountOnly
   ? false
   : (Use_APIM_Project
-      ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed
+      ? (aiFoundryV2Exists ? false : aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed)
       : (enableAIFoundry && projectModuleEnabled))
 
 @description('AI Models deployed count')
