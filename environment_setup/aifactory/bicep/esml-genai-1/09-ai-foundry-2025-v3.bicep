@@ -1298,7 +1298,8 @@ output aiFoundryV2ResourceId string = enableAIFoundry ? aiFoundryResourceIdOutpu
 output aiFoundryProjectDeployed bool = foundryV22AccountOnly
   ? false
   : (Use_APIM_Project
-      ? (aiFoundryV2Exists ? false : aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed)
+      // Module runs when (!aiFoundryV2Exists || updateAIFoundry), so check that condition
+      ? ((!aiFoundryV2Exists || updateAIFoundry) ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed : false)
       : (enableAIFoundry && projectModuleEnabled))
 
 @description('AI Models deployed count')

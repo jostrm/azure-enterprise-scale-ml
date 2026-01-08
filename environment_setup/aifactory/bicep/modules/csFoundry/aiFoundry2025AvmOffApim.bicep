@@ -346,7 +346,8 @@ resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
     capacity: modelCapacity
   }
   dependsOn: [
-    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
+    // Wait for account to be ready based on deployment scenario
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : (cmk ? [aiAccountUpdateWithCMK] : [aiAccountExisting]))
   ]
 }
 
@@ -363,7 +364,8 @@ resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/de
     capacity: modelCapacity
   }
   dependsOn: [
-    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
+    // Wait for account to be ready based on deployment scenario
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : (cmk ? [aiAccountUpdateWithCMK] : [aiAccountExisting]))
     aiAccountDeployment
   ]
 }]
@@ -385,7 +387,10 @@ module projectModule 'aiFoundry2025project.bicep' = if (enableProject) {
     defaultProjectDescription: projectDescription
   }
   dependsOn: [
-    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
+    // When foundryV22AccountOnly=true: depends on aiAccountCreate (but project doesn't deploy)
+    // When foundryV22AccountOnly=false with CMK: depends on aiAccountUpdateWithCMK
+    // When foundryV22AccountOnly=false without CMK: depends on aiAccountExisting
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : (cmk ? [aiAccountUpdateWithCMK] : [aiAccountExisting]))
   ]
 }
 
@@ -445,7 +450,7 @@ module aiFoundryRbac 'aiFoundry2025rbac.bicep' = if (!empty(userRoleObjectIds) |
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : (cmk ? [aiAccountUpdateWithCMK] : [aiAccountExisting]))
     ...(enableProject ? [projectModule] : [])
   ]
 }
@@ -461,7 +466,7 @@ module searchRbac 'rbacAISearchForAIFv2.bicep' = if (enableAISearch && searchInC
     searchIndexDataContributorRoleId: searchIndexDataContributorRoleId
   }
   dependsOn: [
-    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : (cmk ? [aiAccountUpdateWithCMK] : [aiAccountExisting]))
     ...(enableProject ? [projectModule] : [])
   ]
 }
@@ -479,7 +484,7 @@ module storageRbac 'rbacAIStorageAccountsForAIFv2.bicep' = if (storageInCurrentR
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [
-    ...(foundryV22AccountOnly ? [aiAccountCreate] : [])
+    ...(foundryV22AccountOnly ? [aiAccountCreate] : (cmk ? [aiAccountUpdateWithCMK] : [aiAccountExisting]))
     ...(enableProject ? [projectModule] : [])
   ]
 }
@@ -536,6 +541,18 @@ output aiAccountPrincipalId string = !foundryV22AccountOnly? aiAccountPrincipalI
 
 @description('Indicates whether the default project was deployed.')
 output aiFoundryProjectDeployed bool = enableProject
+
+@description('Debug: Shows if CMK update was attempted')
+output cmkUpdateAttempted bool = !foundryV22AccountOnly && cmk
+
+@description('Debug: CMK configuration parameters')
+output cmkDebugInfo object = {
+  cmkEnabled: cmk
+  cmkKeyName: cmkKeyName
+  cmkKeyVaultResourceId: cmkKeyVaultResourceId
+  foundryV22AccountOnly: foundryV22AccountOnly
+  shouldUpdateWithCMK: !foundryV22AccountOnly && cmk
+}
 
 @description('The name of the AI Foundry project.')
 #disable-next-line BCP318
