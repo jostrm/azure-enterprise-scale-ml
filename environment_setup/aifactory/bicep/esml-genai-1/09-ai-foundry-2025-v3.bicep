@@ -785,7 +785,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
   ]
 }
 
-module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry)) {
+module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -981,7 +981,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     // Primary AI Foundry account deployment (scenario 2a or 2b)
     //     TODO Jocke (1st work IA) ...(Use_APIM_Project ? [aiFoundry2025NoAvmV22] : [aiFoundry2025NoAvm])
     // Match exact deployment conditions to avoid referencing non-existent modules
-    ...(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk) ? [aiFoundry2025NoAvmV22] : [])
     ...(!Use_APIM_Project && !foundryV22AccountOnly && !deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvm] : [])
     // TODO Jocke end
     existingTargetRG
@@ -1009,7 +1009,7 @@ module aiFoundryAccountDiagnostics '../modules/diagnostics/cognitiveServicesDiag
   dependsOn: [
     // Wait for AI Foundry account to be created in any scenario - match exact deployment conditions
     ...(Use_APIM_Project && foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists ? [aiFoundry2025NoAvmV22AccountOnly] : [])
-    ...(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk) ? [aiFoundry2025NoAvmV22] : [])
     ...(!Use_APIM_Project && !foundryV22AccountOnly && !deployAvmFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvm] : [])
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
   ]
@@ -1298,9 +1298,30 @@ output aiFoundryV2ResourceId string = enableAIFoundry ? aiFoundryResourceIdOutpu
 output aiFoundryProjectDeployed bool = foundryV22AccountOnly
   ? false
   : (Use_APIM_Project
-      // Module runs when (!aiFoundryV2Exists || updateAIFoundry), so check that condition
-      ? ((!aiFoundryV2Exists || updateAIFoundry) ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed : false)
+      // Module runs when (!aiFoundryV2Exists || updateAIFoundry || cmk), so check that condition
+      ? ((!aiFoundryV2Exists || updateAIFoundry || cmk) ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed : false)
       : (enableAIFoundry && projectModuleEnabled))
+
+@description('Debug: Shows module deployment conditions')
+output debugModuleConditions object = {
+  Use_APIM_Project: Use_APIM_Project
+  foundryV22AccountOnly: foundryV22AccountOnly
+  enableAIFoundry: enableAIFoundry
+  useAVMFoundry: useAVMFoundry
+  aiFoundryV2Exists: aiFoundryV2Exists
+  updateAIFoundry: updateAIFoundry
+  cmk: cmk
+  moduleWillDeploy: Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk)
+}
+
+@description('Debug: CMK update status from child module')
+output debugCmkUpdate object = (Use_APIM_Project && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk)) ? {
+  cmkUpdateAttempted: aiFoundry2025NoAvmV22!.outputs.cmkUpdateAttempted
+  cmkDebugInfo: aiFoundry2025NoAvmV22!.outputs.cmkDebugInfo
+} : {
+  cmkUpdateAttempted: false
+  cmkDebugInfo: {}
+}
 
 @description('AI Models deployed count')
 output aiModelsDeployed int = length(aiModels)
