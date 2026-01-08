@@ -133,6 +133,9 @@ param cmk bool = false
 @description('CMK Key name in the Key Vault.')
 param cmkKeyName string = ''
 
+@description('CMK Key version in the Key Vault.')
+param cmkKeyVersion string = ''
+
 @description('CMK Key Vault resource ID.')
 param cmkKeyVaultResourceId string = ''
 
@@ -322,6 +325,7 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
       keyVaultProperties: {
         // System-Assigned MI is used automatically
         keyName: cmkKeyName
+        keyVersion: cmkKeyVersion
         keyVaultUri: cmkKeyVaultUri
       }
     }
@@ -549,6 +553,7 @@ output cmkUpdateAttempted bool = !foundryV22AccountOnly && cmk
 output cmkDebugInfo object = {
   cmkEnabled: cmk
   cmkKeyName: cmkKeyName
+  cmkKeyVersion: cmkKeyVersion
   cmkKeyVaultResourceId: cmkKeyVaultResourceId
   foundryV22AccountOnly: foundryV22AccountOnly
   shouldUpdateWithCMK: !foundryV22AccountOnly && cmk
