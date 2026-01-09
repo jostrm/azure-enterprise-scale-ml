@@ -440,6 +440,8 @@ module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost &&
   }
   dependsOn: [
     projectModule
+    // Wait for RBAC to be assigned before creating capability host
+    caphostRbacPre
   ]
 }
 
