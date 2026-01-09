@@ -424,8 +424,9 @@ var projectWorkspaceGuid = enableProject && !empty(projectWorkspaceRawId)
 
 var projectCapHostUnique = '${projectCapHost}-${uniqueSuffix}'
 
-module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost && enableProject && enableAISearch && enableCosmosDb) {
-  name: take('aifoundry-caphost-${uniqueSuffix}', 64)
+// Step 1: Create account-level capability host FIRST
+module capabilityHostAccount 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost && enableProject && enableAISearch && enableCosmosDb) {
+  name: take('aifoundry-caphost-acct-${uniqueSuffix}', 64)
   params: {
     #disable-next-line BCP318
     cosmosDBConnection: string(projectModule.outputs.cosmosDBConnection)
@@ -437,6 +438,7 @@ module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost &&
     projectName: projectModule.outputs.projectName
     accountName: aiAccountName
     projectCapHostName: projectCapHostUnique
+    accountLevel: true  // Create at account level first
   }
   dependsOn: [
     projectModule
@@ -444,6 +446,27 @@ module capabilityHost 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost &&
     caphostRbacPre
     ...(searchInCurrentRg ? [searchRbac] : [])
     ...(storageInCurrentRg ? [storageRbac] : [])
+  ]
+}
+
+// Step 2: Create project-level capability host AFTER account-level succeeds
+module capabilityHostProject 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost && enableProject && enableAISearch && enableCosmosDb) {
+  name: take('aifoundry-caphost-proj-${uniqueSuffix}', 64)
+  params: {
+    #disable-next-line BCP318
+    cosmosDBConnection: string(projectModule.outputs.cosmosDBConnection)
+    #disable-next-line BCP318
+    azureStorageConnection: string(projectModule.outputs.azureStorageConnection)
+    #disable-next-line BCP318
+    aiSearchConnection: string(projectModule.outputs.aiSearchConnection)
+    #disable-next-line BCP318
+    projectName: projectModule.outputs.projectName
+    accountName: aiAccountName
+    projectCapHostName: projectCapHostUnique
+    accountLevel: false  // Create at project level
+  }
+  dependsOn: [
+    capabilityHostAccount  // CRITICAL: Wait for account capability host first!
   ]
 }
 
@@ -532,7 +555,7 @@ module caphostRbacPost 'aiFoundry2025caphostRbac2.bicep' = if (enableCapabilityH
     projectWorkspaceId: projectWorkspaceGuid
   }
   dependsOn: [
-    capabilityHost
+    capabilityHostProject
     caphostRbacPre
   ]
 }
