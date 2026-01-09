@@ -257,9 +257,10 @@ variables:
   enableDatabricks: "false"
   # === Cognitive Services ===
   enableAISearch: "true"
+  addAISearch: "true" # true, add new AI Search service with new random name. false, CreateIfNotExists
   enableAISearchSharedPrivateLink: "true" # true, will create a shared private endpoint link in common vNet. false, private endpoint in project vNet
   # Note: Basic tier and higher: Shared private links are supported from Basic tier, BUT for indexers with skillsets (e.g., AI enrichment or embedding skills), the minimum tier is Standard 1 (S1)
-  addAISearch: "true" # true, add new AI Search service with new random name. false, CreateIfNotExists
+
   enableAzureOpenAI: "false"
   enableAzureAIVision: "false"
   enableAzureSpeech: "false"
