@@ -1,5 +1,5 @@
 # Version 1.23 aka 123
-[See Release Notes](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_120)
+[See Release Notes](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_123)
 
 ## main.bicep
 - param aifactoryVersionMajor int = 1
