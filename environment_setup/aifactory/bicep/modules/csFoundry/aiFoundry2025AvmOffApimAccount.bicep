@@ -262,7 +262,6 @@ module kvRbacForAiAccount '../kvRbacSingleAssignment.bicep' = if (foundryV22Acco
     keyVaultName: cMKKeyVault.name
     principalId: aiAccountPrincipalId
     keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-rbac-ai-${accountName}'
     principalType: 'ServicePrincipal'
   }
   dependsOn: [
@@ -283,7 +282,6 @@ module kvRbacForCosmosDb '../kvRbacSingleAssignment.bicep' = if (foundryV22Accou
     keyVaultName: cMKKeyVault.name
     principalId: 'a232010e-820c-4083-83bb-3ace5fc29d0b' // Cosmos DB global service principal
     keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-rbac-cosmos-${accountName}'
     principalType: 'ServicePrincipal'
   }
 }

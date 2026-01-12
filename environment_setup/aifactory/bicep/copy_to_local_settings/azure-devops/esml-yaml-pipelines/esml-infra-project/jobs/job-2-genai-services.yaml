@@ -1215,7 +1215,6 @@ steps:
      --parameters storageAccount1001Exists="$(storageAccount1001Exists)" \
      --parameters storageAccount2001Exists="$(storageAccount2001Exists)" \
      --parameters keyvaultExists="$(keyvaultExists)" \
-     --parameters applicationInsightExists="$(applicationInsightsExists)" \
      --parameters acrProjectExists="$(acrProjectExists)" \
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
@@ -1224,7 +1223,6 @@ steps:
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters enableBingSearch="$(enableBingSearch)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \

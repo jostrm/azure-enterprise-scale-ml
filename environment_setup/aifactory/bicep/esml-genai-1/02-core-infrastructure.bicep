@@ -58,10 +58,6 @@ param bingExists bool = false
 param miACAExists bool = false
 param miPrjExists bool = false
 
-// TODO: not uses there, remove later to v.1.24
-@description('Enable Bing Search deployment')
-param enableBingSearch bool = false
-
 @description('Enable private VM deployment')
 param enableProjectVM bool = false
 
@@ -910,6 +906,3 @@ output applicationInsightsDeployed bool = !applicationInsightExists
 
 @description('Virtual Machine deployment status')
 output virtualMachineDeployed bool = (!vmExists && enableProjectVM)
-
-//@description('Bing Search deployment status')
-//output bingSearchDeployed bool = (!bingExists && enableBingSearch)

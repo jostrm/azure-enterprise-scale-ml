@@ -268,6 +268,7 @@ variables:
   enableBing: "false"
   enableBingCustomSearch: "false"
   bingCustomSearchSku: "G2" # ['G2'] G2 is custom search with grounding
+  enableContentSafety: "false"
   # === Databases ===
   enableCosmosDB: "false" # true, if creating an own Capability host (enableAFoundryCaphost; "true"), then it is needed for AI Foundry V2 project, agents.
   cosmosKind: "GlobalDocumentDB" # "MongoDB", "GlobalDocumentDB"
