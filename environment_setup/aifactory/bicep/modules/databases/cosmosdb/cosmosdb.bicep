@@ -32,6 +32,11 @@ param connectionStringKey string = 'aifactory-proj-cosmosdb-con-string'
 param keyvaultName string
 @description('Default TTL in seconds. Set to -1 to disable or positive integer for automatic document expiration')
 param defaultTtl int = -1
+@description('Enable Cosmos DB free tier (one per subscription)')
+param enableFreeTier bool = false
+@description('Database account offer type. Standard is the only valid value for modern Cosmos DB.')
+@allowed(['Standard'])
+param databaseAccountOfferType string = 'Standard'
 
 import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
 @description('Optional. The managed identity definition for this resource.')
@@ -101,7 +106,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
     ]
     createMode: 'Default'
     minimalTlsVersion: minimalTlsVersion
-    databaseAccountOfferType: 'Standard'
+    databaseAccountOfferType: databaseAccountOfferType
     diagnosticLogSettings: {
       enableFullTextQuery: 'None'
     }
@@ -113,7 +118,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-12-01-preview' = {
       totalThroughputLimit: totalThroughputLimit
     } : null
     
-    enableFreeTier: false
+    enableFreeTier: enableFreeTier
     ipRules: [for rule in ipRules: {
       ipAddressOrRange: string(rule) // Ensure proper string conversion
     }]

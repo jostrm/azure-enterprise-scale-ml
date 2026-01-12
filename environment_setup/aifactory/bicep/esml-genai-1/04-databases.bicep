@@ -9,7 +9,8 @@ targetScope = 'subscription'
 // - SQL Server and Database
 //  inputKeyvault, inputKeyvaultResourcegroup, inputKeyvaultSubscription, projectServicePrincipleAppID_SeedingKeyvaultName, projectServicePrincipleOID_SeedingKeyvaultName, projectServicePrincipleSecret_SeedingKeyvaultName
 // ================================================================
-
+@description('Enable Cosmos DB free tier (one per subscription)')
+param enableCosmosFreeTier bool = false
 // ============================================================================
 // SKU for services
 // ============================================================================
@@ -337,6 +338,8 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
     }
     name: cosmosDBName
     location: location
+    enableFreeTier: enableCosmosFreeTier
+    databaseAccountOfferType: 'Standard'
     useCMK: cmk
     keyVaultKeyUri: cmkKvUri
     cmkUserAssignedIdentityId: cmk ? cmkIdentityId : ''
