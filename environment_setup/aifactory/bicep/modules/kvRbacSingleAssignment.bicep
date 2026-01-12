@@ -4,8 +4,8 @@
 // Replaces individual access policy assignments
 // ================================================================
 
-@description('Assignment name for uniqueness')
-param assignmentName string
+@description('Optional deterministic suffix. Leave empty to derive from scope + principal + role.')
+param assignmentName string = ''
 
 @description('The name of the Key Vault')
 param keyVaultName string
@@ -28,9 +28,13 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyVaultName
 }
 
-// Assign the specified role to the principal
+// Use deterministic GUID based on scope, principal, role (and optional suffix) to keep deployments idempotent
+var assignmentGuid = empty(assignmentName)
+  ? guid(keyVault.id, principalId, keyVaultRoleId)
+  : guid(keyVault.id, principalId, keyVaultRoleId, assignmentName)
+
 resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, principalId, keyVaultRoleId, assignmentName)
+  name: assignmentGuid
   scope: keyVault
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultRoleId)

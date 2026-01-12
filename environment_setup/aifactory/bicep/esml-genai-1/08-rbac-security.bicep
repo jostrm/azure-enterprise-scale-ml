@@ -177,6 +177,8 @@ param aiServicesExists bool = false
 param aiSearchExists bool = false
 param dataFactoryExists bool = false
 param openaiExists bool = false
+@description('Skip creating role assignments that may already exist to avoid RoleAssignmentExists errors')
+param skipExistingRoleAssignments bool = false
 
 @description('Unique deployment identifier to avoid conflicts')
 param deploymentId string = utcNow('yyyyMMddHHmmss')
@@ -308,7 +310,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   ]
 }
 
-var skipACRRoleAssignments = miPrjExists
+// Allow skipping ACR role assignments if they already exist or project MI is pre-provisioned
+var skipACRRoleAssignments = skipExistingRoleAssignments || miPrjExists
 
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
@@ -741,8 +744,8 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR && !skipACRR
   name: take('08-rbacUsCmnACR${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
-    servicePrincipleAndMIArray: spAndMiArray
-    userObjectIds: p011_genai_team_lead_array
+    servicePrincipleAndMIArray: spAndMiUnique
+    userObjectIds: userIdsUnique
     useAdGroups: useAdGroups
   }
   dependsOn: [
