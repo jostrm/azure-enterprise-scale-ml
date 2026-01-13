@@ -1092,7 +1092,8 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
 }
 
 // Grant AI Search identity Cognitive Services OpenAI User on the Foundry account
-module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoundry.bicep' = if(!Use_APIM_Project && enableAISearch && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+//module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoundry.bicep' = if(!Use_APIM_Project && enableAISearch && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoundry.bicep' = if(!Use_APIM_Project && enableAISearch && enableAIFoundry && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacAISearchOAUser-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
