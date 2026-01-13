@@ -1091,6 +1091,25 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
   ]
 }
 
+// Grant AI Search identity Cognitive Services OpenAI User on the Foundry account
+module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoundry.bicep' = if(!Use_APIM_Project && enableAISearch && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-rbacAISearchOAUser-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    aiFoundryAccountName: aifV2Name
+    aiSearchPrincipalId: aiSearchPrincipalId
+    openAIUserRoleId: openAIUserRoleId
+  }
+  dependsOn: [
+    // Ensure Foundry deployment is present before assigning RBAC
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvm])
+    getAISearchInfo
+    namingConvention
+    ...(projectModuleEnabled ? [projectV21] : [])
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
+  ]
+}
+
 // Sets RBAC roles: Storage Blob Data Contributor, Storage File Data Privileged Contributor, Storage Queue Data Contributor on Azure Storage accounts for the AI Foundry system-assigned identity
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataPrivilegedContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'

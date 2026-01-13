@@ -104,7 +104,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
     
     semanticSearch: semanticSearchTier
     
-    // Customer-Managed Key encryption
+    // Customer-Managed Key enforcement policy (per-object keys are set on indexes/indexers)
     encryptionWithCmk: cmk ? {
       enforcement: 'Enabled'
     } : null
