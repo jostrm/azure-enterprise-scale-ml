@@ -523,6 +523,7 @@ module acrCommon '../../modules/containerRegistry.bicep' = if(!deployOnlyAIGatew
 
   dependsOn: [
     esmlCommonResourceGroup
+    cmkRbac
   ]
 }
 module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
