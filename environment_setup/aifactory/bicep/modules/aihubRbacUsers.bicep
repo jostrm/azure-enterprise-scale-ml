@@ -15,6 +15,8 @@ existingAiServicesResource, existingAiHubResource, existingAiHubProjectResource,
 // ============================================
 
 // Parameters for resource and principal IDs
+param storageAccountName string // Name of Azure Storage Account
+param storageAccountName2 string // Name of Azure Storage Account
 param resourceGroupId string // Resource group ID where resources are located
 param userObjectIds array // Specific user's object ID's
 param aiServicesName string // AIServices name, e.g. AIStudio name
@@ -22,6 +24,8 @@ param aiHubName string
 param aiHubProjectName string
 param useAdGroups bool = false // Use AD groups for role assignments
 param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
+param disableContributorAccessForUsers bool = false // Disable Contributor access for users
+param disableRBACAdminOnRGForUsers bool = false // Disable Role Based Access Control Administrator for users on resource group
 
 // ############## RG level ##############
 
@@ -57,6 +61,7 @@ var azureMLMetricsWriter ='635dd51f-9968-44d3-b7fb-6d9a6bd613ae' // EP -> AI pro
 var cognitiveServicesCustomVisionContributorRoleId = 'c1ff6cc2-c111-46fe-8896-e0ef812ad9f3' // User, AI hub, AI project -> Custom Visiom
 
 // Storage
+// Storage role IDs moved to storageRbacUsers.bicep
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageFileDataContributorRoleId = '69566ab7-960f-475b-8e7c-b3118f30c6bd'
 var storageQueueDataContributorRoleId = '974c5e8b-45b9-4653-ba55-5f855dd0fb88' // For Azure Functions and queue processing
@@ -89,7 +94,7 @@ resource aiDeveloperOnAIServicesFromAIProject 'Microsoft.Authorization/roleAssig
   name: guid(existingAiServicesResource.id, azureAIDeveloperRoleId, existingAIHubProject.id)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
-    principalId: existingAIHubProject.identity.principalId
+    principalId: existingAIHubProject.identity.principalId!
     principalType: 'ServicePrincipal'
     description:'001 - Azure AI Developer On AIServices From AIProject MI OID of: ${existingAIHubProject.name} to ${existingAiServicesResource.name}'
   }
@@ -97,77 +102,8 @@ resource aiDeveloperOnAIServicesFromAIProject 'Microsoft.Authorization/roleAssig
 }
 // Needed for Agents in AI Hub project, END
 
-// 002
-@description('Users to Azure AI Services: Cognitive Services Usage Reader for users. Only Access quota (Minimal permission to view Cognitive Services usages)')
-resource cognitiveServicesUsagesReaderU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
-  name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
-    principalId: userObjectIds[i]
-    principalType:useAdGroups? 'Group':'User'
-    description:'002 - cognitiveServicesUsagesReaderId role to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to call data on data plane'
-  }
-  scope:existingAiServicesResource
-}]
-resource cognitiveServicesUsagesReaderSPU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
-  name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, servicePrincipleAndMIArray[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
-    principalId: servicePrincipleAndMIArray[i]
-    principalType: 'ServicePrincipal'
-    description:'003 - cognitiveServicesUsagesReader role to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAiServicesResource.name}'
-  }
-  scope:existingAiServicesResource
-}]
-// 002
-
-@description('Users to Azure AI Services: Cognitive Services OpenAI Contributor for users. Full access including the ability to fine-tune, deploy and generate text')
-resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
-    principalId: userObjectIds[i]
-    principalType:useAdGroups? 'Group':'User'
-    description:'004 - OpenAIContributorRole to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to call data on data plane'
-  }
-  scope:existingAiServicesResource
-}]
-resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, servicePrincipleAndMIArray[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
-    principalId: servicePrincipleAndMIArray[i]
-    principalType: 'ServicePrincipal'
-    description:'005 - cognitiveServicesOpenAIContributorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAiServicesResource.name}'
-  }
-  scope:existingAiServicesResource
-}]
-
-@description('Users to Azure AI Services: Cognitive Services OpenAI User:Read access to view files, models, deployments. The ability to create completion and embedding calls.')
-resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
-    principalId: userObjectIds[i]
-    principalType:useAdGroups? 'Group':'User'
-    description:'006 - OpenAICognitiveServicesUSer to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to list API keys'
-  }
-  scope:existingAiServicesResource
-}]
-resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
-  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, servicePrincipleAndMIArray[i])
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
-    principalId: servicePrincipleAndMIArray[i]
-    principalType: 'ServicePrincipal'
-    description:'007 - cognitiveServicesOpenAIUserRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAiServicesResource.name}'
-  }
-  scope:existingAiServicesResource
-}]
-
 //  AI Hub & AI Project //
 // --------------- AI Hub - specific ---------------- //
-@description('')
 resource azureAIDeveloperRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiHubName)) {
   name: guid(existingAIHub.id, azureAIDeveloperRoleId, userObjectIds[i])
   properties: {
@@ -263,6 +199,72 @@ resource cogServiceContribOnAIProjectSP 'Microsoft.Authorization/roleAssignments
 }]
 
 // end
+
+resource cognitiveServicesUsagesReaderU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
+  name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'002 - cognitiveServicesUsagesReaderId role to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to call data on data plane'
+  }
+  scope:existingAiServicesResource
+}]
+resource cognitiveServicesUsagesReaderSPU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
+  name: guid(existingAiServicesResource.id, cognitiveServicesUsagesReaderId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesUsagesReaderId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'003 - cognitiveServicesUsagesReader role to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAiServicesResource.name}'
+  }
+  scope:existingAiServicesResource
+}]
+// 002
+
+@description('Users to Azure AI Services: Cognitive Services OpenAI Contributor for users. Full access including the ability to fine-tune, deploy and generate text')
+resource cognitiveServicesOpenAIContributorUsersU 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
+  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'004 - OpenAIContributorRole to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to call data on data plane'
+  }
+  scope:existingAiServicesResource
+}]
+resource cognitiveServicesOpenAIContributorSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
+  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIContributorRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIContributorRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'005 - cognitiveServicesOpenAIContributorRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAiServicesResource.name}'
+  }
+  scope:existingAiServicesResource
+}]
+
+@description('Users to Azure AI Services: Cognitive Services OpenAI User:Read access to view files, models, deployments. The ability to create completion and embedding calls.')
+resource roleAssignmentCognitiveServicesOpenAIUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)): if(!empty(aiServicesName)) {
+  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: userObjectIds[i]
+    principalType:useAdGroups? 'Group':'User'
+    description:'006 - OpenAICognitiveServicesUSer to USER with OID  ${userObjectIds[i]} for : ${existingAiServicesResource.name} to list API keys'
+  }
+  scope:existingAiServicesResource
+}]
+resource roleAssignmentCognitiveServicesOpenAISP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)): if(!empty(aiServicesName)) {
+  name: guid(existingAiServicesResource.id, cognitiveServicesOpenAIUserRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesOpenAIUserRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description:'007 - cognitiveServicesOpenAIUserRoleId to project service principal OID:${servicePrincipleAndMIArray[i]} to ${existingAiServicesResource.name}'
+  }
+  scope:existingAiServicesResource
+}]
 
 // --------------- USERS END ---------------- //
 

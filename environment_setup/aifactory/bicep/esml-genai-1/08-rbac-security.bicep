@@ -598,48 +598,50 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if ((!aiHubExists && 
   name: take('08-rbacUsersAIHub${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     aiServicesName: enableAIServices? aiServicesName : ''
+    storageAccountName: storageAccount1001Name
+    storageAccountName2: storageAccount2001Name
     resourceGroupId: projectResourceGroup_rgId
     userObjectIds: userIdsUnique
     aiHubName: enableAIFoundryHub ? aifV1HubName : ''
     aiHubProjectName: enableAIFoundryHub ? aifV1ProjectName : ''
     servicePrincipleAndMIArray: spAndMiUnique
     useAdGroups: useAdGroups
+    disableContributorAccessForUsers: disableContributorAccessForUsers
+    disableRBACAdminOnRGForUsers:disableRBACAdminOnRGForUsers
   }
   dependsOn: [
     existingTargetRG
   ]
 }
 
-module rbacStorageUsers '../modules/storageRbacUsers.bicep' = {
+module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if ((!aiHubExists && enableAIFoundryHub) || (!aiServicesExists && enableAIServices)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('08-rbacStorageUsers${deploymentProjSpecificUniqueSuffix}', 64)
+  name: take('08-rbacStorage${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     userObjectIds: userIdsUnique
-    servicePrincipleAndMIArray: spAndMiArray
+    servicePrincipleAndMIArray: spAndMiUnique
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    existingTargetRG
     rbacModuleUsers
   ]
 }
 
-module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = {
+module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if ((!aiHubExists && enableAIFoundryHub) || (!aiServicesExists && enableAIServices)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('08-rbacRgUsers${deploymentProjSpecificUniqueSuffix}', 64)
+  name: take('08-rbacRGUsers${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     resourceGroupId: projectResourceGroup_rgId
     userObjectIds: userIdsUnique
-    servicePrincipleAndMIArray: spAndMiArray
+    servicePrincipleAndMIArray: spAndMiUnique
     useAdGroups: useAdGroups
     disableContributorAccessForUsers: disableContributorAccessForUsers
     disableRBACAdminOnRGForUsers: disableRBACAdminOnRGForUsers
     aiHubName: enableAIFoundryHub ? aifV1HubName : ''
   }
   dependsOn: [
-    existingTargetRG
     rbacModuleUsers
   ]
 }
