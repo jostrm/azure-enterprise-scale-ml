@@ -62,14 +62,22 @@ var formattedUserAssignedIdentities = reduce(
 var cmkIdentity = cmk && !empty(cmkIdentityId) ? { '${cmkIdentityId}': {} } : {}
 var allUserAssignedIdentities = union(formattedUserAssignedIdentities, cmkIdentity)
 
-var identity = !empty(managedIdentities) || !empty(cmkIdentity)
+// When CMK is enabled, ensure identity is UserAssigned with the CMK identity attached
+var identity = cmk && !empty(cmkIdentityId)
   ? {
-      type: (managedIdentities.?systemAssigned ?? false)
-        ? (!empty(allUserAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned')
-        : (!empty(allUserAssignedIdentities) ? 'UserAssigned' : 'None')
-      userAssignedIdentities: !empty(allUserAssignedIdentities) ? allUserAssignedIdentities : null
+      type: 'UserAssigned'
+      userAssignedIdentities: {
+        '${cmkIdentityId}': {}
+      }
     }
-  : {type:'SystemAssigned'} // Default fallback if nothing provided
+  : (!empty(managedIdentities) || !empty(cmkIdentity)
+    ? {
+        type: (managedIdentities.?systemAssigned ?? false)
+          ? (!empty(allUserAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned')
+          : (!empty(allUserAssignedIdentities) ? 'UserAssigned' : 'None')
+        userAssignedIdentities: !empty(allUserAssignedIdentities) ? allUserAssignedIdentities : null
+      }
+    : {type:'SystemAssigned'}) // Default fallback if nothing provided
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   name: vnetName

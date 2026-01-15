@@ -187,7 +187,7 @@ variables:
   acr_IP_whitelist: "" # Selected networks approved IPs
   acr_adminUserEnabled: "false" # true, enable admin user. false, disable admin user (more secure)
   acr_dedicated: "true" # Premium only
-  acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints
+  acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints, or support CMK (Customer managed encryption key
 
   technical_admins_ad_object_id: "TODO_EntraID_ObjectID" # TODO_EntraID_ObjectID commaseparated list, or just 1 ObjectID
   technical_admins_email: "TODO_email_or_securitygroup_name" # email or name of AD group
