@@ -102,9 +102,6 @@ param enablePurgeProtection bool = true
 // CMK Parameters
 param cmk bool = false
 param cmkKeyName string = ''
-param admin_bicep_kv_fw string = ''
-param admin_bicep_kv_fw_rg string = ''
-param admin_bicep_input_keyvault_subscription string = ''
 
 param keyvaultSoftDeleteDays int = 90
 param BYO_subnets bool = false
@@ -508,13 +505,11 @@ module acrCommon '../../modules/containerRegistry.bicep' = if(!deployOnlyAIGatew
     cmk: cmk
     cmkIdentityId: cmk ? cmkIdentityIdString : ''
     cmkKeyName: cmk ? cmkKeyName : ''
-    cmkKeyVaultUri: cmk ? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri : ''
+    cmkKeyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
   }
 
   dependsOn: [
     esmlCommonResourceGroup
-    cmkIdentity
-    cmkRbac
   ]
 }
 module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
@@ -577,7 +572,7 @@ module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking
     enablePublicAccessWithPerimeter:enablePublicAccessWithPerimeter
     cmk: cmk
     cmkKeyName: cmk ? cmkKeyName : ''
-    keyVaultUri: cmk ? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri : ''
+    keyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
     managedIdentities: {
       systemAssigned: true
       userAssignedResourceIds: cmk ? [
@@ -588,8 +583,6 @@ module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking
 
   dependsOn: [
     esmlCommonResourceGroup
-    cmkIdentity
-    cmkRbac
   ]
 }
 
@@ -848,33 +841,6 @@ module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!
   ]
 }
 
-// CMK Identity
-module cmkIdentity '../../modules/mi.bicep' = if(cmk) {
-  name: 'cmkIdentity-${uniqueInAIFenv}'
-  scope: esmlCommonResourceGroup
-  params: {
-    name: cmkIdentityName
-    location: location
-    tags: tags
-  }
-}
-
-// Assign "Key Vault Crypto Service Encryption User" to the CMK Identity
-module cmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk) {
-  name: 'cmkRbac-${uniqueInAIFenv}'
-  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
-  params: {
-    keyVaultName: admin_bicep_kv_fw
-    principalId: cmk ? reference(cmkIdentityIdString, '2023-01-31').principalId : ''
-    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-rbac-${cmkIdentityName}'
-    principalType: 'ServicePrincipal'
-  }
-  dependsOn: [
-    cmkIdentity
-  ]
-}
-
 var virtualNetworkRules2Add = [
   {
     id: '${vnetId}/subnets/${defaultSubnet}'
@@ -904,13 +870,11 @@ module dataLake '../../modules/dataLake.bicep' = if(!deployOnlyAIGatewayNetworki
     cmk: cmk
     cmkIdentityId: cmk ? cmkIdentityIdString : ''
     cmkKeyName: cmk ? cmkKeyName : ''
-    cmkKeyVaultUri: cmk ? reference(resourceId(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg, 'Microsoft.KeyVault/vaults', admin_bicep_kv_fw), '2022-07-01').vaultUri : ''
+    cmkKeyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
   }
 
   dependsOn: [
     esmlCommonResourceGroup
-    cmkRbac
-    cmkIdentity
   ]
 }
 

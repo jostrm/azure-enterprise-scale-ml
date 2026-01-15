@@ -32,6 +32,15 @@ param enableAdminVM bool = false
 param esmlCommonOverride string = 'esml-common'
 param enableDefenderforAISubLevel bool = false
 param enableDefenderforAIResourceLevel bool = false
+param commonResourceSuffix string = ''
+
+// CMK parameters (optional)
+param cmk bool = false
+param cmkKeyName string = ''
+@description('Input Keyvault, where ADMIN for AD adds service principals to be copied to 3 common env, and SP per project')
+param inputKeyvault string
+param inputKeyvaultSubscription string
+param inputKeyvaultResourcegroup string
 
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
@@ -40,6 +49,12 @@ var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: techni
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}${esmlCommonOverride}-${locationSuffix}-${env}${aifactorySuffixRG}' // aaa-bbb-{commonResourceName}-weu-dev-002 (31/90 chars)
+var commonResourceGroupId = resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroupName)
+var uniqueInAIFenv = substring(uniqueString(commonResourceGroupId), 0, 5)
+
+// CMK identity naming (needs to match 13-rgLevel usage)
+var cmkIdentityName = 'id-cmn-cmk-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+var cmkIdentityIdString = resourceId(subscriptionIdDevTestProd, commonResourceGroupName, 'Microsoft.ManagedIdentity/userAssignedIdentities', cmkIdentityName)
 
 module rgCommon '../../modules/resourcegroupUnmanaged.bicep' = {
   scope: subscription(subscriptionIdDevTestProd)
@@ -77,6 +92,36 @@ module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = if (enab
   }
   dependsOn:[
     rgCommon
+  ]
+}
+
+// CMK UAMI creation (moved earlier to allow propagation before 13-rgLevel)
+module cmkIdentity '../../modules/mi.bicep' = if(cmk) {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroupName)
+  name: 'cmkIdentity-${uniqueInAIFenv}'
+  params: {
+    name: cmkIdentityName
+    location: location
+    tags: tags
+  }
+  dependsOn:[
+    rgCommon
+  ]
+}
+
+// Assign "Key Vault Crypto Service Encryption User" to the CMK Identity
+module cmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk) {
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  name: 'cmkRbac-${uniqueInAIFenv}'
+  params: {
+    keyVaultName: inputKeyvault
+    principalId: cmk ? reference(cmkIdentityIdString, '2023-01-31').principalId : ''
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-cmnrg-acr-rbac-${cmkIdentityName}'
+    principalType: 'ServicePrincipal'
+  }
+  dependsOn: [
+    cmkIdentity
   ]
 }
 
