@@ -161,7 +161,7 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
   ]
 }
 var byoVnet = !empty(vnetNameFull_param)
-module vNetCommon '../modules-common/vNetCommon.bicep' = if(byoVnet && !BYO_subnets) {
+module vNetCommon '../modules-common/vNetCommon.bicep' = if(!BYO_subnets) {
   scope: vnetResourceGroup
   name: '${vnetNameFull}depl${uniqueDetermenistic}'
   params: {
