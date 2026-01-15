@@ -90,8 +90,8 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing 
   parent: vnet
 }
 
-// 2023-11-01-preview needed for metadataSearch (prev: registries@2023-07-01, 2023-11-01-preview)
-resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' = {
+// 2025-05-01-preview matches the working portal-generated template
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-05-01-preview' = {
   name: containerRegistryNameCleaned
   tags: tags
   location: location

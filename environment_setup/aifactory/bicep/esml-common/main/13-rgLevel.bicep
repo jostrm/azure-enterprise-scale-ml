@@ -155,13 +155,15 @@ var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}${commonRes
 
 // CMK Identity Variables - reference existing identity created in 11-rgCommon
 var cmkIdentityName = 'id-cmn-cmk-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// Use exact format from working portal template with lowercase 'resourcegroups'
+var cmkIdentityResourceId = '/subscriptions/${subscriptionIdDevTestProd}/resourcegroups/${toLower(commonResourceGroupName)}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${cmkIdentityName}'
 
 resource cmkIdentityExisting 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if(cmk) {
   name: cmkIdentityName
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroupName)
 }
 
-var cmkIdentityIdString = cmk ? cmkIdentityExisting.id : ''
+var cmkIdentityIdString = cmk ? cmkIdentityResourceId : ''
 var cmkIdentityClientId = cmk ? cmkIdentityExisting!.properties.clientId : ''
 
 // Assign "Key Vault Crypto Service Encryption User" to the CMK Identity (identity created in 11-rgCommon)
