@@ -601,44 +601,68 @@ steps:
         [zoneAPIM]="privatelink.azure-api.net"
       )
 
+      # Get vnet information for link checking
+      VNET_NAME="$(vnetNameFull_resolved)"
+      VNET_RG="$(vnetResourceGroup_resolved)"
+      
       # Print variables for debugging before checking
       echo "=== DNS Zone Check Configuration ==="
       echo "Private DNS Subscription: $privDnsSubscription"
       echo "Private DNS Resource Group: $privDnsResourceGroupName"
       echo "Location: $location"
+      echo "VNet Name: $VNET_NAME"
+      echo "VNet Resource Group: $VNET_RG"
       echo "===================================="
 
-      # Helper function to check if a Private DNS Zone exists
-      dns_zone_exists() {
+      # Helper function to check if a Private DNS Zone exists AND if vnet link exists
+      dns_zone_and_link_exists() {
         local subscription="$1"
         local resourceGroup="$2"
         local dnsZoneName="$3"
+        local vnetName="$4"
+        local vnetRg="$5"
 
         # Send debug output to stderr so it doesn't interfere with the return value
         echo "Checking DNS Zone: $dnsZoneName in RG: $resourceGroup, Subscription: $subscription" >&2
         
-        # Run the az network private-dns zone show command and capture its output and exit status
+        # First check if the DNS zone exists
         local output
         output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
-        local status=$?
+        local zone_status=$?
 
-        # Check if the command succeeded
-        if [ $status -ne 0 ]; then
-          echo "  ❌ Not found or error occurred" >&2
+        if [ $zone_status -ne 0 ]; then
+          echo "  ❌ DNS Zone not found" >&2
           echo "  Error details: $output" >&2
           echo "false"
-        else
-          echo "  ✅ Found" >&2
+          return
+        fi
+        
+        echo "  ✅ DNS Zone found" >&2
+        
+        # Now check if vnet link exists for this zone
+        echo "  Checking vnet links for zone..." >&2
+        local vnet_full_id="/subscriptions/$subscription/resourceGroups/$vnetRg/providers/Microsoft.Network/virtualNetworks/$vnetName"
+        
+        # List all vnet links for this zone and check if our vnet is linked
+        local links_output
+        links_output=$(az network private-dns link vnet list --subscription "$subscription" --resource-group "$resourceGroup" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnet_full_id'].name" -o tsv 2>&1)
+        local links_status=$?
+        
+        if [ $links_status -eq 0 ] && [ -n "$links_output" ]; then
+          echo "  ✅ VNet link exists for this zone" >&2
           echo "true"
+        else
+          echo "  ❌ VNet link does not exist (zone exists but not linked to this vnet)" >&2
+          echo "false"
         fi
       }
 
-      # Check each DNS Zone
+      # Check each DNS Zone and its vnet link
       for key in "${!dnsZones[@]}"; do
         dnsZoneName="${dnsZones[$key]}"
-        exists=$(dns_zone_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName")
+        exists=$(dns_zone_and_link_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName" "$VNET_NAME" "$VNET_RG")
         echo "##vso[task.setvariable variable=${key}Exists]${exists}"
-        echo "Result - DNS Zone: $dnsZoneName, Exists: $exists"
+        echo "Result - DNS Zone: $dnsZoneName, Zone and VNet Link Exists: $exists"
       done
 - task: AzureCLI@2
   displayName: '05b_Check if resource exists'
