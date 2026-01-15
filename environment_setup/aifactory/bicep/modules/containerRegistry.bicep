@@ -33,6 +33,7 @@ param managedIdentities managedIdentityAllType?
 // CMK Parameters
 param cmk bool = false
 param cmkIdentityId string = ''
+param cmkIdentityClientId string = ''
 param cmkKeyName string = ''
 param cmkKeyVaultUri string = ''
 
@@ -102,7 +103,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' =
     encryption: cmk ? {
       status: 'enabled'
       keyVaultProperties: {
-        identity: cmkIdentityId
+        identity: cmkIdentityClientId
         keyIdentifier: '${cmkKeyVaultUri}keys/${cmkKeyName}'
       }
     } : null

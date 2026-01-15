@@ -153,9 +153,16 @@ var vnetId = '${subscription().id}/resourceGroups/${vnetResourceGroupName}/provi
 var vnetNameAbbreviation = vnetNameBase // Dynamic vnet name for private endpoints
 var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}${commonResourceAbbreviation}${replace(commonResourceSuffix,'-','')}${env}' // Max(16/24) Example: {commonLakeNamePrefixMax8chars}001lobguprod
 
-// CMK Identity Variables
+// CMK Identity Variables - reference existing identity created in 11-rgCommon
 var cmkIdentityName = 'id-cmn-cmk-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
-var cmkIdentityIdString = resourceId(subscriptionIdDevTestProd, commonResourceGroupName, 'Microsoft.ManagedIdentity/userAssignedIdentities', cmkIdentityName)
+
+resource cmkIdentityExisting 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if(cmk) {
+  name: cmkIdentityName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroupName)
+}
+
+var cmkIdentityIdString = cmk ? cmkIdentityExisting.id : ''
+var cmkIdentityClientId = cmk ? cmkIdentityExisting!.properties.clientId : ''
 
 // Assign "Key Vault Crypto Service Encryption User" to the CMK Identity (identity created in 11-rgCommon)
 module cmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk) {
@@ -163,7 +170,7 @@ module cmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk) {
   name: 'cmkRbac-${uniqueInAIFenv}'
   params: {
     keyVaultName: inputKeyvault
-    principalId: cmk ? reference(cmkIdentityIdString, '2023-01-31').principalId : ''
+    principalId: cmkIdentityExisting!.properties.principalId
     keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
     assignmentName: 'cmk-cmnrg-acr-rbac-${cmkIdentityName}'
     principalType: 'ServicePrincipal'
@@ -517,6 +524,7 @@ module acrCommon '../../modules/containerRegistry.bicep' = if(!deployOnlyAIGatew
     dedicatedDataPoint:acr_dedicated
     cmk: cmk
     cmkIdentityId: cmk ? cmkIdentityIdString : ''
+    cmkIdentityClientId: cmk ? cmkIdentityClientId : ''
     cmkKeyName: cmk ? cmkKeyName : ''
     cmkKeyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
   }
@@ -524,6 +532,7 @@ module acrCommon '../../modules/containerRegistry.bicep' = if(!deployOnlyAIGatew
   dependsOn: [
     esmlCommonResourceGroup
     cmkRbac
+    cmkIdentityExisting
   ]
 }
 module privateDnsContainerRegistryCommon '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
