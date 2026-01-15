@@ -41,7 +41,13 @@ steps:
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
-     --parameters technicalAdminsEmail="$(technical_admins_email)"
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters cmk="$(cmk)" \
+     --parameters cmkKeyName="$(cmkKeyName)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
@@ -153,9 +159,6 @@ steps:
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmkKeyName)" \
-     --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
-     --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
-     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters inputCommonSPIDKey="$(inputCommonSPIDKey)" \
      --parameters inputCommonSPSecretKey="$(inputCommonSPSecretKey)" \
      --parameters commonServicePrincipleOIDKey="$(commonServicePrincipleOIDKey)" \

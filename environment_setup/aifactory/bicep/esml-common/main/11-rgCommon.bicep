@@ -109,22 +109,6 @@ module cmkIdentity '../../modules/mi.bicep' = if(cmk) {
   ]
 }
 
-// Assign "Key Vault Crypto Service Encryption User" to the CMK Identity
-module cmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk) {
-  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
-  name: 'cmkRbac-${uniqueInAIFenv}'
-  params: {
-    keyVaultName: inputKeyvault
-    principalId: cmk ? reference(cmkIdentityIdString, '2023-01-31').principalId : ''
-    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-cmnrg-acr-rbac-${cmkIdentityName}'
-    principalType: 'ServicePrincipal'
-  }
-  dependsOn: [
-    cmkIdentity
-  ]
-}
-
 // Deploy Microsoft Defender for Cloud at subscription level
 module defenderForCloud '../security/defender.bicep' = if (enableDefenderforAISubLevel) {
   scope: subscription(subscriptionIdDevTestProd)
