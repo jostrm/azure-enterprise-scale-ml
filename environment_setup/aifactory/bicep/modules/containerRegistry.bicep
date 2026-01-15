@@ -161,10 +161,10 @@ resource pendAcr 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePub
 output containerRegistryId string = containerRegistry.id
 output containerRegistryName string = containerRegistry.name
 output registryLoginServer string = containerRegistry.properties.loginServer
-output dnsConfig array = [
+output dnsConfig array = !enablePublicAccessWithPerimeter && skuName == 'Premium' ? [
   {
-    name: !enablePublicAccessWithPerimeter && skuName == 'Premium' ? pendAcr.name: ''
+    name: pendAcr.name
     type: 'registry'
     id:containerRegistry.id
   }
-]
+] : []
