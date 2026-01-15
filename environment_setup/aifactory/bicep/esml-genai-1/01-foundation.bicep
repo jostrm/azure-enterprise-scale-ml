@@ -622,7 +622,7 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.apim.name
     id: privateLinksDnsZones.apim.id
-    exists: zoneAPIMExists
+    exists: true
   }
 ]
 
