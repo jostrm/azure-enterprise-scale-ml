@@ -396,9 +396,14 @@ var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, '
 
 // ============== STORAGE ACCOUNTS ==============
 
-// CMK Key Vault URI - must be calculated as variable, not using reference() in module params
-var cmkKeyVaultUri = cmk && !empty(inputKeyvault) ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
-// externalKv!.properties.vaultUri : ''
+// External key vault reference for CMK
+resource externalKvForCmk 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (cmk && !empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) {
+  name: inputKeyvault
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+}
+
+// CMK Key Vault URI - using existing resource reference instead of reference() function
+var cmkKeyVaultUri = (cmk && !empty(inputKeyvault)) ? externalKvForCmk!.properties.vaultUri : ''
 
 #disable-next-line BCP318
 var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: []
