@@ -625,6 +625,12 @@ steps:
         # Send debug output to stderr so it doesn't interfere with the return value
         echo "Checking DNS Zone: $dnsZoneName in RG: $resourceGroup, Subscription: $subscription" >&2
         
+        # Validate inputs
+        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
+          echo "  ⚠️  WARNING: VNet name or RG is empty. VNet Name: '$vnetName', VNet RG: '$vnetRg'" >&2
+          echo "  Falling back to zone-only check..." >&2
+        fi
+        
         # First check if the DNS zone exists
         local output
         output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
@@ -639,20 +645,34 @@ steps:
         
         echo "  ✅ DNS Zone found" >&2
         
+        # If vnet parameters are missing, only check zone existence (legacy behavior)
+        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
+          echo "  ⚠️  Skipping VNet link check due to missing VNet parameters" >&2
+          echo "true"
+          return
+        fi
+        
         # Now check if vnet link exists for this zone
-        echo "  Checking vnet links for zone..." >&2
+        echo "  🔍 Checking vnet links for zone..." >&2
+        echo "  VNet Full Name: $vnetName" >&2
+        echo "  VNet Resource Group: $vnetRg" >&2
+        
         local vnet_full_id="/subscriptions/$subscription/resourceGroups/$vnetRg/providers/Microsoft.Network/virtualNetworks/$vnetName"
+        echo "  Expected VNet ID: $vnet_full_id" >&2
         
         # List all vnet links for this zone and check if our vnet is linked
         local links_output
         links_output=$(az network private-dns link vnet list --subscription "$subscription" --resource-group "$resourceGroup" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnet_full_id'].name" -o tsv 2>&1)
         local links_status=$?
         
+        echo "  VNet link query status: $links_status" >&2
+        echo "  VNet link query output: '$links_output'" >&2
+        
         if [ $links_status -eq 0 ] && [ -n "$links_output" ]; then
-          echo "  ✅ VNet link exists for this zone" >&2
+          echo "  ✅ VNet link EXISTS for this zone (link name: $links_output)" >&2
           echo "true"
         else
-          echo "  ❌ VNet link does not exist (zone exists but not linked to this vnet)" >&2
+          echo "  ❌ VNet link does NOT exist (zone exists but not linked to this vnet)" >&2
           echo "false"
         fi
       }

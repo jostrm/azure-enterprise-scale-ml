@@ -60,6 +60,8 @@ param miPrjExists bool = false
 
 @description('Enable private VM deployment')
 param enableProjectVM bool = false
+@description('Common resource abbreviation for short names. Default is "cmn"')
+param commonResourceShortName string = 'cmn'
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
@@ -554,6 +556,19 @@ module getExistingAcrIpRules '../modules/get-acr-ip-rules.bicep' = if (useCommon
 #disable-next-line BCP318
 var existingIpRules = useCommonACR ? getExistingAcrIpRules.outputs.ipRules : []
 
+// CMK Identity Variables - reference existing identity created in 11-rgCommon
+var cmkIdentityName = 'id-cmn-cmk-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
+// Use exact format from working portal template with lowercase 'resourcegroups'
+var cmkIdentityResourceId = '/subscriptions/${subscriptionIdDevTestProd}/resourcegroups/${toLower(commonResourceGroup)}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${cmkIdentityName}'
+
+resource cmkIdentityExisting 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if(cmk) {
+  name: cmkIdentityName
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+}
+
+var cmkIdentityIdString = cmk ? cmkIdentityResourceId : ''
+var cmkIdentityClientId = cmk ? cmkIdentityExisting!.properties.clientId : ''
+
 // Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
 module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR == true){
@@ -565,7 +580,7 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: commonSubnetName // dynamic common subnet name
-    privateEndpointName: 'pend-acr-cmn${locationSuffix}-containerreg-to-${vnetNameBase}' // dynamic based on vnet name
+    privateEndpointName: 'pend-acr-${commonResourceShortName}${locationSuffix}-containerreg-to-${vnetNameBase}' // dynamic based on vnet name
     tags: tagsProject
     location: location
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
@@ -574,6 +589,12 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     existingIpRules: existingIpRules
     adminUserEnabled: acr_adminUserEnabled
     dedicatedDataPoint: acr_dedicated
+    cmk: cmk
+    cmkIdentityId: cmk ? cmkIdentityIdString : ''
+    cmkIdentityClientId: cmk ? cmkIdentityClientId : ''
+    cmkKeyName: cmk ? cmkKeyName : ''
+    cmkKeyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
+
   }
 
   dependsOn: [
