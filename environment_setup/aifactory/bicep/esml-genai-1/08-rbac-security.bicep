@@ -49,7 +49,6 @@ param randomValue string
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
 param subscriptionIdDevTestProd string = subscription().subscriptionId
-
 // ============================================================================
 // PS-Networking: Needs to be here, even if not used, since .JSON file
 // ============================================================================
