@@ -396,6 +396,10 @@ var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, '
 
 // ============== STORAGE ACCOUNTS ==============
 
+// CMK Key Vault URI - must be calculated as variable, not using reference() in module params
+var cmkKeyVaultUri = cmk && !empty(inputKeyvault) ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
+// externalKv!.properties.vaultUri : ''
+
 #disable-next-line BCP318
 var var_sacc_dnsConfig = !storageAccount1001Exists? sacc.outputs.dnsConfig: []
 
@@ -439,7 +443,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     cmk: cmk
     cmkIdentityId: cmk ? cmkIdentityId : ''
     cmkKeyName: cmk ? cmkKeyName : ''
-    cmkKeyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
+    cmkKeyVaultUri: cmkKeyVaultUri
     corsRules: [
       {
         allowedOrigins: [
@@ -593,7 +597,7 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     cmkIdentityId: cmk ? cmkIdentityIdString : ''
     cmkIdentityClientId: cmk ? cmkIdentityClientId : ''
     cmkKeyName: cmk ? cmkKeyName : ''
-    cmkKeyVaultUri: cmk ? reference(resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault), '2022-07-01').vaultUri : ''
+    cmkKeyVaultUri: cmkKeyVaultUri
 
   }
 
