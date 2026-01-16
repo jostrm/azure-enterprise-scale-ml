@@ -611,6 +611,24 @@ module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking
   ]
 }
 
+// Grant Data Factory System-Assigned Identity access to Key Vault for CMK
+module adfCmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk && !deployOnlyAIGatewayNetworking) {
+  scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
+  name: 'adfCmkRbac-${uniqueInAIFenv}'
+  params: {
+    keyVaultName: inputKeyvault
+    principalId: adf!.outputs.principalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    assignmentName: 'cmk-adf-rbac-${adfName}'
+    principalType: 'ServicePrincipal'
+    roleDescription: 'Data Factory CMK access to Key Vault'
+  }
+  dependsOn: [
+    adf
+    cmkRbac
+  ]
+}
+
 resource vnetCommonDefaultResourceId 'Microsoft.Network/virtualNetworks@2021-05-01' existing = {
   name:vnetNameFull
   scope: esmlCommonResourceGroup
