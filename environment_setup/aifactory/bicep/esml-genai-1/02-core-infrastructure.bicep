@@ -570,13 +570,17 @@ var cmkIdentityName = 'id-cmn-cmk-${env}-${uniqueInAIFenv}${commonResourceSuffix
 // Use exact format from working portal template with lowercase 'resourcegroups'
 var cmkIdentityResourceId = '/subscriptions/${subscriptionIdDevTestProd}/resourcegroups/${toLower(commonResourceGroup)}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${cmkIdentityName}'
 
-resource cmkIdentityExisting 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if(cmk) {
-  name: cmkIdentityName
+// Use a helper module to get CMK identity properties instead of referencing directly
+module getCmkIdentityInfo '../modules/get-managed-identity-info.bicep' = if(cmk) {
+  name: take('02-getCmkMI-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  params: {
+    managedIdentityName: cmkIdentityName
+  }
 }
 
 var cmkIdentityIdString = cmk ? cmkIdentityResourceId : ''
-var cmkIdentityClientId = cmk ? cmkIdentityExisting!.properties.clientId : ''
+var cmkIdentityClientId = cmk ? getCmkIdentityInfo!.outputs.clientId : ''
 
 // Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
