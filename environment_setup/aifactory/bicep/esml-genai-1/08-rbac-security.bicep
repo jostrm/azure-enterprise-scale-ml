@@ -591,7 +591,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
   ]
 }
 
-// RBAC for Users to AI Hub and Projects
+// RBAC for Users to AI Hub and Projects (only Foundry-specific roles)
 module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if ((!aiHubExists && enableAIFoundryHub) || (!aiServicesExists && enableAIServices)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacUsersAIHub${deploymentProjSpecificUniqueSuffix}', 64)
@@ -613,7 +613,9 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if ((!aiHubExists && 
   ]
 }
 
-module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if ((!aiHubExists && enableAIFoundryHub) || (!aiServicesExists && enableAIServices)) {
+// ============== RBAC MODULES - STORAGE ACCOUNTS (INDEPENDENT) ==============
+// Storage RBAC for users, groups, and service principals - runs independently
+module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if (!updateRbac) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacStorage${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -624,11 +626,13 @@ module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if ((!aiHubExists 
     useAdGroups: useAdGroups
   }
   dependsOn: [
-    rbacModuleUsers
+    existingTargetRG
   ]
 }
 
-module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if ((!aiHubExists && enableAIFoundryHub) || (!aiServicesExists && enableAIServices)) {
+// ============== RBAC MODULES - RESOURCE GROUP (INDEPENDENT) ==============
+// Resource Group RBAC for users, groups, and service principals - runs independently
+module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if (!updateRbac) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacRGUsers${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -641,7 +645,7 @@ module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if ((!
     aiHubName: enableAIFoundryHub ? aifV1HubName : ''
   }
   dependsOn: [
-    rbacModuleUsers
+    existingTargetRG
   ]
 }
 
