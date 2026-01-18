@@ -36,6 +36,22 @@ steps:
         echo "Replaced with network_env value: $NETWORK_ENV"
       fi
       
+      # If VNET variables are not set (empty or unexpanded), use naming convention
+      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
+        VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
+        echo "VNET name not set, using naming convention: $VNET_NAME"
+      else
+        echo "Using provided VNET name: $VNET_NAME"
+      fi
+      
+      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_param\)* ]]; then
+        # Use the common resource group naming convention
+        VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "VNET resource group not set, using naming convention: $VNET_RG"
+      else
+        echo "Using provided VNET resource group: $VNET_RG"
+      fi
+      
       # Set resolved values as pipeline variables for reuse
       echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
       echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
@@ -604,6 +620,7 @@ steps:
       # Get vnet information for link checking
       VNET_NAME="$(vnetNameFull_resolved)"
       VNET_RG="$(vnetResourceGroup_resolved)"
+      VNET_SUBSCRIPTION="$(dev_test_prod_sub_id)"
       
       # Print variables for debugging before checking
       echo "=== DNS Zone Check Configuration ==="
@@ -614,13 +631,14 @@ steps:
       echo "VNet Resource Group: $VNET_RG"
       echo "===================================="
 
-      # Helper function to check if a Private DNS Zone exists AND if vnet link exists
+      # Helper function to check if a Private DNS Zone exists (log VNet link status but don't fail on missing link)
       dns_zone_and_link_exists() {
         local subscription="$1"
         local resourceGroup="$2"
         local dnsZoneName="$3"
         local vnetName="$4"
         local vnetRg="$5"
+        local vnetSub="$6"
 
         # Send debug output to stderr so it doesn't interfere with the return value
         echo "Checking DNS Zone: $dnsZoneName in RG: $resourceGroup, Subscription: $subscription" >&2
@@ -657,7 +675,8 @@ steps:
         echo "  VNet Full Name: $vnetName" >&2
         echo "  VNet Resource Group: $vnetRg" >&2
         
-        local vnet_full_id="/subscriptions/$subscription/resourceGroups/$vnetRg/providers/Microsoft.Network/virtualNetworks/$vnetName"
+        # Use the VNet's subscription (may differ from DNS subscription)
+        local vnet_full_id="/subscriptions/$vnetSub/resourceGroups/$vnetRg/providers/Microsoft.Network/virtualNetworks/$vnetName"
         echo "  Expected VNet ID: $vnet_full_id" >&2
         
         # List all vnet links for this zone and check if our vnet is linked
@@ -670,17 +689,21 @@ steps:
         
         if [ $links_status -eq 0 ] && [ -n "$links_output" ]; then
           echo "  ✅ VNet link EXISTS for this zone (link name: $links_output)" >&2
-          echo "true"
+        elif [ $links_status -eq 0 ]; then
+          echo "  ⚠️  Zone found but no VNet link to expected VNet" >&2
         else
-          echo "  ❌ VNet link does NOT exist (zone exists but not linked to this vnet)" >&2
-          echo "false"
+          echo "  ⚠️  Unable to query VNet links (status $links_status); not failing zone existence" >&2
+          echo "  Raw output: $links_output" >&2
         fi
+
+        # Per requirement: only zone absence should return false
+        echo "true"
       }
 
       # Check each DNS Zone and its vnet link
       for key in "${!dnsZones[@]}"; do
         dnsZoneName="${dnsZones[$key]}"
-        exists=$(dns_zone_and_link_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName" "$VNET_NAME" "$VNET_RG")
+        exists=$(dns_zone_and_link_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName" "$VNET_NAME" "$VNET_RG" "$VNET_SUBSCRIPTION")
         echo "##vso[task.setvariable variable=${key}Exists]${exists}"
         echo "Result - DNS Zone: $dnsZoneName, Zone and VNet Link Exists: $exists"
       done
@@ -1948,7 +1971,7 @@ steps:
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAISearch="$(addAISearch)" \
-     --parameters skipACRRoleAssignments="$(skipACRAssignments)" \
+     --parameters skipExistingRoleAssignments="$(skipACRAssignments)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
