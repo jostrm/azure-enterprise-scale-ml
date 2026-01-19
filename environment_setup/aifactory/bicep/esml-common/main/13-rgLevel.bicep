@@ -40,6 +40,7 @@ param adminPassword string
 param adminUsername string
 @description('Log analytics can only add search queries in BICEP once, otherwise will give error 2nd time, entry key already exists')
 param enableLogAnalyticsQueries bool = true
+param enableDatafactoryCommon bool = false
 param deployOnlyAIGatewayNetworking bool = false
 param vmSKUSelectedArrayIndex int = 0
 @allowed([
@@ -583,7 +584,7 @@ module wsQueries '../../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyti
 
 
 var adfName = 'adf-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}' // globally unique: adf-cmn-weu-prod-1234-004 (25/63)
-module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking) {
+module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking && enableDatafactoryCommon) {
   scope: esmlCommonResourceGroup
   name: 'DataFactoryCmn${uniqueInAIFenv}'
   params: {
@@ -612,7 +613,7 @@ module adf '../../modules/dataFactory.bicep' = if(!deployOnlyAIGatewayNetworking
 }
 
 // Grant Data Factory System-Assigned Identity access to Key Vault for CMK
-module adfCmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk && !deployOnlyAIGatewayNetworking) {
+module adfCmkRbac '../../modules/kvRbacSingleAssignment.bicep' = if (cmk && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon) {
   scope: resourceGroup(inputKeyvaultSubscription, inputKeyvaultResourcegroup)
   name: 'adfCmkRbac-${uniqueInAIFenv}'
   params: {
@@ -747,7 +748,7 @@ module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deplo
     spDatabricksAccessPolicyGet
   ]
 }
-module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking) {
+module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && enableDatafactoryCommon) {
   scope: esmlCommonResourceGroup
   name: 'adfAPGet${uniqueInAIFenv}'
   params: {
@@ -865,7 +866,7 @@ module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if
   ]
 }
 
-module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking){
+module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && enableDatafactoryCommon){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}APadf${uniqueInAIFenv}'
   params: {

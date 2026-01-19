@@ -246,6 +246,7 @@ variables:
 
   # === Data & Machine Learning ===
   enableDatafactory: "false" # Datafactory
+  enableDatafactoryCommon: "false" # Datafactory in common resource group
   enableAzureMachineLearning: "false" # Azure Machine Learning v2 (TODO Databricks, EventHubs, LA)
   addAzureMachineLearning: "false"
   # === AKS for Azure ML ===

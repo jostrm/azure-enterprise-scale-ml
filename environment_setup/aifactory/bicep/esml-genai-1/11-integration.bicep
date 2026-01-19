@@ -597,23 +597,40 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
 }
 
 // ============== STORAGE ROLE ASSIGNMENTS ==============
-// Get the Logic Apps resource after deployment to extract the principal ID
+// Logic Apps uses both user-assigned and system-assigned managed identities
+// Assign storage roles to both for maximum compatibility and to prevent 403 Forbidden errors
+
+// Get the deployed Logic Apps resource to access its system-assigned identity
 resource deployedLogicApp 'Microsoft.Web/sites@2023-12-01' existing = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
   name: logicAppsName
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
-// Use the existing storageRoleAssignments module for Logic Apps
-module logicAppsStorageRoles '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
+// Assign storage roles to user-assigned managed identity (primary authentication method)
+module logicAppsStorageRolesUserMI '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('11-LogicAppsStorageRoles-${deploymentProjSpecificUniqueSuffix}', 64)
+  name: take('11-LogicAppsStorageRoles-UserMI-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
-    #disable-next-line BCP318
-    principalId: deployedLogicApp.identity.principalId
+    principalId: getProjectMIPrincipalId.outputs.principalId
   }
   dependsOn: [
     logicAppStandard
+    getProjectMIPrincipalId
+  ]
+}
+
+// Assign storage roles to system-assigned managed identity (fallback/redundancy)
+module logicAppsStorageRolesSystemMI '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('11-LogicAppsStorageRoles-SystemMI-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    storageAccountName: storageAccount1001Name
+    principalId: deployedLogicApp!.identity.principalId
+  }
+  dependsOn: [
+    logicAppStandard
+    deployedLogicApp
   ]
 }
 
