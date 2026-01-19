@@ -268,6 +268,7 @@ variables:
   # === Integration ===
   enableLogicApps: "false"
   enableEventHubs: "false"
+  enableBotService: "false"
     
   # ============================================================================
   # MANDATORY (POST SETUP of a PROJECT): runNetworkingVar

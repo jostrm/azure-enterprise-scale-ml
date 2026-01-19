@@ -1646,6 +1646,7 @@ steps:
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
      --parameters webAppExists="$(webAppExists)" \
+     --parameters enableBotService="$(enableBotService)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
