@@ -577,10 +577,22 @@ module getExistingAcrEncryption '../modules/get-acr-encryption.bicep' = if (useC
 #disable-next-line BCP318
 var acrHasExistingCmk = useCommonACR ? getExistingAcrEncryption.outputs.hasEncryption : false
 
+// If ACR already has CMK enabled, we must preserve the existing CMK configuration during updates.
+// Otherwise the update will try to enable encryption with empty Identity/KeyIdentifier and fail.
+var effectiveAcrCmk = cmk || acrHasExistingCmk
+
 // CMK Identity Variables - reference existing identity created in 11-rgCommon
 var cmkIdentityName = 'id-cmn-cmk-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 // Use exact format from working portal template with lowercase 'resourcegroups'
 var cmkIdentityResourceId = '/subscriptions/${subscriptionIdDevTestProd}/resourcegroups/${toLower(commonResourceGroup)}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${cmkIdentityName}'
+
+// If ACR already has a user-assigned identity (common when CMK is enabled), preserve that identity resourceId.
+// Get the keys (resourceIds) from identity.userAssignedIdentities (object keyed by resourceId)
+#disable-next-line BCP318
+var existingAcrUserAssignedIdentityIds = (useCommonACR && acrHasExistingCmk && acrCommon != null && acrCommon!.identity != null && acrCommon!.identity!.userAssignedIdentities != null)
+  ? map(items(acrCommon!.identity!.userAssignedIdentities!), entry => entry.key)
+  : []
+var preservedAcrCmkIdentityId = !empty(existingAcrUserAssignedIdentityIds) ? existingAcrUserAssignedIdentityIds[0] : cmkIdentityResourceId
 
 // Use a helper module to get CMK identity properties instead of referencing directly
 module getCmkIdentityInfo '../modules/get-managed-identity-info.bicep' = if(cmk) {
@@ -591,8 +603,22 @@ module getCmkIdentityInfo '../modules/get-managed-identity-info.bicep' = if(cmk)
   }
 }
 
-var cmkIdentityIdString = cmk ? cmkIdentityResourceId : ''
-var cmkIdentityClientId = cmk ? getCmkIdentityInfo!.outputs.clientId : ''
+var cmkIdentityIdString = effectiveAcrCmk ? preservedAcrCmkIdentityId : ''
+var cmkIdentityClientId = cmk
+  ? getCmkIdentityInfo!.outputs.clientId
+  : (effectiveAcrCmk ? getExistingAcrEncryption!.outputs.keyVaultPropertiesIdentity : '')
+
+// If we are preserving existing CMK, parse the key name + vaultUri from the existing keyIdentifier.
+var existingAcrKeyIdentifier = effectiveAcrCmk ? getExistingAcrEncryption!.outputs.keyIdentifier : ''
+var existingAcrKeyVaultUri = (!empty(existingAcrKeyIdentifier) && contains(existingAcrKeyIdentifier, '/keys/'))
+  ? '${split(existingAcrKeyIdentifier, '/keys/')[0]}/'
+  : ''
+var existingAcrKeyName = (!empty(existingAcrKeyIdentifier) && contains(existingAcrKeyIdentifier, '/keys/'))
+  ? split(split(existingAcrKeyIdentifier, '/keys/')[1], '/')[0]
+  : ''
+
+var effectiveAcrCmkKeyVaultUri = cmk ? cmkKeyVaultUri : (effectiveAcrCmk ? existingAcrKeyVaultUri : '')
+var effectiveAcrCmkKeyName = cmk ? cmkKeyName : (effectiveAcrCmk ? existingAcrKeyName : '')
 
 // Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
@@ -615,11 +641,11 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     adminUserEnabled: acr_adminUserEnabled
     dedicatedDataPoint: acr_dedicated
     // Preserve CMK if already enabled, or apply new CMK settings
-    cmk: cmk || acrHasExistingCmk
-    cmkIdentityId: (cmk || acrHasExistingCmk) ? cmkIdentityIdString : ''
-    cmkIdentityClientId: (cmk || acrHasExistingCmk) ? cmkIdentityClientId : ''
-    cmkKeyName: (cmk || acrHasExistingCmk) ? cmkKeyName : ''
-    cmkKeyVaultUri: (cmk || acrHasExistingCmk) ? cmkKeyVaultUri : ''
+    cmk: effectiveAcrCmk
+    cmkIdentityId: effectiveAcrCmk ? cmkIdentityIdString : ''
+    cmkIdentityClientId: effectiveAcrCmk ? cmkIdentityClientId : ''
+    cmkKeyName: effectiveAcrCmk ? effectiveAcrCmkKeyName : ''
+    cmkKeyVaultUri: effectiveAcrCmk ? effectiveAcrCmkKeyVaultUri : ''
 
   }
 
