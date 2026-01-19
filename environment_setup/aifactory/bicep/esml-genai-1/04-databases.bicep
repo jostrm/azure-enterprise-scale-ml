@@ -142,7 +142,7 @@ param cosmosMinimalTlsVersion string = 'Tls12'
 param postgreSQLStorage object = {
   storageSizeGB: 32
 }
-param postgreSQLVersion string = '14'
+param postgreSQLVersion string = '17'
 param postgreSQLHighAvailability object = {
   mode: 'Disabled'
 }

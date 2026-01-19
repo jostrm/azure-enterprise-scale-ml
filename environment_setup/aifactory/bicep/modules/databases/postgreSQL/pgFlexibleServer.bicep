@@ -12,7 +12,7 @@ param storage object = {
       storageSizeGB: 32
       autoGrow: 'Disabled'
 }
-param version string = '16' // PostgreSQL version, default is 16
+param version string = '17' // PostgreSQL version, default is 16
 param administratorLogin string = 'aifactoryadmin'
 param resourceExists bool = false
 param useAdGroups bool = false // If true, the principalType will be set to 'Group' for role assignments
