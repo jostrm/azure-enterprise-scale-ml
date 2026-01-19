@@ -565,6 +565,18 @@ module getExistingAcrIpRules '../modules/get-acr-ip-rules.bicep' = if (useCommon
 #disable-next-line BCP318
 var existingIpRules = useCommonACR ? getExistingAcrIpRules.outputs.ipRules : []
 
+// Get existing ACR encryption configuration to preserve CMK if already enabled
+module getExistingAcrEncryption '../modules/get-acr-encryption.bicep' = if (useCommonACR) {
+  name: take('02-getACREnc-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  params: {
+    containerRegistryName: acrCommonName_Static
+  }
+}
+
+#disable-next-line BCP318
+var acrHasExistingCmk = useCommonACR ? getExistingAcrEncryption.outputs.hasEncryption : false
+
 // CMK Identity Variables - reference existing identity created in 11-rgCommon
 var cmkIdentityName = 'id-cmn-cmk-${env}-${uniqueInAIFenv}${commonResourceSuffix}'
 // Use exact format from working portal template with lowercase 'resourcegroups'
@@ -602,16 +614,18 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     existingIpRules: existingIpRules
     adminUserEnabled: acr_adminUserEnabled
     dedicatedDataPoint: acr_dedicated
-    cmk: cmk
-    cmkIdentityId: cmk ? cmkIdentityIdString : ''
-    cmkIdentityClientId: cmk ? cmkIdentityClientId : ''
-    cmkKeyName: cmk ? cmkKeyName : ''
-    cmkKeyVaultUri: cmkKeyVaultUri
+    // Preserve CMK if already enabled, or apply new CMK settings
+    cmk: cmk || acrHasExistingCmk
+    cmkIdentityId: (cmk || acrHasExistingCmk) ? cmkIdentityIdString : ''
+    cmkIdentityClientId: (cmk || acrHasExistingCmk) ? cmkIdentityClientId : ''
+    cmkKeyName: (cmk || acrHasExistingCmk) ? cmkKeyName : ''
+    cmkKeyVaultUri: (cmk || acrHasExistingCmk) ? cmkKeyVaultUri : ''
 
   }
 
   dependsOn: [
     acrCommon
+    getExistingAcrEncryption
   ]
 }
 // Common container registry reference (if using common ACR)  
