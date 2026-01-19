@@ -919,6 +919,7 @@ module dataLake '../../modules/dataLake.bicep' = if(!deployOnlyAIGatewayNetworki
 
   dependsOn: [
     esmlCommonResourceGroup
+    cmkRbac // Must wait for CMK identity to have Key Vault permissions before storage configures CMK encryption
   ]
 }
 
@@ -987,7 +988,7 @@ module privateDnsKeyVaultAdmin '../../modules/privateDns.bicep' = if(!centralDns
   ]
 }
 
-module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking){
+module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(!centralDnsZoneByPolicyInHub && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon){
   scope:resourceGroup(subscriptionIdDevTestProd,commonResourceGroupName)
   name: 'privDnsZoneADFCmn2${uniqueInAIFenv}'
   params: {
