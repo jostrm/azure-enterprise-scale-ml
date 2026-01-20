@@ -620,6 +620,14 @@ var existingAcrKeyName = (!empty(existingAcrKeyIdentifier) && contains(existingA
 var effectiveAcrCmkKeyVaultUri = cmk ? cmkKeyVaultUri : (effectiveAcrCmk ? existingAcrKeyVaultUri : '')
 var effectiveAcrCmkKeyName = cmk ? cmkKeyName : (effectiveAcrCmk ? existingAcrKeyName : '')
 
+// Safety gate: never attempt to (re)apply ACR CMK unless all required values are present.
+// This prevents ARM failures like:
+// "InvalidEncryptionKeyVaultProperties ... Property Identity and KeyIdentifier must be set when encryption is enabled."
+var canApplyAcrCmk = effectiveAcrCmk && !empty(cmkIdentityIdString) && !empty(cmkIdentityClientId) && !empty(effectiveAcrCmkKeyVaultUri) && !empty(effectiveAcrCmkKeyName)
+
+// If the user explicitly asked for CMK but inputs are incomplete, fail fast with a clear message.
+var _acrCmkGuard = cmk && !canApplyAcrCmk ? fail('DEPLOYMENT FAILED: ACR CMK was requested (cmk=true) but required CMK inputs are missing. Ensure the CMK identity exists and that cmkKeyVaultUri + cmkKeyName can be resolved (and that the deployment identity can read the existing ACR CMK settings when preserving).') : null
+
 // Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
 module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR == true){
@@ -640,12 +648,13 @@ module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR =
     existingIpRules: existingIpRules
     adminUserEnabled: acr_adminUserEnabled
     dedicatedDataPoint: acr_dedicated
-    // Preserve CMK if already enabled, or apply new CMK settings
-    cmk: effectiveAcrCmk
-    cmkIdentityId: effectiveAcrCmk ? cmkIdentityIdString : ''
-    cmkIdentityClientId: effectiveAcrCmk ? cmkIdentityClientId : ''
-    cmkKeyName: effectiveAcrCmk ? effectiveAcrCmkKeyName : ''
-    cmkKeyVaultUri: effectiveAcrCmk ? effectiveAcrCmkKeyVaultUri : ''
+    // Preserve/apply CMK only when all required properties are present.
+    // Otherwise, omit encryption from the request to avoid invalid CMK updates.
+    cmk: canApplyAcrCmk
+    cmkIdentityId: canApplyAcrCmk ? cmkIdentityIdString : ''
+    cmkIdentityClientId: canApplyAcrCmk ? cmkIdentityClientId : ''
+    cmkKeyName: canApplyAcrCmk ? effectiveAcrCmkKeyName : ''
+    cmkKeyVaultUri: canApplyAcrCmk ? effectiveAcrCmkKeyVaultUri : ''
 
   }
 

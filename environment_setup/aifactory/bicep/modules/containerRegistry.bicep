@@ -100,7 +100,9 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-05-01-pr
   }
   identity: identity
   properties: {
-    encryption: cmk ? {
+    // Only include encryption settings when all required CMK values are present.
+    // Passing empty identity/keyIdentifier causes deployment failure.
+    encryption: (cmk && !empty(cmkIdentityClientId) && !empty(cmkKeyVaultUri) && !empty(cmkKeyName)) ? {
       status: 'enabled'
       keyVaultProperties: {
         identity: cmkIdentityClientId
