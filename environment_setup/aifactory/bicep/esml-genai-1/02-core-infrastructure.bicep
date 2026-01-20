@@ -182,7 +182,7 @@ var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<ne
 var vnetResourceGroupName = !empty(vnetResourceGroup_param)? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
 
 // Private DNS calculations
-var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? replace(privDnsResourceGroup_param, '<network_env>', network_env) : vnetResourceGroupName
 var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 var deploymentProjSpecificUniqueSuffix = '${projectNumber}${env}${targetResourceGroup}'
 var commonSubnetName = !empty(subnetCommon)?replace(subnetCommon, '<network_env>', network_env) : common_subnet_name

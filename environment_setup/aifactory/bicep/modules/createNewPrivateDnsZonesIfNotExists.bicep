@@ -23,7 +23,10 @@ resource privateDnsZoneVnetLink 'Microsoft.Network/privateDnsZones/virtualNetwor
   dependsOn: [
     privateDnsZones[index]
   ]
-  name: '${zone.name}/${uniqueString(zone.name)}'
+  // IMPORTANT: Use the same deterministic link-name strategy as createPrivateDnsZones.bicep.
+  // If different deployments use different link names for the same zone+VNet, Azure will throw:
+  // "Private zone '...' is already linked to the virtual network '...'."
+  name: '${zone.name}/${uniqueString(privateDnsZones[index].id)}'
   location: (zone.name == '${location}.data.privatelink.azurecr.io' && allGlobal == false) ? location : locationGlobal
   properties: {
     registrationEnabled: false // Is auto-registration of virtual machine records in the virtual network in the Private DNS zone enabled?

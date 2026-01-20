@@ -597,7 +597,13 @@ steps:
       # Use privDnsResourceGroup_param if available, otherwise construct the name
       PRIV_DNS_RG_PARAM="$(privDnsResourceGroup_param)"
       if [ -n "$PRIV_DNS_RG_PARAM" ] && [ "$PRIV_DNS_RG_PARAM" != "\$(privDnsResourceGroup_param)" ]; then
-        privDnsResourceGroupName="$PRIV_DNS_RG_PARAM"
+        # Resolve optional <network_env> placeholder if it appears in the provided RG name
+        NETWORK_ENV="$(network_env)"
+        if [[ "$PRIV_DNS_RG_PARAM" == *"<network_env>"* ]] && [ -n "$NETWORK_ENV" ]; then
+          privDnsResourceGroupName="${PRIV_DNS_RG_PARAM//<network_env>/$NETWORK_ENV}"
+        else
+          privDnsResourceGroupName="$PRIV_DNS_RG_PARAM"
+        fi
         echo "Using privDnsResourceGroup_param for Private DNS: $privDnsResourceGroupName"
       else
         privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"

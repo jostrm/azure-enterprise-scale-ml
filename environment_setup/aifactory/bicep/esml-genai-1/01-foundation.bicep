@@ -387,7 +387,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
 // COMPUTED VARIABLES - Private DNS
 // ============================================================================
 
-var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? privDnsResourceGroup_param : vnetResourceGroupName
+var privDnsResourceGroupName = (!empty(privDnsResourceGroup_param) && centralDnsZoneByPolicyInHub) ? replace(privDnsResourceGroup_param, '<network_env>', network_env) : vnetResourceGroupName
 var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneByPolicyInHub) ? privDnsSubscription_param : subscriptionIdDevTestProd
 
 resource commonResourceGroupRef 'Microsoft.Resources/resourceGroups@2024-07-01' existing = {
