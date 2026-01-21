@@ -191,6 +191,10 @@ var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneBy
 var randomSalt = substring(uniqueString(subscription().subscriptionId, targetResourceGroup), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 
+// AI Foundry/Project should not require Cosmos DB when agent network injection is disabled
+// or when Capability Host is enabled (per requirement).
+var useCosmosForFoundry = enableCosmosDB && !(disableAgentNetworkInjection || enableCaphost)
+
 // Subnet calculations
 var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
 
@@ -605,7 +609,7 @@ var aiFoundryDefinition = union(
       roleAssignments: []
     }
   } : {},
-  deployAvmFoundry && enableCosmosDB ? {
+  deployAvmFoundry && useCosmosForFoundry ? {
     cosmosDbConfiguration: {
       existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName)
       // privateDnsZoneResourceId: privateLinksDnsZones.cosmosdbnosql.id // Disabled to prevent duplicate PE creation
@@ -672,7 +676,7 @@ var fqdnRaw = [
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
   
   // Cosmos DB endpoint (conditionally included)
-  enableCosmosDB ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
+  useCosmosForFoundry ? '${namingConvention.outputs.cosmosDBName}.documents.azure.com' : ''
   
   // AI Services endpoint
   '${aifV2Name}.cognitiveservices.azure.com'
@@ -754,7 +758,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     modelVersion: defaultModelVersionV22
     modelSkuName: defaultModelSkuNameV22
     modelCapacity: defaultModelCapacityV22
-    enableCosmosDb: enableCosmosDB
+    enableCosmosDb: useCosmosForFoundry
     enableAISearch: enableAISearch
     enableProject: enableAIFactoryCreatedDefaultProjectForAIFv2
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
@@ -764,7 +768,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     apiManagementResourceId: apiManagementResourceId
     azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
-    azureCosmosDBAccountResourceId: enableCosmosDB ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
+    azureCosmosDBAccountResourceId: useCosmosForFoundry ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
     aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
     customerManagedKey: customerManagedKey
   }
@@ -805,7 +809,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     modelVersion: defaultModelVersionV22
     modelSkuName: defaultModelSkuNameV22
     modelCapacity: defaultModelCapacityV22
-    enableCosmosDb: enableCosmosDB
+    enableCosmosDb: useCosmosForFoundry
     enableAISearch: enableAISearch
     enableProject: enableAIFactoryCreatedDefaultProjectForAIFv2
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
@@ -817,7 +821,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     apiManagementResourceId: apiManagementResourceId
     azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
-    azureCosmosDBAccountResourceId: enableCosmosDB ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
+    azureCosmosDBAccountResourceId: useCosmosForFoundry ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
     aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
     cmk: cmk
     cmkKeyName: cmkKeyName
@@ -878,7 +882,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
     #disable-next-line BCP318
     aiFoundryV2Name: aiFoundryAccountNameOutput
     aiSearchName: enableAISearch ? aiSearchName : ''
-    cosmosDBname: enableCosmosDB? namingConvention.outputs.cosmosDBName : ''
+    cosmosDBname: useCosmosForFoundry ? namingConvention.outputs.cosmosDBName : ''
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
   dependsOn: [

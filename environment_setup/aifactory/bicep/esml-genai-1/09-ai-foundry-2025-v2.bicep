@@ -132,6 +132,10 @@ param addAISearch bool = false
 param disableAgentNetworkInjection bool = false
 param addAIFoundry bool = false
 param enableAISearch bool = true
+@description('Enable Cosmos DB integration for AI Foundry. Defaults to true for backward compatibility.')
+param enableCosmosDB bool = true
+@description('Enable Capability Host for AI Foundry.')
+param enableCaphost bool = false
 param enableAISearchSharedPrivateLink bool = false
 param aiFoundryV2Exists bool = false
 param aiFoundryV2ProjectExists bool = false
@@ -273,13 +277,19 @@ var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
 var storageAccountName = namingConvention.outputs.storageAccount1001Name
 var cosmosDbName = namingConvention.outputs.cosmosDBName
 
+// AI Foundry/Project should not require Cosmos DB when agent network injection is disabled
+// or when Capability Host is enabled (per requirement).
+var useCosmosForFoundry = enableCosmosDB && !(disableAgentNetworkInjection || enableCaphost)
+
 var computedAiSearchResourceId = !empty(aiSearchName) ? resourceId(resolvedSubscriptionId, resolvedTargetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
 var computedAzureStorageAccountResourceId = !empty(storageAccountName) ? resourceId(resolvedSubscriptionId, resolvedTargetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccountName) : ''
-var computedAzureCosmosDbResourceId = !empty(cosmosDbName) ? resourceId(resolvedSubscriptionId, resolvedTargetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', cosmosDbName) : ''
+var computedAzureCosmosDbResourceId = useCosmosForFoundry && !empty(cosmosDbName) ? resourceId(resolvedSubscriptionId, resolvedTargetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', cosmosDbName) : ''
 
 var resolvedAiSearchResourceId = !empty(trim(aiSearchResourceId)) ? aiSearchResourceId : computedAiSearchResourceId
 var resolvedAzureStorageAccountResourceId = !empty(trim(azureStorageAccountResourceId)) ? azureStorageAccountResourceId : computedAzureStorageAccountResourceId
-var resolvedAzureCosmosDbResourceId = !empty(trim(azureCosmosDBAccountResourceId)) ? azureCosmosDBAccountResourceId : computedAzureCosmosDbResourceId
+var resolvedAzureCosmosDbResourceId = useCosmosForFoundry
+	? (!empty(trim(azureCosmosDBAccountResourceId)) ? azureCosmosDBAccountResourceId : computedAzureCosmosDbResourceId)
+	: ''
 
 module privateDns '../modules/common/CmnPrivateDnsZones.bicep' = {
 	name: take('foundryv2-dns-${targetResourceGroup}', 64)
