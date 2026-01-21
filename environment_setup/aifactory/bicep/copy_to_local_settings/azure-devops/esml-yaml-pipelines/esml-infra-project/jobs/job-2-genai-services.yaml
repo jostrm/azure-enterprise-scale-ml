@@ -2020,6 +2020,9 @@ steps:
       --parameters projectSuffix="$(projectSuffix)" \
       --parameters tags='$(tagsProject)' \
       --parameters addAIFoundry="$(addAIFoundry)" \
+      --parameters enableCaphost="$(enableAFoundryCaphost)" \
+      --parameters disableAgentNetworkInjection="$(disableAgentNetworkInjection)" \
+      --parameters enableCosmosDB="$(enableCosmosDB)" \
       --parameters enableAISearch="$(enableAISearch)" \
       --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
       --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
