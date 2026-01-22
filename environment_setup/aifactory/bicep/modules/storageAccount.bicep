@@ -18,6 +18,8 @@ param containers array = []
 param files array = []
 param enablePublicAccessWithPerimeter bool = false
 param enablePublicGenAIAccess bool = false
+param enableLogicApps bool = false
+param allowPublicAccessWhenBehindVnet bool = false
 import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
 @description('Optional. The managed identity definition for this resource.')
 param managedIdentities managedIdentityAllType?
@@ -82,6 +84,8 @@ var formattedUserAssignedIdentities = reduce(
 var cmkIdentity = cmk && !empty(cmkIdentityId) ? { '${cmkIdentityId}': {} } : {}
 var allUserAssignedIdentities = union(formattedUserAssignedIdentities, cmkIdentity)
 
+var enablePublicStorage = enablePublicGenAIAccess || enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet
+
 var identity = !empty(managedIdentities) || !empty(cmkIdentity)
   ? {
       type: (managedIdentities.?systemAssigned ?? false) // Default to true if managedIdentities is null? No, default to false.
@@ -107,7 +111,7 @@ var effectiveVnetRules = [for rule in filteredVnetRuleIds: {
   id: rule
 }]
 
-resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicGenAIAccess||enablePublicAccessWithPerimeter) {
+resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicStorage) {
   name: storageAccountName
   tags: tags
   location: location
@@ -158,25 +162,13 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicG
     }
     largeFileSharesState: 'Disabled'
     minimumTlsVersion: 'TLS1_2'
-    networkAcls: (enablePublicAccessWithPerimeter && enablePublicGenAIAccess) ? {
-      // Scenario 2: Fully public with vnetRules but no ipRules
+    networkAcls: {
+      // Public storage scenarios: default allow when no rules, otherwise deny and use provided vnet/ip rules.
       bypass: 'AzureServices'
-      defaultAction: 'Allow'
+      defaultAction: enablePublicAccessWithPerimeter || (empty(ipRules) && empty(vnetRules)) ? 'Allow' : 'Deny'
       virtualNetworkRules: effectiveVnetRules
-      ipRules: []
-    } : (!enablePublicAccessWithPerimeter && enablePublicGenAIAccess) ? {
-      // Scenario 1: IP-whitelisting with both vnetRules and ipRules
-      bypass: 'AzureServices'
-      defaultAction: 'Deny'
-      virtualNetworkRules: effectiveVnetRules
-      ipRules: empty(ipRules) ? [] : ipRules
-    } : (enablePublicGenAIAccess || !empty(ipRules) || !empty(vnetRules)) ? {
-      // Other scenarios
-      bypass: 'AzureServices' 
-      defaultAction: enablePublicGenAIAccess && empty(ipRules) && empty(vnetRules) ? 'Allow' : 'Deny'
-      virtualNetworkRules: effectiveVnetRules
-      ipRules: empty(ipRules) ? [] : ipRules
-    } : null
+      ipRules: enablePublicAccessWithPerimeter ? [] : empty(ipRules) ? [] : ipRules
+    }
   }
   resource blobServices 'blobServices' = if (!empty(containers)) {
     name: 'default'
@@ -210,7 +202,7 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicG
   }
   
 }
-resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicGenAIAccess) {
+resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicStorage) {
   name: storageAccountName
   tags: tags
   location: location
@@ -223,7 +215,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicG
     accessTier: 'Hot'
     publicNetworkAccess:'Disabled'
     allowCrossTenantReplication: true
-    allowSharedKeyAccess: false
+    allowSharedKeyAccess: enableLogicApps
     allowBlobPublicAccess: false
     isHnsEnabled: false
     isNfsV3Enabled: false
@@ -314,7 +306,7 @@ resource pendSaccBlob 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: blobPrivateEndpointName
         properties: {
-          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
+          privateLinkServiceId: !enablePublicStorage ? sacc.id : sacc2.id
           groupIds: [
             'blob'
           ]
@@ -341,7 +333,7 @@ resource pendSaccFile 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: filePrivateEndpointName
         properties: {
-          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
+          privateLinkServiceId: !enablePublicStorage ? sacc.id : sacc2.id
           groupIds: [
             'file'
           ]
@@ -368,7 +360,7 @@ resource pendSaccQ 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: queuePrivateEndpointName
         properties: {
-          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
+          privateLinkServiceId: !enablePublicStorage ? sacc.id : sacc2.id
           groupIds: [
             'queue'
           ]
@@ -395,7 +387,7 @@ resource pendSaccTable 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
       {
         name: tablePrivateEndpointName
         properties: {
-          privateLinkServiceId: !enablePublicGenAIAccess? sacc.id: sacc2.id
+          privateLinkServiceId: !enablePublicStorage ? sacc.id : sacc2.id
           groupIds: [
             'table'
           ]
@@ -411,27 +403,27 @@ resource pendSaccTable 'Microsoft.Network/privateEndpoints@2023-04-01' =  {
 }
 
 
-output storageAccountId string = !enablePublicGenAIAccess? sacc.id: sacc2.id
-output storageAccountName string = !enablePublicGenAIAccess? sacc.name: sacc2.name
+output storageAccountId string = !enablePublicStorage ? sacc.id : sacc2.id
+output storageAccountName string = !enablePublicStorage ? sacc.name : sacc2.name
 output dnsConfig array = [
   {
     name: pendSaccBlob.name
     type: 'blob'
-    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
+    id:!enablePublicStorage? sacc.id: sacc2.id
   }
   {
     name: filePrivateEndpointName
     type: 'file'
-    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
+    id:!enablePublicStorage? sacc.id: sacc2.id
   }
   {
     name: queuePrivateEndpointName
     type: 'queue'
-    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
+    id:!enablePublicStorage? sacc.id: sacc2.id
   }
   {
     name: tablePrivateEndpointName
     type: 'table'
-    id:!enablePublicGenAIAccess? sacc.id: sacc2.id
+    id:!enablePublicStorage? sacc.id: sacc2.id
   }
 ]

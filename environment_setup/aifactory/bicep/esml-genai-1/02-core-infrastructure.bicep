@@ -67,6 +67,7 @@ param commonResourceShortName string = 'cmn'
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param allowPublicAccessWhenBehindVnet bool = false
+param enableLogicApps bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
 // ============================================================================
@@ -422,6 +423,8 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     location: location
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    enableLogicApps: enableLogicApps
     blobPrivateEndpointName: '${storageAccount1001Name}-blob-pend'
     filePrivateEndpointName: '${storageAccount1001Name}-file-pend'
     queuePrivateEndpointName: '${storageAccount1001Name}-queue-pend'
