@@ -563,6 +563,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
           minimumElasticInstanceCount: 1
           preWarmedInstanceCount: 1
           alwaysOn: true
+          minTlsVersion: '1.2'
           linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}' : ''
           netFrameworkVersion: runtime == 'dotnet' ? runtimeVersion : null
         }
