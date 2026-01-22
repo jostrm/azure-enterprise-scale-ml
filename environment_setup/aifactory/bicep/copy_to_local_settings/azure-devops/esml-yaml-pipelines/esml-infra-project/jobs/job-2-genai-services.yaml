@@ -1425,6 +1425,7 @@ steps:
      --parameters enableProjectVM="$(enableProjectVM)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
+     --parameters enableLogicApps="$(enableLogicApps)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
