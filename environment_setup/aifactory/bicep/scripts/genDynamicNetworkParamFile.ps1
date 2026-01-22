@@ -46,6 +46,17 @@ function Set-DeployedOnTag {
     }
 }
 
+
+# Normalize any unintended network_env prefixes in fetched subnet IDs (non-BYO path only)
+if ($BYO_subnets_bool -eq $false -and -not [string]::IsNullOrEmpty($network_env)) {
+    $aksSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aksSubnetId -networkEnv $network_env
+    $aks2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aks2SubnetId -networkEnv $network_env
+    $genaiSubnetId   = Remove-NetworkEnvPrefixFromSubnetId -subnetId $genaiSubnetId -networkEnv $network_env
+    $acaSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $acaSubnetId -networkEnv $network_env
+    $aca2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aca2SubnetId -networkEnv $network_env
+    $dbxPubSubnetId  = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPubSubnetId -networkEnv $network_env
+    $dbxPrivSubnetId = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPrivSubnetId -networkEnv $network_env
+}
 function Get-AzureSubnetId {
     param (
         [string]$subscriptionId,
@@ -761,4 +772,20 @@ if ($saveFileInADOGitRepo -eq $true) {
     Write-Host ""
     Write-Host "  # Specify parent repository path explicitly:" -ForegroundColor Gray
     Write-Host "  .\genDynamicNetworkParamFile.ps1 [your parameters] -saveFileInADOGitRepo `$true -parentGitRepoPath 'C:\path\to\parent\repo'" -ForegroundColor Gray
+}
+
+function Remove-NetworkEnvPrefixFromSubnetId {
+    param(
+        [string]$subnetId,
+        [string]$networkEnv
+    )
+
+    if ([string]::IsNullOrEmpty($subnetId) -or [string]::IsNullOrEmpty($networkEnv)) {
+        return $subnetId
+    }
+
+    # networkEnv is typically "dev-" / "test-" / "prod-". Remove that segment immediately after "subnets/snt-" if present.
+    $pattern = "/subnets/snt-${networkEnv}"
+    $replacement = '/subnets/snt-'
+    return $subnetId -replace [regex]::Escape($pattern), $replacement
 }
