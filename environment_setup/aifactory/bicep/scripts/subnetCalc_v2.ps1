@@ -364,17 +364,17 @@ if ($(Get-AzContext).Subscription -ne "") {
         if($projectTypeADO.Trim().ToLower() -eq "esml"){
             write-host "projectTypeADO=esml"
             $requiredSubnets = [PsObject]@{
-                dbxPubSubnetCidr  = '26' # 23-26
-                dbxPrivSubnetCidr = '26' # 23-26
-                aksSubnetCidr     = '24' # # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                dbxPubSubnetCidr  = $dbxPubSubnetCidrAll # 23-26
+                dbxPrivSubnetCidr = $dbxPrivSubnetCidrAll # 23-26
+                aksSubnetCidr     = $aksSubnetCidrAll # # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
             }
         }
         elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
             write-host "projectTypeADO=genai-1"
             $requiredSubnets = [PsObject]@{
-                genaiSubnetCidr  = '25'
-                aksSubnetCidr     = '24' # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
-                acaSubnetCidr     = '25' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
+                genaiSubnetCidr  = $genaiSubnetCidrAll
+                aksSubnetCidr     = $aksSubnetCidrAll # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                acaSubnetCidr     = $acaSubnetCidrAll # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
             }
         }
         elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
@@ -392,9 +392,13 @@ if ($(Get-AzContext).Subscription -ne "") {
         else {
             write-host "projectTypeADO=not supported value: '$($projectTypeADO)'"
             $requiredSubnets = [PsObject]@{
-                dbxPubSubnetCidr  = '26' # 23-26
-                dbxPrivSubnetCidr = '26' # 23-26
-                aksSubnetCidr     = '26' # 26-27 Azure CNI, Kubenet
+                genaiSubnetCidr   = $genaiSubnetCidrAll
+                aksSubnetCidr     = $aksSubnetCidrAll # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                aks2SubnetCidr    = $aks2SubnetCidrAll # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                acaSubnetCidr     = $acaSubnetCidrAll # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
+                aca2SubnetCidr    = $aca2SubnetCidrAll # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment. Subnets smaller than /23 are rejected at provisioning time—the control plane can’t allocate enough addresses for the infrastructure scale sets—so the Cognitive Services RP keeps the account in Creating
+                dbxPubSubnetCidr  = $dbxPubSubnetCidrAll # 23-26
+                dbxPrivSubnetCidr = $dbxPrivSubnetCidrAll # 23-26
             }
         }
     }
