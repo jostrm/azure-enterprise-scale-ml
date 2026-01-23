@@ -47,16 +47,6 @@ function Set-DeployedOnTag {
 }
 
 
-# Normalize any unintended network_env prefixes in fetched subnet IDs (non-BYO path only)
-if ($BYO_subnets_bool -eq $false -and -not [string]::IsNullOrEmpty($network_env)) {
-    $aksSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aksSubnetId -networkEnv $network_env
-    $aks2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aks2SubnetId -networkEnv $network_env
-    $genaiSubnetId   = Remove-NetworkEnvPrefixFromSubnetId -subnetId $genaiSubnetId -networkEnv $network_env
-    $acaSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $acaSubnetId -networkEnv $network_env
-    $aca2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aca2SubnetId -networkEnv $network_env
-    $dbxPubSubnetId  = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPubSubnetId -networkEnv $network_env
-    $dbxPrivSubnetId = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPrivSubnetId -networkEnv $network_env
-}
 function Get-AzureSubnetId {
     param (
         [string]$subscriptionId,
@@ -105,8 +95,6 @@ function Save-FileToGitRepository {
         } else {
             # Check if we're in a Git submodule first
             $searchPath = $currentLocation.Path
-            $foundSubmodule = $false
-            
             # Look for .git file (indicates submodule) vs .git directory (indicates main repo)
             if (Test-Path (Join-Path $searchPath ".git")) {
                 $gitPath = Join-Path $searchPath ".git"
@@ -115,7 +103,6 @@ function Save-FileToGitRepository {
                 # If .git is a file containing "gitdir:", we're in a submodule
                 if ($gitContent -and $gitContent[0] -match "^gitdir:") {
                     Write-Host "Detected Git submodule at: $searchPath"
-                    $foundSubmodule = $true
                     
                     # Search up the directory tree for the parent repository
                     $parentPath = Split-Path $searchPath -Parent
@@ -369,6 +356,17 @@ $BYO_subnets_bool = if ($null -eq $BYO_subnets -or "" -eq $BYO_subnets -or $BYO_
     $true
 }
 
+# Normalize any unintended network_env prefixes in fetched subnet IDs (non-BYO path only)
+if ($BYO_subnets_bool -eq $false -and -not [string]::IsNullOrEmpty($network_env)) {
+    $aksSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aksSubnetId -networkEnv $network_env
+    $aks2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aks2SubnetId -networkEnv $network_env
+    $genaiSubnetId   = Remove-NetworkEnvPrefixFromSubnetId -subnetId $genaiSubnetId -networkEnv $network_env
+    $acaSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $acaSubnetId -networkEnv $network_env
+    $aca2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aca2SubnetId -networkEnv $network_env
+    $dbxPubSubnetId  = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPubSubnetId -networkEnv $network_env
+    $dbxPrivSubnetId = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPrivSubnetId -networkEnv $network_env
+}
+
 $aksSubnetId=""
 $aks2SubnetId=""
 $dbxPubSubnetId=""
@@ -381,13 +379,16 @@ write-host "vnetResourceGroup is: $($vnetResourceGroup)"
 write-host "BYO_subnets_bool is: $($BYO_subnets_bool)"
 write-host "vnetResourceGroup_param is: $($vnetResourceGroup_param)"
 
-# Check if BYO_subnets is false and vnetResourceGroup_param is null or empty
-if ($BYO_subnets_bool -eq $false -and ([string]::IsNullOrEmpty($vnetResourceGroup_param))) {
+# Non-BYO path: fetch subnets from prior deployment outputs (never mutate names)
+if ($BYO_subnets_bool -eq $false) {
+
+    # Even when BYO_subnets is false, a provided vnetResourceGroup_param should be respected for lookup, but no subnet-name mutation should occur.
+    $lookupResourceGroup = if ([string]::IsNullOrEmpty($vnetResourceGroup_param)) { $vnetResourceGroup } else { $vnetResourceGroup_param }
 
     write-host "BYO_subnets is FALSE and BYOVnet is not true either - Fetching subnet IDs from deployment: $($deploymentPrefix)SubnetDeplProj"
     write-host "Project type all :  trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj for AKS name"
     $aksSubnetId=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$vnetResourceGroup" `
+    -ResourceGroupName "$lookupResourceGroup" `
     -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
 
     if ([string]::IsNullOrEmpty($aksSubnetId)) {
@@ -412,11 +413,11 @@ if ($BYO_subnets_bool -eq $false -and ([string]::IsNullOrEmpty($vnetResourceGrou
         write-host "Project type: esml - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
 
         $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
 
         $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
         
         write-host "dbxPubSubnetName: $dbxPubSubnetName"
@@ -427,7 +428,7 @@ if ($BYO_subnets_bool -eq $false -and ([string]::IsNullOrEmpty($vnetResourceGrou
         write-host "Project type: genai-1 - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
         
         $genaiSubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
         write-host "genaiSubnetId: $genaiSubnetId"
         write-host "aksSubnetId: $aksSubnetId"
@@ -447,26 +448,26 @@ if ($BYO_subnets_bool -eq $false -and ([string]::IsNullOrEmpty($vnetResourceGrou
         write-host "aksSubnetId: $aksSubnetId"
         
         $aks2SubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aks2SubnetId.Value
         write-host "aks2SubnetId: $aks2SubnetId"
 
         $acaSubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.acaSubnetId.Value
         write-host "acaSubnetId: $acaSubnetId"
 
         $aca2SubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aca2SubnetId.Value
         write-host "aca2SubnetId: $aca2SubnetId"
         
         $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
 
         $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
+        -ResourceGroupName "$lookupResourceGroup" `
         -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
         
         write-host "dbxPubSubnetName: $dbxPubSubnetName"
