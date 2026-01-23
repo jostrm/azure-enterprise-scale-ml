@@ -37,7 +37,16 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Tenant ID")][string]$tenantId,
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group base")][string]$vnetResourceGroupBase,
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group parameter override")][string]$vnetResourceGroup_param,
-    [Parameter(Mandatory = $false, HelpMessage = "Virtual network full name parameter override")][string]$vnetNameFull_param
+    [Parameter(Mandatory = $false, HelpMessage = "Virtual network full name parameter override")][string]$vnetNameFull_param,
+
+    # Optional subnet CIDR overrides (defaults match legacy values for projectTypeADO=all)
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for GenAI subnet when projectType=all")][string]$genaiSubnetCidrAll = '25',
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for standalone AKS subnet when projectType=all")][string]$aksSubnetCidrAll = '26',
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for Azure ML's AKS subnet when projectType=all")][string]$aks2SubnetCidrAll = '24',
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for ACA subnet when projectType=all")][string]$acaSubnetCidrAll = '23',
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for secondary ACA subnet when projectType=all")][string]$aca2SubnetCidrAll = '23',
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX public subnet when projectType=all")][string]$dbxPubSubnetCidrAll = '26',
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX private subnet when projectType=all")][string]$dbxPrivSubnetCidrAll = '26'
 )
 
 filter ConvertTo-BinaryIP {
@@ -345,7 +354,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         $requiredSubnets = [PsObject]@{
             dbxPubSubnetCidr  = '26' # 23-26
             dbxPrivSubnetCidr = '26' # 23-26
-            aksSubnetCidr     = '26' # 26-27 Azure CNI, Kubenet
+            aksSubnetCidr     = '24' # 26-27 Azure CNI, Kubenet
         }
     }
     else 
@@ -357,27 +366,27 @@ if ($(Get-AzContext).Subscription -ne "") {
             $requiredSubnets = [PsObject]@{
                 dbxPubSubnetCidr  = '26' # 23-26
                 dbxPrivSubnetCidr = '26' # 23-26
-                aksSubnetCidr     = '26' # 26-27 Azure CNI, Kubenet
+                aksSubnetCidr     = '24' # # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
             }
         }
         elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
             write-host "projectTypeADO=genai-1"
             $requiredSubnets = [PsObject]@{
                 genaiSubnetCidr  = '25'
-                aksSubnetCidr     = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                aksSubnetCidr     = '24' # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 acaSubnetCidr     = '25' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
             }
         }
         elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
             write-host "projectTypeADO=all"
             $requiredSubnets = [PsObject]@{
-                genaiSubnetCidr   = '25'
-                aksSubnetCidr     = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
-                aks2SubnetCidr    = '26' # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
-                acaSubnetCidr     = '23' # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
-                aca2SubnetCidr    = '23' # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment. Subnets smaller than /23 are rejected at provisioning time—the control plane can’t allocate enough addresses for the infrastructure scale sets—so the Cognitive Services RP keeps the account in Creating
-                dbxPubSubnetCidr  = '26' # 23-26
-                dbxPrivSubnetCidr = '26' # 23-26
+                genaiSubnetCidr   = $genaiSubnetCidrAll
+                aksSubnetCidr     = $aksSubnetCidrAll # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                aks2SubnetCidr    = $aks2SubnetCidrAll # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
+                acaSubnetCidr     = $acaSubnetCidrAll # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
+                aca2SubnetCidr    = $aca2SubnetCidrAll # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment. Subnets smaller than /23 are rejected at provisioning time—the control plane can’t allocate enough addresses for the infrastructure scale sets—so the Cognitive Services RP keeps the account in Creating
+                dbxPubSubnetCidr  = $dbxPubSubnetCidrAll # 23-26
+                dbxPrivSubnetCidr = $dbxPrivSubnetCidrAll # 23-26
             }
         }
         else {
