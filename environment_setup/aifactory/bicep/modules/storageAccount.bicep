@@ -199,6 +199,12 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicS
         days: 7
       }
     }
+    resource shares 'shares' = [for file in files: {
+      name: file.name
+      properties: {
+        shareQuota: 1024
+      }
+    }]
   }
   
 }
@@ -289,6 +295,12 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicS
         days: 7
       }
     }
+    resource shares 'shares' = [for file in files: {
+      name: file.name
+      properties: {
+        shareQuota: 1024
+      }
+    }]
   }
   
 }
