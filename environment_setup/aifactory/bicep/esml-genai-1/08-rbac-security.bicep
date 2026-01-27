@@ -615,7 +615,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if ((!aiHubExists && 
 
 // ============== RBAC MODULES - STORAGE ACCOUNTS (INDEPENDENT) ==============
 // Storage RBAC for users, groups, and service principals - runs independently
-module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if (!updateRbac) {
+module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if (!updateRbac && !skipExistingRoleAssignments) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacStorage${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
