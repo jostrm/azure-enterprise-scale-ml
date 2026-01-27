@@ -107,3 +107,20 @@ function Import-Dependencies {
         }
     }
 }
+
+# Utility: strip network environment prefix from subnet IDs (used by genDynamicNetworkParamFile.ps1)
+function Remove-NetworkEnvPrefixFromSubnetId {
+    param(
+        [string]$subnetId,
+        [string]$networkEnv
+    )
+
+    if ([string]::IsNullOrEmpty($subnetId) -or [string]::IsNullOrEmpty($networkEnv)) {
+        return $subnetId
+    }
+
+    # networkEnv typically "dev-" / "test-" / "prod-". Remove that segment immediately after "subnets/snt-" if present.
+    $pattern = "/subnets/snt-${networkEnv}"
+    $replacement = '/subnets/snt-'
+    return $subnetId -replace [regex]::Escape($pattern), $replacement
+}

@@ -775,18 +775,3 @@ if ($saveFileInADOGitRepo -eq $true) {
     Write-Host "  .\genDynamicNetworkParamFile.ps1 [your parameters] -saveFileInADOGitRepo `$true -parentGitRepoPath 'C:\path\to\parent\repo'" -ForegroundColor Gray
 }
 
-function Remove-NetworkEnvPrefixFromSubnetId {
-    param(
-        [string]$subnetId,
-        [string]$networkEnv
-    )
-
-    if ([string]::IsNullOrEmpty($subnetId) -or [string]::IsNullOrEmpty($networkEnv)) {
-        return $subnetId
-    }
-
-    # networkEnv is typically "dev-" / "test-" / "prod-". Remove that segment immediately after "subnets/snt-" if present.
-    $pattern = "/subnets/snt-${networkEnv}"
-    $replacement = '/subnets/snt-'
-    return $subnetId -replace [regex]::Escape($pattern), $replacement
-}
