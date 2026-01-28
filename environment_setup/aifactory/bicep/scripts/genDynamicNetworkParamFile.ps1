@@ -25,6 +25,24 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Parent Git repository path (if different from current location)")][string]$parentGitRepoPath = ""
 )
 
+    # Default subnet name templates (used when BYO_subnets is false)
+    $defaultSubnetProjGenAI = "snt-prj<xxx>-genai"
+    $defaultSubnetProjAKS = "snt-prj<xxx>-aks"
+    $defaultSubnetProjAKS2 = "snt-prj<xxx>-aks-002"
+    $defaultSubnetProjACA = "snt-prj<xxx>-aca"
+    $defaultSubnetProjACA2 = "snt-prj<xxx>-aca-002"
+    $defaultSubnetProjDatabricksPublic = "snt-prj001-dbxpub"
+    $defaultSubnetProjDatabricksPrivate = "snt-prj<xxx>-dbxpriv"
+
+    # Preserve any incoming custom subnet patterns for BYO_subnets=true
+    $subnetProjGenAI_input = $subnetProjGenAI
+    $subnetProjAKS_input = $subnetProjAKS
+    $subnetProjAKS2_input = $subnetProjAKS2
+    $subnetProjACA_input = $subnetProjACA
+    $subnetProjACA2_input = $subnetProjACA2
+    $subnetProjDatabricksPublic_input = $subnetProjDatabricksPublic
+    $subnetProjDatabricksPrivate_input = $subnetProjDatabricksPrivate
+
 function Set-DeployedOnTag {
     [CmdletBinding()]
     param (
@@ -354,6 +372,43 @@ write-host "Deployment to lookup (earlier subnets): $($deploymentPrefix)SubnetDe
 $byoSubnetsNormalized = if ($null -eq $BYO_subnets) { "" } else { $BYO_subnets.Trim().ToLower() }
 $BYO_subnets_bool = $byoSubnetsNormalized -eq "true"
 
+# Initialize effective subnet name templates
+$subnetProjGenAI = $defaultSubnetProjGenAI
+$subnetProjAKS = $defaultSubnetProjAKS
+$subnetProjAKS2 = $defaultSubnetProjAKS2
+$subnetProjACA = $defaultSubnetProjACA
+$subnetProjACA2 = $defaultSubnetProjACA2
+$subnetProjDatabricksPublic = $defaultSubnetProjDatabricksPublic
+$subnetProjDatabricksPrivate = $defaultSubnetProjDatabricksPrivate
+
+# If BYO_subnets is true, override defaults with incoming values when provided.
+# If BYO_subnets is false, keep defaults but replace <xxx> with project number.
+if ($BYO_subnets_bool) {
+    if (-not [string]::IsNullOrEmpty($subnetProjGenAI_input)) { $subnetProjGenAI = $subnetProjGenAI_input }
+    if (-not [string]::IsNullOrEmpty($subnetProjAKS_input)) { $subnetProjAKS = $subnetProjAKS_input }
+    if (-not [string]::IsNullOrEmpty($subnetProjAKS2_input)) { $subnetProjAKS2 = $subnetProjAKS2_input }
+    if (-not [string]::IsNullOrEmpty($subnetProjACA_input)) { $subnetProjACA = $subnetProjACA_input }
+    if (-not [string]::IsNullOrEmpty($subnetProjACA2_input)) { $subnetProjACA2 = $subnetProjACA2_input }
+    if (-not [string]::IsNullOrEmpty($subnetProjDatabricksPublic_input)) { $subnetProjDatabricksPublic = $subnetProjDatabricksPublic_input }
+    if (-not [string]::IsNullOrEmpty($subnetProjDatabricksPrivate_input)) { $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate_input }
+
+    # BYO: still normalize placeholders for project and network env if present
+    $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+}
+else {
+    $subnetProjGenAI = $subnetProjGenAI -replace '<xxx>', $projectNumber
+    $subnetProjAKS = $subnetProjAKS -replace '<xxx>', $projectNumber
+    $subnetProjAKS2 = $subnetProjAKS2 -replace '<xxx>', $projectNumber
+    $subnetProjACA = $subnetProjACA -replace '<xxx>', $projectNumber
+    $subnetProjACA2 = $subnetProjACA2 -replace '<xxx>', $projectNumber
+    $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate -replace '<xxx>', $projectNumber
+}
+
 # Normalize any unintended network_env prefixes in fetched subnet IDs (non-BYO path only)
 if ($BYO_subnets_bool -eq $false -and -not [string]::IsNullOrEmpty($network_env)) {
     $aksSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aksSubnetId -networkEnv $network_env
@@ -407,75 +462,39 @@ if ($BYO_subnets_bool -eq $false) {
         exit 1
     }
 
-    if($projectTypeADO.Trim().ToLower() -eq "esml"){
-        write-host "Project type: esml - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
+    write-host "Project type: all - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
 
-        $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
+    $genaiSubnetId=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$vnetResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
+    write-host "genaiSubnetId: $genaiSubnetId"
+    write-host "aksSubnetId: $aksSubnetId"
 
-        $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
-        
-        write-host "dbxPubSubnetName: $dbxPubSubnetName"
-        write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
-        write-host "aksSubnetId: $aksSubnetId"
-    }elseif($projectTypeADO.Trim().ToLower() -eq "genai-1"){
-        
-        write-host "Project type: genai-1 - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
-        
-        $genaiSubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
-        write-host "genaiSubnetId: $genaiSubnetId"
-        write-host "aksSubnetId: $aksSubnetId"
+    $aks2SubnetId=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$lookupResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aks2SubnetId.Value
+    write-host "aks2SubnetId: $aks2SubnetId"
 
-        $acaSubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.acaSubnetId.Value
-        write-host "acaSubnetId: $acaSubnetId"
-    }elseif($projectTypeADO.Trim().ToLower() -eq "all"){
-        
-        write-host "Project type: all - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
-        
-        $genaiSubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$vnetResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
-        write-host "genaiSubnetId: $genaiSubnetId"
-        write-host "aksSubnetId: $aksSubnetId"
-        
-        $aks2SubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aks2SubnetId.Value
-        write-host "aks2SubnetId: $aks2SubnetId"
+    $acaSubnetId=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$lookupResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.acaSubnetId.Value
+    write-host "acaSubnetId: $acaSubnetId"
 
-        $acaSubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.acaSubnetId.Value
-        write-host "acaSubnetId: $acaSubnetId"
+    $aca2SubnetId=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$lookupResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aca2SubnetId.Value
+    write-host "aca2SubnetId: $aca2SubnetId"
 
-        $aca2SubnetId=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aca2SubnetId.Value
-        write-host "aca2SubnetId: $aca2SubnetId"
-        
-        $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
+    $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$lookupResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
 
-        $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
-        -ResourceGroupName "$lookupResourceGroup" `
-        -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
-        
-        write-host "dbxPubSubnetName: $dbxPubSubnetName"
-        write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
+    $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$lookupResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
 
-    }
-    else
-    {
-        write-host "Unsupported projectTypeADO value: '$projectTypeADO'"
-    }
+    write-host "dbxPubSubnetName: $dbxPubSubnetName"
+    write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
 
 } else {
     write-host "BYO_subnets is TRUE - Using Bring Your Own subnet configuration with template patterns"
@@ -499,172 +518,68 @@ if ($BYO_subnets_bool -eq $false) {
         write-host "subnetCommonPowerbiGwId: $subnetCommonPowerbiGwId"
     }
 
-    if($projectTypeADO.Trim().ToLower() -eq "esml"){
+    write-host "Project type: all : now generating subnet IDs for AKS, AKS2, GenAI, via in-parameters BYOSnets"
 
-        write-host "Project type: esml - now generating subnet IDs for AKS and Databricks, via in-parameters BYOSnets"
-        if ($null -ne $subnetProjAKS -and $subnetProjAKS -ne "") {
-            # AKS
+    if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
+        $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
+        $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
+        write-host "genaiSubnetId: $genaiSubnetId"
+
+        try {
             $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env
-            $subnetProjAKS = $subnetProjAKS -replace '<xxx>', $projectNumber
+
             $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
-
-            $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
-            $dbxPubSubnetName = $dbxPubSubnetName -replace '<xxx>', $projectNumber
-            $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
-            $dbxPrivSubnetName = $dbxPrivSubnetName -replace '<xxx>', $projectNumber
-
-            # These can be full IDs if needed
-            $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
-            $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
-
-            write-host "Databricks: Only the name is needed. Just FYI:"
-            write-host "dbxPubSubnetId: $dbxPubSubnetId"
-            write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
-
-            write-host "AKS full resoiurce ID, and Databrick subnet names:"
             write-host "aksSubnetId: $aksSubnetId"
-            write-host "dbxPubSubnet Name: $dbxPubSubnetName"
-            write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
+            if ($null -ne $subnetProjAKS2 -and $subnetProjAKS2 -ne "") {
+                $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env
+                $aks2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS2 -projectNumber $projectNumber -networkEnv $network_env
+                write-host "aks2SubnetId: $aks2SubnetId"
+            } else {
+                write-host "AIF-WARNING: subnetProjAKS2 in Variables.yaml is empty. Please check your Variables.json file."
+            }
+        } catch {
+            write-host "AIF-WARNING: aksSubnetId, or aks2SubnetId could not be generated(catch). Please check your Variables.json file."
         }
-        else {
-            write-host "AIF-WARNING:BYOSubnets:subnetProjAKS is not set. This is needed for AKS deployment. Please check your parameters.json file."
-       }
 
-    }
-
-    if($projectTypeADO.Trim().ToLower() -eq "genai-1"){
-        write-host "Project type: genai-1 : now generating subnet IDs for AKS and GenAI, via in-parameters BYOSnets"
-
-        if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
-            $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
-            $subnetProjGenAI = $subnetProjGenAI -replace '<xxx>', $projectNumber
-            $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
-            write-host "genaiSubnetId: $genaiSubnetId"
-
-            try {
-                $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
-                write-host "aksSubnetId: $aksSubnetId"    
+        try {
+            $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env
+            $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
+            write-host "acaSubnetId: $acaSubnetId"
+            if ($null -ne $subnetProjACA2 -and $subnetProjACA2 -ne "") {
+                $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env
+                $aca2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA2 -projectNumber $projectNumber -networkEnv $network_env
+                write-host "aca2SubnetId: $aca2SubnetId"
+            } else {
+                write-host "AIF-WARNING: subnetProjACA2 in Variables.yaml is empty. Please check your Variables.json file."
             }
-            catch {
-                write-host "AIF-WARNING: aksSubnetId could not be generated. Please check your parameters.json file."    
-            }
-
-            try {
-                $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
-                write-host "acaSubnetId: $acaSubnetId"
-            }
-            catch {
-                write-host "AIF-WARNING: acaSubnetId could not be generated. Please check your parameters.json file."    
-            }
+        } catch {
+            write-host "AIF-WARNING: acaSubnetId or aca2SubnetId could not be generated(catch). Please check your Variables.json file."
         }
-    }elseif($projectTypeADO.Trim().ToLower() -eq "all"){
-        write-host "Project type: all : now generating subnet IDs for AKS, AKS2, GenAI, via in-parameters BYOSnets"
 
-        if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
-            $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
-            $subnetProjGenAI = $subnetProjGenAI -replace '<xxx>', $projectNumber
-            $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
-            write-host "genaiSubnetId: $genaiSubnetId"
+        try {
+            if ($null -ne $subnetProjDatabricksPublic -and $subnetProjDatabricksPublic -ne "") {
+                $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
+                $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
+                # These can be full IDs if needed
+                $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
+                $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
 
-            try {
-                $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env
-                $subnetProjAKS = $subnetProjAKS -replace '<xxx>', $projectNumber
-
-                $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
-                write-host "aksSubnetId: $aksSubnetId"
-                if ($null -ne $subnetProjAKS2 -and $subnetProjAKS2 -ne "") {
-                    $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env
-                    $subnetProjAKS2 = $subnetProjAKS2 -replace '<xxx>', $projectNumber
-                    $aks2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS2 -projectNumber $projectNumber -networkEnv $network_env
-                    write-host "aks2SubnetId: $aks2SubnetId"
-                }else{
-                    write-host "AIF-WARNING: subnetProjAKS2 in Variables.yaml is empty. Please check your Variables.json file."
-                }
+                write-host "Databricks: Only the name is needed. Just FYI:"
+                write-host "dbxPubSubnetId: $dbxPubSubnetId"
+                write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
+                write-host "dbxPubSubnet Name: $dbxPubSubnetName"
+                write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
+            } else {
+                write-host "AIF-WARNING: Databricks dbxPubSubnetName in Variables.yaml is empty. Please check your Variables.json file."
             }
-            catch {
-                write-host "AIF-WARNING: aksSubnetId, or aks2SubnetId could not be generated(catch). Please check your Variables.json file."    
-            }
-
-            try {
-                $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env
-                $subnetProjACA = $subnetProjACA -replace '<xxx>', $projectNumber
-                $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
-                write-host "acaSubnetId: $acaSubnetId"
-                if ($null -ne $subnetProjACA2 -and $subnetProjACA2 -ne "") {
-                    $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env
-                    $subnetProjACA2 = $subnetProjACA2 -replace '<xxx>', $projectNumber
-                    $aca2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA2 -projectNumber $projectNumber -networkEnv $network_env
-                    write-host "aca2SubnetId: $aca2SubnetId"
-                }else{
-                    write-host "AIF-WARNING: subnetProjACA2 in Variables.yaml is empty. Please check your Variables.json file."
-                }
-            }
-            catch {
-                write-host "AIF-WARNING: acaSubnetId or aca2SubnetId could not be generated(catch). Please check your Variables.json file."    
-            }
-            try{
-                if ($null -ne $subnetProjDatabricksPublic -and $subnetProjDatabricksPublic -ne "") {
-                    $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
-                    $dbxPubSubnetName = $dbxPubSubnetName -replace '<xxx>', $projectNumber
-                    $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
-                    $dbxPrivSubnetName = $dbxPrivSubnetName -replace '<xxx>', $projectNumber
-                    # These can be full IDs if needed
-                    $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
-                    $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
-
-                    write-host "Databricks: Only the name is needed. Just FYI:"
-                    write-host "dbxPubSubnetId: $dbxPubSubnetId"
-                    write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
-                    write-host "dbxPubSubnet Name: $dbxPubSubnetName"
-                    write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
-                }else{
-                    write-host "AIF-WARNING: Databricks dbxPubSubnetName in Variables.yaml is empty. Please check your Variables.json file."
-                }
-
-            }catch{
-                write-host "AIF-WARNING: Databricks subnets could not be fetched (catch). Please check your Variables.json file."
-            }
+        } catch {
+            write-host "AIF-WARNING: Databricks subnets could not be fetched (catch). Please check your Variables.json file."
         }
-    }else {
+    } else {
         write-host "AIF-WARNING:BYOSubnets:subnetProjGenAI: subnetProjGenAI is not set. This is needed for GenAI deployment. Please check your parameters.json file."
-   }
-}
-
-$templateEsml = @"
-{
-    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "dbxPubSubnetName": {
-            "value": "$dbxPubSubnetName"
-        },
-        "dbxPrivSubnetName": {
-            "value": "$dbxPrivSubnetName"
-        },
-        "aksSubnetId": {
-            "value": "$aksSubnetId"
-        }
     }
 }
-"@
 
-$templateGenaI = @"
-{
-    "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "aksSubnetId": {
-            "value": "$aksSubnetId"
-        },
-        "genaiSubnetId": {
-            "value": "$genaiSubnetId"
-        },
-        "acaSubnetId": {
-            "value": "$acaSubnetId"
-        }
-    }
-}
-"@
 $templateAll = @"
 {
     "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
@@ -697,22 +612,8 @@ $templateAll = @"
 
 $template = "not set"
 
-if($projectTypeADO.Trim().ToLower() -eq "esml"){
-    write-host "Template for dynamicNetworkParams.json is projectType:esml"
-    $template = $templateEsml
-}
-elseif ($projectTypeADO.Trim().ToLower() -eq "genai-1"){
-    write-host "Template for dynamicNetworkParams.json is projectType:genai-1"
-    $template = $templateGenaI
-}
-elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
-    write-host "Template for dynamicNetworkParams.json is projectType:all"
-    $template = $templateAll
-}
-else{
-    write-host "Template for dynamicNetworkParams.json is projectType:unsupported value: '$projectTypeADO'"
-    $template = $templateEsml
-}
+write-host "Template for dynamicNetworkParams.json is projectType: all"
+$template = $templateAll
 $outputPath = "$filePath$templateName".Replace('\', '/')
 $template | Out-File $outputPath
 write-host "Template written to $outputPath"
