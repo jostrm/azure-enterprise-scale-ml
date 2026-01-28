@@ -104,6 +104,9 @@ param enableFunction bool = false
 @description('Enable Azure Web App deployment')
 param enableWebApp bool = false
 
+@description('Enable Logic Apps deployment (skip adding project managed identity to shared SP/MI array when true)')
+param enableLogicApps bool = false
+
 @description('Enable Container Apps deployment')
 param enableContainerApps bool = false
 
@@ -301,8 +304,9 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   name: take('08-spAndMI2Array-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
-    managedIdentityOID: var_miPrj_PrincipalId
+    managedIdentityOID: enableLogicApps? '' : var_miPrj_PrincipalId
     servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    includeManagedIdentity: !enableLogicApps
   }
   dependsOn: [
       getProjectMIPrincipalId
