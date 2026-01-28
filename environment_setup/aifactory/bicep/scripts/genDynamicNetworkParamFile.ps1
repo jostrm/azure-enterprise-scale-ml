@@ -350,11 +350,9 @@ write-host "RESULT (vnetResourceGroup): $($vnetResourceGroup)"
 write-host "Deployment to lookup (earlier subnets): $($deploymentPrefix)SubnetDeplProj" # Deployment to lookup (earlier subnets): esml-p001-dev-swc-001SubnetDeplProj
 
 # First, normalize the BYO_subnets parameter since it's a string
-$BYO_subnets_bool = if ($null -eq $BYO_subnets -or "" -eq $BYO_subnets -or $BYO_subnets -eq "false") {
-    $false
-} else {
-    $true
-}
+# Only the literal "true" (any casing, trimmed) enables BYO; everything else is non-BYO
+$byoSubnetsNormalized = if ($null -eq $BYO_subnets) { "" } else { $BYO_subnets.Trim().ToLower() }
+$BYO_subnets_bool = $byoSubnetsNormalized -eq "true"
 
 # Normalize any unintended network_env prefixes in fetched subnet IDs (non-BYO path only)
 if ($BYO_subnets_bool -eq $false -and -not [string]::IsNullOrEmpty($network_env)) {
