@@ -63,14 +63,14 @@ param location string = resourceGroup().location
 
 @description('Bot service SKU')
 @allowed(['F0', 'S1'])
-param sku string = 'F0' // F0 = Free, S1 = Standard
+param sku string = 'S1' // Default to Standard to match Foundry-aligned deployment
 
-@description('Microsoft App ID (Client ID) for bot authentication. REQUIRED for SingleTenant. Leave EMPTY for UserAssignedMSI (recommended).')
+@description('Microsoft App ID (Client ID) for bot authentication. REQUIRED for SingleTenant. Leave EMPTY when using UserAssignedMSI.')
 param microsoftAppId string = ''
 
-@description('Type of Microsoft App authentication. MultiTenant is deprecated. UserAssignedMSI is recommended for new deployments.')
+@description('Type of Microsoft App authentication. MultiTenant is deprecated. Default aligns with Bot A (SingleTenant); UserAssignedMSI remains available.')
 @allowed(['SingleTenant', 'UserAssignedMSI'])
-param microsoftAppType string = 'UserAssignedMSI'
+param microsoftAppType string = 'SingleTenant'
 
 @description('Tenant ID for SingleTenant apps')
 param microsoftAppTenantId string = tenant().tenantId
@@ -78,8 +78,8 @@ param microsoftAppTenantId string = tenant().tenantId
 @description('User-assigned managed identity resource ID. Auto-created if empty and microsoftAppType is UserAssignedMSI.')
 param userAssignedManagedIdentityResourceId string = ''
 
-@description('AI Foundry agent endpoint URL')
-param agentEndpoint string = ''
+@description('AI Foundry agent endpoint URL (required for Foundry listing)')
+param agentEndpoint string
 
 @description('Tags to apply to resources')
 param tags object = {}

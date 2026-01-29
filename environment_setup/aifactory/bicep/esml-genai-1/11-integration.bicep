@@ -168,6 +168,8 @@ param vnetResourceGroup_param string = ''
 
 @description('Add AI Foundry Hub with random naming')
 param addAIFoundryHub bool = false
+@description('Use AI Foundry-created default project name (no def suffix) for AI Foundry v2')
+param enableAIFactoryCreatedDefaultProjectForAIFv2 bool = false
 @description('Add Azure Machine Learning with random naming for debugging/testing')
 param addAzureMachineLearning bool = false
 
@@ -298,11 +300,17 @@ var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+var agentEndpointTemplate = 'https://{foundry}.services.ai.azure.com/api/projects/{project}/applications/{agent}/protocols/activityprotocol?api-version=2025-11-15-preview'
+var aifV2Name = addAIFoundryHub ? namingConvention.outputs.aifV2NameAdd : namingConvention.outputs.aifV2Name
+var aifV2ProjectName = addAIFoundryHub ? namingConvention.outputs.aifV2PrjNameAdd : namingConvention.outputs.aifV2PrjName
+var defaultProjectName = enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
+var defaultBotAgentEndpoint = replace(replace(replace(agentEndpointTemplate, '{foundry}', aifV2Name), '{project}', defaultProjectName), '{agent}', 'agent-001')
+var resolvedBotAgentEndpoint = empty(botAgentEndpoint) ? defaultBotAgentEndpoint : botAgentEndpoint
 
 // ============== MODULE DEPLOYMENTS ==============
 
 // 1) Create Hosting plan for Logic Apps Standard, using Azure verfied modules (AVM)
-module serverFarm 'br/public:avm/res/web/serverfarm:0.5.0' = if(empty(byoAseAppServicePlanRID) && !logicAppsExists && enableLogicApps) {
+module serverFarm 'br/public:avm/res/web/serverfarm:0.6.0' = if(empty(byoAseAppServicePlanRID) && !logicAppsExists && enableLogicApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-Appfarm-LogicApps01-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -368,7 +376,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2020-08
 }
 
 // Event Hub Namespace deployment using Azure verified modules (AVM)
-module eventHub 'br/public:avm/res/event-hub/namespace:0.12.5' = if(!eventHubsExists && enableEventHubs) {
+module eventHub 'br/public:avm/res/event-hub/namespace:0.14.0' = if(!eventHubsExists && enableEventHubs) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-EventHub-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -384,7 +392,7 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.12.5' = if(!eventHubsEx
     // Managed identity configuration (AVM format)
     managedIdentities: {
       systemAssigned: true
-      userAssignedResourceIds: miPrjName != '' ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : []
+      userAssignedResourceId: miPrjName != '' ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName) : ''
     }
     
     // Network configuration based on perimeter access
@@ -409,7 +417,7 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.12.5' = if(!eventHubsEx
         name: 'eh-ml-data-streaming'
         messageRetentionInDays: 1
         partitionCount: 2
-        consumerGroups: [
+        consumergroups: [
           {
             name: 'ml-processors'
           }
@@ -422,7 +430,7 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.12.5' = if(!eventHubsEx
         name: 'eh-genai-events'
         messageRetentionInDays: 1
         partitionCount: 2
-        consumerGroups: [
+        consumergroups: [
           {
             name: 'genai-processors'
           }
@@ -498,7 +506,7 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.12.5' = if(!eventHubsEx
 
 // Logic App Consumption has a separate module in Azure Bicep Verified Modules
 // For Logic App Standard, there is no such different resource since it’s defined as a “site” with a specific kind: ‘functionapp,workflowapp’.
-module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
+module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-LogicApps01-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -602,11 +610,9 @@ module logicAppStandard 'br/public:avm/res/web/site:0.19.3' = if(logiAppType == 
 // Logic Apps uses both user-assigned and system-assigned managed identities
 // Assign storage roles to both for maximum compatibility and to prevent 403 Forbidden errors
 
-// Get the deployed Logic Apps resource to access its system-assigned identity
-resource deployedLogicApp 'Microsoft.Web/sites@2023-12-01' existing = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
-  name: logicAppsName
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-}
+// Resolve Logic App system-assigned principal after creation (avoid first-run race on "existing" lookup)
+var logicAppResourceId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Web/sites', logicAppsName)
+var logicAppSystemPrincipalId = (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) ? reference(logicAppResourceId, '2023-12-01', 'Full').identity.principalId : ''
 
 // Assign storage roles to user-assigned managed identity (primary authentication method)
 module logicAppsStorageRolesUserMI '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
@@ -628,11 +634,10 @@ module logicAppsStorageRolesSystemMI '../modules/storageRoleAssignments.bicep' =
   name: take('11-LogicAppsStorageRoles-SystemMI-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
-    principalId: deployedLogicApp!.identity.principalId
+    principalId: logicAppSystemPrincipalId
   }
   dependsOn: [
     logicAppStandard
-    deployedLogicApp
   ]
 }
 
@@ -761,8 +766,8 @@ module botService '../modules/botService.bicep' = if(!botServiceExists && enable
     microsoftAppType: empty(botMicrosoftAppId) ? 'UserAssignedMSI' : 'SingleTenant'
     microsoftAppTenantId: tenant().tenantId
     userAssignedManagedIdentityResourceId: '' // Auto-create if empty
-    agentEndpoint: botAgentEndpoint
-    messagingEndpoint: botAgentEndpoint
+    agentEndpoint: resolvedBotAgentEndpoint
+    messagingEndpoint: resolvedBotAgentEndpoint
     tags: tags
     enableTeamsChannel: true
     enableDirectLineChannel: true

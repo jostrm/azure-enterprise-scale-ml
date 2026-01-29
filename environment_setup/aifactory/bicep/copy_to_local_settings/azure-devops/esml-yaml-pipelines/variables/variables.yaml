@@ -14,8 +14,8 @@ variables:
   # E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
   # ============================================================================
   aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
-  aifactory_version_minor: "23" # Minor version. 2025-05-23: 20_LTS, 2025-09-20: 23
-  aifactory_branch_chosen: "release/v.1.23"
+  aifactory_version_minor: "24" # Minor version. 2025-05-23: 20_LTS, 2025-09-20: 23
+  aifactory_branch_chosen: "release/v1.24"
   # ============================================================================
   # MANDATORY(CHANGE RARELY) per AI Factory scaleset
   # ============================================================================
@@ -26,8 +26,8 @@ variables:
 
   admin_location: "eastus2"
   admin_locationSuffix: "eus2"
-  admin_aiSearchTier: "standard" # ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
-  admin_semanticSearchTier: "disabled" # ['disabled', 'free', 'standard']
+  admin_aiSearchTier: "basic" # free is not allowed if private endpoints ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
+  admin_semanticSearchTier: "free" # ['disabled', 'free', 'standard']
   admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   
   # CMK (Customer Managed Key) REQUIREMENTS when enabled (cmk=true) on Seeding Keyvault: dev_admin_bicep_kv_fw, test_admin_bicep_kv_fw, prod_admin_bicep_kv_fw
@@ -38,7 +38,7 @@ variables:
   # - If you use the Key Vault firewall, you must allow trusted Microsoft services to access the Azure Key Vault.
   # - The AI Factory will grant your Microsoft Foundry resource and project system-assigned managed identity the following permissions on your key vault: get key, wrap key, unwrap key.
   # - Only RSA and RSA-HSM keys of size 2048 are supported.
-  cmk: "false" # Enable Customer Managed Keys (CMK) for Storage Accounts, AI Services, etc.
+  cmk: "false" # Enable Customer Managed Keys (CMK) for Storage Accounts, AI Services, etc. Requires container registry to be Premium SKU.
   cmkKeyName: "esml-cmk-key" # Common key name for all services in this environment
 
   # SEEDING KEYVAULT: One global (same values for all tripples), or one per environment (different values for dev,test,prod)
@@ -152,6 +152,7 @@ variables:
         # Example vnet 172.16.0.0/16 with subets [172.16.XX.0/26,172.16.XX.64/26,172.16.XX.128/26,172.16.XX.192/26]
       # 192.x.x.x  (/16) is less commonly used in large-scale Azure deployments due to its smaller address space.
       # WAF AI Factory Recommended: 172.16.0.0/16
+      # Don't use the 172.17.0.0/16 IP address range for your virtual network. This range is the default subnet range used by the Docker bridge network on-premises.
   common_vnet_cidr: "172.16.0.0/16"
 
   common_subnet_cidr: "172.16.XX.0/26"
@@ -187,7 +188,7 @@ variables:
   acr_IP_whitelist: "" # Selected networks approved IPs
   acr_adminUserEnabled: "false" # true, enable admin user. false, disable admin user (more secure)
   acr_dedicated: "true" # Premium only
-  acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints, or support CMK (Customer managed encryption key
+  acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints, or support CMK (Customer managed encryption key)
 
   technical_admins_ad_object_id: "TODO_EntraID_ObjectID" # TODO_EntraID_ObjectID commaseparated list, or just 1 ObjectID
   technical_admins_email: "TODO_email_or_securitygroup_name" # email or name of AD group
