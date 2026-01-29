@@ -110,16 +110,16 @@ var aifV1HubName = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-$
 var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // TODO=DONE
 
 // AI Foundry V2 (2025)
-var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${randomSalt}'), '-', ''),12) // @2025-06-01: name (12)
-var aifV2PrjName =take(toLower('aif2-p${projectNumber}-${uniqueInAIFenv}${randomSalt}'),12) // 64 according to doc. but is 12 chars max for project name
-
-//param deploymentTimestamp string = utcNow('yyyyMMddHHmmss')
-//var uniqueSuffix10 = substring(uniqueString('${targetResourceGroupName}-${deploymentTimestamp}'), 0, 10)
+// Dont Add: aif2x46jfec0
+// Add: aif21ec07673
+var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${cleanRandomValue}'), '-', ''),12) // Dont Add: aif2x46jfec0
+var aifV2PrjName =take(toLower('aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}'),12) // aif2-p001x4d
+// Add
 var lastSuffixChar = (!empty(resourceSuffix) && length(resourceSuffix) > 0) ? substring(resourceSuffix, max(0, length(resourceSuffix) - 1), 1) : '' // Extract last character: -001 → 1
 var aif2Random = take('aif2${lastSuffixChar}${cleanRandomValue}',12)
-var aifp2Random = take('aif2-p${projectNumber}-${lastSuffixChar}${cleanRandomValue}',12)
-var aifV2NameAdd = aif2Random
-var aifV2PrjNameAdd = aifp2Random
+var aifp2Random = take('aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}',12)
+var aifV2NameAdd = aif2Random // Add: aif21ec07673
+var aifV2PrjNameAdd = aifp2Random // Add: aif2-p001xe1
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 

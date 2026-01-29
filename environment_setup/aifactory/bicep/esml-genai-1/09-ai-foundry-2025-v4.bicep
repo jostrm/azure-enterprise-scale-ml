@@ -308,6 +308,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 
+// Dont Add: aif2x46jfec0 where 'x46jfec0' is from take(replace(toLower('aif2${uniqueInAIFenv}${cleanRandomValue}'), '-', ''),12) 
+// Add: aif21ec07673 where take('aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}',12)
 var aifV2Name = addAIFoundry? namingConvention.outputs.aifV2NameAdd: namingConvention.outputs.aifV2Name
 var aifV2ProjectName = addAIFoundry? namingConvention.outputs.aifV2PrjNameAdd: namingConvention.outputs.aifV2PrjName 
 
