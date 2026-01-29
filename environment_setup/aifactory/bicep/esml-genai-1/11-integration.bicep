@@ -610,9 +610,8 @@ module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 
 // Logic Apps uses both user-assigned and system-assigned managed identities
 // Assign storage roles to both for maximum compatibility and to prevent 403 Forbidden errors
 
-// Resolve Logic App system-assigned principal after creation (avoid first-run race on "existing" lookup)
+// Resolve Logic App system-assigned principal inside the role assignment module to avoid early evaluation races
 var logicAppResourceId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Web/sites', logicAppsName)
-var logicAppSystemPrincipalId = (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) ? reference(logicAppResourceId, '2023-12-01', 'Full').identity.principalId : ''
 
 // Assign storage roles to user-assigned managed identity (primary authentication method)
 module logicAppsStorageRolesUserMI '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
@@ -634,7 +633,7 @@ module logicAppsStorageRolesSystemMI '../modules/storageRoleAssignments.bicep' =
   name: take('11-LogicAppsStorageRoles-SystemMI-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     storageAccountName: storageAccount1001Name
-    principalId: logicAppSystemPrincipalId
+    principalId: reference(logicAppResourceId, '2023-12-01', 'Full').identity.principalId
   }
   dependsOn: [
     logicAppStandard
