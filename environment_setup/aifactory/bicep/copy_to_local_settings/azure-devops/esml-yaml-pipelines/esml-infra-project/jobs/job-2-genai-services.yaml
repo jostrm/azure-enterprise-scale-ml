@@ -901,7 +901,7 @@ steps:
       aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
       aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aiFoundryV2Name="aif2"
-      aiFoundryV2ProjectName="aif2-p${projectNumber}-"
+      aiFoundryV2ProjectName="aif2-p${projectNumber}"
 
       botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
       dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
@@ -1869,6 +1869,7 @@ steps:
      --parameters enableWebApp="$(enableWebApp)" \
      --parameters webAppExists="$(webAppExists)" \
      --parameters enableBotService="$(enableBotService)" \
+     --parameters addAIFoundry="$(addAIFoundry)" \
      --parameters botServiceExists="$(botServiceExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
@@ -1983,6 +1984,7 @@ steps:
      --parameters enablePostgreSQL="$(enablePostgreSQL)" \
      --parameters enableRedisCache="$(enableRedisCache)" \
      --parameters enableSQLDatabase="$(enableSQLDatabase)" \
+     --parameters enableLogicApps="$(enableLogicApps)" \
      --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
@@ -2145,7 +2147,7 @@ steps:
      --parameters updateAIFoundry="$(updateAIFoundry)" \
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
-     --parameters addAIFoundry="true" \
+     --parameters addAIFoundry="$(addAIFoundry)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -2245,8 +2247,110 @@ steps:
      --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
-     --parameters addAIFoundry="true"
+     --parameters addAIFoundry="$(addAIFoundry)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '100b_create_foundry_agent'
+  condition: and(succeeded(), eq(variables['enableAIFoundry'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     set -euo pipefail
+
+     az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Try to discover the Foundry account (prefers existing matching aif2 prefix)
+     commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+     projectNumber="$(project_number_000)"
+     projectName="prj${projectNumber}"
+     locationSuffix="$(admin_locationSuffix)"
+     envName="$(dev_test_prod)"
+     aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+     vnetResourceGroupBase="$(vnetResourceGroupBase)"
+     projectPrefix="$(projectPrefix)"
+     projectSuffix="$(projectSuffix)"
+     projectNameReplaced="${projectName/prj/project}"
+     projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+     # First try to find the account in the project resource group
+     foundry_info=$(az cognitiveservices account list --subscription "$(dev_test_prod_sub_id)" --resource-group "$projectResourceGroup" --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].[name,resourceGroup]" -o tsv)
+     foundry_name=$(echo "$foundry_info" | head -n1 | awk '{print $1}')
+     foundry_rg=$(echo "$foundry_info" | head -n1 | awk '{print $2}')
+
+     # Fallback: search across the subscription
+     if [ -z "$foundry_name" ] || [ -z "$foundry_rg" ]; then
+       foundry_info=$(az cognitiveservices account list --subscription "$(dev_test_prod_sub_id)" --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].[name,resourceGroup]" -o tsv)
+       foundry_name=$(echo "$foundry_info" | head -n1 | awk '{print $1}')
+       foundry_rg=$(echo "$foundry_info" | head -n1 | awk '{print $2}')
+     fi
+
+     if [ -z "$foundry_name" ] || [ -z "$foundry_rg" ]; then
+       # Compute the expected Foundry name following bicep logic (uses project RG for uniqueString)
+       randomValue="$(deployment_random_value)"
+       aifactorySalt10="$(aifactory_salt_random)"
+
+       rgId="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}"
+       uniqueInAIFenv=$(python -c "import hashlib; rid='${rgId}'; print(hashlib.md5(rid.encode()).hexdigest()[:5])")
+
+       if [ -z "$aifactorySalt10" ] || [ ${#aifactorySalt10} -le 5 ]; then
+         randomSalt=$(echo "$randomValue" | cut -c1-10)
+       else
+         randomSalt="$aifactorySalt10"
+       fi
+
+       rawName="aif2${uniqueInAIFenv}${randomSalt}"
+       rawNameClean=$(echo "$rawName" | tr '[:upper:]' '[:lower:]' | tr -d '-')
+       foundry_name=$(echo "$rawNameClean" | cut -c1-12)
+       foundry_rg="$projectResourceGroup"
+     fi
+
+     if [ -z "$foundry_name" ] || [ -z "$foundry_rg" ]; then
+       echo "Could not resolve Foundry account name or resource group; skipping agent creation."
+       exit 0
+     fi
+
+     echo "Using Foundry account: $foundry_name in RG: $foundry_rg"
+
+     endpoint=$(az cognitiveservices account show --name "$foundry_name" --resource-group "$foundry_rg" --query properties.endpoint -o tsv)
+     if [ -z "$endpoint" ]; then
+       echo "Failed to resolve endpoint for Foundry; skipping agent creation."
+       exit 0
+     fi
+
+     # Resolve managed identity (mi-prj*) client ID from the project resource group for AAD auth
+     miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+     mi_name=$(az identity list --resource-group "$projectResourceGroup" --query "[?starts_with(name, '$miPrjPrefix')].name" -o tsv | head -n1)
+     if [ -n "$mi_name" ]; then
+       mi_client_id=$(az identity show --resource-group "$projectResourceGroup" --name "$mi_name" --query clientId -o tsv)
+       if [ -n "$mi_client_id" ]; then
+         export AZURE_CLIENT_ID="$mi_client_id"
+         echo "Using managed identity clientId: $mi_client_id for token acquisition"
+       else
+         echo "Managed identity found ($mi_name) but clientId empty; continuing with current principal"
+       fi
+     else
+       echo "No managed identity with prefix $miPrjPrefix found; continuing with current principal"
+     fi
+
+     access_token=$(az account get-access-token --resource https://cognitiveservices.azure.com/ --query accessToken -o tsv)
+
+     if [ -z "$access_token" ]; then
+       echo "Failed to acquire access token for Foundry; skipping agent creation."
+       exit 0
+     fi
+
+     payload='{"name":"agent-001","model":"gpt-4o-mini","description":"Created by pipeline","metadata":{"source":"ado-pipeline"}}'
+
+     echo "Creating Foundry agent 'agent-001' via Agents/Activity Protocol API..."
+       response=$(curl -sS -X POST "$endpoint/openai/agents?api-version=2024-10-01-preview" \
+         -H "Content-Type: application/json" \
+         -H "Authorization: Bearer $access_token" \
+         -d "$payload")
+
+     echo "Agent create response: $response"
+     echo "##vso[task.setvariable variable=foundryAgentCreated]true"
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'
   condition: succeeded()
