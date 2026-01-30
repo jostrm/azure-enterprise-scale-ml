@@ -137,6 +137,8 @@ param webAppExists bool = false
 param enablePublicAccessWithPerimeter bool = false
 // Security / access
 param centralDnsZoneByPolicyInHub bool = false
+@description('Assign storage roles to Logic App system-assigned identity (disable to avoid transient first-run lookup issues)')
+param enableLogicAppSystemMiRoleAssignment bool = false
 
 // Bot Service parameters
 @description('Enable Azure Bot Service deployment')
@@ -628,7 +630,7 @@ module logicAppsStorageRolesUserMI '../modules/storageRoleAssignments.bicep' = i
 }
 
 // Assign storage roles to system-assigned managed identity (fallback/redundancy)
-module logicAppsStorageRolesSystemMI '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
+module logicAppsStorageRolesSystemMI '../modules/storageRoleAssignments.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps && enableLogicAppSystemMiRoleAssignment) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-LogicAppsStorageRoles-SystemMI-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
