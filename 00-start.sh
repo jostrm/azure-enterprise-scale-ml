@@ -6,11 +6,42 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Defaults
+TARGET_REPO="${GH_TARGET_REPO:-githuborg/enterprise-scale-aifactory-001}"
+
 # Instructions: 
 ## 1)Run this file from your own parent repository, not from the azure-enterprise-scale-ml repository. Example ./enterprise-scale-ml/00-start.sh
 ## 2) Then you will have the files below in your repository, to run directory, as ./01-aif-copy-aifactory-templates.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+gh_ok() {
+    if ! command -v gh >/dev/null 2>&1; then
+        echo -e "${RED}GitHub CLI (gh) is not installed. Skipping workflow dispatch.${NC}"
+        return 1
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+        echo -e "${RED}GitHub CLI is not authenticated. Run 'gh auth login' first.${NC}"
+        return 1
+    fi
+    return 0
+}
+
+dispatch_common() {
+    local deploy_stage="$1" deploy_prod="$2"
+    gh workflow run ".github/workflows/infra-common.yml" \
+        --repo "$TARGET_REPO" \
+        --raw-field deploy_dev=true \
+        --raw-field deploy_stage="$deploy_stage" \
+        --raw-field deploy_prod="$deploy_prod"
+}
+
+dispatch_project() {
+    local env_name="$1"
+    gh workflow run ".github/workflows/infra-project.yml" \
+        --repo "$TARGET_REPO" \
+        --raw-field environment="$env_name"
+}
 
 # Prompt user for orchestrator choice
 echo -e "${YELLOW}Do you want to use Azure DevOps or GitHub as an orchestrator, to run the IaC pipelines? (Enter 'a' or 'g')${NC}"
@@ -36,7 +67,10 @@ if [[ "$orchestrator" == "a" ]]; then
     # YAML - infra-project-esml.yml -> aifactory-templates + .github/workflows
     rm -f "$SCRIPT_DIR/../.github/workflows/infra-project-esml.yml"
 
-    # YAML - infra-project-genai.yml -> aifactory-templates + .github/workflows
+    # YAML - infra-project.yml -> aifactory-templates + .github/workflows
+    rm -f "$SCRIPT_DIR/../.github/workflows/infra-project.yml"
+
+    # Back-compat cleanup (older name)
     rm -f "$SCRIPT_DIR/../.github/workflows/infra-project-genai.yml"
 
     # YAML - infra-add-project-member.yml -> aifactory-templates + .github/workflows

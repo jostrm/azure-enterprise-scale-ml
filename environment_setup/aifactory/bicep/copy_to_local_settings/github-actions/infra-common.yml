@@ -25,7 +25,7 @@ jobs:
     env: &common_env
       dev_test_prod: dev
       dev_test_prod_sub_id: "${{ vars.DEV_SUBSCRIPTION_ID }}"
-      network_env: "${{ vars.DEV_NETWORK_ENV }}"
+      network_env: "${{ vars.DEV_NETWORK_ENV || vars.NETWORK_ENV || 'dev' }}"
       cidr_range: "${{ vars.DEV_CIDR_RANGE }}"
       admin_location: "${{ vars.AIFACTORY_LOCATION }}"
       admin_locationSuffix: "${{ vars.AIFACTORY_LOCATION_SHORT }}"
@@ -104,6 +104,48 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+      - name: Validate required configuration
+        shell: pwsh
+        run: |
+          $required = @(
+            'dev_test_prod',
+            'dev_test_prod_sub_id',
+            'admin_location',
+            'admin_locationSuffix',
+            'admin_aifactoryPrefixRG',
+            'admin_aifactorySuffixRG',
+            'admin_bicep_input_keyvault_subscription',
+            'admin_bicep_kv_fw',
+            'admin_bicep_kv_fw_rg',
+            'tenantId'
+          )
+          $placeholders = @('<todo>', '<todo_id>', 'TODO', 'todo', '-')
+          $errors = @()
+          foreach ($key in $required) {
+            $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+            if (-not $val) { $errors += "$key is required"; continue }
+            if ($placeholders -contains $val) { $errors += "$key still has placeholder value '$val'" }
+          }
+          if ($Env:BYO_subnets -eq 'true') {
+            foreach ($k in @('vnetResourceGroup_param', 'vnetNameFull_param')) {
+              $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+              if (-not $v) { $errors += "$k is required when BYO_subnets=true" }
+            }
+          }
+          if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+      - name: Initialize derived variables
+        shell: pwsh
+        run: |
+          $envName = '${{ env.dev_test_prod }}'
+          switch ($envName) {
+            'dev'  { $net = '${{ vars.DEV_NETWORK_ENV }}' }
+            'test' { $net = '${{ vars.STAGE_NETWORK_ENV }}' }
+            'prod' { $net = '${{ vars.PROD_NETWORK_ENV }}' }
+            default { $net = '' }
+          }
+          if (-not $net) { $net = '${{ vars.NETWORK_ENV }}' }
+          if (-not $net) { $net = $envName }
+          "network_env=$net" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
       - name: 01_az_bicep_common_rg
         uses: azure/cli@v2
         with:
@@ -250,37 +292,37 @@ jobs:
             --debug
           azcliversion: latest
 
-	common-stage:
-		name: Stage Common
-		needs: common-dev
-		if: github.event.inputs.deploy_stage == 'true' && needs.common-dev.result == 'success'
-		environment: stage
-		runs-on: ubuntu-latest
-		env:
+  common-stage:
+    name: Stage Common
+    needs: common-dev
+    if: github.event.inputs.deploy_stage == 'true' && needs.common-dev.result == 'success'
+    environment: stage
+    runs-on: ubuntu-latest
+    env:
       <<: *common_env
       dev_test_prod: test
       dev_test_prod_sub_id: "${{ vars.STAGE_SUBSCRIPTION_ID }}"
-      network_env: "${{ vars.STAGE_NETWORK_ENV }}"
+      network_env: "${{ vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test' }}"
       cidr_range: "${{ vars.STAGE_CIDR_RANGE }}"
-		steps: *common_steps
+    steps: *common_steps
 
-	common-prod:
-		name: Prod Common
-		needs:
-			- common-dev
-			- common-stage
-		if: |
-			github.event.inputs.deploy_prod == 'true' &&
-			(
-				(github.event.inputs.deploy_stage == 'true' && needs.common-stage.result == 'success') ||
-				(github.event.inputs.deploy_stage != 'true' && needs.common-dev.result == 'success')
-			)
-		environment: prod
-		runs-on: ubuntu-latest
-		env:
+  common-prod:
+    name: Prod Common
+    needs:
+      - common-dev
+      - common-stage
+    if: |
+      github.event.inputs.deploy_prod == 'true' &&
+      (
+        (github.event.inputs.deploy_stage == 'true' && needs.common-stage.result == 'success') ||
+        (github.event.inputs.deploy_stage != 'true' && needs.common-dev.result == 'success')
+      )
+    environment: prod
+    runs-on: ubuntu-latest
+    env:
       <<: *common_env
       dev_test_prod: prod
       dev_test_prod_sub_id: "${{ vars.PROD_SUBSCRIPTION_ID }}"
-      network_env: "${{ vars.PROD_NETWORK_ENV }}"
+      network_env: "${{ vars.PROD_NETWORK_ENV || vars.NETWORK_ENV || 'prod' }}"
       cidr_range: "${{ vars.PROD_CIDR_RANGE }}"
-		steps: *common_steps
+    steps: *common_steps

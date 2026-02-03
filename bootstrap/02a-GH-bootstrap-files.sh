@@ -27,13 +27,9 @@ cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-common.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-common.yml"
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-common.yml" "$SCRIPT_DIR/.github/workflows/infra-common.yml"
 
-# YAML - infra-project-esml.yml -> aifactory + .gihub/workflows
-cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-esml.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-project-esml.yml"
-cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-esml.yml" "$SCRIPT_DIR/.github/workflows/infra-project-esml.yml"
-
-# YAML - infra-project-genai.yml -> aifactory + .gihub/workflows
-cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-genai.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-project-genai.yml"
-cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-genai.yml" "$SCRIPT_DIR/.github/workflows/infra-project-genai.yml"
+# YAML - infra-project.yml -> aifactory + .github/workflows
+cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-project.yml"
+cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml" "$SCRIPT_DIR/.github/workflows/infra-project.yml"
 
 # YAML - infra-add-project-member.yml -> aifactory + .gihub/workflows
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-add-project-member.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-add-project-member.yml"

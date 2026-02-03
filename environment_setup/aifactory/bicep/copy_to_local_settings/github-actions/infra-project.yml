@@ -1,0 +1,1343 @@
+name: infra-project
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment to load variables/secrets from [dev,stage,prod]
+        required: true
+        default: dev
+
+jobs:
+  deploy-project:
+    name: Project (Networking + Services)
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      dev_test_prod: ${{ vars.AZURE_ENV_NAME }}
+      dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # Single source of truth for environment (matches ADO): dev_test_prod drives everything
+      # network_env may be overridden via repo variable NETWORK_ENV, otherwise defaults to dev_test_prod
+      network_env: ${{ vars.NETWORK_ENV || vars.AZURE_ENV_NAME || '' }}
+
+      admin_location: ${{ vars.AIFACTORY_LOCATION }}
+      admin_locationSuffix: ${{ vars.AIFACTORY_LOCATION_SHORT }}
+      admin_aifactoryPrefixRG: ${{ vars.AIFACTORY_PREFIX }}
+      admin_aifactorySuffixRG: ${{ vars.AIFACTORY_SUFFIX }}
+      admin_commonResourceSuffix: ${{ vars.ADMIN_COMMON_RESOURCE_SUFFIX || '-001' }}
+      admin_prjResourceSuffix: ${{ vars.ADMIN_PRJ_RESOURCE_SUFFIX || '-001' }}
+
+      admin_keyvaultSoftDeleteDays: ${{ vars.KEYVAULT_SOFT_DELETE || '7' }}
+      tenantId: ${{ secrets.TENANT_ID }}
+      use_groups: ${{ vars.USE_AD_GROUPS || 'true' }}
+
+      # Seeding Key Vault
+      admin_bicep_input_keyvault_subscription: ${{ secrets.AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID }}
+      admin_bicep_kv_fw: ${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}
+      admin_bicep_kv_fw_rg: ${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}
+      common_sp_appid_seeding_kv_name: ${{ vars.COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID }}
+      common_sp_secret_seeding_kv_name: ${{ vars.COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET }}
+
+      # Project settings
+      project_number_000: ${{ vars.PROJECT_NUMBER }}
+      project_IP_whitelist: ${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}
+      technical_admins_ad_object_id: ${{ secrets.PROJECT_MEMBERS }}
+      technical_admins_email: ${{ vars.PROJECT_MEMBERS_EMAILS }}
+      project_service_principal_AppID_seeding_kv_name: ${{ vars.PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID }}
+      project_service_principal_OID_seeding_kv_name: ${{ vars.PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID }}
+      project_service_principal_Secret_seeding_kv_name: ${{ vars.PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S }}
+
+      # Flow control
+      BYO_subnets: ${{ vars.BYO_SUBNETS || 'false' }}
+      runNetworkingVar: ${{ vars.RUN_JOB1_NETWORKING || 'true' }}
+      disable_whitelisting_for_build_agents: ${{ vars.DISABLE_WHITELISTING_FOR_BUILD_AGENTS || 'false' }}
+      disable_whitelisting_for_built_agents: ${{ vars.DISABLE_WHITELISTING_FOR_BUILD_AGENTS || vars.DISABLE_WHITELISTING_FOR_BUILT_AGENTS || 'false' }}
+
+      # Versioning/salt
+      AIFACTORY_VERSION_MAJOR: ${{ vars.AIFACTORY_VERSION_MAJOR }}
+      AIFACTORY_VERSION_MINOR: ${{ vars.AIFACTORY_VERSION_MINOR }}
+      AIFACTORY_SALT: ${{ vars.AIFACTORY_SALT }}
+      AIFACTORY_SALT_RANDOM: ${{ vars.AIFACTORY_SALT_RANDOM }}
+      aifactory_salt_random: ${{ vars.AIFACTORY_SALT_RANDOM }}
+      deployment_random_value: ''
+
+      # Project types are merged in ADO
+      admin_projectType: all
+
+      # Cost optimization
+      useCommonACR: ${{ vars.USE_COMMON_ACR_FOR_PROJECTS || 'true' }}
+      useCommonACR_override: ${{ vars.USE_COMMON_ACR_OVERRIDE || vars.USE_COMMON_ACR_FOR_PROJECTS || 'true' }}
+
+      # Optional overrides
+      azure_machinelearning_sp_oid: ${{ vars.TENANT_AZUREML_OID }}
+      admin_aks_gpu_sku_dev_override: ${{ vars.AKS_DEV_SKU_OVERRIDE || 'Standard_B4ms' }}
+      admin_aks_gpu_sku_test_prod_override: ${{ vars.AKS_TEST_PROD_SKU_OVERRIDE || 'Standard_DS13-2_v2' }}
+      admin_aks_nodes_dev_override: ${{ vars.AKS_DEV_NODES_OVERRIDE || '1' }}
+      admin_aks_nodes_testProd_override: ${{ vars.AKS_TEST_PROD_NODES_OVERRIDE || '3' }}
+      admin_aks_version_override: ${{ vars.AKS_VERSION_OVERRIDE || '1.30.3' }}
+      admin_aml_cluster_maxNodes_dev_override: ${{ vars.AML_CLUSTER_MAX_NODES_DEV_OVERRIDE || '3' }}
+      admin_aml_cluster_maxNodes_testProd_override: ${{ vars.AML_CLUSTER_MAX_NODES_TESTPROD_OVERRIDE || '5' }}
+      admin_aml_cluster_sku_dev_override: ${{ vars.AML_CLUSTER_SKU_DEV_OVERRIDE || 'Standard_DS3_v2' }}
+      admin_aml_cluster_sku_testProd_override: ${{ vars.AML_CLUSTER_SKU_TESTPROD_OVERRIDE || 'Standard_D13_v2' }}
+      admin_aml_computeInstance_dev_sku_override: ${{ vars.AML_CI_SKU_DEV_OVERRIDE || 'Standard_DS11_v2' }}
+      admin_aml_computeInstance_testProd_sku_override: ${{ vars.AML_CI_SKU_TESTPROD_OVERRIDE || 'Standard_ND96amsr_A100_v4' }}
+      admin_private_azureMLStudioUI: ${{ vars.AML_STUDIO_UI_PRIVATE || 'true' }}
+      admin_private_DatabricksUI: ${{ vars.DATABRICKS_PRIVATE || 'false' }}
+
+      # Naming / network bases
+      vnetNameBase: ${{ vars.VNET_NAME_BASE || 'vnt-esmlcmn' }}
+      vnetResourceGroupBase: ${{ vars.VNET_RESOURCE_GROUP_BASE || 'esml-common' }}
+      common_subnet_name: ${{ vars.COMMON_SUBNET_NAME || 'snet-esml-cmn-001' }}
+      centralDnsZoneByPolicyInHub: ${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB || 'false' }}
+      privDnsSubscription_param: ${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM || '' }}
+      privDnsResourceGroup_param: ${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM || '' }}
+      commonResourceGroup_param: ${{ vars.COMMON_RESOURCE_GROUP_PARAM || '' }}
+      datalakeName_param: ${{ vars.DATALAKE_NAME_PARAM || '' }}
+      kvNameFromCOMMON_param: ${{ vars.KV_NAME_FROM_COMMON_PARAM || '' }}
+
+      # BYO overrides
+      vnetResourceGroup_param: ${{ vars.VNET_RESOURCE_GROUP_PARAM || '' }}
+      vnetNameFull_param: ${{ vars.VNET_NAME_FULL_PARAM || '' }}
+      subnetCommon: ${{ vars.SUBNET_COMMON || '' }}
+      subnetCommonScoring: ${{ vars.SUBNET_COMMON_SCORING || '' }}
+      subnetCommonPowerbiGw: ${{ vars.SUBNET_COMMON_POWERBI_GW || '' }}
+      subnetProjGenAI: ${{ vars.SUBNET_PROJ_GENAI || '' }}
+      subnetProjAKS: ${{ vars.SUBNET_PROJ_AKS || '' }}
+      subnetProjAKS2: ${{ vars.SUBNET_PROJ_AKS2 || '' }}
+      subnetProjACA: ${{ vars.SUBNET_PROJ_ACA || '' }}
+      subnetProjACA2: ${{ vars.SUBNET_PROJ_ACA2 || '' }}
+      subnetProjDatabricksPublic: ${{ vars.SUBNET_PROJ_DATABRICKS_PUBLIC || '' }}
+      subnetProjDatabricksPrivate: ${{ vars.SUBNET_PROJ_DATABRICKS_PRIVATE || '' }}
+      byoASEv3: ${{ vars.BYO_ASEV3 || 'false' }}
+      byoAseFullResourceId: ${{ vars.BYO_ASE_FULL_RESOURCE_ID || '' }}
+      byoAseAppServicePlanResourceId: ${{ vars.BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID || '' }}
+
+      # Feature flags / services
+      enableAIServices: ${{ vars.ENABLE_AI_SERVICES || 'false' }}
+      enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
+      addAISearch: ${{ vars.ADD_AI_SEARCH || 'true' }}
+      AISEARCH_SEMANTIC_TIER: ${{ vars.AISEARCH_SEMANTIC_TIER || 'free' }}
+      enableAISearchSharedPrivateLink: ${{ vars.ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK || 'true' }}
+      enableAzureOpenAI: ${{ vars.ENABLE_AZURE_OPENAI || 'false' }}
+      enableAzureAIVision: ${{ vars.ENABLE_AZURE_AI_VISION || 'false' }}
+      enableAzureSpeech: ${{ vars.ENABLE_AZURE_SPEECH || 'false' }}
+      enableAIDocIntelligence: ${{ vars.ENABLE_AI_DOC_INTELLIGENCE || 'false' }}
+      enableContentSafety: ${{ vars.ENABLE_CONTENT_SAFETY || 'false' }}
+      enableBing: ${{ vars.ENABLE_BING || 'false' }}
+      enableBingCustomSearch: ${{ vars.ENABLE_BING_CUSTOM_SEARCH || 'false' }}
+      enableAIFoundryHub: ${{ vars.ENABLE_AI_FOUNDRY_HUB || 'false' }}
+      addAIFoundryHub: ${{ vars.ADD_AIFOUNDRY_HUB || 'false' }}
+      enableAIFoundry: ${{ vars.ENABLE_AIFOUNDRY || 'true' }}
+      updateAIFoundry: ${{ vars.UPDATE_AIFOUNDRY || 'false' }}
+      addAIFoundry: ${{ vars.ADD_AIFOUNDRY || 'false' }}
+      enableAFoundryCaphost: ${{ vars.ENABLE_AFOUNDRY_CAPHOST || 'true' }}
+      foundryDeploymentType: ${{ vars.FOUNDRY_DEPLOYMENT_TYPE || '1' }}
+      enableAIFactoryCreatedDefaultProjectForAIFv2: ${{ vars.ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2 || 'true' }}
+      disableAgentNetworkInjection: ${{ vars.DISABLE_AGENT_NETWORK_INJECTION || 'false' }}
+      enableDatafactory: ${{ vars.ENABLE_DATAFACTORY || 'false' }}
+      enableAzureMachineLearning: ${{ vars.ENABLE_AZURE_MACHINE_LEARNING || 'false' }}
+      addAzureMachineLearning: ${{ vars.ADD_AZURE_MACHINE_LEARNING || 'false' }}
+      enableDatafactoryCommon: ${{ vars.ENABLE_DATAFACTORY_COMMON || 'false' }}
+      enableDatabricks: ${{ vars.ENABLE_DATABRICKS || 'false' }}
+      enableAksForAzureML: ${{ vars.ENABLE_AKS_FOR_AZURE_ML || 'true' }}
+      aksOutboundType: ${{ vars.AKS_OUTBOUND_TYPE || 'loadBalancer' }}
+      aksPrivateDNSZone: ${{ vars.AKS_PRIVATE_DNS_ZONE || 'system' }}
+      aksAzureFirewallPrivateIp: ${{ vars.AKS_AZURE_FIREWALL_PRIVATE_IP || '' }}
+      enableContainerApps: ${{ vars.ENABLE_CONTAINER_APPS || 'false' }}
+      enableAppInsightsDashboard: ${{ vars.ENABLE_APPINSIGHTS_DASHBOARD || 'false' }}
+      enableFunction: ${{ vars.ENABLE_FUNCTION || 'false' }}
+      functionRuntime: ${{ vars.FUNCTION_RUNTIME || 'dotnet' }}
+      functionVersion: ${{ vars.FUNCTION_VERSION || 'v7.0' }}
+      enableWebApp: ${{ vars.ENABLE_WEBAPP || 'false' }}
+      webAppRuntime: ${{ vars.WEBAPP_RUNTIME || 'python' }}
+      webAppRuntimeVersion: ${{ vars.WEBAPP_RUNTIME_VERSION || '3.11' }}
+      aseSku: ${{ vars.ASE_SKU || 'IsolatedV2' }}
+      aseSkuCode: ${{ vars.ASE_SKU_CODE || 'I1v2' }}
+      aseSkuWorkers: ${{ vars.ASE_SKU_WORKERS || '1' }}
+      enableLogicApps: ${{ vars.ENABLE_LOGIC_APPS || 'false' }}
+      enableEventHubs: ${{ vars.ENABLE_EVENT_HUBS || 'false' }}
+      enableBotService: ${{ vars.ENABLE_BOT_SERVICE || 'true' }}
+      enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
+      cosmosKind: ${{ vars.COSMOS_KIND || 'GlobalDocumentDB' }}
+      enablePostgreSQL: ${{ vars.ENABLE_POSTGRESQL || 'false' }}
+      enableRedisCache: ${{ vars.ENABLE_REDIS_CACHE || 'false' }}
+      enableSQLDatabase: ${{ vars.ENABLE_SQL_DATABASE || 'false' }}
+      enablePublicGenAIAccess: ${{ vars.ENABLE_PUBLIC_GENAI_ACCESS || 'false' }}
+      allowPublicAccessWhenBehindVnet: ${{ vars.ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET || 'false' }}
+      enablePublicAccessWithPerimeter: ${{ vars.ENABLE_PUBLIC_ACCESS_WITH_PERIMETER || 'false' }}
+      updateKeyvaultRbac: ${{ vars.UPDATE_KEYVAULT_RBAC || 'false' }}
+      updateRbac: ${{ vars.UPDATE_RBAC || 'false' }}
+      disableContributorAccessForUsers: ${{ vars.DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS || 'false' }}
+      disableRBACAdminOnRGForUsers: ${{ vars.DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS || 'false' }}
+      enableDefenderforAISubLevel: ${{ vars.ENABLE_DEFENDER_FOR_AI_SUB_LEVEL || 'false' }}
+      enableDefenderforAIResourceLevel: ${{ vars.ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL || 'false' }}
+
+      # Model deployment defaults
+      deployModel_gpt_X: ${{ vars.DEPLOY_MODEL_GPT_X || 'false' }}
+      modelGPTXName: ${{ vars.MODEL_GPTX_NAME || 'gpt-5-mini' }}
+      modelGPTXVersion: ${{ vars.MODEL_GPTX_VERSION || '' }}
+      modelGPTXSku: ${{ vars.MODEL_GPTX_SKU || 'DataZoneStandard' }}
+      modelGPTXCapacity: ${{ vars.MODEL_GPTX_CAPACITY || '30' }}
+      deployModel_text_embedding_ada_002: ${{ vars.DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002 || 'false' }}
+      deployModel_text_embedding_3_large: ${{ vars.DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE || 'true' }}
+      deployModel_text_embedding_3_small: ${{ vars.DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL || 'false' }}
+      default_embedding_capacity: ${{ vars.DEFAULT_EMBEDDING_CAPACITY || '25' }}
+      deployModel_gpt_4o: ${{ vars.DEPLOY_MODEL_GPT_4O || 'true' }}
+      default_gpt_4o_version: ${{ vars.DEFAULT_GPT_4O_VERSION || '2024-11-20' }}
+      deployModel_gpt_4o_mini: ${{ vars.DEPLOY_MODEL_GPT_4O_MINI || 'false' }}
+      default_gpt_4o_mini_version: ${{ vars.DEFAULT_GPT_4O_MINI_VERSION || '2024-07-18' }}
+      default_gpt_capacity: ${{ vars.DEFAULT_GPT_CAPACITY || '40' }}
+      default_model_sku: ${{ vars.DEFAULT_MODEL_SKU || 'Standard' }}
+
+      # Diagnostics / tags
+      diagnosticSettingLevel: ${{ vars.DIAGNOSTIC_SETTING_LEVEL || 'gold' }}
+      tags: ${{ vars.TAGS || '{}' }}
+      tagsProject: ${{ vars.TAGS_PROJECT || '{}' }}
+
+      # CMK
+      cmk: ${{ vars.CMK || 'false' }}
+      cmkKeyName: ${{ vars.CMK_KEY_NAME || 'aifactory-cmk-key' }}
+      cmkKeyVersion: ${{ vars.CMK_KEY_VERSION || '' }}
+
+      # ACR / compute options
+      acr_adminUserEnabled: ${{ vars.ACR_ADMIN_USER_ENABLED || 'false' }}
+      acr_dedicated: ${{ vars.ACR_DEDICATED || 'false' }}
+      acr_SKU: ${{ vars.ACR_SKU || 'Premium' }}
+      enableProjectVM: ${{ vars.ENABLE_PROJECT_VM || 'false' }}
+      aca_a_registry_image: ${{ vars.ACA_W_REGISTRY_IMAGE || 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' }}
+      aca_w_registry_image: ${{ vars.ACA_W_REGISTRY_IMAGE || 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest' }}
+
+      # Foundry / APIM
+      foundryApiManagementResourceId: ${{ vars.FOUNDRY_API_MANAGEMENT_RESOURCE_ID || '' }}
+
+      # Existence flags defaults (set by validations)
+      aiHubExists: 'false'
+      aifProjectExists: 'false'
+      aiFoundryV2Exists: 'false'
+      aiFoundryV2ProjectExists: 'false'
+      dataFactoryExists: 'false'
+      botServiceExists: 'false'
+      aksExists: 'false'
+      amlExists: 'false'
+      openaiExists: 'false'
+      aiSearchExists: 'false'
+      aiServicesExists: 'false'
+      containerAppsEnvExists: 'false'
+      containerAppAExists: 'false'
+      containerAppWExists: 'false'
+      keyvaultExists: 'false'
+      miACAExists: 'false'
+      miPrjExists: 'false'
+      storageAccount1001Exists: 'false'
+      storageAccount2001Exists: 'false'
+      cosmosDBExists: 'false'
+      redisExists: 'false'
+      postgreSQLExists: 'false'
+      sqlServerExists: 'false'
+      logicAppsExists: 'false'
+      eventHubsExists: 'false'
+      functionAppExists: 'false'
+      webAppExists: 'false'
+      funcAppServicePlanExists: 'false'
+      webAppServicePlanExists: 'false'
+      applicationInsightExists: 'false'
+      acrProjectExists: 'false'
+      databricksExists: 'false'
+      skipACRAssignments: 'false'
+      sntGenaiExists: 'false'
+      sntAcaExists: 'false'
+      sntAca002Exists: 'false'
+      sntAksExists: 'false'
+      sntAks002Exists: 'false'
+      sntDatabricksPrivExists: 'false'
+      sntDatabricksPubExists: 'false'
+      LAKE_PREFIX: ${{ vars.LAKE_PREFIX || 'lake' }}
+
+      projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+      projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
+
+    steps:
+            - name: Azure Login
+              uses: azure/login@v2
+              with:
+                creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                submodules: true
+
+            - name: Validate required configuration
+              run: |
+                $required = @(
+                  'dev_test_prod',
+                  'dev_test_prod_sub_id',
+                  'admin_location',
+                  'admin_locationSuffix',
+                  'admin_aifactoryPrefixRG',
+                  'admin_aifactorySuffixRG',
+                  'admin_bicep_input_keyvault_subscription',
+                  'admin_bicep_kv_fw',
+                  'admin_bicep_kv_fw_rg',
+                  'tenantId',
+                  'project_number_000',
+                  'project_service_principal_AppID_seeding_kv_name',
+                  'project_service_principal_OID_seeding_kv_name',
+                  'project_service_principal_Secret_seeding_kv_name',
+                  'AIFACTORY_SALT',
+                  'AIFACTORY_SALT_RANDOM'
+                )
+                $placeholders = @('<todo>', '<todo_id>', 'TODO', 'todo', '-')
+                $errors = @()
+                foreach ($key in $required) {
+                  $val = (Get-Item "Env:$key" -ErrorAction SilentlyContinue).Value
+                  if (-not $val) { $errors += "$key is required"; continue }
+                  if ($placeholders -contains $val) { $errors += "$key still has placeholder value '$val'" }
+                }
+                if ($Env:BYO_subnets -eq 'true') {
+                  foreach ($k in @('vnetResourceGroup_param', 'vnetNameFull_param')) {
+                    $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+                    if (-not $v) { $errors += "$k is required when BYO_subnets=true" }
+                  }
+                }
+                if (-not $Env:project_IP_whitelist -or $Env:project_IP_whitelist -eq '<todo_ip>') {
+                  Write-Warning 'PROJECT_MEMBERS_IP_ADDRESS is empty; deployments relying on IP allow lists may fail.'
+                }
+                if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+
+            - name: Initialize derived variables
+              run: |
+                $net = '${{ env.network_env }}'
+                if (-not $net) { $net = '${{ env.dev_test_prod }}' }
+                "network_env=$net" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+                if (-not $Env:deployment_random_value -or $Env:deployment_random_value -eq '') {
+                  $rand = [System.Guid]::NewGuid().ToString('N').Substring(0,10)
+                  "deployment_random_value=$rand" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+                }
+                if (-not $Env:privDnsSubscription_param -or $Env:privDnsSubscription_param -eq '') {
+                  "privDnsSubscription_param=${{ env.dev_test_prod_sub_id }}" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+                }
+                if (-not $Env:tags) { "tags=${{ env.tags }}" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append }
+                if (-not $Env:tagsProject) { "tagsProject=${{ env.tagsProject }}" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append }
+                if (-not $Env:aifactory_salt_random -or $Env:aifactory_salt_random -eq '') { "aifactory_salt_random=${{ env.AIFACTORY_SALT_RANDOM }}" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append }
+
+            - name: Resolve network env placeholders
+              run: |
+                $networkEnv = $Env:network_env
+                $vnetRg = '${{ env.vnetResourceGroup_param }}'
+                $vnetName = '${{ env.vnetNameFull_param }}'
+                if ($vnetRg -like '*<network_env>*') { $vnetRg = $vnetRg -replace '<network_env>', $networkEnv }
+                if ($vnetName -like '*<network_env>*') { $vnetName = $vnetName -replace '<network_env>', $networkEnv }
+                "vnetResourceGroup_resolved=$vnetRg" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+                "vnetNameFull_resolved=$vnetName" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+
+            - name: Print info
+              run: |
+                echo "env.dev_test_prod=${{ env.dev_test_prod }}"
+                echo "env.project_number_000=${{ env.project_number_000 }}"
+                echo "env.runNetworkingVar=${{ env.runNetworkingVar }}"
+                echo "env.BYO_subnets=${{ env.BYO_subnets }}"
+                echo "env.admin_projectType=${{ env.admin_projectType }}"
+                echo "env.useCommonACR=${{ env.useCommonACR }}"
+                echo "env.network_env=${{ env.network_env }}"
+
+            - name: Validate project subnet exists
+              if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+              shell: bash
+              run: |
+                set -e
+                az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                PROJECT_SUBNET_NAME="snt-prj${{ env.project_number_000 }}-aks"
+                VNET_NAME="${{ env.vnetNameFull_resolved }}"
+                VNET_RG="${{ env.vnetResourceGroup_resolved }}"
+                if [ -z "$VNET_NAME" ]; then VNET_NAME="${{ env.vnetNameBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_commonResourceSuffix }}"; fi
+                if [ -z "$VNET_RG" ]; then VNET_RG="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}"; fi
+                echo "Using VNET $VNET_NAME in RG $VNET_RG"
+                if ! az network vnet show --name "$VNET_NAME" --resource-group "$VNET_RG" >/dev/null 2>&1; then
+                  echo "VNET $VNET_NAME not found in $VNET_RG"; exit 1; fi
+                if az network vnet subnet show --name "$PROJECT_SUBNET_NAME" --vnet-name "$VNET_NAME" --resource-group "$VNET_RG" >/dev/null 2>&1; then
+                  echo "Subnet already exists; networking can be skipped if desired."; exit 0; fi
+                echo "Subnet missing, networking will deploy create-if-not-exists."
+
+            - name: Get runner public IP
+              if: env.disable_whitelisting_for_build_agents != 'true'
+              run: |
+                $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
+                "runner_ip=$resp" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+                echo "runner_ip=$resp"
+
+            - name: Allow runner IP on seeding Key Vault
+              if: env.disable_whitelisting_for_build_agents != 'true'
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.admin_bicep_input_keyvault_subscription }}"
+                  az keyvault update \
+                    --name "${{ env.admin_bicep_kv_fw }}" \
+                    --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
+                    --default-action Deny \
+                    --public-network-access Enabled
+                  echo "Waiting for Key Vault network rules to propagate..."
+                  sleep 15
+                  az keyvault network-rule add \
+                    --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
+                    --name "${{ env.admin_bicep_kv_fw }}" \
+                    --ip-address "${{ env.runner_ip }}"
+
+            - name: Download secrets from seeding Key Vault
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.admin_bicep_input_keyvault_subscription }}"
+                  echo "common_sp_appid_value=$(az keyvault secret show --vault-name \"${{ env.admin_bicep_kv_fw }}\" --name \"${{ env.common_sp_appid_seeding_kv_name }}\" --query 'value' --output tsv)" >> $GITHUB_ENV
+                  echo "common_sp_secret_value=$(az keyvault secret show --vault-name \"${{ env.admin_bicep_kv_fw }}\" --name \"${{ env.common_sp_secret_seeding_kv_name }}\" --query 'value' --output tsv)" >> $GITHUB_ENV
+                  echo "project_sp_oid_value=$(az keyvault secret show --vault-name \"${{ env.admin_bicep_kv_fw }}\" --name \"${{ env.project_service_principal_OID_seeding_kv_name }}\" --query 'value' --output tsv)" >> $GITHUB_ENV
+
+            - name: Calculate subnet allocations
+              if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+              working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
+              run: |
+                sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1" \
+                  -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' \
+                  -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' \
+                  -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' \
+                  -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' \
+                  -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' \
+                  -filePath '../../../../../aifactory/parameters/' \
+                  -spObjId '${{ env.common_sp_appid_value }}' \
+                  -spSecret '${{ env.common_sp_secret_value }}' \
+                  -env '${{ env.dev_test_prod }}' \
+                  -subscriptionId '${{ env.dev_test_prod_sub_id }}' \
+                  -prjResourceSuffix '${{ env.admin_prjResourceSuffix }}' \
+                  -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' \
+                  -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' \
+                  -commonResourceSuffixADO '${{ env.admin_commonResourceSuffix }}' \
+                  -locationADO '${{ env.admin_location }}' \
+                  -locationSuffixADO '${{ env.admin_locationSuffix }}' \
+                  -projectTypeADO '${{ env.admin_projectType }}' \
+                  -vnetResourceGroupBase '${{ env.vnetResourceGroupBase }}' \
+                  -vnetNameBase '${{ env.vnetNameBase }}' \
+                  -tenantId '${{ env.tenantId }}' \
+                  -vnetResourceGroup_param '${{ env.vnetResourceGroup_resolved }}' \
+                  -vnetNameFull_param '${{ env.vnetNameFull_resolved }}' \
+                  -useServicePrincipal
+
+            - name: Deploy project subnets + NSGs (GenAI)
+              if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment group create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}SubnetDeplProj" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --resource-group "${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep" \
+                    --parameters @"./aifactory/parameters/subnetParameters.json" \
+                    --parameters @"./aifactory/parameters/10-esml-globals-1.json" \
+                    --parameters @"./aifactory/parameters/10-esml-globals-override.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters vnetResourceGroup="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters datalakeName_param="${{ env.datalakeName_param }}" \
+                    --parameters kvNameFromCOMMON_param="${{ env.kvNameFromCOMMON_param }}" \
+                    --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+                    --parameters subnetCommon="${{ env.subnetCommon }}" \
+                    --parameters subnetCommonScoring="${{ env.subnetCommonScoring }}" \
+                    --parameters subnetCommonPowerbiGw="${{ env.subnetCommonPowerbiGw }}" \
+                    --parameters subnetProjGenAI="${{ env.subnetProjGenAI }}" \
+                    --parameters subnetProjAKS="${{ env.subnetProjAKS }}" \
+                    --parameters subnetProjAKS2="${{ env.subnetProjAKS2 }}" \
+                    --parameters subnetProjACA="${{ env.subnetProjACA }}" \
+                    --parameters subnetProjACA2="${{ env.subnetProjACA2 }}" \
+                    --parameters subnetProjDatabricksPublic="${{ env.subnetProjDatabricksPublic }}" \
+                    --parameters subnetProjDatabricksPrivate="${{ env.subnetProjDatabricksPrivate }}" \
+                    --parameters byoASEv3="${{ env.byoASEv3 }}" \
+                    --parameters byoAseFullResourceId="${{ env.byoAseFullResourceId }}" \
+                    --parameters byoAseAppServicePlanResourceId="${{ env.byoAseAppServicePlanResourceId }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters aksOutboundType="${{ env.aksOutboundType }}" \
+                    --parameters azureFirewallPrivateIp="${{ env.aksAzureFirewallPrivateIp }}" \
+                    --debug
+
+            - name: Generate dynamic network parameters
+              working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
+              run: |
+                sudo pwsh -Command "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1" \
+                  -spObjId '${{ env.common_sp_appid_value }}' \
+                  -spSecret '${{ env.common_sp_secret_value }}' \
+                  -BYO_subnets '${{ env.BYO_subnets }}' \
+                  -network_env '${{ env.network_env }}' \
+                  -useServicePrincipal \
+                  -bicepPar1 '../../../../../aifactory/parameters/10-esml-globals-1.json' \
+                  -bicepPar2 '../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json' \
+                  -bicepPar3 '../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json' \
+                  -bicepPar4 '../../../../../aifactory/parameters/21-22-esml-prj-parameters.json' \
+                  -bicepPar5 '../../../../../aifactory/parameters/10-esml-globals-override.json' \
+                  -filePath '../../../../../aifactory/parameters/' \
+                  -env '${{ env.dev_test_prod }}' \
+                  -locationSuffixADO '${{ env.admin_locationSuffix }}' \
+                  -aifactorySuffixRGADO '${{ env.admin_aifactorySuffixRG }}' \
+                  -projectNumber '${{ env.project_number_000 }}' \
+                  -subscriptionId '${{ env.dev_test_prod_sub_id }}' \
+                  -commonRGNamePrefixVar '${{ env.admin_aifactoryPrefixRG }}' \
+                  -projectTypeADO '${{ env.admin_projectType }}'
+
+            - name: Check Private DNS zones
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  set -e
+                  privDnsSubscription="${{ env.privDnsSubscription_param || env.dev_test_prod_sub_id }}"
+                  privDnsRg="${{ env.privDnsResourceGroup_param }}"
+                  if [ -z "$privDnsRg" ]; then
+                    privDnsRg="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}"
+                  fi
+                  az account set --subscription "$privDnsSubscription"
+                  declare -A zones=(
+                    [zoneazurecontainerapps]="privatelink.${{ env.admin_location }}.azurecontainerapps.io"
+                    [zoneredis]="privatelink.redis.cache.windows.net"
+                    [zonepostgres]="privatelink.postgres.database.azure.com"
+                    [zonesql]="privatelink.database.windows.net"
+                    [zoneMongo]="privatelink.mongo.cosmos.azure.com"
+                    [zoneServicesAi]="privatelink.services.ai.azure.com"
+                    [zoneAPIM]="privatelink.azure-api.net"
+                  )
+                  for key in "${!zones[@]}"; do
+                    dnsZoneName="${zones[$key]}"
+                    exists=$(az network private-dns zone show --subscription "$privDnsSubscription" --resource-group "$privDnsRg" --name "$dnsZoneName" >/dev/null 2>&1 && echo true || echo false)
+                    echo "${key}Exists=$exists" >> $GITHUB_ENV
+                  done
+
+            - name: Check resource existence (fuzzy)
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  set -e
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+                  projectNumber="${{ env.project_number_000 }}"
+                  projectName="prj${projectNumber}"
+                  locationSuffix="${{ env.admin_locationSuffix }}"
+                  envName="${{ env.dev_test_prod }}"
+                  aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+                  projectPrefix="${{ env.projectPrefix }}"
+                  projectSuffix="${{ env.projectSuffix }}"
+                  projectNameReplaced="${projectName/prj/project}"
+                  targetRG="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+                  echo "targetRG=$targetRG"
+                  if ! az group show --name "$targetRG" >/dev/null 2>&1; then
+                    exit 0
+                  fi
+                  resource_exists_fuzzy(){
+                    local rg=$1; local type=$2; local prefix=$3; local suffix=$4
+                    local output
+                    output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix') ].name" -o tsv 2>/dev/null)
+                    if [ -n "$output" ]; then echo true; else echo false; fi
+                  }
+                  resource_exists_identity(){
+                    local rg=$1; local prefix=$2
+                    local output
+                    output=$(az resource list --resource-group "$rg" --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" --query "[?starts_with(name, '$prefix')].name" -o tsv 2>/dev/null)
+                    if [ -n "$output" ]; then echo true; else echo false; fi
+                  }
+                  suffixStandard="${{ env.admin_prjResourceSuffix }}"
+                  suffixStandardNoDash="${suffixStandard#-}"
+                  suffixAppServicePlan="${suffixStandard}-plan"
+                  twoNumbers="${suffixStandard: -2}"
+                  aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+                  aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+                  aiFoundryV2Name="aif2"
+                  aiFoundryV2ProjectName="aif2-p${projectNumber}"
+                  botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
+                  dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
+                  aksName="aks${projectNumber}-${locationSuffix}-${envName}"
+                  amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
+                  openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
+                  safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
+                  aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
+                  containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
+                  containerAppAName="aca-a-${projectName}${locationSuffix}${envName}"
+                  containerAppWName="aca-w-${projectName}${locationSuffix}${envName}"
+                  keyvaultName="kv-p${projectNumber}-${locationSuffix}-${envName}"
+                  miACAPrefix="mi-aca-${projectName}-${locationSuffix}-${envName}"
+                  miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+                  storageAccount1001Name="sa${projectName}${locationSuffix}"
+                  storageAccount2001Name="sa${projectName}${locationSuffix}"
+                  echo "aiHubExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "aifProjectExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "aiFoundryV2Exists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "")" >> $GITHUB_ENV
+                  echo "aiFoundryV2ProjectExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts/projects" "$aiFoundryV2ProjectName" "")" >> $GITHUB_ENV
+                  echo "dataFactoryExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "botServiceExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "aksExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "amlExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "openaiExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "aiSearchExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")" >> $GITHUB_ENV
+                  echo "aiServicesExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")" >> $GITHUB_ENV
+                  echo "containerAppsEnvExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "containerAppAExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "containerAppWExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")" >> $GITHUB_ENV
+                  echo "keyvaultExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.KeyVault/vaults" "$keyvaultName" "$twoNumbers")" >> $GITHUB_ENV
+                  echo "miACAExists=$(resource_exists_identity "$targetRG" "$miACAPrefix")" >> $GITHUB_ENV
+                  echo "miPrjExists=$(resource_exists_identity "$targetRG" "$miPrjPrefix")" >> $GITHUB_ENV
+                  echo "storageAccount1001Exists=$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "")" >> $GITHUB_ENV
+                  echo "storageAccount2001Exists=$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "")" >> $GITHUB_ENV
+
+            - name: Extract aifactory_salt_random if MI exists
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  if [ "${{ env.miPrjExists }}" != "true" ]; then exit 0; fi
+                  commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+                  projectNumber="${{ env.project_number_000 }}"
+                  projectName="prj${projectNumber}"
+                  locationSuffix="${{ env.admin_locationSuffix }}"
+                  envName="${{ env.dev_test_prod }}"
+                  aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+                  projectPrefix="${{ env.projectPrefix }}"
+                  projectSuffix="${{ env.projectSuffix }}"
+                  projectNameReplaced="${projectName/prj/project}"
+                  targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+                  miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+                  miName=$(az identity list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '$miPrjPrefix')].name" -o tsv | head -n1)
+                  if [ -n "$miName" ]; then
+                    salt="${miName: -14:10}"
+                    echo "aifactory_salt_random=$salt" >> $GITHUB_ENV
+                  fi
+
+            # === Deploy sequences ===
+
+            - name: 61-foundation
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-61-foundation" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/01-foundation.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters useAdGroups="${{ env.use_groups }}" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroupBase="${{ env.vnetResourceGroupBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters miACAExists="${{ env.miACAExists }}" \
+                    --parameters miPrjExists="${{ env.miPrjExists }}" \
+                    --parameters keyvaultExists="${{ env.keyvaultExists }}" \
+                    --parameters storageAccount1001Exists="${{ env.storageAccount1001Exists }}" \
+                    --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+                    --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+                    --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+                    --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --debug
+
+            - name: 62-core-infrastructure
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  ADMIN_PASSWORD=$(date +%s | sha256sum | base64 | head -c 32)
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-62-core-infrastructure" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/02-core-infrastructure.bicep" \
+                    --parameters adminPassword="$ADMIN_PASSWORD" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters common_subnet_name="${{ env.common_subnet_name }}" \
+                    --parameters subnetCommon="${{ env.subnetCommon }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+                    --parameters projectServicePrincipleAppID_SeedingKeyvaultName="${{ env.project_service_principal_AppID_seeding_kv_name }}" \
+                    --parameters projectServicePrincipleSecret_SeedingKeyvaultName="${{ env.project_service_principal_Secret_seeding_kv_name }}" \
+                    --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+                    --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+                    --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+                    --parameters cmk="${{ env.cmk }}" \
+                    --parameters cmkKeyName="${{ env.cmkKeyName }}" \
+                    --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+                    --parameters storageAccount1001Exists="${{ env.storageAccount1001Exists }}" \
+                    --parameters storageAccount2001Exists="${{ env.storageAccount2001Exists }}" \
+                    --parameters keyvaultExists="${{ env.keyvaultExists }}" \
+                    --parameters acrProjectExists="${{ env.acrProjectExists }}" \
+                    --parameters miACAExists="${{ env.miACAExists }}" \
+                    --parameters miPrjExists="${{ env.miPrjExists }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
+                    --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
+                    --parameters allowPublicAccessWhenBehindVnet="${{ env.allowPublicAccessWhenBehindVnet }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters acr_adminUserEnabled="${{ env.acr_adminUserEnabled }}" \
+                    --parameters acr_dedicated="${{ env.acr_dedicated }}" \
+                    --parameters containerRegistrySkuName="${{ env.acr_SKU }}" \
+                    --parameters enableProjectVM="${{ env.enableProjectVM }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --parameters updateKeyvaultRbac="${{ env.updateKeyvaultRbac }}" \
+                    --parameters enableLogicApps="${{ env.enableLogicApps }}" \
+                    --debug
+
+            - name: 63-cognitive-services
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-63-cognitive-services" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/03-cognitive-services.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+                    --parameters openaiExists="${{ env.openaiExists }}" \
+                    --parameters aiSearchExists="${{ env.aiSearchExists }}" \
+                    --parameters aiServicesExists="${{ env.aiServicesExists }}" \
+                    --parameters keyvaultExists="${{ env.keyvaultExists }}" \
+                    --parameters storageAccount2001Exists="${{ env.storageAccount2001Exists }}" \
+                    --parameters storageAccount1001Exists="${{ env.storageAccount1001Exists }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters enableAIServices="${{ env.enableAIServices }}" \
+                    --parameters enableAISearch="${{ env.enableAISearch }}" \
+                    --parameters aiSearchSKUName="${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}" \
+                    --parameters semanticSearchTier="${{ env.AISEARCH_SEMANTIC_TIER || 'free' }}" \
+                    --parameters enableAzureOpenAI="${{ env.enableAzureOpenAI }}" \
+                    --parameters enableContentSafety="${{ env.enableContentSafety }}" \
+                    --parameters enableAzureAIVision="${{ env.enableAzureAIVision }}" \
+                    --parameters enableAzureSpeech="${{ env.enableAzureSpeech }}" \
+                    --parameters enableAIDocIntelligence="${{ env.enableAIDocIntelligence }}" \
+                    --parameters deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
+                    --parameters deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
+                    --parameters deployModel_text_embedding_ada_002="${{ env.deployModel_text_embedding_ada_002 }}" \
+                    --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+                    --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
+                    --parameters default_model_sku="${{ env.default_model_sku }}" \
+                    --parameters modelGPTXName="${{ env.modelGPTXName }}" \
+                    --parameters modelGPTXVersion="${{ env.modelGPTXVersion }}" \
+                    --parameters modelGPTXSku="${{ env.modelGPTXSku }}" \
+                    --parameters modelGPTXCapacity="${{ env.modelGPTXCapacity }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
+                    --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters miACAExists="${{ env.miACAExists }}" \
+                    --parameters miPrjExists="${{ env.miPrjExists }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --parameters enableBingCustomSearch="${{ env.enableBingCustomSearch }}" \
+                    --parameters enableBing="${{ env.enableBing }}" \
+                    --parameters enableAFoundryCaphost="${{ env.enableAFoundryCaphost }}" \
+                    --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
+                    --parameters enableAISearchSharedPrivateLink="${{ env.enableAISearchSharedPrivateLink }}" \
+                    --parameters cmk="${{ env.cmk }}" \
+                    --parameters cmkKeyName="${{ env.cmkKeyName }}" \
+                    --parameters addAISearch="${{ env.addAISearch }}" \
+                    --debug
+
+            - name: 64-databases
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-64-databases" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/04-databases.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+                    --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+                    --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+                    --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+                    --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+                    --parameters cosmosDBExists="${{ env.cosmosDBExists }}" \
+                    --parameters redisExists="${{ env.redisExists }}" \
+                    --parameters postgreSQLExists="${{ env.postgreSQLExists }}" \
+                    --parameters sqlServerExists="${{ env.sqlServerExists }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters enableCosmosDB="${{ env.enableCosmosDB }}" \
+                    --parameters cosmosKind="${{ env.cosmosKind }}" \
+                    --parameters enablePostgreSQL="${{ env.enablePostgreSQL }}" \
+                    --parameters enableRedisCache="${{ env.enableRedisCache }}" \
+                    --parameters enableSQLDatabase="${{ env.enableSQLDatabase }}" \
+                    --parameters useAdGroups="${{ env.use_groups }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
+                    --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --parameters enableAFoundryCaphost="${{ env.enableAFoundryCaphost }}" \
+                    --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
+                    --parameters cmk="${{ env.cmk }}" \
+                    --parameters cmkKeyName="${{ env.cmkKeyName }}" \
+                    --debug
+
+            - name: 65-compute-services
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-65-compute-services" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/05-compute-services.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+                    --parameters containerAppsEnvExists="${{ env.containerAppsEnvExists }}" \
+                    --parameters containerAppAExists="${{ env.containerAppAExists }}" \
+                    --parameters containerAppWExists="${{ env.containerAppWExists }}" \
+                    --parameters functionAppExists="${{ env.functionAppExists }}" \
+                    --parameters webAppExists="${{ env.webAppExists }}" \
+                    --parameters funcAppServicePlanExists="${{ env.funcAppServicePlanExists }}" \
+                    --parameters webAppServicePlanExists="${{ env.webAppServicePlanExists }}" \
+                    --parameters applicationInsightExists="${{ env.applicationInsightExists }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters enableContainerApps="${{ env.enableContainerApps }}" \
+                    --parameters enableFunction="${{ env.enableFunction }}" \
+                    --parameters enableWebApp="${{ env.enableWebApp }}" \
+                    --parameters enableBingSearch="${{ env.enableBing }}" \
+                    --parameters enableAzureOpenAI="${{ env.enableAzureOpenAI }}" \
+                    --parameters enableAISearch="${{ env.enableAISearch }}" \
+                    --parameters enableAIServices="${{ env.enableAIServices }}" \
+                    --parameters functionRuntime="${{ env.functionRuntime }}" \
+                    --parameters functionVersion="${{ env.functionVersion }}" \
+                    --parameters webAppRuntime="${{ env.webAppRuntime }}" \
+                    --parameters webAppRuntimeVersion="${{ env.webAppRuntimeVersion }}" \
+                    --parameters aseSku="${{ env.aseSku }}" \
+                    --parameters aseSkuCode="${{ env.aseSkuCode }}" \
+                    --parameters aseSkuWorkers="${{ env.aseSkuWorkers }}" \
+                    --parameters byoASEv3="${{ env.byoASEv3 }}" \
+                    --parameters byoAseFullResourceId="${{ env.byoAseFullResourceId }}" \
+                    --parameters enableAppInsightsDashboard="${{ env.enableAppInsightsDashboard }}" \
+                    --parameters aca_a_registry_image="${{ env.aca_a_registry_image }}" \
+                    --parameters aca_w_registry_image="${{ env.aca_w_registry_image }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
+                    --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters aiFoundryV2Exists="${{ env.aiFoundryV2Exists }}" \
+                    --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
+                    --parameters disableAgentNetworkInjection="${{ env.disableAgentNetworkInjection }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --parameters addAISearch="${{ env.addAISearch }}" \
+                    --debug
+
+            - name: 66-ai-platform
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-66-ai-platform" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/06-ai-platform.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+                    --parameters aiHubExists="${{ env.aiHubExists }}" \
+                    --parameters aifProjectExists="${{ env.aifProjectExists }}" \
+                    --parameters miPrjExists="${{ env.miPrjExists }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters enableAIFoundryHub="${{ env.enableAIFoundryHub }}" \
+                    --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
+                    --parameters enableAISearch="${{ env.enableAISearch }}" \
+                    --parameters enableAIServices="${{ env.enableAIServices }}" \
+                    --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+                    --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+                    --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+                    --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+                    --parameters deployModel_text_embedding_ada_002="${{ env.deployModel_text_embedding_ada_002 }}" \
+                    --parameters deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
+                    --parameters deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
+                    --parameters default_embedding_capacity="${{ env.default_embedding_capacity }}" \
+                    --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+                    --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
+                    --parameters default_model_sku="${{ env.default_model_sku }}" \
+                    --parameters deployModel_gpt_4o="${{ env.deployModel_gpt_4o }}" \
+                    --parameters deployModel_gpt_X="${{ env.deployModel_gpt_X }}" \
+                    --parameters modelGPTXName="${{ env.modelGPTXName }}" \
+                    --parameters modelGPTXVersion="${{ env.modelGPTXVersion }}" \
+                    --parameters modelGPTXSku="${{ env.modelGPTXSku }}" \
+                    --parameters modelGPTXCapacity="${{ env.modelGPTXCapacity }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
+                    --parameters allowPublicAccessWhenBehindVnet="${{ env.allowPublicAccessWhenBehindVnet }}" \
+                    --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
+                    --parameters common_subnet_name="${{ env.common_subnet_name }}" \
+                    --parameters subnetCommon="${{ env.subnetCommon }}" \
+                    --parameters subnetCommonScoring="${{ env.subnetCommonScoring }}" \
+                    --parameters subscriptionIdDevTestProd="${{ env.dev_test_prod_sub_id }}" \
+                    --parameters useAdGroups="${{ env.use_groups }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --parameters cmk="${{ env.cmk }}" \
+                    --parameters cmkKeyName="${{ env.cmkKeyName }}" \
+                    --parameters addAISearch="${{ env.addAISearch }}" \
+                    --debug
+
+            - name: 67-data_ml_platform
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-67-data-ml-platform" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/07-ml-data-platform.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters subscriptionIdDevTestProd="${{ env.dev_test_prod_sub_id }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters aks_dev_sku_override="${{ env.admin_aks_gpu_sku_dev_override }}" \
+                    --parameters aks_test_prod_sku_override="${{ env.admin_aks_gpu_sku_test_prod_override }}" \
+                    --parameters aks_version_override="${{ env.admin_aks_version_override }}" \
+                    --parameters aks_dev_nodes_override="${{ env.admin_aks_nodes_dev_override }}" \
+                    --parameters aks_test_prod_nodes_override="${{ env.admin_aks_nodes_testProd_override }}" \
+                    --parameters aml_ci_dev_sku_override="${{ env.admin_aml_computeInstance_dev_sku_override }}" \
+                    --parameters aml_ci_test_prod_sku_override="${{ env.admin_aml_computeInstance_testProd_sku_override }}" \
+                    --parameters aml_cluster_dev_sku_override="${{ env.admin_aml_cluster_sku_dev_override }}" \
+                    --parameters aml_cluster_test_prod_sku_override="${{ env.admin_aml_cluster_sku_testProd_override }}" \
+                    --parameters aml_cluster_dev_nodes_override="${{ env.admin_aml_cluster_maxNodes_dev_override }}" \
+                    --parameters aml_cluster_test_prod_nodes_override="${{ env.admin_aml_cluster_maxNodes_testProd_override }}" \
+                    --parameters AMLStudioUIPrivate="${{ env.admin_private_azureMLStudioUI }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+                    --parameters useAdGroups="${{ env.use_groups }}" \
+                    --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+                    --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+                    --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+                    --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+                    --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+                    --parameters amlExists="${{ env.amlExists }}" \
+                    --parameters aksExists="${{ env.aksExists }}" \
+                    --parameters dataFactoryExists="${{ env.dataFactoryExists }}" \
+                    --parameters databricksExists="${{ env.databricksExists }}" \
+                    --parameters enableDatafactory="${{ env.enableDatafactory }}" \
+                    --parameters enableAzureMachineLearning="${{ env.enableAzureMachineLearning }}" \
+                    --parameters enableDatabricks="${{ env.enableDatabricks }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --parameters addAzureMachineLearning="${{ env.addAzureMachineLearning }}" \
+                    --parameters enableAksForAzureML="${{ env.enableAksForAzureML }}" \
+                    --parameters aksOutboundType="${{ env.aksOutboundType }}" \
+                    --parameters aksPrivateDNSZone="${{ env.aksPrivateDNSZone }}" \
+                    --parameters cmk="${{ env.cmk }}" \
+                    --parameters cmkKeyName="${{ env.cmkKeyName }}"
+
+            - name: 68-integration
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-68-integration" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/11-integration.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters subscriptionIdDevTestProd="${{ env.dev_test_prod_sub_id }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+                    --parameters useAdGroups="${{ env.use_groups }}" \
+                    --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
+                    --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+                    --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+                    --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+                    --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+                    --parameters enableLogicApps="${{ env.enableLogicApps }}" \
+                    --parameters enableEventHubs="${{ env.enableEventHubs }}" \
+                    --parameters logicAppsExists="${{ env.logicAppsExists }}" \
+                    --parameters eventHubsExists="${{ env.eventHubsExists }}" \
+                    --parameters functionAppExists="${{ env.functionAppExists }}" \
+                    --parameters enableFunction="${{ env.enableFunction }}" \
+                    --parameters enableWebApp="${{ env.enableWebApp }}" \
+                    --parameters webAppExists="${{ env.webAppExists }}" \
+                    --parameters enableBotService="${{ env.enableBotService }}" \
+                    --parameters addAIFoundry="${{ env.addAIFoundry }}" \
+                    --parameters botServiceExists="${{ env.botServiceExists }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}"
+
+            - name: 99_check_acr_role_assignments
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  commonResourceGroup="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}"
+                  acrName=$(az acr list --resource-group "$commonResourceGroup" --query "[0].name" -o tsv 2>/dev/null || true)
+                  if [ -z "$acrName" ]; then echo "skipACRAssignments=false" >> $GITHUB_ENV; exit 0; fi
+                  acrPushRoleId="8311e382-0749-4cb8-b61a-304f252e45ec"
+                  acrScope="/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${commonResourceGroup}/providers/Microsoft.ContainerRegistry/registries/${acrName}"
+                  assignments=$(az role assignment list --scope "$acrScope" --role "$acrPushRoleId" --query "[?principalType=='User' || principalType=='Group']" -o tsv 2>/dev/null || true)
+                  if [ -n "$assignments" ]; then echo "skipACRAssignments=true" >> $GITHUB_ENV; else echo "skipACRAssignments=false" >> $GITHUB_ENV; fi
+
+            - name: 100-rbac-security
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-100-rbac-security" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/08-rbac-security.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+                    --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+                    --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+                    --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+                    --parameters network_env="${{ env.network_env }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters azureMachineLearningObjectId="${{ env.azure_machinelearning_sp_oid }}" \
+                    --parameters useAdGroups="${{ env.use_groups }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters enableAzureMachineLearning="${{ env.enableAzureMachineLearning }}" \
+                    --parameters enableAIFoundryHub="${{ env.enableAIFoundryHub }}" \
+                    --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
+                    --parameters enableAIServices="${{ env.enableAIServices }}" \
+                    --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
+                    --parameters enableAISearch="${{ env.enableAISearch }}" \
+                    --parameters enableFunction="${{ env.enableFunction }}" \
+                    --parameters enableWebApp="${{ env.enableWebApp }}" \
+                    --parameters enableContainerApps="${{ env.enableContainerApps }}" \
+                    --parameters enableAppInsightsDashboard="${{ env.enableAppInsightsDashboard }}" \
+                    --parameters enableAzureOpenAI="${{ env.enableAzureOpenAI }}" \
+                    --parameters enableAzureAIVision="${{ env.enableAzureAIVision }}" \
+                    --parameters enableAzureSpeech="${{ env.enableAzureSpeech }}" \
+                    --parameters enableAIDocIntelligence="${{ env.enableAIDocIntelligence }}" \
+                    --parameters disableContributorAccessForUsers="${{ env.disableContributorAccessForUsers }}" \
+                    --parameters disableRBACAdminOnRGForUsers="${{ env.disableRBACAdminOnRGForUsers }}" \
+                    --parameters enableCosmosDB="${{ env.enableCosmosDB }}" \
+                    --parameters enablePostgreSQL="${{ env.enablePostgreSQL }}" \
+                    --parameters enableRedisCache="${{ env.enableRedisCache }}" \
+                    --parameters enableSQLDatabase="${{ env.enableSQLDatabase }}" \
+                    --parameters enableLogicApps="${{ env.enableLogicApps }}" \
+                    --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+                    --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+                    --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+                    --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+                    --parameters commonLakeNamePrefixMax8chars="${{ env.LAKE_PREFIX }}" \
+                    --parameters tags=${{ env.tags }} \
+                    --parameters tagsProject=${{ env.tagsProject }} \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters dataFactoryExists="${{ env.dataFactoryExists }}" \
+                    --parameters aksExists="${{ env.aksExists }}" \
+                    --parameters amlExists="${{ env.amlExists }}" \
+                    --parameters aiHubExists="${{ env.aiHubExists }}" \
+                    --parameters aiServicesExists="${{ env.aiServicesExists }}" \
+                    --parameters openaiExists="${{ env.openaiExists }}" \
+                    --parameters updateRbac="${{ env.updateRbac }}" \
+                    --parameters miPrjExists="${{ env.miPrjExists }}" \
+                    --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+                    --parameters addAISearch="${{ env.addAISearch }}" \
+                    --parameters skipExistingRoleAssignments="${{ env.skipACRAssignments }}" \
+                    --debug
+
+            - name: 69-aifoundry-2025-option1
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  az deployment sub create \
+                    --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-69-aifoundry-2025-account-1st" \
+                    --subscription "${{ env.dev_test_prod_sub_id }}" \
+                    --location "${{ env.admin_location }}" \
+                    --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v2.bicep" \
+                    --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+                    --parameters targetSubscriptionId="${{ env.dev_test_prod_sub_id }}" \
+                    --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+                    --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+                    --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+                    --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+                    --parameters env="${{ env.dev_test_prod }}" \
+                    --parameters projectNumber="${{ env.project_number_000 }}" \
+                    --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+                    --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+                    --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+                    --parameters location="${{ env.admin_location }}" \
+                    --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+                    --parameters randomValue="${{ env.deployment_random_value }}" \
+                    --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+                    --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+                    --parameters subscriptionIdDevTestProd="${{ env.dev_test_prod_sub_id }}" \
+                    --parameters apiManagementResourceId="${{ env.foundryApiManagementResourceId }}" \
+                    --parameters privDnsSubscription_param="${{ env.privDnsSubscription_param }}" \
+                    --parameters privDnsResourceGroup_param="${{ env.privDnsResourceGroup_param }}" \
+                    --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
+                    --parameters projectPrefix="${{ env.projectPrefix }}" \
+                    --parameters projectSuffix="${{ env.projectSuffix }}" \
+                    --parameters tags=${{ env.tagsProject }} \
+                    --parameters addAIFoundry="${{ env.addAIFoundry }}" \
+                    --parameters enableAISearch="${{ env.enableAISearch }}" \
+                    --parameters enableAISearchSharedPrivateLink="${{ env.enableAISearchSharedPrivateLink }}" \
+                    --parameters aiFoundryV2Exists="${{ env.aiFoundryV2Exists }}" \
+                    --parameters aiFoundryV2ProjectExists="${{ env.aiFoundryV2ProjectExists }}" \
+                    --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
+                    --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
+                    --debug
+
+            - name: Foundry agent (optional)
+              if: success() && env.enableAIFoundry == 'true'
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+                  projectNumber="${{ env.project_number_000 }}"
+                  projectName="prj${projectNumber}"
+                  locationSuffix="${{ env.admin_locationSuffix }}"
+                  envName="${{ env.dev_test_prod }}"
+                  projectPrefix="${{ env.projectPrefix }}"
+                  projectSuffix="${{ env.projectSuffix }}"
+                  projectNameReplaced="${projectName/prj/project}"
+                  projectRG="${{ env.admin_aifactoryPrefixRG }}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${{ env.admin_aifactorySuffixRG }}${projectSuffix}"
+                  foundry=$(az cognitiveservices account list --subscription "${{ env.dev_test_prod_sub_id }}" --resource-group "$projectRG" --query "[?starts_with(name, 'aif2')].[name,resourceGroup]" -o tsv | head -n1)
+                  foundryName=$(echo "$foundry" | awk '{print $1}')
+                  foundryRg=$(echo "$foundry" | awk '{print $2}')
+                  if [ -z "$foundryName" ]; then echo "No Foundry found; skipping agent"; exit 0; fi
+                  endpoint=$(az cognitiveservices account show --name "$foundryName" --resource-group "$foundryRg" --query properties.endpoint -o tsv)
+                  access_token=$(az account get-access-token --resource https://cognitiveservices.azure.com/ --query accessToken -o tsv)
+                  payload='{"name":"agent-001","model":"gpt-4o-mini","description":"Created by workflow","metadata":{"source":"gha"}}'
+                  curl -sS -X POST "$endpoint/openai/agents?api-version=2024-10-01-preview" \
+                    -H "Content-Type: application/json" \
+                    -H "Authorization: Bearer $access_token" \
+                    -d "$payload" || true
+
+            - name: Remove runner IP from seeding Key Vault
+              if: always() && env.disable_whitelisting_for_build_agents != 'true'
+              uses: azure/cli@v2
+              with:
+                azcliversion: latest
+                inlineScript: |
+                  az account set --subscription "${{ env.admin_bicep_input_keyvault_subscription }}"
+                  az keyvault network-rule remove \
+                    --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
+                    --name "${{ env.admin_bicep_kv_fw }}" \
+                    --ip-address "${{ env.runner_ip }}" || true

@@ -141,7 +141,7 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
 ```
 Read more information in the comment section of variables.yaml
 
-11) Run the workflow `infra-project-genai.yaml`
+11) Run the workflow `infra-project.yml`
 
 ## Workflow: AIFactory Common 
 Start with setting up a common AIFactory environment, example, the DEV environment
@@ -149,8 +149,7 @@ Start with setting up a common AIFactory environment, example, the DEV environme
 
 ## Workflow: AIFactory projects
 Then you can import and run the pipelines to setup 1-M projects. There are 2 AIFactory project types supported as of now: 
-- [infra-project-genai.yaml](./infra-project-genai.yml)
-- [infra-project-esml.yaml](./infra-project-esml.yml)
+- [infra-project.yml](./infra-project.yml)
 
 
 > [!TIP]
