@@ -156,9 +156,10 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
     tags: tags
     location:location
   }
-  dependsOn:[
-    nsgBastion
-  ]
+  // Make sure the PBI NSG waits for whichever bastion NSG path is active
+  dependsOn: !empty(ipWhitelist_array)
+    ? [ nsgBastion ]
+    : [ nsgBastionNoWhitelist ]
 }
 var byoVnet = !empty(vnetNameFull_param)
 module vNetCommon '../modules-common/vNetCommon.bicep' = if(!BYO_subnets) {
