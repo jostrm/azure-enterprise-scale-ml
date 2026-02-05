@@ -151,7 +151,7 @@ param botMicrosoftAppId string = ''
 param botAgentEndpoint string = ''
 @description('Bot Service SKU')
 @allowed(['F0', 'S1'])
-param botServiceSku string = 'F0'
+param botServiceSku string = 'S1'
 
 @description('Tags to apply to all resources')
 param tags object

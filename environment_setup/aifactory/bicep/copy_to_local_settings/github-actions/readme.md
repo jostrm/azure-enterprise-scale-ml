@@ -45,7 +45,7 @@ git config --system core.longpaths true
     
     **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
     ```
-    git submodule foreach 'git checkout "release/v1.23" && git pull origin "release/v1.23"'
+    git submodule foreach 'git checkout "release/v1.24" && git pull origin "release/v1.24"'
     ```
 
     **Option B)**

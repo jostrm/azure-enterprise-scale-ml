@@ -34,6 +34,35 @@ fi
 # DIRECTORIES
 current_dir=$(pwd)
 
+# Rate limit safety: track operations and pause mid-way
+op_counter=0
+rate_limit_pause_after=50
+rate_limit_pause_after_2=85
+rate_limit_sleep_seconds=30
+rate_limit_sleep_seconds_2=30
+start_from_op=1
+run_current_op=true
+
+increment_counter() {
+  op_counter=$((op_counter + 1))
+  echo -e "${YELLOW}[${op_counter}] Processing: $1${NC}"
+  if [[ $op_counter -lt $start_from_op ]]; then
+    echo -e "${YELLOW}Skipping operation ${op_counter} (waiting to start at ${start_from_op})${NC}"
+    run_current_op=false
+    return
+  fi
+
+  run_current_op=true
+
+  if [[ $op_counter -eq $rate_limit_pause_after ]]; then
+    echo -e "${YELLOW}Hit ${rate_limit_pause_after} operations. Sleeping ${rate_limit_sleep_seconds}s to avoid GitHub secondary rate limits...${NC}"
+    sleep "$rate_limit_sleep_seconds"
+  elif [[ $op_counter -eq $rate_limit_pause_after_2 ]]; then
+    echo -e "${YELLOW}Hit ${rate_limit_pause_after_2} operations. Sleeping ${rate_limit_sleep_seconds_2}s to avoid GitHub secondary rate limits...${NC}"
+    sleep "$rate_limit_sleep_seconds_2"
+  fi
+}
+
 # Function to check if a variable exists
 check_variable_exists() {
   gh api repos/$GITHUB_NEW_REPO/environments/$1/variables/$2 > /dev/null 2>&1
@@ -51,6 +80,10 @@ create_or_update_variable() {
     return
   fi
 
+  increment_counter "variable $env/$name"
+  if [[ "$run_current_op" != "true" ]]; then
+    return
+  fi
   if check_variable_exists $env $name; then
     gh api --method PATCH -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/$env/variables/$name -f value="$value"
   else
@@ -68,12 +101,48 @@ create_or_update_secret() {
   local env=$1
   local name=$2
   local value=$3
+  increment_counter "secret $env/$name"
+  if [[ "$run_current_op" != "true" ]]; then
+    return
+  fi
   if check_secret_exists $env $name; then
     gh secret set $name --repo $GITHUB_NEW_REPO --env $env --body "$value"
   else
     gh secret set $name --repo $GITHUB_NEW_REPO --env $env --body "$value"
   fi
 }
+
+# Repo-level variable helper (used to offload common flags and reduce env var count)
+create_or_update_repo_variable() {
+  local name=$1
+  local value=$2
+  if [[ -z "$value" ]]; then
+    echo -e "${YELLOW}Skipping repo variable '$name' because the value is empty.${NC}"
+    return
+  fi
+  gh variable set "$name" --repo "$GITHUB_NEW_REPO" --body "$value"
+}
+
+# Prompt user for environment to run (default DEV) to avoid unnecessary rate-limited calls
+echo -e "${YELLOW}Select environment to run (d=DEV, s=STAGE, p=PROD, a=ALL). Default is DEV:${NC}"
+read -p "env [d/s/p/a]: " env_choice
+case "${env_choice,,}" in
+  a|all)  selected_environments=("dev" "stage" "prod") ;;
+  s|stage) selected_environments=("stage") ;;
+  p|prod)  selected_environments=("prod") ;;
+  d|dev|"") selected_environments=("dev") ;;
+  *) echo -e "${YELLOW}Unrecognized choice. Defaulting to DEV.${NC}"; selected_environments=("dev") ;;
+esac
+
+# Prompt for optional resume position
+echo -e "${YELLOW}Optional: resume from operation number (1-based). Leave empty to start from 1.${NC}"
+read -p "start_from_op: " start_from_input
+if [[ -n "$start_from_input" && "$start_from_input" =~ ^[0-9]+$ ]]; then
+  start_from_op=$start_from_input
+  echo -e "${YELLOW}Will start executing at operation ${start_from_op}.${NC}"
+else
+  start_from_op=1
+fi
 
 # Prompt user for orchestrator choice
 echo -e "${YELLOW}Do you want to overwrite AZURE_CREDENTIALS with dummy value? Usually only the 1st time this is needed, to create the variable in Github (Enter 'y' or 'n')${NC}"
@@ -84,40 +153,24 @@ echo -e "${YELLOW}Bootstraps config from .env as Github environment variables an
 # Get the GitHub CLI version
 gh_version=$(gh --version | grep -oP '\d+\.\d+\.\d+' | head -n 1)
 
-# Define environments
-environments=("dev" "stage" "prod")
+# Helper to get AZURE_ENV_NAME per environment
+get_azure_env_name() {
+  case "$1" in
+    dev) echo "dev" ;;
+    stage) echo "test" ;;
+    prod) echo "prod" ;;
+  esac
+}
 
 # Optional (v1.23+): service enable flags and BYO customization variables.
 # If a value is empty, it will be skipped.
 service_and_byo_vars=(
-  "ENABLE_DEFENDER_FOR_AI_SUB_LEVEL"
-  "ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL"
-  "CMK"
-  "CMK_KEY_NAME"
-  "CMK_KEY_VERSION"
-  "UPDATE_KEYVAULT_RBAC"
-
-  "ENABLE_AI_SERVICES"
-  "ENABLE_AI_FOUNDRY_HUB"
-  "ADD_AI_FOUNDRY_HUB"
-  "ENABLE_AI_FOUNDRY"
   "UPDATE_AI_FOUNDRY"
-  "ADD_AI_FOUNDRY"
-  "ENABLE_AFOUNDRY_CAPHOST"
   "FOUNDRY_DEPLOYMENT_TYPE"
-  "ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2"
   "DISABLE_AGENT_NETWORK_INJECTION"
 
   "ADMIN_AISEARCH_TIER"
 
-  "AIFACTORY_COMMON_ONLY_DEV_ENVIRONMENT"
-  "ADMIN_COMMON_RESOURCE_SUFFIX"
-  "ADMIN_PRJ_RESOURCE_SUFFIX"
-  "DISABLE_WHITELISTING_FOR_BUILD_AGENTS"
-  "USE_COMMON_ACR_OVERRIDE"
-  "COMMON_RESOURCE_GROUP_PARAM"
-  "DATALAKE_NAME_PARAM"
-  "KV_NAME_FROM_COMMON_PARAM"
   "VNET_RESOURCE_GROUP_PARAM"
   "VNET_NAME_FULL_PARAM"
   "SUBNET_COMMON"
@@ -133,44 +186,8 @@ service_and_byo_vars=(
   "BYO_ASEV3"
   "BYO_ASE_FULL_RESOURCE_ID"
   "BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID"
-  "NETWORKING_GENAI_PRIVATE_PRIVATE_UI"
-  "DEV_BYO_VNET_NAME"
-  "DEV_BYO_VNET_RG"
-  "STAGE_BYO_VNET_NAME"
-  "STAGE_BYO_VNET_RG"
-  "PROD_BYO_VNET_NAME"
-  "PROD_BYO_VNET_RG"
-  "DEV_VNET_IP_RANGE"
-  "DEV_SNET_CMN_IP_RANGE"
-  "DEV_SNET_CMN_INFERENCE_IP_RANGE"
-  "DEV_SNET_POWERBI_IP_RANGE"
-  "DEV_SNET_BASTION_IP_RANGE"
-  "STAGE_SNET_CMN_IP_RANGE"
-  "STAGE_SNET_CMN_INFERENCE_IP_RANGE"
-  "STAGE_SNET_POWERBI_IP_RANGE"
-  "STAGE_SNET_BASTION_IP_RANGE"
-  "STAGE_VNET_IP_RANGE"
-  "PROD_SNET_CMN_IP_RANGE"
-  "PROD_SNET_CMN_INFERENCE_IP_RANGE"
-  "PROD_SNET_POWERBI_IP_RANGE"
-  "PROD_SNET_BASTION_IP_RANGE"
-  "PROD_VNET_IP_RANGE"
   "NETWORK_ENV_STAGE"
   "NETWORK_ENV_PROD"
-  "DEV_NETWORK_ENV"
-  "STAGE_NETWORK_ENV"
-  "PROD_NETWORK_ENV"
-  "ADMIN_AKS_GPU_SKU_DEV_OVERRIDE"
-  "ADMIN_AKS_GPU_SKU_TEST_PROD_OVERRIDE"
-  "ADMIN_AKS_NODES_DEV_OVERRIDE"
-  "ADMIN_AKS_NODES_TEST_PROD_OVERRIDE"
-  "ADMIN_AKS_VERSION_OVERRIDE"
-  "ADMIN_AML_CLUSTER_MAX_NODES_DEV_OVERRIDE"
-  "ADMIN_AML_CLUSTER_MAX_NODES_TEST_PROD_OVERRIDE"
-  "ADMIN_AML_CLUSTER_SKU_DEV_OVERRIDE"
-  "ADMIN_AML_CLUSTER_SKU_TEST_PROD_OVERRIDE"
-  "ADMIN_AML_COMPUTE_INSTANCE_DEV_SKU_OVERRIDE"
-  "ADMIN_AML_COMPUTE_INSTANCE_TEST_PROD_SKU_OVERRIDE"
   "DEPLOY_MODEL_GPT_X"
   "MODEL_GPTX_NAME"
   "MODEL_GPTX_VERSION"
@@ -186,6 +203,24 @@ service_and_byo_vars=(
   "DEFAULT_GPT_4O_VERSION"
   "DEFAULT_GPT_CAPACITY"
   "DEFAULT_MODEL_SKU"
+
+  "COSMOS_KIND"
+  "POSTGRES_ADMIN_EMAILS"
+
+  "FUNCTION_RUNTIME"
+  "FUNCTION_VERSION"
+  "WEBAPP_RUNTIME"
+  "WEBAPP_RUNTIME_VERSION"
+  "ASE_SKU"
+  "ASE_SKU_CODE"
+  "ASE_SKU_WORKERS"
+
+  "ACA_W_REGISTRY_IMAGE"
+
+  "FOUNDRY_API_MANAGEMENT_RESOURCE_ID"
+
+
+  # Low priority: run all ADD_* last
   "DEBUG_DISABLE_05_BUILD_ACR_IMAGE"
   "DEBUG_DISABLE_61_FOUNDATION"
   "DEBUG_DISABLE_62_CORE_INFRASTRUCTURE"
@@ -198,26 +233,39 @@ service_and_byo_vars=(
   "DEBUG_DISABLE_69_AIFOUNDRY_2025"
   "DEBUG_DISABLE_100_RBAC_SECURITY"
   "DEBUG_DISABLE_10_AIFACTORY_DASHBOARDS"
-  "DEBUG_ENABLE_CLEANING"
-  "ENABLE_RETRIES"
-  "RETRY_MINUTES"
-  "RETRY_MINUTES_EXTENDED"
-  "MAX_RETRY_ATTEMPTS"
+  "ADD_AI_FOUNDRY_HUB"
+  "ADD_AI_FOUNDRY"
+  "ADD_AI_SEARCH"
+  "ADD_AZURE_MACHINE_LEARNING"
+)
 
+# Repo-scoped variables to reduce env variable count (applied once per repo)
+repo_level_vars=(
+  "ENABLE_DEFENDER_FOR_AI_SUB_LEVEL"
+  "ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL"
+  "CMK"
+  "CMK_KEY_NAME"
+  "CMK_KEY_VERSION"
+  "PROJECT_PREFIX"
+  "PROJECT_SUFFIX"
+  "UPDATE_KEYVAULT_RBAC"
+  "AIFACTORY_COMMON_ONLY_DEV_ENVIRONMENT"
+  "ADMIN_COMMON_RESOURCE_SUFFIX"
+  "ADMIN_PRJ_RESOURCE_SUFFIX"
+  "DISABLE_WHITELISTING_FOR_BUILD_AGENTS"
+  "USE_COMMON_ACR_OVERRIDE"
+  # All ENABLE_* flags moved to repo-level
+  "ENABLE_AI_SERVICES"
+  "ENABLE_AI_FOUNDRY_HUB"
+  "ENABLE_AI_FOUNDRY"
+  "ENABLE_AFOUNDRY_CAPHOST"
+  "ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2"
   "ENABLE_DATAFACTORY"
   "ENABLE_DATAFACTORY_COMMON"
   "ENABLE_AZURE_MACHINE_LEARNING"
-  "ADD_AZURE_MACHINE_LEARNING"
-
   "ENABLE_AKS_FOR_AZURE_ML"
-  "AKS_OUTBOUND_TYPE"
-  "AKS_PRIVATE_DNS_ZONE"
-  "AKS_AZURE_FIREWALL_PRIVATE_IP"
-
   "ENABLE_DATABRICKS"
-
   "ENABLE_AI_SEARCH"
-  "ADD_AI_SEARCH"
   "ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK"
   "ENABLE_AZURE_OPENAI"
   "ENABLE_AZURE_AI_VISION"
@@ -225,50 +273,56 @@ service_and_byo_vars=(
   "ENABLE_AI_DOC_INTELLIGENCE"
   "ENABLE_BING"
   "ENABLE_BING_CUSTOM_SEARCH"
-  "BING_CUSTOM_SEARCH_SKU"
   "ENABLE_CONTENT_SAFETY"
-
   "ENABLE_COSMOS_DB"
-  "COSMOS_KIND"
   "ENABLE_POSTGRESQL"
-  "POSTGRES_ADMIN_EMAILS"
   "ENABLE_REDIS_CACHE"
   "ENABLE_SQL_DATABASE"
-
   "ENABLE_FUNCTION"
-  "FUNCTION_RUNTIME"
-  "FUNCTION_VERSION"
   "ENABLE_WEBAPP"
-  "WEBAPP_RUNTIME"
-  "WEBAPP_RUNTIME_VERSION"
-  "ASE_SKU"
-  "ASE_SKU_CODE"
-  "ASE_SKU_WORKERS"
-
   "ENABLE_CONTAINER_APPS"
   "ENABLE_APPINSIGHTS_DASHBOARD"
-  "ACA_W_REGISTRY_IMAGE"
-
   "ENABLE_LOGIC_APPS"
   "ENABLE_EVENT_HUBS"
   "ENABLE_BOT_SERVICE"
-  "FOUNDRY_API_MANAGEMENT_RESOURCE_ID"
-
-  "PROJECT_PREFIX"
-  "PROJECT_SUFFIX"
+  "NETWORKING_GENAI_PRIVATE_PRIVATE_UI"
+  "DEV_BYO_VNET_NAME"
+  "DEV_BYO_VNET_RG"
+  "STAGE_BYO_VNET_NAME"
+  "STAGE_BYO_VNET_RG"
+  "PROD_BYO_VNET_NAME"
+  "PROD_BYO_VNET_RG"
+  "DEV_NETWORK_ENV"
+  "STAGE_NETWORK_ENV"
+  "PROD_NETWORK_ENV"
+  "AKS_OUTBOUND_TYPE"
+  "AKS_PRIVATE_DNS_ZONE"
+  "AKS_AZURE_FIREWALL_PRIVATE_IP"
+  "ADMIN_AKS_GPU_SKU_DEV_OVERRIDE"
+  "ADMIN_AKS_GPU_SKU_TEST_PROD_OVERRIDE"
+  "ADMIN_AKS_NODES_DEV_OVERRIDE"
+  "ADMIN_AKS_NODES_TEST_PROD_OVERRIDE"
+  "ADMIN_AKS_VERSION_OVERRIDE"
+  "ADMIN_AML_CLUSTER_MAX_NODES_DEV_OVERRIDE"
+  "ADMIN_AML_CLUSTER_MAX_NODES_TEST_PROD_OVERRIDE"
+  "ADMIN_AML_CLUSTER_SKU_DEV_OVERRIDE"
+  "ADMIN_AML_CLUSTER_SKU_TEST_PROD_OVERRIDE"
+  "ADMIN_AML_COMPUTE_INSTANCE_DEV_SKU_OVERRIDE"
+  "ADMIN_AML_COMPUTE_INSTANCE_TEST_PROD_SKU_OVERRIDE"
 )
 
-gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/dev
-create_or_update_variable "dev" "AZURE_ENV_NAME" "dev"
+# Apply repo-level variables once to reduce environment-level count
+for var_name in "${repo_level_vars[@]}"; do
+  create_or_update_repo_variable "$var_name" "${!var_name}"
+done
 
-gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/stage
-create_or_update_variable "stage" "AZURE_ENV_NAME" "test"
-
-gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/prod
-create_or_update_variable "prod" "AZURE_ENV_NAME" "prod"
+for env in "${selected_environments[@]}"; do
+  gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/$env
+  create_or_update_variable "$env" "AZURE_ENV_NAME" "$(get_azure_env_name "$env")"
+done
 
 # AI Factory globals: variables and secrets
-for env in "${environments[@]}"; do
+for env in "${selected_environments[@]}"; do
     echo -e "${YELLOW}Setting variables and secrets for environment: $env${NC}"
     
     # Global: Variables
@@ -332,39 +386,32 @@ for env in "${environments[@]}"; do
     done
 done
 
-# DEV variables
-create_or_update_variable "dev" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
-create_or_update_variable "dev" "AZURE_SUBSCRIPTION_ID" "$DEV_SUBSCRIPTION_ID"
-create_or_update_variable "dev" "AIFACTORY_CIDR_XX" "$DEV_CIDR_RANGE"
-create_or_update_variable "dev" "NETWORK_ENV" "$DEV_NETWORK_ENV"
-
-create_or_update_variable "dev" "GH_CLI_VERSION" "$gh_version"
-
-# DEV: Secrets
-#create_or_update_secret "dev" "AZURE_SUBSCRIPTION_ID" "$DEV_SUBSCRIPTION_ID"
-if [[ "$overwrite_azure_credential" == "y" ]]; then
-  create_or_update_secret "dev" "AZURE_CREDENTIALS" "replace_with_dev_sp_credentials"
+if [[ " ${selected_environments[*]} " == *" dev "* ]]; then
+  create_or_update_variable "dev" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
+  create_or_update_variable "dev" "AZURE_SUBSCRIPTION_ID" "$DEV_SUBSCRIPTION_ID"
+  create_or_update_variable "dev" "AIFACTORY_CIDR_XX" "$DEV_CIDR_RANGE"
+  create_or_update_variable "dev" "NETWORK_ENV" "$DEV_NETWORK_ENV"
+  if [[ "$overwrite_azure_credential" == "y" ]]; then
+    create_or_update_secret "dev" "AZURE_CREDENTIALS" "replace_with_dev_sp_credentials"
+  fi
 fi
 
-# STAGE variables
-create_or_update_variable "stage" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
-create_or_update_variable "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
-create_or_update_variable "stage" "AIFACTORY_CIDR_XX" "$STAGE_CIDR_RANGE"
-create_or_update_variable "stage" "NETWORK_ENV" "$STAGE_NETWORK_ENV"
-
-# STAGE: Secrets
-#create_or_update_secret "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
-if [[ "$overwrite_azure_credential" == "y" ]]; then
-  create_or_update_secret "stage" "AZURE_CREDENTIALS" "replace_with_stage_sp_credentials"
+if [[ " ${selected_environments[*]} " == *" stage "* ]]; then
+  create_or_update_variable "stage" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
+  create_or_update_variable "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
+  create_or_update_variable "stage" "AIFACTORY_CIDR_XX" "$STAGE_CIDR_RANGE"
+  create_or_update_variable "stage" "NETWORK_ENV" "$STAGE_NETWORK_ENV"
+  if [[ "$overwrite_azure_credential" == "y" ]]; then
+    create_or_update_secret "stage" "AZURE_CREDENTIALS" "replace_with_stage_sp_credentials"
+  fi
 fi
-# PROD variables
-create_or_update_variable "prod" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
-create_or_update_variable "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"
-create_or_update_variable "prod" "AIFACTORY_CIDR_XX" "$PROD_CIDR_RANGE"
-create_or_update_variable "prod" "NETWORK_ENV" "$PROD_NETWORK_ENV"
 
-# PROD: Secrets
-#create_or_update_secret "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"
-if [[ "$overwrite_azure_credential" == "y" ]]; then
-  create_or_update_secret "prod" "AZURE_CREDENTIALS" "replace_with_prod_sp_credentials"
+if [[ " ${selected_environments[*]} " == *" prod "* ]]; then
+  create_or_update_variable "prod" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
+  create_or_update_variable "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"
+  create_or_update_variable "prod" "AIFACTORY_CIDR_XX" "$PROD_CIDR_RANGE"
+  create_or_update_variable "prod" "NETWORK_ENV" "$PROD_NETWORK_ENV"
+  if [[ "$overwrite_azure_credential" == "y" ]]; then
+    create_or_update_secret "prod" "AZURE_CREDENTIALS" "replace_with_prod_sp_credentials"
+  fi
 fi

@@ -34,14 +34,6 @@ param (
     $defaultSubnetProjDatabricksPublic = "snt-prj001-dbxpub"
     $defaultSubnetProjDatabricksPrivate = "snt-prj<xxx>-dbxpriv"
 
-    # Preserve any incoming custom subnet patterns for BYO_subnets=true
-    $subnetProjGenAI_input = $subnetProjGenAI
-    $subnetProjAKS_input = $subnetProjAKS
-    $subnetProjAKS2_input = $subnetProjAKS2
-    $subnetProjACA_input = $subnetProjACA
-    $subnetProjACA2_input = $subnetProjACA2
-    $subnetProjDatabricksPublic_input = $subnetProjDatabricksPublic
-    $subnetProjDatabricksPrivate_input = $subnetProjDatabricksPrivate
 
 function Set-DeployedOnTag {
     [CmdletBinding()]
@@ -316,6 +308,15 @@ $jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
 Write-Host "DEBUG: bicepPar5 10-esml-globals-override.json:" -ForegroundColor Cyan
 Write-Host ($jsonParameters5 | ConvertTo-Json -Depth 10) -ForegroundColor Yellow
 ConvertTo-Variables -InputObject $jsonParameters5
+
+# Preserve incoming custom subnet patterns AFTER variables are loaded
+$subnetProjGenAI_input = $subnetProjGenAI
+$subnetProjAKS_input = $subnetProjAKS
+$subnetProjAKS2_input = $subnetProjAKS2
+$subnetProjACA_input = $subnetProjACA
+$subnetProjACA2_input = $subnetProjACA2
+$subnetProjDatabricksPublic_input = $subnetProjDatabricksPublic
+$subnetProjDatabricksPrivate_input = $subnetProjDatabricksPrivate
 
 ## $tenantId comes from Parameters.json  - the rest is INPUT, as ADO parameters (see top of file)
 
