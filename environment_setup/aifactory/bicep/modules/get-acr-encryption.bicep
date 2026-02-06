@@ -5,6 +5,9 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: containerRegistryName
 }
 
-output hasEncryption bool = acr.properties.encryption != null && acr.properties.encryption.status == 'enabled'
-output keyVaultPropertiesIdentity string = acr.properties.encryption != null && acr.properties.encryption.keyVaultProperties != null ? acr.properties.encryption.keyVaultProperties.identity : ''
-output keyIdentifier string = acr.properties.encryption != null && acr.properties.encryption.keyVaultProperties != null ? acr.properties.encryption.keyVaultProperties.keyIdentifier : ''
+// Defensive guards because some API versions only return encryption.status when CMK is disabled
+var encryption = acr.properties.encryption ?? {}
+
+output hasEncryption bool = contains(encryption, 'status') && encryption.status == 'enabled'
+output keyVaultPropertiesIdentity string = contains(encryption, 'keyVaultProperties') && contains(encryption.keyVaultProperties, 'identity') ? encryption.keyVaultProperties.identity : ''
+output keyIdentifier string = contains(encryption, 'keyVaultProperties') && contains(encryption.keyVaultProperties, 'keyIdentifier') ? encryption.keyVaultProperties.keyIdentifier : ''

@@ -19,16 +19,18 @@ param aifactorySuffixRG string =''
 param vnetNameBase string
 @description('CIDR for common vNet ')
 param common_vnet_cidr string
-@description('common Power BI subnet for vNet gateway')
-param common_pbi_subnet_name string
+param common_pbi_subnet_name string = 'snt-common-pbi-gw'
 @description('CIDR for common Power BI subnet for gateway')
 param common_pbi_subnet_cidr string
 @description('common subnet')
 param common_subnet_name string
 @description('CIDR for common subnet')
 param common_subnet_cidr string
-@description('common Bastion host subnet for RDP access over private IP')
-param common_bastion_subnet_name string
+@description('common Bastion host subnet for RDP access over private IP. Must remain AzureBastionSubnet per platform requirements')
+@allowed([
+  'AzureBastionSubnet'
+])
+param common_bastion_subnet_name string = 'AzureBastionSubnet'
 @description('common Bastion host subnet CIDR')
 param common_bastion_subnet_cidr string
 @description('common scoring subnet CIDR')
