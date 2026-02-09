@@ -130,6 +130,14 @@ param commonResourceName string = 'esml-common'
 param commonResourceAbbreviation string = 'esml'
 @description('Common resource abbreviation for short names. Default is "cmn"')
 param commonResourceShortName string = 'cmn'
+@description('Enable Azure Monitor Private Link Scope (AMPLS) for Log Analytics workspace')
+param enableAMPLS bool = false
+@description('Monitoring subnet name to use for AMPLS private endpoint')
+param hubMonitoringSubnetName string = 'snet-monitoring'
+@description('Optional: existing Application Insights resource IDs to add to AMPLS')
+param existingAmplsApplicationInsightsIds array = []
+@description('Optional: existing Log Analytics workspace IDs to add to AMPLS')
+param existingAmplsLogAnalyticsWorkspaceIds array = []
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'  // {commonResourceName}-weu-dev-002
@@ -563,6 +571,7 @@ module logAnalyticsWorkspaceOpInsight '../../modules/logAnalyticsWorkspace.bicep
     tags: tags
     location: location
     keyvaultName: kvNameCommon
+    enableAMPLS: enableAMPLS
   }
 
   dependsOn: [
@@ -577,6 +586,30 @@ module wsQueries '../../modules/logAnalyticsQueries.bicep' = if(enableLogAnalyti
   params: {
     logAnalyticsName:laName
   }
+  dependsOn: [
+    logAnalyticsWorkspaceOpInsight
+  ]
+}
+
+// AMPLS integration (hub/spoke). Uses foundation AMPLS module to attach the workspace privately.
+module logAnalyticsAmpls '../../modules/monitoring/amplsIntegration.bicep' = if(enableAMPLS && !deployOnlyAIGatewayNetworking) {
+  name: 'amplsCmn-${uniqueInAIFenv}'
+  scope: esmlCommonResourceGroup
+  params: {
+    env: env
+    location: location
+    locationSuffix: locationSuffix
+    commonResourceSuffix: commonResourceSuffix
+    tags: tags
+    privDnsSubscription: privDnsSubscription
+    privDnsResourceGroup: privDnsResourceGroupName
+    hubVnetName: vnetNameFull
+    hubVnetResourceGroup: vnetResourceGroupName
+    monitoringSubnetName: hubMonitoringSubnetName
+    existingLogAnalyticsWorkspaceIds: union(existingAmplsLogAnalyticsWorkspaceIds, [logAnalyticsWorkspaceOpInsight!.outputs.logAnalyticsWkspId])
+    existingApplicationInsightsIds: existingAmplsApplicationInsightsIds
+  }
+
   dependsOn: [
     logAnalyticsWorkspaceOpInsight
   ]

@@ -8,7 +8,7 @@ variables:
   # #### END - DO NOT TOUCH####
   # ============================================================================
 
-  # ============================================================================  
+  # ============================================================f================  
   # MANDATORY(CHANGE ONCE) - UPDATING submodule RELEASE version
   # If you want to upgrade the AIFactory (Long Term Support branches exists)
   # E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
@@ -278,11 +278,11 @@ variables:
   postGresAdminEmails: "email_adress_only" # pass a commaseparated list of email addresses. or a single email address
   enableRedisCache: "false"
   enableSQLDatabase: "false"
-  # === WebApp ===
+  # === Azure Function ===
   enableFunction: "false"
   functionRuntime: "dotnet"
   functionVersion: "v7.0"
-  # === Azure function ===
+  # === Azure Webapp ===
   enableWebApp: "false"
   webAppRuntime: "python"
   webAppRuntimeVersion: "3.11"
@@ -304,9 +304,9 @@ variables:
   # MANDATORY (POST SETUP of a PROJECT): runNetworkingVar
   # ============================================================================
   # Description: runNetworkingVar:"true"(default) 
-  #  Set to true when creating a new project, "false" to UPDATE or ADD services
+  #  Keep true when creating a new project or update. Set "false" to UPDATE or ADD services without running the networking module, to optimize deployment time, and avoid touching the network, when not needed.
   # ============================================================================
-  runNetworkingVar: "true" # true, when creating a new project. set to false if you want to UPDATE or ADD services to a project. 
+  runNetworkingVar: "true" # true, when creating a new project. Keep true, since create if not exists. Set to false, to optimize updates on project
 
 ## ============================================================================
 ## END - FOREACH PER PROJECT (MANDATORY)

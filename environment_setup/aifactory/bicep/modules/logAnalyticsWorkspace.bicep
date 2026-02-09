@@ -20,6 +20,7 @@ param keyvaultName string
 @maxValue(730)
 @description('Number of days of retention. Free plans can only have 7 days, Standalone and Log Analytics plans include 30 days for free')
 param logAnalyticsWkspRentationDays int = 30
+param enableAMPLS bool = false
 
 resource alyt 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: name
@@ -33,8 +34,8 @@ resource alyt 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     workspaceCapping: {
       dailyQuotaGb: -1
     }
-    publicNetworkAccessForIngestion: 'Enabled'
-    publicNetworkAccessForQuery: 'Disabled'
+    publicNetworkAccessForIngestion: enableAMPLS ? 'Disabled' : 'Enabled'
+    publicNetworkAccessForQuery: enableAMPLS ? 'Disabled' : 'Enabled'
   }
 }
 
