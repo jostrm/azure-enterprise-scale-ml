@@ -130,6 +130,17 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
         - 3) Search "Azure Machine Learning"
         - 4) Copy the ObjectID that the green arrow points at
     - See image: ![](./images/12-prerequisites-aml-sp-oid.png)
+    - **Object ID** for the Service principals
+        - 1) Go to: Enterprise applications
+        - 2) Filter on Enterprise applications
+        - 3) Search service principal name you created "esml-project-001-sp"
+        - 4) Click in it and Copy the ObjectID with green checkbox
+        - See image, Correcnt Object ID: ![](./images/sp-correct-oid.png)
+    - Note: If you see this view below, you see another Object ID, the wrong one. You probably clicked on "App registrations" in Entra ID, instead of step 1
+        - See image of Wrong Object ID: ![](./images/sp-incorrect-oid.png)
+    - NB! We have created a SCRIPT, that automatically created service principals, and adds the triplet of information (oid, secret, app id) to the seeding keyvault. If you use that, it is fetching correct info, and it create SP's for add 1 or 100 projects auotomatically:
+        - BASH Script: [Docs-link: 29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh) | [Local-repo-link](../../../../aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh)
+
 
 
 ## Step 6: Verify: Resource Providers, Private DNS zones (if not standalone)
