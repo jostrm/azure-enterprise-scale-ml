@@ -753,6 +753,7 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
   params: {
     aiSearchName: safeNameAISearch
     aiSearchExists: aiSearchExists
+    aiSearchEnabled: enableAISearch || (enableAFoundryCaphost && enableAIFoundry)
   }
 }
 

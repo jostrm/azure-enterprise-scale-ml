@@ -272,7 +272,7 @@ param projectSuffix string = '-rg'
 param commonResourceName string = 'esml-common'
 
 // ============== VARIABLES ==============
-var aseIdNormalized = empty(byoAseFullResourceId)
+var aseIdNormalized = (!byoASEv3 || empty(byoAseFullResourceId))
   ? ''
   : (startsWith(byoAseFullResourceId, '/subscriptions/') || startsWith(byoAseFullResourceId, '/providers/'))
     ? byoAseFullResourceId
