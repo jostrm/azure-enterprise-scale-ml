@@ -102,9 +102,9 @@ variables:
   prod_seeding_kv_service_connection: "todo_ado_service_connection" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
   # ============================================================================
   # MANDATORY(CHANGE RARELY):NETWORKING: Networking modes
-  #  [false, false, false ] = private UI with private backend. No public IP (Bastion host + VM, Azure VPN, Peering)
-  #  [true, true, false ]  = public UI for IP whitelisted devices, with private backend
-  #  [true, true, true ]   = public UI with private backend 
+  #  [false, false, false ] = private UI with private backend. No public IP (Bastion host + VM, Azure VPN, Peering). No VNet
+  #  [true, true, false ]  = public UI for IP whitelisted devices, with private backend. Selected virtual network.
+  #  [true, true, true ]   = public UI with private backend. Public Network
   # ============================================================================
   enablePublicGenAIAccess: "false"
   allowPublicAccessWhenBehindVnet: "false"
