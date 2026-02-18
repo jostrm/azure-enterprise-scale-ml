@@ -113,6 +113,7 @@ variables:
   # ============================================================================
   # MANDATORY(CHANGE RARELY):RBAC restrictions
   # ============================================================================
+  BYOContributorRoleID: "b24988ac-6180-42a0-ab88-20f7382dd24c" # Built-in Contributor role ID. Change to use a custom role for finer-grained access control.
   disableContributorAccessForUsers: "false"
   disableRBACAdminOnRGForUsers: "false"
   # ============================================================================
@@ -244,7 +245,7 @@ variables:
   updateAIFoundry: "false" # true, enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false means "CreateIfNotExists"
   addAIFoundry: "false" # Add new AI foundry with project, with a new random name (can be used for debugging, or running pipeline twice directly, not wating for deletion)
   enableAFoundryCaphost: "true" # Ensures Agents metadata, and history/threads is saved in your subscription and network, using CosmosDB, Storage, AI Search
-  foundryDeploymentType: "1" # "1" = AI Factory based on PG, "2" = AI Factory based on AVM, "3" = Both. Where 1 is tested, and if fails, it uses 2
+  foundryDeploymentType: "2" # "1" = AI Factory based on PG, "2" = AI Factory based on AVM, "3" = Both. Where 1 is tested, and if fails, it uses 2
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # true, only connections is created to AIFactory created services. false, Azure will create a default project, with additional CosmosDB, Storage Account, AI Search, and connections
   disableAgentNetworkInjection: "false" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.

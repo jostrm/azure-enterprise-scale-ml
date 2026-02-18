@@ -5,6 +5,8 @@ param servicePrincipleAndMIArray array // Service Principle Object ID, User crea
 @description('Additional optional Object ID of more people to access Resource group')
 param user_object_ids array
 param useAdGroups bool = false // Use AD groups for role assignments
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource networkContributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
@@ -45,7 +47,7 @@ resource networkContributorSPVnet 'Microsoft.Authorization/roleAssignments@2020-
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
-  name: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+  name: contributorRoleId
 }
 
 resource nsgBastion4project 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = {

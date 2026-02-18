@@ -4,10 +4,12 @@ param aiHubPrincipalId string = ''
 param aiHubProjectName string = ''
 param aiHubProjectPrincipalId string = ''
 param aiSearchName string = ''
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 var aml_appId = '0736f41a-0425-4b46-bdb5-1563eff02385'
 var azureAIAdministrator = 'b78c5d69-af96-48a3-bf8d-a8b4d589de94' // AIHub -> RG: (AIServices, AI Projects, Agents)
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' 
+// contributorRoleId is now a parameter 
 // Search
 var searchIndexDataReader = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0'

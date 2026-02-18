@@ -46,6 +46,9 @@ param addAIFoundry bool = false
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+
 
 @description('Enable Capability host for AI Foundry - BYO network and resources for thread, vector, storage')
 param enableCaphost bool = true
@@ -436,7 +439,7 @@ var azureAIDeveloperRoleId = '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI 
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User - for Agent secrets
 var keyVaultContributorRoleId = 'f25e0fa2-a7c8-4377-a976-54943a77a395' // Key Vault Contributor - for managing secrets
 var keyVaultSecretsOfficerRoleId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7' // Key Vault Secrets Officer - for Agent operations
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor - for resource management
+// contributorRoleId is now a parameter - see top of file
 var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader - for resource access
 
 @description('RBAC Security Phase 7 deployment completed successfully')

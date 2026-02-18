@@ -15,6 +15,8 @@ param common_bastion_subnet_name string = 'AzureBastionSubnet'
 param project_service_principle_oid string
 param user_object_ids string
 param useAdGroups bool = false
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 var user_object_ids_array = array(split(replace(user_object_ids,' ',''),','))
 var user_object_ids_array_Safe = user_object_ids == ''? []: user_object_ids_array
@@ -48,7 +50,7 @@ resource networkContributorRoleDefinition 'Microsoft.Authorization/roleDefinitio
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
-  name: 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+  name: contributorRoleId
 }
 
 // vNet - Network Contributor: Reader was not enough. Network Contributor is needed, to be able to JOIN subnets

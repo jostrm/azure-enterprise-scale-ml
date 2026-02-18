@@ -5,8 +5,10 @@ param adminNames array = []
 param postgreSqlServerName string
 param useAdGroups bool
 param resourceCreatedNow bool = false
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
+// contributorRoleId is now a parameter
 var postgreSqlReaderRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'       // Reader role
 var postgreSqlContributorRoleId = 'a9f2b5d7-5c0c-4d8e-bd6f-3f9c0f9d5f9b' // PostgreSQL DB Contributor
 

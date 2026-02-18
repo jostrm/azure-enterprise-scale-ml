@@ -6,13 +6,16 @@ param useAdGroups bool = false
 param disableContributorAccessForUsers bool = false
 param disableRBACAdminOnRGForUsers bool = false
 param aiHubName string = ''
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 var aiUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
+var aiProjectManagerRoleId = 'eadc314b-1a2d-4efa-be10-5d325db5065e'
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 var azureAIInferenceDeploymentOperatorRoleId = '3afb7f49-54cb-416e-8c09-6dc049efa503'
 var azureMLDataScientistRoleId = 'f6c7c914-8db3-469d-8ca1-694a8f32e121'
 var azureMachineLearningWorkspaceConnectionSecretsReaderRoleId = 'ea01e6af-a1c1-4350-9563-ad00f8c72ec5'
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+// contributorRoleId is now a parameter
 var roleBasedAccessControlAdministratorRG = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'
 var acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec'
 
@@ -41,6 +44,30 @@ resource aiUserSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i 
     principalId: servicePrincipleAndMIArray[i]
     principalType: 'ServicePrincipal'
     description: '029 - Azure AI User to SP/MI ${servicePrincipleAndMIArray[i]} at RG scope'
+  }
+  scope: resourceGroup()
+}]
+
+@description('RG: Azure AI Project Manager for users')
+resource aiProjectManagerUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(userObjectIds)):{
+  name: guid(resourceGroupId, aiProjectManagerRoleId, userObjectIds[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', aiProjectManagerRoleId)
+    principalId: userObjectIds[i]
+    principalType: useAdGroups ? 'Group' : 'User'
+    description: '028b - Azure AI Project Manager role to principal ${userObjectIds[i]} at RG scope'
+  }
+  scope: resourceGroup()
+}]
+
+@description('RG: Azure AI Project Manager for SP/MI')
+resource aiProjectManagerSP 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for i in range(0, length(servicePrincipleAndMIArray)):{
+  name: guid(resourceGroupId, aiProjectManagerRoleId, servicePrincipleAndMIArray[i])
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', aiProjectManagerRoleId)
+    principalId: servicePrincipleAndMIArray[i]
+    principalType: 'ServicePrincipal'
+    description: '029b - Azure AI Project Manager to SP/MI ${servicePrincipleAndMIArray[i]} at RG scope'
   }
   scope: resourceGroup()
 }]
