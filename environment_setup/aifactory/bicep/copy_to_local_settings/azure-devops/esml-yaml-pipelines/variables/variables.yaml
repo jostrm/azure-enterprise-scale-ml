@@ -209,9 +209,6 @@ variables:
   # ============================================================================
   aifactory_salt: "" # 5 characters.  A deteministic unique value, from COMMON RG
 
-  # === Complete mode vs Incremental mode ===
-  enableDeleteForDisabledResources: "false" # true, if a service is set to "false", enableAISearch: "false" , it will be deleted if exists. false, if a service is set to "false", it will be left as is if exists. (Complete mode vs Incremental mode)
-
   # ============================================================================
   # MANDATORY:Services to be added to deployment. CreateIfNotExists logic
   # ============================================================================
@@ -224,6 +221,9 @@ variables:
   # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
   
+  # === Complete mode vs Incremental mode ===
+  enableDeleteForDisabledResources: true
+  deleteAllServicesForProject: true # true, delete all services in the project resource group, except foundational services such as Keyvault, Storage, AppInsights. false, only delete services that are set to false in the variables. Note! if true, and enableDeleteForDisabledResources is false, services that are set to false in the variables will not be re-created.
   # === Defender for Cloud: Defender for AI ===
   enableDefenderforAISubLevel: "false"
   enableDefenderforAIResourceLevel: "false"
