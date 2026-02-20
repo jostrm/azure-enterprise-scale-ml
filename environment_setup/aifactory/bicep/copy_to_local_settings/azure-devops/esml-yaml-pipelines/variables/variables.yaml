@@ -5,6 +5,17 @@ variables:
   admin_ip_fw: "" # Leave this. Will be set by pipeline
   aifactory_salt_random: "" # 10 characters. Based on "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
   # ============================================================================
+  # Description: aifactory_salt:""(default) [5 chars] 
+  # What: 
+  #   A deteministic unique value unique for the AIFactory environment. Same for all projects.
+  # How to find it: 
+  #   Update with values from AI Factory COMMON Resource group.
+  #   The aifactory_salt can be read from the AI Factory common resource group in names of services such as Azure Datafactory
+  #   Example: the 'a4c2b'in "adf-cmn-weu-dev-a4c2b-001" and in Container registry, private endpoints: "pend-kv-cmndev-a4c2b-001-to-vnt-esmlcmn"
+  # Usage: aifactory_salt will be used in Project resource groups 'abcde' for resources such as Managed Identity  'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
+  # ============================================================================
+  aifactory_salt: "" # Leave empty, 5 characters.  A deteministic unique value, from COMMON RG
+  # ============================================================================
   # #### END - DO NOT TOUCH####
   # ============================================================================
 
@@ -30,17 +41,6 @@ variables:
   admin_semanticSearchTier: "free" # ['disabled', 'free', 'standard']
   admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
   
-  # CMK (Customer Managed Key) REQUIREMENTS when enabled (cmk=true) on Seeding Keyvault: dev_admin_bicep_kv_fw, test_admin_bicep_kv_fw, prod_admin_bicep_kv_fw
-  # - Key Vault MUST have enableSoftDelete=true and enablePurgeProtection=true (see admin_keyvaultSoftDeleteDays below)
-  # - Key Vault firewall MUST allow trusted Microsoft services (bypass: AzureServices) - already configured
-  # - Managed identities MUST have Key Vault Crypto Service Encryption User role (get key, wrap key, unwrap key permissions)
-  # - Only RSA and RSA-HSM keys of size 2048 are supported
-  # - If you use the Key Vault firewall, you must allow trusted Microsoft services to access the Azure Key Vault.
-  # - The AI Factory will grant your Microsoft Foundry resource and project system-assigned managed identity the following permissions on your key vault: get key, wrap key, unwrap key.
-  # - Only RSA and RSA-HSM keys of size 2048 are supported.
-  cmk: "false" # Enable Customer Managed Keys (CMK) for Storage Accounts, AI Services, etc. Requires container registry to be Premium SKU.
-  cmkKeyName: "esml-cmk-key" # Common key name for all services in this environment
-
   # SEEDING KEYVAULT: One global (same values for all tripples), or one per environment (different values for dev,test,prod)
   dev_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
   dev_admin_bicep_kv_fw_rg: "TODO_ResourceGroup_DEV" # Resource Group name for seeding Keyvault
@@ -186,7 +186,7 @@ variables:
   project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. "10.123.456.10,124.56.78.0/24"
   
   # Container registry
-  acr_IP_whitelist: "" # Selected networks approved IPs
+  acr_IP_whitelist: "" # Selected networks approved IPs. Leave as empty string if no IP whitelisting is needed. "10.123.456.10,
   acr_adminUserEnabled: "false" # true, enable admin user. false, disable admin user (more secure)
   acr_dedicated: "true" # Premium only
   acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints, or support CMK (Customer managed encryption key)
@@ -194,20 +194,6 @@ variables:
   technical_admins_ad_object_id: "TODO_EntraID_ObjectID" # TODO_EntraID_ObjectID commaseparated list, or just 1 ObjectID
   technical_admins_email: "TODO_email_or_securitygroup_name" # email or name of AD group
   serviceSettingDeployProjectVM: "false" # VM Project resource group, to use with BASTION
-
-  # ============================================================================
-  # MANDATORY (PRE SETUP of a PROJECT): AI Factory salt from COMMON RG
-  # ============================================================================
-  # Description: aifactory_salt:""(default) [5 chars] 
-  # What: 
-  #   A deteministic unique value unique for the AIFactory environment. Same for all projects.
-  # How to find it: 
-  #   Update with values from AI Factory COMMON Resource group.
-  #   The aifactory_salt can be read from the AI Factory common resource group in names of services such as Azure Datafactory
-  #   Example: the 'a4c2b'in "adf-cmn-weu-dev-a4c2b-001" and in Container registry, private endpoints: "pend-kv-cmndev-a4c2b-001-to-vnt-esmlcmn"
-  # Usage: aifactory_salt will be used in Project resource groups 'abcde' for resources such as Managed Identity  'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
-  # ============================================================================
-  aifactory_salt: "" # 5 characters.  A deteministic unique value, from COMMON RG
 
   # ============================================================================
   # MANDATORY:Services to be added to deployment. CreateIfNotExists logic
@@ -222,14 +208,23 @@ variables:
   # ============================================================================
   
   # === Complete mode vs Incremental mode ===
-  enableDeleteForDisabledResources: true
-  deleteAllServicesForProject: true # true, delete all services in the project resource group, except foundational services such as Keyvault, Storage, AppInsights. false, only delete services that are set to false in the variables. Note! if true, and enableDeleteForDisabledResources is false, services that are set to false in the variables will not be re-created.
+  enableDeleteForDisabledResources: true # true, will delete all enabled services that are set to false in the variables. false, will keep all existing resources, even if ENABLE_* = false. Note! if deleteAllServicesForProject is true, and enableDeleteForDisabledResources is false, services that are set to false in the variables will not be re-created.
+  deleteAllServicesForProject: false # true, delete all services in the project resource group in step 04 then quits pipeline (sicne you need to purge Foundry and Azure ML, soft deleted). It will not del foundational services,  except foundational services such as Keyvault, Storage, AppInsights. false, only delete services that are set to false in the variables. Note! if true, and enableDeleteForDisabledResources is false, services that are set to false in the variables will not be re-created.
   # === Defender for Cloud: Defender for AI ===
   enableDefenderforAISubLevel: "false"
   enableDefenderforAIResourceLevel: "false"
   # === CMK - Customer Managed Key for encryption at rest, for all services that supports CMK ===
+  # CMK (Customer Managed Key) REQUIREMENTS when enabled (cmk=true) on Seeding Keyvault: dev_admin_bicep_kv_fw, test_admin_bicep_kv_fw, prod_admin_bicep_kv_fw
+  # - Key Vault MUST have enableSoftDelete=true and enablePurgeProtection=true (see admin_keyvaultSoftDeleteDays below)
+  # - Key Vault firewall MUST allow trusted Microsoft services (bypass: AzureServices) - already configured
+  # - Managed identities MUST have Key Vault Crypto Service Encryption User role (get key, wrap key, unwrap key permissions)
+  # - Only RSA and RSA-HSM keys of size 2048 are supported
+  # - If you use the Key Vault firewall, you must allow trusted Microsoft services to access the Azure Key Vault.
+  # - The AI Factory will grant your Microsoft Foundry resource and project system-assigned managed identity the following permissions on your key vault: get key, wrap key, unwrap key.
+  # - Only RSA and RSA-HSM keys of size 2048 are supported.
+
   cmk: "false" # Customer Managed Key encryption for Keyvault, Storage accounts, etc.  true, enable CMK. false, use platform managed keys.
-  cmkKeyName: "aifactory-cmk-key" # Name of the Key in Keyvault to be used for CMK encryption
+  cmkKeyName: "TODO_aifactory-cmk-key" # Name of the Key in Keyvault to be used for CMK encryption
   cmkKeyVersion: "" # Version of the Key in Keyvault (GUID format). Leave empty to automatically use the LATEST version from Key Vault.
   # === Keyvault RBAC ===
   updateKeyvaultRbac: "false" # true, enables you to update RBAC properties running the pipeline twice. false means "CreateIfNotExists"  
@@ -410,7 +405,7 @@ variables:
   subnetProjDatabricksPublic: "snt-prj001-dbxpub" # Example, no replacement of <xxx>
   subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # Example, with replacement of <xxx>
   byoASEv3: "false"
-  byoAseFullResourceId: "/subscriptions/...yourASEnameS2"
+  byoAseFullResourceId: "/subscriptions/...yourASEnameS2" # Needs to start with forward slash "/subscriptions/..." and contain the full resource ID of the existing ASEv3, including the name of the ASE, and the SKU (S2, S3, etc.) at the end. Example: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/acme-dev-rg/providers/Microsoft.Web/hostingEnvironments/acme-ase-s2"
   byoAseAppServicePlanResourceId: ""
 
   # ============================================================================
@@ -430,10 +425,12 @@ variables:
   debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage) 
   debug_disable_100_rbac_security: "false" # RBAC for 61-99
   debug_disable_10_aifactory_dashboards: "true" # AI Factory Dashboards
-  # ============================================================================
+  
+  # EXPERIMENTAL FEATURES - USE WITH CAUTION, AND ONLY FOR TESTING PURPOSES. NOT RECOMMENDED FOR PRODUCTION USE. MAY CAUSE UNEXPECTED BEHAVIOR, OR DEPLOYMENT FAILURES. NOT FULLY TESTED, AND MAY BE REMOVED WITHOUT NOTICE.
+  ## ============================================================================
   # DEBUG SETTINGS - Error Cleanup Tasks
   # Note: You still need to PURGE AIServices and AI Foundry project (2025) due to soft delete
-  # ============================================================================
+  ## ============================================================================
   debugEnableCleaning: "false" # Enable error cleanup tasks (71-73) that delete resources on deployment failures. Set to "true" to enable cleanup tasks.
   # ============================================================================
   # RETRY SETTINGS - Job Retry Configuration
@@ -442,3 +439,4 @@ variables:
   retryMinutes: "5" # Number of minutes to wait between 1st and 2nd attempts. Default is 5 minutes.
   retryMinutesExtended: "15" # Number of minutes to wait between 2nd and 3rd attempts. Default is 15 minutes.
   maxRetryAttempts: "2" # Maximum number of total attempts (1 original + 2 retries = 3 total attempts). Valid values: 1, 2, or 3
+  # EXPERIMENTAL FEATURES - END
