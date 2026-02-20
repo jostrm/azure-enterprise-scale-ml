@@ -29,6 +29,17 @@ if [ "$deleteAllServicesForProject" = "true" ]; then
   echo "⚠️  deleteAllServicesForProject=true: ALL services will be deleted (except KeyVault, Storage, AppInsights)"
 fi
 
+# =============================================================================
+# SERVICES THAT ARE ** NEVER ** DELETED BY THIS SCRIPT (any flag value):
+#   - Key Vault          (foundational secret store)
+#   - Storage Accounts   (foundational data plane)
+#   - Application Insights / Dashboard Insights (foundational observability)
+#   - AI Foundry Hub v1 (MachineLearningServices/workspaces kind=Hub)
+#   - AI Foundry V2 / Azure OpenAI / AI Services (CognitiveServices) -
+#       these are handled by 04_Purge_SoftDeleted after soft-delete settles
+#   - Managed Identities (miPrjExists / miACAExists)
+# =============================================================================
+
 # Check networking mode to determine if private endpoints are expected
 allowPublic="$allowPublicAccessWhenBehindVnet"
 enablePublicGenAI="$enablePublicGenAIAccess"
@@ -649,6 +660,57 @@ else
 fi
 
 # =============================================================================
+# CONTAINER APPS ENVIRONMENT - Delete after all Container Apps are gone
+# =============================================================================
+containerAppsEnvExists="$containerAppsEnvExists"
+# When deleteAllServicesForProject=true, override enable_ flag (reuse enableContainerApps)
+if [ "$deleteAllServicesForProject" = "true" ]; then enableContainerApps="false"; fi
+
+echo ""
+echo "--- Container Apps Environment ---"
+echo "enableContainerApps: $enableContainerApps"
+echo "containerAppsEnvExists: $containerAppsEnvExists"
+
+if [ "$enableContainerApps" = "false" ] && [ "$containerAppsEnvExists" = "true" ]; then
+  echo "✓ Container Apps Env is no longer needed - proceeding with deletion"
+
+  acaEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
+
+  acaenv_name=$(az containerapp env list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, '${acaEnvName}')].name" \
+    -o tsv | head -n1)
+
+  if [ -n "$acaenv_name" ]; then
+    echo "Found Container Apps Environment: $acaenv_name"
+
+    # Delete private endpoints before the environment
+    delete_private_endpoints "$acaenv_name" "Container Apps Environment"
+
+    echo "Deleting Container Apps Environment: $acaenv_name"
+    az containerapp env delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$acaenv_name" \
+      --yes 2>&1
+
+    if [ $? -eq 0 ]; then
+      echo "✅ Successfully deleted Container Apps Environment"
+      echo "##vso[task.setvariable variable=containerAppsEnvExists]false"
+    else
+      echo "❌ Failed to delete Container Apps Environment"
+    fi
+  else
+    echo "⚠️  Container Apps Environment not found with prefix: $acaEnvName"
+  fi
+elif [ "$enableContainerApps" = "true" ]; then
+  echo "ℹ️  Container Apps are enabled - skipping environment deletion"
+elif [ "$containerAppsEnvExists" = "false" ]; then
+  echo "ℹ️  Container Apps Environment doesn't exist - skipping deletion"
+else
+  echo "ℹ️  Conditions not met for Container Apps Environment deletion"
+fi
+
+# =============================================================================
 # LOGIC APPS - Delete if disabled and exists
 # =============================================================================
 enableLogicApps="$enableLogicApps"
@@ -964,7 +1026,7 @@ else
 fi
 
 # =============================================================================
-# AZURE MACHINE LEARNING - Delete if disabled and exists
+# AKS FOR AZURE ML - Delete BEFORE AML (AKS must be detached before workspace delete)
 # =============================================================================
 enableAzureMachineLearning="$enableAzureMachineLearning"
 amlExists="$amlExists"
@@ -974,34 +1036,72 @@ aksExists="$aksExists"
 if [ "$deleteAllServicesForProject" = "true" ]; then enableAzureMachineLearning="false"; enableAksForAzureML="false"; fi
 
 echo ""
-echo "--- Azure Machine Learning ---"
-echo "enableAzureMachineLearning: $enableAzureMachineLearning"
-echo "amlExists: $amlExists"
+echo "--- AKS for Azure ML (deleted before AML) ---"
 echo "enableAksForAzureML: $enableAksForAzureML"
 echo "aksExists: $aksExists"
 
+if [ "$enableAksForAzureML" = "false" ] && [ "$aksExists" = "true" ]; then
+  echo "✓ AKS for Azure ML is disabled but exists - proceeding with deletion"
+
+  aksName="aks${projectNumber}-${locationSuffix}-${envName}"
+
+  aks_name=$(az aks list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, '${aksName}')].name" \
+    -o tsv | head -n1)
+
+  if [ -n "$aks_name" ]; then
+    echo "Found AKS cluster: $aks_name"
+
+    echo "Deleting AKS cluster: $aks_name"
+    az aks delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$aks_name" \
+      --yes 2>&1
+
+    if [ $? -eq 0 ]; then
+      echo "✅ Successfully deleted AKS cluster"
+      echo "##vso[task.setvariable variable=aksExists]false"
+    else
+      echo "❌ Failed to delete AKS cluster"
+    fi
+  else
+    echo "⚠️  AKS cluster not found with prefix: $aksName"
+  fi
+else
+  echo "ℹ️  AKS skipped (enableAksForAzureML=$enableAksForAzureML, aksExists=$aksExists)"
+fi
+
+# =============================================================================
+# AZURE MACHINE LEARNING - Delete if disabled and exists (AFTER AKS)
+# =============================================================================
+echo ""
+echo "--- Azure Machine Learning ---"
+echo "enableAzureMachineLearning: $enableAzureMachineLearning"
+echo "amlExists: $amlExists"
+
 if [ "$enableAzureMachineLearning" = "false" ] && [ "$amlExists" = "true" ]; then
   echo "✓ Azure ML is disabled but exists - proceeding with deletion"
-  
+
   amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
-  
+
   aml_name=$(az ml workspace list \
     --resource-group "$projectResourceGroup" \
     --query "[?starts_with(name, '${amlName}')].name" \
     -o tsv | head -n1)
-  
+
   if [ -n "$aml_name" ]; then
     echo "Found Azure ML workspace: $aml_name"
-    
+
     # Always attempt to delete private endpoints (fail silently if not found)
     delete_private_endpoints "$aml_name" "Azure ML"
-    
+
     echo "Deleting Azure ML workspace: $aml_name"
     az ml workspace delete \
       --resource-group "$projectResourceGroup" \
       --name "$aml_name" \
       --yes 2>&1
-    
+
     if [ $? -eq 0 ]; then
       echo "✅ Successfully deleted Azure ML workspace"
       echo "##vso[task.setvariable variable=amlExists]false"
@@ -1017,37 +1117,6 @@ elif [ "$amlExists" = "false" ]; then
   echo "ℹ️  Azure ML doesn't exist - skipping deletion"
 else
   echo "ℹ️  Conditions not met for Azure ML deletion"
-fi
-
-# Delete AKS if it's not needed for Azure ML
-if [ "$enableAksForAzureML" = "false" ] && [ "$aksExists" = "true" ]; then
-  echo "✓ AKS for Azure ML is disabled but exists - proceeding with deletion"
-  
-  aksName="aks${projectNumber}-${locationSuffix}-${envName}"
-  
-  aks_name=$(az aks list \
-    --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${aksName}')].name" \
-    -o tsv | head -n1)
-  
-  if [ -n "$aks_name" ]; then
-    echo "Found AKS cluster: $aks_name"
-    
-    echo "Deleting AKS cluster: $aks_name"
-    az aks delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aks_name" \
-      --yes 2>&1
-    
-    if [ $? -eq 0 ]; then
-      echo "✅ Successfully deleted AKS cluster"
-      echo "##vso[task.setvariable variable=aksExists]false"
-    else
-      echo "❌ Failed to delete AKS cluster"
-    fi
-  else
-    echo "⚠️  AKS cluster not found with prefix: $aksName"
-  fi
 fi
 
 # =============================================================================
@@ -1100,6 +1169,144 @@ elif [ "$dataFactoryExists" = "false" ]; then
   echo "ℹ️  Data Factory doesn't exist - skipping deletion"
 else
   echo "ℹ️  Conditions not met for Data Factory deletion"
+fi
+
+# =============================================================================
+# BOT SERVICE - Delete if disabled and exists
+# =============================================================================
+enableBotService="$enableBotService"
+botServiceExists="$botServiceExists"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableBotService="false"; fi
+
+echo ""
+echo "--- Bot Service ---"
+echo "enableBotService: $enableBotService"
+echo "botServiceExists: $botServiceExists"
+
+if [ "$enableBotService" = "false" ] && [ "$botServiceExists" = "true" ]; then
+  echo "✓ Bot Service is disabled but exists - proceeding with deletion"
+
+  botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
+
+  bot_name=$(az resource list \
+    --resource-group "$projectResourceGroup" \
+    --resource-type "Microsoft.BotService/botServices" \
+    --query "[?starts_with(name, '${botServiceName}')].name" \
+    -o tsv | head -n1)
+
+  if [ -n "$bot_name" ]; then
+    echo "Found Bot Service: $bot_name"
+
+    delete_private_endpoints "$bot_name" "Bot Service"
+
+    echo "Deleting Bot Service: $bot_name"
+    az resource delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$bot_name" \
+      --resource-type "Microsoft.BotService/botServices" 2>&1
+
+    if [ $? -eq 0 ]; then
+      echo "✅ Successfully deleted Bot Service"
+      echo "##vso[task.setvariable variable=botServiceExists]false"
+    else
+      echo "❌ Failed to delete Bot Service"
+    fi
+  else
+    echo "⚠️  Bot Service not found with prefix: $botServiceName"
+  fi
+elif [ "$enableBotService" = "true" ]; then
+  echo "ℹ️  Bot Service is enabled - skipping deletion"
+elif [ "$botServiceExists" = "false" ]; then
+  echo "ℹ️  Bot Service doesn't exist - skipping deletion"
+else
+  echo "ℹ️  Conditions not met for Bot Service deletion"
+fi
+
+# =============================================================================
+# VM / DSVM - Delete if disabled and exists (deleteAllServicesForProject only)
+# =============================================================================
+vmExists="$vmExists"
+
+echo ""
+echo "--- VM / DSVM ---"
+echo "vmExists: $vmExists"
+echo "deleteAllServicesForProject: $deleteAllServicesForProject"
+
+if [ "$deleteAllServicesForProject" = "true" ] && [ "$vmExists" = "true" ]; then
+  echo "✓ deleteAllServicesForProject=true and VM exists - proceeding with deletion"
+
+  vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
+
+  vm_name=$(az vm list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, '${vmName}')].name" \
+    -o tsv | head -n1)
+
+  if [ -n "$vm_name" ]; then
+    echo "Found VM: $vm_name"
+
+    echo "Deleting VM (with managed disks and NIC): $vm_name"
+    az vm delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$vm_name" \
+      --yes 2>&1
+
+    if [ $? -eq 0 ]; then
+      echo "✅ Successfully deleted VM"
+      echo "##vso[task.setvariable variable=vmExists]false"
+    else
+      echo "❌ Failed to delete VM"
+    fi
+  else
+    echo "⚠️  VM not found with prefix: $vmName"
+  fi
+else
+  echo "ℹ️  VM deletion skipped (deleteAllServicesForProject=$deleteAllServicesForProject, vmExists=$vmExists)"
+fi
+
+# =============================================================================
+# ACR PROJECT - Delete if disabled and exists (deleteAllServicesForProject only)
+# =============================================================================
+acrProjectExists="$acrProjectExists"
+
+echo ""
+echo "--- ACR Project ---"
+echo "acrProjectExists: $acrProjectExists"
+echo "deleteAllServicesForProject: $deleteAllServicesForProject"
+
+if [ "$deleteAllServicesForProject" = "true" ] && [ "$acrProjectExists" = "true" ]; then
+  echo "✓ deleteAllServicesForProject=true and ACR project exists - proceeding with deletion"
+
+  acrName="acr${projectName}genai${locationSuffix}"
+
+  acr_name=$(az acr list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, '${acrName}')].name" \
+    -o tsv | head -n1)
+
+  if [ -n "$acr_name" ]; then
+    echo "Found ACR: $acr_name"
+
+    delete_private_endpoints "$acr_name" "ACR Project"
+
+    echo "Deleting ACR: $acr_name"
+    az acr delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$acr_name" \
+      --yes 2>&1
+
+    if [ $? -eq 0 ]; then
+      echo "✅ Successfully deleted ACR project"
+      echo "##vso[task.setvariable variable=acrProjectExists]false"
+    else
+      echo "❌ Failed to delete ACR project"
+    fi
+  else
+    echo "⚠️  ACR not found with prefix: $acrName"
+  fi
+else
+  echo "ℹ️  ACR deletion skipped (deleteAllServicesForProject=$deleteAllServicesForProject, acrProjectExists=$acrProjectExists)"
 fi
 
 # =============================================================================
