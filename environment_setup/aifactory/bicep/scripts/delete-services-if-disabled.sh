@@ -20,6 +20,15 @@ projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced
 
 echo "Target resource group: $projectResourceGroup"
 
+# Override mode: deleteAllServicesForProject bypasses all enable_ flags (except KeyVault, Storage, AppInsights)
+deleteAllServicesForProject="$(deleteAllServicesForProject)"
+echo ""
+echo "=== Delete Mode ==="
+echo "deleteAllServicesForProject: $deleteAllServicesForProject"
+if [ "$deleteAllServicesForProject" = "true" ]; then
+  echo "⚠️  deleteAllServicesForProject=true: ALL services will be deleted (except KeyVault, Storage, AppInsights)"
+fi
+
 # Check networking mode to determine if private endpoints are expected
 allowPublic="$(allowPublicAccessWhenBehindVnet)"
 enablePublicGenAI="$(enablePublicGenAIAccess)"
@@ -155,8 +164,10 @@ echo "addAISearch: $addAISearch"
 echo "enableAFoundryCaphost: $enableAFoundryCaphost"
 echo "enableAIFoundry: $enableAIFoundry"
 
-# Check if AI Search is a dependency for Foundry with capability host
-if [ "$enableAFoundryCaphost" = "true" ] && [ "$enableAIFoundry" = "true" ]; then
+# When deleteAllServicesForProject=true, override enable_ flag regardless of Foundry dependencies
+if [ "$deleteAllServicesForProject" = "true" ]; then enableAISearch="false"; addAISearch="false"; fi
+# Check if AI Search is a dependency for Foundry with capability host (bypassed when deleteAllServicesForProject=true)
+if [ "$enableAFoundryCaphost" = "true" ] && [ "$enableAIFoundry" = "true" ] && [ "$deleteAllServicesForProject" != "true" ]; then
   echo "🔒 AI Search is required as dependency for AI Foundry with capability host - skipping deletion"
   skip_aisearch_deletion=true
 else
@@ -284,8 +295,10 @@ echo "--- Cosmos DB ---"
 echo "enableCosmosDB: $enableCosmosDB"
 echo "cosmosDBExists: $cosmosDBExists"
 
-# Check if Cosmos DB is a dependency for Foundry with capability host
-if [ "$enableAFoundryCaphost" = "true" ] && [ "$enableAIFoundry" = "true" ]; then
+# When deleteAllServicesForProject=true, override enable_ flag regardless of Foundry dependencies
+if [ "$deleteAllServicesForProject" = "true" ]; then enableCosmosDB="false"; fi
+# Check if Cosmos DB is a dependency for Foundry with capability host (bypassed when deleteAllServicesForProject=true)
+if [ "$enableAFoundryCaphost" = "true" ] && [ "$enableAIFoundry" = "true" ] && [ "$deleteAllServicesForProject" != "true" ]; then
   echo "🔒 Cosmos DB is required as dependency for AI Foundry with capability host - skipping deletion"
   skip_cosmosdb_deletion=true
 else
@@ -340,6 +353,8 @@ fi
 enableWebApp="$(enableWebApp)"
 webAppExists="$(webAppExists)"
 byoASEv3Val="$(byoASEv3)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableWebApp="false"; fi
 
 echo ""
 echo "--- Web App ---"
@@ -449,6 +464,8 @@ fi
 # =============================================================================
 enableFunction="$(enableFunction)"
 functionAppExists="$(functionAppExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableFunction="false"; fi
 
 echo ""
 echo "--- Function App ---"
@@ -558,6 +575,8 @@ fi
 enableContainerApps="$(enableContainerApps)"
 containerAppAExists="$(containerAppAExists)"
 containerAppWExists="$(containerAppWExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableContainerApps="false"; fi
 
 echo ""
 echo "--- Container Apps ---"
@@ -634,6 +653,8 @@ fi
 # =============================================================================
 enableLogicApps="$(enableLogicApps)"
 logicAppsExists="$(logicAppsExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableLogicApps="false"; fi
 
 echo ""
 echo "--- Logic Apps ---"
@@ -685,6 +706,8 @@ fi
 # =============================================================================
 enableEventHubs="$(enableEventHubs)"
 eventHubsExists="$(eventHubsExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableEventHubs="false"; fi
 
 echo ""
 echo "--- Event Hubs ---"
@@ -734,6 +757,8 @@ fi
 # =============================================================================
 enablePostgreSQL="$(enablePostgreSQL)"
 postgreSQLExists="$(postgreSQLExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enablePostgreSQL="false"; fi
 
 echo ""
 echo "--- PostgreSQL ---"
@@ -784,6 +809,8 @@ fi
 # =============================================================================
 enableRedisCache="$(enableRedisCache)"
 redisExists="$(redisExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableRedisCache="false"; fi
 
 echo ""
 echo "--- Redis Cache ---"
@@ -835,6 +862,8 @@ fi
 enableSQLDatabase="$(enableSQLDatabase)"
 sqlServerExists="$(sqlServerExists)"
 sqlDBExists="$(sqlDBExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableSQLDatabase="false"; fi
 
 echo ""
 echo "--- SQL Database ---"
@@ -887,6 +916,8 @@ fi
 # =============================================================================
 enableDatabricks="$(enableDatabricks)"
 databricksExists="$(databricksExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableDatabricks="false"; fi
 
 echo ""
 echo "--- Databricks ---"
@@ -939,6 +970,8 @@ enableAzureMachineLearning="$(enableAzureMachineLearning)"
 amlExists="$(amlExists)"
 enableAksForAzureML="$(enableAksForAzureML)"
 aksExists="$(aksExists)"
+# When deleteAllServicesForProject=true, override enable_ flags (covers AML and AKS)
+if [ "$deleteAllServicesForProject" = "true" ]; then enableAzureMachineLearning="false"; enableAksForAzureML="false"; fi
 
 echo ""
 echo "--- Azure Machine Learning ---"
@@ -1022,6 +1055,8 @@ fi
 # =============================================================================
 enableDatafactory="$(enableDatafactory)"
 dataFactoryExists="$(dataFactoryExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableDatafactory="false"; fi
 
 echo ""
 echo "--- Data Factory ---"
@@ -1072,6 +1107,8 @@ fi
 # =============================================================================
 enableBing="$(enableBing)"
 bingExists="$(bingExists)"
+# When deleteAllServicesForProject=true, override enable_ flag
+if [ "$deleteAllServicesForProject" = "true" ]; then enableBing="false"; fi
 
 echo ""
 echo "--- Bing Search ---"
@@ -1122,7 +1159,7 @@ echo ""
 # Azure AI Vision
 # ======================================
 echo "Checking Azure AI Vision deletion conditions..."
-if [ "$enableDeleteForDisabledResources" = "true" ] && [ "$enableAzureAIVision" = "false" ]; then
+if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesForProject" = "true" ]) && [ "$enableAzureAIVision" = "false" ]; then
   echo "✓ Delete mode enabled and Azure AI Vision not enabled"
   
   # Find Azure AI Vision resource (vision-{projectName}-...)
@@ -1168,7 +1205,7 @@ echo ""
 # Azure Speech Services
 # ======================================
 echo "Checking Azure Speech Services deletion conditions..."
-if [ "$enableDeleteForDisabledResources" = "true" ] && [ "$enableAzureSpeech" = "false" ]; then
+if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesForProject" = "true" ]) && [ "$enableAzureSpeech" = "false" ]; then
   echo "✓ Delete mode enabled and Azure Speech not enabled"
   
   # Find Azure Speech resource (speech-{projectName}-...)
@@ -1214,7 +1251,7 @@ echo ""
 # AI Document Intelligence
 # ======================================
 echo "Checking AI Document Intelligence deletion conditions..."
-if [ "$enableDeleteForDisabledResources" = "true" ] && [ "$enableAIDocIntelligence" = "false" ]; then
+if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesForProject" = "true" ]) && [ "$enableAIDocIntelligence" = "false" ]; then
   echo "✓ Delete mode enabled and AI Document Intelligence not enabled"
   
   # Find Document Intelligence resource (docs-{projectName}-...)
@@ -1260,7 +1297,7 @@ echo ""
 # Bing Custom Search
 # ======================================
 echo "Checking Bing Custom Search deletion conditions..."
-if [ "$enableDeleteForDisabledResources" = "true" ] && [ "$enableBingCustomSearch" = "false" ]; then
+if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesForProject" = "true" ]) && [ "$enableBingCustomSearch" = "false" ]; then
   echo "✓ Delete mode enabled and Bing Custom Search not enabled"
   
   # Find Bing Custom Search resource (bing-custom-{projectName}-...)
