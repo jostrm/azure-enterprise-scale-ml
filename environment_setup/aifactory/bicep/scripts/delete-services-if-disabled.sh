@@ -21,7 +21,9 @@ projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced
 echo "Target resource group: $projectResourceGroup"
 
 # Override mode: deleteAllServicesForProject bypasses all enable_ flags (except KeyVault, Storage, AppInsights)
-deleteAllServicesForProject="$deleteAllServicesForProject"
+# Normalize to lowercase because ADO serializes unquoted YAML booleans as "True"/"False" (capital T/F)
+# and all bash comparisons in this script use lowercase "true"/"false"
+deleteAllServicesForProject=$(echo "${deleteAllServicesForProject:-false}" | tr '[:upper:]' '[:lower:]')
 echo ""
 echo "=== Delete Mode ==="
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
