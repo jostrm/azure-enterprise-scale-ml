@@ -1,19 +1,19 @@
 #!/bin/bash
 set -e
 
-az account set --subscription "$(dev_test_prod_sub_id)"
+az account set --subscription "$dev_test_prod_sub_id"
 
 echo "=== Delete Services If Not Enabled (Complete Mode) ==="
 
 # Build resource group name
-commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-projectNumber="$(project_number_000)"
+commonRGNamePrefix="$admin_aifactoryPrefixRG"
+projectNumber="$project_number_000"
 projectName="prj${projectNumber}"
-locationSuffix="$(admin_locationSuffix)"
-envName="$(dev_test_prod)"
-aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-projectPrefix="$(projectPrefix)"
-projectSuffix="$(projectSuffix)"
+locationSuffix="$admin_locationSuffix"
+envName="$dev_test_prod"
+aifactorySuffixRG="$admin_aifactorySuffixRG"
+projectPrefix="$projectPrefix"
+projectSuffix="$projectSuffix"
 
 projectNameReplaced="${projectName/prj/project}"
 projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
@@ -21,7 +21,7 @@ projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced
 echo "Target resource group: $projectResourceGroup"
 
 # Override mode: deleteAllServicesForProject bypasses all enable_ flags (except KeyVault, Storage, AppInsights)
-deleteAllServicesForProject="$(deleteAllServicesForProject)"
+deleteAllServicesForProject="$deleteAllServicesForProject"
 echo ""
 echo "=== Delete Mode ==="
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
@@ -30,9 +30,9 @@ if [ "$deleteAllServicesForProject" = "true" ]; then
 fi
 
 # Check networking mode to determine if private endpoints are expected
-allowPublic="$(allowPublicAccessWhenBehindVnet)"
-enablePublicGenAI="$(enablePublicGenAIAccess)"
-enablePublicPerimeter="$(enablePublicAccessWithPerimeter)"
+allowPublic="$allowPublicAccessWhenBehindVnet"
+enablePublicGenAI="$enablePublicGenAIAccess"
+enablePublicPerimeter="$enablePublicAccessWithPerimeter"
 
 echo "Networking configuration:"
 echo "  allowPublicAccessWhenBehindVnet: $allowPublic"
@@ -150,11 +150,11 @@ delete_storage_private_endpoints() {
 # =============================================================================
 # AI SEARCH - Delete if disabled and exists
 # =============================================================================
-enableAISearch="$(enableAISearch)"
-aiSearchExists="$(aiSearchExists)"
-addAISearch="$(addAISearch)"
-enableAFoundryCaphost="$(enableAFoundryCaphost)"
-enableAIFoundry="$(enableAIFoundry)"
+enableAISearch="$enableAISearch"
+aiSearchExists="$aiSearchExists"
+addAISearch="$addAISearch"
+enableAFoundryCaphost="$enableAFoundryCaphost"
+enableAIFoundry="$enableAIFoundry"
 
 echo ""
 echo "--- AI Search ---"
@@ -287,8 +287,8 @@ fi
 # =============================================================================
 # COSMOS DB - Delete if disabled and exists (Capability host dependency)
 # =============================================================================
-enableCosmosDB="$(enableCosmosDB)"
-cosmosDBExists="$(cosmosDBExists)"
+enableCosmosDB="$enableCosmosDB"
+cosmosDBExists="$cosmosDBExists"
 
 echo ""
 echo "--- Cosmos DB ---"
@@ -350,9 +350,9 @@ fi
 # WEB APP - Delete if disabled and exists
 # Includes: private endpoints, NICs, App Service Plan (only if byoASEv3=false)
 # =============================================================================
-enableWebApp="$(enableWebApp)"
-webAppExists="$(webAppExists)"
-byoASEv3Val="$(byoASEv3)"
+enableWebApp="$enableWebApp"
+webAppExists="$webAppExists"
+byoASEv3Val="$byoASEv3"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableWebApp="false"; fi
 
@@ -462,8 +462,8 @@ fi
 # FUNCTION APP - Delete if disabled and exists
 # Includes: private endpoints, NICs, App Service Plan (only if byoASEv3=false)
 # =============================================================================
-enableFunction="$(enableFunction)"
-functionAppExists="$(functionAppExists)"
+enableFunction="$enableFunction"
+functionAppExists="$functionAppExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableFunction="false"; fi
 
@@ -572,9 +572,9 @@ fi
 # =============================================================================
 # CONTAINER APPS - Delete if disabled and exists
 # =============================================================================
-enableContainerApps="$(enableContainerApps)"
-containerAppAExists="$(containerAppAExists)"
-containerAppWExists="$(containerAppWExists)"
+enableContainerApps="$enableContainerApps"
+containerAppAExists="$containerAppAExists"
+containerAppWExists="$containerAppWExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableContainerApps="false"; fi
 
@@ -651,8 +651,8 @@ fi
 # =============================================================================
 # LOGIC APPS - Delete if disabled and exists
 # =============================================================================
-enableLogicApps="$(enableLogicApps)"
-logicAppsExists="$(logicAppsExists)"
+enableLogicApps="$enableLogicApps"
+logicAppsExists="$logicAppsExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableLogicApps="false"; fi
 
@@ -704,8 +704,8 @@ fi
 # =============================================================================
 # EVENT HUBS - Delete if disabled and exists
 # =============================================================================
-enableEventHubs="$(enableEventHubs)"
-eventHubsExists="$(eventHubsExists)"
+enableEventHubs="$enableEventHubs"
+eventHubsExists="$eventHubsExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableEventHubs="false"; fi
 
@@ -755,8 +755,8 @@ fi
 # =============================================================================
 # POSTGRESQL - Delete if disabled and exists
 # =============================================================================
-enablePostgreSQL="$(enablePostgreSQL)"
-postgreSQLExists="$(postgreSQLExists)"
+enablePostgreSQL="$enablePostgreSQL"
+postgreSQLExists="$postgreSQLExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enablePostgreSQL="false"; fi
 
@@ -807,8 +807,8 @@ fi
 # =============================================================================
 # REDIS CACHE - Delete if disabled and exists
 # =============================================================================
-enableRedisCache="$(enableRedisCache)"
-redisExists="$(redisExists)"
+enableRedisCache="$enableRedisCache"
+redisExists="$redisExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableRedisCache="false"; fi
 
@@ -859,9 +859,9 @@ fi
 # =============================================================================
 # SQL DATABASE - Delete if disabled and exists
 # =============================================================================
-enableSQLDatabase="$(enableSQLDatabase)"
-sqlServerExists="$(sqlServerExists)"
-sqlDBExists="$(sqlDBExists)"
+enableSQLDatabase="$enableSQLDatabase"
+sqlServerExists="$sqlServerExists"
+sqlDBExists="$sqlDBExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableSQLDatabase="false"; fi
 
@@ -914,8 +914,8 @@ fi
 # =============================================================================
 # DATABRICKS - Delete if disabled and exists
 # =============================================================================
-enableDatabricks="$(enableDatabricks)"
-databricksExists="$(databricksExists)"
+enableDatabricks="$enableDatabricks"
+databricksExists="$databricksExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableDatabricks="false"; fi
 
@@ -966,10 +966,10 @@ fi
 # =============================================================================
 # AZURE MACHINE LEARNING - Delete if disabled and exists
 # =============================================================================
-enableAzureMachineLearning="$(enableAzureMachineLearning)"
-amlExists="$(amlExists)"
-enableAksForAzureML="$(enableAksForAzureML)"
-aksExists="$(aksExists)"
+enableAzureMachineLearning="$enableAzureMachineLearning"
+amlExists="$amlExists"
+enableAksForAzureML="$enableAksForAzureML"
+aksExists="$aksExists"
 # When deleteAllServicesForProject=true, override enable_ flags (covers AML and AKS)
 if [ "$deleteAllServicesForProject" = "true" ]; then enableAzureMachineLearning="false"; enableAksForAzureML="false"; fi
 
@@ -1053,8 +1053,8 @@ fi
 # =============================================================================
 # DATA FACTORY - Delete if disabled and exists
 # =============================================================================
-enableDatafactory="$(enableDatafactory)"
-dataFactoryExists="$(dataFactoryExists)"
+enableDatafactory="$enableDatafactory"
+dataFactoryExists="$dataFactoryExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableDatafactory="false"; fi
 
@@ -1105,8 +1105,8 @@ fi
 # =============================================================================
 # BING SEARCH - Delete if disabled and exists
 # =============================================================================
-enableBing="$(enableBing)"
-bingExists="$(bingExists)"
+enableBing="$enableBing"
+bingExists="$bingExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableBing="false"; fi
 
@@ -1167,23 +1167,22 @@ if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesFor
   echo "Looking for Azure AI Vision with prefix: $visionName"
   
   visionResource=$(az cognitiveservices account list \
-    --resource-group "$targetResourceGroup" \
-    --subscription "$subscriptionIdDevTestProd" \
+    --resource-group "$projectResourceGroup" \
+    --subscription "$dev_test_prod_sub_id" \
     --query "[?starts_with(name, '$visionName')] | [0].name" -o tsv 2>/dev/null || echo "")
   
   if [ -n "$visionResource" ]; then
     echo "Found Azure AI Vision: $visionResource"
     
     # Always attempt to delete private endpoints (fail silently if not found)
-    pendName="p-${projectName}-vision-${genaiName}-pend"
-    delete_private_endpoints "$pendName" "Azure AI Vision"
+    delete_private_endpoints "$visionResource" "Azure AI Vision"
     
     # Delete the Azure AI Vision account
     echo "Deleting Azure AI Vision account: $visionResource"
     az cognitiveservices account delete \
       --name "$visionResource" \
-      --resource-group "$targetResourceGroup" \
-      --subscription "$subscriptionIdDevTestProd"
+      --resource-group "$projectResourceGroup" \
+      --subscription "$dev_test_prod_sub_id"
     
     if [ $? -eq 0 ]; then
       echo "✓ Azure AI Vision deleted successfully"
@@ -1213,23 +1212,22 @@ if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesFor
   echo "Looking for Azure Speech with prefix: $speechName"
   
   speechResource=$(az cognitiveservices account list \
-    --resource-group "$targetResourceGroup" \
-    --subscription "$subscriptionIdDevTestProd" \
+    --resource-group "$projectResourceGroup" \
+    --subscription "$dev_test_prod_sub_id" \
     --query "[?starts_with(name, '$speechName')] | [0].name" -o tsv 2>/dev/null || echo "")
   
   if [ -n "$speechResource" ]; then
     echo "Found Azure Speech: $speechResource"
     
     # Always attempt to delete private endpoints (fail silently if not found)
-    pendName="p-${projectName}-speech-${genaiName}-pend"
-    delete_private_endpoints "$pendName" "Azure Speech"
+    delete_private_endpoints "$speechResource" "Azure Speech"
     
     # Delete the Azure Speech account
     echo "Deleting Azure Speech account: $speechResource"
     az cognitiveservices account delete \
       --name "$speechResource" \
-      --resource-group "$targetResourceGroup" \
-      --subscription "$subscriptionIdDevTestProd"
+      --resource-group "$projectResourceGroup" \
+      --subscription "$dev_test_prod_sub_id"
     
     if [ $? -eq 0 ]; then
       echo "✓ Azure Speech deleted successfully"
@@ -1259,23 +1257,22 @@ if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesFor
   echo "Looking for AI Document Intelligence with prefix: $docsName"
   
   docsResource=$(az cognitiveservices account list \
-    --resource-group "$targetResourceGroup" \
-    --subscription "$subscriptionIdDevTestProd" \
+    --resource-group "$projectResourceGroup" \
+    --subscription "$dev_test_prod_sub_id" \
     --query "[?starts_with(name, '$docsName')] | [0].name" -o tsv 2>/dev/null || echo "")
   
   if [ -n "$docsResource" ]; then
     echo "Found AI Document Intelligence: $docsResource"
     
     # Always attempt to delete private endpoints (fail silently if not found)
-    pendName="p-${projectName}-docs-${genaiName}-pend"
-    delete_private_endpoints "$pendName" "AI Document Intelligence"
+    delete_private_endpoints "$docsResource" "AI Document Intelligence"
     
     # Delete the AI Document Intelligence account
     echo "Deleting AI Document Intelligence account: $docsResource"
     az cognitiveservices account delete \
       --name "$docsResource" \
-      --resource-group "$targetResourceGroup" \
-      --subscription "$subscriptionIdDevTestProd"
+      --resource-group "$projectResourceGroup" \
+      --subscription "$dev_test_prod_sub_id"
     
     if [ $? -eq 0 ]; then
       echo "✓ AI Document Intelligence deleted successfully"
@@ -1306,8 +1303,8 @@ if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesFor
   
   # Bing resources are of type Microsoft.Bing/accounts
   bingCustomResource=$(az resource list \
-    --resource-group "$targetResourceGroup" \
-    --subscription "$subscriptionIdDevTestProd" \
+    --resource-group "$projectResourceGroup" \
+    --subscription "$dev_test_prod_sub_id" \
     --resource-type "Microsoft.Bing/accounts" \
     --query "[?starts_with(name, '$bingCustomName')] | [0].name" -o tsv 2>/dev/null || echo "")
   
@@ -1319,8 +1316,8 @@ if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesFor
     echo "Deleting Bing Custom Search account: $bingCustomResource"
     az resource delete \
       --name "$bingCustomResource" \
-      --resource-group "$targetResourceGroup" \
-      --subscription "$subscriptionIdDevTestProd" \
+      --resource-group "$projectResourceGroup" \
+      --subscription "$dev_test_prod_sub_id" \
       --resource-type "Microsoft.Bing/accounts"
     
     if [ $? -eq 0 ]; then
