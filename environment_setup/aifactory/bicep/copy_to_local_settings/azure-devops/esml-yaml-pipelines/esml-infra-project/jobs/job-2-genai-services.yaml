@@ -1248,7 +1248,7 @@ steps:
       # ---------------------------------------------------------------
       amlExists="$(amlExists)"
       enableAML="$(enableAzureMachineLearning)"
-      amlActualName="$(amlActualName)"
+      amlActualName="${amlActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       amlPrefixName="aml-${projectNumber}-${locationSuffix}-${envName}"
       amlPurgeName="${amlActualName:-$amlPrefixName}"
       if [ "$amlExists" = "true" ] && { [ "$enableAML" = "false" ] || [ "$deleteAll" = "true" ]; }; then
@@ -1264,7 +1264,7 @@ steps:
       # ---------------------------------------------------------------
       aifProjectExists="$(aifProjectExists)"
       enableAIFoundryHubFlag="$(enableAIFoundryHub)"
-      aifProjectActualName="$(aifProjectActualName)"
+      aifProjectActualName="${aifProjectActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aifProjectPrefixName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aifProjectPurgeName="${aifProjectActualName:-$aifProjectPrefixName}"
       if [ "$aifProjectExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
@@ -1278,7 +1278,7 @@ steps:
       # Use actual name recorded by delete script (includes resource suffix like -001)
       # ---------------------------------------------------------------
       aiHubExists="$(aiHubExists)"
-      aiHubActualName="$(aiHubActualName)"
+      aiHubActualName="${aiHubActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aiHubPrefixName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
       aiHubPurgeName="${aiHubActualName:-$aiHubPrefixName}"
       if [ "$aiHubExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
@@ -1325,6 +1325,13 @@ steps:
       fi
 
       echo "=== 04_Purge_SoftDeleted complete ==="
+  env:
+    # These three variables are set dynamically by task 04_Delete via ##vso[task.setvariable].
+    # Passing them through env: ensures bash receives an empty string (not a command substitution)
+    # when the pipeline variable is unset (e.g. resource didn't exist / delete didn't run).
+    amlActualName: $(amlActualName)
+    aifProjectActualName: $(aifProjectActualName)
+    aiHubActualName: $(aiHubActualName)
 - task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
