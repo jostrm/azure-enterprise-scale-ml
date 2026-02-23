@@ -1447,14 +1447,20 @@ if [ "$enableBotService" = "false" ] && [ "$botServiceExists" = "true" ]; then
       -o tsv 2>/dev/null | head -n1)
 
     if [ -n "$botMIExists" ]; then
-      echo "Deleting Bot Service managed identity: $botMIName"
-      az identity delete \
-        --resource-group "$projectResourceGroup" \
-        --name "$botMIName" 2>&1
-      if [ $? -eq 0 ]; then
-        echo "✅ Successfully deleted Bot Service managed identity: $botMIName"
+      # Safety guard: NEVER delete the project core managed identities (mi-aca-prj... / mi-prj...)
+      # These are essential to the project and are never deleted by this script.
+      if [[ "$botMIName" == mi-aca-* ]] || [[ "$botMIName" == mi-* && "$botMIName" != *-identity ]]; then
+        echo "🛑 Safety guard: refusing to delete protected managed identity: $botMIName — skipping"
       else
-        echo "❌ Failed to delete Bot Service managed identity: $botMIName"
+        echo "Deleting Bot Service managed identity: $botMIName"
+        az identity delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$botMIName" 2>&1
+        if [ $? -eq 0 ]; then
+          echo "✅ Successfully deleted Bot Service managed identity: $botMIName"
+        else
+          echo "❌ Failed to delete Bot Service managed identity: $botMIName"
+        fi
       fi
     else
       echo "ℹ️  Bot Service managed identity not found: $botMIName — skipping"

@@ -331,15 +331,23 @@ if ($PSBoundParameters.ContainsKey('vnetNameFull_param') -and $vnetNameFull_para
     Write-Host "Using inline parameter: vnetNameFull_param = $vnetNameFull_param"
 }
 
-$authSettings = @{
-    useServicePrincipal = $useServicePrincipal
-    tenantId            = $tenantId
-    spObjId             = $spObjId
-    spSecret            = $spSecret
-    subscriptionId      = $subscriptionId
+if ( $useServicePrincipal -eq $null -or $useServicePrincipal -eq "" -or $useServicePrincipal -eq $false )
+{
+    $useServicePrincipal = $false
+    Write-Host "Using current context active AzContext (AzurePowerShell task service connection)"
 }
+else
+{
+    $authSettings = @{
+        useServicePrincipal = $useServicePrincipal
+        tenantId            = $tenantId
+        spObjId             = $spObjId
+        spSecret            = $spSecret
+        subscriptionId      = $subscriptionId
+    }
 
-Connect-AzureContext @authSettings
+    Connect-AzureContext @authSettings
+}
 $vnetObj = $null
 
 if ($(Get-AzContext).Subscription -ne "") {

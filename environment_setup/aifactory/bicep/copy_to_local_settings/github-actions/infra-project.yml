@@ -911,25 +911,65 @@ jobs:
             miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
             storageAccount1001Name="sa${projectName}${locationSuffix}"
             storageAccount2001Name="sa${projectName}${locationSuffix}"
-            echo "aiHubExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "aifProjectExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "aiFoundryV2Exists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "")" >> $GITHUB_ENV
-            echo "aiFoundryV2ProjectExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts/projects" "$aiFoundryV2ProjectName" "")" >> $GITHUB_ENV
-            echo "dataFactoryExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "botServiceExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "aksExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "amlExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "openaiExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "aiSearchExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")" >> $GITHUB_ENV
-            echo "aiServicesExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")" >> $GITHUB_ENV
-            echo "containerAppsEnvExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "containerAppAExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "containerAppWExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")" >> $GITHUB_ENV
-            echo "keyvaultExists=$(resource_exists_fuzzy "$targetRG" "Microsoft.KeyVault/vaults" "$keyvaultName" "$twoNumbers")" >> $GITHUB_ENV
-            echo "miACAExists=$(resource_exists_identity "$targetRG" "$miACAPrefix")" >> $GITHUB_ENV
-            echo "miPrjExists=$(resource_exists_identity "$targetRG" "$miPrjPrefix")" >> $GITHUB_ENV
-            echo "storageAccount1001Exists=$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "")" >> $GITHUB_ENV
-            echo "storageAccount2001Exists=$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "")" >> $GITHUB_ENV
+            databricksName="dbw-${projectName}-${locationSuffix}-${envName}"
+            redisName="redis${projectName}${locationSuffix}${envName}"
+            cosmosDbAccountName="cosmos-${projectName}-${locationSuffix}-${envName}"
+            logicAppName="la-${projectName}-${locationSuffix}-${envName}"
+            eventHubNsName="evhns-${projectName}-${locationSuffix}-${envName}"
+            funcAppName="func-${projectName}-${locationSuffix}-${envName}"
+            webAppResourceName="app-${projectName}-${locationSuffix}-${envName}"
+            pgServerName="pg-${projectName}-${locationSuffix}-${envName}"
+            bingAccountName="bing-${projectName}-${locationSuffix}-${envName}"
+            bingCustomName="bingcustom-${projectName}-${locationSuffix}-${envName}"
+            set_env() {
+              local key="$1" val="$2"
+              echo "${key}=${val}" >> $GITHUB_ENV
+              echo "Checking variable: ${key}, Value: ${val}"
+            }
+            set_env "aiHubExists"            "$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
+            set_env "aifProjectExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
+            set_env "aiFoundryV2Exists"      "$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "")"
+            # Nested projects can't be enumerated with az resource list — use REST API instead
+            _subId=$(az account show --query id -o tsv)
+            _fdryAcct=$(az cognitiveservices account list --resource-group "$targetRG" \
+              --query "[?starts_with(name, 'aif2')].name" -o tsv 2>/dev/null | head -n1)
+            if [ -n "$_fdryAcct" ]; then
+              _projCount=$(az rest --method GET \
+                --url "https://management.azure.com/subscriptions/${_subId}/resourceGroups/${targetRG}/providers/Microsoft.CognitiveServices/accounts/${_fdryAcct}/projects?api-version=2024-10-01" \
+                --query "length(value)" -o tsv 2>/dev/null || echo "0")
+              if [ "${_projCount:-0}" -gt 0 ]; then
+                set_env "aiFoundryV2ProjectExists" "true"
+              else
+                set_env "aiFoundryV2ProjectExists" "false"
+              fi
+            else
+              set_env "aiFoundryV2ProjectExists" "false"
+            fi
+            set_env "dataFactoryExists"      "$(resource_exists_fuzzy "$targetRG" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
+            set_env "botServiceExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"
+            set_env "aksExists"              "$(resource_exists_fuzzy "$targetRG" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")"
+            set_env "amlExists"              "$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
+            set_env "openaiExists"           "$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
+            set_env "aiSearchExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")"
+            set_env "aiServicesExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")"
+            set_env "containerAppsEnvExists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")"
+            set_env "containerAppAExists"    "$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")"
+            set_env "containerAppWExists"    "$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")"
+            set_env "keyvaultExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.KeyVault/vaults" "$keyvaultName" "$twoNumbers")"
+            set_env "miACAExists"            "$(resource_exists_identity "$targetRG" "$miACAPrefix")"
+            set_env "miPrjExists"            "$(resource_exists_identity "$targetRG" "$miPrjPrefix")"
+            set_env "storageAccount1001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "")"
+            set_env "storageAccount2001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "")"
+            set_env "databricksExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.Databricks/workspaces" "$databricksName" "$suffixStandard")"
+            set_env "redisExists"            "$(resource_exists_fuzzy "$targetRG" "Microsoft.Cache/Redis" "$redisName" "$suffixStandardNoDash")"
+            set_env "cosmosDBExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDbAccountName" "$suffixStandard")"
+            set_env "logicAppsExists"        "$(resource_exists_fuzzy "$targetRG" "Microsoft.Logic/workflows" "$logicAppName" "$suffixStandard")"
+            set_env "eventHubsExists"        "$(resource_exists_fuzzy "$targetRG" "Microsoft.EventHub/namespaces" "$eventHubNsName" "$suffixStandard")"
+            set_env "functionAppExists"      "$(resource_exists_fuzzy "$targetRG" "Microsoft.Web/sites" "$funcAppName" "$suffixStandard")"
+            set_env "webAppExists"           "$(resource_exists_fuzzy "$targetRG" "Microsoft.Web/sites" "$webAppResourceName" "$suffixStandard")"
+            set_env "postgreSQLExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.DBforPostgreSQL/flexibleServers" "$pgServerName" "$suffixStandard")"
+            set_env "bingExists"             "$(resource_exists_fuzzy "$targetRG" "Microsoft.Bing/accounts" "$bingAccountName" "$suffixStandard")"
+            set_env "bingCustomSearchExists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$bingCustomName" "$suffixStandard")"
 
       - name: 17_Extract_aifactory_salt_random
         uses: azure/cli@v2
@@ -976,16 +1016,130 @@ jobs:
             echo "Target resource group: $targetRG"
             delete_all="${{ env.deleteAllServicesForProject }}"
 
+            # Never deleted regardless of flags: RG itself, KeyVault, Storage Accounts, Application Insights.
+            # Those are intentionally absent from the list below.
+
             delete_resource() {
               local rtype="$1" rname="$2" rg="$3"
               echo "Deleting $rtype '$rname' in $rg ..."
-              az resource delete --resource-group "$rg" --name "$rname" --resource-type "$rtype" --no-wait 2>/dev/null || true
+              case "$rtype" in
+                Microsoft.CognitiveServices/accounts)
+                  # Nested projects require REST — az resource list cannot enumerate child types
+                  subId=$(az account show --query id -o tsv)
+                  projectNames=$(az rest --method GET \
+                    --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects?api-version=2024-10-01" \
+                    --query "value[].name" -o tsv 2>/dev/null || echo "")
+                  if [ -n "$projectNames" ]; then
+                    while IFS= read -r proj; do
+                      [ -z "$proj" ] && continue
+                      echo "  Deleting nested project '$proj' under account '$rname' ..."
+                      az rest --method DELETE \
+                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects/${proj}?api-version=2024-10-01" \
+                        || echo "WARN: failed to delete project $proj"
+                    done <<< "$projectNames"
+                    echo "  Polling until all projects are gone (max 3min)..."
+                    for i in $(seq 1 18); do
+                      remaining=$(az rest --method GET \
+                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects?api-version=2024-10-01" \
+                        --query "length(value)" -o tsv 2>/dev/null || echo "0")
+                      [ "${remaining:-0}" -eq 0 ] && break
+                      echo "  Still $remaining project(s) remaining, waiting 10s (attempt $i/18)..."
+                      sleep 10
+                    done
+                  fi
+                  az cognitiveservices account delete --resource-group "$rg" --name "$rname" || echo "WARN: failed to delete $rname" ;;
+                Microsoft.Search/searchServices)
+                  # Delete shared private link resources first, then poll until all gone
+                  subId=$(az account show --query id -o tsv)
+                  splNames=$(az rest --method GET \
+                    --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.Search/searchServices/${rname}/sharedPrivateLinkResources?api-version=2023-11-01" \
+                    --query "value[].name" -o tsv 2>/dev/null || echo "")
+                  if [ -n "$splNames" ]; then
+                    while IFS= read -r spl; do
+                      [ -z "$spl" ] && continue
+                      echo "  Deleting shared private link '$spl' ..."
+                      az rest --method DELETE \
+                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.Search/searchServices/${rname}/sharedPrivateLinkResources/${spl}?api-version=2023-11-01" \
+                        || echo "WARN: failed to delete SPL $spl"
+                    done <<< "$splNames"
+                    echo "  Polling until all SPLs are gone (max 5min)..."
+                    for i in $(seq 1 30); do
+                      remaining=$(az rest --method GET \
+                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.Search/searchServices/${rname}/sharedPrivateLinkResources?api-version=2023-11-01" \
+                        --query "length(value)" -o tsv 2>/dev/null || echo "0")
+                      [ "$remaining" -eq 0 ] && break
+                      echo "  Still $remaining SPL(s) remaining, waiting 10s (attempt $i/30)..."
+                      sleep 10
+                    done
+                  fi
+                  az search service delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.MachineLearningServices/workspaces)
+                  az ml workspace delete --resource-group "$rg" --name "$rname" --yes --no-wait || echo "WARN: failed to delete $rname" ;;
+                Microsoft.App/containerApps)
+                  az containerapp delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.App/managedEnvironments)
+                  az containerapp env delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.ContainerService/managedClusters)
+                  az aks delete --resource-group "$rg" --name "$rname" --yes --no-wait || echo "WARN: failed to delete $rname" ;;
+                Microsoft.DataFactory/factories)
+                  az datafactory delete --resource-group "$rg" --factory-name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.DocumentDB/databaseAccounts)
+                  az cosmosdb delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname"
+                  # Delete associated private endpoint(s): name starts with 'cosmos', ends with 'pend'
+                  pendNames=$(az network private-endpoint list --resource-group "$rg" \
+                    --query "[?starts_with(name, 'cosmos') && ends_with(name, 'pend')].name" -o tsv 2>/dev/null || echo "")
+                  if [ -n "$pendNames" ]; then
+                    while IFS= read -r pend; do
+                      [ -z "$pend" ] && continue
+                      echo "  Deleting private endpoint '$pend' ..."
+                      az network private-endpoint delete --resource-group "$rg" --name "$pend" || echo "WARN: failed to delete PE $pend"
+                    done <<< "$pendNames"
+                  fi
+                  # Delete associated NICs: name starts with 'cosmos', ends with 'pend-nic'
+                  nicNames=$(az network nic list --resource-group "$rg" \
+                    --query "[?starts_with(name, 'cosmos') && ends_with(name, 'pend-nic')].name" -o tsv 2>/dev/null || echo "")
+                  if [ -n "$nicNames" ]; then
+                    while IFS= read -r nic; do
+                      [ -z "$nic" ] && continue
+                      echo "  Deleting NIC '$nic' ..."
+                      az network nic delete --resource-group "$rg" --name "$nic" || echo "WARN: failed to delete NIC $nic"
+                    done <<< "$nicNames"
+                  fi ;;
+                Microsoft.DBforPostgreSQL/flexibleServers)
+                  az postgres flexible-server delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.Cache/Redis)
+                  az redis delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.Web/sites)
+                  az webapp delete --resource-group "$rg" --name "$rname" || echo "WARN: failed to delete $rname" ;;
+                Microsoft.Databricks/workspaces)
+                  az databricks workspace delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.Logic/workflows)
+                  az logicapp delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                Microsoft.EventHub/namespaces)
+                  az eventhubs namespace delete --resource-group "$rg" --namespace-name "$rname" || echo "WARN: failed to delete $rname" ;;
+                Microsoft.BotService/botServices)
+                  az bot delete --resource-group "$rg" --name "$rname" || echo "WARN: failed to delete bot $rname"
+                  # Delete bot managed identity (suffix: <name>-identity)
+                  botIdentity=$(az resource list --resource-group "$rg" \
+                    --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
+                    --query "[?starts_with(name, '${rname}') && ends_with(name, '-identity')].name" -o tsv 2>/dev/null | head -n1)
+                  if [ -n "$botIdentity" ]; then
+                    echo "  Deleting bot managed identity '$botIdentity' ..."
+                    az identity delete --resource-group "$rg" --name "$botIdentity" || echo "WARN: failed to delete identity $botIdentity"
+                  fi ;;
+                Microsoft.Bing/accounts)
+                  az resource delete --resource-group "$rg" --name "$rname" --resource-type "Microsoft.Bing/accounts" || echo "WARN: failed to delete $rname" ;;
+                *)
+                  az resource delete --resource-group "$rg" --name "$rname" --resource-type "$rtype" || echo "WARN: failed to delete $rname" ;;
+              esac
             }
 
+            # delete_all=true  → always attempt deletion (live query decides if resource exists).
+            # delete_all=false → only delete if service is explicitly disabled AND not known absent.
             should_delete() {
               local enabled="$1" exists="$2"
-              if [ "$exists" != "true" ]; then return 1; fi
               if [ "$delete_all" == "true" ]; then return 0; fi
+              if [ "$exists" == "false" ]; then return 1; fi
               if [ "$enabled" == "false" ] || [ "$enabled" == "'false'" ]; then return 0; fi
               return 1
             }
@@ -1010,6 +1164,9 @@ jobs:
               az containerapp list --resource-group "$targetRG" --query "[].name" -o tsv 2>/dev/null | while read -r name; do
                 [ -n "$name" ] && delete_resource "Microsoft.App/containerApps" "$name" "$targetRG"
               done
+              # Also delete the managed environment once apps are removed
+              acaEnvName=$(az containerapp env list --resource-group "$targetRG" --query "[0].name" -o tsv 2>/dev/null)
+              [ -n "$acaEnvName" ] && delete_resource "Microsoft.App/managedEnvironments" "$acaEnvName" "$targetRG"
             fi
             if should_delete "${{ env.enableCosmosDB }}" "${{ env.cosmosDBExists }}"; then
               cosmosName=$(az cosmosdb list --resource-group "$targetRG" --query "[0].name" -o tsv 2>/dev/null)
@@ -1047,11 +1204,112 @@ jobs:
               ehNs=$(az eventhubs namespace list --resource-group "$targetRG" --query "[0].name" -o tsv 2>/dev/null)
               [ -n "$ehNs" ] && delete_resource "Microsoft.EventHub/namespaces" "$ehNs" "$targetRG"
             fi
+            if should_delete "${{ env.enableAzureMachineLearning }}" "${{ env.amlExists }}"; then
+              amlName=$(az ml workspace list --resource-group "$targetRG" --query "[?kind=='Default'].name" -o tsv 2>/dev/null | head -n1)
+              [ -n "$amlName" ] && delete_resource "Microsoft.MachineLearningServices/workspaces" "$amlName" "$targetRG"
+            fi
+            if should_delete "${{ env.enableAIServices }}" "${{ env.aiServicesExists }}"; then
+              # Filter by name prefix 'aiservices' to avoid matching AI Foundry V2 accounts (prefix 'aif2')
+              aiSvcName=$(az cognitiveservices account list --resource-group "$targetRG" --query "[?starts_with(name, 'aiservices')].name" -o tsv 2>/dev/null | head -n1)
+              [ -n "$aiSvcName" ] && delete_resource "Microsoft.CognitiveServices/accounts" "$aiSvcName" "$targetRG"
+            fi
+            if should_delete "${{ env.enableAksForAzureML }}" "${{ env.aksExists }}"; then
+              aksName=$(az aks list --resource-group "$targetRG" --query "[0].name" -o tsv 2>/dev/null)
+              [ -n "$aksName" ] && delete_resource "Microsoft.ContainerService/managedClusters" "$aksName" "$targetRG"
+            fi
+            if should_delete "${{ env.enableBotService }}" "${{ env.botServiceExists }}"; then
+              # Bot name pattern: bot-{projectNumber}-{locationSuffix}-{envName}-{suffix}
+              botName=$(az resource list --resource-group "$targetRG" \
+                --resource-type "Microsoft.BotService/botServices" \
+                --query "[?starts_with(name, 'bot-${projectNumber}')].name" -o tsv 2>/dev/null | head -n1)
+              [ -n "$botName" ] && delete_resource "Microsoft.BotService/botServices" "$botName" "$targetRG"
+            fi
+            if should_delete "${{ env.enableBing }}" "${{ env.bingExists }}"; then
+              bingName=$(az resource list --resource-group "$targetRG" \
+                --resource-type "Microsoft.Bing/accounts" \
+                --query "[?starts_with(name, 'bing-${projectName}')].name" -o tsv 2>/dev/null | head -n1)
+              [ -n "$bingName" ] && delete_resource "Microsoft.Bing/accounts" "$bingName" "$targetRG"
+            fi
+            if should_delete "${{ env.enableBingCustomSearch }}" "${{ env.bingCustomSearchExists }}"; then
+              bingCustName=$(az cognitiveservices account list --resource-group "$targetRG" \
+                --query "[?kind=='Bing.CustomSearch' || starts_with(name, 'bingcustom')].name" -o tsv 2>/dev/null | head -n1)
+              [ -n "$bingCustName" ] && delete_resource "Microsoft.CognitiveServices/accounts" "$bingCustName" "$targetRG"
+            fi
             echo "18_Delete_Service_If_Not_Enabled_And_Exists completed."
+
+      - name: 18_Purge_Soft_Deleted
+        if: env.enableDeleteForDisabledResources == 'true'
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -e
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            echo "Waiting 5 minutes for soft-delete to process before purging..."
+            sleep 300
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            envName="${{ env.dev_test_prod }}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            location="${{ env.admin_location }}"
+            projectNameReplaced="${projectName/prj/project}"
+            targetRG="${{ env.admin_aifactoryPrefixRG }}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${{ env.admin_aifactorySuffixRG }}${projectSuffix}"
+            echo "Target RG for purge: $targetRG"
+
+            # Purge soft-deleted AI Foundry / AI Hub (Cognitive Services) accounts
+            if [[ "${{ env.aiFoundryV2Exists }}" == "true" || "${{ env.aiHubExists }}" == "true" ]]; then
+              echo "Scanning for soft-deleted Cognitive Services accounts in $targetRG..."
+              deletedAccounts=$(az cognitiveservices account list-deleted \
+                --query "[?resourceGroup=='${targetRG}'].name" \
+                -o tsv 2>/dev/null || echo "")
+              if [ -n "$deletedAccounts" ]; then
+                while IFS= read -r accountName; do
+                  echo "Purging soft-deleted Cognitive Services account: $accountName"
+                  if ! az cognitiveservices account purge \
+                    --location "$location" \
+                    --resource-group "$targetRG" \
+                    --name "$accountName"; then
+                    echo "ERROR: Failed to purge Cognitive Services account '$accountName'" >&2
+                    exit 1
+                  fi
+                done <<< "$deletedAccounts"
+              else
+                echo "No soft-deleted Cognitive Services accounts found in $targetRG."
+              fi
+            fi
+
+            # Purge soft-deleted AML workspaces via REST API
+            if [[ "${{ env.amlExists }}" == "true" ]]; then
+              echo "Scanning for soft-deleted AML workspaces in $targetRG..."
+              subId="${{ env.dev_test_prod_sub_id }}"
+              deletedWorkspaces=$(az rest \
+                --method GET \
+                --url "https://management.azure.com/subscriptions/${subId}/providers/Microsoft.MachineLearningServices/locations/${location}/deletedWorkspaces?api-version=2024-04-01" \
+                --query "value[?resourceGroup=='${targetRG}'].name" \
+                -o tsv 2>/dev/null || echo "")
+              if [ -n "$deletedWorkspaces" ]; then
+                while IFS= read -r wsName; do
+                  echo "Purging soft-deleted AML workspace: $wsName"
+                  if ! az rest \
+                    --method DELETE \
+                    --url "https://management.azure.com/subscriptions/${subId}/providers/Microsoft.MachineLearningServices/locations/${location}/deletedWorkspaces/${wsName}?api-version=2024-04-01"; then
+                    echo "ERROR: Failed to purge AML workspace '$wsName'" >&2
+                    exit 1
+                  fi
+                done <<< "$deletedWorkspaces"
+              else
+                echo "No soft-deleted AML workspaces found in $targetRG."
+              fi
+            fi
+
+            echo "18_Purge_Soft_Deleted completed."
 
       # === Deploy sequences ===
 
       - name: 61-foundation
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1177,6 +1435,7 @@ jobs:
               --debug
 
       - name: 62-core-infrastructure
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1250,6 +1509,7 @@ jobs:
               --debug
 
       - name: 63-cognitive-services
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1329,6 +1589,7 @@ jobs:
               --debug
 
       - name: 64-databases
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1390,6 +1651,7 @@ jobs:
               --debug
 
       - name: 65-compute-services
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1465,6 +1727,7 @@ jobs:
               --debug
 
       - name: 66-ai-platform
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1542,6 +1805,7 @@ jobs:
               --debug
 
       - name: 67-data_ml_platform
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1612,6 +1876,7 @@ jobs:
               --parameters cmkKeyName="${{ env.cmkKeyName }}"
 
       - name: 68-integration
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1668,6 +1933,7 @@ jobs:
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}"
 
       - name: 99_check_acr_role_assignments
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1682,6 +1948,7 @@ jobs:
             if [ -n "$assignments" ]; then echo "skipACRAssignments=true" >> $GITHUB_ENV; else echo "skipACRAssignments=false" >> $GITHUB_ENV; fi
 
       - name: 100-rbac-security
+        if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1762,7 +2029,7 @@ jobs:
               --debug
 
       - name: 69a-aifoundry-2025-2ndOption-Account
-        if: env.debug_disable_69_aifoundry_2025 != 'true' && env.aiFoundryV2Exists != 'true'
+        if: env.deleteAllServicesForProject != 'true' && env.debug_disable_69_aifoundry_2025 != 'true' && env.aiFoundryV2Exists != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1850,14 +2117,14 @@ jobs:
               --debug
 
       - name: 69-Rehydrate
-        if: success() && env.debug_disable_69_aifoundry_2025 != 'true' && env.aiFoundryV2Exists != 'true'
+        if: success() && env.deleteAllServicesForProject != 'true' && env.debug_disable_69_aifoundry_2025 != 'true' && env.aiFoundryV2Exists != 'true'
         shell: bash
         run: |
           echo "Rehydration takes 2.5 to 5 minutes to allow AI Foundry account to finish..."
           sleep 15
 
       - name: 69b-aifoundry-2025-2ndOption-AccountUpdate
-        if: success() && env.debug_disable_69_aifoundry_2025 != 'true'
+        if: success() && env.deleteAllServicesForProject != 'true' && env.debug_disable_69_aifoundry_2025 != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1944,7 +2211,7 @@ jobs:
               --parameters addAIFoundry="${{ env.addAIFoundry }}"
 
       - name: Foundry agent (optional)
-        if: success() && env.enableAIFoundry == 'true'
+        if: success() && env.deleteAllServicesForProject != 'true' && env.enableAIFoundry == 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -1981,3 +2248,7 @@ jobs:
               --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
               --name "${{ env.admin_bicep_kv_fw }}" \
               --ip-address "${{ env.runner_ip }}" || true
+
+
+
+

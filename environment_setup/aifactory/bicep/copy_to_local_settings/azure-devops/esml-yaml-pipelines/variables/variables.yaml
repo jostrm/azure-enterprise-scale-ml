@@ -2,6 +2,11 @@ variables:
   # ============================================================================
   # #### DO NOT TOUCH ####
   # ============================================================================
+  # === Deprecated-START: DO NOT USE. HAVE false on all 3. AI Foundry 2023-2025 Do not use from 2026-01 ===
+  enableAIServices: "false" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
+  enableAIFoundryHub: "false" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
+  addAIFoundryHub: "false"  # Add new AI Foundry Hub with project, with a new random name (Solution, if deletion, and Enterprise application is not deleted as it should)
+  # === Deprecated-END: ===
   admin_ip_fw: "" # Leave this. Will be set by pipeline
   aifactory_salt_random: "" # 10 characters. Based on "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
   # ============================================================================
@@ -209,7 +214,7 @@ variables:
   
   # === Complete mode vs Incremental mode ===
   enableDeleteForDisabledResources: true # true, will delete all enabled services that are set to false in the variables. false, will keep all existing resources, even if ENABLE_* = false. Note! if deleteAllServicesForProject is true, and enableDeleteForDisabledResources is false, services that are set to false in the variables will not be re-created.
-  deleteAllServicesForProject: false # true, delete all services in the project resource group in step 04 then quits pipeline (sicne you need to purge Foundry and Azure ML, soft deleted). It will not del foundational services,  except foundational services such as Keyvault, Storage, AppInsights. false, only delete services that are set to false in the variables. Note! if true, and enableDeleteForDisabledResources is false, services that are set to false in the variables will not be re-created.
+  deleteAllServicesForProject: false # true, delete all services in the project resource group in step 04 then quits pipeline after purging soft deletes. It will not deleete foundational services such as Keyvault, Storage, AppInsights. false, only delete services that are set to false in the variables. Note! if true, and enableDeleteForDisabledResources is false, services that are set to false in the variables will not be re-created.
   # === Defender for Cloud: Defender for AI ===
   enableDefenderforAISubLevel: "false"
   enableDefenderforAIResourceLevel: "false"
@@ -229,12 +234,6 @@ variables:
   # === Keyvault RBAC ===
   updateKeyvaultRbac: "false" # true, enables you to update RBAC properties running the pipeline twice. false means "CreateIfNotExists"  
   
-  # === Deprecated-START: DO NOT USE. HAVE false on all 3. AI Foundry 2023-2025 Do not use from 2026-01 ===
-  enableAIServices: "false" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
-  enableAIFoundryHub: "false" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
-  addAIFoundryHub: "false"  # Add new AI Foundry Hub with project, with a new random name (Solution, if deletion, and Enterprise application is not deleted as it should)
-  # === Deprecated-END: ===
-
   # === AI foundry 2025 ===
   enableAIFoundry: "true" # AI Foundry with default project. Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
   updateAIFoundry: "false" # true, enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false means "CreateIfNotExists"
