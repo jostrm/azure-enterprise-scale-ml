@@ -686,6 +686,27 @@ if [ "$enableContainerApps" = "false" ] && [ "$containerAppsEnvExists" = "true" 
   if [ -n "$acaenv_name" ]; then
     echo "Found Container Apps Environment: $acaenv_name"
 
+    # Before deleting the env, delete ALL container apps inside it.
+    # Azure refuses to delete a managed environment that still has container apps.
+    echo "Checking for any remaining container apps in the environment..."
+    remaining_apps=$(az containerapp list \
+      --resource-group "$projectResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null || echo "")
+    if [ -n "$remaining_apps" ]; then
+      while IFS= read -r app_name; do
+        if [ -n "$app_name" ]; then
+          echo "  Deleting remaining container app: $app_name"
+          az containerapp delete \
+            --resource-group "$projectResourceGroup" \
+            --name "$app_name" \
+            --yes 2>&1 && echo "  ✅ Deleted: $app_name" || echo "  ⚠️  Could not delete: $app_name (continuing)"
+        fi
+      done <<< "$remaining_apps"
+    else
+      echo "  No remaining container apps found."
+    fi
+
     # Delete private endpoints before the environment
     delete_private_endpoints "$acaenv_name" "Container Apps Environment"
 
@@ -1028,6 +1049,207 @@ else
 fi
 
 # =============================================================================
+# AI FOUNDRY V1 PROJECT - Delete BEFORE AI Hub (child workspace of Hub)
+# Deletion puts it in soft-delete state → 04_Purge_SoftDeleted task handles purge
+# =============================================================================
+enableAIFoundryHub="$enableAIFoundryHub"
+aifProjectExists="$aifProjectExists"
+# Normalize to lowercase (ADO may pass unquoted booleans as "True")
+enableAIFoundryHub=$(echo "${enableAIFoundryHub:-false}" | tr '[:upper:]' '[:lower:]')
+aifProjectExists=$(echo "${aifProjectExists:-false}" | tr '[:upper:]' '[:lower:]')
+if [ "$deleteAllServicesForProject" = "true" ]; then enableAIFoundryHub="false"; fi
+
+echo ""
+echo "--- AI Foundry V1 Project (deleted before AI Hub) ---"
+echo "enableAIFoundryHub: $enableAIFoundryHub"
+echo "aifProjectExists: $aifProjectExists"
+
+if [ "$enableAIFoundryHub" = "false" ] && [ "$aifProjectExists" = "true" ]; then
+  echo "✓ AI Foundry V1 project exists - proceeding with deletion (will go to soft-delete)"
+
+  aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+
+  aif_proj_name=$(az ml workspace list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, '${aifProjectName}')].name" \
+    -o tsv 2>/dev/null | head -n1)
+
+  if [ -n "$aif_proj_name" ]; then
+    echo "Found AI Foundry V1 Project: $aif_proj_name"
+    echo "##vso[task.setvariable variable=aifProjectActualName]$aif_proj_name"
+    delete_private_endpoints "$aif_proj_name" "AI Foundry V1 Project"
+    echo "Deleting AI Foundry V1 Project: $aif_proj_name"
+    az ml workspace delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$aif_proj_name" \
+      --yes 2>&1 && echo "✅ Deleted AI Foundry V1 Project (soft-deleted)" || echo "⚠️  Could not delete AI Foundry V1 Project"
+  else
+    echo "⚠️  AI Foundry V1 Project not found with prefix: $aifProjectName"
+  fi
+else
+  echo "ℹ️  AI Foundry V1 Project skipped (enableAIFoundryHub=$enableAIFoundryHub, aifProjectExists=$aifProjectExists)"
+fi
+
+# =============================================================================
+# AI HUB (AI Foundry V1) - Delete if disabled and exists
+# Deletion puts it in soft-delete state → 04_Purge_SoftDeleted task handles purge
+# =============================================================================
+aiHubExists="$aiHubExists"
+aiHubExists=$(echo "${aiHubExists:-false}" | tr '[:upper:]' '[:lower:]')
+# enableAIFoundryHub already set and overridden above
+
+echo ""
+echo "--- AI Hub (AI Foundry V1) ---"
+echo "enableAIFoundryHub: $enableAIFoundryHub"
+echo "aiHubExists: $aiHubExists"
+
+if [ "$enableAIFoundryHub" = "false" ] && [ "$aiHubExists" = "true" ]; then
+  echo "✓ AI Hub exists - proceeding with deletion (will go to soft-delete)"
+
+  aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+
+  ai_hub_name=$(az ml workspace list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, '${aiHubName}')].name" \
+    -o tsv 2>/dev/null | head -n1)
+
+  if [ -n "$ai_hub_name" ]; then
+    echo "Found AI Hub: $ai_hub_name"
+    echo "##vso[task.setvariable variable=aiHubActualName]$ai_hub_name"
+    delete_private_endpoints "$ai_hub_name" "AI Hub"
+    echo "Deleting AI Hub: $ai_hub_name (soft-delete, purge by 04_Purge_SoftDeleted)"
+    az ml workspace delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$ai_hub_name" \
+      --yes 2>&1 && echo "✅ Deleted AI Hub (soft-deleted)" || echo "⚠️  Could not delete AI Hub"
+  else
+    echo "⚠️  AI Hub not found with prefix: $aiHubName"
+  fi
+else
+  echo "ℹ️  AI Hub skipped (enableAIFoundryHub=$enableAIFoundryHub, aiHubExists=$aiHubExists)"
+fi
+
+# =============================================================================
+# AI FOUNDRY V2 ACCOUNT (CognitiveServices) - Delete if disabled and exists
+# Deletion puts it in soft-delete state → 04_Purge_SoftDeleted task handles purge
+# =============================================================================
+enableAIFoundry="$enableAIFoundry"
+aiFoundryV2Exists="$aiFoundryV2Exists"
+enableAIFoundry=$(echo "${enableAIFoundry:-true}" | tr '[:upper:]' '[:lower:]')
+aiFoundryV2Exists=$(echo "${aiFoundryV2Exists:-false}" | tr '[:upper:]' '[:lower:]')
+if [ "$deleteAllServicesForProject" = "true" ]; then enableAIFoundry="false"; fi
+
+echo ""
+echo "--- AI Foundry V2 Account ---"
+echo "enableAIFoundry: $enableAIFoundry"
+echo "aiFoundryV2Exists: $aiFoundryV2Exists"
+
+if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
+  echo "✓ AI Foundry V2 account exists - proceeding with deletion (will go to soft-delete)"
+
+  aiFoundryV2Prefix="aif2"
+
+  aif2_name=$(az resource list \
+    --resource-group "$projectResourceGroup" \
+    --resource-type "Microsoft.CognitiveServices/accounts" \
+    --query "[?starts_with(name, '${aiFoundryV2Prefix}')].name" \
+    -o tsv 2>/dev/null | head -n1)
+
+  if [ -n "$aif2_name" ]; then
+    echo "Found AI Foundry V2 account: $aif2_name"
+    delete_private_endpoints "$aif2_name" "AI Foundry V2"
+    echo "Deleting AI Foundry V2 account: $aif2_name (soft-delete, purge by 04_Purge_SoftDeleted)"
+    az cognitiveservices account delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$aif2_name" 2>&1 && echo "✅ Deleted AI Foundry V2 (soft-deleted)" || echo "⚠️  Could not delete AI Foundry V2"
+  else
+    echo "⚠️  AI Foundry V2 account not found with prefix: $aiFoundryV2Prefix"
+  fi
+else
+  echo "ℹ️  AI Foundry V2 skipped (enableAIFoundry=$enableAIFoundry, aiFoundryV2Exists=$aiFoundryV2Exists)"
+fi
+
+# =============================================================================
+# AI SERVICES ACCOUNT (CognitiveServices) - Delete if disabled and exists
+# Deletion puts it in soft-delete state → 04_Purge_SoftDeleted task handles purge
+# =============================================================================
+enableAIServices="$enableAIServices"
+aiServicesExists="$aiServicesExists"
+enableAIServices=$(echo "${enableAIServices:-false}" | tr '[:upper:]' '[:lower:]')
+aiServicesExists=$(echo "${aiServicesExists:-false}" | tr '[:upper:]' '[:lower:]')
+if [ "$deleteAllServicesForProject" = "true" ]; then enableAIServices="false"; fi
+
+echo ""
+echo "--- AI Services Account ---"
+echo "enableAIServices: $enableAIServices"
+echo "aiServicesExists: $aiServicesExists"
+
+if [ "$enableAIServices" = "false" ] && [ "$aiServicesExists" = "true" ]; then
+  echo "✓ AI Services account exists - proceeding with deletion (will go to soft-delete)"
+
+  aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
+
+  aisvc_name=$(az resource list \
+    --resource-group "$projectResourceGroup" \
+    --resource-type "Microsoft.CognitiveServices/accounts" \
+    --query "[?starts_with(name, '${aiServicesPrefix}')].name" \
+    -o tsv 2>/dev/null | head -n1)
+
+  if [ -n "$aisvc_name" ]; then
+    echo "Found AI Services account: $aisvc_name"
+    delete_private_endpoints "$aisvc_name" "AI Services"
+    echo "Deleting AI Services account: $aisvc_name (soft-delete, purge by 04_Purge_SoftDeleted)"
+    az cognitiveservices account delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$aisvc_name" 2>&1 && echo "✅ Deleted AI Services (soft-deleted)" || echo "⚠️  Could not delete AI Services"
+  else
+    echo "⚠️  AI Services account not found with prefix: $aiServicesPrefix"
+  fi
+else
+  echo "ℹ️  AI Services skipped (enableAIServices=$enableAIServices, aiServicesExists=$aiServicesExists)"
+fi
+
+# =============================================================================
+# AZURE OPENAI (CognitiveServices) - Delete if disabled and exists
+# Deletion puts it in soft-delete state → 04_Purge_SoftDeleted task handles purge
+# =============================================================================
+enableAzureOpenAI="$enableAzureOpenAI"
+openaiExists="$openaiExists"
+enableAzureOpenAI=$(echo "${enableAzureOpenAI:-false}" | tr '[:upper:]' '[:lower:]')
+openaiExists=$(echo "${openaiExists:-false}" | tr '[:upper:]' '[:lower:]')
+if [ "$deleteAllServicesForProject" = "true" ]; then enableAzureOpenAI="false"; fi
+
+echo ""
+echo "--- Azure OpenAI ---"
+echo "enableAzureOpenAI: $enableAzureOpenAI"
+echo "openaiExists: $openaiExists"
+
+if [ "$enableAzureOpenAI" = "false" ] && [ "$openaiExists" = "true" ]; then
+  echo "✓ Azure OpenAI account exists - proceeding with deletion (will go to soft-delete)"
+
+  openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
+
+  aoai_name=$(az resource list \
+    --resource-group "$projectResourceGroup" \
+    --resource-type "Microsoft.CognitiveServices/accounts" \
+    --query "[?starts_with(name, '${openaiName}')].name" \
+    -o tsv 2>/dev/null | head -n1)
+
+  if [ -n "$aoai_name" ]; then
+    echo "Found Azure OpenAI account: $aoai_name"
+    delete_private_endpoints "$aoai_name" "Azure OpenAI"
+    echo "Deleting Azure OpenAI account: $aoai_name (soft-delete, purge by 04_Purge_SoftDeleted)"
+    az cognitiveservices account delete \
+      --resource-group "$projectResourceGroup" \
+      --name "$aoai_name" 2>&1 && echo "✅ Deleted Azure OpenAI (soft-deleted)" || echo "⚠️  Could not delete Azure OpenAI"
+  else
+    echo "⚠️  Azure OpenAI account not found with prefix: $openaiName"
+  fi
+else
+  echo "ℹ️  Azure OpenAI skipped (enableAzureOpenAI=$enableAzureOpenAI, openaiExists=$openaiExists)"
+fi
+
+# =============================================================================
 # AKS FOR AZURE ML - Delete BEFORE AML (AKS must be detached before workspace delete)
 # =============================================================================
 enableAzureMachineLearning="$enableAzureMachineLearning"
@@ -1094,6 +1316,7 @@ if [ "$enableAzureMachineLearning" = "false" ] && [ "$amlExists" = "true" ]; the
 
   if [ -n "$aml_name" ]; then
     echo "Found Azure ML workspace: $aml_name"
+    echo "##vso[task.setvariable variable=amlActualName]$aml_name"
 
     # Always attempt to delete private endpoints (fail silently if not found)
     delete_private_endpoints "$aml_name" "Azure ML"
@@ -1213,6 +1436,28 @@ if [ "$enableBotService" = "false" ] && [ "$botServiceExists" = "true" ]; then
       echo "##vso[task.setvariable variable=botServiceExists]false"
     else
       echo "❌ Failed to delete Bot Service"
+    fi
+
+    # Delete the Bot Service managed identity (naming: {botName}-identity)
+    botMIName="${bot_name}-identity"
+    botMIExists=$(az resource list \
+      --resource-group "$projectResourceGroup" \
+      --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
+      --query "[?name=='${botMIName}'].name" \
+      -o tsv 2>/dev/null | head -n1)
+
+    if [ -n "$botMIExists" ]; then
+      echo "Deleting Bot Service managed identity: $botMIName"
+      az identity delete \
+        --resource-group "$projectResourceGroup" \
+        --name "$botMIName" 2>&1
+      if [ $? -eq 0 ]; then
+        echo "✅ Successfully deleted Bot Service managed identity: $botMIName"
+      else
+        echo "❌ Failed to delete Bot Service managed identity: $botMIName"
+      fi
+    else
+      echo "ℹ️  Bot Service managed identity not found: $botMIName — skipping"
     fi
   else
     echo "⚠️  Bot Service not found with prefix: $botServiceName"
@@ -1495,6 +1740,50 @@ elif [ "$enableAIDocIntelligence" = "true" ]; then
   echo "ℹ️  AI Document Intelligence is enabled - skipping deletion"
 else
   echo "ℹ️  Conditions not met for AI Document Intelligence deletion"
+fi
+
+echo ""
+
+# ======================================
+# Content Safety
+# ======================================
+echo "Checking Content Safety deletion conditions..."
+if ([ "$enableDeleteForDisabledResources" = "true" ] || [ "$deleteAllServicesForProject" = "true" ]) && [ "$enableContentSafety" = "false" ]; then
+  echo "✓ Delete mode enabled and Content Safety not enabled"
+
+  # Name prefix from bicep: cs-{projectName}-{locationSuffix}-{env}-{uniqueInAIFenv}{commonResourceSuffix}
+  contentSafetyPrefix="cs-${projectName}"
+  echo "Looking for Content Safety with prefix: $contentSafetyPrefix"
+
+  contentSafetyResource=$(az cognitiveservices account list \
+    --resource-group "$projectResourceGroup" \
+    --subscription "$dev_test_prod_sub_id" \
+    --query "[?starts_with(name, '$contentSafetyPrefix')] | [0].name" -o tsv 2>/dev/null || echo "")
+
+  if [ -n "$contentSafetyResource" ]; then
+    echo "Found Content Safety: $contentSafetyResource"
+
+    delete_private_endpoints "$contentSafetyResource" "Content Safety"
+
+    echo "Deleting Content Safety account: $contentSafetyResource"
+    az cognitiveservices account delete \
+      --name "$contentSafetyResource" \
+      --resource-group "$projectResourceGroup" \
+      --subscription "$dev_test_prod_sub_id"
+
+    if [ $? -eq 0 ]; then
+      echo "✓ Content Safety deleted successfully"
+      echo "##vso[task.setvariable variable=contentSafetyExists]false"
+    else
+      echo "⚠️  Failed to delete Content Safety"
+    fi
+  else
+    echo "⚠️  Content Safety not found with prefix: $contentSafetyPrefix"
+  fi
+elif [ "$enableContentSafety" = "true" ]; then
+  echo "ℹ️  Content Safety is enabled - skipping deletion"
+else
+  echo "ℹ️  Conditions not met for Content Safety deletion"
 fi
 
 echo ""
