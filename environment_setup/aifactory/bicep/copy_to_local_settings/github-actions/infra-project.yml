@@ -1105,7 +1105,14 @@ jobs:
                       sleep 10
                     done
                   fi
-                  az search service delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname" ;;
+                  az search service delete --resource-group "$rg" --name "$rname" --yes || echo "WARN: failed to delete $rname"
+                  # Clean up private endpoint and NIC: {searchName}-pend, {searchName}-pend-nic
+                  _srchPE="${rname}-pend"
+                  _srchNIC="${rname}-pend-nic"
+                  echo "  Deleting private endpoint '${_srchPE}' ..."
+                  az network private-endpoint delete --resource-group "$rg" --name "$_srchPE" 2>/dev/null || echo "  INFO: PE '${_srchPE}' not found or already deleted"
+                  echo "  Deleting NIC '${_srchNIC}' ..."
+                  az network nic delete --resource-group "$rg" --name "$_srchNIC" 2>/dev/null || echo "  INFO: NIC '${_srchNIC}' not found or already deleted" ;;
                 Microsoft.MachineLearningServices/workspaces)
                   az ml workspace delete --resource-group "$rg" --name "$rname" --yes --no-wait || echo "WARN: failed to delete $rname" ;;
                 Microsoft.App/containerApps)
@@ -1207,6 +1214,25 @@ jobs:
             if should_delete "${{ env.enableAISearch }}" "${{ env.aiSearchExists }}"; then
               srchName=$(az search service list --resource-group "$targetRG" --query "[0].name" -o tsv 2>/dev/null)
               [ -n "$srchName" ] && delete_resource "Microsoft.Search/searchServices" "$srchName" "$targetRG"
+            fi
+            # Unconditional sweep: clean up orphaned AI Search private endpoints and NICs
+            # (runs even if the service was already deleted but PE/NIC cleanup previously failed)
+            echo "Sweeping for orphaned AI Search private endpoints (aisearch*-pend) ..."
+            orphanSrchPEs=$(az network private-endpoint list --resource-group "$targetRG" \
+              --query "[?starts_with(name, 'aisearch') && ends_with(name, '-pend')].name" -o tsv 2>/dev/null || echo "")
+            if [ -n "$orphanSrchPEs" ]; then
+              while IFS= read -r pe; do
+                [ -z "$pe" ] && continue
+                echo "  Deleting orphaned PE '$pe' ..."
+                az network private-endpoint delete --resource-group "$targetRG" --name "$pe" 2>/dev/null \
+                  || echo "  INFO: PE '$pe' not found or already deleted"
+                _orphanNIC="${pe}-nic"
+                echo "  Deleting orphaned NIC '${_orphanNIC}' ..."
+                az network nic delete --resource-group "$targetRG" --name "$_orphanNIC" 2>/dev/null \
+                  || echo "  INFO: NIC '${_orphanNIC}' not found or already deleted"
+              done <<< "$orphanSrchPEs"
+            else
+              echo "  No orphaned AI Search PEs found."
             fi
             if should_delete "${{ env.enableAzureOpenAI }}" "${{ env.openaiExists }}"; then
               openaiName=$(az cognitiveservices account list --resource-group "$targetRG" --query "[?kind=='OpenAI'].name" -o tsv 2>/dev/null | head -n1)
