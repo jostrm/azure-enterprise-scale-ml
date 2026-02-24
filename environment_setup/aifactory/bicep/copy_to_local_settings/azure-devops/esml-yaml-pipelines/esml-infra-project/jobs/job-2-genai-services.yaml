@@ -776,7 +776,7 @@ steps:
         aifV2ProjResult=$(az rest \
           --method get \
           --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryV2ActualName}/projects?api-version=2025-04-01-preview" \
-          --query "value[?starts_with(name, 'p${projectNumber}')].name" \
+          --query "value[?starts_with(name, 'aif2-p${projectNumber}')].name" \
           -o tsv 2>/dev/null || echo "")
         if [ -n "$aifV2ProjResult" ]; then
           echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]true"
