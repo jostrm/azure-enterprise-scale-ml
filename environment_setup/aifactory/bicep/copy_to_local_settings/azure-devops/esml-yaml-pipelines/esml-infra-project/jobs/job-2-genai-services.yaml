@@ -773,17 +773,20 @@ steps:
         --query "[?starts_with(name, 'aif2')].name" \
         -o tsv 2>/dev/null | head -n1)
       if [ -n "$aiFoundryV2ActualName" ]; then
-        aifV2ProjResult=$(az rest \
+        # Dump the full JSON and grep for the project name pattern "aif2-p" — avoids JMESPath
+        # query issues with child resource response shapes. An AI Foundry V2 project name always
+        # contains "aif2-p" (e.g. aif2-p002x46), whether returned as a short name or full id.
+        aifV2ProjRaw=$(az rest \
           --method get \
-          --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryV2ActualName}/projects?api-version=2025-04-01-preview" \
-          --query "value[?starts_with(name, 'aif2-p${projectNumber}')].name" \
-          -o tsv 2>/dev/null || echo "")
-        if [ -n "$aifV2ProjResult" ]; then
+          --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryV2ActualName}/projects?api-version=2025-12-01" \
+          -o json 2>/dev/null || echo "")
+        if echo "$aifV2ProjRaw" | grep -q "aif2-p"; then
           echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]true"
-          echo "Checking variable: aiFoundryV2ProjectExists, Value: true (project: $aifV2ProjResult)"
+          echo "Checking variable: aiFoundryV2ProjectExists, Value: true"
         else
           echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]false"
           echo "Checking variable: aiFoundryV2ProjectExists, Value: false"
+          echo "DEBUG: az rest response: $aifV2ProjRaw"
         fi
       else
         echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]false"

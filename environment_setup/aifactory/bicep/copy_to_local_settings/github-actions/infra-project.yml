@@ -935,12 +935,24 @@ jobs:
               --query "[?starts_with(name, 'aif2')].name" -o tsv 2>/dev/null | head -n1)
             if [ -n "$_fdryAcct" ]; then
               _projCount=$(az rest --method GET \
-                --url "https://management.azure.com/subscriptions/${_subId}/resourceGroups/${targetRG}/providers/Microsoft.CognitiveServices/accounts/${_fdryAcct}/projects?api-version=2024-10-01" \
+                --url "https://management.azure.com/subscriptions/${_subId}/resourceGroups/${targetRG}/providers/Microsoft.CognitiveServices/accounts/${_fdryAcct}/projects?api-version=2025-12-01" \
                 --query "length(value)" -o tsv 2>/dev/null || echo "0")
               if [ "${_projCount:-0}" -gt 0 ]; then
                 set_env "aiFoundryV2ProjectExists" "true"
               else
-                set_env "aiFoundryV2ProjectExists" "false"
+                # Fallback: derive project name from account name suffix (accountName e.g. 'aif2ahbbc2e4' → suffix 'ahbbc2e4')
+                # Project name = take('aif2-p{num}{acctSuffix}', 12) → e.g. 'aif2-p002ahb'
+                _acctSuffix="${_fdryAcct:4}"
+                _projName=$(echo "aif2-p${{ env.project_number_000 }}${_acctSuffix}" | cut -c1-12)
+                echo "  Fallback: trying direct GET for derived project name '${_projName}' ..."
+                _httpStatus=$(az rest --method GET \
+                  --url "https://management.azure.com/subscriptions/${_subId}/resourceGroups/${targetRG}/providers/Microsoft.CognitiveServices/accounts/${_fdryAcct}/projects/${_projName}?api-version=2025-12-01" \
+                  -o none 2>/dev/null && echo "200" || echo "404")
+                if [ "$_httpStatus" = "200" ]; then
+                  set_env "aiFoundryV2ProjectExists" "true"
+                else
+                  set_env "aiFoundryV2ProjectExists" "false"
+                fi
               fi
             else
               set_env "aiFoundryV2ProjectExists" "false"
@@ -1026,28 +1038,49 @@ jobs:
                 Microsoft.CognitiveServices/accounts)
                   # Nested projects require REST — az resource list cannot enumerate child types
                   subId=$(az account show --query id -o tsv)
+                  # Option A (primary): LIST projects and strip "accountName/" prefix that ARM returns for nested resources
                   projectNames=$(az rest --method GET \
-                    --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects?api-version=2024-10-01" \
-                    --query "value[].name" -o tsv 2>/dev/null || echo "")
+                    --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects?api-version=2025-12-01" \
+                    --query "value[].name" -o tsv 2>/dev/null | sed 's|.*/||' || echo "")
+                  # Option B (fallback): derive project name from account name suffix
+                  # Account name e.g. 'aif2ahbbc2e4' → suffix after 'aif2' = 'ahbbc2e4'
+                  # Project name = take('aif2-p{num}{suffix}', 12) → e.g. 'aif2-p002ahb'
+                  if [ -z "$projectNames" ]; then
+                    _acctSuffix="${rname:4}"
+                    _directProjName=$(echo "aif2-p${{ env.project_number_000 }}${_acctSuffix}" | cut -c1-12)
+                    echo "  Fallback: trying direct GET for derived project name '${_directProjName}' ..."
+                    _chk=$(az rest --method GET \
+                      --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects/${_directProjName}?api-version=2025-12-01" \
+                      -o none 2>/dev/null && echo "exists" || echo "")
+                    [ -n "$_chk" ] && projectNames="$_directProjName"
+                  fi
                   if [ -n "$projectNames" ]; then
                     while IFS= read -r proj; do
                       [ -z "$proj" ] && continue
+                      proj="${proj##*/}"  # strip any residual accountName/ prefix
                       echo "  Deleting nested project '$proj' under account '$rname' ..."
                       az rest --method DELETE \
-                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects/${proj}?api-version=2024-10-01" \
+                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects/${proj}?api-version=2025-12-01" \
                         || echo "WARN: failed to delete project $proj"
                     done <<< "$projectNames"
                     echo "  Polling until all projects are gone (max 3min)..."
                     for i in $(seq 1 18); do
                       remaining=$(az rest --method GET \
-                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects?api-version=2024-10-01" \
+                        --url "https://management.azure.com/subscriptions/${subId}/resourceGroups/${rg}/providers/Microsoft.CognitiveServices/accounts/${rname}/projects?api-version=2025-12-01" \
                         --query "length(value)" -o tsv 2>/dev/null || echo "0")
                       [ "${remaining:-0}" -eq 0 ] && break
                       echo "  Still $remaining project(s) remaining, waiting 10s (attempt $i/18)..."
                       sleep 10
                     done
                   fi
-                  az cognitiveservices account delete --resource-group "$rg" --name "$rname" || echo "WARN: failed to delete $rname" ;;
+                  az cognitiveservices account delete --resource-group "$rg" --name "$rname" || echo "WARN: failed to delete $rname"
+                  # Clean up private endpoint and NIC: {accountName}-pend, {accountName}-pend-nic
+                  _aif2PE="${rname}-pend"
+                  _aif2NIC="${rname}-pend-nic"
+                  echo "  Deleting private endpoint '${_aif2PE}' ..."
+                  az network private-endpoint delete --resource-group "$rg" --name "$_aif2PE" 2>/dev/null || echo "  INFO: PE '${_aif2PE}' not found or already deleted"
+                  echo "  Deleting NIC '${_aif2NIC}' ..."
+                  az network nic delete --resource-group "$rg" --name "$_aif2NIC" 2>/dev/null || echo "  INFO: NIC '${_aif2NIC}' not found or already deleted" ;;
                 Microsoft.Search/searchServices)
                   # Delete shared private link resources first, then poll until all gone
                   subId=$(az account show --query id -o tsv)
@@ -1151,6 +1184,25 @@ jobs:
             if should_delete "${{ env.enableAIFoundry }}" "${{ env.aiFoundryV2Exists }}"; then
               fdryName=$(az cognitiveservices account list --resource-group "$targetRG" --query "[?kind=='AIServices'].name" -o tsv 2>/dev/null | head -n1)
               [ -n "$fdryName" ] && delete_resource "Microsoft.CognitiveServices/accounts" "$fdryName" "$targetRG"
+            fi
+            # Unconditional sweep: clean up orphaned AI Foundry V2 private endpoints and NICs
+            # (runs even if the account was already deleted but PE/NIC cleanup previously failed)
+            echo "Sweeping for orphaned AI Foundry V2 private endpoints (aif2*-pend) ..."
+            orphanPEs=$(az network private-endpoint list --resource-group "$targetRG" \
+              --query "[?starts_with(name, 'aif2') && ends_with(name, '-pend')].name" -o tsv 2>/dev/null || echo "")
+            if [ -n "$orphanPEs" ]; then
+              while IFS= read -r pe; do
+                [ -z "$pe" ] && continue
+                echo "  Deleting orphaned PE '$pe' ..."
+                az network private-endpoint delete --resource-group "$targetRG" --name "$pe" 2>/dev/null \
+                  || echo "  INFO: PE '$pe' not found or already deleted"
+                _orphanNIC="${pe}-nic"
+                echo "  Deleting orphaned NIC '${_orphanNIC}' ..."
+                az network nic delete --resource-group "$targetRG" --name "$_orphanNIC" 2>/dev/null \
+                  || echo "  INFO: NIC '${_orphanNIC}' not found or already deleted"
+              done <<< "$orphanPEs"
+            else
+              echo "  No orphaned AI Foundry V2 PEs found."
             fi
             if should_delete "${{ env.enableAISearch }}" "${{ env.aiSearchExists }}"; then
               srchName=$(az search service list --resource-group "$targetRG" --query "[0].name" -o tsv 2>/dev/null)

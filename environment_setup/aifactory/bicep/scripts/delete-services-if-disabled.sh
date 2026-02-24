@@ -1157,6 +1157,32 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
 
   if [ -n "$aif2_name" ]; then
     echo "Found AI Foundry V2 account: $aif2_name"
+
+    # --- Delete nested projects first (CannotDeleteResource if skipped) ---
+    # AI Foundry V2 accounts have child resources: Microsoft.CognitiveServices/accounts/projects
+    # Azure RM requires all nested resources to be removed before the parent account can be deleted.
+    aif2_sub=$(az account show --query id -o tsv 2>/dev/null)
+    aif2_projects=$(az rest \
+      --method GET \
+      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2025-04-01-preview" \
+      --query "value[].name" -o tsv 2>/dev/null)
+
+    if [ -n "$aif2_projects" ]; then
+      echo "Found nested AI Foundry V2 projects — deleting before account removal:"
+      while IFS= read -r proj_name; do
+        [ -z "$proj_name" ] && continue
+        echo "  Deleting project: $proj_name"
+        az rest \
+          --method DELETE \
+          --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}?api-version=2025-04-01-preview" \
+          2>&1 && echo "  ✅ Deleted project: $proj_name" || echo "  ⚠️  Could not delete project: $proj_name"
+      done <<< "$aif2_projects"
+      echo "All nested projects processed."
+    else
+      echo "No nested projects found under $aif2_name"
+    fi
+    # --- End nested project deletion ---
+
     delete_private_endpoints "$aif2_name" "AI Foundry V2"
     echo "Deleting AI Foundry V2 account: $aif2_name (soft-delete, purge by 04_Purge_SoftDeleted)"
     az cognitiveservices account delete \
