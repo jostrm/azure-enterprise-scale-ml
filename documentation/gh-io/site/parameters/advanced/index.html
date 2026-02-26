@@ -1,0 +1,3418 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Enterprise-grade AI landing zone for Azure — automates AI Foundry, private networking, MLOps, GenAIOps, and DataOps across Dev/Stage/Prod environments.">
+      
+      
+        <meta name="author" content="Microsoft">
+      
+      
+        <link rel="canonical" href="https://jostrm.github.io/azure-enterprise-scale-ml/parameters/advanced/">
+      
+      
+        <link rel="prev" href="../standard/">
+      
+      
+        <link rel="next" href="../../concepts/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Advanced Mode (all) - Enterprise Scale AI Factory</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#parameters-advanced-mode" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Enterprise Scale AI Factory" class="md-header__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Enterprise Scale AI Factory
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Advanced Mode (all)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jostrm/azure-enterprise-scale-ml" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    azure/Enterprise-Scale-AIFactory
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Parameters
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../concepts/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI Factory Concepts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../architectures/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Automated Architectures
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../iac/bicep/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  IaC
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../orchestrators/ado/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Orchestrators
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../news/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  News
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../intelligence/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  AI Factory Intelligence
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Enterprise Scale AI Factory" class="md-nav__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    Enterprise Scale AI Factory
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jostrm/azure-enterprise-scale-ml" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    azure/Enterprise-Scale-AIFactory
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameters
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Parameters
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../standard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Standard Mode (mandatory)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Mode (all)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Mode (all)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#group-1-github-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 1 — GitHub Bootstrap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-2-ai-factory-globals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 2 — AI Factory Globals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-3-azure-subscriptions-cidr-ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 3 — Azure Subscriptions &amp; CIDR Ranges
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-4-versioning-resource-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 4 — Versioning &amp; Resource Tags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-5-common-service-principal-identity-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 5 — Common Service Principal (Identity Keys)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-6-project-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 6 — Project Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-7-project-service-principals-secret-names-in-seeding-kv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 7 — Project Service Principals (Secret Names in Seeding KV)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-8-core-service-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 8 — Core Service Flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-9-networking-public-private-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 9 — Networking — Public / Private Controls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-10-security-defender-cmk-rbac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 10 — Security — Defender / CMK / RBAC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-11-ai-foundry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 11 — AI Foundry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-12-ml-data-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 12 — ML &amp; Data Platform
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-13-aks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 13 — AKS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-14-cognitive-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 14 — Cognitive Services
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-15-databases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 15 — Databases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-16-functions-web-apps-container-apps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 16 — Functions, Web Apps &amp; Container Apps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-17-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 17 — Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-18-ai-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 18 — AI Models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-19-naming-suffixes-acr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 19 — Naming, Suffixes &amp; ACR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-20-baseline-networking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 20 — Baseline Networking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-21-byo-subnets-vnet-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 21 — BYO Subnets &amp; VNet Overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../concepts/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Factory Concepts
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Factory Concepts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/intelligence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Factory Intelligence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/enterprise-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Enterprise Grade & Scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Templates
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/templates/iac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IaC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/templates/dataops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DataOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/templates/mlops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/templates/genaiops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GenAIOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architectures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated Architectures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IaC
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    IaC
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../iac/bicep/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BICEP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../iac/terraform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BYO Terraform
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orchestrators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Orchestrators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../orchestrators/ado/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Azure DevOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../orchestrators/gh/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../news/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    News
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../intelligence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Factory Intelligence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#group-1-github-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 1 — GitHub Bootstrap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-2-ai-factory-globals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 2 — AI Factory Globals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-3-azure-subscriptions-cidr-ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 3 — Azure Subscriptions &amp; CIDR Ranges
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-4-versioning-resource-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 4 — Versioning &amp; Resource Tags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-5-common-service-principal-identity-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 5 — Common Service Principal (Identity Keys)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-6-project-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 6 — Project Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-7-project-service-principals-secret-names-in-seeding-kv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 7 — Project Service Principals (Secret Names in Seeding KV)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-8-core-service-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 8 — Core Service Flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-9-networking-public-private-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 9 — Networking — Public / Private Controls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-10-security-defender-cmk-rbac" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 10 — Security — Defender / CMK / RBAC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-11-ai-foundry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 11 — AI Foundry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-12-ml-data-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 12 — ML &amp; Data Platform
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-13-aks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 13 — AKS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-14-cognitive-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 14 — Cognitive Services
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-15-databases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 15 — Databases
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-16-functions-web-apps-container-apps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 16 — Functions, Web Apps &amp; Container Apps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-17-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 17 — Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-18-ai-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 18 — AI Models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-19-naming-suffixes-acr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 19 — Naming, Suffixes &amp; ACR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-20-baseline-networking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 20 — Baseline Networking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group-21-byo-subnets-vnet-overrides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group 21 — BYO Subnets &amp; VNet Overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="parameters-advanced-mode">Parameters — Advanced Mode<a class="headerlink" href="#parameters-advanced-mode" title="Permanent link">&para;</a></h1>
+<p>This page lists <strong>all parameters</strong> — both mandatory (<strong>M</strong>) and optional (<strong>O</strong>) — from the <code>.env.template</code> file, organized by category. Mandatory parameters are also covered in <a href="../standard/">Standard Mode</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">How to read the tables</p>
+<ul>
+<li><strong>M/O</strong> — <strong>M</strong> = mandatory (required before first run), <strong>O</strong> = optional</li>
+<li><strong>Guidance</strong> follows tag priority: <code>ensure</code> › <code>recommended</code> › <code>keep-as-is</code> › <code>otherwise</code></li>
+<li>Source file: <code>environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template</code></li>
+</ul>
+</div>
+<hr />
+<h2 id="group-1-github-bootstrap">Group 1 — GitHub Bootstrap<a class="headerlink" href="#group-1-github-bootstrap" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GITHUB_USERNAME</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> your GitHub username or org name</td>
+<td>GitHub user or org that owns the new repo</td>
+</tr>
+<tr>
+<td><code>GITHUB_NEW_REPO</code></td>
+<td><code>&lt;todo&gt;/&lt;todo&gt;azure-enterprise-scale-aifactory-001</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> format must be <code>&lt;org&gt;/&lt;repo-name&gt;</code></td>
+<td>Full repo path for the new AI Factory repo</td>
+</tr>
+<tr>
+<td><code>TENANT_ID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> Azure Portal → Entra ID → Overview (Directory ID)</td>
+<td>Azure AD / Entra tenant ID</td>
+</tr>
+<tr>
+<td><code>TENANT_AZUREML_OID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> Entra ID → Enterprise Apps → Azure Machine Learning (AppId <code>0736f41a-...</code>) → OID. <strong>otherwise</strong> optional if <code>ENABLE_AI_FOUNDRY=false</code></td>
+<td>Object ID of the Azure ML service principal in your tenant</td>
+</tr>
+<tr>
+<td><code>GITHUB_USE_SSH</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Use SSH instead of HTTPS for git operations</td>
+</tr>
+<tr>
+<td><code>GITHUB_TEMPLATE_REPO</code></td>
+<td><code>azure/enterprise-scale-aifactory</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Source template repo used for bootstrapping</td>
+</tr>
+<tr>
+<td><code>GITHUB_NEW_REPO_VISIBILITY</code></td>
+<td><code>public</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>private</code> or <code>internal</code></td>
+<td>Visibility of the newly created repo</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-2-ai-factory-globals">Group 2 — AI Factory Globals<a class="headerlink" href="#group-2-ai-factory-globals" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AIFACTORY_LOCATION</code></td>
+<td><code>eastus2</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. <strong>otherwise</strong> any Azure region name</td>
+<td>Primary Azure region for all AI Factory resources</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_LOCATION_SHORT</code></td>
+<td><code>eus2</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. <strong>otherwise</strong> 4-char region abbreviation matching your region</td>
+<td>Short suffix used in resource names</td>
+</tr>
+<tr>
+<td><code>ADMIN_AISEARCH_TIER</code></td>
+<td><code>basic</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> <code>free</code> tier is <strong>not allowed</strong> when using private endpoints</td>
+<td>AI Search SKU tier</td>
+</tr>
+<tr>
+<td><code>AISEARCH_SEMANTIC_TIER</code></td>
+<td><code>free</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. Options: <code>disabled</code>, <code>free</code>, <code>standard</code></td>
+<td>Semantic search tier for AI Search</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_SUFFIX</code></td>
+<td><code>-001</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. <strong>otherwise</strong> increment to <code>-002</code>, <code>-003</code> for additional scale sets</td>
+<td>AI Factory scale-set suffix appended to common resource names</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_PREFIX</code></td>
+<td><code>acme-ai</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> company-specific prefix, max 6 chars</td>
+<td>Prefix for AI Factory resource group names</td>
+</tr>
+<tr>
+<td><code>LAKE_PREFIX</code></td>
+<td><code>mrvel</code></td>
+<td>O</td>
+<td>keep-as-is. max 8 chars</td>
+<td>Data lake storage account name prefix</td>
+</tr>
+<tr>
+<td><code>USE_COMMON_ACR_FOR_PROJECTS</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>false</code> = each project gets its own ACR (higher cost)</td>
+<td>Share common ACR across all projects</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_COMMON_ONLY_DEV_ENVIRONMENT</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>false</code> = also deploy common resources in Stage + Prod</td>
+<td>Deploy common resources only to DEV environment</td>
+</tr>
+<tr>
+<td><code>KEYVAULT_SOFT_DELETE</code></td>
+<td><code>7</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>ensure</strong> mandatory value <code>7</code> if <code>CMK=true</code>. <strong>otherwise</strong> <code>90</code> days recommended for production KVs</td>
+<td>Key Vault soft-delete retention period (days)</td>
+</tr>
+<tr>
+<td><code>USE_AD_GROUPS</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>false</code> = assign RBAC to individual user OIDs</td>
+<td>Use Entra ID groups for RBAC assignments</td>
+</tr>
+<tr>
+<td><code>ADMIN_USERNAME</code></td>
+<td><code>esmladmin</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Admin username for VMs deployed by AI Factory</td>
+</tr>
+<tr>
+<td><code>ADMIN_HYBRID_BENEFIT</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>true</code> if you have eligible Windows Server / SQL Server licences</td>
+<td>Enable Azure Hybrid Benefit on Windows VMs</td>
+</tr>
+<tr>
+<td><code>ENABLE_AMPLS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Enable Azure Monitor Private Link Scope</td>
+</tr>
+<tr>
+<td><code>ADD_BASTION_HOST</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Bastion host in the common VNet</td>
+</tr>
+<tr>
+<td><code>ENABLE_ADMIN_VM</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy admin jump-box VM</td>
+</tr>
+<tr>
+<td><code>DIAGNOSTIC_SETTING_LEVEL</code></td>
+<td><code>gold</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>silver</code> or <code>bronze</code> to reduce Log Analytics ingestion cost</td>
+<td>Diagnostics verbosity level</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-3-azure-subscriptions-cidr-ranges">Group 3 — Azure Subscriptions &amp; CIDR Ranges<a class="headerlink" href="#group-3-azure-subscriptions-cidr-ranges" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEV_SUBSCRIPTION_ID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> the common SP must have Contributor on this subscription</td>
+<td>DEV Azure subscription ID</td>
+</tr>
+<tr>
+<td><code>DEV_CIDR_RANGE</code></td>
+<td><code>61</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. <strong>otherwise</strong> any integer 0–255 that doesn't conflict with existing VNets</td>
+<td>Integer replacing <code>XX</code> in all DEV subnet CIDRs (e.g. <code>172.16.61.0/26</code>)</td>
+</tr>
+<tr>
+<td><code>STAGE_CIDR_RANGE</code></td>
+<td><code>62</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is</td>
+<td>Integer replacing <code>XX</code> in STAGE subnet CIDRs</td>
+</tr>
+<tr>
+<td><code>PROD_CIDR_RANGE</code></td>
+<td><code>63</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is</td>
+<td>Integer replacing <code>XX</code> in PROD subnet CIDRs</td>
+</tr>
+<tr>
+<td><code>STAGE_SUBSCRIPTION_ID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td>O</td>
+<td><strong>recommended</strong> use a separate subscription from DEV</td>
+<td>STAGE Azure subscription ID</td>
+</tr>
+<tr>
+<td><code>PROD_SUBSCRIPTION_ID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td>O</td>
+<td><strong>recommended</strong> use a separate subscription from DEV</td>
+<td>PROD Azure subscription ID</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-4-versioning-resource-tags">Group 4 — Versioning &amp; Resource Tags<a class="headerlink" href="#group-4-versioning-resource-tags" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AIFACTORY_VERSION_MAJOR</code></td>
+<td><code>1</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>AI Factory major version (used in tags)</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_VERSION_MINOR</code></td>
+<td><code>24</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>AI Factory minor version (used in tags)</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_BRANCH_CHOSEN</code></td>
+<td><code>release/v1.24</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Git branch checked out during bootstrap</td>
+</tr>
+<tr>
+<td><code>TAG_COSTCETER_COMMON</code></td>
+<td><code>9999</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> set to your organisation's cost centre code</td>
+<td>Cost centre tag applied to common resources</td>
+</tr>
+<tr>
+<td><code>TAG_REPOSITORY</code></td>
+<td><code>aifactory</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Repository tag value</td>
+</tr>
+<tr>
+<td><code>TAG_REPOSITORY_BRANCH</code></td>
+<td><code>aifactory-001</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Branch tag value</td>
+</tr>
+<tr>
+<td><code>TAGS</code></td>
+<td><em>(JSON blob)</em></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> update <code>CostCenter</code> and <code>Description</code> values</td>
+<td>Additional Azure resource tags as a JSON object</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-5-common-service-principal-identity-keys">Group 5 — Common Service Principal (Identity Keys)<a class="headerlink" href="#group-5-common-service-principal-identity-keys" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> subscription where the DEV seeding Key Vault exists</td>
+<td>Subscription ID of the DEV seeding KV</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_SEEDING_KEYVAULT_NAME</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> Key Vault must exist and contain the required SP secrets</td>
+<td>Name of the DEV seeding Key Vault</td>
+</tr>
+<tr>
+<td><code>AIFACTORY_SEEDING_KEYVAULT_RG</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> resource group must exist</td>
+<td>Resource group of the DEV seeding KV</td>
+</tr>
+<tr>
+<td><code>AZURE_MACHINELEARNING_SP_OID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> Entra ID → Enterprise Apps → Azure Machine Learning → Object ID</td>
+<td>OID of the Azure ML service principal</td>
+</tr>
+<tr>
+<td><code>COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID</code></td>
+<td><code>esml-common-sp-id</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match the secret name in your seeding KV</td>
+<td>Secret name storing the common SP App ID</td>
+</tr>
+<tr>
+<td><code>COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET</code></td>
+<td><code>esml-common-sp-secret</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match the secret name in your seeding KV</td>
+<td>Secret name storing the common SP secret</td>
+</tr>
+<tr>
+<td><code>INPUT_COMMON_SPID_KEY</code></td>
+<td><code>esml-common-sp-id</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match secret name in seeding KV</td>
+<td>Read alias for common SP App ID secret name</td>
+</tr>
+<tr>
+<td><code>INPUT_COMMON_SP_SECRET_KEY</code></td>
+<td><code>esml-common-sp-secret</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match secret name</td>
+<td>Read alias for common SP secret name</td>
+</tr>
+<tr>
+<td><code>COMMON_SERVICE_PRINCIPLE_OID_KEY</code></td>
+<td><code>esml-common-sp-oid</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match secret name</td>
+<td>Secret name storing the common SP Object ID</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-6-project-setup">Group 6 — Project Setup<a class="headerlink" href="#group-6-project-setup" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PROJECT_NUMBER</code></td>
+<td><code>001</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. <strong>otherwise</strong> <code>002</code>, <code>003</code>… for additional projects</td>
+<td>Three-digit project number used in resource names</td>
+</tr>
+<tr>
+<td><code>PROJECT_MEMBERS</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> comma-separated Entra ID OIDs (users) or AD group OIDs</td>
+<td>OIDs that receive project-level RBAC</td>
+</tr>
+<tr>
+<td><code>RUN_JOB1_NETWORKING</code></td>
+<td><code>true</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. <strong>otherwise</strong> <code>false</code> to skip networking job on subsequent re-runs</td>
+<td>Run the networking deployment job</td>
+</tr>
+<tr>
+<td><code>PROJECT_MEMBERS_EMAILS</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td>O</td>
+<td><strong>recommended</strong> set for cost tracking and notifications</td>
+<td>Comma-separated email addresses of project members</td>
+</tr>
+<tr>
+<td><code>PROJECT_MEMBERS_IP_ADDRESS</code></td>
+<td><code>-</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if IP-whitelisting mode is enabled</td>
+<td>Comma-separated public IPs for firewall whitelisting</td>
+</tr>
+<tr>
+<td><code>TAG_COSTCENTER</code></td>
+<td><code>1234</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> your project cost centre code</td>
+<td>Cost centre tag for project resources</td>
+</tr>
+<tr>
+<td><code>TAGS_PROJECT</code></td>
+<td><em>(JSON blob)</em></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> update field values</td>
+<td>Additional resource tags for project resources</td>
+</tr>
+<tr>
+<td><code>SERVICE_SETTING_DEPLOY_PROJECT_VM</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy a jump-box VM in the project resource group</td>
+</tr>
+<tr>
+<td><code>PROJECT_TYPE</code></td>
+<td><em>(type string)</em></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Project persona type (affects RBAC persona mapping)</td>
+</tr>
+<tr>
+<td><code>PROJECT_PREFIX</code></td>
+<td><code>esml-</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Prefix for project resource group names</td>
+</tr>
+<tr>
+<td><code>PROJECT_SUFFIX</code></td>
+<td><code>-rg</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Suffix for project resource group names</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-7-project-service-principals-secret-names-in-seeding-kv">Group 7 — Project Service Principals (Secret Names in Seeding KV)<a class="headerlink" href="#group-7-project-service-principals-secret-names-in-seeding-kv" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID</code></td>
+<td><code>esml-project001-sp-id</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match the secret name in your seeding KV</td>
+<td>Secret name for the project SP App ID</td>
+</tr>
+<tr>
+<td><code>PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID</code></td>
+<td><code>esml-project001-sp-oid</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match the secret name in your seeding KV</td>
+<td>Secret name for the project SP Object ID</td>
+</tr>
+<tr>
+<td><code>PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S</code></td>
+<td><code>esml-project001-sp-secret</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> must exactly match the secret name in your seeding KV</td>
+<td>Secret name for the project SP client secret</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-8-core-service-flags">Group 8 — Core Service Flags<a class="headerlink" href="#group-8-core-service-flags" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_AI_FOUNDRY</code></td>
+<td><code>true</code></td>
+<td><strong>M</strong></td>
+<td><strong>recommended</strong> keep <code>true</code> for enterprise-grade private networking</td>
+<td>Deploy AI Foundry Hub and default project with private endpoints</td>
+</tr>
+<tr>
+<td><code>ADMIN_AI_SEARCH_TIER</code></td>
+<td><code>basic</code></td>
+<td><strong>M</strong></td>
+<td><strong>ensure</strong> <code>free</code> is <strong>not allowed</strong> when using private endpoints</td>
+<td>AI Search SKU tier for the common AI Factory</td>
+</tr>
+<tr>
+<td><code>ADMIN_SEMANTIC_SEARCH_TIER</code></td>
+<td><code>free</code></td>
+<td><strong>M</strong></td>
+<td>keep-as-is. Options: <code>disabled</code>, <code>free</code>, <code>standard</code></td>
+<td>Semantic search tier</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-9-networking-public-private-controls">Group 9 — Networking — Public / Private Controls<a class="headerlink" href="#group-9-networking-public-private-controls" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td><strong>recommended</strong> <code>false</code> for a fully private deployment</td>
+<td>Allow public access to services even when placed behind a VNet</td>
+</tr>
+<tr>
+<td><code>ENABLE_PUBLIC_GENAI_ACCESS</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td><strong>recommended</strong> <code>false</code> for a fully private deployment</td>
+<td>Enable public access to GenAI endpoints</td>
+</tr>
+<tr>
+<td><code>ENABLE_PUBLIC_ACCESS_WITH_PERIMETER</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td><strong>recommended</strong> <code>false</code> for a fully private deployment</td>
+<td>Enable public access via network perimeter policy</td>
+</tr>
+<tr>
+<td><code>CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>true</code> if a hub manages all private DNS zones centrally</td>
+<td>Use central hub private DNS instead of per-spoke DNS zones</td>
+</tr>
+<tr>
+<td><code>PRIV_DNS_SUBSCRIPTION_PARAM</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB=true</code></td>
+<td>Subscription ID containing the central private DNS zones</td>
+</tr>
+<tr>
+<td><code>PRIV_DNS_RESOURCE_GROUP_PARAM</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB=true</code></td>
+<td>Resource group containing the central private DNS zones</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-10-security-defender-cmk-rbac">Group 10 — Security — Defender / CMK / RBAC<a class="headerlink" href="#group-10-security-defender-cmk-rbac" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_DEFENDER_FOR_AI_SUB_LEVEL</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Enable Microsoft Defender for AI at subscription level</td>
+</tr>
+<tr>
+<td><code>ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Enable Microsoft Defender for AI at resource level</td>
+</tr>
+<tr>
+<td><code>CMK</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Enable Customer-Managed Key encryption for storage and Key Vault</td>
+</tr>
+<tr>
+<td><code>CMK_KEY_NAME</code></td>
+<td><code>&lt;todo&gt;aifactory-cmk-key</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>CMK=true</code>. Provide the exact CMK key name in your Key Vault</td>
+<td>Name of the CMK key in the shared Key Vault</td>
+</tr>
+<tr>
+<td><code>CMK_KEY_VERSION</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td>keep-as-is (auto-uses latest key version)</td>
+<td>CMK key version; empty = always use latest</td>
+</tr>
+<tr>
+<td><code>UPDATE_KEYVAULT_RBAC</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Re-apply RBAC policies on the common Key Vault</td>
+</tr>
+<tr>
+<td><code>BYO_CONTRIBUTOR_ROLE_ID</code></td>
+<td><code>b24988ac-6180-42a0-ab88-20f7382dd24c</code></td>
+<td>O</td>
+<td>keep-as-is (built-in Contributor role)</td>
+<td>Custom contributor role ID if your org uses a scoped role</td>
+</tr>
+<tr>
+<td><code>DISABLE_CONTRIBUTOR_ACCESS_FORUSERS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td><strong>recommended</strong> <code>true</code> for production governance</td>
+<td>Remove Contributor access from individual users</td>
+</tr>
+<tr>
+<td><code>DISABLE_RBAC_ADMIN_ON_RG_FORUSERS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td><strong>recommended</strong> <code>true</code> for production governance</td>
+<td>Remove RBAC Administrator role from individual users on RGs</td>
+</tr>
+<tr>
+<td><code>ENABLE_DELETE_FOR_DISABLED_RESOURCES</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Delete orphaned or disabled resources on re-runs</td>
+</tr>
+<tr>
+<td><code>DELETE_ALL_SERVICES_FOR_PROJECT</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>true</code> deletes <strong>all</strong> project resources — use with caution</td>
+<td>Tear down all services in a project on re-run</td>
+</tr>
+<tr>
+<td><code>DISABLE_WHITELISTING_FOR_BUILD_AGENTS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Skip adding build agent IPs to service firewall rules</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-11-ai-foundry">Group 11 — AI Foundry<a class="headerlink" href="#group-11-ai-foundry" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>UPDATE_AI_FOUNDRY</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is. set <code>true</code> to update an existing AI Foundry Hub</td>
+<td>Run the AI Foundry update step</td>
+</tr>
+<tr>
+<td><code>ADD_AI_FOUNDRY</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Add AI Foundry to an existing project</td>
+</tr>
+<tr>
+<td><code>ENABLE_FOUNDRY_CAPHOST</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td><strong>recommended</strong> <code>true</code> — enables private agents (requires <code>ENABLE_COSMOS_DB=true</code>)</td>
+<td>Enable AI Foundry Capacity Host for agentic workloads</td>
+</tr>
+<tr>
+<td><code>FOUNDRY_DEPLOYMENT_TYPE</code></td>
+<td><code>1</code></td>
+<td>O</td>
+<td>keep-as-is. <code>1</code>=PG, <code>2</code>=AVM, <code>3</code>=Both</td>
+<td>AI Foundry internal deployment architecture variant</td>
+</tr>
+<tr>
+<td><code>ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Create the AI Foundry v2 default project automatically</td>
+</tr>
+<tr>
+<td><code>DISABLE_AGENT_NETWORK_INJECTION</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>true</code> only if you need serverless agents — requires Class B/C subnet ranges</td>
+<td>Disable network injection for AI Foundry agents</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-12-ml-data-platform">Group 12 — ML &amp; Data Platform<a class="headerlink" href="#group-12-ml-data-platform" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_DATAFACTORY</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Data Factory in the project resource group</td>
+</tr>
+<tr>
+<td><code>ENABLE_DATAFACTORY_COMMON</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Data Factory in the common resource group</td>
+</tr>
+<tr>
+<td><code>ENABLE_AZURE_MACHINE_LEARNING</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Machine Learning workspace</td>
+</tr>
+<tr>
+<td><code>ADD_AZURE_MACHINE_LEARNING</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Add AML to an existing project</td>
+</tr>
+<tr>
+<td><code>ENABLE_DATABRICKS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Databricks workspace</td>
+</tr>
+<tr>
+<td><code>DATABRICKS_OID</code></td>
+<td><code>&lt;todo&gt;</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>ENABLE_DATABRICKS=true</code></td>
+<td>Object ID of the Databricks service principal</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-13-aks">Group 13 — AKS<a class="headerlink" href="#group-13-aks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_AKS_FOR_AZURE_ML</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>ensure</strong> mandatory if <code>ENABLE_AZURE_MACHINE_LEARNING=true</code></td>
+<td>Deploy private AKS cluster for AML online endpoints</td>
+</tr>
+<tr>
+<td><code>AKS_OUTBOUND_TYPE</code></td>
+<td><code>loadBalancer</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>userDefinedRouting</code> if routing through Azure Firewall</td>
+<td>AKS outbound connectivity type</td>
+</tr>
+<tr>
+<td><code>AKS_PRIVATE_DNS_ZONE</code></td>
+<td><code>system</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>AKS private DNS zone. <code>system</code> = AKS-managed, or supply a custom DNS zone resource ID</td>
+</tr>
+<tr>
+<td><code>AKS_AZURE_FIREWALL_PRIVATE_IP</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>AKS_OUTBOUND_TYPE=userDefinedRouting</code></td>
+<td>Private IP of Azure Firewall for UDR routing</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-14-cognitive-services">Group 14 — Cognitive Services<a class="headerlink" href="#group-14-cognitive-services" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_AI_SEARCH</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure AI Search (required for RAG and Agents)</td>
+</tr>
+<tr>
+<td><code>ADD_AI_SEARCH</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Add AI Search to an existing project</td>
+</tr>
+<tr>
+<td><code>ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Enable shared private link for AI Search indexer</td>
+</tr>
+<tr>
+<td><code>ENABLE_AZURE_OPENAI</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy standalone Azure OpenAI (separate from AI Foundry)</td>
+</tr>
+<tr>
+<td><code>ENABLE_AZURE_AI_VISION</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure AI Vision</td>
+</tr>
+<tr>
+<td><code>ENABLE_AZURE_SPEECH</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure AI Speech</td>
+</tr>
+<tr>
+<td><code>ENABLE_AI_DOC_INTELLIGENCE</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure AI Document Intelligence</td>
+</tr>
+<tr>
+<td><code>ENABLE_BING</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Enable Bing Grounding for AI Foundry agents</td>
+</tr>
+<tr>
+<td><code>ENABLE_BING_CUSTOM_SEARCH</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Enable Bing Custom Search</td>
+</tr>
+<tr>
+<td><code>BING_CUSTOM_SEARCH_SKU</code></td>
+<td><code>G2</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Bing Custom Search SKU</td>
+</tr>
+<tr>
+<td><code>ENABLE_CONTENT_SAFETY</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure AI Content Safety</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-15-databases">Group 15 — Databases<a class="headerlink" href="#group-15-databases" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_COSMOS_DB</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>ensure</strong> required if <code>ENABLE_FOUNDRY_CAPHOST=true</code></td>
+<td>Deploy Azure Cosmos DB account</td>
+</tr>
+<tr>
+<td><code>COSMOS_KIND</code></td>
+<td><code>GlobalDocumentDB</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>MongoDB</code></td>
+<td>Cosmos DB API kind</td>
+</tr>
+<tr>
+<td><code>ENABLE_POSTGRESQL</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Database for PostgreSQL Flexible Server</td>
+</tr>
+<tr>
+<td><code>POSTGRES_ADMIN_EMAILS</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>ENABLE_POSTGRESQL=true</code></td>
+<td>Comma-separated admin email(s) for PostgreSQL Entra auth</td>
+</tr>
+<tr>
+<td><code>ENABLE_REDIS_CACHE</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Cache for Redis</td>
+</tr>
+<tr>
+<td><code>ENABLE_SQL_DATABASE</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure SQL Database</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-16-functions-web-apps-container-apps">Group 16 — Functions, Web Apps &amp; Container Apps<a class="headerlink" href="#group-16-functions-web-apps-container-apps" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_FUNCTION</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Function App</td>
+</tr>
+<tr>
+<td><code>FUNCTION_RUNTIME</code></td>
+<td><code>dotnet</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>python</code>, <code>node</code>, or <code>java</code></td>
+<td>Function App runtime stack</td>
+</tr>
+<tr>
+<td><code>FUNCTION_VERSION</code></td>
+<td><code>v7.0</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Function App runtime version</td>
+</tr>
+<tr>
+<td><code>ENABLE_WEBAPP</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Web App (App Service)</td>
+</tr>
+<tr>
+<td><code>WEBAPP_RUNTIME</code></td>
+<td><code>python</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Web App runtime stack</td>
+</tr>
+<tr>
+<td><code>WEBAPP_RUNTIME_VERSION</code></td>
+<td><code>3.11</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Web App runtime version</td>
+</tr>
+<tr>
+<td><code>ASE_SKU</code></td>
+<td><code>IsolatedV2</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>App Service Environment v3 SKU family</td>
+</tr>
+<tr>
+<td><code>ASE_SKU_CODE</code></td>
+<td><code>I1v2</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>App Service Environment v3 SKU code</td>
+</tr>
+<tr>
+<td><code>ASE_SKU_WORKERS</code></td>
+<td><code>1</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Number of App Service Environment workers</td>
+</tr>
+<tr>
+<td><code>ENABLE_CONTAINER_APPS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Container Apps environment</td>
+</tr>
+<tr>
+<td><code>ENABLE_APPINSIGHTS_DASHBOARD</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Application Insights dashboard workbook</td>
+</tr>
+<tr>
+<td><code>ACA_W_REGISTRY_IMAGE</code></td>
+<td><code>mcr.microsoft.com/azuredocs/containerapps-helloworld:latest</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Seed image for the Container App</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-17-integration">Group 17 — Integration<a class="headerlink" href="#group-17-integration" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_LOGIC_APPS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Logic Apps</td>
+</tr>
+<tr>
+<td><code>ENABLE_EVENT_HUBS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Event Hubs namespace</td>
+</tr>
+<tr>
+<td><code>ENABLE_BOT_SERVICE</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy Azure Bot Service</td>
+</tr>
+<tr>
+<td><code>FOUNDRY_API_MANAGEMENT_RESOURCE_ID</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> provide the full ARM resource ID of an existing APIM instance</td>
+<td>Link an existing APIM instance as AI Gateway for AI Foundry</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-18-ai-models">Group 18 — AI Models<a class="headerlink" href="#group-18-ai-models" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEPLOY_MODEL_GPT_4O</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy GPT-4o model in AI Foundry</td>
+</tr>
+<tr>
+<td><code>DEFAULT_GPT_4O_VERSION</code></td>
+<td><code>2024-11-20</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>GPT-4o model version</td>
+</tr>
+<tr>
+<td><code>DEFAULT_GPT_CAPACITY</code></td>
+<td><code>40</code></td>
+<td>O</td>
+<td>keep-as-is (= 40 K TPM)</td>
+<td>Capacity for GPT-4o in thousands of tokens per minute</td>
+</tr>
+<tr>
+<td><code>DEPLOY_MODEL_GPT_4O_MINI</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy GPT-4o-mini model</td>
+</tr>
+<tr>
+<td><code>DEFAULT_GPT_4O_MINI_VERSION</code></td>
+<td><code>2024-07-18</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>GPT-4o-mini model version</td>
+</tr>
+<tr>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is — <strong>recommended</strong> for production RAG</td>
+<td>Deploy text-embedding-3-large</td>
+</tr>
+<tr>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy text-embedding-3-small</td>
+</tr>
+<tr>
+<td><code>DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is (legacy)</td>
+<td>Deploy text-embedding-ada-002 (older model)</td>
+</tr>
+<tr>
+<td><code>DEFAULT_EMBEDDING_CAPACITY</code></td>
+<td><code>25</code></td>
+<td>O</td>
+<td>keep-as-is (= 25 K TPM)</td>
+<td>Capacity for all embedding models</td>
+</tr>
+<tr>
+<td><code>DEPLOY_MODEL_GPT_X</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Deploy a custom or future GPT model</td>
+</tr>
+<tr>
+<td><code>MODEL_GPTX_NAME</code></td>
+<td><code>gpt-5-mini</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Custom model name (used when <code>DEPLOY_MODEL_GPT_X=true</code>)</td>
+</tr>
+<tr>
+<td><code>MODEL_GPTX_VERSION</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td>keep-as-is (empty = latest available)</td>
+<td>Custom model version</td>
+</tr>
+<tr>
+<td><code>MODEL_GPTX_SKU</code></td>
+<td><code>DataZoneStandard</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Custom model SKU</td>
+</tr>
+<tr>
+<td><code>MODEL_GPTX_CAPACITY</code></td>
+<td><code>30</code></td>
+<td>O</td>
+<td>keep-as-is (= 30 K TPM)</td>
+<td>Custom model capacity</td>
+</tr>
+<tr>
+<td><code>DEFAULT_MODEL_SKU</code></td>
+<td><code>Standard</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Default SKU for all model deployments</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-19-naming-suffixes-acr">Group 19 — Naming, Suffixes &amp; ACR<a class="headerlink" href="#group-19-naming-suffixes-acr" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ADMIN_COMMON_RESOURCE_SUFFIX</code></td>
+<td><code>-001</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Suffix appended to common AI Factory resource names</td>
+</tr>
+<tr>
+<td><code>ADMIN_PRJ_RESOURCE_SUFFIX</code></td>
+<td><code>-001</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Suffix appended to project resource names</td>
+</tr>
+<tr>
+<td><code>USE_COMMON_ACR_OVERRIDE</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Override to use the shared common ACR</td>
+</tr>
+<tr>
+<td><code>ACR_IP_WHITELIST</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Comma-separated IPs to add to the ACR firewall</td>
+</tr>
+<tr>
+<td><code>ACR_ADMIN_USER_ENABLED</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is (<code>false</code> = more secure)</td>
+<td>Enable ACR admin user account</td>
+</tr>
+<tr>
+<td><code>ACR_DEDICATED</code></td>
+<td><code>true</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>ensure</strong> <code>true</code> when using private endpoints or CMK</td>
+<td>Dedicate the ACR to the AI Factory (no shared SKU)</td>
+</tr>
+<tr>
+<td><code>ACR_SKU</code></td>
+<td><code>Premium</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>ensure</strong> <code>Premium</code> is required for private endpoints and CMK</td>
+<td>Azure Container Registry SKU</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-20-baseline-networking">Group 20 — Baseline Networking<a class="headerlink" href="#group-20-baseline-networking" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>VNET_RESOURCE_GROUP_BASE</code></td>
+<td><code>esml-common</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Base name for the common VNet resource group</td>
+</tr>
+<tr>
+<td><code>VNET_NAME_BASE</code></td>
+<td><code>vnt-esmlcmn</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Base name for the common VNet</td>
+</tr>
+<tr>
+<td><code>SUBNET_COMMON_BASE</code></td>
+<td><code>snet-esml-cmn-001</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Base name for the common subnet</td>
+</tr>
+<tr>
+<td><code>COMMON_VNET_CIDR</code></td>
+<td><code>172.16.0.0/16</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> choose a <code>/16</code> that doesn't conflict with your hub VNet</td>
+<td>Common VNet address space</td>
+</tr>
+<tr>
+<td><code>COMMON_SUBNET_CIDR</code></td>
+<td><code>172.16.XX.0/26</code></td>
+<td>O</td>
+<td>keep-as-is (<code>XX</code> is replaced at runtime by the env CIDR range)</td>
+<td>Common subnet CIDR</td>
+</tr>
+<tr>
+<td><code>COMMON_SUBNET_SCORING_CIDR</code></td>
+<td><code>172.16.XX.64/26</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Scoring/inference subnet CIDR</td>
+</tr>
+<tr>
+<td><code>COMMON_PBI_SUBNET_NAME</code></td>
+<td><code>snet-esml-cmn-pbi-001</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Power BI Gateway subnet name</td>
+</tr>
+<tr>
+<td><code>COMMON_PBI_SUBNET_CIDR</code></td>
+<td><code>172.16.XX.128/26</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Power BI Gateway subnet CIDR</td>
+</tr>
+<tr>
+<td><code>COMMON_BASTION_SUBNET_NAME</code></td>
+<td><code>AzureBastionSubnet</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>ensure</strong> must be <strong>exactly</strong> <code>AzureBastionSubnet</code> for Azure Bastion to work</td>
+<td>Bastion subnet name (Azure-required fixed name)</td>
+</tr>
+<tr>
+<td><code>COMMON_BASTION_SUBNET_CIDR</code></td>
+<td><code>172.16.XX.192/26</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>Bastion subnet CIDR</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="group-21-byo-subnets-vnet-overrides">Group 21 — BYO Subnets &amp; VNet Overrides<a class="headerlink" href="#group-21-byo-subnets-vnet-overrides" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Only needed when <code>BYO_SUBNETS=true</code>. Leave all defaults if letting the AI Factory auto-calculate subnets.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>M/O</th>
+<th>Guidance</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BYO_SUBNETS</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>keep-as-is. <strong>otherwise</strong> <code>true</code> to use pre-existing subnets</td>
+<td>Bring your own subnets instead of AI Factory auto-creating them</td>
+</tr>
+<tr>
+<td><code>DEV_NETWORK_ENV</code></td>
+<td><code>dev-</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>DEV prefix inserted into BYO subnet names</td>
+</tr>
+<tr>
+<td><code>STAGE_NETWORK_ENV</code></td>
+<td><code>stage-</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>STAGE prefix inserted into BYO subnet names</td>
+</tr>
+<tr>
+<td><code>PROD_NETWORK_ENV</code></td>
+<td><code>prod-</code></td>
+<td>O</td>
+<td>keep-as-is</td>
+<td>PROD prefix inserted into BYO subnet names</td>
+</tr>
+<tr>
+<td><code>VNET_RESOURCE_GROUP_PARAM</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>BYO_SUBNETS=true</code></td>
+<td>Resource group of the BYO VNet</td>
+</tr>
+<tr>
+<td><code>VNET_NAME_FULL_PARAM</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>BYO_SUBNETS=true</code></td>
+<td>Full name of the BYO VNet</td>
+</tr>
+<tr>
+<td><code>SUBNET_COMMON</code></td>
+<td><code>""</code></td>
+<td>O</td>
+<td><strong>ensure</strong> mandatory if <code>BYO_SUBNETS=true</code></td>
+<td>Name of the BYO common subnet</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<div class="admonition success">
+<p class="admonition-title">You now have a complete view of all parameters</p>
+<p>Return to <a href="../standard/">Standard Mode</a> to see the minimal mandatory set needed for a first deployment.</p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Source file</p>
+<p>All parameters above map directly to variables in:
+<code>environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template</code></p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/azure/Enterprise-Scale-AIFactory" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations" target="_blank" rel="noopener" title="learn.microsoft.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M0 32h214.6v214.6H0zm233.4 0H448v214.6H233.4zM0 265.4h214.6V480H0zm233.4 0H448V480H233.4z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

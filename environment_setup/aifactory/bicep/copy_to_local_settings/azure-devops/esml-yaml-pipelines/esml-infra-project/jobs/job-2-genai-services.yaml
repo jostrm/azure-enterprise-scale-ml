@@ -59,6 +59,32 @@ steps:
       echo "Resolved vnetResourceGroup: $VNET_RG"
       echo "Resolved vnetNameFull: $VNET_NAME"
       echo "Variables set: vnetResourceGroup_resolved and vnetNameFull_resolved"
+
+      # ---------------------------------------------------------------
+      # BYO_subnets=false (default): clear all subnet name variables so
+      # Bicep templates use their own naming convention. The values in
+      # variables.yaml are documentation examples only and must never be
+      # passed to deployments when the pipeline manages subnets itself.
+      # BYO_subnets=true: leave variables as-is (user-provided names).
+      # ---------------------------------------------------------------
+      BYO="$(BYO_subnets)"
+      if [ "$BYO" != "true" ]; then
+        echo "BYO_subnets=false: clearing subnet name overrides so Bicep uses naming convention"
+        echo "##vso[task.setvariable variable=subnetCommon]"
+        echo "##vso[task.setvariable variable=subnetCommonScoring]"
+        echo "##vso[task.setvariable variable=subnetCommonPowerbiGw]"
+        echo "##vso[task.setvariable variable=subnetProjGenAI]"
+        echo "##vso[task.setvariable variable=subnetProjAKS]"
+        echo "##vso[task.setvariable variable=subnetProjAKS2]"
+        echo "##vso[task.setvariable variable=subnetProjACA]"
+        echo "##vso[task.setvariable variable=subnetProjACA2]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
+      else
+        echo "BYO_subnets=true: using provided subnet names from variables"
+        echo "  subnetCommon=$(subnetCommon)"
+        echo "  subnetProjGenAI=$(subnetProjGenAI)"
+      fi
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
   condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
@@ -339,22 +365,38 @@ steps:
       $project | ConvertTo-Json -Depth 5 | Out-File "$tempDir/21-22-esml-prj-parameters.json" -Encoding UTF8
       
       # 10-esml-globals-override.json (bicepPar5) - Use resolved variables with <network_env> already replaced
+      # BYO_subnets guard: when BYO_subnets=false, subnet names in variables.yaml are documentation
+      # examples only. Pass empty strings so genDynamicNetworkParamFile.ps1 uses its naming convention
+      # and Bicep uses common_subnet_name (snet-esml-cmn-001) as fallback for subnetCommon.
+      $_byo = "$(BYO_subnets)"
+      $_useSubnetNames = ($_byo -eq "true")
+      $subnetCommonVal            = if ($_useSubnetNames) { "$(subnetCommon)" }            else { "" }
+      $subnetCommonScoringVal     = if ($_useSubnetNames) { "$(subnetCommonScoring)" }     else { "" }
+      $subnetCommonPowerbiGwVal   = if ($_useSubnetNames) { "$(subnetCommonPowerbiGw)" }   else { "" }
+      $subnetProjGenAIVal         = if ($_useSubnetNames) { "$(subnetProjGenAI)" }         else { "" }
+      $subnetProjAKSVal           = if ($_useSubnetNames) { "$(subnetProjAKS)" }           else { "" }
+      $subnetProjAKS2Val          = if ($_useSubnetNames) { "$(subnetProjAKS2)" }          else { "" }
+      $subnetProjACAVal           = if ($_useSubnetNames) { "$(subnetProjACA)" }           else { "" }
+      $subnetProjACA2Val          = if ($_useSubnetNames) { "$(subnetProjACA2)" }          else { "" }
+      $subnetProjDatabricksPublicVal  = if ($_useSubnetNames) { "$(subnetProjDatabricksPublic)" }  else { "" }
+      $subnetProjDatabricksPrivateVal = if ($_useSubnetNames) { "$(subnetProjDatabricksPrivate)" } else { "" }
+      Write-Host "BYO_subnets=$_byo => subnetCommon='$subnetCommonVal', subnetProjGenAI='$subnetProjGenAIVal'"
       $override = @{
         '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
         contentVersion = "1.0.0.0"
         parameters = @{
           vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_resolved)" }
           vnetNameFull_param = @{ value = "$(vnetNameFull_resolved)" }
-          subnetCommon = @{ value = "$(subnetCommon)" }
-          subnetCommonScoring = @{ value = "$(subnetCommonScoring)" }
-          subnetCommonPowerbiGw = @{ value = "$(subnetCommonPowerbiGw)" }
-          subnetProjGenAI = @{ value = "$(subnetProjGenAI)" }
-          subnetProjAKS = @{ value = "$(subnetProjAKS)" }
-          subnetProjAKS2 = @{ value = "$(subnetProjAKS2)" }
-          subnetProjACA = @{ value = "$(subnetProjACA)" }
-          subnetProjACA2 = @{ value = "$(subnetProjACA2)" }
-          subnetProjDatabricksPublic = @{ value = "$(subnetProjDatabricksPublic)" }
-          subnetProjDatabricksPrivate = @{ value = "$(subnetProjDatabricksPrivate)" }
+          subnetCommon = @{ value = $subnetCommonVal }
+          subnetCommonScoring = @{ value = $subnetCommonScoringVal }
+          subnetCommonPowerbiGw = @{ value = $subnetCommonPowerbiGwVal }
+          subnetProjGenAI = @{ value = $subnetProjGenAIVal }
+          subnetProjAKS = @{ value = $subnetProjAKSVal }
+          subnetProjAKS2 = @{ value = $subnetProjAKS2Val }
+          subnetProjACA = @{ value = $subnetProjACAVal }
+          subnetProjACA2 = @{ value = $subnetProjACA2Val }
+          subnetProjDatabricksPublic = @{ value = $subnetProjDatabricksPublicVal }
+          subnetProjDatabricksPrivate = @{ value = $subnetProjDatabricksPrivateVal }
         }
       }
       $override | ConvertTo-Json -Depth 5 | Out-File "$tempDir/10-esml-globals-override.json" -Encoding UTF8
@@ -1248,9 +1290,10 @@ steps:
       # ---------------------------------------------------------------
       # AML workspace
       # Use actual name recorded by delete script (includes resource suffix like -001)
+      # ALL $(varName) reads below use ${VAR:-} to safely get empty string when unset.
       # ---------------------------------------------------------------
-      amlExists="$(amlExists)"
-      enableAML="$(enableAzureMachineLearning)"
+      amlExists="${amlExists:-false}"
+      enableAML="${enableAzureMachineLearning:-true}"
       amlActualName="${amlActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       amlPrefixName="aml-${projectNumber}-${locationSuffix}-${envName}"
       amlPurgeName="${amlActualName:-$amlPrefixName}"
@@ -1265,8 +1308,8 @@ steps:
       # Purge BEFORE the Hub (child workspace of Hub)
       # Use actual name recorded by delete script (includes resource suffix like -001)
       # ---------------------------------------------------------------
-      aifProjectExists="$(aifProjectExists)"
-      enableAIFoundryHubFlag="$(enableAIFoundryHub)"
+      aifProjectExists="${aifProjectExists:-false}"
+      enableAIFoundryHubFlag="${enableAIFoundryHub:-false}"
       aifProjectActualName="${aifProjectActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aifProjectPrefixName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aifProjectPurgeName="${aifProjectActualName:-$aifProjectPrefixName}"
@@ -1280,7 +1323,7 @@ steps:
       # AI Foundry Hub (MachineLearningServices/workspaces kind=Hub)
       # Use actual name recorded by delete script (includes resource suffix like -001)
       # ---------------------------------------------------------------
-      aiHubExists="$(aiHubExists)"
+      aiHubExists="${aiHubExists:-false}"
       aiHubActualName="${aiHubActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aiHubPrefixName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
       aiHubPurgeName="${aiHubActualName:-$aiHubPrefixName}"
@@ -1295,8 +1338,8 @@ steps:
       # Account name format: aif2{uniqueInAIFenv}{randomValue} — no dashes, max 12 chars
       # Use no_dash=true so the prefix 'aif2' does NOT accidentally match projects (aif2-p002x46)
       # ---------------------------------------------------------------
-      aiFoundryV2Exists="$(aiFoundryV2Exists)"
-      enableAIFoundry="$(enableAIFoundry)"
+      aiFoundryV2Exists="${aiFoundryV2Exists:-false}"
+      enableAIFoundry="${enableAIFoundry:-true}"
       if [ "$aiFoundryV2Exists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_cognitive_service "aif2" "$projectResourceGroup" "true"
       else
@@ -1307,7 +1350,7 @@ steps:
       # Azure OpenAI (CognitiveServices/accounts) — tied to AI Foundry lifecycle
       # Name prefix: aoai-{projectName}-{locationSuffix}-{envName} (may have resource suffix)
       # ---------------------------------------------------------------
-      openaiExists="$(openaiExists)"
+      openaiExists="${openaiExists:-false}"
       openaiPrefix="aoai-${projectName}-${locationSuffix}-${envName}"
       if [ "$openaiExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_cognitive_service "$openaiPrefix" "$projectResourceGroup"
@@ -1319,7 +1362,7 @@ steps:
       # AI Services (CognitiveServices/accounts)
       # Name prefix: aiservices{projectName}{locationSuffix}{envName} (may have resource suffix)
       # ---------------------------------------------------------------
-      aiServicesExists="$(aiServicesExists)"
+      aiServicesExists="${aiServicesExists:-false}"
       aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
       if [ "$aiServicesExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_cognitive_service "$aiServicesPrefix" "$projectResourceGroup"
@@ -1329,12 +1372,21 @@ steps:
 
       echo "=== 04_Purge_SoftDeleted complete ==="
   env:
-    # These three variables are set dynamically by task 04_Delete via ##vso[task.setvariable].
-    # Passing them through env: ensures bash receives an empty string (not a command substitution)
-    # when the pipeline variable is unset (e.g. resource didn't exist / delete didn't run).
+    # All variables that may be unset (set dynamically via ##vso[task.setvariable] in prior tasks,
+    # or simply not defined yet) are passed through env: so bash always gets a safe empty/default
+    # string instead of a bare $(varName) token that bash would try to execute as a command.
     amlActualName: $(amlActualName)
     aifProjectActualName: $(aifProjectActualName)
     aiHubActualName: $(aiHubActualName)
+    amlExists: $(amlExists)
+    aifProjectExists: $(aifProjectExists)
+    aiHubExists: $(aiHubExists)
+    aiFoundryV2Exists: $(aiFoundryV2Exists)
+    openaiExists: $(openaiExists)
+    aiServicesExists: $(aiServicesExists)
+    enableAzureMachineLearning: $(enableAzureMachineLearning)
+    enableAIFoundryHub: $(enableAIFoundryHub)
+    enableAIFoundry: $(enableAIFoundry)
 - task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
@@ -1751,6 +1803,14 @@ steps:
      echo "Generated admin password"
      
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
+     # so Bicep uses common_subnet_name (snet-esml-cmn-001) as fallback instead of
+     # the documentation example value (snet-dev-esml-cmn-001) from variables.yaml.
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-62-core-infrastructure" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -1770,7 +1830,7 @@ steps:
      --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters subnetCommon="$_subnet_common" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
@@ -2058,6 +2118,13 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty strings for subnet names
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     _subnet_common_scoring="$(subnetCommonScoring)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; _subnet_common_scoring=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-66-ai-platform" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -2117,8 +2184,8 @@ steps:
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
-     --parameters subnetCommonScoring="$(subnetCommonScoring)" \
+     --parameters subnetCommon="$_subnet_common" \
+     --parameters subnetCommonScoring="$_subnet_common_scoring" \
      --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters projectPrefix="$(projectPrefix)" \
@@ -2470,6 +2537,12 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-a" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -2509,7 +2582,7 @@ steps:
      --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters subnetCommon="$_subnet_common" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
@@ -2570,6 +2643,12 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-b" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -2610,7 +2689,7 @@ steps:
      --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters subnetCommon="$_subnet_common" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \

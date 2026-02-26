@@ -1,0 +1,89 @@
+site_name: Enterprise Scale AI Factory
+site_url: https://jostrm.github.io/azure-enterprise-scale-ml/
+site_description: Enterprise-grade AI landing zone for Azure — automates AI Foundry, private networking, MLOps, GenAIOps, and DataOps across Dev/Stage/Prod environments.
+site_author: Microsoft
+
+repo_name: azure/Enterprise-Scale-AIFactory
+repo_url: https://github.com/jostrm/azure-enterprise-scale-ml
+
+docs_dir: docs
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  palette:
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+nav:
+  - Overview: index.md
+  - Parameters:
+      - parameters/index.md
+      - Standard Mode (mandatory): parameters/standard.md
+      - Advanced Mode (all): parameters/advanced.md
+  - AI Factory Concepts:
+      - concepts/index.md
+      - AI Factory Intelligence: concepts/intelligence.md
+      - Enterprise Grade & Scale: concepts/enterprise-scale.md
+      - Templates:
+          - IaC: concepts/templates/iac.md
+          - DataOps: concepts/templates/dataops.md
+          - MLOps: concepts/templates/mlops.md
+          - GenAIOps: concepts/templates/genaiops.md
+  - Automated Architectures: architectures.md
+  - IaC:
+      - BICEP: iac/bicep.md
+      - BYO Terraform: iac/terraform.md
+  - Orchestrators:
+      - Azure DevOps: orchestrators/ado.md
+      - GitHub Actions: orchestrators/gh.md
+  - News: news.md
+  - AI Factory Intelligence: intelligence.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/azure/Enterprise-Scale-AIFactory
+    - icon: fontawesome/brands/microsoft
+      link: https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory-for-organization-machine-learning-operations

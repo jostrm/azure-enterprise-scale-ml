@@ -16,7 +16,7 @@
     ```` 
 ### Prerequisite setup tools: on your laptop (for Option B - Github)
 - **Github CLI**: https://cli.github.com/
-    - **Purpose**: The .env file will push those values as Github secretc and variables, and create Github environments Dev, Stage, Production
+    - **Purpose**: The .env file will push those values as Github secrets and variables, and create Github environments Dev, Stage, Production
     - **Version**: 2.71.0 or above
     ```bash
         gh --version
@@ -53,7 +53,7 @@ git config --system core.longpaths true
     ``` 
     git submodule foreach 'git checkout main && git pull origin main'
     ```
-    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
+    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (bootstrap scripts, templates)
     
 2) Run the start script `./azure-enterprise-scale-ml/00-start.sh`,  this will create some bootstrap-scripts at your repo root.
 
@@ -66,7 +66,7 @@ git config --system core.longpaths true
     ```
 4) Rename the newly created folder  `aifactory-templates` to  `aifactory` (protects you to overwrite your configuration if running the script again)
     - Note: Is is under the `aifactory` folder, you will configure your variables, and the possibility to leverage BYOBicep when editing the GH workflow templates.
-5) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will creat an .env file at your root.
+5) Run the file created at your root called: `02-GH-bootstrap-files.sh`, this will create an .env file at your root.
     - Note: If you want to refresh the pipeline templates, but not overwrite the .env file, you may run `03-GH-bootstrap-files-no-env-overwrite.sh`
      ```
    bash ./02-GH-bootstrap-files.sh
@@ -78,7 +78,7 @@ OUTPUT: The file structure should now look something like below (except paramete
 
 ## Continue with steps:6-10:
 
-6) Authenticate to Github CLI, with a user that is Administrator (Can create Environemnts, variables, secrets, Github Action workflows)
+6) Authenticate to Github CLI, with a user that is Administrator (Can create Environments, variables, secrets, Github Action workflows)
    ```sh
     gh auth login
    ```
@@ -86,7 +86,7 @@ OUTPUT: The file structure should now look something like below (except paramete
 5) Authenticate to  Azure and Github
 You need to login via `Azure CLI` and `Github CLI`, but recommendation is to also test login via `Powershell`. 
 - NB! Recommendation is to use a service principal when logging in, such as `esml-commmon-bicep-sp`, see your ``. You may also use your user id (for Github this is the usual case).
-- The Service Principal should have OWNER permission to all 3 subscriptions (Dev, Test, Prod), such as the `esml-common-bicep-sp` service principle.
+- The Service Principal should have OWNER permission to all 3 subscriptions (Dev, Test, Prod), such as the `esml-common-bicep-sp` service principal.
 - Test the login for all 3 subscriptions using `az cli` and `powershell` as below: 
 
    a) Log in to `Azure CLI with a service principal`, to a specific tenant
@@ -111,7 +111,7 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
     - BYOVNet, BYOSubnet, BYOAce, enableAIGateway
     - etc
 8) Run the file created at your root called: `10-GH-create-or-update-github-variables.sh`, that will copy values from .env to your Github repo as Environment variables, and secrets.
-    - NB! The below will use Github CLI (gh), if the command does not work, plese see PREREQUISITES.
+    - NB! The below will use Github CLI (gh), if the command does not work, please see PREREQUISITES.
     ```
    bash ./10-GH-create-or-update-github-variables.sh
     ```
@@ -120,8 +120,8 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
     - Then, set the AZURE_CREDENTIALS manually using Github web portal for each Environment. The format should be: 
         ```json
         {
-            "clientId": "<AppId of service princple that is OWNER, such as esml-commonn-bicep-sp>",
-            "clientSecret": "Secret of of service princple that is OWNER, such as esml-commonn-bicep-sp",
+            "clientId": "<AppId of service principal that is OWNER, such as esml-common-bicep-sp>",
+            "clientSecret": "Secret of service principal that is OWNER, such as esml-common-bicep-sp",
             "subscriptionId": "<subscriptionID>",
             "tenantId": "<TenantId>"
         }
@@ -153,5 +153,5 @@ Then you can import and run the pipelines to setup 1-M projects. There are 2 AIF
 
 
 > [!TIP]
->  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.
+>  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.
 >
