@@ -30,9 +30,11 @@ The resources that can be added in packages of configs, such as **ARCHITECTURES*
 - **AI Factory Configuration Wizard** Setup in minutes, intelligent workflow-drivern setup Wizard 
 
 [How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) - When a new feature arrives, or fix for breaking changes in a product?
-- [Feature roadmap & AI Factory release branch to pin](#feature-roadmap--next-release-121)?
+- See RELEASES - for Latest, recommended version.
 
-[Documentation](./documentation/readme.md) 
+[Quickstart Documentation](https://jostrm.github.io/azure-enterprise-scale-ml/)
+
+[Full Documentation](./documentation/readme.md) 
 
 ![AI Factory architectures](./documentation/v2/10-19/images/10-two-architectures-v2.png)
 *Figure*: Each team in the AI Factory, have their own *floor* with either architecture 01 or 02, and each team can own multiple floors. You may *turn ON/OFF* services, and add them later via feature flags & re-run pipeline.
