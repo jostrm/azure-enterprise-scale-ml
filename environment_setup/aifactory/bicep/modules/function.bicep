@@ -191,7 +191,7 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
     storageAccountRequired:false // Set to false if you don't want to require a storage account
     serverFarmId: !empty(byoAseAppServicePlanRID) ? existingAppServicePlan.id : appServicePlan.id
     httpsOnly: true
-    hostingEnvironmentProfile: !empty(byoAseFullResourceId) ? {
+    hostingEnvironmentProfile: byoASEv3 && !empty(byoAseFullResourceId) ? {
       id: byoAseFullResourceId
     } : null
     // VNet integration not needed for ASEv3 as it's already in a subnet

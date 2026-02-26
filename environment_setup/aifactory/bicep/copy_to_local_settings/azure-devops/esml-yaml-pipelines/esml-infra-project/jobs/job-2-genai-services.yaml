@@ -59,6 +59,32 @@ steps:
       echo "Resolved vnetResourceGroup: $VNET_RG"
       echo "Resolved vnetNameFull: $VNET_NAME"
       echo "Variables set: vnetResourceGroup_resolved and vnetNameFull_resolved"
+
+      # ---------------------------------------------------------------
+      # BYO_subnets=false (default): clear all subnet name variables so
+      # Bicep templates use their own naming convention. The values in
+      # variables.yaml are documentation examples only and must never be
+      # passed to deployments when the pipeline manages subnets itself.
+      # BYO_subnets=true: leave variables as-is (user-provided names).
+      # ---------------------------------------------------------------
+      BYO="$(BYO_subnets)"
+      if [ "$BYO" != "true" ]; then
+        echo "BYO_subnets=false: clearing subnet name overrides so Bicep uses naming convention"
+        echo "##vso[task.setvariable variable=subnetCommon]"
+        echo "##vso[task.setvariable variable=subnetCommonScoring]"
+        echo "##vso[task.setvariable variable=subnetCommonPowerbiGw]"
+        echo "##vso[task.setvariable variable=subnetProjGenAI]"
+        echo "##vso[task.setvariable variable=subnetProjAKS]"
+        echo "##vso[task.setvariable variable=subnetProjAKS2]"
+        echo "##vso[task.setvariable variable=subnetProjACA]"
+        echo "##vso[task.setvariable variable=subnetProjACA2]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
+      else
+        echo "BYO_subnets=true: using provided subnet names from variables"
+        echo "  subnetCommon=$(subnetCommon)"
+        echo "  subnetProjGenAI=$(subnetProjGenAI)"
+      fi
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
   condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
@@ -339,22 +365,38 @@ steps:
       $project | ConvertTo-Json -Depth 5 | Out-File "$tempDir/21-22-esml-prj-parameters.json" -Encoding UTF8
       
       # 10-esml-globals-override.json (bicepPar5) - Use resolved variables with <network_env> already replaced
+      # BYO_subnets guard: when BYO_subnets=false, subnet names in variables.yaml are documentation
+      # examples only. Pass empty strings so genDynamicNetworkParamFile.ps1 uses its naming convention
+      # and Bicep uses common_subnet_name (snet-esml-cmn-001) as fallback for subnetCommon.
+      $_byo = "$(BYO_subnets)"
+      $_useSubnetNames = ($_byo -eq "true")
+      $subnetCommonVal            = if ($_useSubnetNames) { "$(subnetCommon)" }            else { "" }
+      $subnetCommonScoringVal     = if ($_useSubnetNames) { "$(subnetCommonScoring)" }     else { "" }
+      $subnetCommonPowerbiGwVal   = if ($_useSubnetNames) { "$(subnetCommonPowerbiGw)" }   else { "" }
+      $subnetProjGenAIVal         = if ($_useSubnetNames) { "$(subnetProjGenAI)" }         else { "" }
+      $subnetProjAKSVal           = if ($_useSubnetNames) { "$(subnetProjAKS)" }           else { "" }
+      $subnetProjAKS2Val          = if ($_useSubnetNames) { "$(subnetProjAKS2)" }          else { "" }
+      $subnetProjACAVal           = if ($_useSubnetNames) { "$(subnetProjACA)" }           else { "" }
+      $subnetProjACA2Val          = if ($_useSubnetNames) { "$(subnetProjACA2)" }          else { "" }
+      $subnetProjDatabricksPublicVal  = if ($_useSubnetNames) { "$(subnetProjDatabricksPublic)" }  else { "" }
+      $subnetProjDatabricksPrivateVal = if ($_useSubnetNames) { "$(subnetProjDatabricksPrivate)" } else { "" }
+      Write-Host "BYO_subnets=$_byo => subnetCommon='$subnetCommonVal', subnetProjGenAI='$subnetProjGenAIVal'"
       $override = @{
         '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"
         contentVersion = "1.0.0.0"
         parameters = @{
           vnetResourceGroup_param = @{ value = "$(vnetResourceGroup_resolved)" }
           vnetNameFull_param = @{ value = "$(vnetNameFull_resolved)" }
-          subnetCommon = @{ value = "$(subnetCommon)" }
-          subnetCommonScoring = @{ value = "$(subnetCommonScoring)" }
-          subnetCommonPowerbiGw = @{ value = "$(subnetCommonPowerbiGw)" }
-          subnetProjGenAI = @{ value = "$(subnetProjGenAI)" }
-          subnetProjAKS = @{ value = "$(subnetProjAKS)" }
-          subnetProjAKS2 = @{ value = "$(subnetProjAKS2)" }
-          subnetProjACA = @{ value = "$(subnetProjACA)" }
-          subnetProjACA2 = @{ value = "$(subnetProjACA2)" }
-          subnetProjDatabricksPublic = @{ value = "$(subnetProjDatabricksPublic)" }
-          subnetProjDatabricksPrivate = @{ value = "$(subnetProjDatabricksPrivate)" }
+          subnetCommon = @{ value = $subnetCommonVal }
+          subnetCommonScoring = @{ value = $subnetCommonScoringVal }
+          subnetCommonPowerbiGw = @{ value = $subnetCommonPowerbiGwVal }
+          subnetProjGenAI = @{ value = $subnetProjGenAIVal }
+          subnetProjAKS = @{ value = $subnetProjAKSVal }
+          subnetProjAKS2 = @{ value = $subnetProjAKS2Val }
+          subnetProjACA = @{ value = $subnetProjACAVal }
+          subnetProjACA2 = @{ value = $subnetProjACA2Val }
+          subnetProjDatabricksPublic = @{ value = $subnetProjDatabricksPublicVal }
+          subnetProjDatabricksPrivate = @{ value = $subnetProjDatabricksPrivateVal }
         }
       }
       $override | ConvertTo-Json -Depth 5 | Out-File "$tempDir/10-esml-globals-override.json" -Encoding UTF8
@@ -408,17 +450,946 @@ steps:
       }
       Write-Host "=== END DEBUG ==="
 
-- task: AzureCLI@2
+- task: AzurePowerShell@5
   displayName: '04_pwsh_fetch_network_parameters'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: pscore
+    ScriptType: FilePath
     ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
-    arguments: '-spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -useServicePrincipal -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)"'
+    ScriptArguments: '-BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)"'
+    azurePowerShellVersion: LatestVersion
+    pwsh: true
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
 - task: AzureCLI@2
-  displayName: '05_Build default image offline, to private registry (ACR) if not exists'
-  condition: and(eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  displayName: '05a_Check if Private DNS Zones exist'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+
+      # Input parameters
+      # Use privDnsSubscription_param if available, otherwise use dev_test_prod_sub_id
+      PRIV_DNS_SUB_PARAM="$(privDnsSubscription_param)"
+      if [ -n "$PRIV_DNS_SUB_PARAM" ] && [ "$PRIV_DNS_SUB_PARAM" != "\$(privDnsSubscription_param)" ]; then
+        privDnsSubscription="$PRIV_DNS_SUB_PARAM"
+        echo "Using privDnsSubscription_param: $privDnsSubscription"
+      else
+        privDnsSubscription="$(dev_test_prod_sub_id)"
+        echo "Using dev_test_prod_sub_id for Private DNS subscription: $privDnsSubscription"
+      fi
+
+      az account set --subscription "$privDnsSubscription"
+      
+      # Use privDnsResourceGroup_param if available, otherwise construct the name
+      PRIV_DNS_RG_PARAM="$(privDnsResourceGroup_param)"
+      if [ -n "$PRIV_DNS_RG_PARAM" ] && [ "$PRIV_DNS_RG_PARAM" != "\$(privDnsResourceGroup_param)" ]; then
+        privDnsResourceGroupName="$PRIV_DNS_RG_PARAM"
+        echo "Using privDnsResourceGroup_param for Private DNS: $privDnsResourceGroupName"
+      else
+        privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "Using constructed Private DNS resource group name: $privDnsResourceGroupName"
+      fi
+      
+      location="$(admin_location)"
+
+      # Define DNS Zones as space-separated pairs (variable_name:dns_zone_name)
+      # Using a simple approach compatible with all shell versions
+      dnsZonePairs=(
+        "zoneazurecontainerapps:privatelink.${location}.azurecontainerapps.io"
+        "zoneredis:privatelink.redis.cache.windows.net"
+        "zonepostgres:privatelink.postgres.database.azure.com"
+        "zonesql:privatelink.database.windows.net"
+        "zoneMongo:privatelink.mongo.cosmos.azure.com"
+        "zoneServicesAi:privatelink.services.ai.azure.com"
+        "zoneAPIM:privatelink.azure-api.net"
+      )
+
+      # Get vnet information for link checking
+      VNET_NAME="$(vnetNameFull_resolved)"
+      VNET_RG="$(vnetResourceGroup_resolved)"
+      VNET_SUBSCRIPTION="$(dev_test_prod_sub_id)"
+      
+      # Print variables for debugging before checking
+      echo "=== DNS Zone Check Configuration ==="
+      echo "Private DNS Subscription: $privDnsSubscription"
+      echo "Private DNS Resource Group: $privDnsResourceGroupName"
+      echo "Location: $location"
+      echo "VNet Name: $VNET_NAME"
+      echo "VNet Resource Group: $VNET_RG"
+      echo "===================================="
+
+      # Helper function to check if a Private DNS Zone exists (log VNet link status but don't fail on missing link)
+      dns_zone_and_link_exists() {
+        local subscription="$1"
+        local resourceGroup="$2"
+        local dnsZoneName="$3"
+        local vnetName="$4"
+        local vnetRg="$5"
+        local vnetSub="$6"
+
+        # Send debug output to stderr so it doesn't interfere with the return value
+        echo "Checking DNS Zone: $dnsZoneName in RG: $resourceGroup, Subscription: $subscription" >&2
+        
+        # Validate inputs
+        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
+          echo "  ⚠️  WARNING: VNet name or RG is empty. VNet Name: '$vnetName', VNet RG: '$vnetRg'" >&2
+          echo "  Falling back to zone-only check..." >&2
+        fi
+        
+        # First check if the DNS zone exists
+        local output
+        output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
+        local zone_status=$?
+
+        if [ $zone_status -ne 0 ]; then
+          echo "  ❌ DNS Zone not found" >&2
+          echo "  Error details: $output" >&2
+          echo "false"
+          return
+        fi
+        
+        echo "  ✅ DNS Zone found" >&2
+        
+        # If vnet parameters are missing, only check zone existence (legacy behavior)
+        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
+          echo "  ⚠️  Skipping VNet link check due to missing VNet parameters" >&2
+          echo "true"
+          return
+        fi
+        
+        # Now check if vnet link exists for this zone
+        echo "  🔍 Checking vnet links for zone..." >&2
+        echo "  VNet Full Name: $vnetName" >&2
+        echo "  VNet Resource Group: $vnetRg" >&2
+        
+        # Use the VNet's subscription (may differ from DNS subscription)
+        local vnet_full_id="/subscriptions/$vnetSub/resourceGroups/$vnetRg/providers/Microsoft.Network/virtualNetworks/$vnetName"
+        echo "  Expected VNet ID: $vnet_full_id" >&2
+        
+        # List all vnet links for this zone and check if our vnet is linked
+        local links_output
+        links_output=$(az network private-dns link vnet list --subscription "$subscription" --resource-group "$resourceGroup" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnet_full_id'].name" -o tsv 2>&1)
+        local links_status=$?
+        
+        echo "  VNet link query status: $links_status" >&2
+        echo "  VNet link query output: '$links_output'" >&2
+        
+        if [ $links_status -eq 0 ] && [ -n "$links_output" ]; then
+          echo "  ✅ VNet link EXISTS for this zone (link name: $links_output)" >&2
+        elif [ $links_status -eq 0 ]; then
+          echo "  ⚠️  Zone found but no VNet link to expected VNet" >&2
+        else
+          echo "  ⚠️  Unable to query VNet links (status $links_status); not failing zone existence" >&2
+          echo "  Raw output: $links_output" >&2
+        fi
+
+        # Per requirement: only zone absence should return false
+        echo "true"
+      }
+
+      # Check each DNS Zone and its vnet link
+      for pair in "${dnsZonePairs[@]}"; do
+        # Split the pair by colon
+        key="${pair%%:*}"
+        dnsZoneName="${pair#*:}"
+        
+        exists=$(dns_zone_and_link_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName" "$VNET_NAME" "$VNET_RG" "$VNET_SUBSCRIPTION")
+        echo "##vso[task.setvariable variable=${key}Exists]${exists}"
+        echo "Result - DNS Zone: $dnsZoneName, Zone and VNet Link Exists: $exists"
+      done
+- task: AzureCLI@2
+  displayName: '05b_Check if resource exists'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      # Input parameters
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      # uniqueInAIFenv="$(aifactory_salt)" # not used in this script. fuzzy match is used instead.
+      resourceSuffix="$(admin_prjResourceSuffix)"
+      prjResourceSuffixNoDash="${resourceSuffix#-}"
+      twoNumbers="${resourceSuffix:2:2}"
+      
+      # Set project prefix and suffix from pipeline variables
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+
+      # Construct resource group name
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      # Debug resource group construction
+      echo "=== RESOURCE GROUP CONSTRUCTION DEBUG ==="
+      echo "commonRGNamePrefix: '$commonRGNamePrefix'"
+      echo "projectPrefix: '$projectPrefix'"
+      echo "projectNameReplaced: '$projectNameReplaced'"
+      echo "locationSuffix: '$locationSuffix'"
+      echo "envName: '$envName'"
+      echo "aifactorySuffixRG: '$aifactorySuffixRG'"
+      echo "projectSuffix: '$projectSuffix'"
+      echo "Final targetResourceGroup: '$targetResourceGroup'"
+      echo "================================================"
+
+      # Check if target resource group exists
+      echo "Checking if resource group exists: $targetResourceGroup"
+      if ! az group show --name "$targetResourceGroup" &> /dev/null; then
+        echo "Resource group '$targetResourceGroup' does not exist."
+        return 1
+        
+        # Set all resource existence variables to false
+        echo "##vso[task.setvariable variable=aiHubExists]false"
+        echo "##vso[task.setvariable variable=aifProjectExists]false"
+        echo "##vso[task.setvariable variable=amlExists]false"
+        echo "##vso[task.setvariable variable=openaiExists]false"
+        echo "##vso[task.setvariable variable=aiSearchExists]false"
+        echo "##vso[task.setvariable variable=dashboardInsightsExists]false"
+        echo "##vso[task.setvariable variable=applicationInsightExists]false"
+        echo "##vso[task.setvariable variable=aiServicesExists]false"
+        echo "##vso[task.setvariable variable=bingExists]false"
+        echo "##vso[task.setvariable variable=containerAppsEnvExists]false"
+        echo "##vso[task.setvariable variable=containerAppAExists]false"
+        echo "##vso[task.setvariable variable=containerAppWExists]false"
+        echo "##vso[task.setvariable variable=cosmosDBExists]false"
+        echo "##vso[task.setvariable variable=functionAppExists]false"
+        echo "##vso[task.setvariable variable=webAppExists]false"
+        echo "##vso[task.setvariable variable=funcAppServicePlanExists]false"
+        echo "##vso[task.setvariable variable=webAppServicePlanExists]false"
+        echo "##vso[task.setvariable variable=keyvaultExists]false"
+        echo "##vso[task.setvariable variable=miACAExists]false"
+        echo "##vso[task.setvariable variable=miPrjExists]false"
+        echo "##vso[task.setvariable variable=storageAccount1001Exists]false"
+        echo "##vso[task.setvariable variable=storageAccount2001Exists]false"
+        echo "##vso[task.setvariable variable=aifExists]false"
+        echo "##vso[task.setvariable variable=redisExists]false"
+        echo "##vso[task.setvariable variable=postgreSQLExists]false"
+        echo "##vso[task.setvariable variable=sqlServerExists]false"
+        echo "##vso[task.setvariable variable=sqlDBExists]false"
+        echo "##vso[task.setvariable variable=acrProjectExists]false"
+        echo "##vso[task.setvariable variable=vmExists]false"
+        echo "##vso[task.setvariable variable=contentSafetyExists]false"
+        
+        exit 0
+      fi
+
+      echo "Resource group '$targetResourceGroup' exists. Proceeding with resource checks."
+
+      # Helper function for fuzzy resource existence check
+      resource_exists_fuzzy() {
+        local rg="$1"
+        local type="$2"
+        local prefix="$3"
+        local suffix="$4"
+
+        # Debug output for managed identity checks (send to stderr so it doesn't interfere with return value)
+        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+          echo "DEBUG: Checking managed identity in RG: $rg" >&2
+          echo "DEBUG: Looking for prefix: $prefix" >&2
+        fi
+
+        # Run the az resource list command and capture its output and exit status
+        local output
+        # For managed identities and other resources with random salts, use more flexible matching
+        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+          # For managed identities, only check prefix since they have random salts
+          output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix')]" 2>&1)
+          echo "DEBUG: Command executed: az resource list --resource-group '$rg' --resource-type '$type' --query \"[?starts_with(name, '$prefix')]\"" >&2
+        else
+          # For other resources, use the original logic
+          output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix') ]" 2>&1)
+        fi
+        local status=$?
+
+        # Debug output for managed identity checks (send to stderr)
+        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+          echo "DEBUG: Command status: $status" >&2
+          echo "DEBUG: Raw output: $output" >&2
+        fi
+
+        # Check if the command succeeded
+        if [ $status -ne 0 ]; then
+          echo "Error: Failed to list resources in resource group '$rg' with type '$type'." >&2
+          echo "Details: $output" >&2
+          return 1
+        fi
+
+        # Check if the resource exists
+        if echo "$output" | grep -q "$prefix"; then
+          if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+            echo "DEBUG: Found managed identity matching prefix" >&2
+          fi
+          echo "true"
+        else
+          if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
+            echo "DEBUG: No managed identity found matching prefix" >&2
+          fi
+          echo "false"
+        fi
+      }
+
+      # Helper function for exact resource existence check
+      resource_exists_exact() {
+        local rg="$1"
+        local type="$2"
+        local name="$3"
+        if az resource show --resource-group "$rg" --name "$name" --resource-type "$type" &> /dev/null; then
+          echo "true"
+        else
+          echo "false"
+        fi
+      }
+
+      # ...existing code...
+
+      # Resource name variables
+      noSuffix=""
+      suffixStandard="${resourceSuffix}"
+      suffixStandardNoDash="${prjResourceSuffixNoDash}"
+      suffixStorage1=$(echo "1${prjResourceSuffixNoDash}${envName}" | tr -d '-')
+      suffixStorage2=$(echo "2${prjResourceSuffixNoDash}${envName}" | tr -d '-')
+      suffixAppServicePlan="${resourceSuffix}-plan"
+      suffixAcr="${prjResourceSuffixNoDash}"
+      suffixKeyvault="${twoNumbers}"
+
+      aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+      aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+      aiFoundryV2Name="aif2"
+      aiFoundryV2ProjectName="aif2-p${projectNumber}"
+
+      botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
+      dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
+      aksName="aks${projectNumber}-${locationSuffix}-${envName}"
+      amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
+      openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
+      safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
+      dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}"
+      applicationInsightName="ain-${projectName}-${locationSuffix}-${envName}"
+      aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
+      bingName="bing-${projectName}-${locationSuffix}-${envName}"
+      containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
+      containerAppAName="aca-a-${projectName}${locationSuffix}${envName}"
+      containerAppWName="aca-w-${projectName}${locationSuffix}${envName}"
+      cosmosDBName="cosmos-${projectName}-${locationSuffix}-${envName}"
+      functionAppName="func-${projectName}-${locationSuffix}-${envName}"
+      webAppName="webapp-${projectName}-${locationSuffix}-${envName}"
+      funcAppServicePlanName="func-${projectName}-${locationSuffix}-${envName}"
+      webbAppServicePlanName="webapp-${projectName}-${locationSuffix}-${envName}"
+      keyvaultName="kv-p${projectNumber}-${locationSuffix}-${envName}"
+      miACAPrefix="mi-aca-${projectName}-${locationSuffix}-${envName}"
+      miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
+      storageAccount1001Name="sa${projectName}${locationSuffix}"
+      storageAccount2001Name="sa${projectName}${locationSuffix}"
+      aifName="aif-hub-${projectName}-${locationSuffix}-${envName}"
+      redisName="redis-${projectName}-${locationSuffix}-${envName}"
+      postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}"
+      sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
+      sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}"
+      acrProjectName="acr${projectName}genai${locationSuffix}"
+      vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
+      logicAppsName="adf-${projectNumber}-${locationSuffix}-${envName}"
+      eventHubsName="eh-${projectNumber}-${locationSuffix}-${envName}"
+      databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
+      contentSafetyName="cs-${projectName}-${locationSuffix}-${envName}"
+
+      # Check resources (fuzzy for those with randomSalt,unique, exact for others)
+      echo "##vso[task.setvariable variable=aiHubExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aifProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$noSuffix")"
+      # aiFoundryV2ProjectExists: child resources (CognitiveServices/accounts/projects) are NOT returned
+      # by az resource list. Find the account first, then use az rest to list projects.
+      aiFoundryV2ActualName=$(az resource list \
+        --resource-group "$targetResourceGroup" \
+        --resource-type "Microsoft.CognitiveServices/accounts" \
+        --query "[?starts_with(name, 'aif2')].name" \
+        -o tsv 2>/dev/null | head -n1)
+      if [ -n "$aiFoundryV2ActualName" ]; then
+        # Dump the full JSON and grep for the project name pattern "aif2-p" — avoids JMESPath
+        # query issues with child resource response shapes. An AI Foundry V2 project name always
+        # contains "aif2-p" (e.g. aif2-p002x46), whether returned as a short name or full id.
+        aifV2ProjRaw=$(az rest \
+          --method get \
+          --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryV2ActualName}/projects?api-version=2025-12-01" \
+          -o json 2>/dev/null || echo "")
+        if echo "$aifV2ProjRaw" | grep -q "aif2-p"; then
+          echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]true"
+          echo "Checking variable: aiFoundryV2ProjectExists, Value: true"
+        else
+          echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]false"
+          echo "Checking variable: aiFoundryV2ProjectExists, Value: false"
+          echo "DEBUG: az rest response: $aifV2ProjRaw"
+        fi
+      else
+        echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]false"
+        echo "Checking variable: aiFoundryV2ProjectExists, Value: false (AI Foundry V2 account not found)"
+      fi
+
+      echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Azure.Databricks/workspaces" "$databricksName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=botServiceExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=amlExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=openaiExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aiSearchExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")"
+      echo "##vso[task.setvariable variable=dashboardInsightsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=applicationInsightExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=aiServicesExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")"
+      echo "##vso[task.setvariable variable=bingExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=containerAppsEnvExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=containerAppAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=containerAppWExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=cosmosDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDBName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=functionAppExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$functionAppName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=webAppExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$webAppName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=funcAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$funcAppServicePlanName" "$suffixAppServicePlan")"
+      echo "##vso[task.setvariable variable=webAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName" "$suffixAppServicePlan")"
+      echo "##vso[task.setvariable variable=keyvaultExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName" "$suffixKeyvault")"
+      echo "##vso[task.setvariable variable=miACAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix" "$suffixStandard")"
+      
+      # Debug output for managed identity check
+      echo "=== DEBUGGING MANAGED IDENTITY CHECK ==="
+      echo "Target Resource Group: $targetResourceGroup"
+      echo "MI Project Prefix: $miPrjPrefix"
+      echo "Suffix Standard: $suffixStandard"
+      echo "Looking for managed identity with prefix: $miPrjPrefix"
+      
+      # List all managed identities in the resource group for debugging
+      echo "=== ALL MANAGED IDENTITIES IN RESOURCE GROUP ==="
+      az resource list --resource-group "$targetResourceGroup" --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" --query "[].name" -o table || echo "Failed to list managed identities or none found"
+      
+      echo "##vso[task.setvariable variable=miPrjExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=storageAccount1001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
+      echo "##vso[task.setvariable variable=storageAccount2001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")"
+      echo "##vso[task.setvariable variable=aifExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=redisExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=postgreSQLExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=sqlServerExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "*")"
+      echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
+      echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=contentSafetyExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$contentSafetyName" "$noSuffix")"
+
+      # Print variables for debugging
+      echo "Target Resource Group: $targetResourceGroup"
+      echo "Key Vault Name: $keyvaultName"
+- task: AzureCLI@2
+  displayName: '05b_Extract_and_set_aifactory_salt_values'
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      set -e
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      DETERMINISTIC_SALT=""
+      RANDOM_SALT=""
+      
+      echo "=== Starting aifactory salt extraction ==="
+      
+      # Build resource group names
+      COMMON_RG_INPUT="$(commonResourceGroup_param)"
+      if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != '$''(commonResourceGroup_param)' ]; then
+        COMMON_RG="$COMMON_RG_INPUT"
+      else
+        COMMON_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      fi
+      
+      echo "Common resource group: $COMMON_RG"
+      
+      # Try to extract deterministic salt from common resources
+      echo "Scanning common RG for salt pattern..."
+      RESOURCE_NAMES=$(az resource list --resource-group "$COMMON_RG" --query "[].name" -o tsv 2>/dev/null || echo "")
+      
+      if [ -n "$RESOURCE_NAMES" ]; then
+        # Look for pattern like: anything-xxxxx-anything where xxxxx is 5 alphanumeric chars
+        while IFS= read -r resource_name; do
+          if [ -z "$resource_name" ]; then
+            continue
+          fi
+          
+          # Extract 5-char segments between hyphens
+          IFS='-' read -ra PARTS <<< "$resource_name"
+          for part in "${PARTS[@]}"; do
+            if [ ${#part} -eq 5 ]; then
+              # Check if it's alphanumeric lowercase
+              if echo "$part" | grep -qE '^[a-z0-9]{5}$'; then
+                DETERMINISTIC_SALT="$part"
+                echo "Found deterministic salt from common RG: $DETERMINISTIC_SALT"
+                break 2
+              fi
+            fi
+          done
+        done <<< "$RESOURCE_NAMES"
+      else
+        echo "Warning: Could not list resources in common RG"
+      fi
+      
+      # Extract salts from managed identity if it exists
+      MI_EXISTS="$(miPrjExists)"
+      echo "miPrjExists: $MI_EXISTS"
+      
+      if [ "$MI_EXISTS" = "true" ]; then
+        echo "Extracting salts from managed identity..."
+        
+        # Build project resource group name
+        PROJECT_NUM="$(project_number_000)"
+        PROJECT_NAME="prj${PROJECT_NUM}"
+        LOCATION_SUFFIX="$(admin_locationSuffix)"
+        ENV_NAME="$(dev_test_prod)"
+        AIF_SUFFIX="$(admin_aifactorySuffixRG)"
+        PROJECT_PREFIX="$(projectPrefix)"
+        PROJECT_SUFFIX="$(projectSuffix)"
+        COMMON_PREFIX="$(admin_aifactoryPrefixRG)"
+        
+        PROJECT_NAME_REPLACED="${PROJECT_NAME/prj/project}"
+        PROJECT_RG="${COMMON_PREFIX}${PROJECT_PREFIX}${PROJECT_NAME_REPLACED}-${LOCATION_SUFFIX}-${ENV_NAME}${AIF_SUFFIX}${PROJECT_SUFFIX}"
+        
+        MI_PREFIX="mi-${PROJECT_NAME}-${LOCATION_SUFFIX}-${ENV_NAME}"
+        
+        echo "Looking for MI with prefix: $MI_PREFIX"
+        echo "In resource group: $PROJECT_RG"
+        
+        MI_NAME=$(az resource list \
+          --resource-group "$PROJECT_RG" \
+          --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
+          --query "[?starts_with(name, '$MI_PREFIX')].name" \
+          -o tsv 2>/dev/null | head -n 1)
+        
+        if [ -n "$MI_NAME" ]; then
+          echo "Found managed identity: $MI_NAME"
+          
+          # Extract the last segment before the final suffix
+          # Expected format: mi-prj001-weu-dev-xxxxxxxxxxxxx-001
+          # Remove the last segment (suffix like -001)
+          MI_NO_SUFFIX="${MI_NAME%-*}"
+          # Get the last remaining segment (the salt)
+          SALT_SEGMENT="${MI_NO_SUFFIX##*-}"
+          
+          echo "Extracted salt segment: $SALT_SEGMENT (length: ${#SALT_SEGMENT})"
+          
+          # Expected format: 5 chars deterministic + 10 chars random = 15 total
+          SALT_LEN=${#SALT_SEGMENT}
+          if [ "$SALT_LEN" -ge 15 ]; then
+            # Extract first 5 chars for deterministic salt (if not already found)
+            if [ -z "$DETERMINISTIC_SALT" ]; then
+              DETERMINISTIC_SALT="${SALT_SEGMENT:0:5}"
+              echo "Extracted deterministic salt from MI: $DETERMINISTIC_SALT"
+            fi
+            # Extract next 10 chars for random salt
+            RANDOM_SALT="${SALT_SEGMENT:5:10}"
+            echo "Extracted random salt from MI: $RANDOM_SALT"
+          elif [ "$SALT_LEN" -ge 5 ]; then
+            echo "Warning: Salt segment shorter than expected (${SALT_LEN} chars)"
+            if [ -z "$DETERMINISTIC_SALT" ]; then
+              DETERMINISTIC_SALT="${SALT_SEGMENT:0:5}"
+              echo "Extracted deterministic salt from MI: $DETERMINISTIC_SALT"
+            fi
+            # Try to extract whatever random portion is available
+            if [ "$SALT_LEN" -gt 5 ]; then
+              REMAINING=$((SALT_LEN - 5))
+              RANDOM_SALT="${SALT_SEGMENT:5:$REMAINING}"
+              echo "Extracted partial random salt from MI: $RANDOM_SALT"
+            fi
+          else
+            echo "Warning: Salt segment too short (${SALT_LEN} chars, expected at least 5)"
+          fi
+        else
+          echo "Warning: Could not find managed identity with prefix: $MI_PREFIX"
+        fi
+      else
+        echo "Managed identity does not exist yet, skipping MI-based extraction"
+      fi
+      
+      # Set the pipeline variables
+      echo "##vso[task.setvariable variable=aifactory_salt]$DETERMINISTIC_SALT"
+      echo "##vso[task.setvariable variable=aifactory_salt_random]$RANDOM_SALT"
+      
+      echo "=== Salt extraction complete ==="
+      echo "aifactory_salt: ${DETERMINISTIC_SALT:-<not set>}"
+      echo "aifactory_salt_random: ${RANDOM_SALT:-<not set>}"
+      
+      if [ -z "$DETERMINISTIC_SALT" ]; then
+        echo "WARNING: aifactory_salt could not be determined"
+      fi
+      if [ -z "$RANDOM_SALT" ]; then
+        echo "WARNING: aifactory_salt_random could not be determined"
+      fi
+- task: AzureCLI@2
+  displayName: '05c_Validate Required Parameters'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      # List of required variables with their Azure DevOps variable references
+      declare -A required_vars=(
+        ["aiHubExists"]="$(aiHubExists)"
+        ["aifProjectExists"]="$(aifProjectExists)"
+        ["aiFoundryV2Exists"]="$(aiFoundryV2Exists)"
+        ["aiFoundryV2ProjectExists"]="$(aiFoundryV2ProjectExists)"
+        ["amlExists"]="$(amlExists)"
+        ["datafactoryExists"]="$(datafactoryExists)"
+        ["logicAppsExists"]="$(logicAppsExists)"
+        ["databricksExists"]="$(databricksExists)"
+        ["aksExists"]="$(aksExists)"
+        ["openaiExists"]="$(openaiExists)"
+        ["eventHubsExists"]="$(eventHubsExists)"
+        ["aiSearchExists"]="$(aiSearchExists)"
+        ["dashboardInsightsExists"]="$(dashboardInsightsExists)"
+        ["applicationInsightExists"]="$(applicationInsightExists)"
+        ["aiServicesExists"]="$(aiServicesExists)"
+        ["bingExists"]="$(bingExists)"
+        ["containerAppsEnvExists"]="$(containerAppsEnvExists)"
+        ["containerAppWExists"]="$(containerAppWExists)"
+        ["cosmosDBExists"]="$(cosmosDBExists)"
+        ["functionAppExists"]="$(functionAppExists)"
+        ["webAppExists"]="$(webAppExists)"
+        ["botServiceExists"]="$(botServiceExists)"
+        ["funcAppServicePlanExists"]="$(funcAppServicePlanExists)"
+        ["webAppServicePlanExists"]="$(webAppServicePlanExists)"
+        ["keyvaultExists"]="$(keyvaultExists)"
+        ["miACAExists"]="$(miACAExists)"
+        ["miPrjExists"]="$(miPrjExists)"
+        ["storageAccount1001Exists"]="$(storageAccount1001Exists)"
+        ["storageAccount2001Exists"]="$(storageAccount2001Exists)"
+        ["aifExists"]="$(aifExists)"
+        ["redisExists"]="$(redisExists)"
+        ["postgreSQLExists"]="$(postgreSQLExists)"
+        ["sqlServerExists"]="$(sqlServerExists)"
+        ["sqlDBExists"]="$(sqlDBExists)"
+        ["acrProjectExists"]="$(acrProjectExists)"
+        ["vmExists"]="$(vmExists)"
+        ["contentSafetyExists"]="$(contentSafetyExists)"
+        ["zoneazurecontainerappsExists"]="$(zoneazurecontainerappsExists)"
+        ["zoneredisExists"]="$(zoneredisExists)"
+        ["zonepostgresExists"]="$(zonepostgresExists)"
+        ["zonesqlExists"]="$(zonesqlExists)"
+        ["zoneMongoExists"]="$(zoneMongoExists)"
+        ["zoneServicesAiExists"]="$(zoneServicesAiExists)"
+        ["zoneAPIMExists"]="$(zoneAPIMExists)"
+        ["aifactory_salt_random"]="$(aifactory_salt_random)"
+      )
+
+      # Validate each variable
+      for var_name in "${!required_vars[@]}"; do
+        value="${required_vars[$var_name]}"
+        echo "Checking variable: $var_name, Value: $value"
+        if [ -z "$value" ] || [ "$value" = "\$(${var_name})" ]; then
+          if [ "$var_name" = "aifactory_salt_random" ]; then
+            echo "Warning: Variable $var_name is not set or empty  (It should be 10 characters), but continuing execution. aifactory_salt_random needs to be set if UPDATING an existing project - adding services. But not att init."
+          else
+            echo "Warning: Required variable $var_name is not set or empty."
+            exit 0
+          fi
+        fi
+      done
+
+      echo "All required parameters are set and valid."
+- task: AzureCLI@2
+  displayName: '04_Delete_Service_If_Not_Enabled_And_Exists'
+  condition: and(succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh'
+  env:
+    dev_test_prod_sub_id: $(dev_test_prod_sub_id)
+    admin_aifactoryPrefixRG: $(admin_aifactoryPrefixRG)
+    admin_aifactorySuffixRG: $(admin_aifactorySuffixRG)
+    admin_locationSuffix: $(admin_locationSuffix)
+    dev_test_prod: $(dev_test_prod)
+    project_number_000: $(project_number_000)
+    projectPrefix: $(projectPrefix)
+    projectSuffix: $(projectSuffix)
+    allowPublicAccessWhenBehindVnet: $(allowPublicAccessWhenBehindVnet)
+    enablePublicGenAIAccess: $(enablePublicGenAIAccess)
+    enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
+    deleteAllServicesForProject: $(deleteAllServicesForProject)
+    enableDeleteForDisabledResources: $(enableDeleteForDisabledResources)
+    enableAISearch: $(enableAISearch)
+    aiSearchExists: $(aiSearchExists)
+    addAISearch: $(addAISearch)
+    enableAFoundryCaphost: $(enableAFoundryCaphost)
+    enableAIFoundry: $(enableAIFoundry)
+    enableCosmosDB: $(enableCosmosDB)
+    cosmosDBExists: $(cosmosDBExists)
+    enableWebApp: $(enableWebApp)
+    webAppExists: $(webAppExists)
+    byoASEv3: $(byoASEv3)
+    enableFunction: $(enableFunction)
+    functionAppExists: $(functionAppExists)
+    enableContainerApps: $(enableContainerApps)
+    containerAppAExists: $(containerAppAExists)
+    containerAppWExists: $(containerAppWExists)
+    enableLogicApps: $(enableLogicApps)
+    logicAppsExists: $(logicAppsExists)
+    enableEventHubs: $(enableEventHubs)
+    eventHubsExists: $(eventHubsExists)
+    enablePostgreSQL: $(enablePostgreSQL)
+    postgreSQLExists: $(postgreSQLExists)
+    enableRedisCache: $(enableRedisCache)
+    redisExists: $(redisExists)
+    enableSQLDatabase: $(enableSQLDatabase)
+    sqlServerExists: $(sqlServerExists)
+    sqlDBExists: $(sqlDBExists)
+    enableDatabricks: $(enableDatabricks)
+    databricksExists: $(databricksExists)
+    enableAzureMachineLearning: $(enableAzureMachineLearning)
+    amlExists: $(amlExists)
+    enableAksForAzureML: $(enableAksForAzureML)
+    aksExists: $(aksExists)
+    enableDatafactory: $(enableDatafactory)
+    dataFactoryExists: $(dataFactoryExists)
+    enableBing: $(enableBing)
+    bingExists: $(bingExists)
+    enableAzureAIVision: $(enableAzureAIVision)
+    enableAzureSpeech: $(enableAzureSpeech)
+    enableAIDocIntelligence: $(enableAIDocIntelligence)
+    enableBingCustomSearch: $(enableBingCustomSearch)
+    containerAppsEnvExists: $(containerAppsEnvExists)
+    enableBotService: $(enableBotService)
+    botServiceExists: $(botServiceExists)
+    vmExists: $(vmExists)
+    acrProjectExists: $(acrProjectExists)
+    aiFoundryV2Exists: $(aiFoundryV2Exists)
+    aiHubExists: $(aiHubExists)
+    aifProjectExists: $(aifProjectExists)
+    aiServicesExists: $(aiServicesExists)
+    openaiExists: $(openaiExists)
+    enableAIFoundryHub: $(enableAIFoundryHub)
+    enableAIServices: $(enableAIServices)
+    enableAzureOpenAI: $(enableAzureOpenAI)
+    enableContentSafety: $(enableContentSafety)
+    contentSafetyExists: $(contentSafetyExists)
+- task: AzureCLI@2
+  displayName: '04_Purge_SoftDeleted'
+  # Runs after deletion (deleteAllServicesForProject=true OR enableDeleteForDisabledResources=true).
+  # Purges CognitiveServices-based resources (AI Foundry V2, OpenAI, AI Services) and AML workspaces
+  # that were deleted in the previous task and are now in soft-deleted state.
+  # Only attempts purge when the resource existed before deletion AND the enable flag is false.
+  # If a purge call fails the pipeline stops here (set -e) — Owner on subscription has purge rights.
+  condition: and(succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      set -e
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      echo "=== 04_Purge_SoftDeleted: sleeping 5 minutes to allow soft-delete to settle ==="
+      sleep 300
+
+      # Build resource names / resource group (same formula as task 05b / delete script)
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+      location="$(admin_location)"
+      subscription="$(dev_test_prod_sub_id)"
+      deleteAll="$(deleteAllServicesForProject)"
+
+      projectNameReplaced="${projectName/prj/project}"
+      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      echo "Project resource group: $projectResourceGroup"
+      echo "deleteAllServicesForProject: $deleteAll"
+
+      # ---------------------------------------------------------------
+      # Helper: purge a CognitiveServices account (AI Foundry V2, OpenAI, AI Services).
+      # Uses starts_with prefix matching because actual names have random suffixes
+      # (e.g. aif2 account → aif2x46jfec0, aiservices → aiservicesprj002sdcdev001).
+      # no_dash=$3: if "true", also filters out names containing '-' to distinguish
+      # the aif2 ACCOUNT (aif2x46jfec0, no dash) from PROJECTS (aif2-p002x46, has dash).
+      # If found but purge fails → set -e exits the pipeline.
+      # ---------------------------------------------------------------
+      purge_cognitive_service() {
+        local prefix="$1"
+        local rg="$2"
+        local no_dash="${3:-false}"
+        echo "--- Checking soft-deleted CognitiveServices with prefix: $prefix (rg=$rg)"
+
+        local actual_name
+        if [ "$no_dash" = "true" ]; then
+          actual_name=$(az cognitiveservices account list-deleted \
+            --subscription "$subscription" \
+            --query "[?starts_with(name, '$prefix') && resourceGroup=='$rg'].name" \
+            -o tsv 2>/dev/null | grep -v -- '-' | head -n1 || echo "")
+        else
+          actual_name=$(az cognitiveservices account list-deleted \
+            --subscription "$subscription" \
+            --query "[?starts_with(name, '$prefix') && resourceGroup=='$rg'].name" \
+            -o tsv 2>/dev/null | head -n1 || echo "")
+        fi
+
+        if [ -n "$actual_name" ]; then
+          echo "Found soft-deleted CognitiveServices: $actual_name. Purging..."
+          az cognitiveservices account purge \
+            --subscription "$subscription" \
+            --location "$location" \
+            --resource-group "$rg" \
+            --name "$actual_name"
+          echo "✅ Purged CognitiveServices account: $actual_name"
+        else
+          echo "ℹ️  No soft-deleted CognitiveServices found with prefix '$prefix' in rg '$rg' — skipping"
+        fi
+      }
+
+      # ---------------------------------------------------------------
+      # Helper: purge an AML/AI-Foundry-Hub workspace via forceToPurge REST call.
+      # AML soft-delete is opt-in; if the workspace is already gone (404) we skip.
+      # If the workspace IS in soft-deleted state and purge fails → set -e exits.
+      # ---------------------------------------------------------------
+      purge_aml_workspace() {
+        local name="$1"
+        local rg="$2"
+        echo "--- Checking soft-deleted AML workspace: $name"
+
+        local http_code
+        http_code=$(az rest \
+          --method get \
+          --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${rg}/providers/Microsoft.MachineLearningServices/workspaces/${name}?api-version=2024-04-01" \
+          --query "properties.provisioningState" -o tsv 2>/dev/null || echo "NotFound")
+
+        if [ "$http_code" = "SoftDeleted" ] || [ "$http_code" = "Deleting" ]; then
+          echo "Found in soft-deleted state ($http_code). Purging AML workspace: $name"
+          az rest \
+            --method delete \
+            --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${rg}/providers/Microsoft.MachineLearningServices/workspaces/${name}?api-version=2024-04-01&forceToPurge=true"
+          echo "✅ AML workspace purge initiated: $name"
+        else
+          echo "ℹ️  AML workspace $name not in soft-deleted state (state='$http_code') — skipping"
+        fi
+      }
+
+      # ---------------------------------------------------------------
+      # AML workspace
+      # Use actual name recorded by delete script (includes resource suffix like -001)
+      # ALL $(varName) reads below use ${VAR:-} to safely get empty string when unset.
+      # ---------------------------------------------------------------
+      amlExists="${amlExists:-false}"
+      enableAML="${enableAzureMachineLearning:-true}"
+      amlActualName="${amlActualName:-}"  # set via env: block; safe empty if delete task didn't fire
+      amlPrefixName="aml-${projectNumber}-${locationSuffix}-${envName}"
+      amlPurgeName="${amlActualName:-$amlPrefixName}"
+      if [ "$amlExists" = "true" ] && { [ "$enableAML" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+        purge_aml_workspace "$amlPurgeName" "$projectResourceGroup"
+      else
+        echo "Skipping AML purge (amlExists=$amlExists, enableAML=$enableAML)"
+      fi
+
+      # ---------------------------------------------------------------
+      # AI Foundry V1 Project (MachineLearningServices/workspaces kind=Project)
+      # Purge BEFORE the Hub (child workspace of Hub)
+      # Use actual name recorded by delete script (includes resource suffix like -001)
+      # ---------------------------------------------------------------
+      aifProjectExists="${aifProjectExists:-false}"
+      enableAIFoundryHubFlag="${enableAIFoundryHub:-false}"
+      aifProjectActualName="${aifProjectActualName:-}"  # set via env: block; safe empty if delete task didn't fire
+      aifProjectPrefixName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+      aifProjectPurgeName="${aifProjectActualName:-$aifProjectPrefixName}"
+      if [ "$aifProjectExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+        purge_aml_workspace "$aifProjectPurgeName" "$projectResourceGroup"
+      else
+        echo "Skipping AI Foundry V1 Project purge (aifProjectExists=$aifProjectExists, enableAIFoundryHub=$enableAIFoundryHubFlag)"
+      fi
+
+      # ---------------------------------------------------------------
+      # AI Foundry Hub (MachineLearningServices/workspaces kind=Hub)
+      # Use actual name recorded by delete script (includes resource suffix like -001)
+      # ---------------------------------------------------------------
+      aiHubExists="${aiHubExists:-false}"
+      aiHubActualName="${aiHubActualName:-}"  # set via env: block; safe empty if delete task didn't fire
+      aiHubPrefixName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+      aiHubPurgeName="${aiHubActualName:-$aiHubPrefixName}"
+      if [ "$aiHubExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+        purge_aml_workspace "$aiHubPurgeName" "$projectResourceGroup"
+      else
+        echo "Skipping AI Foundry Hub purge (aiHubExists=$aiHubExists, enableAIFoundryHub=$enableAIFoundryHubFlag)"
+      fi
+
+      # ---------------------------------------------------------------
+      # AI Foundry V2 account (CognitiveServices/accounts)
+      # Account name format: aif2{uniqueInAIFenv}{randomValue} — no dashes, max 12 chars
+      # Use no_dash=true so the prefix 'aif2' does NOT accidentally match projects (aif2-p002x46)
+      # ---------------------------------------------------------------
+      aiFoundryV2Exists="${aiFoundryV2Exists:-false}"
+      enableAIFoundry="${enableAIFoundry:-true}"
+      if [ "$aiFoundryV2Exists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+        purge_cognitive_service "aif2" "$projectResourceGroup" "true"
+      else
+        echo "Skipping AI Foundry V2 purge (aiFoundryV2Exists=$aiFoundryV2Exists, enableAIFoundry=$enableAIFoundry)"
+      fi
+
+      # ---------------------------------------------------------------
+      # Azure OpenAI (CognitiveServices/accounts) — tied to AI Foundry lifecycle
+      # Name prefix: aoai-{projectName}-{locationSuffix}-{envName} (may have resource suffix)
+      # ---------------------------------------------------------------
+      openaiExists="${openaiExists:-false}"
+      openaiPrefix="aoai-${projectName}-${locationSuffix}-${envName}"
+      if [ "$openaiExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+        purge_cognitive_service "$openaiPrefix" "$projectResourceGroup"
+      else
+        echo "Skipping OpenAI purge (openaiExists=$openaiExists, enableAIFoundry=$enableAIFoundry)"
+      fi
+
+      # ---------------------------------------------------------------
+      # AI Services (CognitiveServices/accounts)
+      # Name prefix: aiservices{projectName}{locationSuffix}{envName} (may have resource suffix)
+      # ---------------------------------------------------------------
+      aiServicesExists="${aiServicesExists:-false}"
+      aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
+      if [ "$aiServicesExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+        purge_cognitive_service "$aiServicesPrefix" "$projectResourceGroup"
+      else
+        echo "Skipping AI Services purge (aiServicesExists=$aiServicesExists, enableAIFoundry=$enableAIFoundry)"
+      fi
+
+      echo "=== 04_Purge_SoftDeleted complete ==="
+  env:
+    # All variables that may be unset (set dynamically via ##vso[task.setvariable] in prior tasks,
+    # or simply not defined yet) are passed through env: so bash always gets a safe empty/default
+    # string instead of a bare $(varName) token that bash would try to execute as a command.
+    amlActualName: $(amlActualName)
+    aifProjectActualName: $(aifProjectActualName)
+    aiHubActualName: $(aiHubActualName)
+    amlExists: $(amlExists)
+    aifProjectExists: $(aifProjectExists)
+    aiHubExists: $(aiHubExists)
+    aiFoundryV2Exists: $(aiFoundryV2Exists)
+    openaiExists: $(openaiExists)
+    aiServicesExists: $(aiServicesExists)
+    enableAzureMachineLearning: $(enableAzureMachineLearning)
+    enableAIFoundryHub: $(enableAIFoundryHub)
+    enableAIFoundry: $(enableAIFoundry)
+- task: AzureCLI@2
+  displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -601,539 +1572,8 @@ steps:
       fi
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
-  displayName: '05a_Check if Private DNS Zones exist'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-
-      # Input parameters
-      # Use privDnsSubscription_param if available, otherwise use dev_test_prod_sub_id
-      PRIV_DNS_SUB_PARAM="$(privDnsSubscription_param)"
-      if [ -n "$PRIV_DNS_SUB_PARAM" ] && [ "$PRIV_DNS_SUB_PARAM" != "\$(privDnsSubscription_param)" ]; then
-        privDnsSubscription="$PRIV_DNS_SUB_PARAM"
-        echo "Using privDnsSubscription_param: $privDnsSubscription"
-      else
-        privDnsSubscription="$(dev_test_prod_sub_id)"
-        echo "Using dev_test_prod_sub_id for Private DNS subscription: $privDnsSubscription"
-      fi
-
-      az account set --subscription "$privDnsSubscription"
-      
-      # Use privDnsResourceGroup_param if available, otherwise construct the name
-      PRIV_DNS_RG_PARAM="$(privDnsResourceGroup_param)"
-      if [ -n "$PRIV_DNS_RG_PARAM" ] && [ "$PRIV_DNS_RG_PARAM" != "\$(privDnsResourceGroup_param)" ]; then
-        privDnsResourceGroupName="$PRIV_DNS_RG_PARAM"
-        echo "Using privDnsResourceGroup_param for Private DNS: $privDnsResourceGroupName"
-      else
-        privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-        echo "Using constructed Private DNS resource group name: $privDnsResourceGroupName"
-      fi
-      
-      location="$(admin_location)"
-
-      # Define key-value pairs for DNS Zones
-      declare -A dnsZones=(
-        [zoneazurecontainerapps]="privatelink.${location}.azurecontainerapps.io"
-        [zoneredis]="privatelink.redis.cache.windows.net"
-        [zonepostgres]="privatelink.postgres.database.azure.com"
-        [zonesql]="privatelink.database.windows.net"
-        [zoneMongo]="privatelink.mongo.cosmos.azure.com"
-        [zoneServicesAi]="privatelink.services.ai.azure.com"
-        [zoneAPIM]="privatelink.azure-api.net"
-      )
-
-      # Get vnet information for link checking
-      VNET_NAME="$(vnetNameFull_resolved)"
-      VNET_RG="$(vnetResourceGroup_resolved)"
-      VNET_SUBSCRIPTION="$(dev_test_prod_sub_id)"
-      
-      # Print variables for debugging before checking
-      echo "=== DNS Zone Check Configuration ==="
-      echo "Private DNS Subscription: $privDnsSubscription"
-      echo "Private DNS Resource Group: $privDnsResourceGroupName"
-      echo "Location: $location"
-      echo "VNet Name: $VNET_NAME"
-      echo "VNet Resource Group: $VNET_RG"
-      echo "===================================="
-
-      # Helper function to check if a Private DNS Zone exists (log VNet link status but don't fail on missing link)
-      dns_zone_and_link_exists() {
-        local subscription="$1"
-        local resourceGroup="$2"
-        local dnsZoneName="$3"
-        local vnetName="$4"
-        local vnetRg="$5"
-        local vnetSub="$6"
-
-        # Send debug output to stderr so it doesn't interfere with the return value
-        echo "Checking DNS Zone: $dnsZoneName in RG: $resourceGroup, Subscription: $subscription" >&2
-        
-        # Validate inputs
-        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
-          echo "  ⚠️  WARNING: VNet name or RG is empty. VNet Name: '$vnetName', VNet RG: '$vnetRg'" >&2
-          echo "  Falling back to zone-only check..." >&2
-        fi
-        
-        # First check if the DNS zone exists
-        local output
-        output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
-        local zone_status=$?
-
-        if [ $zone_status -ne 0 ]; then
-          echo "  ❌ DNS Zone not found" >&2
-          echo "  Error details: $output" >&2
-          echo "false"
-          return
-        fi
-        
-        echo "  ✅ DNS Zone found" >&2
-        
-        # If vnet parameters are missing, only check zone existence (legacy behavior)
-        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
-          echo "  ⚠️  Skipping VNet link check due to missing VNet parameters" >&2
-          echo "true"
-          return
-        fi
-        
-        # Now check if vnet link exists for this zone
-        echo "  🔍 Checking vnet links for zone..." >&2
-        echo "  VNet Full Name: $vnetName" >&2
-        echo "  VNet Resource Group: $vnetRg" >&2
-        
-        # Use the VNet's subscription (may differ from DNS subscription)
-        local vnet_full_id="/subscriptions/$vnetSub/resourceGroups/$vnetRg/providers/Microsoft.Network/virtualNetworks/$vnetName"
-        echo "  Expected VNet ID: $vnet_full_id" >&2
-        
-        # List all vnet links for this zone and check if our vnet is linked
-        local links_output
-        links_output=$(az network private-dns link vnet list --subscription "$subscription" --resource-group "$resourceGroup" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnet_full_id'].name" -o tsv 2>&1)
-        local links_status=$?
-        
-        echo "  VNet link query status: $links_status" >&2
-        echo "  VNet link query output: '$links_output'" >&2
-        
-        if [ $links_status -eq 0 ] && [ -n "$links_output" ]; then
-          echo "  ✅ VNet link EXISTS for this zone (link name: $links_output)" >&2
-        elif [ $links_status -eq 0 ]; then
-          echo "  ⚠️  Zone found but no VNet link to expected VNet" >&2
-        else
-          echo "  ⚠️  Unable to query VNet links (status $links_status); not failing zone existence" >&2
-          echo "  Raw output: $links_output" >&2
-        fi
-
-        # Per requirement: only zone absence should return false
-        echo "true"
-      }
-
-      # Check each DNS Zone and its vnet link
-      for key in "${!dnsZones[@]}"; do
-        dnsZoneName="${dnsZones[$key]}"
-        exists=$(dns_zone_and_link_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName" "$VNET_NAME" "$VNET_RG" "$VNET_SUBSCRIPTION")
-        echo "##vso[task.setvariable variable=${key}Exists]${exists}"
-        echo "Result - DNS Zone: $dnsZoneName, Zone and VNet Link Exists: $exists"
-      done
-- task: AzureCLI@2
-  displayName: '05b_Check if resource exists'
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-
-      az account set --subscription "$(dev_test_prod_sub_id)"
-
-      # Input parameters
-      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-      projectNumber="$(project_number_000)"
-      projectName="prj${projectNumber}"
-      locationSuffix="$(admin_locationSuffix)"
-      envName="$(dev_test_prod)"
-      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      # uniqueInAIFenv="$(aifactory_salt)" # not used in this script. fuzzy match is used instead.
-      resourceSuffix="$(admin_prjResourceSuffix)"
-      prjResourceSuffixNoDash="${resourceSuffix#-}"
-      twoNumbers="${resourceSuffix:2:2}"
-      
-      # Set project prefix and suffix from pipeline variables
-      projectPrefix="$(projectPrefix)"
-      projectSuffix="$(projectSuffix)"
-
-      # Construct resource group name
-      projectNameReplaced="${projectName/prj/project}"
-      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-
-      # Debug resource group construction
-      echo "=== RESOURCE GROUP CONSTRUCTION DEBUG ==="
-      echo "commonRGNamePrefix: '$commonRGNamePrefix'"
-      echo "projectPrefix: '$projectPrefix'"
-      echo "projectNameReplaced: '$projectNameReplaced'"
-      echo "locationSuffix: '$locationSuffix'"
-      echo "envName: '$envName'"
-      echo "aifactorySuffixRG: '$aifactorySuffixRG'"
-      echo "projectSuffix: '$projectSuffix'"
-      echo "Final targetResourceGroup: '$targetResourceGroup'"
-      echo "================================================"
-
-      # Check if target resource group exists
-      echo "Checking if resource group exists: $targetResourceGroup"
-      if ! az group show --name "$targetResourceGroup" &> /dev/null; then
-        echo "Resource group '$targetResourceGroup' does not exist."
-        return 1
-        
-        # Set all resource existence variables to false
-        echo "##vso[task.setvariable variable=aiHubExists]false"
-        echo "##vso[task.setvariable variable=aifProjectExists]false"
-        echo "##vso[task.setvariable variable=amlExists]false"
-        echo "##vso[task.setvariable variable=openaiExists]false"
-        echo "##vso[task.setvariable variable=aiSearchExists]false"
-        echo "##vso[task.setvariable variable=dashboardInsightsExists]false"
-        echo "##vso[task.setvariable variable=applicationInsightExists]false"
-        echo "##vso[task.setvariable variable=aiServicesExists]false"
-        echo "##vso[task.setvariable variable=bingExists]false"
-        echo "##vso[task.setvariable variable=containerAppsEnvExists]false"
-        echo "##vso[task.setvariable variable=containerAppAExists]false"
-        echo "##vso[task.setvariable variable=containerAppWExists]false"
-        echo "##vso[task.setvariable variable=cosmosDBExists]false"
-        echo "##vso[task.setvariable variable=functionAppExists]false"
-        echo "##vso[task.setvariable variable=webAppExists]false"
-        echo "##vso[task.setvariable variable=funcAppServicePlanExists]false"
-        echo "##vso[task.setvariable variable=webAppServicePlanExists]false"
-        echo "##vso[task.setvariable variable=keyvaultExists]false"
-        echo "##vso[task.setvariable variable=miACAExists]false"
-        echo "##vso[task.setvariable variable=miPrjExists]false"
-        echo "##vso[task.setvariable variable=storageAccount1001Exists]false"
-        echo "##vso[task.setvariable variable=storageAccount2001Exists]false"
-        echo "##vso[task.setvariable variable=aifExists]false"
-        echo "##vso[task.setvariable variable=redisExists]false"
-        echo "##vso[task.setvariable variable=postgreSQLExists]false"
-        echo "##vso[task.setvariable variable=sqlServerExists]false"
-        echo "##vso[task.setvariable variable=sqlDBExists]false"
-        echo "##vso[task.setvariable variable=acrProjectExists]false"
-        echo "##vso[task.setvariable variable=vmExists]false"
-        
-        exit 0
-      fi
-
-      echo "Resource group '$targetResourceGroup' exists. Proceeding with resource checks."
-
-      # Helper function for fuzzy resource existence check
-      resource_exists_fuzzy() {
-        local rg="$1"
-        local type="$2"
-        local prefix="$3"
-        local suffix="$4"
-
-        # Debug output for managed identity checks (send to stderr so it doesn't interfere with return value)
-        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
-          echo "DEBUG: Checking managed identity in RG: $rg" >&2
-          echo "DEBUG: Looking for prefix: $prefix" >&2
-        fi
-
-        # Run the az resource list command and capture its output and exit status
-        local output
-        # For managed identities and other resources with random salts, use more flexible matching
-        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
-          # For managed identities, only check prefix since they have random salts
-          output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix')]" 2>&1)
-          echo "DEBUG: Command executed: az resource list --resource-group '$rg' --resource-type '$type' --query \"[?starts_with(name, '$prefix')]\"" >&2
-        else
-          # For other resources, use the original logic
-          output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix') ]" 2>&1)
-        fi
-        local status=$?
-
-        # Debug output for managed identity checks (send to stderr)
-        if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
-          echo "DEBUG: Command status: $status" >&2
-          echo "DEBUG: Raw output: $output" >&2
-        fi
-
-        # Check if the command succeeded
-        if [ $status -ne 0 ]; then
-          echo "Error: Failed to list resources in resource group '$rg' with type '$type'." >&2
-          echo "Details: $output" >&2
-          return 1
-        fi
-
-        # Check if the resource exists
-        if echo "$output" | grep -q "$prefix"; then
-          if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
-            echo "DEBUG: Found managed identity matching prefix" >&2
-          fi
-          echo "true"
-        else
-          if [ "$type" = "Microsoft.ManagedIdentity/userAssignedIdentities" ]; then
-            echo "DEBUG: No managed identity found matching prefix" >&2
-          fi
-          echo "false"
-        fi
-      }
-
-      # Helper function for exact resource existence check
-      resource_exists_exact() {
-        local rg="$1"
-        local type="$2"
-        local name="$3"
-        if az resource show --resource-group "$rg" --name "$name" --resource-type "$type" &> /dev/null; then
-          echo "true"
-        else
-          echo "false"
-        fi
-      }
-
-      # ...existing code...
-
-      # Resource name variables
-      noSuffix=""
-      suffixStandard="${resourceSuffix}"
-      suffixStandardNoDash="${prjResourceSuffixNoDash}"
-      suffixStorage1=$(echo "1${prjResourceSuffixNoDash}${envName}" | tr -d '-')
-      suffixStorage2=$(echo "2${prjResourceSuffixNoDash}${envName}" | tr -d '-')
-      suffixAppServicePlan="${resourceSuffix}-plan"
-      suffixAcr="${prjResourceSuffixNoDash}"
-      suffixKeyvault="${twoNumbers}"
-
-      aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
-      aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
-      aiFoundryV2Name="aif2"
-      aiFoundryV2ProjectName="aif2-p${projectNumber}"
-
-      botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
-      dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
-      aksName="aks${projectNumber}-${locationSuffix}-${envName}"
-      amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
-      openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
-      safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
-      dashboardInsightsName="AIFactory${aifactorySuffixRG}-${projectName}-insights-${envName}"
-      applicationInsightName="ain-${projectName}-${locationSuffix}-${envName}"
-      aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
-      bingName="bing-${projectName}-${locationSuffix}-${envName}"
-      containerAppsEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
-      containerAppAName="aca-a-${projectName}${locationSuffix}${envName}"
-      containerAppWName="aca-w-${projectName}${locationSuffix}${envName}"
-      cosmosDBName="cosmos-${projectName}-${locationSuffix}-${envName}"
-      functionAppName="func-${projectName}-${locationSuffix}-${envName}"
-      webAppName="webapp-${projectName}-${locationSuffix}-${envName}"
-      funcAppServicePlanName="func-${projectName}-${locationSuffix}-${envName}"
-      webbAppServicePlanName="webapp-${projectName}-${locationSuffix}-${envName}"
-      keyvaultName="kv-p${projectNumber}-${locationSuffix}-${envName}"
-      miACAPrefix="mi-aca-${projectName}-${locationSuffix}-${envName}"
-      miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
-      storageAccount1001Name="sa${projectName}${locationSuffix}"
-      storageAccount2001Name="sa${projectName}${locationSuffix}"
-      aifName="aif-hub-${projectName}-${locationSuffix}-${envName}"
-      redisName="redis-${projectName}-${locationSuffix}-${envName}"
-      postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}"
-      sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
-      sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}"
-      acrProjectName="acr${projectName}genai${locationSuffix}"
-      vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
-      logicAppsName="adf-${projectNumber}-${locationSuffix}-${envName}"
-      eventHubsName="eh-${projectNumber}-${locationSuffix}-${envName}"
-      databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
-
-      # Check resources (fuzzy for those with randomSalt,unique, exact for others)
-      echo "##vso[task.setvariable variable=aiHubExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=aifProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$noSuffix")"
-      echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts/projects" "$aiFoundryV2ProjectName" "$noSuffix")"
-
-      echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Azure.Databricks/workspaces" "$databricksName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=botServiceExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=aksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=amlExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=openaiExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=aiSearchExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")"
-      echo "##vso[task.setvariable variable=dashboardInsightsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=applicationInsightExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=aiServicesExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")"
-      echo "##vso[task.setvariable variable=bingExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=containerAppsEnvExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=containerAppAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=containerAppWExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=cosmosDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDBName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=functionAppExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$functionAppName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=webAppExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$webAppName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=funcAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$funcAppServicePlanName" "$suffixAppServicePlan")"
-      echo "##vso[task.setvariable variable=webAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName" "$suffixAppServicePlan")"
-      echo "##vso[task.setvariable variable=keyvaultExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName" "$suffixKeyvault")"
-      echo "##vso[task.setvariable variable=miACAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix" "$suffixStandard")"
-      
-      # Debug output for managed identity check
-      echo "=== DEBUGGING MANAGED IDENTITY CHECK ==="
-      echo "Target Resource Group: $targetResourceGroup"
-      echo "MI Project Prefix: $miPrjPrefix"
-      echo "Suffix Standard: $suffixStandard"
-      echo "Looking for managed identity with prefix: $miPrjPrefix"
-      
-      # List all managed identities in the resource group for debugging
-      echo "=== ALL MANAGED IDENTITIES IN RESOURCE GROUP ==="
-      az resource list --resource-group "$targetResourceGroup" --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" --query "[].name" -o table || echo "Failed to list managed identities or none found"
-      
-      echo "##vso[task.setvariable variable=miPrjExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=storageAccount1001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
-      echo "##vso[task.setvariable variable=storageAccount2001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")"
-      echo "##vso[task.setvariable variable=aifExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=redisExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=postgreSQLExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=sqlServerExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "*")"
-      echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
-      echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
-
-      # Print variables for debugging
-      echo "Target Resource Group: $targetResourceGroup"
-      echo "Key Vault Name: $keyvaultName"
-- task: AzureCLI@2
-  displayName: '05c_Validate Required Parameters'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-      
-      # List of required variables with their Azure DevOps variable references
-      declare -A required_vars=(
-        ["aiHubExists"]="$(aiHubExists)"
-        ["aifProjectExists"]="$(aifProjectExists)"
-        ["aiFoundryV2Exists"]="$(aiFoundryV2Exists)"
-        ["aiFoundryV2ProjectExists"]="$(aiFoundryV2ProjectExists)"
-        ["amlExists"]="$(amlExists)"
-        ["datafactoryExists"]="$(datafactoryExists)"
-        ["logicAppsExists"]="$(logicAppsExists)"
-        ["databricksExists"]="$(databricksExists)"
-        ["aksExists"]="$(aksExists)"
-        ["openaiExists"]="$(openaiExists)"
-        ["eventHubsExists"]="$(eventHubsExists)"
-        ["aiSearchExists"]="$(aiSearchExists)"
-        ["dashboardInsightsExists"]="$(dashboardInsightsExists)"
-        ["applicationInsightExists"]="$(applicationInsightExists)"
-        ["aiServicesExists"]="$(aiServicesExists)"
-        ["bingExists"]="$(bingExists)"
-        ["containerAppsEnvExists"]="$(containerAppsEnvExists)"
-        ["containerAppWExists"]="$(containerAppWExists)"
-        ["cosmosDBExists"]="$(cosmosDBExists)"
-        ["functionAppExists"]="$(functionAppExists)"
-        ["webAppExists"]="$(webAppExists)"
-        ["botServiceExists"]="$(botServiceExists)"
-        ["funcAppServicePlanExists"]="$(funcAppServicePlanExists)"
-        ["webAppServicePlanExists"]="$(webAppServicePlanExists)"
-        ["keyvaultExists"]="$(keyvaultExists)"
-        ["miACAExists"]="$(miACAExists)"
-        ["miPrjExists"]="$(miPrjExists)"
-        ["storageAccount1001Exists"]="$(storageAccount1001Exists)"
-        ["storageAccount2001Exists"]="$(storageAccount2001Exists)"
-        ["aifExists"]="$(aifExists)"
-        ["redisExists"]="$(redisExists)"
-        ["postgreSQLExists"]="$(postgreSQLExists)"
-        ["sqlServerExists"]="$(sqlServerExists)"
-        ["sqlDBExists"]="$(sqlDBExists)"
-        ["acrProjectExists"]="$(acrProjectExists)"
-        ["vmExists"]="$(vmExists)"
-        ["zoneazurecontainerappsExists"]="$(zoneazurecontainerappsExists)"
-        ["zoneredisExists"]="$(zoneredisExists)"
-        ["zonepostgresExists"]="$(zonepostgresExists)"
-        ["zonesqlExists"]="$(zonesqlExists)"
-        ["zoneMongoExists"]="$(zoneMongoExists)"
-        ["zoneServicesAiExists"]="$(zoneServicesAiExists)"
-        ["zoneAPIMExists"]="$(zoneAPIMExists)"
-        ["aifactory_salt_random"]="$(aifactory_salt_random)"
-      )
-
-      # Validate each variable
-      for var_name in "${!required_vars[@]}"; do
-        value="${required_vars[$var_name]}"
-        echo "Checking variable: $var_name, Value: $value"
-        if [ -z "$value" ] || [ "$value" = "\$(${var_name})" ]; then
-          if [ "$var_name" = "aifactory_salt_random" ]; then
-            echo "Warning: Variable $var_name is not set or empty  (It should be 10 characters), but continuing execution. aifactory_salt_random needs to be set if UPDATING an existing project - adding services. But not att init."
-          else
-            echo "Warning: Required variable $var_name is not set or empty."
-            exit 0
-          fi
-        fi
-      done
-
-      echo "All required parameters are set and valid."
-
-- task: AzureCLI@2
-  displayName: '05d_Extract_and_set_aifactory_salt_random'
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-      
-      az account set --subscription "$(dev_test_prod_sub_id)"
-      
-      # Check if miPrjExists is true
-      miPrjExists="$(miPrjExists)"
-      echo "miPrjExists value: $miPrjExists"
-      
-      if [ "$miPrjExists" = "true" ]; then
-        echo "Managed Identity exists, extracting aifactory_salt_random..."
-        
-        # Input parameters
-        commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-        projectNumber="$(project_number_000)"
-        projectName="prj${projectNumber}"
-        locationSuffix="$(admin_locationSuffix)"
-        envName="$(dev_test_prod)"
-        aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-        miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
-        
-        # Set project prefix and suffix from pipeline variables
-        projectPrefix="$(projectPrefix)"
-        projectSuffix="$(projectSuffix)"
-        
-        # Construct resource group name
-        projectNameReplaced="${projectName/prj/project}"
-        targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-        
-        echo "Looking for managed identity with prefix: $miPrjPrefix"
-        echo "In resource group: $targetResourceGroup"
-        
-        # Find the managed identity resource
-        miResourceName=$(az resource list \
-          --resource-group "$targetResourceGroup" \
-          --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
-          --query "[?starts_with(name, '$miPrjPrefix')].name" \
-          --output tsv)
-        
-        if [ -n "$miResourceName" ]; then
-          echo "Found managed identity: $miResourceName"
-          
-          # Extract 10 characters starting from the end minus 4 characters
-          # Example: mi-prj001-eus2-dev-qoygyf7d0ac126c-001 -> f7d0ac126c
-          saltValue="${miResourceName: -14:10}"
-          
-          echo "Extracted salt value: $saltValue"
-          echo "##vso[task.setvariable variable=aifactory_salt_random]$saltValue"
-          
-        else
-          echo "Warning: Could not find managed identity resource with prefix '$miPrjPrefix'"
-          echo "##vso[task.setvariable variable=aifactory_salt_random]"
-        fi
-        
-      else
-        echo "miPrjExists is false, skipping salt extraction"
-        echo "##vso[task.setvariable variable=aifactory_salt_random]"
-      fi
-
-- task: AzureCLI@2
   displayName: 'Check and Delete Orphan Role Assignments'
-  condition: succeeded()
+  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1224,7 +1664,7 @@ steps:
 
 - task: AzureCLI@2
   displayName: '61-foundation'
-  condition: and(ne(variables['debug_disable_61_foundation'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1352,7 +1792,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '62-core-infrastructure'
-  condition: and(ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1363,6 +1803,14 @@ steps:
      echo "Generated admin password"
      
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
+     # so Bicep uses common_subnet_name (snet-esml-cmn-001) as fallback instead of
+     # the documentation example value (snet-dev-esml-cmn-001) from variables.yaml.
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-62-core-infrastructure" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -1382,7 +1830,7 @@ steps:
      --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters subnetCommon="$_subnet_common" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
@@ -1430,7 +1878,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '63-cognitive-services'
-  condition: and(succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1516,7 +1964,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '64-databases'
-  condition: and(succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1584,7 +2032,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '65-compute-services'
-  condition: and(ne(variables['debug_disable_65_compute_services'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_65_compute_services'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1663,13 +2111,20 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '66-ai-platform'
-  condition: and(ne(variables['debug_disable_66_ai_platform'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_66_ai_platform'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty strings for subnet names
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     _subnet_common_scoring="$(subnetCommonScoring)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; _subnet_common_scoring=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-66-ai-platform" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -1729,8 +2184,8 @@ steps:
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
-     --parameters subnetCommonScoring="$(subnetCommonScoring)" \
+     --parameters subnetCommon="$_subnet_common" \
+     --parameters subnetCommonScoring="$_subnet_common_scoring" \
      --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters projectPrefix="$(projectPrefix)" \
@@ -1743,7 +2198,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '67-data_ml_platform'
-  condition: and(ne(variables['debug_disable_67_data_ml_platform'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1816,7 +2271,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '68-integration'
-  condition: and(ne(variables['debug_disable_68_integration'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1871,11 +2326,12 @@ steps:
      --parameters enableBotService="$(enableBotService)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
      --parameters botServiceExists="$(botServiceExists)" \
+     --parameters botServiceSku="S1" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '99_check_acr_role_assignments'
-  condition: succeeded()
+  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1926,13 +2382,24 @@ steps:
      fi
 - task: AzureCLI@2
   displayName: '100-rbac-security'
-  condition: and(ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Compute effective RBAC flags: only true if the feature is enabled AND the resource
+     # actually exists. This prevents RBAC Bicep from failing with ResourceNotFound when
+     # a service is enabled in variables but was never deployed (e.g. debug_disable_67=true).
+     AML_RBAC="false"
+     if [ "$(enableAzureMachineLearning)" = "true" ] && [ "$(amlExists)" = "true" ]; then AML_RBAC="true"; fi
+     AKS_RBAC_EXISTS="$(aksExists)"
+     if [ "$(enableAksForAzureML)" != "true" ]; then AKS_RBAC_EXISTS="false"; fi
+     echo "Effective enableAzureMachineLearning for RBAC: $AML_RBAC (amlExists=$(amlExists))"
+     echo "Effective aksExists for RBAC: $AKS_RBAC_EXISTS"
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-100-rbac-security" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -1963,7 +2430,7 @@ steps:
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
+     --parameters enableAzureMachineLearning="$AML_RBAC" \
      --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
      --parameters addAIFoundryHub="$(addAIFoundryHub)" \
      --parameters enableAIServices="$(enableAIServices)" \
@@ -1995,7 +2462,7 @@ steps:
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
      --parameters dataFactoryExists="$(dataFactoryExists)" \
-     --parameters aksExists="$(aksExists)" \
+     --parameters aksExists="$AKS_RBAC_EXISTS" \
      --parameters amlExists="$(amlExists)" \
      --parameters aiHubExists="$(aiHubExists)" \
      --parameters aiServicesExists="$(aiServicesExists)" \
@@ -2009,7 +2476,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025-1stOption'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), or(eq(variables['foundryDeploymentType'], '1'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), or(eq(variables['foundryDeploymentType'], '1'), eq(variables['foundryDeploymentType'], '3')))
   # continueOnError: true
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -2063,13 +2530,19 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(canceled()), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(canceled()), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-a" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -2109,7 +2582,7 @@ steps:
      --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters subnetCommon="$_subnet_common" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
@@ -2152,7 +2625,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-Rehydrate'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2163,13 +2636,19 @@ steps:
      sleep 15
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
-  condition: and(ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
+     _BYO="$(BYO_subnets)"
+     _subnet_common="$(subnetCommon)"
+     if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-b" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -2210,7 +2689,7 @@ steps:
      --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
      --parameters network_env="$(network_env)" \
      --parameters common_subnet_name="$(common_subnet_name)" \
-     --parameters subnetCommon="$(subnetCommon)" \
+     --parameters subnetCommon="$_subnet_common" \
      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
@@ -2251,17 +2730,19 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '100b_create_foundry_agent'
-  condition: and(succeeded(), eq(variables['enableAIFoundry'], 'true'))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-     set -euo pipefail
-
+     set -e
+     
      az account set --subscription "$(dev_test_prod_sub_id)"
-
-     # Try to discover the Foundry account (prefers existing matching aif2 prefix)
+     
+     echo "=== AI Foundry Agent Creation ==="
+     
+     # Build resource group name
      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
      projectNumber="$(project_number_000)"
      projectName="prj${projectNumber}"
@@ -2273,87 +2754,144 @@ steps:
      projectSuffix="$(projectSuffix)"
      projectNameReplaced="${projectName/prj/project}"
      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-
-     # First try to find the account in the project resource group
-     foundry_info=$(az cognitiveservices account list --subscription "$(dev_test_prod_sub_id)" --resource-group "$projectResourceGroup" --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].[name,resourceGroup]" -o tsv)
-     foundry_name=$(echo "$foundry_info" | head -n1 | awk '{print $1}')
-     foundry_rg=$(echo "$foundry_info" | head -n1 | awk '{print $2}')
-
-     # Fallback: search across the subscription
-     if [ -z "$foundry_name" ] || [ -z "$foundry_rg" ]; then
-       foundry_info=$(az cognitiveservices account list --subscription "$(dev_test_prod_sub_id)" --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].[name,resourceGroup]" -o tsv)
-       foundry_name=$(echo "$foundry_info" | head -n1 | awk '{print $1}')
-       foundry_rg=$(echo "$foundry_info" | head -n1 | awk '{print $2}')
-     fi
-
-     if [ -z "$foundry_name" ] || [ -z "$foundry_rg" ]; then
-       # Compute the expected Foundry name following bicep logic (uses project RG for uniqueString)
-       randomValue="$(deployment_random_value)"
-       aifactorySalt10="$(aifactory_salt_random)"
-
-       rgId="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}"
-       uniqueInAIFenv=$(python -c "import hashlib; rid='${rgId}'; print(hashlib.md5(rid.encode()).hexdigest()[:5])")
-
-       if [ -z "$aifactorySalt10" ] || [ ${#aifactorySalt10} -le 5 ]; then
-         randomSalt=$(echo "$randomValue" | cut -c1-10)
-       else
-         randomSalt="$aifactorySalt10"
-       fi
-
-       rawName="aif2${uniqueInAIFenv}${randomSalt}"
-       rawNameClean=$(echo "$rawName" | tr '[:upper:]' '[:lower:]' | tr -d '-')
-       foundry_name=$(echo "$rawNameClean" | cut -c1-12)
-       foundry_rg="$projectResourceGroup"
-     fi
-
-     if [ -z "$foundry_name" ] || [ -z "$foundry_rg" ]; then
-       echo "Could not resolve Foundry account name or resource group; skipping agent creation."
+     
+     echo "Target resource group: $projectResourceGroup"
+     
+     # Find the AI Foundry account (aif2* but not aif2-p*)
+     echo "Searching for AI Foundry account..."
+     foundry_account=$(az cognitiveservices account list \
+       --subscription "$(dev_test_prod_sub_id)" \
+       --resource-group "$projectResourceGroup" \
+       --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].{name:name, id:id}" \
+       -o json | jq -r '.[0]')
+     
+     if [ "$foundry_account" = "null" ] || [ -z "$foundry_account" ]; then
+       echo "❌ No AI Foundry account found in resource group. Skipping agent creation."
        exit 0
      fi
-
-     echo "Using Foundry account: $foundry_name in RG: $foundry_rg"
-
-     endpoint=$(az cognitiveservices account show --name "$foundry_name" --resource-group "$foundry_rg" --query properties.endpoint -o tsv)
-     if [ -z "$endpoint" ]; then
-       echo "Failed to resolve endpoint for Foundry; skipping agent creation."
-       exit 0
-     fi
-
-     # Resolve managed identity (mi-prj*) client ID from the project resource group for AAD auth
-     miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
-     mi_name=$(az identity list --resource-group "$projectResourceGroup" --query "[?starts_with(name, '$miPrjPrefix')].name" -o tsv | head -n1)
-     if [ -n "$mi_name" ]; then
-       mi_client_id=$(az identity show --resource-group "$projectResourceGroup" --name "$mi_name" --query clientId -o tsv)
-       if [ -n "$mi_client_id" ]; then
-         export AZURE_CLIENT_ID="$mi_client_id"
-         echo "Using managed identity clientId: $mi_client_id for token acquisition"
-       else
-         echo "Managed identity found ($mi_name) but clientId empty; continuing with current principal"
+     
+     account_name=$(echo "$foundry_account" | jq -r '.name')
+     account_id=$(echo "$foundry_account" | jq -r '.id')
+     
+     echo "✅ Found AI Foundry account: $account_name"
+     
+     # Find the AI Foundry project (aif2-p*)
+     echo "Searching for AI Foundry project..."
+     
+     # Projects are sub-resources of the account - query via REST API
+     project_list=$(az rest \
+       --method GET \
+       --url "https://management.azure.com${account_id}/aiServicesProjects?api-version=2024-04-01-preview" \
+       --query "value[?starts_with(name, 'aif2-p${projectNumber}')].{name:name, id:id, endpoint:properties.discoveryUrl}" \
+       -o json 2>/dev/null || echo "[]")
+     
+     project_info=$(echo "$project_list" | jq -r '.[0]')
+     
+     if [ "$project_info" = "null" ] || [ -z "$project_info" ]; then
+       echo "⚠️  No AI Foundry project found for project ${projectNumber}. Trying alternative approach..."
+       
+       # Alternative: List all projects and filter
+       project_list=$(az rest \
+         --method GET \
+         --url "https://management.azure.com${account_id}/aiServicesProjects?api-version=2024-04-01-preview" \
+         --query "value[].{name:name, id:id, endpoint:properties.discoveryUrl}" \
+         -o json 2>/dev/null || echo "[]")
+       
+       project_info=$(echo "$project_list" | jq -r '.[0]')
+       
+       if [ "$project_info" = "null" ] || [ -z "$project_info" ]; then
+         echo "❌ No AI Foundry projects found. Agent creation requires a project. Skipping."
+         exit 0
        fi
+     fi
+     
+     project_name=$(echo "$project_info" | jq -r '.name')
+     project_id=$(echo "$project_info" | jq -r '.id')
+     project_endpoint=$(echo "$project_info" | jq -r '.endpoint // empty')
+     
+     echo "✅ Found AI Foundry project: $project_name"
+     
+     # If no discovery URL, construct from account endpoint
+     if [ -z "$project_endpoint" ] || [ "$project_endpoint" = "null" ]; then
+       account_endpoint=$(az cognitiveservices account show \
+         --name "$account_name" \
+         --resource-group "$projectResourceGroup" \
+         --query "properties.endpoint" -o tsv)
+       
+       # Remove trailing slash from account endpoint
+       account_endpoint=$(echo "$account_endpoint" | sed 's:/*$::')
+       
+       # Construct project endpoint
+       project_endpoint="${account_endpoint}/projects/${project_name}"
+       echo "Constructed project endpoint: $project_endpoint"
      else
-       echo "No managed identity with prefix $miPrjPrefix found; continuing with current principal"
+       echo "Using project discovery endpoint: $project_endpoint"
      fi
-
-     access_token=$(az account get-access-token --resource https://cognitiveservices.azure.com/ --query accessToken -o tsv)
-
+     
+     # Get access token
+     echo "Acquiring access token..."
+     access_token=$(az account get-access-token \
+       --resource https://cognitiveservices.azure.com/ \
+       --query accessToken -o tsv)
+     
      if [ -z "$access_token" ]; then
-       echo "Failed to acquire access token for Foundry; skipping agent creation."
+       echo "❌ Failed to acquire access token. Skipping agent creation."
        exit 0
      fi
-
-     payload='{"name":"agent-001","model":"gpt-4o-mini","description":"Created by pipeline","metadata":{"source":"ado-pipeline"}}'
-
-     echo "Creating Foundry agent 'agent-001' via Agents/Activity Protocol API..."
-       response=$(curl -sS -X POST "$endpoint/openai/agents?api-version=2024-10-01-preview" \
+     
+     # Try to create agent with correct project-scoped endpoint
+     echo "Creating agent 'agent-001' in project..."
+     
+     payload='{"name":"agent-001","model":"gpt-4o-mini","description":"Pipeline-created agent","instructions":"You are a helpful AI assistant.","metadata":{"source":"ado-pipeline"}}'
+     
+     # Try multiple API versions and paths
+     api_versions=("2024-10-01-preview" "2024-07-01-preview" "2024-05-01-preview")
+     agent_created=false
+     
+     for api_version in "${api_versions[@]}"; do
+       echo "Attempting with API version: $api_version"
+       
+       # Remove trailing slash and construct proper URL
+       base_url=$(echo "$project_endpoint" | sed 's:/*$::')
+       agent_url="${base_url}/agents?api-version=${api_version}"
+       
+       echo "POST URL: $agent_url"
+       
+       response=$(curl -sS -w "\nHTTP_STATUS:%{http_code}" -X POST "$agent_url" \
          -H "Content-Type: application/json" \
          -H "Authorization: Bearer $access_token" \
-         -d "$payload")
-
-     echo "Agent create response: $response"
-     echo "##vso[task.setvariable variable=foundryAgentCreated]true"
+         -d "$payload" 2>&1 || echo "CURL_ERROR")
+       
+       http_status=$(echo "$response" | grep "HTTP_STATUS" | cut -d: -f2)
+       response_body=$(echo "$response" | sed '/HTTP_STATUS/d')
+       
+       echo "Response (HTTP $http_status): $response_body"
+       
+       if [ "$http_status" = "200" ] || [ "$http_status" = "201" ]; then
+         echo "✅ Agent created successfully!"
+         agent_created=true
+         echo "##vso[task.setvariable variable=foundryAgentCreated]true"
+         break
+       elif [ "$http_status" = "409" ]; then
+         echo "ℹ️  Agent already exists (409 Conflict)"
+         agent_created=true
+         echo "##vso[task.setvariable variable=foundryAgentCreated]true"
+         break
+       else
+         echo "⚠️  Attempt failed with API version $api_version"
+       fi
+     done
+     
+     if [ "$agent_created" = false ]; then
+       echo "❌ Failed to create agent with all attempted API versions."
+       echo "This may require using Azure AI Foundry SDK or portal to create agents."
+       echo "##vso[task.setvariable variable=foundryAgentCreated]false"
+     fi
+     
+     echo "=== Agent creation task completed ==="
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'
-  condition: succeeded()
+  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

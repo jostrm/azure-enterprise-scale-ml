@@ -26,7 +26,7 @@ jobs:
       dev_test_prod: dev
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.DEV_NETWORK_ENV || vars.NETWORK_ENV || 'dev' }}"
-      cidr_range: "${{ vars.DEV_CIDR_RANGE }}"
+      cidr_range: "${{ vars.CIDR_RANGE }}"
       admin_location: "${{ vars.AIFACTORY_LOCATION }}"
       admin_locationSuffix: "${{ vars.AIFACTORY_LOCATION_SHORT }}"
       admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"
@@ -38,7 +38,7 @@ jobs:
       admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
       admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
       tenantId: "${{ secrets.TENANT_ID }}"
-      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}"
+      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
       technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
       technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
       useAdGroups: "${{ vars.USE_AD_GROUPS }}"
@@ -47,25 +47,25 @@ jobs:
       tags: "${{ vars.TAGS }}"
       runNetworkingVar: "${{ vars.RUN_JOB1_NETWORKING || 'true' }}"
       BYO_subnets: "${{ vars.BYO_SUBNETS || 'false' }}"
-      vnetNameBase: "${{ vars.VNET_NAME_BASE }}"
-      vnetResourceGroupBase: "${{ vars.VNET_RESOURCE_GROUP_BASE }}"
-      common_subnet_name: "${{ vars.COMMON_SUBNET_NAME }}"
+      vnetNameBase: "${{ vars.VNET_NAME_BASE || 'vnt-esmlcmn' }}"
+      vnetResourceGroupBase: "${{ vars.VNET_RESOURCE_GROUP_BASE || 'esml-common' }}"
+      common_subnet_name: "${{ vars.COMMON_SUBNET_NAME || vars.SUBNET_COMMON_BASE || 'snet-esml-cmn-001' }}"
       common_vnet_cidr: "${{ vars.COMMON_VNET_CIDR }}"
       common_subnet_cidr: "${{ vars.COMMON_SUBNET_CIDR }}"
       common_subnet_scoring_cidr: "${{ vars.COMMON_SUBNET_SCORING_CIDR }}"
       common_pbi_subnet_name: "${{ vars.COMMON_PBI_SUBNET_NAME }}"
       common_pbi_subnet_cidr: "${{ vars.COMMON_PBI_SUBNET_CIDR }}"
-      common_bastion_subnet_name: "${{ vars.COMMON_BASTION_SUBNET_NAME }}"
+      common_bastion_subnet_name: "AzureBastionSubnet"
       common_bastion_subnet_cidr: "${{ vars.COMMON_BASTION_SUBNET_CIDR }}"
-      vnetResourceGroup_param: "${{ vars.DEV_BYO_VNET_RG || vars.VNET_RESOURCE_GROUP_PARAM }}"
-      vnetNameFull_param: "${{ vars.DEV_BYO_VNET_NAME || vars.VNET_NAME_FULL_PARAM }}"
+      vnetResourceGroup_param: "${{ vars.VNET_RESOURCE_GROUP_PARAM || '' }}"
+      vnetNameFull_param: "${{ vars.VNET_NAME_FULL_PARAM || '' }}"
       commonResourceGroup_param: "${{ vars.COMMON_RESOURCE_GROUP_PARAM }}"
       datalakeName_param: "${{ vars.DATALAKE_NAME_PARAM }}"
       kvNameFromCOMMON_param: "${{ vars.KV_NAME_FROM_COMMON_PARAM }}"
       useCommonACR_override: "${{ vars.USE_COMMON_ACR_OVERRIDE }}"
-      subnetCommon: "${{ vars.SUBNET_COMMON }}"
-      subnetCommonScoring: "${{ vars.SUBNET_COMMON_SCORING }}"
-      subnetCommonPowerbiGw: "${{ vars.SUBNET_COMMON_POWERBI_GW }}"
+      subnetCommon: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON || '' }}"
+      subnetCommonScoring: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON_SCORING || '' }}"
+      subnetCommonPowerbiGw: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON_POWERBI_GW || '' }}"
       subnetProjGenAI: "${{ vars.SUBNET_PROJ_GENAI }}"
       subnetProjAKS: "${{ vars.SUBNET_PROJ_AKS }}"
       subnetProjACA: "${{ vars.SUBNET_PROJ_ACA }}"
@@ -89,7 +89,7 @@ jobs:
       enableDatafactoryCommon: "${{ vars.ENABLE_DATAFACTORY_COMMON || 'false' }}"
       acr_adminUserEnabled: "${{ vars.ACR_ADMIN_USER_ENABLED }}"
       acr_dedicated: "${{ vars.ACR_DEDICATED }}"
-      acr_SKU: "${{ vars.ACR_SKU }}"
+      acr_SKU: "${{ vars.ACR_SKU || 'Premium' }}"
       enablePublicAccessWithPerimeter: "${{ vars.ENABLE_PUBLIC_ACCESS_WITH_PERIMETER }}"
       admin_hybridBenefit: "${{ vars.ADMIN_HYBRID_BENEFIT }}"
       commonLakeNamePrefixMax8chars: "${{ vars.COMMON_LAKE_NAME_PREFIX_MAX8CHARS }}"
@@ -184,6 +184,24 @@ jobs:
             --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
             --debug
 
+      - name: Debug networking inputs (before 02)
+        shell: pwsh
+        run: |
+          $keys = @(
+            'dev_test_prod','dev_test_prod_sub_id','admin_location','admin_locationSuffix','admin_commonResourceSuffix',
+            'vnetNameBase','vnetResourceGroupBase','common_subnet_name','common_vnet_cidr','common_subnet_cidr','common_subnet_scoring_cidr',
+            'common_pbi_subnet_name','common_pbi_subnet_cidr','common_bastion_subnet_cidr',
+            'vnetResourceGroup_param','vnetNameFull_param','commonResourceGroup_param','datalakeName_param','kvNameFromCOMMON_param',
+            'useCommonACR_override','subnetCommon','subnetCommonScoring','subnetCommonPowerbiGw',
+            'subnetProjGenAI','subnetProjAKS','subnetProjACA','subnetProjDatabricksPublic','subnetProjDatabricksPrivate',
+            'byoASEv3','byoAseFullResourceId','byoAseAppServicePlanResourceId',
+            'network_env','cidr_range','BYO_subnets','runNetworkingVar','technical_admins_bastion_IP_whitelist'
+          )
+          foreach ($k in $keys) {
+            $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+            Write-Host "$k=$v"
+          }
+
       - name: 02_az_bicep_private_networking
         if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
         shell: bash
@@ -225,7 +243,7 @@ jobs:
             --parameters common_subnet_scoring_cidr="${{ env.common_subnet_scoring_cidr }}" \
             --parameters common_pbi_subnet_name="${{ env.common_pbi_subnet_name }}" \
             --parameters common_pbi_subnet_cidr="${{ env.common_pbi_subnet_cidr }}" \
-            --parameters common_bastion_subnet_name="${{ env.common_bastion_subnet_name }}" \
+            --parameters common_bastion_subnet_name="AzureBastionSubnet" \
             --parameters common_bastion_subnet_cidr="${{ env.common_bastion_subnet_cidr }}" \
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
@@ -286,9 +304,6 @@ jobs:
             --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
             --parameters cmk="${{ env.cmk }}" \
             --parameters cmkKeyName="${{ env.cmkKeyName }}" \
-            --parameters admin_bicep_kv_fw="${{ env.admin_bicep_kv_fw }}" \
-            --parameters admin_bicep_kv_fw_rg="${{ env.admin_bicep_kv_fw_rg }}" \
-            --parameters admin_bicep_input_keyvault_subscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
             --parameters inputCommonSPIDKey="${{ env.inputCommonSPIDKey }}" \
             --parameters inputCommonSPSecretKey="${{ env.inputCommonSPSecretKey }}" \
             --parameters commonServicePrincipleOIDKey="${{ env.commonServicePrincipleOIDKey }}" \
@@ -316,7 +331,7 @@ jobs:
       dev_test_prod: test
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test' }}"
-      cidr_range: "${{ vars.STAGE_CIDR_RANGE }}"
+      cidr_range: "${{ vars.CIDR_RANGE }}"
       admin_location: "${{ vars.AIFACTORY_LOCATION }}"
       admin_locationSuffix: "${{ vars.AIFACTORY_LOCATION_SHORT }}"
       admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"
@@ -328,7 +343,7 @@ jobs:
       admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
       admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
       tenantId: "${{ secrets.TENANT_ID }}"
-      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}"
+      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
       technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
       technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
       useAdGroups: "${{ vars.USE_AD_GROUPS }}"
@@ -337,25 +352,25 @@ jobs:
       tags: "${{ vars.TAGS }}"
       runNetworkingVar: "${{ vars.RUN_JOB1_NETWORKING || 'true' }}"
       BYO_subnets: "${{ vars.BYO_SUBNETS || 'false' }}"
-      vnetNameBase: "${{ vars.VNET_NAME_BASE }}"
-      vnetResourceGroupBase: "${{ vars.VNET_RESOURCE_GROUP_BASE }}"
-      common_subnet_name: "${{ vars.COMMON_SUBNET_NAME }}"
+      vnetNameBase: "${{ vars.VNET_NAME_BASE || 'vnt-esmlcmn' }}"
+      vnetResourceGroupBase: "${{ vars.VNET_RESOURCE_GROUP_BASE || 'esml-common' }}"
+      common_subnet_name: "${{ vars.COMMON_SUBNET_NAME || vars.SUBNET_COMMON_BASE || 'snet-esml-cmn-001' }}"
       common_vnet_cidr: "${{ vars.COMMON_VNET_CIDR }}"
       common_subnet_cidr: "${{ vars.COMMON_SUBNET_CIDR }}"
       common_subnet_scoring_cidr: "${{ vars.COMMON_SUBNET_SCORING_CIDR }}"
       common_pbi_subnet_name: "${{ vars.COMMON_PBI_SUBNET_NAME }}"
       common_pbi_subnet_cidr: "${{ vars.COMMON_PBI_SUBNET_CIDR }}"
-      common_bastion_subnet_name: "${{ vars.COMMON_BASTION_SUBNET_NAME }}"
+      common_bastion_subnet_name: "AzureBastionSubnet"
       common_bastion_subnet_cidr: "${{ vars.COMMON_BASTION_SUBNET_CIDR }}"
-      vnetResourceGroup_param: "${{ vars.STAGE_BYO_VNET_RG || vars.VNET_RESOURCE_GROUP_PARAM }}"
-      vnetNameFull_param: "${{ vars.STAGE_BYO_VNET_NAME || vars.VNET_NAME_FULL_PARAM }}"
+      vnetResourceGroup_param: "${{ vars.VNET_RESOURCE_GROUP_PARAM || '' }}"
+      vnetNameFull_param: "${{ vars.VNET_NAME_FULL_PARAM || '' }}"
       commonResourceGroup_param: "${{ vars.COMMON_RESOURCE_GROUP_PARAM }}"
       datalakeName_param: "${{ vars.DATALAKE_NAME_PARAM }}"
       kvNameFromCOMMON_param: "${{ vars.KV_NAME_FROM_COMMON_PARAM }}"
       useCommonACR_override: "${{ vars.USE_COMMON_ACR_OVERRIDE }}"
-      subnetCommon: "${{ vars.SUBNET_COMMON }}"
-      subnetCommonScoring: "${{ vars.SUBNET_COMMON_SCORING }}"
-      subnetCommonPowerbiGw: "${{ vars.SUBNET_COMMON_POWERBI_GW }}"
+      subnetCommon: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON || '' }}"
+      subnetCommonScoring: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON_SCORING || '' }}"
+      subnetCommonPowerbiGw: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON_POWERBI_GW || '' }}"
       subnetProjGenAI: "${{ vars.SUBNET_PROJ_GENAI }}"
       subnetProjAKS: "${{ vars.SUBNET_PROJ_AKS }}"
       subnetProjACA: "${{ vars.SUBNET_PROJ_ACA }}"
@@ -379,7 +394,7 @@ jobs:
       enableDatafactoryCommon: "${{ vars.ENABLE_DATAFACTORY_COMMON || 'false' }}"
       acr_adminUserEnabled: "${{ vars.ACR_ADMIN_USER_ENABLED }}"
       acr_dedicated: "${{ vars.ACR_DEDICATED }}"
-      acr_SKU: "${{ vars.ACR_SKU }}"
+      acr_SKU: "${{ vars.ACR_SKU || 'Premium' }}"
       enablePublicAccessWithPerimeter: "${{ vars.ENABLE_PUBLIC_ACCESS_WITH_PERIMETER }}"
       admin_hybridBenefit: "${{ vars.ADMIN_HYBRID_BENEFIT }}"
       commonLakeNamePrefixMax8chars: "${{ vars.COMMON_LAKE_NAME_PREFIX_MAX8CHARS }}"
@@ -471,6 +486,24 @@ jobs:
             --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
             --debug
 
+      - name: Debug networking inputs (before 02)
+        shell: pwsh
+        run: |
+          $keys = @(
+            'dev_test_prod','dev_test_prod_sub_id','admin_location','admin_locationSuffix','admin_commonResourceSuffix',
+            'vnetNameBase','vnetResourceGroupBase','common_subnet_name','common_vnet_cidr','common_subnet_cidr','common_subnet_scoring_cidr',
+            'common_pbi_subnet_name','common_pbi_subnet_cidr','common_bastion_subnet_cidr',
+            'vnetResourceGroup_param','vnetNameFull_param','commonResourceGroup_param','datalakeName_param','kvNameFromCOMMON_param',
+            'useCommonACR_override','subnetCommon','subnetCommonScoring','subnetCommonPowerbiGw',
+            'subnetProjGenAI','subnetProjAKS','subnetProjACA','subnetProjDatabricksPublic','subnetProjDatabricksPrivate',
+            'byoASEv3','byoAseFullResourceId','byoAseAppServicePlanResourceId',
+            'network_env','cidr_range','BYO_subnets','runNetworkingVar','technical_admins_bastion_IP_whitelist'
+          )
+          foreach ($k in $keys) {
+            $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+            Write-Host "$k=$v"
+          }
+
       - name: 02_az_bicep_private_networking
         if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
         shell: bash
@@ -512,7 +545,7 @@ jobs:
             --parameters common_subnet_scoring_cidr="${{ env.common_subnet_scoring_cidr }}" \
             --parameters common_pbi_subnet_name="${{ env.common_pbi_subnet_name }}" \
             --parameters common_pbi_subnet_cidr="${{ env.common_pbi_subnet_cidr }}" \
-            --parameters common_bastion_subnet_name="${{ env.common_bastion_subnet_name }}" \
+            --parameters common_bastion_subnet_name="AzureBastionSubnet" \ 
             --parameters common_bastion_subnet_cidr="${{ env.common_bastion_subnet_cidr }}" \
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
@@ -573,9 +606,6 @@ jobs:
             --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
             --parameters cmk="${{ env.cmk }}" \
             --parameters cmkKeyName="${{ env.cmkKeyName }}" \
-            --parameters admin_bicep_kv_fw="${{ env.admin_bicep_kv_fw }}" \
-            --parameters admin_bicep_kv_fw_rg="${{ env.admin_bicep_kv_fw_rg }}" \
-            --parameters admin_bicep_input_keyvault_subscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
             --parameters inputCommonSPIDKey="${{ env.inputCommonSPIDKey }}" \
             --parameters inputCommonSPSecretKey="${{ env.inputCommonSPSecretKey }}" \
             --parameters commonServicePrincipleOIDKey="${{ env.commonServicePrincipleOIDKey }}" \
@@ -605,7 +635,7 @@ jobs:
       dev_test_prod: prod
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.PROD_NETWORK_ENV || vars.NETWORK_ENV || 'prod' }}"
-      cidr_range: "${{ vars.PROD_CIDR_RANGE }}"
+      cidr_range: "${{ vars.CIDR_RANGE }}"
       admin_location: "${{ vars.AIFACTORY_LOCATION }}"
       admin_locationSuffix: "${{ vars.AIFACTORY_LOCATION_SHORT }}"
       admin_aifactoryPrefixRG: "${{ vars.AIFACTORY_PREFIX }}"
@@ -617,7 +647,7 @@ jobs:
       admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
       admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
       tenantId: "${{ secrets.TENANT_ID }}"
-      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}"
+      technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
       technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
       technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
       useAdGroups: "${{ vars.USE_AD_GROUPS }}"
@@ -626,25 +656,25 @@ jobs:
       tags: "${{ vars.TAGS }}"
       runNetworkingVar: "${{ vars.RUN_JOB1_NETWORKING || 'true' }}"
       BYO_subnets: "${{ vars.BYO_SUBNETS || 'false' }}"
-      vnetNameBase: "${{ vars.VNET_NAME_BASE }}"
-      vnetResourceGroupBase: "${{ vars.VNET_RESOURCE_GROUP_BASE }}"
-      common_subnet_name: "${{ vars.COMMON_SUBNET_NAME }}"
+      vnetNameBase: "${{ vars.VNET_NAME_BASE || 'vnt-esmlcmn' }}"
+      vnetResourceGroupBase: "${{ vars.VNET_RESOURCE_GROUP_BASE || 'esml-common' }}"
+      common_subnet_name: "${{ vars.COMMON_SUBNET_NAME || vars.SUBNET_COMMON_BASE || 'snet-esml-cmn-001' }}"
       common_vnet_cidr: "${{ vars.COMMON_VNET_CIDR }}"
       common_subnet_cidr: "${{ vars.COMMON_SUBNET_CIDR }}"
       common_subnet_scoring_cidr: "${{ vars.COMMON_SUBNET_SCORING_CIDR }}"
       common_pbi_subnet_name: "${{ vars.COMMON_PBI_SUBNET_NAME }}"
       common_pbi_subnet_cidr: "${{ vars.COMMON_PBI_SUBNET_CIDR }}"
-      common_bastion_subnet_name: "${{ vars.COMMON_BASTION_SUBNET_NAME }}"
+      common_bastion_subnet_name: "AzureBastionSubnet"
       common_bastion_subnet_cidr: "${{ vars.COMMON_BASTION_SUBNET_CIDR }}"
-      vnetResourceGroup_param: "${{ vars.PROD_BYO_VNET_RG || vars.VNET_RESOURCE_GROUP_PARAM }}"
-      vnetNameFull_param: "${{ vars.PROD_BYO_VNET_NAME || vars.VNET_NAME_FULL_PARAM }}"
+      vnetResourceGroup_param: "${{ vars.VNET_RESOURCE_GROUP_PARAM || '' }}"
+      vnetNameFull_param: "${{ vars.VNET_NAME_FULL_PARAM || '' }}"
       commonResourceGroup_param: "${{ vars.COMMON_RESOURCE_GROUP_PARAM }}"
       datalakeName_param: "${{ vars.DATALAKE_NAME_PARAM }}"
       kvNameFromCOMMON_param: "${{ vars.KV_NAME_FROM_COMMON_PARAM }}"
       useCommonACR_override: "${{ vars.USE_COMMON_ACR_OVERRIDE }}"
-      subnetCommon: "${{ vars.SUBNET_COMMON }}"
-      subnetCommonScoring: "${{ vars.SUBNET_COMMON_SCORING }}"
-      subnetCommonPowerbiGw: "${{ vars.SUBNET_COMMON_POWERBI_GW }}"
+      subnetCommon: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON || '' }}"
+      subnetCommonScoring: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON_SCORING || '' }}"
+      subnetCommonPowerbiGw: "${{ vars.BYO_SUBNETS == 'true' && vars.SUBNET_COMMON_POWERBI_GW || '' }}"
       subnetProjGenAI: "${{ vars.SUBNET_PROJ_GENAI }}"
       subnetProjAKS: "${{ vars.SUBNET_PROJ_AKS }}"
       subnetProjACA: "${{ vars.SUBNET_PROJ_ACA }}"
@@ -668,7 +698,7 @@ jobs:
       enableDatafactoryCommon: "${{ vars.ENABLE_DATAFACTORY_COMMON || 'false' }}"
       acr_adminUserEnabled: "${{ vars.ACR_ADMIN_USER_ENABLED }}"
       acr_dedicated: "${{ vars.ACR_DEDICATED }}"
-      acr_SKU: "${{ vars.ACR_SKU }}"
+      acr_SKU: "${{ vars.ACR_SKU || 'Premium' }}"
       enablePublicAccessWithPerimeter: "${{ vars.ENABLE_PUBLIC_ACCESS_WITH_PERIMETER }}"
       admin_hybridBenefit: "${{ vars.ADMIN_HYBRID_BENEFIT }}"
       commonLakeNamePrefixMax8chars: "${{ vars.COMMON_LAKE_NAME_PREFIX_MAX8CHARS }}"
@@ -760,6 +790,24 @@ jobs:
             --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
             --debug
 
+      - name: Debug networking inputs (before 02)
+        shell: pwsh
+        run: |
+          $keys = @(
+            'dev_test_prod','dev_test_prod_sub_id','admin_location','admin_locationSuffix','admin_commonResourceSuffix',
+            'vnetNameBase','vnetResourceGroupBase','common_subnet_name','common_vnet_cidr','common_subnet_cidr','common_subnet_scoring_cidr',
+            'common_pbi_subnet_name','common_pbi_subnet_cidr','common_bastion_subnet_cidr',
+            'vnetResourceGroup_param','vnetNameFull_param','commonResourceGroup_param','datalakeName_param','kvNameFromCOMMON_param',
+            'useCommonACR_override','subnetCommon','subnetCommonScoring','subnetCommonPowerbiGw',
+            'subnetProjGenAI','subnetProjAKS','subnetProjACA','subnetProjDatabricksPublic','subnetProjDatabricksPrivate',
+            'byoASEv3','byoAseFullResourceId','byoAseAppServicePlanResourceId',
+            'network_env','cidr_range','BYO_subnets','runNetworkingVar','technical_admins_bastion_IP_whitelist'
+          )
+          foreach ($k in $keys) {
+            $v = (Get-Item "Env:$k" -ErrorAction SilentlyContinue).Value
+            Write-Host "$k=$v"
+          }
+
       - name: 02_az_bicep_private_networking
         if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
         shell: bash
@@ -801,7 +849,7 @@ jobs:
             --parameters common_subnet_scoring_cidr="${{ env.common_subnet_scoring_cidr }}" \
             --parameters common_pbi_subnet_name="${{ env.common_pbi_subnet_name }}" \
             --parameters common_pbi_subnet_cidr="${{ env.common_pbi_subnet_cidr }}" \
-            --parameters common_bastion_subnet_name="${{ env.common_bastion_subnet_name }}" \
+            --parameters common_bastion_subnet_name="AzureBastionSubnet" \
             --parameters common_bastion_subnet_cidr="${{ env.common_bastion_subnet_cidr }}" \
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
@@ -862,9 +910,6 @@ jobs:
             --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
             --parameters cmk="${{ env.cmk }}" \
             --parameters cmkKeyName="${{ env.cmkKeyName }}" \
-            --parameters admin_bicep_kv_fw="${{ env.admin_bicep_kv_fw }}" \
-            --parameters admin_bicep_kv_fw_rg="${{ env.admin_bicep_kv_fw_rg }}" \
-            --parameters admin_bicep_input_keyvault_subscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
             --parameters inputCommonSPIDKey="${{ env.inputCommonSPIDKey }}" \
             --parameters inputCommonSPSecretKey="${{ env.inputCommonSPSecretKey }}" \
             --parameters commonServicePrincipleOIDKey="${{ env.commonServicePrincipleOIDKey }}" \

@@ -7,8 +7,9 @@ param useAdGroups bool = false
 param additionalUserIds array
 param servicePrincipleAndMIArray array = []
 param disableContributorAccessForUsers bool = false
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
-var roleContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
+var roleContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
 var roleDataFactoryContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '673868aa-7521-48a0-acc6-0f60742d39f5')
 var roleDataFactoryDataFlowDeveloper = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'e5c9c5c8-8c8a-4f2d-9b9a-4b4b4b4b4b4b')
 var allUsers = additionalUserIds

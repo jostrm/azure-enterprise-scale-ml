@@ -71,4 +71,8 @@ cp "$start_dir/environment_setup/aifactory/azure_dashboards" "$aif_dir/esml-infr
 # Git Ignore
 cp "$start_dir/bootstrap/.gitignore.template" "$start_dir/../.gitignore"
 
+## Config wizard placeholder
+mkdir -p "$aif_dir/config-wizard"
+echo "# Placeholder folder for the AI Factory configuration wizard" > "$aif_dir/config-wizard/readme.md"
+
 echo -e "${GREEN}02. Success! ${NC}"

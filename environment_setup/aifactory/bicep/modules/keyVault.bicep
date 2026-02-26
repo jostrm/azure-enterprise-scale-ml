@@ -34,6 +34,7 @@ param enablePurgeProtection bool = true
 param location string
 param enablePublicAccessWithPerimeter bool = false
 param enablePublicGenAIAccess bool = false
+param allowPublicAccessWhenBehindVnet bool = false
 param vnetName string
 param vnetResourceGroupName string
 
@@ -67,7 +68,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
     enableSoftDelete: true
     softDeleteRetentionInDays:enablePurgeProtection?soft_delete_days: null // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
     enablePurgeProtection: enablePurgeProtection
-    publicNetworkAccess: ((enablePublicGenAIAccess && !empty(ipRules)) || enablePublicAccessWithPerimeter)?'Enabled':'Disabled'
+    publicNetworkAccess: (enablePublicAccessWithPerimeter || allowPublicAccessWhenBehindVnet || enablePublicGenAIAccess) ? 'Enabled' : 'Disabled'
     // Above, if Disabled, will override the set firewall rules, meaning that even if the firewall rules are present, ip allowed, we will not honor the rules.
     tenantId: tenantIdentity
     networkAcls: !enablePublicAccessWithPerimeter?{

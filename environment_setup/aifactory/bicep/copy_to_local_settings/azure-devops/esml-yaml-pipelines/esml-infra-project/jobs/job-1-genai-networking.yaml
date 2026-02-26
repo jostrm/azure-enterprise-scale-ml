@@ -218,6 +218,11 @@ steps:
     scriptLocation: 'inlineScript'
     inlineScript: |
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
+     
+     az keyvault update --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --public-network-access Enabled --default-action Deny
+     echo "Waiting for network rules to propagate..."
+     sleep 10
+     
      az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
 - task: AzureKeyVault@2  
   displayName: '03_az_download_seeding_keyvault'
@@ -353,15 +358,15 @@ steps:
       
       Write-Host "=== ALL PATHS VALIDATED SUCCESSFULLY ==="
 
-- task: AzurePowerShell@4
+- task: AzurePowerShell@5
   displayName: '04_pwsh_calculate_subnet_allocations'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
+    ScriptType: FilePath
     ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1'
-    ScriptArguments: '-filePath "../../../../../aifactory/parameters/" -spObjId "$(esml-common-bicep-sp-id)" -spSecret "$(esml-common-bicep-sp-secret)" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -useServicePrincipal -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_resolved)" -vnetNameFull_param "$(vnetNameFull_resolved)"'
+    ScriptArguments: '-filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_resolved)" -vnetNameFull_param "$(vnetNameFull_resolved)"'
+    azurePowerShellVersion: LatestVersion
     pwsh: true
-    azurePowerShellVersion: 'LatestVersion' # 'LatestVersion' | 'OtherVersion' 
-    # preferredAzurePowerShellVersion: # ['4.251.1',' 5.251.1'] is downloaded.  This works on other pipeline: '4.248.1'. AllowClobber worked.
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
 - task: AzureCLI@2
   displayName: '04b_check_subnet_exists_for_project'

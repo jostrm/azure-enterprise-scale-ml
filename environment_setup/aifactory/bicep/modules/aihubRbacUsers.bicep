@@ -26,6 +26,8 @@ param useAdGroups bool = false // Use AD groups for role assignments
 param servicePrincipleAndMIArray array // Service Principle Object ID, User created MAnaged Identity
 param disableContributorAccessForUsers bool = false // Disable Contributor access for users
 param disableRBACAdminOnRGForUsers bool = false // Disable Role Based Access Control Administrator for users on resource group
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 // ############## RG level ##############
 
@@ -33,7 +35,7 @@ param disableRBACAdminOnRGForUsers bool = false // Disable Role Based Access Con
 var acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec' // SP, user -> RG
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d' // EP, App service or Function app -> RG
 
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // User -> RG
+// contributorRoleId is now a parameter
 var roleBasedAccessControlAdministratorRG = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'
 
 // Privileged administrator roles that should be excluded from RBAC assignments
@@ -45,6 +47,7 @@ var rbacAdministratorRoleId = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168' // Role Bas
 var excludePrivilegedRolesCondition = '((!(ActionMatches{\'Microsoft.Authorization/roleAssignments/write\'} AND @Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ownerRoleId}, ${userAccessAdministratorRoleId}, ${rbacAdministratorRoleId}})))'
 
 var aiUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d' // User to RG level, to all underlying resources (aiservices, AIF_v2_agents)
+var aiProjectManagerRoleId = 'eadc314b-1a2d-4efa-be10-5d325db5065e' // Azure AI Project Manager - manage AI projects and resources
 // ############## RG LEVEL END
 
 // Azure ML (AI Hub, AIProject)

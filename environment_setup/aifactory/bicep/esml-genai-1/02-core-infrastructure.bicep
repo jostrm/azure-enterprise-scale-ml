@@ -501,6 +501,7 @@ module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
     tenantIdentity: tenant().tenantId
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     enablePublicGenAIAccess:enablePublicGenAIAccess
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetName: defaultSubnet

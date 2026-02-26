@@ -20,7 +20,7 @@ fi
 if [ -f .env ]; then
   set -o allexport
   source .env
-  set -o allexport -
+  set +o allexport
 else
   echo "Error: .env file not found."
   exit 1
@@ -40,7 +40,7 @@ rate_limit_pause_after=50
 rate_limit_pause_after_2=85
 rate_limit_sleep_seconds=30
 rate_limit_sleep_seconds_2=30
-start_from_op=1
+start_from_op=1  # QUICK UPDATE TIP: Run script once and note operation number at "QUICK UPDATE SECTION" message, then set this to that number
 run_current_op=true
 
 increment_counter() {
@@ -136,6 +136,7 @@ esac
 
 # Prompt for optional resume position
 echo -e "${YELLOW}Optional: resume from operation number (1-based). Leave empty to start from 1.${NC}"
+echo -e "${YELLOW}TIP: Set to 82 to update Project number and ENABLE_ flags.${NC}"
 read -p "start_from_op: " start_from_input
 if [[ -n "$start_from_input" && "$start_from_input" =~ ^[0-9]+$ ]]; then
   start_from_op=$start_from_input
@@ -186,8 +187,6 @@ service_and_byo_vars=(
   "BYO_ASEV3"
   "BYO_ASE_FULL_RESOURCE_ID"
   "BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID"
-  "NETWORK_ENV_STAGE"
-  "NETWORK_ENV_PROD"
   "DEPLOY_MODEL_GPT_X"
   "MODEL_GPTX_NAME"
   "MODEL_GPTX_VERSION"
@@ -246,19 +245,41 @@ repo_level_vars=(
   "CMK"
   "CMK_KEY_NAME"
   "CMK_KEY_VERSION"
+  "ADMIN_AISEARCH_TIER"
   "PROJECT_PREFIX"
   "PROJECT_SUFFIX"
   "UPDATE_KEYVAULT_RBAC"
   "AIFACTORY_COMMON_ONLY_DEV_ENVIRONMENT"
+  "ADMIN_USERNAME"
+  "ADMIN_HYBRID_BENEFIT"
   "ADMIN_COMMON_RESOURCE_SUFFIX"
   "ADMIN_PRJ_RESOURCE_SUFFIX"
+  "VNET_RESOURCE_GROUP_BASE"
+  "VNET_NAME_BASE"
+  "SUBNET_COMMON_BASE"
+  "COMMON_VNET_CIDR"
+  "COMMON_SUBNET_CIDR"
+  "COMMON_SUBNET_SCORING_CIDR"
+  "COMMON_PBI_SUBNET_NAME"
+  "COMMON_PBI_SUBNET_CIDR"
+  "COMMON_BASTION_SUBNET_NAME"
+  "COMMON_BASTION_SUBNET_CIDR"
   "DISABLE_WHITELISTING_FOR_BUILD_AGENTS"
   "USE_COMMON_ACR_OVERRIDE"
+  "ACR_IP_WHITELIST"
+  "ACR_ADMIN_USER_ENABLED"
+  "ACR_DEDICATED"
+  "ACR_SKU"
+  # === RBAC: Contributor role override ===
+  "BYO_CONTRIBUTOR_ROLE_ID"
+  # === Complete mode vs Incremental mode ===
+  "ENABLE_DELETE_FOR_DISABLED_RESOURCES"
+  "DELETE_ALL_SERVICES_FOR_PROJECT"
   # All ENABLE_* flags moved to repo-level
   "ENABLE_AI_SERVICES"
   "ENABLE_AI_FOUNDRY_HUB"
   "ENABLE_AI_FOUNDRY"
-  "ENABLE_AFOUNDRY_CAPHOST"
+  "ENABLE_FOUNDRY_CAPHOST"
   "ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2"
   "ENABLE_DATAFACTORY"
   "ENABLE_DATAFACTORY_COMMON"
@@ -285,13 +306,6 @@ repo_level_vars=(
   "ENABLE_LOGIC_APPS"
   "ENABLE_EVENT_HUBS"
   "ENABLE_BOT_SERVICE"
-  "NETWORKING_GENAI_PRIVATE_PRIVATE_UI"
-  "DEV_BYO_VNET_NAME"
-  "DEV_BYO_VNET_RG"
-  "STAGE_BYO_VNET_NAME"
-  "STAGE_BYO_VNET_RG"
-  "PROD_BYO_VNET_NAME"
-  "PROD_BYO_VNET_RG"
   "DEV_NETWORK_ENV"
   "STAGE_NETWORK_ENV"
   "PROD_NETWORK_ENV"
@@ -309,11 +323,39 @@ repo_level_vars=(
   "ADMIN_AML_CLUSTER_SKU_TEST_PROD_OVERRIDE"
   "ADMIN_AML_COMPUTE_INSTANCE_DEV_SKU_OVERRIDE"
   "ADMIN_AML_COMPUTE_INSTANCE_TEST_PROD_SKU_OVERRIDE"
+  "TAGS"
+  "SERVICE_SETTING_DEPLOY_PROJECT_VM"
+  "DEBUG_DISABLE_VALIDATION_TASKS"
+  "ADMIN_AI_SEARCH_TIER"
+  "INPUT_COMMON_SPID_KEY"
+  "INPUT_COMMON_SPSECRET_KEY"
+  "INPUT_COMMON_SP_SECRET_KEY"
+  "COMMON_SERVICE_PRINCIPLE_OID_KEY"
 )
 
 # Apply repo-level variables once to reduce environment-level count
+echo -e "${GREEN}================================================${NC}"
+echo -e "${GREEN}GitHub Variables Update Script${NC}"
+echo -e "${GREEN}================================================${NC}"
+echo -e "${YELLOW}TIP: To quickly update frequently-changed variables only:${NC}"
+echo -e "${YELLOW}  - Edit this script and set start_from_op to the appropriate number${NC}"
+echo -e "${YELLOW}  - Frequently updated variables are processed LAST in each environment:${NC}"
+echo -e "${YELLOW}    • PROJECT_NUMBER, PROJECT_MEMBERS, PROJECT_MEMBERS_EMAILS${NC}"
+echo -e "${YELLOW}    • PROJECT_MEMBERS_IP_ADDRESS${NC}"
+echo -e "${YELLOW}    • TAGS_PROJECT${NC}"
+echo -e "${YELLOW}    • All ENABLE_* flags${NC}"
+echo -e "${YELLOW}  - Watch the [operation_number] output to find the right start_from_op${NC}"
+echo -e "${GREEN}================================================${NC}"
+echo ""
+
 for var_name in "${repo_level_vars[@]}"; do
-  create_or_update_repo_variable "$var_name" "${!var_name}"
+  var_value="${!var_name}"
+  # Strip outer single quotes from TAGS and TAGS_PROJECT
+  if [[ "$var_name" == "TAGS" || "$var_name" == "TAGS_PROJECT" ]]; then
+    var_value="${var_value#\'}"
+    var_value="${var_value%\'}"
+  fi
+  create_or_update_repo_variable "$var_name" "$var_value"
 done
 
 for env in "${selected_environments[@]}"; do
@@ -351,14 +393,16 @@ for env in "${selected_environments[@]}"; do
     create_or_update_variable $env "AIFACTORY_SEEDING_KEYVAULT_RG" "$AIFACTORY_SEEDING_KEYVAULT_RG"
     create_or_update_variable $env "COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID" "$COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID"
     create_or_update_variable $env "COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET" "$COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET"
+    create_or_update_variable $env "INPUT_COMMON_SPID_KEY" "$INPUT_COMMON_SPID_KEY"
+    create_or_update_variable $env "INPUT_COMMON_SPSECRET_KEY" "$INPUT_COMMON_SPSECRET_KEY"
+    create_or_update_variable $env "INPUT_COMMON_SP_SECRET_KEY" "$INPUT_COMMON_SP_SECRET_KEY"
+    create_or_update_variable $env "COMMON_SERVICE_PRINCIPLE_OID_KEY" "$COMMON_SERVICE_PRINCIPLE_OID_KEY"
 
     # Networking
     create_or_update_variable $env "AIFACTORY_LOCATION_SHORT" "$AIFACTORY_LOCATION_SHORT"
     
     # Project specific settings, for all environments
-    create_or_update_variable $env "PROJECT_MEMBERS_EMAILS" "$PROJECT_MEMBERS_EMAILS"
     create_or_update_variable $env "PROJECT_TYPE" "$PROJECT_TYPE"
-    create_or_update_variable $env "PROJECT_NUMBER" "$PROJECT_NUMBER"
     create_or_update_variable $env "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID" "$PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID"
     create_or_update_variable $env "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID" "$PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID"
     create_or_update_variable $env "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S" "$PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S"
@@ -370,8 +414,6 @@ for env in "${selected_environments[@]}"; do
     create_or_update_secret $env "AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID" "$AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID"
     
     # Project Specifics (1st project bootstrap): 
-    create_or_update_secret $env "PROJECT_MEMBERS" "$PROJECT_MEMBERS"
-    create_or_update_secret $env "PROJECT_MEMBERS_IP_ADDRESS" "$PROJECT_MEMBERS_IP_ADDRESS"
     create_or_update_secret $env "TENANT_ID" "$TENANT_ID"
     # Variables: 
     create_or_update_variable $env "BYO_SUBNETS" "$BYO_SUBNETS"
@@ -380,7 +422,21 @@ for env in "${selected_environments[@]}"; do
     create_or_update_variable $env "AIFACTORY_SALT" "$AIFACTORY_SALT"
     create_or_update_variable $env "AIFACTORY_SALT_RANDOM" "$AIFACTORY_SALT_RANDOM"
 
-    # v1.23+ enable flags + BYO customization variables
+    # ========================================================================
+    # FREQUENTLY UPDATED VARIABLES - Positioned last for quick start_from_op
+    # ========================================================================
+    echo -e "${GREEN}>>> QUICK UPDATE SECTION for $env - Note the operation number above! <<<${NC}"
+    # Project-specific variables (moved to end for quick updates)
+    create_or_update_variable $env "PROJECT_NUMBER" "$PROJECT_NUMBER"
+    create_or_update_variable $env "PROJECT_MEMBERS_EMAILS" "$PROJECT_MEMBERS_EMAILS"
+    create_or_update_variable $env "PROJECT_IP_WHITELIST" "$PROJECT_IP_WHITELIST"
+    create_or_update_variable $env "TAGS_PROJECT" "$TAGS_PROJECT"
+    
+    # Project member secrets
+    create_or_update_secret $env "PROJECT_MEMBERS" "$PROJECT_MEMBERS"
+    create_or_update_secret $env "PROJECT_MEMBERS_IP_ADDRESS" "$PROJECT_MEMBERS_IP_ADDRESS"
+
+    # v1.23+ enable flags + BYO customization variables (includes all ENABLE_* flags)
     for var_name in "${service_and_byo_vars[@]}"; do
       create_or_update_variable "$env" "$var_name" "${!var_name}"
     done
@@ -389,7 +445,10 @@ done
 if [[ " ${selected_environments[*]} " == *" dev "* ]]; then
   create_or_update_variable "dev" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
   create_or_update_variable "dev" "AZURE_SUBSCRIPTION_ID" "$DEV_SUBSCRIPTION_ID"
+  create_or_update_variable "dev" "CIDR_RANGE" "$DEV_CIDR_RANGE"
+  create_or_update_variable "dev" "DEV_CIDR_RANGE" "$DEV_CIDR_RANGE"
   create_or_update_variable "dev" "AIFACTORY_CIDR_XX" "$DEV_CIDR_RANGE"
+  create_or_update_variable "dev" "DEV_NETWORK_ENV" "$DEV_NETWORK_ENV"
   create_or_update_variable "dev" "NETWORK_ENV" "$DEV_NETWORK_ENV"
   if [[ "$overwrite_azure_credential" == "y" ]]; then
     create_or_update_secret "dev" "AZURE_CREDENTIALS" "replace_with_dev_sp_credentials"
@@ -399,7 +458,10 @@ fi
 if [[ " ${selected_environments[*]} " == *" stage "* ]]; then
   create_or_update_variable "stage" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
   create_or_update_variable "stage" "AZURE_SUBSCRIPTION_ID" "$STAGE_SUBSCRIPTION_ID"
+  create_or_update_variable "stage" "CIDR_RANGE" "$STAGE_CIDR_RANGE"
+  create_or_update_variable "stage" "STAGE_CIDR_RANGE" "$STAGE_CIDR_RANGE"
   create_or_update_variable "stage" "AIFACTORY_CIDR_XX" "$STAGE_CIDR_RANGE"
+  create_or_update_variable "stage" "STAGE_NETWORK_ENV" "$STAGE_NETWORK_ENV"
   create_or_update_variable "stage" "NETWORK_ENV" "$STAGE_NETWORK_ENV"
   if [[ "$overwrite_azure_credential" == "y" ]]; then
     create_or_update_secret "stage" "AZURE_CREDENTIALS" "replace_with_stage_sp_credentials"
@@ -409,7 +471,10 @@ fi
 if [[ " ${selected_environments[*]} " == *" prod "* ]]; then
   create_or_update_variable "prod" "AZURE_LOCATION" "$AIFACTORY_LOCATION"
   create_or_update_variable "prod" "AZURE_SUBSCRIPTION_ID" "$PROD_SUBSCRIPTION_ID"
+  create_or_update_variable "prod" "CIDR_RANGE" "$PROD_CIDR_RANGE"
+  create_or_update_variable "prod" "PROD_CIDR_RANGE" "$PROD_CIDR_RANGE"
   create_or_update_variable "prod" "AIFACTORY_CIDR_XX" "$PROD_CIDR_RANGE"
+  create_or_update_variable "prod" "PROD_NETWORK_ENV" "$PROD_NETWORK_ENV"
   create_or_update_variable "prod" "NETWORK_ENV" "$PROD_NETWORK_ENV"
   if [[ "$overwrite_azure_credential" == "y" ]]; then
     create_or_update_secret "prod" "AZURE_CREDENTIALS" "replace_with_prod_sp_credentials"

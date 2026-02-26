@@ -2,9 +2,11 @@ param aiServicesPrincipalId string // Principal ID for Azure AI services/OpenAI
 param storageAccountName string // Name of Azure Storage Account
 param storageAccountName2 string // Name of Azure Storage Account
 param aiSearchName string // Resource ID for Azure AI Search
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 // ###### 2024-12-19 TechExcel ###### 
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // User -> RG
+// contributorRoleId is now a parameter
 
 // Container Registry (EP, WebApp, Azure Function)
 var acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec' // SP, user -> RG

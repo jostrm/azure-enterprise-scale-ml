@@ -3,6 +3,7 @@ param usersOrAdGroupArray array
 param servicePrincipleAndMIArray array
 param sqlServerName string
 param useAdGroups bool
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 // Azure SQL built-in roles
 // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
@@ -12,7 +13,7 @@ var sqlContributorRoleId = '9b7fa17d-e63e-47b0-bb0a-15c516ac86ec' // SQL DB Cont
 var sqlDatabaseAdminRoleId = 'dbaa88c4-8eeb-4f5a-9e09-3c5b2e2f7ef5' // Database Administrator (placeholder, update if needed)
 
 var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'       // Reader role
-var contributorId = 'b24988ac-6180-42a0-ab88-20f7382dd24c'        // Contributor role
+var contributorId = contributorRoleId        // Contributor role
 
 resource sqlServer 'Microsoft.Sql/servers@2022-05-01-preview' existing = {
   name: sqlServerName

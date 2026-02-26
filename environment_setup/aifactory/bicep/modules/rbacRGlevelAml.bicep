@@ -6,10 +6,12 @@ param servicePrincipleAndMIArray array // Service Principle Object ID, User crea
 @description('The resource group ID.')
 param resourceGroupId string
 param useAdGroups bool = false
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 // ############## RG level ##############
 
-var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // User -> RG
+// contributorRoleId is now a parameter
 var ownerRoleId = '8e3af657-a8ff-443c-a75c-2fe8c4bcb635' // Owner
 var userAccessAdministratorRoleId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9' // User Access Administrator
 var roleBasedAccessControlAdministratorRG = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'

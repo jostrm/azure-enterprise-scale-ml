@@ -33,7 +33,7 @@ git config --system core.longpaths true
     git submodule update --init --recursive --remote
     ```
 
-    Then in both caess, choose A or B, where we recommend Option A
+    Then in both cases, choose A or B, where we recommend Option A
     
     **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
     ```
@@ -46,7 +46,7 @@ git config --system core.longpaths true
     git submodule foreach 'git checkout main && git pull origin main'
     ```
 
-    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (boostrap scripts, templates)
+    This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (bootstrap scripts, templates)
 
 2) Run the start script `./azure-enterprise-scale-ml/00-start.sh`,  this will create some bootstrap-scripts at your repo root.
 
@@ -61,7 +61,7 @@ git config --system core.longpaths true
     - Note: Is is under the `aifactory` folder, you will configure your [variables.yaml](../../../../aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml)
 
 >[!TIP]
-> If you want to update the pipeline templates? Witout overwriting previous configuration. Then run the bash file created at your root called: `03-ADO-YAML-bootstrap-files-no-var-overwrite.sh`. This will ensure updated pipeline templates, and will not overwrite variables
+> If you want to update the pipeline templates? Without overwriting previous configuration. Then run the bash file created at your root called: `03-ADO-YAML-bootstrap-files-no-var-overwrite.sh`. This will ensure updated pipeline templates, and will not overwrite variables
 
 The file structure should now look something like below (parameters folder should not be visible). The underlined folder is the AI Factory `submodule`.
 
@@ -99,5 +99,5 @@ Read more information in the comment section of variables.yaml
     - [infra-project-genai.yaml](./esml-infra-project/infra-project-genai.yaml)
 
 > [!TIP]
->  Do you want to use Github instead of Azure Devops? Then you can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage).
+>  Do you want to use Github instead of Azure Devops? Then you can use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage).
 >

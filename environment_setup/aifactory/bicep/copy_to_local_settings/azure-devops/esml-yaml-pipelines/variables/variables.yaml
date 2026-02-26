@@ -1,129 +1,110 @@
 variables:
-  # ============================================================================
-  # #### DO NOT TOUCH ####
-  # ============================================================================
-  admin_ip_fw: "" # Leave this. Will be set by pipeline
-  aifactory_salt_random: "" # 10 characters. Based on "User created Managed Identity". It is a unique random value. This '19x2858d4a' in that: 'mi-aca-prj001-sdc-dev-abcde19x2858d4a-001'
-  # ============================================================================
-  # #### END - DO NOT TOUCH####
-  # ============================================================================
-
   # ============================================================f================  
   # MANDATORY(CHANGE ONCE) - UPDATING submodule RELEASE version
   # If you want to upgrade the AIFactory (Long Term Support branches exists)
   # E.g. if you go from submodule RELEASE_BRANCH_120_LTS to RELEASE_BRANCH_121_LTS your AIFactory will be upgraded to 1.21 (add new private dns zones, etc)
   # ============================================================================
-  aifactory_version_major: "1" # Major version of AI Factory. Used to determine which bicep files to use. 1, 2, etc.
-  aifactory_version_minor: "24" # Minor version. 2025-05-23: 20_LTS, 2025-09-20: 23
-  aifactory_branch_chosen: "release/v1.24"
+  aifactory_version_major: "1" # <optional>AI Factory major version<default>1<keep-as-is> Used to determine which bicep files to use.
+  aifactory_version_minor: "24" # <optional>AI Factory minor version<default>24<keep-as-is> 2025-09-20: 24 = release/v1.24
+  aifactory_branch_chosen: "release/v1.24" # <optional>Submodule release branch<default>release/v1.24<keep-as-is>
   # ============================================================================
   # MANDATORY(CHANGE RARELY) per AI Factory scaleset
   # ============================================================================
-  tag_costceter_common: '9999'
-  tag_repository: 'aifactory' # Repository name
-  tag_repository_branch: 'aifactory-001' # Can be per AI Factory scaleset 'aifactory-001' or 'aifactory-002', or per scaleset and project 'aifactory-001/project001-main'
+  tag_costceter_common: '9999' # <optional>Common cost center tag<default>9999<keep-as-is> Metadata for Resource group cost tracking.
+  tag_repository: 'aifactory' # <optional>Repository name tag<default>aifactory<keep-as-is>
+  tag_repository_branch: 'aifactory-001' # <optional>Repository branch tag<default>aifactory-001<keep-as-is> <otherwise> per scaleset 'aifactory-002', or per project 'aifactory-001/project001-main'.
   tags: '{"CostCenter":"$(tag_costceter_common)","Description":"AI Factory common","AIF-Repo":"$(tag_repository)","AIF-Branch":"$(tag_repository_branch)","AIF-Version":"$(aifactory_version_major).$(aifactory_version_minor)","AIF-Submodule-Chosen-Branch":"$(aifactory_branch_chosen)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
 
-  admin_location: "eastus2"
-  admin_locationSuffix: "eus2"
-  admin_aiSearchTier: "basic" # free is not allowed if private endpoints ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
-  admin_semanticSearchTier: "free" # ['disabled', 'free', 'standard']
-  admin_aifactoryPrefixRG: "mrvel-1-" # Max 6 characters. <company>-<aifactoryname-> Examples: ["acme-ai-", "mrvel-1-", "contoso-", "ms-ai-"]
+  admin_location: "eastus2" # <mandatory>Azure region<default>eastus2 Main Azure region for AI Factory.
+  admin_locationSuffix: "eus2" # <mandatory>Region short name<default>eus2
+  admin_aiSearchTier: "basic" # <mandatory>AI Search SKU tier<default>basic<ensure> 'free' is not allowed when using private endpoints. ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
+  admin_semanticSearchTier: "free" # <mandatory>Semantic search tier<default>free ['disabled', 'free', 'standard']
+  admin_aifactoryPrefixRG: "mrvel-1-" # <optional>AI Factory resource group prefix<default>mrvel-1-<keep-as-is> Max 6 chars. <otherwise> set your company prefix, e.g. "acme-ai-", "contoso-".
   
-  # CMK (Customer Managed Key) REQUIREMENTS when enabled (cmk=true) on Seeding Keyvault: dev_admin_bicep_kv_fw, test_admin_bicep_kv_fw, prod_admin_bicep_kv_fw
-  # - Key Vault MUST have enableSoftDelete=true and enablePurgeProtection=true (see admin_keyvaultSoftDeleteDays below)
-  # - Key Vault firewall MUST allow trusted Microsoft services (bypass: AzureServices) - already configured
-  # - Managed identities MUST have Key Vault Crypto Service Encryption User role (get key, wrap key, unwrap key permissions)
-  # - Only RSA and RSA-HSM keys of size 2048 are supported
-  # - If you use the Key Vault firewall, you must allow trusted Microsoft services to access the Azure Key Vault.
-  # - The AI Factory will grant your Microsoft Foundry resource and project system-assigned managed identity the following permissions on your key vault: get key, wrap key, unwrap key.
-  # - Only RSA and RSA-HSM keys of size 2048 are supported.
-  cmk: "false" # Enable Customer Managed Keys (CMK) for Storage Accounts, AI Services, etc. Requires container registry to be Premium SKU.
-  cmkKeyName: "esml-cmk-key" # Common key name for all services in this environment
-
   # SEEDING KEYVAULT: One global (same values for all tripples), or one per environment (different values for dev,test,prod)
-  dev_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
-  dev_admin_bicep_kv_fw_rg: "TODO_ResourceGroup_DEV" # Resource Group name for seeding Keyvault
-  dev_admin_bicep_kv_fw: "TODO_Name_Dev" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  dev_admin_bicep_input_keyvault_subscription: "<todo>_SubID" # <mandatory>DEV seeding KV subscription ID<default><todo>_SubID<ensure> subscription where the DEV seeding Key Vault resides.
+  dev_admin_bicep_kv_fw_rg: "<todo>_ResourceGroup_DEV" # <mandatory>DEV seeding KV resource group<default><todo>_ResourceGroup_DEV<ensure> resource group where the DEV seeding Key Vault resides.
+  dev_admin_bicep_kv_fw: "<todo>_Name_Dev" # <mandatory>DEV seeding KV name<default><todo>_Name_Dev<ensure> Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID.
   
-  test_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
-  test_admin_bicep_kv_fw_rg: "TODO_ResourceGroup_Test" # Resource Group name for seeding Keyvault
-  test_admin_bicep_kv_fw: "TODO_Name_Test" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  test_admin_bicep_input_keyvault_subscription: "<todo>_SubID" # <mandatory>STAGE seeding KV subscription ID<default><todo>_SubID<ensure> subscription where the STAGE seeding Key Vault resides.
+  test_admin_bicep_kv_fw_rg: "<todo>_ResourceGroup_Test" # <mandatory>STAGE seeding KV resource group<default><todo>_ResourceGroup_Test<ensure> resource group where the STAGE seeding Key Vault resides.
+  test_admin_bicep_kv_fw: "<todo>_Name_Test" # <mandatory>STAGE seeding KV name<default><todo>_Name_Test<ensure> Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID.
   
-  prod_admin_bicep_input_keyvault_subscription: "TODO_SubID" # seeding keuvyalt, subscription id
-  prod_admin_bicep_kv_fw_rg: "TODO_ResourceGroup_Prod" # Resource Group name for seeding Keyvault
-  prod_admin_bicep_kv_fw: "TODO_Name_Prod" # Keyvault name. Purpose: to store secrets with names mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID,...
+  prod_admin_bicep_input_keyvault_subscription: "<todo>_SubID" # <mandatory>PROD seeding KV subscription ID<default><todo>_SubID<ensure> subscription where the PROD seeding Key Vault resides.
+  prod_admin_bicep_kv_fw_rg: "<todo>_ResourceGroup_Prod" # <mandatory>PROD seeding KV resource group<default><todo>_ResourceGroup_Prod<ensure> resource group where the PROD seeding Key Vault resides.
+  prod_admin_bicep_kv_fw: "<todo>_Name_Prod" # <mandatory>PROD seeding KV name<default><todo>_Name_Prod<ensure> Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID.
   # ===========================================================================
-  useCommonACR: true # Use common Azure Container Registry (save cost), instead of each project having its own.
-  admin_hybridBenefit: "true"
-  admin_keyvaultSoftDeleteDays: 7 # 90 days is default. 7 lowest. 0 is disabled. 90 days is recommended. NOTE: When CMK is enabled, purge protection is REQUIRED.
-  azure_machinelearning_sp_oid: "TODO_ObjectID" # Azure Machine Learning service principle Object ID. Find it in Entra ID called "Azure Machine Learning" with AppId:0736f41a-0425-4b46-bdb5-1563eff02385
-  use_ad_groups: "true" # true, use AD groups for project members & advanced Personas. false, use individual ObjectID's and simple mode Personas
-  enableAMPLS: "false" # true, then AMPLS will be created in Hub subscription, AppInsights will be added, in private/private mode.
+  useCommonACR: "true" # <optional>Use shared ACR across projects<default>true<keep-as-is> <otherwise> false, each project gets its own ACR (higher cost).
+  admin_hybridBenefit: "false" # <optional>Azure Hybrid Benefit for VMs<default>false <otherwise> true, if you have eligible Windows licenses with Software Assurance (pay-as-you-go avoided).
+  admin_keyvaultSoftDeleteDays: 7 # <optional>Key Vault soft delete days<default>7<keep-as-is> <mandatory> if cmk:'true' (purge protection required). <otherwise> 90 days recommended; 0 to disable.
+  azure_machinelearning_sp_oid: "<todo>_ObjectID" # <mandatory>Azure ML service principal OID<default><todo>_ObjectID<ensure> find in Entra ID as "Azure Machine Learning" app (AppId: 0736f41a-0425-4b46-bdb5-1563eff02385). <otherwise> optional if enableAIFoundry:'false'.
+  use_ad_groups: "true" # <optional>Use AD groups for project members<default>true<keep-as-is> <otherwise> false, use individual ObjectIDs and simple mode Personas.
+  enableAMPLS: "false" # <optional>Enable AMPLS in Hub<default>false<keep-as-is> <otherwise> true, AMPLS created in Hub subscription; AppInsights in private/private mode.
   # ============================================================================
   # OPTIONALLY (CHANGE ONCE) - Naming convention, on resource group
   # if projectPrefix='' and projectSuffix='' then mrvel-1-project001-eus2-dev-008
   # if projectPrefix='esml-' and projectSuffix='-rg' then mrvel-1-esml-project001-eus2-dev-008-rg
   # ============================================================================
-  projectPrefix: 'esml-' # default: esml-
-  projectSuffix: '-rg' # default: -rg
+  projectPrefix: 'esml-' # <optional>Project resource group prefix<default>esml-<keep-as-is>
+  projectSuffix: '-rg' # <optional>Project resource group suffix<default>-rg<keep-as-is>
 
   # ============================================================================
   # MANDATORY(CHANGE ONCE):BASE PARAMETERS: v1.22 updates: Moved from .json to this YAML
   # ============================================================================
-  vnetNameBase: "vnt-esmlcmn" # If not using BYOvNet, the base name of the common vNet
-  vnetResourceGroupBase: "esml-common" # If not using BYOvNet, the base name of the common vNet's resource group
-  common_subnet_name: "snet-esml-cmn-001" # Optional, to customize subnet name for common resources
-  commonLakeNamePrefixMax8chars: "mrvel"
-  lakeContainerName: "lake3"
-  adminUsername: "esmladmin"
+  vnetNameBase: "vnt-esmlcmn" # <optional>Common vNet base name<default>vnt-esmlcmn<keep-as-is> <otherwise> ignored if vnetNameFull_param is set (BYOvNet).
+  vnetResourceGroupBase: "esml-common" # <optional>Common vNet resource group base<default>esml-common<keep-as-is> <otherwise> ignored if vnetResourceGroup_param is set (BYOvNet).
+  common_subnet_name: "snet-esml-cmn-001" # <optional>Common subnet name<default>snet-esml-cmn-001<keep-as-is>
+  commonLakeNamePrefixMax8chars: "mrvel" # <optional>Data lake storage name prefix<default>mrvel<keep-as-is> Max 8 characters.
+  lakeContainerName: "lake3" # <optional>Data lake container name<default>lake3<keep-as-is>
+  adminUsername: "esmladmin" # <optional>VM admin username<default>esmladmin<keep-as-is>
   # Standalone AI Factory, or centralized private DNS zones by Azure Policy in Hub.
-  centralDnsZoneByPolicyInHub: "false" # false, will automatically "create if not exists" private dns zones in each spoke resource group. true, will use central private dns zones in HUB resource group, created by Azure Policy.
-  privDnsSubscription_param: "TODO_SubID"
-  privDnsResourceGroup_param: "TODO_rg_name"
-  tenantId: "TODO_tenantId"
-  databricksOID: "TODO_ObjectID"
-  databricksPrivate: "false"
-  AMLStudioUIPrivate: "true"
-  inputCommonSPIDKey: "esml-common-sp-id"
-  inputCommonSPSecretKey: "esml-common-sp-secret"
-  commonServicePrincipleOIDKey: "esml-common-sp-oid"
+  centralDnsZoneByPolicyInHub: "false" # <optional>Centralized DNS via Hub policy<default>false<keep-as-is> <otherwise> true, uses central private DNS zones in HUB resource group managed by Azure Policy.
+  privDnsSubscription_param: "<todo>_SubscriptionID" # <optional>Hub DNS subscription ID<default><todo>_SubscriptionID<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity subscription ID where central private DNS zones are deployed.
+  privDnsResourceGroup_param: "<todo>_ResourceGroup_name" # <optional>Hub DNS resource group<default><todo>_ResourceGroup_name<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity resource group where central private DNS zones are deployed.
+  tenantId: "<todo>_TenantId" # <mandatory>Azure tenant ID<default><todo>_TenantId<ensure> find in Azure Portal > Entra ID > Overview (Directory ID).
+  databricksOID: "<todo>_ObjectID" # <optional>Databricks object ID<default><todo>_ObjectID<mandatory> if enableDatabricks:'true' <ensure> find Databricks object ID in Entra ID.
+  databricksPrivate: "true" # <optional>Databricks private control plane<default>true<keep-as-is> <otherwise> false, only data plane is private; control plane is public.
+  AMLStudioUIPrivate: "true" # <optional>AML Studio UI private access<default>true<keep-as-is> <otherwise> false, only data plane is private; control plane is public.
+  inputCommonSPIDKey: "<todo>esml-common-sp-id" # <mandatory>Seeding KV secret name for common SP App ID<default>esml-common-sp-id<ensure> name matches the secret in your Seeding Keyvault.
+  inputCommonSPSecretKey: "<todo>esml-common-sp-secret" # <mandatory>Seeding KV secret name for common SP secret<default>esml-common-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
+  commonServicePrincipleOIDKey: "<todo>esml-common-sp-oid" # <mandatory>Seeding KV secret name for common SP OID<default>esml-common-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
    
   # ============================================================================
   # MANDATORY(CHANGE ONCE): Azure Devops
   # ============================================================================
   # Azure DevOps - Service Connections for task subscription
-  dev_service_connection: "todo_ado_service_connection" # Name of service connection for DEV Azure subscription
-  test_service_connection: "todo_ado_service_connection" # Name of service connection TEST Azure subscription
-  prod_service_connection: "todo_ado_service_connection" # Name of service connection PROD Azure subscription
+  dev_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for DEV<default><todo>_ado_service_connection<ensure> name matches your Azure DevOps service connection for the DEV subscription.
+  test_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for STAGE<default><todo>_ado_service_connection<ensure> name matches your Azure DevOps service connection for the STAGE subscription.
+  prod_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for PROD<default><todo>_ado_service_connection<ensure> name matches your Azure DevOps service connection for the PROD subscription.
   # Azure DevOps - Service Connections for seeding keyvault, that may be in another subscription
-  dev_seeding_kv_service_connection: "todo_ado_service_connection" # Name of service connection for DEV Azure subscription where the seeding keuvauly resides. May be same as: dev_service_connection
-  test_seeding_kv_service_connection: "todo_ado_service_connection" # Name of service connection for TEST Azure subscription. May be same as: test_service_connection
-  prod_seeding_kv_service_connection: "todo_ado_service_connection" # Name of service connection for PROD Azure subscription. May be same as: prod_service_connection
+  dev_seeding_kv_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for DEV seeding KV<default><todo>_ado_service_connection<ensure> name matches your service connection for the DEV seeding KV subscription. <otherwise> can be same as dev_service_connection.
+  test_seeding_kv_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for STAGE seeding KV<default><todo>_ado_service_connection<ensure> name matches your service connection for the STAGE seeding KV subscription. <otherwise> can be same as test_service_connection.
+  prod_seeding_kv_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for PROD seeding KV<default><todo>_ado_service_connection<ensure> name matches your service connection for the PROD seeding KV subscription. <otherwise> can be same as prod_service_connection.
   # ============================================================================
   # MANDATORY(CHANGE RARELY):NETWORKING: Networking modes
-  #  [false, false, false ] = private UI with private backend. No public IP (Bastion host + VM, Azure VPN, Peering)
-  #  [true, true, false ]  = public UI for IP whitelisted devices, with private backend
-  #  [true, true, true ]   = public UI with private backend 
+  #  [false, false, false ] = private UI with private backend. No public IP (Bastion host + VM, Azure VPN, Peering). No VNet
+  #  [true, true, false ]  = public UI for IP whitelisted devices, with private backend. Selected virtual network.
+  #  [true, true, true ]   = public UI with private backend. Public Network
   # ============================================================================
-  enablePublicGenAIAccess: "false"
-  allowPublicAccessWhenBehindVnet: "false"
-  enablePublicAccessWithPerimeter: "false"
+  enablePublicGenAIAccess: "true" # <optional>Public GenAI access (control plane)<default>true<recommended> false to enable fully private networking.
+  allowPublicAccessWhenBehindVnet: "true" # <optional>Public UI access when behind vNet<default>true<recommended> false to enable fully private networking.
+  enablePublicAccessWithPerimeter: "true" # <optional>Public access with network perimeter<default>true<recommended> false to enable fully private networking.
 
   # ============================================================================
   # MANDATORY(CHANGE RARELY):RBAC restrictions
   # ============================================================================
-  disableContributorAccessForUsers: "false"
-  disableRBACAdminOnRGForUsers: "false"
+  BYOContributorRoleID: "b24988ac-6180-42a0-ab88-20f7382dd24c" # <optional>Contributor role ID<default>b24988ac-6180-42a0-ab88-20f7382dd24c<keep-as-is> Azure built-in Contributor. <otherwise> provide a custom role ID for finer-grained access control.
+  disableContributorAccessForUsers: "false" # <optional>Disable Contributor for project users<default>false<recommended> false, enables users to create artifacts (managed online endpoints etc). <otherwise> true, restrict Contributor access.
+  disableRBACAdminOnRGForUsers: "true" # <optional>Disable RBAC Admin on RG for project users<default>true<recommended> true, restricts users from assigning RBAC at resource group scope.
   # ============================================================================
   # MANDATORY(CHANGE RARELY):Client Access: Services to be added to deployment. CreateIfNotExists logic
   # ============================================================================
-  addBastionHost: "false" # COMMON resource group
-  enableAdminVM: "false" # COMMON resource group
+  addBastionHost: "false" # <optional>Add Bastion Host in common RG<default>false<keep-as-is>
+  enableAdminVM: "false" # <optional>Enable Admin VM in common RG<default>false<keep-as-is>
   # ============================================================================
   # MANDATORY(CHANGE RARELY):Diagnostics - on all resources.
   # ============================================================================
-  diagnosticSettingLevel: "gold" # gold, silver, bronze where gold has most info
+  diagnosticSettingLevel: "gold" # <optional>Diagnostics level<default>gold<keep-as-is> <otherwise> silver or bronze for less verbose (lower cost) logging.
   # ============================================================================
 
   # ============================================================================
@@ -133,13 +114,13 @@ variables:
   # - If you want to have multiple AIFactory's in same regions, multiple projects for team
   # More info: https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10_index.md#40-faq
   # ============================================================================
-  admin_aifactorySuffixRG: "-001" #<-XXX> Change for AIFactory scale set, or if you have mutliple AIFactory's in same regions: Examples: ["-001", "-002", "-003"]
+  admin_aifactorySuffixRG: "-001" # <mandatory>AI Factory scaleset suffix<default>-001<keep-as-is> For 1st scaleset. <otherwise> increment to '-002', '-003' for additional scalesets.
   # ============================================================================
   # MANDATORY(CHANGE RARELY): Environments: Dev, Stage, Prod per AI Factory scaleset
   # ============================================================================
-  dev_sub_id: "TODO_SubID" # SubscriptionID dev
-  test_sub_id: "TODO_SubID" # SubscriptionID test
-  prod_sub_id: "TODO_SubID" # SubscriptionID prod
+  dev_sub_id: "<todo>_SubID" # <mandatory>DEV subscription ID<default><todo>_SubID
+  test_sub_id: "<todo>_SubID" # <optional>STAGE subscription ID<default><todo>_SubID<recommended> separate subscription from DEV. <otherwise> can reuse dev_sub_id.
+  prod_sub_id: "<todo>_SubID" # <optional>PROD subscription ID<default><todo>_SubID<recommended> separate subscription from DEV. <otherwise> can reuse dev_sub_id.
   # ============================================================================
   # MANDATORY(CHANGE RARELY): Networking per environment and AI Factory scaleset
   # ============================================================================
@@ -153,60 +134,47 @@ variables:
       # 192.x.x.x  (/16) is less commonly used in large-scale Azure deployments due to its smaller address space.
       # WAF AI Factory Recommended: 172.16.0.0/16
       # Don't use the 172.17.0.0/16 IP address range for your virtual network. This range is the default subnet range used by the Docker bridge network on-premises.
-  common_vnet_cidr: "172.16.0.0/16"
+  common_vnet_cidr: "172.16.0.0/16" # <mandatory>Common vNet CIDR range<default>172.16.0.0/16<keep-as-is> Standalone AI Factory. <otherwise> <ensure> get a vNet range from your networking team for Hub peering.
 
-  common_subnet_cidr: "172.16.XX.0/26"
-  common_subnet_scoring_cidr: "172.16.XX.64/26"
+  common_subnet_cidr: "172.16.XX.0/26" # <mandatory>Common subnet CIDR<default>172.16.XX.0/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
+  common_subnet_scoring_cidr: "172.16.XX.64/26" # <mandatory>Scoring subnet CIDR<default>172.16.XX.64/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
   
-  common_pbi_subnet_name: "snet-esml-cmn-pbi-001"
-  common_pbi_subnet_cidr: "172.16.XX.128/26"
+  common_pbi_subnet_name: "snet-esml-cmn-pbi-001" # <mandatory>Power BI gateway subnet name<default>snet-esml-cmn-pbi-001<keep-as-is> <ensure> within common_vnet_cidr.
+  common_pbi_subnet_cidr: "172.16.XX.128/26" # <mandatory>Power BI gateway subnet CIDR<default>172.16.XX.128/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
   
-  common_bastion_subnet_name: "AzureBastionSubnet"
-  common_bastion_subnet_cidr: "172.16.XX.192/26"
+  common_bastion_subnet_name: "AzureBastionSubnet" # <mandatory>Bastion subnet name<default>AzureBastionSubnet<keep-as-is> Required name for Azure Bastion. <ensure> within common_vnet_cidr.
+  common_bastion_subnet_cidr: "172.16.XX.192/26" # <mandatory>Bastion subnet CIDR<default>172.16.XX.192/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
 
+## HELP for CIDR RANGE============================================================================
   # If vnet (common_vnet_cidr) of size /16 you may have subnets (such as common_subnet_cidr) within: 0–255
   # If vnet of size /18 you may have subnets within: 0–63
   # If vnet of size /19 you may have subnets within: 0–31
   # If vnet of size /20 you may have subnets within: 0–15
-  dev_cidr_range: "61" # CIDR range (1)  for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
-  test_cidr_range: "62" # CIDR range (5)  for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
-  prod_cidr_range: "63" # CIDR range (10)  for each environment vNet, that will replace XX in the CIDR template: 172.16.XX.0/24
+  dev_cidr_range: "61" # <mandatory>DEV vNet CIDR substitution value<default>61<keep-as-is> Replaces XX in CIDR templates (e.g. 172.16.61.0/26). <otherwise> choose 0-255 not conflicting with other environments.
+  test_cidr_range: "62" # <mandatory>STAGE vNet CIDR substitution value<default>62<keep-as-is> Replaces XX in CIDR templates (e.g. 172.16.62.0/26). <otherwise> choose 0-255 not conflicting with other environments.
+  prod_cidr_range: "63" # <mandatory>PROD vNet CIDR substitution value<default>63<keep-as-is> Replaces XX in CIDR templates (e.g. 172.16.63.0/26). <otherwise> choose 0-255 not conflicting with other environments.
+## HELP for CIDR RANGE ============================================================================
 
 ## ============================================================================
 ## START - FOR EACH PROJECT (MANDATORY), PRE SETUP
 ## ============================================================================
-  project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # Service principle ID, name from seeding keuvalt (need to be from enterprise application)
-  project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # Service principle Object ID, name from seeding keuvalt (need to be from enterprise application)
-  project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # Service principle secret, name from seeding keuvalt
-  admin_projectType: "all" # Azure Devops related: Set "all" from v 1.23 Earlier versions [esml,genai-1,all] to fetch subnets from Bicep deployment.
-  project_number_000: "001" # Project number (3 digits in a string) <000> Example "001"
-  tag_costcenter: "1234"
+  project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # <mandatory>Project SP App ID secret name in seeding KV<default>esml-project001-sp-id<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # <mandatory>Project SP OID secret name in seeding KV<default>esml-project001-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # <mandatory>Project SP secret name in seeding KV<default>esml-project001-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
+  project_number_000: "001" # <mandatory>Project number<default>001<keep-as-is> For 1st project. <otherwise> increment to '002', '003', etc.
+  tag_costcenter: "1234" # <optional>Project cost center tag<default>1234<keep-as-is> Metadata for per-project cost tracking on resource group level.
   tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Branch":"$(tag_repository_branch)/project$(project_number_000)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
-  project_IP_whitelist: "" # IP (IPv4) adresses in a commas separated list, without space, to whitelist to acccess UI in Azure. "10.123.456.10,124.56.78.0/24"
+  project_IP_whitelist: "" # <optional>Project UI IP allowlist<default>""<mandatory> if using IP-whitelisting networking mode <ensure> comma-separated IPv4 addresses without spaces, e.g. "10.123.456.10,124.56.78.0/24".
   
   # Container registry
-  acr_IP_whitelist: "" # Selected networks approved IPs
-  acr_adminUserEnabled: "false" # true, enable admin user. false, disable admin user (more secure)
-  acr_dedicated: "true" # Premium only
-  acr_SKU: "Premium" # Premium is mandatory, to enable private endpoints, or support CMK (Customer managed encryption key)
+  acr_IP_whitelist: "" # <optional>ACR IP allowlist<default>""<keep-as-is> <otherwise> provide comma-separated IPv4 addresses if ACR network restrictions are needed.
+  acr_adminUserEnabled: "false" # <optional>ACR admin user enabled<default>false<recommended> false, disable admin user for security. <otherwise> true, enable for simpler dev access.
+  acr_dedicated: "true" # <mandatory>ACR dedicated (Premium tier)<default>true<ensure> must be true when using private endpoints or CMK.
+  acr_SKU: "Premium" # <mandatory>ACR SKU<default>Premium<ensure> Premium required for private endpoints and CMK support.
 
-  technical_admins_ad_object_id: "TODO_EntraID_ObjectID" # TODO_EntraID_ObjectID commaseparated list, or just 1 ObjectID
-  technical_admins_email: "TODO_email_or_securitygroup_name" # email or name of AD group
-  serviceSettingDeployProjectVM: "false" # VM Project resource group, to use with BASTION
-
-  # ============================================================================
-  # MANDATORY (PRE SETUP of a PROJECT): AI Factory salt from COMMON RG
-  # ============================================================================
-  # Description: aifactory_salt:""(default) [5 chars] 
-  # What: 
-  #   A deteministic unique value unique for the AIFactory environment. Same for all projects.
-  # How to find it: 
-  #   Update with values from AI Factory COMMON Resource group.
-  #   The aifactory_salt can be read from the AI Factory common resource group in names of services such as Azure Datafactory
-  #   Example: the 'a4c2b'in "adf-cmn-weu-dev-a4c2b-001" and in Container registry, private endpoints: "pend-kv-cmndev-a4c2b-001-to-vnt-esmlcmn"
-  # Usage: aifactory_salt will be used in Project resource groups 'abcde' for resources such as Managed Identity  'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
-  # ============================================================================
-  aifactory_salt: "" # 5 characters.  A deteministic unique value, from COMMON RG
+  technical_admins_ad_object_id: "<todo>_EntraID_ObjectID" # <mandatory>Project team Entra ID object ID(s)<default><todo>_EntraID_ObjectID<ensure> comma-separated ObjectIDs of users or AD groups for the project team.
+  technical_admins_email: "<todo>_email_or_securitygroup_name" # <optional>Project team contact email or group name<default><todo>_email_or_securitygroup_name<recommended> set for better project tracking.
+  serviceSettingDeployProjectVM: "false" # <optional>Deploy VM in project resource group<default>false<keep-as-is> <otherwise> true, deploy a jumpbox VM for use with Azure Bastion.
 
   # ============================================================================
   # MANDATORY:Services to be added to deployment. CreateIfNotExists logic
@@ -220,85 +188,93 @@ variables:
   # - Networking (IPwhitelist UX access + private endpoints service-service):   enablePublicGenAIAccess, allowPublicAccessWhenBehindVnet
   # ============================================================================
   
+  # === Complete mode vs Incremental mode ===
+  enableDeleteForDisabledResources: true # <optional>Delete disabled services<default>true<keep-as-is> <otherwise> false, keeps all existing resources regardless of ENABLE_* flags.
+  deleteAllServicesForProject: false # <optional>Delete all project services<default>false<keep-as-is> <otherwise> true, deletes all services in project RG in step 04 then quits pipeline (foundational services like KV, Storage, AppInsights are retained).
   # === Defender for Cloud: Defender for AI ===
-  enableDefenderforAISubLevel: "false"
-  enableDefenderforAIResourceLevel: "false"
+  enableDefenderforAISubLevel: "false" # <optional>Defender for AI at subscription level<default>false<keep-as-is> <otherwise> true, enable Microsoft Defender for AI at subscription level.
+  enableDefenderforAIResourceLevel: "false" # <optional>Defender for AI at resource level<default>false<keep-as-is> <otherwise> true, enable Microsoft Defender for AI at per-resource level.
   # === CMK - Customer Managed Key for encryption at rest, for all services that supports CMK ===
-  cmk: "false" # Customer Managed Key encryption for Keyvault, Storage accounts, etc.  true, enable CMK. false, use platform managed keys.
-  cmkKeyName: "aifactory-cmk-key" # Name of the Key in Keyvault to be used for CMK encryption
-  cmkKeyVersion: "" # Version of the Key in Keyvault (GUID format). Leave empty to automatically use the LATEST version from Key Vault.
+  # CMK (Customer Managed Key) REQUIREMENTS when enabled (cmk=true) on Seeding Keyvault: dev_admin_bicep_kv_fw, test_admin_bicep_kv_fw, prod_admin_bicep_kv_fw
+  # - Key Vault MUST have enableSoftDelete=true and enablePurgeProtection=true (see admin_keyvaultSoftDeleteDays below)
+  # - Key Vault firewall MUST allow trusted Microsoft services (bypass: AzureServices) - already configured
+  # - Managed identities MUST have Key Vault Crypto Service Encryption User role (get key, wrap key, unwrap key permissions)
+  # - Only RSA and RSA-HSM keys of size 2048 are supported
+  # - If you use the Key Vault firewall, you must allow trusted Microsoft services to access the Azure Key Vault.
+  # - The AI Factory will grant your Microsoft Foundry resource and project system-assigned managed identity the following permissions on your key vault: get key, wrap key, unwrap key.
+  # - Only RSA and RSA-HSM keys of size 2048 are supported.
+
+  cmk: "false" # <optional>Customer Managed Key encryption<default>false<keep-as-is> <otherwise> true, enable CMK for Key Vault, Storage accounts, etc.
+  cmkKeyName: "<todo>_aifactory-cmk-key" # <optional>CMK key name in seeding KV<default><todo>_aifactory-cmk-key<mandatory> if cmk:'true' <ensure> key name in your Seeding Keyvault to use for CMK encryption.
+  cmkKeyVersion: "" # <optional>CMK key version<default>""<keep-as-is> <otherwise> pin to a specific GUID version string.
   # === Keyvault RBAC ===
-  updateKeyvaultRbac: "false" # true, enables you to update RBAC properties running the pipeline twice. false means "CreateIfNotExists"  
+  updateKeyvaultRbac: "false" # <optional>Update Key Vault RBAC<default>false<keep-as-is> <otherwise> true, re-run to update RBAC properties.
   
-  # === AI Foundry 2023-2025+ ===
-  enableAIServices: "false" # Standalone AI Services acount with Azure OpenAI endpoint, and endpoint to other models in AI Foundry model catalogue
-  enableAIFoundryHub: "false" # AI Foundry Hub service, with default project. Requires: enableAIServices: "true" 
-  addAIFoundryHub: "false"  # Add new AI Foundry Hub with project, with a new random name (Solution, if deletion, and Enterprise application is not deleted as it should)
   # === AI foundry 2025 ===
-  enableAIFoundry: "true" # AI Foundry with default project. Enterprise grade implemenetation (private networking, BYOvNet, exising infra). GA.
-  updateAIFoundry: "false" # true, enables you to update AI Foundry properties and its RBAC, running the pipeline twice. false means "CreateIfNotExists"
-  addAIFoundry: "false" # Add new AI foundry with project, with a new random name (can be used for debugging, or running pipeline twice directly, not wating for deletion)
-  enableAFoundryCaphost: "true" # Ensures Agents metadata, and history/threads is saved in your subscription and network, using CosmosDB, Storage, AI Search
-  foundryDeploymentType: "1" # "1" = AI Factory based on PG, "2" = AI Factory based on AVM, "3" = Both. Where 1 is tested, and if fails, it uses 2
-  enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # true, only connections is created to AIFactory created services. false, Azure will create a default project, with additional CosmosDB, Storage Account, AI Search, and connections
-  disableAgentNetworkInjection: "false" # If false, NB! requires your Container apps subnet (snt-prj001-aca) needs to be in either 172.16.0.0/12 or 192.168.0.0/16 (class B or C).
+  enableAIFoundry: "true" # <mandatory>Enable AI Foundry<default>true<recommended> AI Foundry with default project; enterprise-grade private networking, BYOvNet, existing infra. GA.
+  updateAIFoundry: "false" # <optional>Update AI Foundry properties<default>false<keep-as-is> <otherwise> true, re-run to update AI Foundry properties and RBAC.
+  addAIFoundry: "false" # <optional>Add new AI Foundry instance<default>false<keep-as-is> <otherwise> true, provisions a new AI Foundry with a new random name (for debugging or re-run).
+  enableAFoundryCaphost: "true" # <optional>AI Foundry capability host<default>true<recommended> ensures agents metadata and history/threads are saved in your subscription using CosmosDB, Storage, AI Search.
+  foundryDeploymentType: "2" # <optional>AI Foundry deployment type<default>2<keep-as-is> '1'=based on PG, '2'=based on AVM, '3'=both. '1' is tested first; falls back to '2' on failure.
+  enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # <optional>AI Factory default project for AIFv2<default>true<keep-as-is> <otherwise> false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections.
+  disableAgentNetworkInjection: "false" # <optional>Disable agent network injection<default>false<keep-as-is> false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. <otherwise> true, disables network injection.
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
   # NetworkInjection -> Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
 
   # === Data & Machine Learning ===
-  enableDatafactory: "false" # Datafactory
-  enableDatafactoryCommon: "false" # Datafactory in common resource group
-  enableAzureMachineLearning: "false" # Azure Machine Learning v2 (TODO Databricks, EventHubs, LA)
-  addAzureMachineLearning: "false"
+  enableDatafactory: "false" # <optional>Deploy Azure Data Factory in project RG<default>false<keep-as-is>
+  enableDatafactoryCommon: "false" # <optional>Deploy Azure Data Factory in common RG<default>false<keep-as-is>
+  enableAzureMachineLearning: "false" # <optional>Deploy Azure ML workspace<default>false<keep-as-is>
+  addAzureMachineLearning: "false" # <optional>Add new Azure ML workspace<default>false<keep-as-is>
   # === AKS for Azure ML ===
-  enableAksForAzureML: "true" # AKS for Azure ML compute
-  aksOutboundType: "loadBalancer" # loadBalancer, userDefinedRouting
-  aksPrivateDNSZone: "system" # "none", "system" or resource ID
-  aksAzureFirewallPrivateIp: "" # Only needed if aksOutboundType is userDefinedRouting. Provide an IP from the subnet range of the subnet used for Azure Firewall.
+  enableAksForAzureML: "true" # <optional>Deploy AKS for Azure ML inference<default>true<keep-as-is>
+  aksOutboundType: "loadBalancer" # <optional>AKS outbound traffic type<default>loadBalancer<keep-as-is> <otherwise> userDefinedRouting, if you have Azure Firewall and UDR configured.
+  aksPrivateDNSZone: "system" # <optional>AKS private DNS zone<default>system<keep-as-is> <otherwise> "none" or full resource ID of a private DNS zone.
+  aksAzureFirewallPrivateIp: "" # <optional>AKS Azure Firewall private IP<default>""<mandatory> if aksOutboundType:'userDefinedRouting' <ensure> IP within the Azure Firewall subnet range.
 
-  enableDatabricks: "false"
+  enableDatabricks: "false" # <optional>Deploy Databricks workspace<default>false<keep-as-is>
   # === Cognitive Services ===
-  enableAISearch: "true"
-  addAISearch: "true" # true, add new AI Search service with new random name. false, CreateIfNotExists
-  enableAISearchSharedPrivateLink: "true" # true, will create a shared private endpoint link in common vNet. false, private endpoint in project vNet
+  enableAISearch: "true" # <mandatory>Deploy Azure AI Search<default>true<recommended> required for RAG and Agents scenarios.
+  addAISearch: "true" # <optional>Add new AI Search instance<default>true<keep-as-is> <otherwise> false, CreateIfNotExists logic.
+  enableAISearchSharedPrivateLink: "true" # <optional>AI Search shared private link<default>true<recommended> <otherwise> false, creates a private endpoint in the project vNet.
   # Note: Basic tier and higher: Shared private links are supported from Basic tier, BUT for indexers with skillsets (e.g., AI enrichment or embedding skills), the minimum tier is Standard 1 (S1)
 
-  enableAzureOpenAI: "false"
-  enableAzureAIVision: "false"
-  enableAzureSpeech: "false"
-  enableAIDocIntelligence: "false"
-  enableBing: "false"
-  enableBingCustomSearch: "false"
-  bingCustomSearchSku: "G2" # ['G2'] G2 is custom search with grounding
-  enableContentSafety: "false"
+  enableAzureOpenAI: "false" # <optional>Deploy standalone Azure OpenAI<default>false<keep-as-is>
+  enableAzureAIVision: "false" # <optional>Deploy Azure AI Vision<default>false<keep-as-is>
+  enableAzureSpeech: "false" # <optional>Deploy Azure AI Speech<default>false<keep-as-is>
+  enableAIDocIntelligence: "false" # <optional>Deploy Azure AI Document Intelligence<default>false<keep-as-is>
+  enableBing: "false" # <optional>Deploy Bing Search<default>false<keep-as-is>
+  enableBingCustomSearch: "false" # <optional>Deploy Bing Custom Search<default>false<keep-as-is>
+  bingCustomSearchSku: "G2" # <optional>Bing Custom Search SKU<default>G2<keep-as-is> ['G2'] G2 is custom search with grounding.
+  enableContentSafety: "false" # <optional>Deploy Azure AI Content Safety<default>false<keep-as-is>
   # === Databases ===
-  enableCosmosDB: "false" # true, if creating an own Capability host (enableAFoundryCaphost; "true"), then it is needed for AI Foundry V2 project, agents.
-  cosmosKind: "GlobalDocumentDB" # "MongoDB", "GlobalDocumentDB"
-  enablePostgreSQL: "false"
-  postGresAdminEmails: "email_adress_only" # pass a commaseparated list of email addresses. or a single email address
-  enableRedisCache: "false"
-  enableSQLDatabase: "false"
+  enableCosmosDB: "false" # <optional>Deploy Azure Cosmos DB<default>false<keep-as-is> Required if enableAFoundryCaphost:'true'.
+  cosmosKind: "GlobalDocumentDB" # <optional>Cosmos DB kind<default>GlobalDocumentDB<keep-as-is> <otherwise> "MongoDB".
+  enablePostgreSQL: "false" # <optional>Deploy Azure PostgreSQL<default>false<keep-as-is>
+  postGresAdminEmails: "email_adress_only" # <optional>PostgreSQL admin emails<default>email_adress_only<mandatory> if enablePostgreSQL:'true' <ensure> valid comma-separated email addresses.
+  enableRedisCache: "false" # <optional>Deploy Azure Cache for Redis<default>false<keep-as-is>
+  enableSQLDatabase: "false" # <optional>Deploy Azure SQL Database<default>false<keep-as-is>
   # === Azure Function ===
-  enableFunction: "false"
-  functionRuntime: "dotnet"
-  functionVersion: "v7.0"
+  enableFunction: "false" # <optional>Deploy Azure Function App<default>false<keep-as-is>
+  functionRuntime: "dotnet" # <optional>Azure Function runtime<default>dotnet<keep-as-is> <otherwise> "python", "node", "java", "powershell".
+  functionVersion: "v7.0" # <optional>Azure Function runtime version<default>v7.0<keep-as-is>
   # === Azure Webapp ===
-  enableWebApp: "false"
-  webAppRuntime: "python"
-  webAppRuntimeVersion: "3.11"
-  aseSku: "IsolatedV2"
-  aseSkuCode: "I1v2"
-  aseSkuWorkers: 1
+  enableWebApp: "false" # <optional>Deploy Azure Web App<default>false<keep-as-is>
+  webAppRuntime: "python" # <optional>Azure Web App runtime<default>python<keep-as-is> <otherwise> "dotnet", "node", "java".
+  webAppRuntimeVersion: "3.11" # <optional>Azure Web App runtime version<default>3.11<keep-as-is>
+  aseSku: "IsolatedV2" # <optional>App Service Environment SKU<default>IsolatedV2<keep-as-is> Used only if byoASEv3:'true' or a dedicated ASE is provisioned.
+  aseSkuCode: "I1v2" # <optional>App Service Environment SKU code<default>I1v2<keep-as-is>
+  aseSkuWorkers: 1 # <optional>App Service Environment worker count<default>1<keep-as-is>
   # === Container Apps ===
-  enableContainerApps: "false"
-  enableAppInsightsDashboard: "false"
+  enableContainerApps: "false" # <optional>Deploy Azure Container Apps<default>false<keep-as-is>
+  enableAppInsightsDashboard: "false" # <optional>Deploy Application Insights dashboard<default>false<keep-as-is>
   # aca_a_registry_image: "containerapps-default:latest"
-  aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+  aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" # <optional>Container Apps default image<default>mcr.microsoft.com/azuredocs/containerapps-helloworld:latest<keep-as-is> <otherwise> replace with your own ACR image.
   # === Integration ===
-  enableLogicApps: "false"
-  enableEventHubs: "false"
-  enableBotService: "true" # === AI: Bot Service - for Microsoft Foundry ===
-  foundryApiManagementResourceId: "" # === AI: API AI Gateway - for Microsoft Foundry === Optional, provide an existing API Management resource ID to integrate with Microsoft Foundry V22
+  enableLogicApps: "false" # <optional>Deploy Azure Logic Apps<default>false<keep-as-is>
+  enableEventHubs: "false" # <optional>Deploy Azure Event Hubs<default>false<keep-as-is>
+  enableBotService: "true" # <optional>Deploy Azure Bot Service<default>true<keep-as-is> Required for Microsoft Foundry agent scenarios.
+  foundryApiManagementResourceId: "" # <optional>APIM resource ID for Foundry integration<default>""<keep-as-is> <otherwise> provide existing API Management resource ID to integrate with Microsoft Foundry.
 
   # ============================================================================
   # MANDATORY (POST SETUP of a PROJECT): runNetworkingVar
@@ -306,11 +282,110 @@ variables:
   # Description: runNetworkingVar:"true"(default) 
   #  Keep true when creating a new project or update. Set "false" to UPDATE or ADD services without running the networking module, to optimize deployment time, and avoid touching the network, when not needed.
   # ============================================================================
-  runNetworkingVar: "true" # true, when creating a new project. Keep true, since create if not exists. Set to false, to optimize updates on project
+  runNetworkingVar: "true" # <mandatory>Run networking module<default>true<keep-as-is> true when creating or updating a project. <otherwise> false, to skip networking on service-only updates.
 
 ## ============================================================================
 ## END - FOREACH PER PROJECT (MANDATORY)
 ## ============================================================================
+  # ============================================================================
+  # OPTIONAL: GENAI: Default Models to start with.
+  # ============================================================================
+  deployModel_gpt_X: "false" # <optional>Deploy custom GPT-X model<default>false<keep-as-is> <otherwise> true, deploy the model defined in modelGPTXName.
+  modelGPTXName: "gpt-5-mini" # <optional>GPT-X model name<default>gpt-5-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
+  modelGPTXVersion: "" # <optional>GPT-X model version<default>""<keep-as-is> <otherwise> pin to a specific version string.
+  modelGPTXSku: "DataZoneStandard" # <optional>GPT-X deployment SKU<default>DataZoneStandard<keep-as-is> ['Standard','DataZoneStandard','GlobalStandard']
+  modelGPTXCapacity: 30 # <optional>GPT-X TPM capacity (K)<default>30<keep-as-is> 30 = 30K tokens per minute.
+
+  deployModel_text_embedding_ada_002: "false" # <optional>Deploy text-embedding-ada-002<default>false<keep-as-is>
+  deployModel_text_embedding_3_large: "true" # <optional>Deploy text-embedding-3-large<default>true<keep-as-is> <recommended> for production RAG scenarios.
+  deployModel_text_embedding_3_small: "false" # <optional>Deploy text-embedding-3-small<default>false<keep-as-is> <recommended> for cost-optimized scenarios.
+  default_embedding_capacity: 25 # <optional>Embedding model TPM capacity (K)<default>25<keep-as-is> 25 = 25K tokens per minute.
+
+  deployModel_gpt_4o_mini: "false" # <optional>Deploy gpt-4o-mini<default>false<keep-as-is>
+  default_gpt_4o_mini_version: "2024-07-18" # <optional>gpt-4o-mini version<default>2024-07-18<keep-as-is> Note: '2024-07-18' does not support Bing grounding in Agents.
+
+  deployModel_gpt_4o: "true" # <optional>Deploy gpt-4o<default>true<keep-as-is> <recommended> for general-purpose AI Foundry scenarios.
+  default_gpt_4o_version: "2024-11-20" # <optional>gpt-4o version<default>2024-11-20<keep-as-is> <otherwise> "2024-08-06".
+
+  default_gpt_capacity: 40 # <optional>GPT model TPM capacity (K)<default>40<keep-as-is> 40 = 40K tokens per minute.
+  default_model_sku: "Standard"  # <optional>Default GPT deployment SKU<default>Standard<keep-as-is> ['Standard','DataZoneStandard','GlobalStandard']
+  # ============================================================================
+  # OPTIONAL: Change if you want to create new resources. Keeps old.
+  # ============================================================================
+  admin_commonResourceSuffix: "-001" # <optional>Common resources suffix<default>-001<keep-as-is> <otherwise> change to reprovision new services in the same common RG while keeping old ones.
+  admin_prjResourceSuffix: "-001" # <optional>Project resources suffix<default>-001<keep-as-is> <otherwise> change to reprovision new services in the same project RG while keeping old ones.
+
+  # ============================================================================
+  # OPTIONAL: Built Agent: Azure Devops, or Github Actions Runners
+  # ============================================================================
+  disable_whitelisting_for_build_agents: "false" # <optional>Disable runner IP whitelisting<default>false<keep-as-is> <otherwise> true, skip whitelisting (use only if runner already has network access).
+
+  # ============================================================================
+  # OPTIONAL: BYO Overrides: Override AI Factory vanilla - BYOvNet, BYOsnet, BYOAse
+  # ============================================================================
+  # DOCS_byovnet_example: "esml-common-eus2-<network_env>001-rg" or 'esml-common-eus2-dev-001-rg' if 'network_env_dev' is an empty string
+  vnetResourceGroup_param: "" # <optional>BYO vNet resource group<default>""<keep-as-is> <otherwise> provide the full RG name of your existing vNet.
+  vnetNameFull_param: "" # <optional>BYO vNet full name<default>""<keep-as-is> <otherwise> provide the full name of your existing vNet.
+  commonResourceGroup_param: "" # <optional>BYO common resource group name<default>""<keep-as-is> <otherwise> provide a custom name for the common resource group.
+  datalakeName_param: "" # <optional>BYO data lake storage account name<default>""<keep-as-is> <otherwise> provide a custom storage account name.
+  kvNameFromCOMMON_param: "" # <optional>BYO common Key Vault name<default>""<keep-as-is> <otherwise> provide a custom Key Vault name.
+  useCommonACR_override: "true" # <optional>Use shared ACR override<default>true<keep-as-is> <otherwise> false, each project gets its own ACR (higher cost).
+  # ============================================================================
+  # OPTIONAL(CHANGE ONCE) - Bring your own vNet/subnets (BYO_subnets=true) 
+  # Default: leave false and empty strings to disable, and pipeline will create new subnets based on the CIDR
+  # ============================================================================
+  BYO_subnets: "false" # <optional>Bring your own subnets<default>false<keep-as-is> <otherwise> true, uses pre-existing subnets defined by the BYO subnet variables below.
+  network_env_dev: "dev-" # <optional>DEV environment prefix for BYO subnets<default>dev-<keep-as-is> <otherwise> set to empty string if not using environment-prefixed naming.
+  network_env_stage: "tst2-" # <optional>STAGE environment prefix for BYO subnets<default>tst2-<keep-as-is> <otherwise> "test-", "tst-", or empty string.
+  network_env_prod: "prd-" # <optional>PROD environment prefix for BYO subnets<default>prd-<keep-as-is> <otherwise> "prod-", "pr-", or empty string.
+  # DOCS_byosnet_common_example: "acme-<network_env>common-eus2-subnet"
+  subnetCommon: "snet-dev-esml-cmn-001" # <optional>BYO common subnet name<default>snet-dev-esml-cmn-001<mandatory> if BYO_subnets:'true' <ensure> subnet exists in your vNet.
+  subnetCommonScoring: "snet-<network_env>esml-cmn-001-scoring" # <optional>BYO scoring subnet name<default>snet-<network_env>esml-cmn-001-scoring<mandatory> if BYO_subnets:'true' <ensure> subnet exists. <network_env> is replaced with network_env_dev value.
+  subnetCommonPowerbiGw: "snet-esml-cmn-pbi-001" # <optional>BYO Power BI gateway subnet name<default>snet-esml-cmn-pbi-001<mandatory> if BYO_subnets:'true' <ensure> subnet exists.
+  # DOCS_byosnet_project_example: "acme-<network_env>prj<xxx>-genai-eus2-subnet"
+  subnetProjGenAI: "snt-dev-prj<xxx>-genai" # <optional>BYO project GenAI subnet name<default>snt-dev-prj<xxx>-genai<mandatory> if BYO_subnets:'true' <ensure> subnet exists. <xxx> is replaced with the project number.
+  subnetProjAKS: "snt-prj<xxx>-aks" # <optional>BYO project AKS subnet name<default>snt-prj<xxx>-aks<mandatory> if BYO_subnets:'true' <ensure> subnet exists.
+  subnetProjAKS2: "snt-<network_env>prj<xxx>-aks2" # <optional>BYO project secondary AKS subnet<default>snt-<network_env>prj<xxx>-aks2<mandatory> if BYO_subnets:'true' <ensure> subnet exists.
+  subnetProjACA: "snt-prj<xxx>-aca" # <optional>BYO project Container Apps subnet<default>snt-prj<xxx>-aca<mandatory> if BYO_subnets:'true' <ensure> subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.
+  subnetProjACA2: "snt-prj<xxx>-aca2" # <optional>BYO project secondary Container Apps subnet<default>snt-prj<xxx>-aca2<mandatory> if BYO_subnets:'true'.
+  subnetProjDatabricksPublic: "snt-prj001-dbxpub" # <optional>BYO Databricks public subnet<default>snt-prj001-dbxpub<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
+  subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # <optional>BYO Databricks private subnet<default>snt-prj<xxx>-dbxpriv<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
+  byoASEv3: "false" # <optional>Use BYO App Service Environment v3<default>false<keep-as-is> <otherwise> true, use an existing ASEv3 specified in byoAseFullResourceId.
+  byoAseFullResourceId: "/subscriptions/...yourASEnameS2" # <optional>BYO ASEv3 ARM resource ID<default>/subscriptions/...yourASEnameS2<mandatory> if byoASEv3:'true' <ensure> full ARM resource ID of the existing ASEv3.
+  byoAseAppServicePlanResourceId: "" # <optional>BYO App Service Plan resource ID<default>""<keep-as-is> <otherwise> provide full ARM resource ID of an existing App Service Plan within the ASEv3.
+
+  # ============================================================================
+  # GenAI-DEBUG - Dont touch: infra AIFactory core team only. 
+  # Purpose: To DISABLE full sections (for efficiency, if re-running pipeline)
+  # ============================================================================
+  debug_disable_validation_tasks: "false" # <optional>Disable validation tasks<default>false<keep-as-is> <otherwise> true, skip subnet validation, submodule check, DNS zones check to speed up re-runs.
+  debug_disable_05_build_acr_image: "false" # <optional>Skip ACR image build step<default>false<keep-as-is> <otherwise> true, skip. Cannot be disabled if enableContainerApps:'true'.
+  debug_disable_61_foundation: "false" # <optional>Skip foundation step<default>false<keep-as-is> <otherwise> true, skip: Resource groups, User-Assigned Managed Identities, VMs.
+  debug_disable_62_core_infrastructure: "false" # <optional>Skip core infrastructure step<default>false<keep-as-is> <otherwise> true, skip: Application Insights, Key Vault, Storage, ACR.
+  debug_disable_63_cognitive_services: "false" # <optional>Skip cognitive services step<default>false<keep-as-is> <otherwise> true, skip: AI Search, OpenAI, Vision, Speech, etc.
+  debug_disable_64_databases: "false" # <optional>Skip databases step<default>false<keep-as-is> <otherwise> true, skip: Cosmos DB, SQL Database, etc.
+  debug_disable_65_compute_services: "false" # <optional>Skip compute services step<default>false<keep-as-is> <otherwise> true, skip: Container Apps, Web App, Function App.
+  debug_disable_66_ai_platform: "false" # <optional>Skip AI platform step<default>false<keep-as-is> <otherwise> true, skip: AI Foundry Hub (V1) with default project and connections.
+  debug_disable_67_data_ml_platform: "false" # <optional>Skip ML platform step<default>false<keep-as-is> <otherwise> true, skip: Azure Machine Learning, Data Factory, Databricks.
+  debug_disable_68_integration: "false" # <optional>Skip integration step<default>false<keep-as-is> <otherwise> true, skip: Logic Apps, Event Hubs.
+  debug_disable_69_aifoundry_2025: "false" # <optional>Skip AI Foundry V2 step<default>false<keep-as-is> <otherwise> true, skip: AI Foundry V2 including RBAC and default project.
+  debug_disable_100_rbac_security: "false" # <optional>Skip RBAC and security step<default>false<keep-as-is> <otherwise> true, skip RBAC and security step for all services (steps 61-99).
+  debug_disable_10_aifactory_dashboards: "true" # <optional>Skip AI Factory dashboards step<default>true<keep-as-is>
+  
+  # ============================================================================
+  # OPTIONAL: ESML: Azure ML Compute & Performance
+  # ============================================================================
+  admin_aks_gpu_sku_dev_override: "Standard_B4ms" # <optional>AKS node VM SKU for DEV<default>Standard_B4ms<keep-as-is> <otherwise> change to a GPU-enabled SKU for ML workloads.
+  admin_aks_gpu_sku_test_prod_override: "Standard_DS13-2_v2" # <optional>AKS node VM SKU for TEST/PROD<default>Standard_DS13-2_v2<keep-as-is>
+  admin_aks_nodes_dev_override: 1 # <optional>AKS node count for DEV<default>1<keep-as-is>
+  admin_aks_nodes_testProd_override: 3 # <optional>AKS node count for TEST/PROD<default>3<keep-as-is>
+  admin_aks_version_override: "1.33.2" # <optional>AKS Kubernetes version<default>1.33.2<keep-as-is> <ensure> version is available in your region.
+  admin_aml_cluster_maxNodes_dev_override: 3 # <optional>AML cluster max nodes for DEV<default>3<keep-as-is>
+  admin_aml_cluster_maxNodes_testProd_override: 5 # <optional>AML cluster max nodes for TEST/PROD<default>5<keep-as-is>
+  admin_aml_cluster_sku_dev_override: "Standard_DS3_v2" # <optional>AML cluster VM SKU for DEV<default>Standard_DS3_v2<keep-as-is>
+  admin_aml_cluster_sku_testProd_override: "Standard_D13_v2" # <optional>AML cluster VM SKU for TEST/PROD<default>Standard_D13_v2<keep-as-is>
+  admin_aml_computeInstance_dev_sku_override: "Standard_DS11_v2" # <optional>AML compute instance SKU for DEV<default>Standard_DS11_v2<keep-as-is>
+  admin_aml_computeInstance_testProd_sku_override: "Standard_ND96amsr_A100_v4" # <optional>AML compute instance SKU for TEST/PROD<default>Standard_ND96amsr_A100_v4<keep-as-is> <otherwise> change to a lower-cost SKU to save cost.
   
   # ============================================================================
   # OPTIONAL: ENTRA ID SECURITY GROUPS - Object ID to PERSONAS
@@ -319,120 +394,55 @@ variables:
   # ============================================================================
   
   # EntraID group names
-  groups_project_members_esml: "<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>" #[GH-Secret] 3 groups of users. All except p001 group can be empty groups. ObjectID for Entra ID security groups in a commas separated list, without space
-  groups_project_members_genai_1: "<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>" #[GH-Secret] 5 groups. All except p011 can be empty groups. ObjectID for Entra ID security groups in a commas separated list, without space
-  groups_coreteam_members: "<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>" #[GH-Secret] 3 groups. ll except p080 group can be empty groups. Group ObjectID ObjectID for Entra ID security  in a commas separated list, without space
+  groups_project_members_esml: "<aif001sdc_prj001_team_lead_p001>,<aif001sdc_prj001_team_member_ds_p002>,<aif001sdc_prj001_team_member_fend_p003>" # <optional>ESML project team AD group ObjectIDs<default><todo>_grouped_objectids<mandatory> if use_ad_groups:'true' <todo> replace placeholders with real Entra ID security group ObjectIDs. 3 groups: team lead, data scientist, front-end. Comma-separated, without spaces.
+  groups_project_members_genai_1: "<aif001sdc_prj002_team_lead_p011>,<aif001sdc_prj002_genai_team_member_aifoundry_p012>,<aif002sdc_prj001_genai_team_member_agentic_p013>,<aif001sdc_prj001_genai_team_member_dataops_p014>,<aif001sdc_prj001_team_member_fend_p015>" # <optional>GenAI-1 project team AD group ObjectIDs<default><todo>_grouped_objectids<mandatory> if use_ad_groups:'true' <todo> replace placeholders with real Entra ID security group ObjectIDs. 5 groups for GenAI-1 project type. Comma-separated, without spaces.
+  groups_coreteam_members: "<aif001sdc_coreteam_admin_p080>,<aif001sdc_coreteam_dataops_p081>,<aif001sdc_coreteam_dataops_fabric_p082>" # <optional>Core team AD group ObjectIDs<default><todo>_grouped_objectids<mandatory> if use_ad_groups:'true' <todo> replace placeholders with real Entra ID security group ObjectIDs. 3 groups for core team. Comma-separated, without spaces.
   # Persona names
-  personas_project_esml: "p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops" # 4 Personas where first 3 contains users. The 4th is of type Service Principal. 3 are mapped to groups_project_members_esml & PROJECT_TYPE=esml
-  personas_project_genai_1: "p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops" # 6 Personas where 5 contain users. The 6th is an SP. mapped to groups_project_members_genai_1 & PROJECT_TYPE=genai-1
-  personas_core_team: "p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops" # 4 Personas, whereof first 3 contains useres. The 4th is a service principal. These personas are mapped to group_coreteam_members
-  # ============================================================================
-  # OPTIONAL: ESML: Azure ML Compute & Performance
-  # ============================================================================
-  admin_aks_gpu_sku_dev_override: "Standard_B4ms"
-  admin_aks_gpu_sku_test_prod_override: "Standard_DS13-2_v2"
-  admin_aks_nodes_dev_override: 1
-  admin_aks_nodes_testProd_override: 3
-  admin_aks_version_override: "1.33.2" # AKS version. SDC: "1.30.3" | EUS: "1.30.3"
-  admin_aml_cluster_maxNodes_dev_override: 3
-  admin_aml_cluster_maxNodes_testProd_override: 5
-  admin_aml_cluster_sku_dev_override: "Standard_DS3_v2"
-  admin_aml_cluster_sku_testProd_override: "Standard_D13_v2"
-  admin_aml_computeInstance_dev_sku_override: "Standard_DS11_v2" 
-  admin_aml_computeInstance_testProd_sku_override: "Standard_ND96amsr_A100_v4"
-  # ============================================================================
-  # OPTIONAL: GENAI: Default Models to start with.
-  # ============================================================================
-  deployModel_gpt_X: "false"
-  modelGPTXName: "gpt-5-mini"
-  modelGPTXVersion: ""
-  modelGPTXSku: "DataZoneStandard" # ['Standard','DataZoneStandard','GlobalStandard']
-  modelGPTXCapacity: 30 # TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K
+  personas_project_esml: "p001_esml_team_lead,p002_esml_team_member_datascientist,p003_esml_team_member_front_end,p101_esml_team_process_ops" # <optional>ESML project personas<default>p001_esml_team_lead,...<keep-as-is> Mapped to groups_project_members_esml and PROJECT_TYPE=esml.
+  personas_project_genai_1: "p011_genai_team_lead,p012_genai_team_member_aifoundry,p013_genai_team_member_agentic,p014_genai_team_member_dataops,p015_genai_team_member_frontend,p102_esml_team_process_ops" # <optional>GenAI-1 project personas<default>p011_genai_team_lead,...<keep-as-is> Mapped to groups_project_members_genai_1 and PROJECT_TYPE=genai-1.
+  personas_core_team: "p080_coreteam_it_admin,coreteam_dataops,p081_coreteam_dataops_fabric, p103_coreteam_team_process_ops" # <optional>Core team personas<default>p080_coreteam_it_admin,...<keep-as-is> Mapped to group_coreteam_members.
 
-  deployModel_text_embedding_ada_002: "false"
-  deployModel_text_embedding_3_large: "true"
-  deployModel_text_embedding_3_small: "false"
-  default_embedding_capacity: 25
-
-  deployModel_gpt_4o_mini: "false"
-  default_gpt_4o_mini_version: "2024-07-18" # Note: This model with version '2024-07-18' does not support Bing search grounding in Agents.
-
-  deployModel_gpt_4o: "true"
-  default_gpt_4o_version: "2024-11-20" # "2024-08-06", "2024-11-20"
-
-  default_gpt_capacity: 40 # TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K
-  default_model_sku: "Standard"  #  ['Standard','DataZoneStandard','GlobalStandard']
-  # ============================================================================
-  # OPTIONAL: Change if you want to create new resources. Keeps old.
-  # ============================================================================
-  admin_commonResourceSuffix: "-001" # Only if you want to reprovision new services within same resource group, esml-common. (and don't want to delete the old ones)
-  admin_prjResourceSuffix: "-001" # Only if you want to reprovision new services within same resource group, project-specific (and don't want to delete the old ones)
-
-  # ============================================================================
-  # OPTIONAL: Built Agent: Azure Devops, or Github Actions Runners
-  # ============================================================================
-  disable_whitelisting_for_build_agents: "false" # true, disable whitelisting of Azure Devops pipeline task/GHA, IPs in Keyvault.
-
-  # ============================================================================
-  # OPTIONAL: BYO Overrides: Override AI Factory vanilla - BYOvNet, BYOsnet, BYOAse
-  # ============================================================================
-  # DOCS_byovnet_example: "esml-common-eus2-<network_env>001-rg" or 'esml-common-eus2-dev-001-rg' if 'network_env_dev' is an empty string
-  vnetResourceGroup_param: ""
-  vnetNameFull_param: ""
-  commonResourceGroup_param: ""
-  datalakeName_param: ""
-  kvNameFromCOMMON_param: ""
-  useCommonACR_override: "true"
-  # ============================================================================
-  # OPTIONAL(CHANGE ONCE) - Bring your own vNet/subnets (BYO_subnets=true) 
-  # Default: leave false and empty strings to disable, and pipeline will create new subnets based on the CIDR
-  # ============================================================================
-  BYO_subnets: "false" # false, the default subnets created by the pipeline. true then Azure Devops pipeline will not run Networking step - your subnets, with names as below is used.
-  network_env_dev: "dev-" # used by both BYO_subnets, and vnetResourceGroup_param
-  network_env_stage: "tst2-"
-  network_env_prod: "prd-"
-  # DOCS_byosnet_common_example: "acme-<network_env>common-eus2-subnet"
-  subnetCommon: "snet-dev-esml-cmn-001" # Example: with no replacement of <network_env>
-  subnetCommonScoring: "snet-<network_env>esml-cmn-001-scoring" # Example: Replacement of <network_env> that will get value "dev-" from network_env_dev
-  subnetCommonPowerbiGw: "snet-esml-cmn-pbi-001"
-  # DOCS_byosnet_project_example: "acme-<network_env>prj<xxx>-genai-eus2-subnet"
-  subnetProjGenAI: "snt-dev-prj<xxx>-genai" # Example, with replacement of <xxx> but not with <network_env>
-  subnetProjAKS: "snt-prj<xxx>-aks"
-  subnetProjAKS2: "snt-<network_env>prj<xxx>-aks2" # Example, with replacement of <xxx> and <network_env> that will get value "dev-" from network_env_dev
-  subnetProjACA: "snt-prj<xxx>-aca"
-  subnetProjACA2: "snt-prj<xxx>-aca2"
-  subnetProjDatabricksPublic: "snt-prj001-dbxpub" # Example, no replacement of <xxx>
-  subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # Example, with replacement of <xxx>
-  byoASEv3: "false"
-  byoAseFullResourceId: "/subscriptions/...yourASEnameS2"
-  byoAseAppServicePlanResourceId: ""
-
-  # ============================================================================
-  # GenAI-DEBUG - Dont touch: infra AIFactory core team only. 
-  # Purpose: To DISABLE full sections (for efficiency, if re-running pipeline)
-  # ============================================================================
-  debug_disable_validation_tasks: "false" # OPTIMIZE: Disable validation tasks like subnet validation, submodule check, DNS zones check, etc.
-  debug_disable_05_build_acr_image: "false" # Cannot be disabled if ContainerApps is enabled.It needs ACR  networking with whitelist to Azure Deveops/GHA IPs, that this closes in the end.
-  debug_disable_61_foundation: "false" # Resource group, UAMI's, VM
-  debug_disable_62_core_infrastructure: "false" # Application Insights, Keyvault, Storage, ACR
-  debug_disable_63_cognitive_services: "false" # AI Search, OpenAI Standalone, Vision standalone, Speech standalone, ...
-  debug_disable_64_databases: "false" # CosmosDB, SQL Database, ...
-  debug_disable_65_compute_services: "false" # ContainerApps, WebApp, FunctionApp
-  debug_disable_66_ai_platform: "false" # AI Foundry Hub (V1) with default project, and connections to AISearch, Storage, ...
-  debug_disable_67_data_ml_platform: "false" # Azure Machine Learning, Datafactory, Databricks
-  debug_disable_68_integration: "false" # Logic Apps, Eventhubs
-  debug_disable_69_aifoundry_2025: "false" # AI Foundry V2, including RBAC, and default project (CosmosDB, Storage) 
-  debug_disable_100_rbac_security: "false" # RBAC for 61-99
-  debug_disable_10_aifactory_dashboards: "true" # AI Factory Dashboards
-  # ============================================================================
+# ============================================================================
+# EXTRA - EXPERIMENTAL, PLACEHOLDERS, AND DEPRECATED - DONT TOUCH (ONLY CHANGE IF YOU KNOW WHAT YOU ARE DOING)
+# ============================================================================
+  ## ============================================================================
   # DEBUG SETTINGS - Error Cleanup Tasks
   # Note: You still need to PURGE AIServices and AI Foundry project (2025) due to soft delete
-  # ============================================================================
-  debugEnableCleaning: "false" # Enable error cleanup tasks (71-73) that delete resources on deployment failures. Set to "true" to enable cleanup tasks.
+  ## ============================================================================
+  debugEnableCleaning: "false" # <optional>Enable error cleanup tasks<default>false<keep-as-is> <otherwise> true, enables cleanup tasks (71-73) that delete resources on deployment failures. Use only when debugging.
   # ============================================================================
   # RETRY SETTINGS - Job Retry Configuration
   # ============================================================================
-  enableRetries: "false" # Enable automatic job retries on failure. Set to "true" to enable retry logic for GenAI services deployment.
-  retryMinutes: "5" # Number of minutes to wait between 1st and 2nd attempts. Default is 5 minutes.
-  retryMinutesExtended: "15" # Number of minutes to wait between 2nd and 3rd attempts. Default is 15 minutes.
-  maxRetryAttempts: "2" # Maximum number of total attempts (1 original + 2 retries = 3 total attempts). Valid values: 1, 2, or 3
+  enableRetries: "false" # <optional>Enable automatic job retries<default>false<keep-as-is> <otherwise> true, enable automatic retries on failure for GenAI services deployment.
+  retryMinutes: "5" # <optional>Retry wait (minutes) 1st attempt<default>5<keep-as-is> Minutes between 1st and 2nd retry.
+  retryMinutesExtended: "15" # <optional>Retry wait (minutes) 2nd attempt<default>15<keep-as-is> Minutes between 2nd and 3rd retry.
+  maxRetryAttempts: "2" # <optional>Max total retry attempts<default>2<keep-as-is> Total attempts (1 original + N retries). Valid values: 1, 2, or 3.
+    
+  # ============================================================================
+  # DO NOT TOUCH
+  # ============================================================================
+  # === Deprecated-START: DO NOT USE. HAVE false on all 3. AI Foundry 2023-2025 Do not use from 2026-01 ===
+  enableAIServices: "false" # <keep-as-is> DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead.
+  enableAIFoundryHub: "false" # <keep-as-is> DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead.
+  addAIFoundryHub: "false"  # <keep-as-is> DEPRECATED. Do not enable.
+  # === Deprecated-END: ===
+  admin_ip_fw: "" # <keep-as-is> Leave empty. Will be automatically set by the pipeline to the build agent IP.
+  aifactory_salt_random: "" # <keep-as-is> Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline.
+  # ============================================================================
+  # Description: aifactory_salt:""(default) [5 chars] 
+  # What: 
+  #   A deteministic unique value unique for the AIFactory environment. Same for all projects.
+  # How to find it: 
+  #   Update with values from AI Factory COMMON Resource group.
+  #   The aifactory_salt can be read from the AI Factory common resource group in names of services such as Azure Datafactory
+  #   Example: the 'a4c2b'in "adf-cmn-weu-dev-a4c2b-001" and in Container registry, private endpoints: "pend-kv-cmndev-a4c2b-001-to-vnt-esmlcmn"
+  # Usage: aifactory_salt will be used in Project resource groups 'abcde' for resources such as Managed Identity  'mi-aca-prj001-sdc-dev-abcde19-2858-4a-001'
+  # ============================================================================
+  aifactory_salt: "" # Leave empty, 5 characters.  A deteministic unique value, from COMMON RG
+  admin_projectType: "all" # <mandatory><keep-as-is>
+  # ============================================================================
+  # END - DO NOT TOUCH
+  # ============================================================================
+# ============================================================================
+# EXTRA - END
+# ============================================================================
