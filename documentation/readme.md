@@ -20,7 +20,7 @@ It is also organized via the four components of the ESML AIFactory:
 
 # Documentation Executive Summary VS Full documentation
 The current page is only an *executive summary* of the documentation. 
-- Go here for the [Quick Documentation - parameter search tool](https://jostrm.github.io/azure-enterprise-scale-ml/)
+- Go here for the [Quick Documentation - parameter search tool](https://jostrm.github.io/azure-enterprise-scale-ml/parameters/) and where the *AI Factory Configuration Wizard* can be downloaded.
 - Go here for the [Full Documentation](./v2/10_index.md)
 
 ## ESML AIFactory: The 4 components of acceleration
