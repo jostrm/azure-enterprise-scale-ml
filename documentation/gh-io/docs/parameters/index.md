@@ -18,7 +18,7 @@ Download the Configuration Wizard for your platform:
 - [**Download AI Factory Configuration Wizard — Linux**](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/aifactory-config-linux.zip)
 - [**Download AI Factory Configuration Wizard — macOS**](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/aifactory-config-macos.zip)
 
-![AI Factory Configuration Wizard](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/images/aifactory-config-wizard-02.png)
+![AI Factory Configuration Wizard](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/images/aifactory-config-wizard-01.png)
 
 ---
 

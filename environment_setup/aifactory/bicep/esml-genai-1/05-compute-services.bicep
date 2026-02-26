@@ -612,8 +612,8 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
   }
 }
 
-// Subnet delegation for Container Apps
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists && enableContainerApps) && (!aiFoundryV2Exists && !disableAgentNetworkInjection)) {
+// Subnet delegation for Container Apps OR Foundry
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) {
   name: take('05-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
