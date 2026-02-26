@@ -2,7 +2,9 @@
 
 Quick Setup
 1) [Prerequisites - to setup AIFactory](./10-19/12-prerequisites-setup.md) - Estimated setup time: 1-2h
+- Note: Go here for the [Quick Documentation - parameter search tool](https://jostrm.github.io/azure-enterprise-scale-ml/parameters/) where also the *AI Factory Configuration Wizard" can be downloaded. 
 2) [End-2-End SETUP tutorial - AIFactory + 1 ESMLProject](#24-end-2-end-setup-tutorial-aifactory-4-8-hours---how-to) - Estimated setup time: 4-8h
+
 
 **Governance related** - relevant for central IT, networking team (CoreTeam: 10-29)
 

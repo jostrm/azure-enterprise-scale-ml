@@ -19,7 +19,9 @@ It is also organized via the four components of the ESML AIFactory:
 | 4) Accelerators: ESML SDK (Python, PySpark), RAG Chatbot, etc  | Y | - |ProjectTeam | 30-39 |
 
 # Documentation Executive Summary VS Full documentation
-The current page is only an *executive summary* of the documentation. Go here for the [Full Documentation](./v2/10_index.md)
+The current page is only an *executive summary* of the documentation. 
+- Go here for the [Quick Documentation - parameter search tool](https://jostrm.github.io/azure-enterprise-scale-ml/)
+- Go here for the [Full Documentation](./v2/10_index.md)
 
 ## ESML AIFactory: The 4 components of acceleration
 ![](./v2/10-19/images/10-aifactory-4-components-2024-small.png)
