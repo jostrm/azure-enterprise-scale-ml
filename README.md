@@ -27,7 +27,7 @@ The resources that can be added in packages of configs, such as **ARCHITECTURES*
 [How-to SETUP AI Factory](./documentation/v2/20-29/24-end-2-end-setup.md)<br>
 - **Includes two setup modes:** *Fully private AI factory* or *Standalone AI Factory* (VPN, IP whitelist, Bastion, or Hybrid access)
 - **Supports both Github Actions or Azure Devops** as orchestrator to kick-off network calculation and the IaC (BICEP)
-- **AI Factory Configuration Wizard** Setup in minutes, intelligent workflow-drivern setup Wizard 
+- [**AI Factory Configuration Wizard**](./environment_setup/install_config_wizard/readme.md) Setup in minutes, intelligent workflow-drivern setup Wizard.
 
 [How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) - When a new feature arrives, or fix for breaking changes in a product?
 - See RELEASES - for Latest, recommended version.
