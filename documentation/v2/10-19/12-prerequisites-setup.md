@@ -7,7 +7,7 @@
 ## 📋 Summary of what is needed (Steps 1-6 covers the details)
 The output from prerequisites, is Azure, and orchestrator (Github or Azure Devops), and Access (Entra ID) for the automation.
 
-The values from prerequisites, will be used to set the PARAMETERS in the AI Factory. See [PARAMETERS here](https://jostrm.github.io/azure-enterprise-scale-ml/parameters/)
+The values from prerequisites, will be used to set the PARAMETERS in the AI Factory. See [PARAMETERS here](https://jostrm.github.io/azure-enterprise-scale-ml/parameters/), all of these PARAMETERS can be set in a .yaml file manually, or set via the [*AI Factory Configuration Wizard*](../../../environment_setup/install_config_wizard/readme.md), the latter is recommended.
 
 - 🗂️ **Github / Azure Devops**
     - **Steps: 1**
