@@ -40,7 +40,7 @@ The **Enterprise Scale AI Factory** is a plug-and-play solution that automates t
     - `WAF Cost optimization`: Reuse networking and common artifacts, across services in an architecture used by the `use case` and team
     - `WAF Security`: `Least privileged access` since the end-users does not need to have access on certain networking resources and other artifacts. `Granular security`
     - `Operations`: `Reusing` common artifacts also makes it easier to operate, such as `Centralized Monitoring & Logging`, `Common security` separated from granular `Role Specific Access`.
-    - See full [Documentation](./documentation/readme.md) for more info
+    - See full [Documentation](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10_index.md) for more info
 - The AI Factory is designed, with its own compatible TEMPLATES for DataOps, MLOps, GenAIOps ( to avoid the challenges of incompatible security, etc)
 - Each `AI Factory project` can `add or remove +34 Azure services` - e.g. Not only the GenAI part of a solution, but also to avoid the challenges of incompatible security with ease and full automation of creating an End-2-End solution with 100% private networking for:
         - Full AI: Both GenAI (Foundry) and Machine Learning (Azure Machine Learning, Azure Databricks)
