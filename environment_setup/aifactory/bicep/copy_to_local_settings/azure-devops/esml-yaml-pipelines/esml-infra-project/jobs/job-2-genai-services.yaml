@@ -13,63 +13,23 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
       #!/bin/bash
-      
-      NETWORK_ENV="$(network_env)"
-      VNET_RG="$(vnetResourceGroup_param)"
-      VNET_NAME="$(vnetNameFull_param)"
-      
-      echo "Original vnetResourceGroup_param: $VNET_RG"
-      echo "Original vnetNameFull_param: $VNET_NAME"
-      echo "network_env value: $NETWORK_ENV"
-      
-      # Replace <network_env> placeholder in VNET_RG if it exists
-      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
-        echo "Found <network_env> placeholder in vnetResourceGroup_param"
-        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
-        echo "Replaced with network_env value: $NETWORK_ENV"
-      fi
-      
-      # Replace <network_env> placeholder in VNET_NAME if it exists
-      if [[ "$VNET_NAME" == *"<network_env>"* ]]; then
-        echo "Found <network_env> placeholder in vnetNameFull_param"
-        VNET_NAME="${VNET_NAME//<network_env>/$NETWORK_ENV}"
-        echo "Replaced with network_env value: $NETWORK_ENV"
-      fi
-      
-      # If VNET variables are not set (empty or unexpanded), use naming convention
-      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
-        VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
-        echo "VNET name not set, using naming convention: $VNET_NAME"
-      else
-        echo "Using provided VNET name: $VNET_NAME"
-      fi
-      
-      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_param\)* ]]; then
-        # Use the common resource group naming convention
-        VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-        echo "VNET resource group not set, using naming convention: $VNET_RG"
-      else
-        echo "Using provided VNET resource group: $VNET_RG"
-      fi
-      
-      # Set resolved values as pipeline variables for reuse
-      echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
-      echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
-      
-      echo "Resolved vnetResourceGroup: $VNET_RG"
-      echo "Resolved vnetNameFull: $VNET_NAME"
-      echo "Variables set: vnetResourceGroup_resolved and vnetNameFull_resolved"
 
       # ---------------------------------------------------------------
-      # BYO_subnets=false (default): clear all subnet name variables so
-      # Bicep templates use their own naming convention. The values in
-      # variables.yaml are documentation examples only and must never be
-      # passed to deployments when the pipeline manages subnets itself.
-      # BYO_subnets=true: leave variables as-is (user-provided names).
+      # BYO_subnets guard: evaluated FIRST before any variable usage.
+      # When BYO_subnets=false (default), network_env and all subnet name
+      # variables are documentation examples only and must be treated as
+      # empty so Bicep and the PS1 script fall back to their own naming
+      # conventions (snt-prj003-genai, snet-esml-cmn-001, etc.).
+      # When BYO_subnets=true, the values from variables.yaml are used.
       # ---------------------------------------------------------------
       BYO="$(BYO_subnets)"
-      if [ "$BYO" != "true" ]; then
-        echo "BYO_subnets=false: clearing subnet name overrides so Bicep uses naming convention"
+      if [ "$BYO" = "true" ]; then
+        NETWORK_ENV="$(network_env)"
+        echo "BYO_subnets=true: using network_env=$NETWORK_ENV and provided subnet names"
+      else
+        NETWORK_ENV=""
+        echo "BYO_subnets=false: network_env forced to empty; Bicep/PS1 will use naming convention"
+        echo "##vso[task.setvariable variable=network_env]"
         echo "##vso[task.setvariable variable=subnetCommon]"
         echo "##vso[task.setvariable variable=subnetCommonScoring]"
         echo "##vso[task.setvariable variable=subnetCommonPowerbiGw]"
@@ -80,11 +40,51 @@ steps:
         echo "##vso[task.setvariable variable=subnetProjACA2]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
-      else
-        echo "BYO_subnets=true: using provided subnet names from variables"
-        echo "  subnetCommon=$(subnetCommon)"
-        echo "  subnetProjGenAI=$(subnetProjGenAI)"
       fi
+
+      VNET_RG="$(vnetResourceGroup_param)"
+      VNET_NAME="$(vnetNameFull_param)"
+
+      echo "Original vnetResourceGroup_param: $VNET_RG"
+      echo "Original vnetNameFull_param: $VNET_NAME"
+      echo "network_env value: $NETWORK_ENV"
+
+      # Replace <network_env> placeholder in VNET_RG if it exists
+      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetResourceGroup_param"
+        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+
+      # Replace <network_env> placeholder in VNET_NAME if it exists
+      if [[ "$VNET_NAME" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetNameFull_param"
+        VNET_NAME="${VNET_NAME//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+
+      # If VNET variables are not set (empty or unexpanded), use naming convention
+      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
+        VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
+        echo "VNET name not set, using naming convention: $VNET_NAME"
+      else
+        echo "Using provided VNET name: $VNET_NAME"
+      fi
+
+      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_param\)* ]]; then
+        VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "VNET resource group not set, using naming convention: $VNET_RG"
+      else
+        echo "Using provided VNET resource group: $VNET_RG"
+      fi
+
+      # Set resolved values as pipeline variables for reuse
+      echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
+      echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
+
+      echo "Resolved vnetResourceGroup: $VNET_RG"
+      echo "Resolved vnetNameFull: $VNET_NAME"
+      echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
   condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))

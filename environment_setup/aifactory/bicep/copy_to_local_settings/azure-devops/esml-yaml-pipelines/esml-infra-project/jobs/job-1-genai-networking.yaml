@@ -12,36 +12,62 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
       #!/bin/bash
-      
-      NETWORK_ENV="$(network_env)"
+
+      # ---------------------------------------------------------------
+      # BYO_subnets guard: evaluated FIRST before any variable usage.
+      # When BYO_subnets=false (default), network_env and all subnet name
+      # variables are documentation examples only and must be treated as
+      # empty so the networking Bicep falls back to its naming convention.
+      # When BYO_subnets=true, the values from variables.yaml are used.
+      # ---------------------------------------------------------------
+      BYO="$(BYO_subnets)"
+      if [ "$BYO" = "true" ]; then
+        NETWORK_ENV="$(network_env)"
+        echo "BYO_subnets=true: using network_env=$NETWORK_ENV and provided subnet names"
+      else
+        NETWORK_ENV=""
+        echo "BYO_subnets=false: network_env forced to empty; Bicep/PS1 will use naming convention"
+        echo "##vso[task.setvariable variable=network_env]"
+        echo "##vso[task.setvariable variable=subnetCommon]"
+        echo "##vso[task.setvariable variable=subnetCommonScoring]"
+        echo "##vso[task.setvariable variable=subnetCommonPowerbiGw]"
+        echo "##vso[task.setvariable variable=subnetProjGenAI]"
+        echo "##vso[task.setvariable variable=subnetProjAKS]"
+        echo "##vso[task.setvariable variable=subnetProjAKS2]"
+        echo "##vso[task.setvariable variable=subnetProjACA]"
+        echo "##vso[task.setvariable variable=subnetProjACA2]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
+      fi
+
       VNET_RG="$(vnetResourceGroup_param)"
       VNET_NAME="$(vnetNameFull_param)"
-      
+
       echo "Original vnetResourceGroup_param: $VNET_RG"
       echo "Original vnetNameFull_param: $VNET_NAME"
       echo "network_env value: $NETWORK_ENV"
-      
+
       # Replace <network_env> placeholder in VNET_RG if it exists
       if [[ "$VNET_RG" == *"<network_env>"* ]]; then
         echo "Found <network_env> placeholder in vnetResourceGroup_param"
         VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
         echo "Replaced with network_env value: $NETWORK_ENV"
       fi
-      
+
       # Replace <network_env> placeholder in VNET_NAME if it exists
       if [[ "$VNET_NAME" == *"<network_env>"* ]]; then
         echo "Found <network_env> placeholder in vnetNameFull_param"
         VNET_NAME="${VNET_NAME//<network_env>/$NETWORK_ENV}"
         echo "Replaced with network_env value: $NETWORK_ENV"
       fi
-      
+
       # Set resolved values as pipeline variables for reuse
       echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
       echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
-      
+
       echo "Resolved vnetResourceGroup: $VNET_RG"
       echo "Resolved vnetNameFull: $VNET_NAME"
-      echo "Variables set: vnetResourceGroup_resolved and vnetNameFull_resolved"
+      echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
   condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
