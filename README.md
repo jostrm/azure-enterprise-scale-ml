@@ -15,11 +15,11 @@ The deployed features follow [Microsoft's Well-Architected Framework WAF](https:
 > Since *Well-architected Framework* does not recommend using the Azure Developer CLI (`AZD`) for production purposes (or other dev/preview technology such as Azure Verified Module(`AVM`), we removed those, to only use GA `Azure CLI` with orchestrator pipelines in `Github Actions`or `Azure Devops pipelines`.
 > Also both a Managed Identity and Service principal is created for your team, to be able to automate the full **GenAIOps process** (via the GenAIOps template)
 
-The *AI Factory project* can have 1 or many resources *ENABLED=True* to get a *GenAI* baseline architecture automated in 10 minutes with resources: **AI Foundry, AI Services, AI Search** + 2 Storage accounts, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access. <br>
+The *AI Factory project* can have 1 or many resources *ENABLED=True* to get a *GenAI* with *Machine Learning* baseline architecture automated in 10 minutes with resources: **AI Foundry, AI Services, AI Search, Azure Machine Learning, Databricks** + 2 Storage accounts, Keyvault, Monitoring, Dashboards, Private networking - optionally hybrid mode with public user access. <br>
 Via *AI Factory feature flags* you can add optional resources, re-run the Github action workflow (or Azure Devops pipeline) - to incrementally build your solution (e.g start without front-end in PoC). 
 
 The resources that can be added in packages of configs, such as **ARCHITECTURES** seen in the image below: 
-- **AI related**: Azure OpenAI (standalone), Azure Machine Learning, Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
+- **AI related**: Microsoft Foundry, Azure OpenAI (standalone), Azure Machine Learning, Azure Databricks Bing Grounding, AI Search (on/off), Azure Speech, Azure Vision
 - **Front end/Backend hosting**: Azure ContainerApps, Azure Webapp/function, AKS (fully private, and Azure Arc enabled)
 - **Data & Databases**: Azure Cosmos DB, MongoDB, Azure SQL Database, PostgreSQL Flexible server, Azure cache for Redis
 - **Integration & ELT/ETL/Streaming**: Logic Apps, Azure Datafactory, Databricks, EventHubs, APIM - AI Gateway Hub(integration & IaC), Microsoft Onelake (integration: Snowflake, S3, etc)
