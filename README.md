@@ -42,6 +42,24 @@ The resources that can be added in packages of configs, such as **ARCHITECTURES*
 > [!TIP]
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a submodule repo.
 >
+## AI factory *AI Application Landingzones*: CONCEPTS & DESIGN: Differentiators? 
+- The AI Factory wraps multiple environments together: Dev, Stage, Prod, per team, called `AI Factory project`.
+- The AI Factory sets up 1 to 3 AI Application Landing Zones per `AI Factory project` and `project team` (a team assigned to a project)
+- The AI Factory scales with Azure Subscriptions, called `AI Factory scale sets`, each team their own scaleset (3 Subscriptions = Application Landingzones)
+- Each AI Factory project (landingzone) is divided in two parts: COMMON & PROJECT specific, on resource group level - since required to align with WAF & CAF: 
+    - `WAF Cost optimization`: Reuse networking and common artifacts, across services in an architecture used by the `use case` and team
+    - `WAF Security`: `Least privileged access` since the end-users does not need to have access on certain networking resources and other artifacts. `Granular security`
+    - `Operations`: `Reusing` common artifacts also makes it easier to operate, such as `Centralized Monitoring & Logging`, `Common security` separated from granular `Role Specific Access`.
+    - See full [Documentation](./documentation/readme.md) for more info
+- The AI Factory is designed, with its own compatible TEMPLATES for DataOps, MLOps, GenAIOps ( to avoid the challenges of incompatible security, etc)
+- Each `AI Factory project` can `add or remove +34 Azure services` - e.g. **Not only** the GenAI part of a solution, but also to avoid the challenges of incompatible security with ease and full automation of creating an End-2-End solution with 100% private networking for:
+        - Full AI: Both GenAI (Foundry) and Machine Learning (Azure Machine Learning, Azure Databricks)
+        - Front-End (UI, Caching)
+        - Back-End (Databases)
+        - Integration (LogicApps, APIM, Eventhubs) 
+        - Soveregnity: On-premises link via Azure Arc to Azure Machine Learning, Kubernetes, for Sovereign Cloud purposes. 
+
+---
 
 <details>
   <summary><b>This accelerator: Main purpose</b></summary>

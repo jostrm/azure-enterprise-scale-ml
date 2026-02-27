@@ -519,6 +519,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ai-factory-ai-application-landingzones-concepts-design-differentiators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI factory AI Application Landingzones: CONCEPTS &amp; DESIGN: Differentiators?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#architectures" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1410,6 +1421,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ai-factory-ai-application-landingzones-concepts-design-differentiators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AI factory AI Application Landingzones: CONCEPTS &amp; DESIGN: Differentiators?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#architectures" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1506,6 +1528,27 @@
 <li><strong>Turn-key Enterprise Scale Data Lake with Datamesh</strong>: A structured, permission-layered data lake is provisioned automatically, with per-project ACL isolation and Datamesh-ready design, to marry data management with AI workloads.</li>
 <li><strong>Flexible with 10+ BYO concepts</strong>: Bring Your Own IaC (Bicep, Terraform, ARM) on top of the AI Factory pipelines; BYO networking (VNet, subnets, routing tables); BYO Data Lake; BYO App Service Environment; BYO encryption key (CMK) — all configurable via a handful of parameters.</li>
 </ol>
+<hr />
+<h2 id="ai-factory-ai-application-landingzones-concepts-design-differentiators">AI factory AI Application Landingzones: CONCEPTS &amp; DESIGN: Differentiators?<a class="headerlink" href="#ai-factory-ai-application-landingzones-concepts-design-differentiators" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The AI Factory wraps multiple environments together: Dev, Stage, Prod, per team, called <code>AI Factory project</code>.</li>
+<li>The AI Factory sets up 1 to 3 AI Application Landing Zones per <code>AI Factory project</code> and <code>project team</code> (a team assigned to a project)</li>
+<li>The AI Factory scales with Azure Subscriptions, called <code>AI Factory scale sets</code>, each team their own scaleset (3 Subscriptions = Application Landingzones)</li>
+<li>Each AI Factory project (landingzone) is divided in two parts: COMMON &amp; PROJECT specific, on resource group level - since required to align with WAF &amp; CAF: <ul>
+<li><code>WAF Cost optimization</code>: Reuse networking and common artifacts, across services in an architecture used by the <code>use case</code> and team</li>
+<li><code>WAF Security</code>: <code>Least privileged access</code> since the end-users does not need to have access on certain networking resources and other artifacts. <code>Granular security</code></li>
+<li><code>Operations</code>: <code>Reusing</code> common artifacts also makes it easier to operate, such as <code>Centralized Monitoring &amp; Logging</code>, <code>Common security</code> separated from granular <code>Role Specific Access</code>.</li>
+<li>See full <a href="./documentation/readme.md">Documentation</a> for more info</li>
+</ul>
+</li>
+<li>The AI Factory is designed, with its own compatible TEMPLATES for DataOps, MLOps, GenAIOps ( to avoid the challenges of incompatible security, etc)</li>
+<li>Each <code>AI Factory project</code> can <code>add or remove +34 Azure services</code> - e.g. Not only the GenAI part of a solution, but also to avoid the challenges of incompatible security with ease and full automation of creating an End-2-End solution with 100% private networking for:
+        - Full AI: Both GenAI (Foundry) and Machine Learning (Azure Machine Learning, Azure Databricks)
+        - Front-End (UI, Caching)
+        - Back-End (Databases)
+        - Integration (LogicApps, APIM, Eventhubs) 
+        - Soveregnity: On-premises link via Azure Arc to Azure Machine Learning, Kubernetes, for Sovereign Cloud purposes. </li>
+</ul>
 <hr />
 <h2 id="architectures">Architectures<a class="headerlink" href="#architectures" title="Permanent link">&para;</a></h2>
 <p>The AI Factory supports two baseline architectures:</p>

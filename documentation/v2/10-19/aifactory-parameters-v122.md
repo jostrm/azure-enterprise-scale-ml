@@ -1,3 +1,10 @@
+# Version 1.24 and above
+> [!NOTE]
+> This page has moved.
+
+➡️ **[Go here for AI Factory Docs about PARAMETERS](https://jostrm.github.io/azure-enterprise-scale-ml/parameters/)**
+
+
 # Version 1.22
 
 # 01-foundation.bicep

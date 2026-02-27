@@ -51,8 +51,8 @@ if [ "$init_esml_util" = true ]; then
 fi
 
 ## TEMPLATES: infra orchestration (pipelines) - ADO (Bicep)
-mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/classic/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/classic/"
+# mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/classic/"
+# cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/classic/"
 
 mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/yaml/"
 cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/yaml/" -r

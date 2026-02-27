@@ -96,6 +96,14 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
 
 
 ## 👤 Step 5) EntraID: Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
+
+> **TIP: How to create service principals for PROJECTS, and add to SEEDING KEYVAULT**
+> 1) Copy this file to your local computer, e.g. under your "aifactory" folder
+>   - [29-create-sp-or-update-oid-for-project.sh](../../../environment_setup/aifactory/bicep/esml-util/29-create-sp-or-update-oid-for-project.sh)
+> 2) Edit the variables: 
+> 3) Run it
+
+
 - **Purpose:** To be used to setup the AIFactory. The information of the service principals: ObjectID, ApplicationID, Secret needs to be stored in the seeding keyvault
     - **SP1: `esml-common-bicep-sp`:** IaC purpose. This service principal will be used as a Service connection in Azure Devops. Used in a pipeline to create the AIFactory.
         - Store the info in the seeding keyvault.

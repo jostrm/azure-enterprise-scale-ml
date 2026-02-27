@@ -20,7 +20,7 @@ git submodule update --init --recursive --remote
 
 **Option A)** To get `stable version` (recommended), set at specific `RELEASE branch`: 
 ```
-git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
+git submodule foreach 'git checkout "release/v1.24" && git pull origin "release/v1.24"'
 ```
 
 **Option B)**
@@ -42,7 +42,6 @@ If such feature is added, the below "pipelines & variables", may need to be upda
 The below files will be updated via `bash` scripts:
 - `Pipeline templates (.yaml)` located `aifactory/esml-infa/azure-devops`
 - `Variables.yaml` located `aifactory/esml-infa/azure-devops/variables`
-- `parameter files (.json)` (sometimes / rare cases) located `aifactory/parameters`
 
 
 ##  A) Azure Devops: How-To
@@ -55,7 +54,7 @@ The below files will be updated via `bash` scripts:
     git submodule update --init --recursive --remote
     ```
     ```
-    git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
+    git submodule foreach 'git checkout "release/v1.24" && git pull origin "release/v1.24"'
     ```
 
 2) Run the START script - to ensure you have the latest bootstrap scripts. 
@@ -78,24 +77,13 @@ The below files will be updated via `bash` scripts:
     - Compare the file, to see if any new variables have been added, that you need to set, then set them
     - Example below: 
     ```yaml
-    # Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
-    BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
-    network_env_dev: "" # Example: "dev-" Default is empty string. Set to empty if  BYO_subnets: "false"
-    network_env_stage: "" # Example: "stage-"
-    network_env_prod: "" # # Example: "prod-"
+    # ============================================================================
+    # MANDATORY(CHANGE RARELY):RBAC restrictions
+    # ============================================================================
+  BYOContributorRoleID: "b24988ac-6180-42a0-ab88-20f7382dd24c" # <optional>Contributor role ID<default>b24988ac-6180-42a0-ab88-20f7382dd24c<keep-as-is> Azure built-in Contributor. <otherwise> provide a custom role ID for finer-grained access control.
+  disableContributorAccessForUsers: "false" # <optional>Disable Contributor for project users<default>false<recommended> false, enables users to create artifacts (managed online endpoints etc). <otherwise> true, restrict Contributor access.
+  disableRBACAdminOnRGForUsers: "true" # <optional>Disable RBAC Admin on RG for project users<default>true<recommended> true, restricts users from assigning RBAC at resource group scope.
     ```
-
-5) `Rare cases`: Added or updated base `parameter` files, or parameters inside of files
-    - Friendly: It will NOT overwrie your `aifactory` folder. It will create a new folder at root called `aifactory-templates`
-    - TODO: Check the `release-notes` to see which file need to be updated. Example: Lately most changes is in 
-        - `10-esml-globals-override.json`
-        - `31-esgenai-default.json`
-        - You may also do a file compare on each file in `aifactory-template/parameters`, with your files `aifactory/parameters`, to see if any parameters are added or removed. 
-
-    ```bash
-    bash ./01-aif-copy-aifactory-templates.sh
-    ```
-
 **Finished!**
 
 </details>
@@ -118,7 +106,7 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
     git submodule update --init --recursive --remote
     ```
     ```
-    git submodule foreach 'git checkout "release/v1.20" && git pull origin "release/v1.20"'
+    git submodule foreach 'git checkout "release/v1.24" && git pull origin "release/v1.24"'
     ```
 
 2) Run the START script - to ensure you have the latest bootstrap scripts. 

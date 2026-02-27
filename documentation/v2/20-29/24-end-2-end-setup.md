@@ -22,23 +22,19 @@
         ```bash
            gh --version
         ```` 
+### Prerequisite (Optional But Highly Recommended) - AI Factory Configuration Wizard
+
+Use the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md)
 
 ## Setup options: 
-Whether you want to use Azure DevOps or GitHub, we recommend using the **AI Factory Configuration Wizard** to configure the AI Factory and its first project initially. The wizard provides a guided, form-based UI that validates your inputs and generates a correctly populated configuration file — significantly reducing the risk of misconfiguration on first deployment.
+Whether you want to use Azure DevOps or GitHub, we recommend using the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to configure the AI Factory and its first project initially. The wizard provides a guided, form-based UI that validates your inputs and generates a correctly populated configuration file — significantly reducing the risk of misconfiguration on first deployment.
 
 ![AI Factory Configuration Wizard](../../../environment_setup/install_config_wizard/images/aifactory-config-wizard-01.png)
 
 > **Two common workflows**
 >
 > - **ITSM-integrated (fully automated):** Many teams integrate the AI Factory pipelines directly with their ITSM system (ServiceNow, Jira Service Management, etc.), so that project teams can "order" an AI Factory project via a self-service ticket — triggering the pipeline with 100% automation and zero manual intervention.
-> - **Core-team managed:** Other teams prefer to route tickets to the AI Factory core team, who then uses the **AI Factory Configuration Wizard** to generate the correct configuration from the ticket information and trigger the pipeline on behalf of the requesting team.
-
-Download the Configuration Wizard for your platform:
-
-- [**Download AI Factory Configuration Wizard — Windows**](../../../environment_setup/install_config_wizard/aifactory-config-windows.zip)
-- [**Download AI Factory Configuration Wizard — Linux**](../../../environment_setup/install_config_wizard/aifactory-config-linux.gzip)
-- [**Download AI Factory Configuration Wizard — macOS**](../../../environment_setup/install_config_wizard/aifactory-config-linux.tar)
-
+> - **Core-team managed:** Other teams prefer to route tickets to the AI Factory core team, who then uses the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to generate the correct configuration from the ticket information and trigger the pipeline on behalf of the requesting team.
 
 ### Option A — Azure DevOps
 
@@ -71,16 +67,12 @@ But if you want simplicity or want to setup an AI Factory in an isolated bubble 
 ### Standalone
 For `Standalone mode` using the *AI Factory common resource group* for both `Virtual Network, Network Security Groups, Private DNS zones` set the values as below: `true, subscriptionId and resourceGroupName` where your centralized Private DNS zones resides. This is usually your Hub subscription and platform-connectivity resource group.
 
-```json
-        "centralDnsZoneByPolicyInHub": {
-            "value": false
-        },
-        "privDnsSubscription_param": {
-            "value": ""
-        },
-        "privDnsResourceGroup_param": {
-            "value": ""
-        },
+```python
+  # HUB vs STANDALONE
+  
+  CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB="false" # <optional>Centralized DNS via Hub policy<default>false<keep-as-is> <otherwise> true, uses central private DNS zones in HUB resource group managed by Azure Policy.
+  PRIV_DNS_SUBSCRIPTION_PARAM="<todo>" # <optional>Hub DNS subscription ID<default><todo>_SubscriptionID<mandatory> if CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB:'true' <ensure> Hub connectivity subscription ID.
+  PRIV_DNS_RESOURCE_GROUP_PARAM="<todo>" # <optional>Hub DNS resource group<default><todo>_ResourceGroup_name<mandatory> if CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB:'true' <ensure> Hub connectivity resource group.
 ```
 
 ### Hub-Connected & Centralized private DNS zones

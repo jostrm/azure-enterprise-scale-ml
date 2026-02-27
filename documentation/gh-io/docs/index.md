@@ -32,6 +32,25 @@ The **Enterprise Scale AI Factory** is a plug-and-play solution that automates t
 
 ---
 
+## AI factory AI Application Landingzones: CONCEPTS & DESIGN: Differentiators?
+- The AI Factory wraps multiple environments together: Dev, Stage, Prod, per team, called `AI Factory project`.
+- The AI Factory sets up 1 to 3 AI Application Landing Zones per `AI Factory project` and `project team` (a team assigned to a project)
+- The AI Factory scales with Azure Subscriptions, called `AI Factory scale sets`, each team their own scaleset (3 Subscriptions = Application Landingzones)
+- Each AI Factory project (landingzone) is divided in two parts: COMMON & PROJECT specific, on resource group level - since required to align with WAF & CAF: 
+    - `WAF Cost optimization`: Reuse networking and common artifacts, across services in an architecture used by the `use case` and team
+    - `WAF Security`: `Least privileged access` since the end-users does not need to have access on certain networking resources and other artifacts. `Granular security`
+    - `Operations`: `Reusing` common artifacts also makes it easier to operate, such as `Centralized Monitoring & Logging`, `Common security` separated from granular `Role Specific Access`.
+    - See full [Documentation](./documentation/readme.md) for more info
+- The AI Factory is designed, with its own compatible TEMPLATES for DataOps, MLOps, GenAIOps ( to avoid the challenges of incompatible security, etc)
+- Each `AI Factory project` can `add or remove +34 Azure services` - e.g. Not only the GenAI part of a solution, but also to avoid the challenges of incompatible security with ease and full automation of creating an End-2-End solution with 100% private networking for:
+        - Full AI: Both GenAI (Foundry) and Machine Learning (Azure Machine Learning, Azure Databricks)
+        - Front-End (UI, Caching)
+        - Back-End (Databases)
+        - Integration (LogicApps, APIM, Eventhubs) 
+        - Soveregnity: On-premises link via Azure Arc to Azure Machine Learning, Kubernetes, for Sovereign Cloud purposes. 
+
+---
+
 ## Architectures
 
 The AI Factory supports two baseline architectures:
@@ -48,11 +67,12 @@ Optional add-ons (enabled via feature flags, can be added at any time):
 
 | Category | Services |
 |---|---|
-| **AI** | Azure OpenAI (standalone), Azure Machine Learning, Azure Speech, Azure Vision, Bing Grounding |
+| **AI** | Microsoft Foundry, Azure OpenAI (standalone), Azure Machine Learning, Azure Speech, Azure Vision, Bing Grounding, ... |
 | **Front-end / Hosting** | Azure Container Apps, Azure Web App / Function App, AKS (private + Arc-enabled) |
 | **Data & Databases** | Cosmos DB, MongoDB, Azure SQL, PostgreSQL Flexible, Azure Cache for Redis |
 | **Integration & ETL** | Azure Data Factory, Databricks, Event Hubs, Logic Apps, APIM AI Gateway, Microsoft Fabric / OneLake |
-
+| **On-oremises & Sovereign Cloud** | BYO Encryption Key, Azure Arc for on-prem execution on Kubernetes |
+s
 ![AI Factory Architectures](assets/images/10-two-architectures-v2.png)
 
 ---
@@ -64,8 +84,7 @@ Optional add-ons (enabled via feature flags, can be added at any time):
 | Setup Guide | [How-to set up AI Factory](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/24-end-2-end-setup.md) |
 | Update Guide | [How-to update AI Factory](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/26-update-AIFactory.md) |
 | CAF Documentation | [AI Factory in Cloud Adoption Framework](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops) |
-| WAF AI Workload | [Well-Architected Framework — AI personas](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) |
-| Bootstrap Template | [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory) |
+| WAF AI Workload | [Well-Architected Framework — Enterprise Scale AI Factory](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) |
 
 ---
 
