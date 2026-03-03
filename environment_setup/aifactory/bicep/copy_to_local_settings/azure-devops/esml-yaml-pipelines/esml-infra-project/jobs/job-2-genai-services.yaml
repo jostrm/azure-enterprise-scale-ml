@@ -1793,6 +1793,7 @@ steps:
 - task: AzureCLI@2
   displayName: '62-core-infrastructure'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
