@@ -69,6 +69,68 @@ steps:
       echo "Resolved vnetNameFull: $VNET_NAME"
       echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
 - task: AzureCLI@2
+  displayName: '00_validate_byo_subnet_variables'
+  condition: and(eq(variables['BYO_subnets'], 'true'), ne(variables['debug_disable_validation_tasks'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      # ---------------------------------------------------------------
+      # Validate that all subnet variables required by the enabled
+      # services are actually set when BYO_subnets=true.
+      # Mapping:
+      #   subnetProjGenAI             -> enableAIFoundry=true
+      #   subnetProjAKS               -> enableAksForAzureML=true
+      #   subnetProjAKS2              -> enableAksForAzureML=true
+      #   subnetProjACA               -> enableContainerApps=true
+      #   subnetProjACA2              -> enableAIFoundry=true AND disableAgentNetworkInjection=false
+      #   subnetProjDatabricksPublic  -> enableDatabricks=true
+      #   subnetProjDatabricksPrivate -> enableDatabricks=true
+      # ---------------------------------------------------------------
+      ERRORS=0
+
+      check_subnet() {
+        local varName="$1"
+        local varValue="$2"
+        local reason="$3"
+        if [ -z "$varValue" ]; then
+          echo "##vso[task.logissue type=error]BYO_subnets=true and $reason but '$varName' is not set in variables.yaml. Please provide a value."
+          ERRORS=$((ERRORS + 1))
+        else
+          echo "✅ $varName is set: $varValue"
+        fi
+      }
+
+      if [ "$(enableAIFoundry)" = "true" ]; then
+        check_subnet "subnetProjGenAI" "$(subnetProjGenAI)" "enableAIFoundry=true"
+      fi
+
+      if [ "$(enableAksForAzureML)" = "true" ]; then
+        check_subnet "subnetProjAKS"  "$(subnetProjAKS)"  "enableAksForAzureML=true"
+        check_subnet "subnetProjAKS2" "$(subnetProjAKS2)" "enableAksForAzureML=true"
+      fi
+
+      if [ "$(enableContainerApps)" = "true" ]; then
+        check_subnet "subnetProjACA" "$(subnetProjACA)" "enableContainerApps=true"
+      fi
+
+      if [ "$(enableAIFoundry)" = "true" ] && [ "$(disableAgentNetworkInjection)" != "true" ]; then
+        check_subnet "subnetProjACA2" "$(subnetProjACA2)" "enableAIFoundry=true and disableAgentNetworkInjection=false"
+      fi
+
+      if [ "$(enableDatabricks)" = "true" ]; then
+        check_subnet "subnetProjDatabricksPublic"  "$(subnetProjDatabricksPublic)"  "enableDatabricks=true"
+        check_subnet "subnetProjDatabricksPrivate" "$(subnetProjDatabricksPrivate)" "enableDatabricks=true"
+      fi
+
+      if [ "$ERRORS" -gt 0 ]; then
+        echo "❌ $ERRORS required BYO subnet variable(s) are missing. Set them in variables.yaml."
+        exit 1
+      fi
+      echo "✅ All required BYO subnet variables are set."
+- task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
   condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
   inputs:

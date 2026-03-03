@@ -227,7 +227,7 @@ variables:
   enableAzureMachineLearning: "false" # <optional>Deploy Azure ML workspace<default>false<keep-as-is>
   addAzureMachineLearning: "false" # <optional>Add new Azure ML workspace<default>false<keep-as-is>
   # === AKS for Azure ML ===
-  enableAksForAzureML: "true" # <optional>Deploy AKS for Azure ML inference<default>true<keep-as-is>
+  enableAksForAzureML: "false" # <optional>Deploy AKS for Azure ML inference<default>true<keep-as-is>
   aksOutboundType: "loadBalancer" # <optional>AKS outbound traffic type<default>loadBalancer<keep-as-is> <otherwise> userDefinedRouting, if you have Azure Firewall and UDR configured.
   aksPrivateDNSZone: "system" # <optional>AKS private DNS zone<default>system<keep-as-is> <otherwise> "none" or full resource ID of a private DNS zone.
   aksAzureFirewallPrivateIp: "" # <optional>AKS Azure Firewall private IP<default>""<mandatory> if aksOutboundType:'userDefinedRouting' <ensure> IP within the Azure Firewall subnet range.
@@ -235,7 +235,7 @@ variables:
   enableDatabricks: "false" # <optional>Deploy Databricks workspace<default>false<keep-as-is>
   # === Cognitive Services ===
   enableAISearch: "true" # <mandatory>Deploy Azure AI Search<default>true<recommended> required for RAG and Agents scenarios.
-  addAISearch: "true" # <optional>Add new AI Search instance<default>true<keep-as-is> <otherwise> false, CreateIfNotExists logic.
+  addAISearch: "false" # <optional>Add new AI Search instance<default>true<keep-as-is> <otherwise> false, CreateIfNotExists logic.
   enableAISearchSharedPrivateLink: "true" # <optional>AI Search shared private link<default>true<recommended> <otherwise> false, creates a private endpoint in the project vNet.
   # Note: Basic tier and higher: Shared private links are supported from Basic tier, BUT for indexers with skillsets (e.g., AI enrichment or embedding skills), the minimum tier is Standard 1 (S1)
 
@@ -346,8 +346,8 @@ variables:
   subnetProjGenAI: "snt-dev-prj<xxx>-genai" # <optional>BYO project GenAI subnet name<default>snt-dev-prj<xxx>-genai<mandatory> if BYO_subnets:'true' <ensure> subnet exists. <xxx> is replaced with the project number.
   subnetProjAKS: "snt-prj<xxx>-aks" # <optional>BYO project AKS subnet name<default>snt-prj<xxx>-aks<mandatory> if BYO_subnets:'true' <ensure> subnet exists.
   subnetProjAKS2: "snt-<network_env>prj<xxx>-aks2" # <optional>BYO project secondary AKS subnet<default>snt-<network_env>prj<xxx>-aks2<mandatory> if BYO_subnets:'true' <ensure> subnet exists.
-  subnetProjACA: "snt-prj<xxx>-aca" # <optional>BYO project Container Apps subnet<default>snt-prj<xxx>-aca<mandatory> if BYO_subnets:'true' <ensure> subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.
-  subnetProjACA2: "snt-prj<xxx>-aca2" # <optional>BYO project secondary Container Apps subnet<default>snt-prj<xxx>-aca2<mandatory> if BYO_subnets:'true'.
+  subnetProjACA: "snt-prj<xxx>-aca" # <optional>ContainerApps subnet. BYO project Container Apps subnet<default>snt-prj<xxx>-aca<mandatory> if BYO_subnets:'true' <ensure> subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.
+  subnetProjACA2: "snt-prj<xxx>-aca2" # <optional>Agent subnet. BYO project secondary Container Apps subnet<default>snt-prj<xxx>-aca2<mandatory> if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false'
   subnetProjDatabricksPublic: "snt-prj001-dbxpub" # <optional>BYO Databricks public subnet<default>snt-prj001-dbxpub<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # <optional>BYO Databricks private subnet<default>snt-prj<xxx>-dbxpriv<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   byoASEv3: "false" # <optional>Use BYO App Service Environment v3<default>false<keep-as-is> <otherwise> true, use an existing ASEv3 specified in byoAseFullResourceId.

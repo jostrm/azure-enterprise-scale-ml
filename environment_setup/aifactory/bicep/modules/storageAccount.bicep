@@ -13,6 +13,7 @@ param queuePrivateEndpointName string
 @description('Specifies the name of the table service private endpoint')
 param tablePrivateEndpointName string
 
+param allowCrossTenantReplication bool = false
 param corsRules array = []
 param containers array = []
 param files array = []
@@ -220,7 +221,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicS
   properties:{
     accessTier: 'Hot'
     publicNetworkAccess:'Disabled'
-    allowCrossTenantReplication: true
+    allowCrossTenantReplication: allowCrossTenantReplication
     allowSharedKeyAccess: enableLogicApps
     allowBlobPublicAccess: false
     isHnsEnabled: false

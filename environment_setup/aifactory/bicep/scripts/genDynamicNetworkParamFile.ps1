@@ -22,7 +22,14 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets, true or false string")][string]$BYO_subnets,
     [Parameter(Mandatory = $false, HelpMessage = "Bring your own subnets. <network_env> dev-, test-, prod- or other env name")][string]$network_env,
     [Parameter(Mandatory = $false, HelpMessage = "Save generated file to Git repository (Azure DevOps or GitHub)")][bool]$saveFileInADOGitRepo = $false,
-    [Parameter(Mandatory = $false, HelpMessage = "Parent Git repository path (if different from current location)")][string]$parentGitRepoPath = ""
+    [Parameter(Mandatory = $false, HelpMessage = "Parent Git repository path (if different from current location)")][string]$parentGitRepoPath = "",
+
+    # Enable flags — used to determine which BYO subnets are mandatory when BYO_subnets=true
+    [Parameter(Mandatory = $false, HelpMessage = "Enable AI Foundry — makes subnetProjGenAI and subnetProjACA2 mandatory when BYO_subnets=true")][string]$enableAIFoundry = "true",
+    [Parameter(Mandatory = $false, HelpMessage = "Enable AKS for Azure ML — makes subnetProjAKS and subnetProjAKS2 mandatory when BYO_subnets=true")][string]$enableAksForAzureML = "true",
+    [Parameter(Mandatory = $false, HelpMessage = "Enable Container Apps — makes subnetProjACA mandatory when BYO_subnets=true")][string]$enableContainerApps = "false",
+    [Parameter(Mandatory = $false, HelpMessage = "Enable Databricks — makes subnetProjDatabricksPublic and subnetProjDatabricksPrivate mandatory when BYO_subnets=true")][string]$enableDatabricks = "false",
+    [Parameter(Mandatory = $false, HelpMessage = "Disable agent network injection — when false and enableAIFoundry=true, subnetProjACA2 is mandatory")][string]$disableAgentNetworkInjection = "false"
 )
 
     # Default subnet name templates (used when BYO_subnets is false)
@@ -498,86 +505,145 @@ if ($BYO_subnets_bool -eq $false) {
     write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
 
 } else {
-    write-host "BYO_subnets is TRUE - Using Bring Your Own subnet configuration with template patterns"
-    <# Action when all if and elseif conditions are false #>
-    # Replace placeholders in vnet and subnet names
+    write-host "BYO_subnets is TRUE - Using Bring Your Own subnet configuration with enable-flag-aware validation"
+    # Replace placeholders in vnet name
     $vnetName = $vnetNameFull_param -replace '<network_env>', $network_env
 
+    # Normalize enable flags (pipeline variables arrive as strings "true"/"false")
+    $enableAIFoundry_bool             = ($enableAIFoundry             -eq "true")
+    $enableAksForAzureML_bool         = ($enableAksForAzureML         -eq "true")
+    $enableContainerApps_bool         = ($enableContainerApps         -eq "true")
+    $enableDatabricks_bool            = ($enableDatabricks            -eq "true")
+    $disableAgentNetworkInjection_bool = ($disableAgentNetworkInjection -eq "true")
+
+    write-host "BYO flag summary: enableAIFoundry=$enableAIFoundry, enableAksForAzureML=$enableAksForAzureML, enableContainerApps=$enableContainerApps, enableDatabricks=$enableDatabricks, disableAgentNetworkInjection=$disableAgentNetworkInjection"
+
+    # Common subnets (always resolved when provided — not tied to an enable flag)
     if ($null -ne $subnetCommon -and $subnetCommon -ne "") {
-        # Common subnets
-        $subnetCommon = $subnetCommon -replace '<network_env>', $network_env
-        $subnetCommonScoring = $subnetCommonScoring -replace '<network_env>', $network_env
+        $subnetCommon          = $subnetCommon          -replace '<network_env>', $network_env
+        $subnetCommonScoring   = $subnetCommonScoring   -replace '<network_env>', $network_env
         $subnetCommonPowerbiGw = $subnetCommonPowerbiGw -replace '<network_env>', $network_env
 
-        $subnetCommonId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommon -networkEnv $network_env
-        $subnetCommonScoringId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonScoring -networkEnv $network_env
+        $subnetCommonId          = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommon          -networkEnv $network_env
+        $subnetCommonScoringId   = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonScoring   -networkEnv $network_env
         $subnetCommonPowerbiGwId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetCommonPowerbiGw -networkEnv $network_env
 
-        write-host "COMMON subnets: Just FYI - since these are specified directly in BICEP"
-        write-host "subnetCommonId: $subnetCommonId"
-        write-host "subnetCommonScoringId: $subnetCommonScoringId"
-        write-host "subnetCommonPowerbiGwId: $subnetCommonPowerbiGwId"
+        write-host "COMMON subnets (FYI — specified directly in Bicep):"
+        write-host "  subnetCommonId:          $subnetCommonId"
+        write-host "  subnetCommonScoringId:   $subnetCommonScoringId"
+        write-host "  subnetCommonPowerbiGwId: $subnetCommonPowerbiGwId"
     }
 
-    write-host "Project type: all : now generating subnet IDs for AKS, AKS2, GenAI, via in-parameters BYOSnets"
+    write-host "Project subnets: resolving based on enable flags..."
 
-    if ($null -ne $subnetProjGenAI -and $subnetProjGenAI -ne "") {
-        $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
-        $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
-        write-host "genaiSubnetId: $genaiSubnetId"
-
-        try {
-            $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env
-
-            $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
-            write-host "aksSubnetId: $aksSubnetId"
-            if ($null -ne $subnetProjAKS2 -and $subnetProjAKS2 -ne "") {
-                $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env
-                $aks2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS2 -projectNumber $projectNumber -networkEnv $network_env
-                write-host "aks2SubnetId: $aks2SubnetId"
-            } else {
-                write-host "AIF-WARNING: subnetProjAKS2 in Variables.yaml is empty. Please check your Variables.json file."
-            }
-        } catch {
-            write-host "AIF-WARNING: aksSubnetId, or aks2SubnetId could not be generated(catch). Please check your Variables.json file."
+    # -------------------------------------------------------------------------
+    # subnetProjGenAI — mandatory only if enableAIFoundry=true
+    # -------------------------------------------------------------------------
+    if ($enableAIFoundry_bool) {
+        if (-not [string]::IsNullOrEmpty($subnetProjGenAI)) {
+            $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
+            $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
+            write-host "genaiSubnetId: $genaiSubnetId"
+        } else {
+            write-host "##vso[task.logissue type=error]BYO_subnets=true and enableAIFoundry=true but subnetProjGenAI is not set in variables.yaml. Please provide a value."
+            exit 1
         }
+    } else {
+        write-host "INFO: subnetProjGenAI skipped (enableAIFoundry=false)"
+    }
 
-        try {
-            $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env
-            $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
-            write-host "acaSubnetId: $acaSubnetId"
-            if ($null -ne $subnetProjACA2 -and $subnetProjACA2 -ne "") {
+    # -------------------------------------------------------------------------
+    # subnetProjAKS / subnetProjAKS2 — mandatory only if enableAksForAzureML=true
+    # -------------------------------------------------------------------------
+    if ($enableAksForAzureML_bool) {
+        if (-not [string]::IsNullOrEmpty($subnetProjAKS)) {
+            try {
+                $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env
+                $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
+                write-host "aksSubnetId: $aksSubnetId"
+
+                if (-not [string]::IsNullOrEmpty($subnetProjAKS2)) {
+                    $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env
+                    $aks2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS2 -projectNumber $projectNumber -networkEnv $network_env
+                    write-host "aks2SubnetId: $aks2SubnetId"
+                } else {
+                    write-host "AIF-WARNING: enableAksForAzureML=true but subnetProjAKS2 is empty in variables.yaml."
+                }
+            } catch {
+                write-host "AIF-WARNING: aksSubnetId or aks2SubnetId could not be generated (catch). Please check variables.yaml."
+            }
+        } else {
+            write-host "##vso[task.logissue type=error]BYO_subnets=true and enableAksForAzureML=true but subnetProjAKS is not set in variables.yaml. Please provide a value."
+            exit 1
+        }
+    } else {
+        write-host "INFO: subnetProjAKS/AKS2 skipped (enableAksForAzureML=false)"
+    }
+
+    # -------------------------------------------------------------------------
+    # subnetProjACA — mandatory only if enableContainerApps=true
+    # -------------------------------------------------------------------------
+    if ($enableContainerApps_bool) {
+        if (-not [string]::IsNullOrEmpty($subnetProjACA)) {
+            try {
+                $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env
+                $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
+                write-host "acaSubnetId: $acaSubnetId"
+            } catch {
+                write-host "AIF-WARNING: acaSubnetId could not be generated (catch). Please check variables.yaml."
+            }
+        } else {
+            write-host "##vso[task.logissue type=error]BYO_subnets=true and enableContainerApps=true but subnetProjACA is not set in variables.yaml. Please provide a value."
+            exit 1
+        }
+    } else {
+        write-host "INFO: subnetProjACA skipped (enableContainerApps=false)"
+    }
+
+    # -------------------------------------------------------------------------
+    # subnetProjACA2 — mandatory only if enableAIFoundry=true AND disableAgentNetworkInjection=false
+    # -------------------------------------------------------------------------
+    $aca2Required = $enableAIFoundry_bool -and (-not $disableAgentNetworkInjection_bool)
+    if ($aca2Required) {
+        if (-not [string]::IsNullOrEmpty($subnetProjACA2)) {
+            try {
                 $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env
                 $aca2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA2 -projectNumber $projectNumber -networkEnv $network_env
                 write-host "aca2SubnetId: $aca2SubnetId"
-            } else {
-                write-host "AIF-WARNING: subnetProjACA2 in Variables.yaml is empty. Please check your Variables.json file."
+            } catch {
+                write-host "AIF-WARNING: aca2SubnetId could not be generated (catch). Please check variables.yaml."
             }
-        } catch {
-            write-host "AIF-WARNING: acaSubnetId or aca2SubnetId could not be generated(catch). Please check your Variables.json file."
-        }
-
-        try {
-            if ($null -ne $subnetProjDatabricksPublic -and $subnetProjDatabricksPublic -ne "") {
-                $dbxPubSubnetName = $subnetProjDatabricksPublic -replace '<network_env>', $network_env
-                $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
-                # These can be full IDs if needed
-                $dbxPubSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic -projectNumber $projectNumber -networkEnv $network_env
-                $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
-
-                write-host "Databricks: Only the name is needed. Just FYI:"
-                write-host "dbxPubSubnetId: $dbxPubSubnetId"
-                write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
-                write-host "dbxPubSubnet Name: $dbxPubSubnetName"
-                write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
-            } else {
-                write-host "AIF-WARNING: Databricks dbxPubSubnetName in Variables.yaml is empty. Please check your Variables.json file."
-            }
-        } catch {
-            write-host "AIF-WARNING: Databricks subnets could not be fetched (catch). Please check your Variables.json file."
+        } else {
+            write-host "##vso[task.logissue type=error]BYO_subnets=true, enableAIFoundry=true and disableAgentNetworkInjection=false but subnetProjACA2 is not set in variables.yaml. Please provide a value."
+            exit 1
         }
     } else {
-        write-host "AIF-WARNING:BYOSubnets:subnetProjGenAI: subnetProjGenAI is not set. This is needed for GenAI deployment. Please check your parameters.json file."
+        write-host "INFO: subnetProjACA2 skipped (enableAIFoundry=$enableAIFoundry OR disableAgentNetworkInjection=$disableAgentNetworkInjection)"
+    }
+
+    # -------------------------------------------------------------------------
+    # subnetProjDatabricksPublic / subnetProjDatabricksPrivate — mandatory only if enableDatabricks=true
+    # -------------------------------------------------------------------------
+    if ($enableDatabricks_bool) {
+        if (-not [string]::IsNullOrEmpty($subnetProjDatabricksPublic)) {
+            try {
+                $dbxPubSubnetName  = $subnetProjDatabricksPublic  -replace '<network_env>', $network_env
+                $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
+                $dbxPubSubnetId  = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic  -projectNumber $projectNumber -networkEnv $network_env
+                $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
+                write-host "dbxPubSubnet Name:  $dbxPubSubnetName"
+                write-host "dbxPrivSubnet Name: $dbxPrivSubnetName"
+                write-host "dbxPubSubnetId:  $dbxPubSubnetId"
+                write-host "dbxPrivSubnetId: $dbxPrivSubnetId"
+            } catch {
+                write-host "AIF-WARNING: Databricks subnets could not be resolved (catch). Please check variables.yaml."
+            }
+        } else {
+            write-host "##vso[task.logissue type=error]BYO_subnets=true and enableDatabricks=true but subnetProjDatabricksPublic is not set in variables.yaml. Please provide a value."
+            exit 1
+        }
+    } else {
+        write-host "INFO: subnetProjDatabricksPublic/Private skipped (enableDatabricks=false)"
     }
 }
 
