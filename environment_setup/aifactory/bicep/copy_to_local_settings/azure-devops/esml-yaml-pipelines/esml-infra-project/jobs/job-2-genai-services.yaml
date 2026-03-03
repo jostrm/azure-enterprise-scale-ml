@@ -2634,10 +2634,11 @@ steps:
     inlineScript: |
      #!/bin/bash
      echo "Rehydration takes 2.5 to 5 minutes to allow AI Foundry account to finish..."
-     sleep 180
+     sleep 300
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
