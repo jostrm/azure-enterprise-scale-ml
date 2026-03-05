@@ -537,19 +537,20 @@ if ($BYO_subnets_bool -eq $false) {
     write-host "Project subnets: resolving based on enable flags..."
 
     # -------------------------------------------------------------------------
-    # subnetProjGenAI — mandatory only if enableAIFoundry=true
+    # subnetProjGenAI — ALWAYS resolved when provided.
+    # It is used as the defaultSubnet (private endpoint / pend subnet) by
+    # CmnAIfactoryNaming.bicep for ALL deployments, regardless of enableAIFoundry.
+    # Mandatory (exit 1) only when enableAIFoundry=true.
     # -------------------------------------------------------------------------
-    if ($enableAIFoundry_bool) {
-        if (-not [string]::IsNullOrEmpty($subnetProjGenAI)) {
-            $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
-            $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
-            write-host "genaiSubnetId: $genaiSubnetId"
-        } else {
-            write-host "##vso[task.logissue type=error]BYO_subnets=true and enableAIFoundry=true but subnetProjGenAI is not set in variables.yaml. Please provide a value."
-            exit 1
-        }
+    if (-not [string]::IsNullOrEmpty($subnetProjGenAI)) {
+        $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
+        $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
+        write-host "genaiSubnetId: $genaiSubnetId (enableAIFoundry=$enableAIFoundry)"
+    } elseif ($enableAIFoundry_bool) {
+        write-host "##vso[task.logissue type=error]BYO_subnets=true and enableAIFoundry=true but subnetProjGenAI is not set in variables.yaml. Please provide a value."
+        exit 1
     } else {
-        write-host "INFO: subnetProjGenAI skipped (enableAIFoundry=false)"
+        write-host "##vso[task.logissue type=warning]subnetProjGenAI is empty. genaiSubnetId will be empty — this WILL cause deployment failures in 62-core-infrastructure because it is used as the defaultSubnet/pend subnet for all private endpoints. Please set subnetProjGenAI in variables.yaml."
     }
 
     # -------------------------------------------------------------------------
