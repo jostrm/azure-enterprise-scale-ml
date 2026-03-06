@@ -129,7 +129,6 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicS
     allowBlobPublicAccess: false
     isHnsEnabled: false
     isNfsV3Enabled: false
-    enableExtendedGroups: false
     supportsHttpsTrafficOnly: true
     encryption: {
       keySource: cmk ? 'Microsoft.Keyvault' : 'Microsoft.Storage'
@@ -226,7 +225,6 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicS
     allowBlobPublicAccess: false
     isHnsEnabled: false
     isNfsV3Enabled: false
-    enableExtendedGroups: false
     supportsHttpsTrafficOnly: true
     encryption: {
       keySource: cmk ? 'Microsoft.Keyvault' : 'Microsoft.Storage'
