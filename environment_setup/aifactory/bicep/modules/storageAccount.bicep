@@ -255,9 +255,9 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicS
         }
       }
     }
-    keyPolicy: {
+    keyPolicy: enableLogicApps ? {
       keyExpirationPeriodInDays: 7
-    }
+    } : null
     largeFileSharesState: 'Disabled'
     minimumTlsVersion: 'TLS1_2'
     networkAcls:{
