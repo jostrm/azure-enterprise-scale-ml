@@ -1,0 +1,20 @@
+# AI Foundry Agent – dependencies
+# Install with:  pip install -r requirements.txt
+
+# Azure AI Foundry project client (connections + OpenAI inference)
+azure-ai-projects>=2.0.0b4
+
+# Azure AI Agent Service SDK (threads / messages / runs)
+azure-ai-agents>=1.1.0
+
+# Azure AI Search – index management and document upload
+azure-search-documents>=11.6.0
+
+# Azure identity (RBAC / no account keys)
+azure-identity>=1.19.0
+
+# OpenAI Python SDK (used via project inference endpoint)
+openai>=1.55.0
+
+# Load environment variables from .env files
+python-dotenv>=1.0.1
