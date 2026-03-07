@@ -406,6 +406,7 @@ if ($BYO_subnets_bool) {
     $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
     $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
     $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    $subnetProjDatabricksPublic  = $subnetProjDatabricksPublic  -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
     $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
 }
 else {
@@ -417,16 +418,7 @@ else {
     $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate -replace '<xxx>', $projectNumber
 }
 
-# Normalize any unintended network_env prefixes in fetched subnet IDs (non-BYO path only)
-if ($BYO_subnets_bool -eq $false -and -not [string]::IsNullOrEmpty($network_env)) {
-    $aksSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aksSubnetId -networkEnv $network_env
-    $aks2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aks2SubnetId -networkEnv $network_env
-    $genaiSubnetId   = Remove-NetworkEnvPrefixFromSubnetId -subnetId $genaiSubnetId -networkEnv $network_env
-    $acaSubnetId     = Remove-NetworkEnvPrefixFromSubnetId -subnetId $acaSubnetId -networkEnv $network_env
-    $aca2SubnetId    = Remove-NetworkEnvPrefixFromSubnetId -subnetId $aca2SubnetId -networkEnv $network_env
-    $dbxPubSubnetId  = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPubSubnetId -networkEnv $network_env
-    $dbxPrivSubnetId = Remove-NetworkEnvPrefixFromSubnetId -subnetId $dbxPrivSubnetId -networkEnv $network_env
-}
+# BYO subnet names are used verbatim — only <network_env> and <xxx> placeholders are substituted (done above).
 
 $aksSubnetId=""
 $aks2SubnetId=""
@@ -543,7 +535,6 @@ if ($BYO_subnets_bool -eq $false) {
     # Mandatory (exit 1) only when enableAIFoundry=true.
     # -------------------------------------------------------------------------
     if (-not [string]::IsNullOrEmpty($subnetProjGenAI)) {
-        $subnetProjGenAI = $subnetProjGenAI -replace '<network_env>', $network_env
         $genaiSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjGenAI -projectNumber $projectNumber -networkEnv $network_env
         write-host "genaiSubnetId: $genaiSubnetId (enableAIFoundry=$enableAIFoundry)"
     } elseif ($enableAIFoundry_bool) {
@@ -559,12 +550,10 @@ if ($BYO_subnets_bool -eq $false) {
     if ($enableAksForAzureML_bool) {
         if (-not [string]::IsNullOrEmpty($subnetProjAKS)) {
             try {
-                $subnetProjAKS = $subnetProjAKS -replace '<network_env>', $network_env
                 $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
                 write-host "aksSubnetId: $aksSubnetId"
 
                 if (-not [string]::IsNullOrEmpty($subnetProjAKS2)) {
-                    $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env
                     $aks2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS2 -projectNumber $projectNumber -networkEnv $network_env
                     write-host "aks2SubnetId: $aks2SubnetId"
                 } else {
@@ -587,7 +576,6 @@ if ($BYO_subnets_bool -eq $false) {
     if ($enableContainerApps_bool) {
         if (-not [string]::IsNullOrEmpty($subnetProjACA)) {
             try {
-                $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env
                 $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
                 write-host "acaSubnetId: $acaSubnetId"
             } catch {
@@ -608,7 +596,6 @@ if ($BYO_subnets_bool -eq $false) {
     if ($aca2Required) {
         if (-not [string]::IsNullOrEmpty($subnetProjACA2)) {
             try {
-                $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env
                 $aca2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA2 -projectNumber $projectNumber -networkEnv $network_env
                 write-host "aca2SubnetId: $aca2SubnetId"
             } catch {
@@ -628,8 +615,8 @@ if ($BYO_subnets_bool -eq $false) {
     if ($enableDatabricks_bool) {
         if (-not [string]::IsNullOrEmpty($subnetProjDatabricksPublic)) {
             try {
-                $dbxPubSubnetName  = $subnetProjDatabricksPublic  -replace '<network_env>', $network_env
-                $dbxPrivSubnetName = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env
+                $dbxPubSubnetName  = $subnetProjDatabricksPublic
+                $dbxPrivSubnetName = $subnetProjDatabricksPrivate
                 $dbxPubSubnetId  = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPublic  -projectNumber $projectNumber -networkEnv $network_env
                 $dbxPrivSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjDatabricksPrivate -projectNumber $projectNumber -networkEnv $network_env
                 write-host "dbxPubSubnet Name:  $dbxPubSubnetName"
