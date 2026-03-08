@@ -60,12 +60,14 @@ resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityH
 
 // Project-level capability host - Created AFTER account capability host
 // NOTE: Name format follows AVM pattern - remove dashes from project name
+// NOTE: capabilityHostKind is NOT a valid property at project scope (only at account scope).
+//       Permissible project-level properties: vectorStoreConnections, threadStorageConnections,
+//       storageConnections, aiServicesConnections.
 #disable-next-line BCP081
-resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-07-01-preview' = if (!accountLevel) {
+resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-09-01' = if (!accountLevel) {
   name: resolvedProjectCapabilityHostName
   parent: project
   properties: {
-    capabilityHostKind: 'Agents'
     threadStorageConnections: ['${cosmosDbConnectionResource.name}']
     vectorStoreConnections: ['${aiSearchConnectionResource.name}']
     storageConnections: ['${storageAccountConnectionResource.name}']
