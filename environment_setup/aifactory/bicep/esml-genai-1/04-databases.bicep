@@ -354,8 +354,8 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
     createPrivateEndpoint: enablePublicAccessWithPerimeter ? false : true
     keyvaultName: keyvaultName
     vNetRules: [
-      genaiSubnetId
-      aksSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
+      ...( !empty(aksSubnetId) ? [aksSubnetId] : [] )
     ]
     kind: (enableAFoundryCaphost && enableAIFoundry) ? 'GlobalDocumentDB' : cosmosKind
     minimalTlsVersion: cosmosMinimalTlsVersion

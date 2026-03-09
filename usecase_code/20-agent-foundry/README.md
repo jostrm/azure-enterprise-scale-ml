@@ -9,10 +9,11 @@ IF you have a "core team", ask your core team to enable them:
 
 ## 1) Set up a local Python env
 - Use Python 3.10+.
+- Go to this folder: `usecase_code\20-agent-foundry`
 - Create a venv in this folder (not committed):
     - Windows: `python -m venv .venv && .venv\Scripts\activate`
     - macOS/Linux: `python -m venv .venv && source .venv/bin/activate`
-- Install deps: `pip install -r agent_foundry/requirements.txt`
+- Install deps: `pip install -r requirements.txt`
 - Sign in to Azure so `DefaultAzureCredential` works: `az login` (needs RBAC access to the AI Foundry account/project, AI Search, and the resource group noted in the scripts).
 
 ## 1a) Set the .env variables
@@ -23,7 +24,7 @@ IF you have a "core team", ask your core team to enable them:
 
 , or with a default question: 
 
-`python agent_foundry/agent_02_multiagent.py --query "top 5 fruits by calorie"`
+`python agent_02_multiagent.py --query "top 5 fruits by calorie"`
 
 ## 1c) Agent examples: Common behaviour
 - On start you are prompted to create new agents or reuse existing ones; choose reuse unless you need fresh names.
@@ -33,24 +34,105 @@ IF you have a "core team", ask your core team to enable them:
 
 
 ## 2) Single-agent RAG example
-- File: [../agent_foundry/agent_01_rag_test.py](../agent_foundry/agent_01_rag_test.py)
+- File: [../agent_01_rag_test.py](../agent_01_rag_test.py)
 - What it does: indexes [../data/Joakim.md](../data/Joakim.md) into Azure AI Search using the AI Foundry account’s embedding deployment, then creates one agent with the AI Search tool and asks “How to reset Robot-Joakim?”.
-- Run (from this folder): `python agent_foundry/agent_01_rag_test.py --reindex` (omit `--reindex` to reuse an existing index). The script prompts before cleanup; choose yes to delete the agent/thread when done.
+- Run (from this folder): `python agent_01_rag_test.py --reindex` (omit `--reindex` to reuse an existing index). The script prompts before cleanup; choose yes to delete the agent/thread when done.
+
+### Example Output
+
+If you run in a terminal:
+`python agent_01_rag_test.py`
+
+You will see output similar to (resource names anonymized):
+```
+================================================================
+  AI Foundry Agent  ×  AI Search Tool
+  Data: Joakim.md   |  Query: How to reset Robot-Joakim?
+================================================================
+
+[1] Building DefaultAzureCredential (RBAC, no keys)…
+
+Reindex? (y/n): y
+
+[2] Connecting to AI Foundry project…
+    https://<foundry-account>.services.ai.azure.com/api/projects/<project-name>
+
+[3] Building AzureOpenAI client for embeddings…
+    Account endpoint: https://<foundry-account>.services.ai.azure.com
+
+[4] Parsing Joakim.md…
+    4 chunk(s) found:
+      [chunk-0] Manual for Joakim-robot with article number: 12345
+      [chunk-1] How to: “Switch batteries”:
+      [chunk-2] How to reset Joakim-robot
+      [chunk-3] How to reset your iPhone to factory settings
+
+[5] Setting up AI Search index '<search-index-name>'…
+    Deleted existing index '<search-index-name>'
+    Created index '<search-index-name>'
+
+[6] Indexing chunks with 'text-embedding-3-large'…
+    Embedding: [chunk-0] 'Manual for Joakim-robot with article number: 12345'
+    Embedding: [chunk-1] 'How to: “Switch batteries”:'
+    Embedding: [chunk-2] 'How to reset Joakim-robot'
+    Embedding: [chunk-3] 'How to reset your iPhone to factory settings'
+    Uploaded 4 docs – 4 succeeded
+    Waiting 15 s for the indexer to settle…
+
+[7] Resolving AI Search connection in AI Foundry project…
+    Matched connection: name='<search-conn>' type='ConnectionType.AZURE_AI_SEARCH' target='https://<search-name>.search.windows.net/'
+
+[8] Creating agent '<agent-name>'…
+    Agent id: asst_xxx
+
+[9] Creating conversation thread…
+    Thread id: thread_xxx
+
+[10] Sending: 'How to reset Robot-Joakim?'
+    Running agent…
+    Run status: RunStatus.COMPLETED
+
+    Run steps:
+      step type=RunStepType.MESSAGE_CREATION status=RunStepStatus.COMPLETED
+      tool_call [azure_ai_search] id=call_xxx
+        input : ?
+        output: ?
+
+[11] Agent answer:
+----------------------------------------------------------------
+To reset Robot-Joakim to factory settings, follow these steps:
+
+1. Back up the brain by turning the head 90 degrees clockwise and tapping the back of the head.
+2. Open the mouth and whisper the word "reset."
+3. Tap the nose and left ear twice, then hold for 5 seconds.
+4. The Joakim-robot will spin 360 degrees to indicate that the reset is complete【3:1†source】.
+
+Sources:
+  【3:1†source】  How to reset Joakim-robot  doc_1
+----------------------------------------------------------------
+
+Would you like to delete the agent and clean up the thread? (y/n): y
+
+[12] Cleaning up…
+    Deleted agent  : asst_fYb6b7DvY4P2DnatFexUzFAy
+    Deleted thread : thread_MriEKAczi1lrmmPgL9HgEOqT
+    
+```
 
 ## 3) Multi-agent orchestrator
-- File: [../agent_foundry/agent_02_multiagent.py](../agent_foundry/agent_02_multiagent.py)
-- What it does: builds three agents plus a router: Router → Coding Agent (CodeInterpreter) or RAG Agent (AI Search / Robot-Joakim) → Presenter Agent (CodeInterpreter). Coding routes produce charts; RAG routes return structured JSON. Agents are loaded from the [../agent_foundry/multi-agent](../agent_foundry/multi-agent) modules via importlib.
+- File: [../agent_02_multiagent.py](../agent_02_multiagent.py)
+- What it does: builds three agents plus a router: Router → Coding Agent (CodeInterpreter) or RAG Agent (AI Search / Robot-Joakim) → Presenter Agent (CodeInterpreter). Coding routes produce charts; RAG routes return structured JSON. Agents are loaded from the [../multi-agent](../multi-agent) modules via importlib.
 - Run examples (from this folder):
-    - `python agent_foundry/agent_02_multiagent.py`
-    - `python agent_foundry/agent_02_multiagent.py --query "top 5 fruits by calorie"`
-    - `python agent_foundry/agent_02_multiagent.py --query "How to reset Robot-Joakim?"`
+    - `python agent_02_multiagent.py`
+    - `python agent_02_multiagent.py --query "top 5 fruits by calorie"`
+    - `python agent_02_multiagent.py --query "How to reset Robot-Joakim?"`
     - Add `--no-cleanup` to keep agents/threads; add `--new-agents` to force fresh ones.
-- Output: presenter response prints to console; CodeInterpreter chart images (for CODING route) are saved under [../agent_foundry/output](../agent_foundry/output).
+- Output: presenter response prints to console; CodeInterpreter chart images (for CODING route) are saved under [../output](../output).
 
 
 ### Example output (anonymized resources)
 If you run in a terminal:
-`python agent_foundry/agent_02_multiagent.py --query "top 5 fruits by calorie"`
+`python agent_02_multiagent.py --query "top 5 fruits by calorie"`
 
 You will see output similar to:
 ```

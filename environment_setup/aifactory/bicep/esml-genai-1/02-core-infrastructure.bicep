@@ -444,7 +444,7 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
       }
     ]
     vnetRules: [
-      genaiSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
       ...( !empty(aksSubnetId) ? [aksSubnetId] : [] )
     ]
     ipRules: empty(processedIpRulesSa) ? [] : processedIpRulesSa

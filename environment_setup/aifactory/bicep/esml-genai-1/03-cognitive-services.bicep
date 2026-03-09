@@ -392,7 +392,7 @@ module csContentSafety '../modules/csContentSafety.bicep' = if(enableContentSafe
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess ? true : enablePublicNetworkAccessForCognitive
     vnetRules: [
-      genaiSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -439,7 +439,7 @@ module csVision '../modules/csVision.bicep' = if(enableAzureAIVision == true) {
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess ? true : enablePublicNetworkAccessForCognitive
     vnetRules: [
-      genaiSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -470,7 +470,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(enableAzureSpeech == true) {
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess ? true : enablePublicNetworkAccessForCognitive
     vnetRules: [
-      genaiSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -501,7 +501,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIn
     vnetName: vnetNameFull
     publicNetworkAccess: enablePublicGenAIAccess ? true : enablePublicNetworkAccessForCognitive
     vnetRules: [
-      genaiSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
@@ -555,7 +555,7 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
       }
     ]
     vnetRules: [
-      genaiSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
       
     ]
     corsRules: [
@@ -719,7 +719,7 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     kind: kindAIServices
     publicNetworkAccess: enablePublicGenAIAccess
     vnetRules: [
-      genaiSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
     ]
     ipRules: empty(processedIpRulesAIServices) ? [] : processedIpRulesAIServices
     disableLocalAuth: disableLocalAuth
@@ -797,8 +797,8 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && enableAzu
     publicNetworkAccess: enablePublicGenAIAccess
     disableLocalAuth: disableLocalAuth
     vnetRules: [
-      genaiSubnetId
-      aksSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
+      ...( !empty(aksSubnetId) ? [aksSubnetId] : [] )
     ]
     ipRules: [for ip in ipWhitelist_array: {
       action: 'Allow'
