@@ -1,5 +1,12 @@
 # Agents Foundry examples – how to run
 
+## Pre-reqs) AI Factory services to have enabled (PREREQUISITES)
+IF you have a "core team", ask your core team to enable them: 
+
+- enableAIFoundry: true
+- enableAISearch: true
+- You can turn these on via the AI Factory install wizard. Full setup (with wizard) is in [documentation/v2/20-29/24-end-2-end-setup.md](../../documentation/v2/20-29/24-end-2-end-setup.md).
+
 ## 1) Set up a local Python env
 - Use Python 3.10+.
 - Create a venv in this folder (not committed):
@@ -9,12 +16,14 @@
 - Sign in to Azure so `DefaultAzureCredential` works: `az login` (needs RBAC access to the AI Foundry account/project, AI Search, and the resource group noted in the scripts).
 
 ## 1a) Set the .env variables
-- TODO: Rename [../.env.template](../.env.template) to .env and set the variables.
+- TODO: Rename [../.env.template](../.env.template) to `.env` and set the variables.
 
-## 1b) AI Factory services to enable (PREREQUISITES)
-- enableAIFoundry: true
-- enableAISearch: true
-- You can turn these on via the AI Factory install wizard. Full setup (with wizard) is in [documentation/v2/20-29/24-end-2-end-setup.md](../../documentation/v2/20-29/24-end-2-end-setup.md).
+## 1b) Run code: 
+`python .\agent_02_multiagent.py`
+
+, or with a default question: 
+
+`python agent_foundry/agent_02_multiagent.py --query "top 5 fruits by calorie"`
 
 ## 1c) Agent examples: Common behaviour
 - On start you are prompted to create new agents or reuse existing ones; choose reuse unless you need fresh names.
