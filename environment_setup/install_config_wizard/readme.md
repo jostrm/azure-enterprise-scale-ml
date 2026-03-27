@@ -15,8 +15,8 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 | Platform | File |
 |---|---|
 | Windows | [aifactory-config-windows.zip](aifactory-config-windows.zip) |
-| Linux | [aifactory-config-linux.gzip](aifactory-config-linux.gzip) |
-| macOS | [aifactory-config-macos.tar](aifactory-config-linux.tar) |
+| Linux | [aifactory-config-linux.tar.gz.zip](aifactory-config-linux.tar.gz.zip) |
+| macOS | [aifactory-config-macos.tar.gz.zip](aifactory-config-macos.tar.gz.zip) |
 
 ## Documentation
 
