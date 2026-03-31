@@ -21,7 +21,7 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 ## Documentation
 
 [Quickstart Documentation](https://jostrm.github.io/azure-enterprise-scale-ml/)
-- Full parameter reference: [https://jostrm.github.io/azure-enterprise-scale-ml/parameters/](https://jostrm.github.io/
+- Full parameter reference: [https://jostrm.github.io/azure-enterprise-scale-ml/parameters/](https://jostrm.github.io/)
 - Recommended for all that wants to setup an AI Factory: Core team or project team.
 
 [Full Documentation](../../documentation/readme.md) 
