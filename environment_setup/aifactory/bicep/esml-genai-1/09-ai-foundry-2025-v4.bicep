@@ -1180,6 +1180,14 @@ var aiFoundryResourceIdOutput = foundryV22AccountOnly
 // ============== AI FOUNDRY HUB ==============
 
 // ==== Shared private link Azure AI Search to foundry
+// Runs in phase 2 (foundryV22AccountOnly=false). The Foundry account was created in phase 1.
+//
+// NOTE: aiFoundryV2ProjectExists is ALWAYS false in the ADO pipeline flow:
+//   - Phase 1 (foundryV22AccountOnly=true):  account-only deploy, project doesn't exist yet.
+//   - Phase 2 (foundryV22AccountOnly=false):  project is about to be created, so it still doesn't
+//     exist before this bicep runs (ADO checks before the deployment, not after).
+// Therefore all modules gated on !aiFoundryV2ProjectExists will always be deployed in phase 2,
+// and their dependsOn references here are always safe.
 var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && enableAISearch && enableAIFoundry && !foundryV22AccountOnly
 
 module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bicep' = if (enableSharedLinkDeployment) {
@@ -1191,9 +1199,10 @@ module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bi
     location: location
   }
   dependsOn: [
-    // Primary AI Foundry deployment based on scenario - match exact deployment conditions
+    // Wait for the Foundry account deployment to complete
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    // Wait for AI Search RBAC to be in place before creating the shared private link
     ...(enableAISearch ? [rbacAISearchForAIFv21] : [])
     // Wait for private endpoints if they are being deployed
     ...(!enablePublicAccessWithPerimeter && shouldDeployFoundryPrivateEndpoints ? [aiFoundryPrivateEndpoints] : [])
