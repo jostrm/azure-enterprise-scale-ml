@@ -507,8 +507,8 @@ module kv1 '../modules/kvRbacKeyVault.bicep' = if(!keyvaultExists) {
     subnetName: defaultSubnet
     privateEndpointName: '${keyvaultName}-pend'
     keyvaultNetworkPolicySubnets: [
-      genaiSubnetId
-      aksSubnetId
+      ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
+      ...( !empty(aksSubnetId) ? [aksSubnetId] : [] )
       ...( !empty(dbxPubSubnetName) ? [databricksPublicSubnetResourceId] : [] )
     ]
     ipRules: empty(processedIpRulesKv) ? [] : processedIpRulesKv
