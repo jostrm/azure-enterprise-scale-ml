@@ -221,8 +221,8 @@ function New-SubnetScheme {
         [Parameter(Mandatory = $true)]$possibleValuesMap,
         [Parameter(Mandatory = $false)][int]$maxRetries = 10
     )
-    # Sort by subnet size descending (largest first)
-    $sortedSubnetMap = $map.GetEnumerator() | Sort-Object -Property Value -Descending
+    # Sort by subnet size descending (largest first = lowest CIDR number first, e.g. /23 before /26)
+    $sortedSubnetMap = $map.GetEnumerator() | Sort-Object -Property Value
     $allocatedIps = @()
     $result = @{}
     $startIpVnet = ($startIp -split '\.')[0..1] -join '.' # More robust vNet prefix
