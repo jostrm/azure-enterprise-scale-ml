@@ -44,6 +44,7 @@ resource csAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     publicNetworkAccess: publicNetworkAccess || enablePublicAccessWithPerimeter? 'Enabled': 'Disabled'
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess? false:true
+    disableLocalAuth: disableLocalAuth
     networkAcls: !enablePublicAccessWithPerimeter ? {
       //bypass:'AzureServices'
       defaultAction: 'Deny' // 'Allow':'Deny' // If not Deny, then ipRules will be ignored.

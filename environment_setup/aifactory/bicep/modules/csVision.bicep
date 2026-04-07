@@ -46,6 +46,7 @@ resource visionAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
     publicNetworkAccess: publicNetworkAccess || enablePublicAccessWithPerimeter? 'Enabled': 'Disabled'
     restore: restore
     restrictOutboundNetworkAccess: publicNetworkAccess || enablePublicAccessWithPerimeter? false:true
+    disableLocalAuth: disableLocalAuth
     apiProperties: {
       responsibleAiNotice: 'Acknowledged'
     }
