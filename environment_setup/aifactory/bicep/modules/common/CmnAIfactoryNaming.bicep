@@ -178,17 +178,18 @@ var laWorkspaceName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}$
 // ============================================================================
 // COMPUTED VARIABLES - Networking subnets
 // ============================================================================
-var segments = split(genaiSubnetId, '/')
-var genaiSubnetName = segments[length(segments) - 1] // Get the last segment, which is the subnet name
+// Filter empty strings to handle trailing slashes in subnet IDs (e.g. '.../subnets/' would yield '' as last segment)
+var segments = filter(split(genaiSubnetId, '/'), s => !empty(s))
+var genaiSubnetName = length(segments) > 0 ? segments[length(segments) - 1] : '' // Get the last segment, which is the subnet name
 var defaultSubnet = genaiSubnetName // Pend subnet
-var segmentsAKS = split(aksSubnetId, '/')
-var segmentsAKS2 = split(aks2SubnetId, '/')
-var aksSubnetName = segmentsAKS[length(segmentsAKS) - 1] // Get the last segment, which is the subnet name
-var aks2SubnetName = segmentsAKS2[length(segmentsAKS2) - 1] // Get the last segment, which is the subnet name
-var segmentsACA = split(acaSubnetId, '/')
-var segmentsACA2 = split(aca2SubnetId, '/')
-var acaSubnetName = segmentsACA[length(segmentsACA) - 1] // Get the last segment, which is the subnet name
-var aca2SubnetName = segmentsACA2[length(segmentsACA2) - 1] // Get the last segment, which is the subnet name
+var segmentsAKS = filter(split(aksSubnetId, '/'), s => !empty(s))
+var segmentsAKS2 = filter(split(aks2SubnetId, '/'), s => !empty(s))
+var aksSubnetName = length(segmentsAKS) > 0 ? segmentsAKS[length(segmentsAKS) - 1] : '' // Get the last segment, which is the subnet name
+var aks2SubnetName = length(segmentsAKS2) > 0 ? segmentsAKS2[length(segmentsAKS2) - 1] : '' // Get the last segment, which is the subnet name
+var segmentsACA = filter(split(acaSubnetId, '/'), s => !empty(s))
+var segmentsACA2 = filter(split(aca2SubnetId, '/'), s => !empty(s))
+var acaSubnetName = length(segmentsACA) > 0 ? segmentsACA[length(segmentsACA) - 1] : '' // Get the last segment, which is the subnet name
+var aca2SubnetName = length(segmentsACA2) > 0 ? segmentsACA2[length(segmentsACA2) - 1] : '' // Get the last segment, which is the subnet name
 
 var adfName = 'adf-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
