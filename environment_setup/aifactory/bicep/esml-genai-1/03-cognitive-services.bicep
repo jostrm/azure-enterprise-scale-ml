@@ -142,7 +142,7 @@ param default_model_sku string = 'Standard'
 param enablePublicGenAIAccess bool = false
 param enablePublicAccessWithPerimeter bool = false
 param enablePublicNetworkAccessForCognitive bool = true
-param disableLocalAuth bool = false
+param disableLocalAuth bool = true
 
 // ============================================================================
 // PS-Networking: Needs to be here, even if not used, since .JSON file
