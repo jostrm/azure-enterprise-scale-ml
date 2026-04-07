@@ -96,18 +96,17 @@ resource keyVault4Vision 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup()
 }
 
-@description('Key Vault: Computer Vision K in vault as S')
-resource kValueVision 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!disableLocalAuth) {
-  parent: keyVault4Vision
-  name: 'aifactory-proj-vision-api-key'
-  properties: {
-    value:visionAccount.listKeys().key1
-    contentType: 'text/plain'
-    attributes: {
-      enabled: true
-    }
+// API key secret: use a nested module so ARM never evaluates listKeys() when
+// disableLocalAuth=true. Conditional resources do NOT prevent ARM from evaluating
+// list* expressions in the resource body - only a conditional module does.
+module visionKvKey './csVision-kvSecret.bicep' = if(!disableLocalAuth) {
+  name: take('vision-kv-key-${name}', 64)
+  params: {
+    visionAccountName: visionAccount.name
+    keyvaultName: keyvaultName
   }
 }
+
 @description('Key Vault: Computer Vision Endpoint in vault as S')
 resource kValueVisionEP 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault4Vision
