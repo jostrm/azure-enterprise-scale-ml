@@ -12,6 +12,7 @@ param restore bool
 param keyvaultName string
 param vnetResourceGroupName string
 param enablePublicAccessWithPerimeter bool = false
+param disableLocalAuth bool = false
 
 var nameCleaned = toLower(replace(name, '-', ''))
 
@@ -86,7 +87,7 @@ resource keyVaultDocInt 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 }
 
 @description('Key Vault: Azur AI Document Intelligence K in vault as S')
-resource kValueDocInt 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource kValueDocInt 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!disableLocalAuth) {
   parent: keyVaultDocInt
   name: 'aifactory-proj-aidocintelligence-api-key'
   properties: {

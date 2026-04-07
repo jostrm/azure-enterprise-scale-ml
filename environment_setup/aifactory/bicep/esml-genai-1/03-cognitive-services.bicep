@@ -446,6 +446,7 @@ module csVision '../modules/csVision.bicep' = if(enableAzureAIVision == true) {
       value: ip
     }]
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    disableLocalAuth: disableLocalAuth
   }
   dependsOn: [
     projectResourceGroupExists
@@ -477,6 +478,7 @@ module csSpeech '../modules/csSpeech.bicep' = if(enableAzureSpeech == true) {
       value: ip
     }]
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    disableLocalAuth: disableLocalAuth
   }
   dependsOn: [
     projectResourceGroupExists
@@ -508,6 +510,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIn
       value: ip
     }]
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    disableLocalAuth: disableLocalAuth
   }
   dependsOn: [
     projectResourceGroupExists

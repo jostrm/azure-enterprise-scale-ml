@@ -12,6 +12,7 @@ param restore bool
 param keyvaultName string
 param vnetResourceGroupName string
 param enablePublicAccessWithPerimeter bool = false
+param disableLocalAuth bool = false
 
 var nameCleaned = toLower(replace(name, '-', ''))
 
@@ -96,7 +97,7 @@ resource keyVault4Vision 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 }
 
 @description('Key Vault: Computer Vision K in vault as S')
-resource kValueVision 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource kValueVision 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!disableLocalAuth) {
   parent: keyVault4Vision
   name: 'aifactory-proj-vision-api-key'
   properties: {

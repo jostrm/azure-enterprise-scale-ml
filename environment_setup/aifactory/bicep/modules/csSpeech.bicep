@@ -12,6 +12,7 @@ param restore bool
 param keyvaultName string
 param vnetResourceGroupName string
 param enablePublicAccessWithPerimeter bool = false
+param disableLocalAuth bool = false
 
 var nameCleaned = toLower(replace(name, '-', ''))
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
@@ -86,7 +87,7 @@ resource keyVault4Speech 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
 }
 
 @description('Key Vault: Speech k in vault')
-resource kValueSpeech 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource kValueSpeech 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if(!disableLocalAuth) {
   parent: keyVault4Speech
   name: 'aifactory-proj-speech-api-key'
   properties: {
