@@ -87,17 +87,6 @@ resource keyVault4Speech 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup()
 }
 
-// API key secret: use a nested module so ARM never evaluates listKeys() when
-// disableLocalAuth=true. Conditional resources do NOT prevent ARM from evaluating
-// list* expressions in the resource body - only a conditional module does.
-module speechKvKey './csSpeech-kvSecret.bicep' = if(!disableLocalAuth) {
-  name: take('speech-kv-key-${name}', 64)
-  params: {
-    speechAccountName: csAccount.name
-    keyvaultName: keyvaultName
-  }
-}
-
 @description('Key Vault: Speech Endpoint in vault')
 resource kValueSpeechEP 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault4Speech

@@ -87,17 +87,6 @@ resource keyVaultDocInt 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   scope: resourceGroup()
 }
 
-// API key secret: use a nested module so ARM never evaluates listKeys() when
-// disableLocalAuth=true. Conditional resources do NOT prevent ARM from evaluating
-// list* expressions in the resource body - only a conditional module does.
-module docIntKvKey './csDocIntelligence-kvSecret.bicep' = if(!disableLocalAuth) {
-  name: take('docint-kv-key-${name}', 64)
-  params: {
-    docIntAccountName: csAccountDocInt.name
-    keyvaultName: keyvaultName
-  }
-}
-
 @description('Key Vault: Azure AI Document Intelligence Endpoint in vault as S')
 resource kValueDocInt2 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVaultDocInt
