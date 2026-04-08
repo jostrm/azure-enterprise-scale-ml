@@ -612,6 +612,7 @@ if [ "$enableContainerApps" = "false" ]; then
     if [ -n "$aca_a_name" ]; then
       echo "Found Container App A: $aca_a_name"
       
+      delete_private_endpoints "$aca_a_name" "Container App A"
       echo "Deleting Container App A: $aca_a_name"
       az containerapp delete \
         --resource-group "$projectResourceGroup" \
@@ -641,6 +642,7 @@ if [ "$enableContainerApps" = "false" ]; then
     if [ -n "$aca_w_name" ]; then
       echo "Found Container App W: $aca_w_name"
       
+      delete_private_endpoints "$aca_w_name" "Container App W"
       echo "Deleting Container App W: $aca_w_name"
       az containerapp delete \
         --resource-group "$projectResourceGroup" \
@@ -1303,6 +1305,7 @@ if [ "$enableAksForAzureML" = "false" ] && [ "$aksExists" = "true" ]; then
   if [ -n "$aks_name" ]; then
     echo "Found AKS cluster: $aks_name"
 
+    delete_private_endpoints "$aks_name" "AKS"
     echo "Deleting AKS cluster: $aks_name"
     az aks delete \
       --resource-group "$projectResourceGroup" \
