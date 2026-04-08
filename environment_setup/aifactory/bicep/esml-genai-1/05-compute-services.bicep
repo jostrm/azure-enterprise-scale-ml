@@ -593,7 +593,7 @@ var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
-module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3) {
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3 && !empty(aksSubnetName)) {
   name: take('05-snetDelegSF1${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -613,12 +613,14 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
 }
 
 // Subnet delegation for Container Apps OR Foundry
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) {
+// When ACA is disabled but AI Foundry agent network injection is enabled, fall back to genaiSubnetName
+var acaDelegationSubnetName = !empty(acaSubnetName) ? acaSubnetName : genaiSubnetName
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) && !empty(acaDelegationSubnetName)) {
   name: take('05-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
     vnetName: vnetNameFull
-    subnetName: acaSubnetName
+    subnetName: acaDelegationSubnetName
     location: location
     vnetResourceGroupName: vnetResourceGroupName
     delegations: [
