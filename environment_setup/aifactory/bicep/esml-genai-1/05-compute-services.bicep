@@ -635,6 +635,9 @@ module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (((!containe
       }
     ]
   }
+  dependsOn: [
+    subnetDelegationServerFarm // Serialize VNet subnet writes — concurrent modifications cause AnotherOperationInProgress
+  ]
 }
 
 // ============== App insights Dashboard with AppInsights of type WEB  ==============
