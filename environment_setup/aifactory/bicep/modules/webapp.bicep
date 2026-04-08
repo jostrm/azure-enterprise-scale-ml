@@ -69,7 +69,7 @@ param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
   'v8.0'
 ])
 param runtimeVersion string = '3.11' // Used if runtime is 'python'
-param subnetIntegrationName string  // Name of the subnet for VNet integration
+param subnetIntegrationName string = '' // Optional: Name of the subnet for VNet integration (delegated to Microsoft.Web/serverFarms). Leave empty to skip VNet integration.
 param hostNameSslStatesIn array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
 param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
 param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the resource.
@@ -126,10 +126,10 @@ resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing 
   scope: resourceGroup(vnetResourceGroupName)
 }
 // Get subnet reference for VNet integration
-resource integrationSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
-  name: '${vnetName}/${subnetIntegrationName}'
-  scope: resourceGroup(vnetResourceGroupName)
-}
+// Use computed resource ID to avoid ARM validation failure when subnetIntegrationName is empty
+var integrationSubnetId = !empty(subnetIntegrationName)
+  ? resourceId(vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, subnetIntegrationName)
+  : ''
 
 // Create App Service Plan
 // TODO: Linux or Windows
@@ -197,7 +197,7 @@ resource webApp 'Microsoft.Web/sites@2024-11-01' = {
     hostingEnvironmentProfile: !empty(byoAseFullResourceId) && byoASEv3 ? {
       id: byoAseFullResourceId
     } : null
-    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? null : integrationSubnet.id
+    virtualNetworkSubnetId: enablePublicAccessWithPerimeter || byoASEv3 ? null : (!empty(integrationSubnetId) ? integrationSubnetId : null)
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       http20Enabled: true  // enable HTTP/2.0

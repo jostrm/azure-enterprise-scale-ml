@@ -61,7 +61,7 @@ param runtime string = 'python'  // Options: 'dotnet', 'node', 'python', 'java'
   'v8.0'
 ])
 param runtimeVersion string = '3.11' // Used if runtime is 'python'
-param subnetIntegrationName string
+param subnetIntegrationName string = '' // Optional: Name of the subnet for VNet integration (delegated to Microsoft.Web/serverFarms). Leave empty to skip VNet integration.
 param hostNameSslStatesIn array = [] // 'Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
 param systemAssignedIdentity bool = true // Enables system assigned managed identity on the resource
 param userAssignedIdentities object = {} // Optional. The ID(s) to assign to the resource.
@@ -116,10 +116,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing 
 }
 
 // Get subnet reference for VNet integration
-resource integrationSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
-  name: '${vnetName}/${subnetIntegrationName}'
-  scope: resourceGroup(vnetResourceGroupName)
-}
+// Use computed resource ID to avoid ARM validation failure when subnetIntegrationName is empty
+var integrationSubnetId = !empty(subnetIntegrationName)
+  ? resourceId(vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, subnetIntegrationName)
+  : ''
 
 // Get subnet reference for private endpoint
 resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' existing = {
@@ -195,7 +195,7 @@ resource functionApp 'Microsoft.Web/sites@2024-11-01' = {
       id: byoAseFullResourceId
     } : null
     // VNet integration not needed for ASEv3 as it's already in a subnet
-    virtualNetworkSubnetId: byoASEv3 ? null : (enablePublicAccessWithPerimeter ? null : integrationSubnet.id)
+    virtualNetworkSubnetId: byoASEv3 ? null : (enablePublicAccessWithPerimeter ? null : (!empty(integrationSubnetId) ? integrationSubnetId : null))
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter || enablePublicGenAIAccess ? 'Enabled' : 'Disabled')
     siteConfig: {
       alwaysOn: alwaysOn // aca

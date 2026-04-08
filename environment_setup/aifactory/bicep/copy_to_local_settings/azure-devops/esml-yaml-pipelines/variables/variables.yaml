@@ -351,7 +351,7 @@ variables:
   subnetProjDatabricksPublic: "snt-prj001-dbxpub" # <optional>BYO Databricks public subnet<default>snt-prj001-dbxpub<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # <optional>BYO Databricks private subnet<default>snt-prj<xxx>-dbxpriv<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   byoASEv3: "false" # <optional>Use BYO App Service Environment v3<default>false<keep-as-is> <otherwise> true, use an existing ASEv3 specified in byoAseFullResourceId.
-  byoAseFullResourceId: "/subscriptions/...yourASEnameS2" # <optional>BYO ASEv3 ARM resource ID<default>/subscriptions/...yourASEnameS2<mandatory> if byoASEv3:'true' <ensure> full ARM resource ID of the existing ASEv3.
+  byoAseFullResourceId: "subscriptions/...yourASEnameS2" # <optional>BYO ASEv3 ARM resource ID<default>/subscriptions/...yourASEnameS2<mandatory> if byoASEv3:'true' <ensure> full ARM resource ID of the existing ASEv3.
   byoAseAppServicePlanResourceId: "" # <optional>BYO App Service Plan resource ID<default>""<keep-as-is> <otherwise> provide full ARM resource ID of an existing App Service Plan within the ASEv3.
 
   # ============================================================================

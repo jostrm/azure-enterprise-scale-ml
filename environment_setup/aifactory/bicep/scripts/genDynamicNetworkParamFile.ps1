@@ -29,7 +29,9 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Enable AKS for Azure ML — makes subnetProjAKS and subnetProjAKS2 mandatory when BYO_subnets=true")][string]$enableAksForAzureML = "true",
     [Parameter(Mandatory = $false, HelpMessage = "Enable Container Apps — makes subnetProjACA mandatory when BYO_subnets=true")][string]$enableContainerApps = "false",
     [Parameter(Mandatory = $false, HelpMessage = "Enable Databricks — makes subnetProjDatabricksPublic and subnetProjDatabricksPrivate mandatory when BYO_subnets=true")][string]$enableDatabricks = "false",
-    [Parameter(Mandatory = $false, HelpMessage = "Disable agent network injection — when false and enableAIFoundry=true, subnetProjACA2 is mandatory")][string]$disableAgentNetworkInjection = "false"
+    [Parameter(Mandatory = $false, HelpMessage = "Disable agent network injection — when false and enableAIFoundry=true, subnetProjACA2 is mandatory")][string]$disableAgentNetworkInjection = "false",
+    [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Web App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableWebApp = "false",
+    [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Function App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableFunction = "false"
 )
 
     # Default subnet name templates (used when BYO_subnets is false)
@@ -507,8 +509,10 @@ if ($BYO_subnets_bool -eq $false) {
     $enableContainerApps_bool         = ($enableContainerApps         -eq "true")
     $enableDatabricks_bool            = ($enableDatabricks            -eq "true")
     $disableAgentNetworkInjection_bool = ($disableAgentNetworkInjection -eq "true")
+    $enableWebApp_bool                = ($enableWebApp                -eq "true")
+    $enableFunction_bool              = ($enableFunction              -eq "true")
 
-    write-host "BYO flag summary: enableAIFoundry=$enableAIFoundry, enableAksForAzureML=$enableAksForAzureML, enableContainerApps=$enableContainerApps, enableDatabricks=$enableDatabricks, disableAgentNetworkInjection=$disableAgentNetworkInjection"
+    write-host "BYO flag summary: enableAIFoundry=$enableAIFoundry, enableAksForAzureML=$enableAksForAzureML, enableContainerApps=$enableContainerApps, enableDatabricks=$enableDatabricks, disableAgentNetworkInjection=$disableAgentNetworkInjection, enableWebApp=$enableWebApp, enableFunction=$enableFunction"
 
     # Common subnets (always resolved when provided — not tied to an enable flag)
     if ($null -ne $subnetCommon -and $subnetCommon -ne "") {
@@ -545,29 +549,37 @@ if ($BYO_subnets_bool -eq $false) {
     }
 
     # -------------------------------------------------------------------------
-    # subnetProjAKS / subnetProjAKS2 — mandatory only if enableAksForAzureML=true
+    # subnetProjAKS / subnetProjAKS2
+    # Mandatory (exit 1) if enableAksForAzureML=true.
+    # Also required (warning only) for VNet integration when enableWebApp=true or
+    # enableFunction=true, because Microsoft.Web/serverFarms delegation needs a
+    # dedicated /28+ subnet — the genai subnet is NOT delegated for serverFarms.
     # -------------------------------------------------------------------------
-    if ($enableAksForAzureML_bool) {
+    $aksSubnetNeeded = $enableAksForAzureML_bool -or $enableWebApp_bool -or $enableFunction_bool
+    if ($aksSubnetNeeded) {
         if (-not [string]::IsNullOrEmpty($subnetProjAKS)) {
             try {
                 $aksSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS -projectNumber $projectNumber -networkEnv $network_env
-                write-host "aksSubnetId: $aksSubnetId"
+                write-host "aksSubnetId: $aksSubnetId (enableAksForAzureML=$enableAksForAzureML, enableWebApp=$enableWebApp, enableFunction=$enableFunction)"
 
                 if (-not [string]::IsNullOrEmpty($subnetProjAKS2)) {
                     $aks2SubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjAKS2 -projectNumber $projectNumber -networkEnv $network_env
                     write-host "aks2SubnetId: $aks2SubnetId"
-                } else {
+                } elseif ($enableAksForAzureML_bool) {
                     write-host "AIF-WARNING: enableAksForAzureML=true but subnetProjAKS2 is empty in variables.yaml."
                 }
             } catch {
                 write-host "AIF-WARNING: aksSubnetId or aks2SubnetId could not be generated (catch). Please check variables.yaml."
             }
-        } else {
+        } elseif ($enableAksForAzureML_bool) {
             write-host "##vso[task.logissue type=error]BYO_subnets=true and enableAksForAzureML=true but subnetProjAKS is not set in variables.yaml. Please provide a value."
             exit 1
+        } else {
+            # enableWebApp or enableFunction requires the subnet but it is not mandatory (deployment may still work via fallback)
+            write-host "##vso[task.logissue type=warning]enableWebApp=$enableWebApp or enableFunction=$enableFunction is true but subnetProjAKS is not set. The subnet delegated to Microsoft.Web/serverFarms is needed for VNet integration. Please set subnetProjAKS in variables.yaml."
         }
     } else {
-        write-host "INFO: subnetProjAKS/AKS2 skipped (enableAksForAzureML=false)"
+        write-host "INFO: subnetProjAKS/AKS2 skipped (enableAksForAzureML=false, enableWebApp=false, enableFunction=false)"
     }
 
     # -------------------------------------------------------------------------

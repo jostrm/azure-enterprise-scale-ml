@@ -384,6 +384,9 @@ var aksSubnetName = namingConvention.outputs.aksSubnetName
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 var defaultSubnet = namingConvention.outputs.defaultSubnet
 
+// VNet integration subnet: prefer aksSubnetName (dedicated, at least /28), fall back to genaiSubnetName when AKS is disabled
+var vnetIntegrationSubnetName = !empty(aksSubnetName) ? aksSubnetName : genaiSubnetName
+
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
 
@@ -664,7 +667,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
-    subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
+    subnetIntegrationName: vnetIntegrationSubnetName // prefer aksSubnetName (/28+), falls back to genaiSubnetName when AKS disabled
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     applicationInsightsName: applicationInsightName
@@ -746,7 +749,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && enableFun
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
-    subnetIntegrationName: aksSubnetName // at least /28 use 25 similar as AKS subnet
+    subnetIntegrationName: vnetIntegrationSubnetName // prefer aksSubnetName (/28+), falls back to genaiSubnetName when AKS disabled
     storageAccountName: storageAccount1001Name
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
