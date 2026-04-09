@@ -583,22 +583,24 @@ if ($BYO_subnets_bool -eq $false) {
     }
 
     # -------------------------------------------------------------------------
-    # subnetProjACA — mandatory only if enableContainerApps=true
+    # subnetProjACA — always resolved when provided.
+    # Mandatory (exit 1) if enableContainerApps=true OR enableAIFoundry=true,
+    # because the ACA subnet is also used for AI Foundry agent network injection.
     # -------------------------------------------------------------------------
     if ($enableContainerApps_bool -or $enableAIFoundry_bool) {
         if (-not [string]::IsNullOrEmpty($subnetProjACA)) {
             try {
                 $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
-                write-host "acaSubnetId: $acaSubnetId"
+                write-host "acaSubnetId: $acaSubnetId (enableContainerApps=$enableContainerApps, enableAIFoundry=$enableAIFoundry)"
             } catch {
                 write-host "AIF-WARNING: acaSubnetId could not be generated (catch). Please check variables.yaml."
             }
         } else {
-            write-host "##vso[task.logissue type=error]BYO_subnets=true and enableContainerApps=true but subnetProjACA is not set in variables.yaml. Please provide a value."
+            write-host "##vso[task.logissue type=error]BYO_subnets=true and (enableContainerApps=$enableContainerApps or enableAIFoundry=$enableAIFoundry) but subnetProjACA is not set in variables.yaml. Please provide a value."
             exit 1
         }
     } else {
-        write-host "INFO: subnetProjACA skipped (enableContainerApps=false or enableAIFoundry=false)"
+        write-host "INFO: subnetProjACA skipped (enableContainerApps=false and enableAIFoundry=false)"
     }
 
     # -------------------------------------------------------------------------
