@@ -88,16 +88,16 @@ param deployModel_text_embedding_3_large bool = false
 @description('Whether to deploy text-embedding-3-small model')
 param deployModel_text_embedding_3_small bool = true
 @description('Default capacity for embedding models')
-param default_embedding_capacity int = 25
+param default_embedding_capacity int = 45
 
 @description('Default capacity for GPT models')
-param default_gpt_capacity int = 40
+param default_gpt_capacity int = 80
 @description('Whether to deploy GPT-4o model')
 param deployModel_gpt_4o bool = false
 param default_gpt_4o_version string = '2024-11-20'// '2024-11-20'
-@description('Whether to deploy GPT-4o-mini model')
-param deployModel_gpt_4o_mini bool = true
-param default_gpt_4o_mini_version string = '2024-07-18'
+@description('Whether to deploy GPT-5.4-mini model')
+param deployModel_gpt_54_mini bool = true
+param default_gpt_54_mini_version string = '2026-03-17'
 
 @description('Default SKU for models')
 @allowed(['Standard','DataZoneStandard','GlobalStandard'])
@@ -349,9 +349,9 @@ var aiModels = concat(
     capacity: modelGPTXCapacity
     skuLocation: modelGPTXSku
   }] : [],
-  deployModel_gpt_4o_mini ? [{
-    modelName: 'gpt-4o-mini'
-    version: default_gpt_4o_mini_version
+  deployModel_gpt_54_mini ? [{
+    modelName: 'gpt-5.4-mini'
+    version: default_gpt_54_mini_version
     capacity: default_gpt_capacity
     skuLocation: default_model_sku
   }] : [],
