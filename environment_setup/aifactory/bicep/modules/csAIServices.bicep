@@ -150,7 +150,7 @@ resource gpt54mini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01'
   name: 'gpt-5.4-mini'
   parent: aiServices
   sku: {
-    name: default_model_sku
+    name: 'DataZoneStandard'
     capacity: default_gpt_capacity
   }
   properties: {

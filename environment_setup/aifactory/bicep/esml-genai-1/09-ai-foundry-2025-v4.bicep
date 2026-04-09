@@ -353,7 +353,7 @@ var aiModels = concat(
     modelName: 'gpt-5.4-mini'
     version: default_gpt_54_mini_version
     capacity: default_gpt_capacity
-    skuLocation: default_model_sku
+    skuLocation: 'DataZoneStandard'
   }] : [],
   deployModel_gpt_4o ? [{
     modelName: 'gpt-4o'
