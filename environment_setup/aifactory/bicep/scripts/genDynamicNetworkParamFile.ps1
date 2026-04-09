@@ -604,9 +604,11 @@ if ($BYO_subnets_bool -eq $false) {
     }
 
     # -------------------------------------------------------------------------
-    # subnetProjACA2 — mandatory only if enableAIFoundry=true AND disableAgentNetworkInjection=false
+    # subnetProjACA2 — mandatory if:
+    #   - enableAIFoundry=true AND disableAgentNetworkInjection=false, OR
+    #   - enableContainerApps=true (ACA2 is the dedicated subnet for Container Apps environments)
     # -------------------------------------------------------------------------
-    $aca2Required = $enableAIFoundry_bool -and (-not $disableAgentNetworkInjection_bool)
+    $aca2Required = ($enableAIFoundry_bool -and (-not $disableAgentNetworkInjection_bool)) -or $enableContainerApps_bool
     if ($aca2Required) {
         if (-not [string]::IsNullOrEmpty($subnetProjACA2)) {
             try {
@@ -616,11 +618,11 @@ if ($BYO_subnets_bool -eq $false) {
                 write-host "AIF-WARNING: aca2SubnetId could not be generated (catch). Please check variables.yaml."
             }
         } else {
-            write-host "##vso[task.logissue type=error]BYO_subnets=true, enableAIFoundry=true and disableAgentNetworkInjection=false but subnetProjACA2 is not set in variables.yaml. Please provide a value."
+            write-host "##vso[task.logissue type=error]BYO_subnets=true and (enableContainerApps=$enableContainerApps or (enableAIFoundry=$enableAIFoundry and disableAgentNetworkInjection=false)) but subnetProjACA2 is not set in variables.yaml. Please provide a value."
             exit 1
         }
     } else {
-        write-host "INFO: subnetProjACA2 skipped (enableAIFoundry=$enableAIFoundry OR disableAgentNetworkInjection=$disableAgentNetworkInjection)"
+        write-host "INFO: subnetProjACA2 skipped (enableContainerApps=false and (enableAIFoundry=false OR disableAgentNetworkInjection=true))"
     }
 
     # -------------------------------------------------------------------------

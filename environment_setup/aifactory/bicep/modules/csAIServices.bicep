@@ -39,8 +39,9 @@ param managedIdentities managedIdentityAllType?
 param deployModel_text_embedding_ada_002 bool = false // text-embedding-ada-002
 param deployModel_text_embedding_3_small bool = false // text-embedding-3-small
 param deployModel_text_embedding_3_large bool = false // text-embedding-3-large
-// GPT-4o-mini
-param deployModel_gpt_4o_mini bool = false // gpt-4o-mini
+// GPT-5.4-mini
+param deployModel_gpt_54_mini bool = false // gpt-5.4-mini
+param default_gpt_54_mini_version string = '2026-03-17'
 param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'
@@ -145,8 +146,8 @@ resource embedding2 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01
     ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
   ]
 }
-resource gpt4omini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_gpt_4o_mini) {
-  name: 'gpt-4o-mini'
+resource gpt54mini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if(deployModel_gpt_54_mini) {
+  name: 'gpt-5.4-mini'
   parent: aiServices
   sku: {
     name: default_model_sku
@@ -155,7 +156,8 @@ resource gpt4omini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01'
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-4o-mini'
+      name: 'gpt-5.4-mini'
+      version: default_gpt_54_mini_version
     }
     raiPolicyName: 'Microsoft.DefaultV2'
     versionUpgradeOption: 'OnceNewDefaultVersionAvailable'
@@ -166,6 +168,7 @@ resource gpt4omini 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01'
     ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
   ]
 }
+
 resource gptXmodelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = if (deployModel_gpt_X && !empty(modelGPTXVersion) && !empty(modelGPTXName)) {
   name: modelGPTXName
   parent: aiServices
@@ -186,7 +189,7 @@ resource gptXmodelOpenAI 'Microsoft.CognitiveServices/accounts/deployments@2023-
     aiServices
     ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
     ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
-    ...(deployModel_gpt_4o_mini ? [gpt4omini] : [])
+    ...(deployModel_gpt_54_mini ? [gpt54mini] : [])
   ]
 }
 
@@ -209,7 +212,7 @@ resource embedding3large 'Microsoft.CognitiveServices/accounts/deployments@2023-
     aiServices
     ...(deployModel_text_embedding_ada_002 ? [embedding2] : [])
     ...(deployModel_text_embedding_3_small ? [textEmbedding3Small] : [])
-    ...(deployModel_gpt_4o_mini ? [gpt4omini] : [])
+    ...(deployModel_gpt_54_mini ? [gpt54mini] : [])
     ...(deployModel_gpt_X ? [gptXmodelOpenAI] : [])
   ]
 }

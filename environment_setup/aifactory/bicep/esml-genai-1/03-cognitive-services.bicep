@@ -129,8 +129,9 @@ param deployModel_text_embedding_3_small bool = false
 param deployModel_text_embedding_ada_002 bool = false
 param default_embedding_capacity int = 25
 
-// 4o-mini
-param deployModel_gpt_4o_mini bool = false
+// 5.4-mini
+param deployModel_gpt_54_mini bool = false
+param default_gpt_54_mini_version string = '2026-03-17'
 param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'
 
@@ -734,7 +735,8 @@ module aiServices '../modules/csAIServices.bicep' = if(!aiServicesExists && enab
     modelGPTXVersion: modelGPTXVersion
     modelGPTXSku:modelGPTXSku
     modelGPTXCapacity:modelGPTXCapacity
-    deployModel_gpt_4o_mini: deployModel_gpt_4o_mini
+    deployModel_gpt_54_mini: deployModel_gpt_54_mini
+    default_gpt_54_mini_version: default_gpt_54_mini_version
     deployModel_text_embedding_3_small: deployModel_text_embedding_3_small
     deployModel_text_embedding_3_large: deployModel_text_embedding_3_large
     deployModel_text_embedding_ada_002: deployModel_text_embedding_ada_002
