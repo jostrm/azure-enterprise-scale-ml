@@ -94,10 +94,10 @@ param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
 @description('Whether to deploy GPT-4o model')
 param deployModel_gpt_4o bool = false
-param default_gpt_4o_version string = 'latest'// '2024-11-20'
+param default_gpt_4o_version string = '2024-11-20'// '2024-11-20'
 @description('Whether to deploy GPT-4o-mini model')
 param deployModel_gpt_4o_mini bool = true
-param default_gpt_4o_mini_version string = '2025-01-01-preview'
+param default_gpt_4o_mini_version string = '2024-07-18'
 
 @description('Default SKU for models')
 @allowed(['Standard','DataZoneStandard','GlobalStandard'])
