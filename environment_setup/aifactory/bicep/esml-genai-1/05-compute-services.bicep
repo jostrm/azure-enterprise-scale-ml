@@ -382,10 +382,11 @@ var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrProjectName
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var aksSubnetName = namingConvention.outputs.aksSubnetName
 var acaSubnetName = namingConvention.outputs.acaSubnetName
+var aca2SubnetName = namingConvention.outputs.aca2SubnetName
 var defaultSubnet = namingConvention.outputs.defaultSubnet
 
-// VNet integration subnet: prefer aksSubnetName (dedicated, at least /28), fall back to genaiSubnetName when AKS is disabled
-var vnetIntegrationSubnetName = !empty(aksSubnetName) ? aksSubnetName : genaiSubnetName
+// VNet integration subnet: prefer aksSubnetName (dedicated, at least /28), fall back to acaSubnetName when AKS is disabled
+var vnetIntegrationSubnetName = !empty(aksSubnetName) ? aksSubnetName : acaSubnetName
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -617,7 +618,7 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
 
 // Subnet delegation for Container Apps OR Foundry
 // When ACA is disabled but AI Foundry agent network injection is enabled, fall back to genaiSubnetName
-var acaDelegationSubnetName = !empty(acaSubnetName) ? acaSubnetName : 'TODO need a subnet for ACA delegation when ACA enabled but no subnet provided'
+var acaDelegationSubnetName = !empty(acaSubnetName) ? acaSubnetName : aca2SubnetName
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) && (!empty(acaSubnetId) || !empty(genaiSubnetId))) {
   name: take('05-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
@@ -670,7 +671,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
     subnetNamePend: defaultSubnet
-    subnetIntegrationName: vnetIntegrationSubnetName // prefer aksSubnetName (/28+), falls back to genaiSubnetName when AKS disabled
+    subnetIntegrationName: vnetIntegrationSubnetName // prefer aksSubnetName (/28+), falls back to acaSubnetName when AKS disabled
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
     applicationInsightsName: applicationInsightName
