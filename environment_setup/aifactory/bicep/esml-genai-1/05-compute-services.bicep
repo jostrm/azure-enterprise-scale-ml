@@ -616,10 +616,11 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
   }
 }
 
-// Subnet delegation for Container Apps OR Foundry
-// When ACA is disabled but AI Foundry agent network injection is enabled, fall back to genaiSubnetName
+// Subnet delegation for Container Apps OR Foundry agent network injection.
+// Only runs when a dedicated ACA subnet exists (acaSubnetId or aca2SubnetId).
+// Never delegates the genai subnet — private endpoints need it undelegated.
 var acaDelegationSubnetName = !empty(acaSubnetName) ? acaSubnetName : aca2SubnetName
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) && (!empty(acaSubnetId) || !empty(genaiSubnetId))) {
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) && (!empty(acaSubnetId) || !empty(aca2SubnetId))) {
   name: take('05-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {

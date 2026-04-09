@@ -585,7 +585,7 @@ if ($BYO_subnets_bool -eq $false) {
     # -------------------------------------------------------------------------
     # subnetProjACA — mandatory only if enableContainerApps=true
     # -------------------------------------------------------------------------
-    if ($enableContainerApps_bool) {
+    if ($enableContainerApps_bool -or $enableAIFoundry_bool) {
         if (-not [string]::IsNullOrEmpty($subnetProjACA)) {
             try {
                 $acaSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjACA -projectNumber $projectNumber -networkEnv $network_env
@@ -598,7 +598,7 @@ if ($BYO_subnets_bool -eq $false) {
             exit 1
         }
     } else {
-        write-host "INFO: subnetProjACA skipped (enableContainerApps=false)"
+        write-host "INFO: subnetProjACA skipped (enableContainerApps=false or enableAIFoundry=false)"
     }
 
     # -------------------------------------------------------------------------
