@@ -617,7 +617,7 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
 
 // Subnet delegation for Container Apps OR Foundry
 // When ACA is disabled but AI Foundry agent network injection is enabled, fall back to genaiSubnetName
-var acaDelegationSubnetName = !empty(acaSubnetName) ? acaSubnetName : genaiSubnetName
+var acaDelegationSubnetName = !empty(acaSubnetName) ? acaSubnetName : 'TODO need a subnet for ACA delegation when ACA enabled but no subnet provided'
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) && (!empty(acaSubnetId) || !empty(genaiSubnetId))) {
   name: take('05-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
