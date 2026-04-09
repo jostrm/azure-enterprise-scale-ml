@@ -690,9 +690,6 @@ steps:
         echo "##vso[task.setvariable variable=acrProjectExists]false"
         echo "##vso[task.setvariable variable=vmExists]false"
         echo "##vso[task.setvariable variable=contentSafetyExists]false"
-        echo "##vso[task.setvariable variable=visionExists]false"
-        echo "##vso[task.setvariable variable=speechExists]false"
-        echo "##vso[task.setvariable variable=docIntelligenceExists]false"
         
         exit 0
       fi
@@ -815,9 +812,6 @@ steps:
       eventHubsName="eh-${projectNumber}-${locationSuffix}-${envName}"
       databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
       contentSafetyName="cs-${projectName}-${locationSuffix}-${envName}"
-      visionName="vision-${projectName}"
-      speechName="speech-${projectName}-${locationSuffix}-${envName}"
-      docIntelligenceName="docs-${projectName}-${locationSuffix}-${envName}"
 
       # Check resources (fuzzy for those with randomSalt,unique, exact for others)
       echo "##vso[task.setvariable variable=aiHubExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
@@ -897,9 +891,6 @@ steps:
       echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
       echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=contentSafetyExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$contentSafetyName" "$noSuffix")"
-      echo "##vso[task.setvariable variable=visionExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$visionName" "$noSuffix")"
-      echo "##vso[task.setvariable variable=speechExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$speechName" "$noSuffix")"
-      echo "##vso[task.setvariable variable=docIntelligenceExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$docIntelligenceName" "$noSuffix")"
 
       # Print variables for debugging
       echo "Target Resource Group: $targetResourceGroup"
@@ -1250,17 +1241,9 @@ steps:
       enableAIFoundry="${enableAIFoundry:-true}"
       openaiExists="${openaiExists:-false}"
       aiServicesExists="${aiServicesExists:-false}"
-      visionExists="${visionExists:-false}"
-      enableVisionFlag="${enableAzureAIVision:-false}"
-      speechExists="${speechExists:-false}"
-      enableSpeechFlag="${enableAzureSpeech:-false}"
-      contentSafetyExists="${contentSafetyExists:-false}"
-      enableContentSafetyFlag="${enableContentSafety:-false}"
-      docIntelligenceExists="${docIntelligenceExists:-false}"
-      enableDocIntelligenceFlag="${enableAIDocIntelligence:-false}"
 
-      echo "exists flags  — aml=$amlExists aifProject=$aifProjectExists aiHub=$aiHubExists aiFoundryV2=$aiFoundryV2Exists openai=$openaiExists aiServices=$aiServicesExists vision=$visionExists speech=$speechExists contentSafety=$contentSafetyExists docIntelligence=$docIntelligenceExists"
-      echo "enable flags  — AML=$enableAML AIFoundryHub=$enableAIFoundryHubFlag AIFoundry=$enableAIFoundry Vision=$enableVisionFlag Speech=$enableSpeechFlag ContentSafety=$enableContentSafetyFlag DocIntelligence=$enableDocIntelligenceFlag"
+      echo "exists flags  — aml=$amlExists aifProject=$aifProjectExists aiHub=$aiHubExists aiFoundryV2=$aiFoundryV2Exists openai=$openaiExists aiServices=$aiServicesExists"
+      echo "enable flags  — AML=$enableAML AIFoundryHub=$enableAIFoundryHubFlag AIFoundry=$enableAIFoundry"
 
       needs_purge=false
       if { [ "$amlExists" = "true" ]         && { [ "$enableAML"             = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
@@ -1268,11 +1251,7 @@ steps:
          { [ "$aiHubExists" = "true" ]       && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
          { [ "$aiFoundryV2Exists" = "true" ] && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
          { [ "$openaiExists" = "true" ]      && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$aiServicesExists" = "true" ]  && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$visionExists" = "true" ]          && { [ "$enableVisionFlag"          = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$speechExists" = "true" ]          && { [ "$enableSpeechFlag"          = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$contentSafetyExists" = "true" ]   && { [ "$enableContentSafetyFlag"   = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$docIntelligenceExists" = "true" ]  && { [ "$enableDocIntelligenceFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; }; then
+         { [ "$aiServicesExists" = "true" ]  && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; }; then
         needs_purge=true
       fi
 
@@ -1423,50 +1402,6 @@ steps:
         echo "Skipping AI Services purge (aiServicesExists=$aiServicesExists, enableAIFoundry=$enableAIFoundry)"
       fi
 
-      # ---------------------------------------------------------------
-      # Azure AI Vision (CognitiveServices/accounts, kind=ComputerVision)
-      # Prefix: vision-{projectName} — location suffix may be overridden, so match on prefix only
-      # ---------------------------------------------------------------
-      visionPrefix="vision-${projectName}"
-      if [ "$visionExists" = "true" ] && { [ "$enableVisionFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
-        purge_cognitive_service "$visionPrefix" "$projectResourceGroup"
-      else
-        echo "Skipping Vision purge (visionExists=$visionExists, enableAzureAIVision=$enableVisionFlag)"
-      fi
-
-      # ---------------------------------------------------------------
-      # Azure AI Speech (CognitiveServices/accounts, kind=SpeechServices)
-      # Prefix: speech-{projectName}-{locationSuffix}-{env}
-      # ---------------------------------------------------------------
-      speechPrefix="speech-${projectName}-${locationSuffix}-${envName}"
-      if [ "$speechExists" = "true" ] && { [ "$enableSpeechFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
-        purge_cognitive_service "$speechPrefix" "$projectResourceGroup"
-      else
-        echo "Skipping Speech purge (speechExists=$speechExists, enableAzureSpeech=$enableSpeechFlag)"
-      fi
-
-      # ---------------------------------------------------------------
-      # Content Safety (CognitiveServices/accounts, kind=ContentSafety)
-      # Prefix: cs-{projectName}-{locationSuffix}-{env}
-      # ---------------------------------------------------------------
-      contentSafetyPrefix="cs-${projectName}-${locationSuffix}-${envName}"
-      if [ "$contentSafetyExists" = "true" ] && { [ "$enableContentSafetyFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
-        purge_cognitive_service "$contentSafetyPrefix" "$projectResourceGroup"
-      else
-        echo "Skipping Content Safety purge (contentSafetyExists=$contentSafetyExists, enableContentSafety=$enableContentSafetyFlag)"
-      fi
-
-      # ---------------------------------------------------------------
-      # Document Intelligence (CognitiveServices/accounts, kind=FormRecognizer)
-      # Prefix: docs-{projectName}-{locationSuffix}-{env}
-      # ---------------------------------------------------------------
-      docIntelligencePrefix="docs-${projectName}-${locationSuffix}-${envName}"
-      if [ "$docIntelligenceExists" = "true" ] && { [ "$enableDocIntelligenceFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
-        purge_cognitive_service "$docIntelligencePrefix" "$projectResourceGroup"
-      else
-        echo "Skipping Document Intelligence purge (docIntelligenceExists=$docIntelligenceExists, enableAIDocIntelligence=$enableDocIntelligenceFlag)"
-      fi
-
       echo "=== 04_Purge_SoftDeleted complete ==="
   env:
     # All variables that may be unset (set dynamically via ##vso[task.setvariable] in prior tasks,
@@ -1481,17 +1416,9 @@ steps:
     aiFoundryV2Exists: $(aiFoundryV2Exists)
     openaiExists: $(openaiExists)
     aiServicesExists: $(aiServicesExists)
-    visionExists: $(visionExists)
-    speechExists: $(speechExists)
-    contentSafetyExists: $(contentSafetyExists)
-    docIntelligenceExists: $(docIntelligenceExists)
     enableAzureMachineLearning: $(enableAzureMachineLearning)
     enableAIFoundryHub: $(enableAIFoundryHub)
     enableAIFoundry: $(enableAIFoundry)
-    enableAzureAIVision: $(enableAzureAIVision)
-    enableAzureSpeech: $(enableAzureSpeech)
-    enableContentSafety: $(enableContentSafety)
-    enableAIDocIntelligence: $(enableAIDocIntelligence)
 - task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
@@ -1706,10 +1633,12 @@ steps:
       
       # Construct common resource group name
       commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+      echo "commonResourceGroup resolved to: $commonResourceGroup"
       
       # Construct project resource group name
       projectNameReplaced="${projectName/prj/project}"
       projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+      echo "projectResourceGroup resolved to: $projectResourceGroup"
       
       # Function to check and delete orphan role assignments
       check_and_delete_orphans() {
@@ -1889,7 +1818,6 @@ steps:
      --parameters DEBUG_deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
      --parameters DEBUG_deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters DEBUG_deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
-     --parameters DEBUG_deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
@@ -1983,25 +1911,6 @@ steps:
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '62b-purge-soft-deleted-cognitive'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded())
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-     az account set --subscription "$(dev_test_prod_sub_id)"
-     echo "Purging any soft-deleted Cognitive Services accounts in project RG..."
-     _prj_rg="$(admin_aifactoryPrefixRG)$(projectPrefix)project$(project_number_000)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)$(projectSuffix)"
-     _location="$(admin_location)"
-     deleted=$(az cognitiveservices account list-deleted --query "[?location=='$_location'].name" -o tsv 2>/dev/null || true)
-     for name in $deleted; do
-       echo "Purging soft-deleted Cognitive Services account: $name"
-       az cognitiveservices account purge --name "$name" --resource-group "$_prj_rg" --location "$_location" 2>/dev/null || \
-       echo "Purge skipped for $name (may belong to a different RG or already purged)"
-     done
-     echo "Purge step complete."
-- task: AzureCLI@2
   displayName: '63-cognitive-services'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   retryCountOnTaskFailure: 2
@@ -2058,7 +1967,7 @@ steps:
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
-     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters deployModel_gpt_54_mini="$(deployModel_gpt_54_mini)" \
      --parameters default_gpt_capacity="$(default_gpt_capacity)" \
      --parameters default_model_sku="$(default_model_sku)" \
      --parameters modelGPTXName="$(modelGPTXName)" \
@@ -2085,7 +1994,6 @@ steps:
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters addAISearch="$(addAISearch)" \
-     --parameters restore="$(restore)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -2295,7 +2203,7 @@ steps:
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters default_embedding_capacity="$(default_embedding_capacity)" \
-     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
+     --parameters deployModel_gpt_54_mini="$(deployModel_gpt_54_mini)" \
      --parameters default_gpt_capacity="$(default_gpt_capacity)" \
      --parameters default_model_sku="$(default_model_sku)" \
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
@@ -2599,26 +2507,8 @@ steps:
      --parameters addAISearch="$(addAISearch)" \
      --parameters skipExistingRoleAssignments="$(skipACRAssignments)" \
      --debug
+     echo "##vso[task.setvariable variable=pre_foundry_gate_passed]true"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
-- task: AzureCLI@2
-  displayName: '69-purge-soft-deleted-cognitive'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded())
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-     az account set --subscription "$(dev_test_prod_sub_id)"
-     echo "Purging any soft-deleted Cognitive Services accounts before AI Foundry deployment..."
-     _prj_rg="$(admin_aifactoryPrefixRG)$(projectPrefix)project$(project_number_000)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)$(projectSuffix)"
-     _location="$(admin_location)"
-     deleted=$(az cognitiveservices account list-deleted --query "[?location=='$_location'].name" -o tsv 2>/dev/null || true)
-     for name in $deleted; do
-       echo "Purging soft-deleted Cognitive Services account: $name"
-       az cognitiveservices account purge --name "$name" --resource-group "$_prj_rg" --location "$_location" 2>/dev/null || \
-       echo "Purge skipped for $name (may belong to a different RG or already purged)"
-     done
-     echo "Purge step complete."
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025-1stOption'
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), or(eq(variables['foundryDeploymentType'], '1'), eq(variables['foundryDeploymentType'], '3')))
@@ -2675,7 +2565,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), not(canceled()), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2714,8 +2604,8 @@ steps:
      --parameters default_gpt_capacity="$(default_gpt_capacity)" \
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
      --parameters default_gpt_4o_version="$(default_gpt_4o_version)" \
-     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
-     --parameters default_gpt_4o_mini_version="$(default_gpt_4o_mini_version)" \
+     --parameters deployModel_gpt_54_mini="$(deployModel_gpt_54_mini)" \
+     --parameters default_gpt_54_mini_version="$(default_gpt_54_mini_version)" \
      --parameters default_model_sku="$(default_model_sku)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
@@ -2766,7 +2656,6 @@ steps:
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
-     --parameters restore="$(restore)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -2823,8 +2712,8 @@ steps:
      --parameters default_gpt_capacity="$(default_gpt_capacity)" \
      --parameters deployModel_gpt_4o="$(deployModel_gpt_4o)" \
      --parameters default_gpt_4o_version="$(default_gpt_4o_version)" \
-     --parameters deployModel_gpt_4o_mini="$(deployModel_gpt_4o_mini)" \
-     --parameters default_gpt_4o_mini_version="$(default_gpt_4o_mini_version)" \
+     --parameters deployModel_gpt_54_mini="$(deployModel_gpt_54_mini)" \
+     --parameters default_gpt_54_mini_version="$(default_gpt_54_mini_version)" \
      --parameters default_model_sku="$(default_model_sku)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
