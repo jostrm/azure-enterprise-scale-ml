@@ -180,34 +180,4 @@ resource approveSharedPrivateLinkBlob 'Microsoft.Storage/storageAccounts/private
   ]
 }
 
-resource approveSharedPrivateLinkFile 'Microsoft.Storage/storageAccounts/privateEndpointConnections@2024-01-01' = if (approveStorageSharedLinks && enableSharedPrivateLink) {
-  name: '${aiSearch.name}-shared-pe-1'
-  parent: storageAccountForSharedLinks
-  properties: {
-    privateLinkServiceConnectionState: {
-      status: 'Approved'
-      description: 'Approved during deployment'
-    }
-  }
-  dependsOn: [
-    aiSearch::sharedPrivateLinkResource[1]
-  ]
-}
 
-resource aiServicesAccountForSharedLink 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (approveAiServicesSharedLink && enableSharedPrivateLink) {
-  name: aiServicesNameForSharedLink
-}
-
-resource approveSharedPrivateLinkAiServices 'Microsoft.CognitiveServices/accounts/privateEndpointConnections@2024-10-01' = if (approveAiServicesSharedLink && enableSharedPrivateLink) {
-  name: '${aiSearch.name}-shared-pe-2'
-  parent: aiServicesAccountForSharedLink
-  properties: {
-    privateLinkServiceConnectionState: {
-      status: 'Approved'
-      description: 'Approved during deployment'
-    }
-  }
-  dependsOn: [
-    aiSearch::sharedPrivateLinkResource[2]
-  ]
-}
