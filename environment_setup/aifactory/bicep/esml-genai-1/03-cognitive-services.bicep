@@ -620,35 +620,16 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
 }
 
 // Build shared private links array for AI Search
-var sharedPrivateLinksForAISearch = enableAISearchSharedPrivateLink ? union(
-  // Storage Account - Blob
-  [
-    {
-      privateLinkResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount2001Name)
-      groupId: 'blob'
-      requestMessage: 'AI Search shared private link to blob storage'
-      resourceRegion: location
-    }
-  ],
-  // Storage Account - File
-  [
-    {
-      privateLinkResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount2001Name)
-      groupId: 'file'
-      requestMessage: 'AI Search shared private link to file storage'
-      resourceRegion: location
-    }
-  ],
-  // AI Services - conditionally added if enableAIServices is true
-  enableAIServices ? [
-    {
-      privateLinkResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.CognitiveServices/accounts', aiServicesName)
-      groupId: 'account'
-      requestMessage: 'AI Search shared private link to AI Services'
-      resourceRegion: location
-    }
-  ] : []
-) : []
+// Group IDs: blob, openai_account, cognitiveservices_account, foundry_account (via aiSearchSharedPrivateLinkFoundry.bicep)
+// 'account' (AI Services) removed - AI Services is included in AI Foundry, and the quota is 4 distinct group IDs.
+var sharedPrivateLinksForAISearch = enableAISearchSharedPrivateLink ? [
+  {
+    privateLinkResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount2001Name)
+    groupId: 'blob'
+    requestMessage: 'AI Search shared private link to blob storage'
+    resourceRegion: location
+  }
+] : []
 
 // AI Search Service
 module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry))) {
