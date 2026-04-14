@@ -301,8 +301,10 @@ variables:
   deployModel_text_embedding_3_small: "false" # <optional>Deploy text-embedding-3-small<default>false<keep-as-is> <recommended> for cost-optimized scenarios.
   default_embedding_capacity: 25 # <optional>Embedding model TPM capacity (K)<default>25<keep-as-is> 25 = 25K tokens per minute.
 
-  deployModel_gpt_4o_mini: "false" # <optional>Deploy gpt-4o-mini<default>false<keep-as-is>
-  default_gpt_4o_mini_version: "2024-07-18" # <optional>gpt-4o-mini version<default>2024-07-18<keep-as-is> Note: '2024-07-18' does not support Bing grounding in Agents.
+  # deployModel_gpt_4o_mini: "true"
+  # default_gpt_4o_mini_version: "2026-03-17" #"2025-01-01-preview"
+  deployModel_gpt_54_mini: "false"
+  default_gpt_54_mini_version: "2026-03-17"
 
   deployModel_gpt_4o: "true" # <optional>Deploy gpt-4o<default>true<keep-as-is> <recommended> for general-purpose AI Foundry scenarios.
   default_gpt_4o_version: "2024-11-20" # <optional>gpt-4o version<default>2024-11-20<keep-as-is> <otherwise> "2024-08-06".
