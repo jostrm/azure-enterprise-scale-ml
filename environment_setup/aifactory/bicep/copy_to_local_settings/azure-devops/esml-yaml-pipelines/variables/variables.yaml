@@ -207,8 +207,8 @@ variables:
   cmk: "false" # <optional>Customer Managed Key encryption<default>false<keep-as-is> <otherwise> true, enable CMK for Key Vault, Storage accounts, etc.
   cmkKeyName: "<todo>_aifactory-cmk-key" # <optional>CMK key name in seeding KV<default><todo>_aifactory-cmk-key<mandatory> if cmk:'true' <ensure> key name in your Seeding Keyvault to use for CMK encryption.
   cmkKeyVersion: "" # <optional>CMK key version<default>""<keep-as-is> <otherwise> pin to a specific GUID version string.
-  cmkDisableForAISearch: "false" # <optional>Disable CMK for AI Search<default>false<keep-as-is> <otherwise> true, disables CMK encryption for Azure AI Search even when cmk:'true'. Reason: Foundry runtime creates indexes without providing CMK info, causing failures.
-  cmkDisableForFoundry: "false" # <optional>Disable CMK for AI Foundry<default>false<keep-as-is> <otherwise> true, disables CMK encryption for AI Foundry account even when cmk:'true'. Reason: Foundry does not respect AI Search CMK contract at runtime.
+  cmkDisableForAISearch: "true" # <optional>Disable CMK for AI Search<default>false<keep-as-is> <otherwise> true, disables CMK encryption for Azure AI Search even when cmk:'true'. Reason: Foundry runtime creates indexes without providing CMK info, causing failures.
+  cmkDisableForFoundry: "true" # <optional>Disable CMK for AI Foundry<default>false<keep-as-is> <otherwise> true, disables CMK encryption for AI Foundry account even when cmk:'true'. Reason: Foundry does not respect AI Search CMK contract at runtime.
   # === Keyvault RBAC ===
   updateKeyvaultRbac: "false" # <optional>Update Key Vault RBAC<default>false<keep-as-is> <otherwise> true, re-run to update RBAC properties.
   
