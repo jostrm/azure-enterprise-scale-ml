@@ -52,6 +52,8 @@ param diagnosticSettingLevel string = 'silver'
 // CMK Parameters
 param cmk bool = false
 param cmkKeyName string = ''
+@description('Disable CMK for AI Search even when cmk is true. Foundry runtime creates indexes without providing CMK info.')
+param cmkDisableForAISearch bool = false
 param admin_bicep_kv_fw string = ''
 param admin_bicep_kv_fw_rg string = ''
 param admin_bicep_input_keyvault_subscription string = ''
@@ -520,6 +522,7 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIn
 }
 
 // ============== CMK CONFIGURATION ==============
+var cmkForAISearch = cmk && !cmkDisableForAISearch
 var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
 
 // Construct Key Vault URI properly (avoid reference() function which causes deployment issues)
@@ -664,10 +667,10 @@ module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (ena
       )
     }
     // CMK encryption parameters
-    cmk: cmk
-    cmkKeyName: cmk ? cmkKeyName : ''
-    cmkKeyVaultUri: cmkKeyVaultUri
-    cmkIdentityId: cmkIdentityId
+    cmk: cmkForAISearch
+    cmkKeyName: cmkForAISearch ? cmkKeyName : ''
+    cmkKeyVaultUri: cmkForAISearch ? cmkKeyVaultUri : ''
+    cmkIdentityId: cmkForAISearch ? cmkIdentityId : ''
   }
   dependsOn: [
     projectResourceGroupExists
@@ -744,9 +747,9 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
 }
 
 // CMK RBAC: Assign Key Vault Crypto Service Encryption User role to AI Search System-Assigned MI
-// Only runs when AI Search is newly deployed (!aiSearchExists) and CMK is enabled
+// Only runs when AI Search is newly deployed (!aiSearchExists) and CMK is enabled for AI Search
 #disable-next-line BCP073
-module aiSearchCmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && cmk) {
+module aiSearchCmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && cmkForAISearch) {
   name: take('03-aiSearchCmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
   params: {

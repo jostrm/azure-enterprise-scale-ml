@@ -97,7 +97,10 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
     hostingMode: hostingMode
     partitionCount: partitionCount
     publicNetworkAccess:(enablePublicAccessWithPerimeter || publicNetworkAccess)? 'Enabled': 'Disabled'  // Enabled, for ipRules to work.
-    networkRuleSet: !enablePublicAccessWithPerimeter ? {
+    // networkRuleSet is only valid when publicNetworkAccess is 'Enabled'.
+    // When publicNetworkAccess is 'Disabled', setting networkRuleSet (including bypass:'AzureServices')
+    // causes Azure to override publicNetworkAccess back to 'Enabled'. Gate on both conditions.
+    networkRuleSet: (!enablePublicAccessWithPerimeter && publicNetworkAccess) ? {
       bypass: 'AzureServices'
       ipRules: ipRules // [{value: 'ip'}], .e.g. only IP addresses. Not also "action: 'Allow'"
     }:null
@@ -179,5 +182,3 @@ resource approveSharedPrivateLinkBlob 'Microsoft.Storage/storageAccounts/private
     aiSearch::sharedPrivateLinkResource[0]
   ]
 }
-
-

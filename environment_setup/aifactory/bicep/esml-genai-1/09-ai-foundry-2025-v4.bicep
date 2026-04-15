@@ -60,6 +60,9 @@ param enableAISearchSharedPrivateLink bool = true
 @description('Enable Customer Managed Keys (CMK) encryption')
 param cmk bool = false
 
+@description('Disable CMK for AI Foundry even when cmk is true. Foundry does not respect AI Search CMK contract at runtime.')
+param cmkDisableForFoundry bool = false
+
 @description('Name of the Customer Managed Key in Key Vault')
 param cmkKeyName string = ''
 
@@ -528,7 +531,8 @@ var aiFoundryDeployments = [
 ]
 
 // Customer Managed Key (CMK) configuration - applies to all AI Foundry deployments
-var customerManagedKey = cmk ? {
+var cmkForFoundry = cmk && !cmkDisableForFoundry
+var customerManagedKey = cmkForFoundry ? {
   keyName: cmkKeyName
   keyVaultResourceId: resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault)
   userAssignedIdentityResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
@@ -786,7 +790,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
   ]
 }
 
-module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk)) {
+module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep' = if(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV22-NoAvm_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -828,10 +832,10 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
     azureCosmosDBAccountResourceId: useCosmosForFoundry ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
     aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
-    cmk: cmk
-    cmkKeyName: cmkKeyName
-    cmkKeyVersion: cmkKeyVersion
-    cmkKeyVaultResourceId: cmk ? resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault) : ''
+    cmk: cmkForFoundry
+    cmkKeyName: cmkForFoundry ? cmkKeyName : ''
+    cmkKeyVersion: cmkForFoundry ? cmkKeyVersion : ''
+    cmkKeyVaultResourceId: cmkForFoundry ? resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault) : ''
   }
   dependsOn: [
     existingTargetRG
@@ -916,7 +920,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     apiManagementResourceId: apiManagementResourceId
   }
   dependsOn: [
-    ...( !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk) ? [aiFoundry2025NoAvmV22] : [])
+    ...( !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry) ? [aiFoundry2025NoAvmV22] : [])
     existingTargetRG
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(projectModuleEnabled ? [assignCognitiveServicesRoles] : [])
@@ -940,7 +944,7 @@ module aiFoundryAccountDiagnostics '../modules/diagnostics/cognitiveServicesDiag
   }
   dependsOn: [
     ...(foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists ? [aiFoundry2025NoAvmV22AccountOnly] : [])
-    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk) ? [aiFoundry2025NoAvmV22] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry) ? [aiFoundry2025NoAvmV22] : [])
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
   ]
 }
@@ -1242,7 +1246,7 @@ output aiFoundryProjectDeployed bool = foundryV22AccountOnly
   ? false
   : (deployAvmFoundry
   ? (enableAIFoundry && projectModuleEnabled)
-      : ((!aiFoundryV2Exists || updateAIFoundry || cmk) ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed : (enableAIFoundry && projectModuleEnabled)))
+      : ((!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry) ? aiFoundry2025NoAvmV22!.outputs.aiFoundryProjectDeployed : (enableAIFoundry && projectModuleEnabled)))
 
 @description('Debug: Shows module deployment conditions')
 output debugModuleConditions object = {
@@ -1252,11 +1256,13 @@ output debugModuleConditions object = {
   aiFoundryV2Exists: aiFoundryV2Exists
   updateAIFoundry: updateAIFoundry
   cmk: cmk
-  moduleWillDeploy: !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk)
+  cmkForFoundry: cmkForFoundry
+  cmkDisableForFoundry: cmkDisableForFoundry
+  moduleWillDeploy: !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry)
 }
 
 @description('Debug: CMK update status from child module')
-output debugCmkUpdate object = (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmk)) ? {
+output debugCmkUpdate object = (!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry)) ? {
   cmkUpdateAttempted: aiFoundry2025NoAvmV22!.outputs.cmkUpdateAttempted
   cmkDebugInfo: aiFoundry2025NoAvmV22!.outputs.cmkDebugInfo
 } : {
