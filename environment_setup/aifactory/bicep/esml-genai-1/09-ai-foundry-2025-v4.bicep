@@ -979,7 +979,7 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   ]
 }
 
-module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && useCosmosForFoundry && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_RBACpreCH_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1065,7 +1065,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 
 // This module creates the capability host for the project and account
 // Only executes in scenario 2b (non-APIM)
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && useCosmosForFoundry && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1088,7 +1088,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   ]
 }
 
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && useCosmosForFoundry && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1103,7 +1103,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
 // START CAPHOST RBAC: Some RBAC for COSMOS & STORAGE must be assigned AFTER the CAPABILITY HOST is created
 // - The Storage Blob Data Owner role must be assigned after.
 // - The Cosmos Built-In Data Contributor role must be assigned after.
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && useCosmosForFoundry && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -1112,10 +1112,12 @@ module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = 
     #disable-next-line BCP318
     projectWorkspaceId: formatProjectWorkspaceId.outputs.projectWorkspaceIdGuid
     cosmosAccountName: namingConvention.outputs.cosmosDBName
+    aiSearchName: aiSearchName
   }
   dependsOn: [
     addProjectCapabilityHost
     formatProjectWorkspaceId
+    rbacAISearchForAIFv21
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }

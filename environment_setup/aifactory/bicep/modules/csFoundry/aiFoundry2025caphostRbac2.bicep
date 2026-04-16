@@ -9,6 +9,11 @@ param projectPrincipalId string
 param storageName string
 @description('Workspace Id of the AI Project')
 param projectWorkspaceId string
+@description('Name of the AI Search service for vector store data plane access')
+param aiSearchName string = ''
+@description('RBAC level for AI Search index data access: contributor (read+write) or reader (read-only)')
+@allowed(['contributor', 'reader'])
+param searchRbacLevel string = 'contributor'
 
 // Reference existing storage account
 resource storage 'Microsoft.Storage/storageAccounts@2025-01-01' existing = {
@@ -108,5 +113,27 @@ resource storageBlobDataOwnerAssignment 'Microsoft.Authorization/roleAssignments
     principalType: 'ServicePrincipal'
     conditionVersion: '2.0'
     condition: conditionStr
+  }
+}
+
+// ============== AI SEARCH: Search Index Data access for Capability Host vector store ==============
+// The capability host uses the project MI to access indexes in AI Search (vector store connection).
+// 'contributor' grants read + write (for File Search ingestion), 'reader' grants read-only.
+
+resource aiSearchService 'Microsoft.Search/searchServices@2023-11-01' existing = if (!empty(aiSearchName)) {
+  name: aiSearchName
+}
+
+var searchIndexDataContributorRoleId_caphost = '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
+var searchIndexDataReaderRoleId_caphost = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
+var searchRoleId = searchRbacLevel == 'contributor' ? searchIndexDataContributorRoleId_caphost : searchIndexDataReaderRoleId_caphost
+
+resource caphostSearchIndexDataAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiSearchName)) {
+  name: guid(aiSearchService.id, projectPrincipalId, searchRoleId, 'caphost')
+  scope: aiSearchService
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
   }
 }
