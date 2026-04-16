@@ -5,23 +5,31 @@ param bastion_service_name string
 param addBastion bool = false
 param useAdGroups bool = false
 
-var readerRoleDefinitionId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
-@description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
-resource readerRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
+@description('Key Vault role level: user = Key Vault Secrets User, officer = Key Vault Secrets Officer, admin = Key Vault Administrator')
+@allowed(['user', 'officer', 'admin'])
+param kvRoleLevel string = 'admin'
+
+var secretsUserRoleDefinitionId = '4633458b-17de-408a-b874-0445c86b69e6'
+var secretsOfficerRoleDefinitionId = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
+var adminRoleDefinitionId = '00482a5a-887f-4fb3-b363-3b7fe8e74483'
+var selectedRoleId = kvRoleLevel == 'admin' ? adminRoleDefinitionId : (kvRoleLevel == 'officer' ? secretsOfficerRoleDefinitionId : secretsUserRoleDefinitionId)
+var selectedRoleLabel = kvRoleLevel == 'admin' ? 'KeyVaultAdministrator' : (kvRoleLevel == 'officer' ? 'KeyVaultSecretsOfficer' : 'KeyVaultSecretsUser')
+
+resource kvRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
   scope: subscription()
-  name: readerRoleDefinitionId
+  name: selectedRoleId
 }
 
 resource commonKvReader 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: common_kv_name
 }
 resource readerUserCommonKv 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
-  name: guid('${user_object_ids[i]}-reader-${common_kv_name}-${resourceGroup().id}')
+  name: guid('${user_object_ids[i]}-${selectedRoleLabel}-${common_kv_name}-${resourceGroup().id}')
   properties: {
-    roleDefinitionId: readerRoleDefinition.id
+    roleDefinitionId: kvRoleDefinition.id
     principalId: user_object_ids[i]
     principalType:useAdGroups? 'Group':'User'
-    description:'Reader to USER with OID  ${user_object_ids[i]} for keyvault: ${common_kv_name}'
+    description:'${selectedRoleLabel} to USER with OID  ${user_object_ids[i]} for keyvault: ${common_kv_name}'
   }
   scope:commonKvReader
 }]
@@ -35,7 +43,7 @@ resource resBastion4project 'Microsoft.Network/bastionHosts@2021-05-01' existing
 resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)): if (addBastion) {
   name: guid('${user_object_ids[i]}-reader-${bastion_service_name}-${resourceGroup().id}')
   properties: {
-    roleDefinitionId: readerRoleDefinition.id
+    roleDefinitionId: kvRoleDefinition.id
     principalId: user_object_ids[i]
     principalType:useAdGroups? 'Group':'User'
     description:'Reader to USER with OID  ${user_object_ids[i]} for Bastion service: ${bastion_service_name}'
