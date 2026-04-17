@@ -285,7 +285,8 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var genaiName = namingConvention.outputs.genaiName
 var aoaiName = namingConvention.outputs.aoaiName
-var safeNameAISearchOrg = enableAISearch ? namingConvention.outputs.safeNameAISearch : ''
+var needsAISearch = enableAISearch || (enableAFoundryCaphost && enableAIFoundry)
+var safeNameAISearchOrg = needsAISearch ? namingConvention.outputs.safeNameAISearch : ''
 var aiServicesName = namingConvention.outputs.aiServicesName
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
 var keyvaultName = namingConvention.outputs.keyvaultName
@@ -296,11 +297,11 @@ var miPrjName = namingConvention.outputs.miPrjName
 //var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
 var cleanRandomValue = take(namingConvention.outputs.randomSalt,2)
 
-var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+var safeNameAISearchBase = (needsAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
   : ''
 
-var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+var safeNameAISearchSuffix = (needsAISearch && !empty(safeNameAISearchOrg))
   ? substring(
       safeNameAISearchOrg,
       max(length(safeNameAISearchOrg) - 3, 0),
@@ -308,7 +309,7 @@ var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
     )
   : ''
 
-var safeNameAISearch = (enableAISearch && !empty(safeNameAISearchOrg))
+var safeNameAISearch = (needsAISearch && !empty(safeNameAISearchOrg))
   ? take(
       addAISearch
         ? '${safeNameAISearchBase}${cleanRandomValue}${safeNameAISearchSuffix}'
