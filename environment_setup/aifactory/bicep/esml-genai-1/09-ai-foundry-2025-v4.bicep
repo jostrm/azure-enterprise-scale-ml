@@ -197,9 +197,10 @@ var privDnsSubscription = (!empty(privDnsSubscription_param) && centralDnsZoneBy
 var randomSalt = substring(uniqueString(subscription().subscriptionId, targetResourceGroup), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 
-// AI Foundry/Project should not require Cosmos DB when agent network injection is disabled
-// or when Capability Host is enabled (per requirement).
-var useCosmosForFoundry = enableCosmosDB && !(disableAgentNetworkInjection || enableCaphost)
+// Cosmos DB is required for AI Foundry/Project when agent network injection is enabled
+// OR when Capability Host is enabled (caphost needs Cosmos for thread storage).
+// Reference: microsoft-foundry/foundry-samples/15-private-network-standard-agent-setup
+var useCosmosForFoundry = enableCosmosDB && (!disableAgentNetworkInjection || enableCaphost)
 
 // Subnet calculations
 var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
