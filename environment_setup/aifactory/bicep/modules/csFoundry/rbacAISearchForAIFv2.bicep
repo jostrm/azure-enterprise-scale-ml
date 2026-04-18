@@ -11,6 +11,9 @@ param aiSearchName string
 @description('The name of the AI Foundry account to get the principal ID from')
 param aiFoundryAccountName string
 
+@description('The principal ID of the AI Foundry account system-assigned managed identity (passed as param to ensure deploy-time determinism for role assignment names)')
+param aiFoundryPrincipalId string
+
 @description('The principal ID of the AI Foundry project system-assigned managed identity')
 param projectPrincipalId string = ''
 
@@ -26,15 +29,6 @@ param searchIndexDataContributorRoleId string
 @description('Azure AI Developer role ID')
 param azureAIDeveloperRoleId string = '64702f94-c441-49e6-a78b-ef80e0188fee'
 
-// Reference the AI Foundry account to get its system-assigned managed identity
-#disable-next-line BCP081
-resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
-  name: aiFoundryAccountName
-}
-
-// Get the principal ID from the AI Foundry account's system-assigned managed identity
-var principalId = aiFoundryAccount.identity.principalId
-
 // Reference the existing AI Search service
 resource aiSearchService 'Microsoft.Search/searchServices@2023-11-01' existing = {
   name: aiSearchName
@@ -42,44 +36,44 @@ resource aiSearchService 'Microsoft.Search/searchServices@2023-11-01' existing =
 
 // Assign Search Service Contributor role
 resource searchServiceContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aiSearchService.id, aiFoundryAccount.id, searchServiceContributorRoleId)
+  name: guid(aiSearchService.id, aiFoundryPrincipalId, searchServiceContributorRoleId)
   scope: aiSearchService
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Search Index Data Reader role
 resource searchIndexDataReaderAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aiSearchService.id, aiFoundryAccount.id, searchIndexDataReaderRoleId)
+  name: guid(aiSearchService.id, aiFoundryPrincipalId, searchIndexDataReaderRoleId)
   scope: aiSearchService
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataReaderRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Search Index Data Contributor role
 resource searchIndexDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aiSearchService.id, aiFoundryAccount.id, searchIndexDataContributorRoleId)
+  name: guid(aiSearchService.id, aiFoundryPrincipalId, searchIndexDataContributorRoleId)
   scope: aiSearchService
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Azure AI Developer role to AI Foundry system-assigned MI
 resource azureAIDeveloperSystemMIAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(aiSearchService.id, aiFoundryAccount.id, azureAIDeveloperRoleId)
+  name: guid(aiSearchService.id, aiFoundryPrincipalId, azureAIDeveloperRoleId)
   scope: aiSearchService
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', azureAIDeveloperRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }

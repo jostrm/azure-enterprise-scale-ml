@@ -13,6 +13,9 @@ param storageAccountName2 string
 @description('The name of the AI Foundry account to get the principal ID from')
 param aiFoundryAccountName string
 
+@description('The principal ID of the AI Foundry account system-assigned managed identity (passed as param to ensure deploy-time determinism for role assignment names)')
+param aiFoundryPrincipalId string
+
 @description('The principal ID of the AI Foundry project system-assigned managed identity')
 param projectPrincipalId string = ''
 
@@ -26,15 +29,6 @@ param storageFileDataSMBPrivilegedContributorRoleId string
 @description('Storage Queue Data Contributor role ID')
 param storageQueueDataContributorRoleId string = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
 
-// Reference the AI Foundry account to get its system-assigned managed identity
-#disable-next-line BCP081
-resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
-  name: aiFoundryAccountName
-}
-
-// Get the principal ID from the AI Foundry account's system-assigned managed identity
-var principalId = aiFoundryAccount.identity.principalId
-
 // Reference the existing storage account
 resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' existing = {
   name: storageAccountName
@@ -47,42 +41,42 @@ resource storageAccount2 'Microsoft.Storage/storageAccounts@2025-01-01' existing
 
 // Assign Storage Blob Data Contributor role
 resource storageBlobDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, aiFoundryAccount.id, storageBlobDataContributorRoleId)
+  name: guid(storageAccount.id, aiFoundryPrincipalId, storageBlobDataContributorRoleId)
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Storage File Data Privileged Contributor role
 resource storageFileDataPrivilegedContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, aiFoundryAccount.id, storageFileDataPrivilegedContributorRoleId)
+  name: guid(storageAccount.id, aiFoundryPrincipalId, storageFileDataPrivilegedContributorRoleId)
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 resource storageFileDataSMBPrivilegedContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, aiFoundryAccount.id, storageFileDataSMBPrivilegedContributorRoleId)
+  name: guid(storageAccount.id, aiFoundryPrincipalId, storageFileDataSMBPrivilegedContributorRoleId)
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataSMBPrivilegedContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Storage Queue Data Contributor role
 resource storageQueueDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, aiFoundryAccount.id, storageQueueDataContributorRoleId)
+  name: guid(storageAccount.id, aiFoundryPrincipalId, storageQueueDataContributorRoleId)
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -126,33 +120,33 @@ resource projectStorageQueueDataContributorAssignment 'Microsoft.Authorization/r
 
 // Assign Storage Blob Data Contributor role to Storage Account 2
 resource storageBlobDataContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount2.id, aiFoundryAccount.id, storageBlobDataContributorRoleId)
+  name: guid(storageAccount2.id, aiFoundryPrincipalId, storageBlobDataContributorRoleId)
   scope: storageAccount2
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Storage File Data Privileged Contributor role to Storage Account 2
 resource storageFileDataPrivilegedContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount2.id, aiFoundryAccount.id, storageFileDataPrivilegedContributorRoleId)
+  name: guid(storageAccount2.id, aiFoundryPrincipalId, storageFileDataPrivilegedContributorRoleId)
   scope: storageAccount2
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageFileDataPrivilegedContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Storage Queue Data Contributor role to Storage Account 2
 resource storageQueueDataContributorAssignment2 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount2.id, aiFoundryAccount.id, storageQueueDataContributorRoleId)
+  name: guid(storageAccount2.id, aiFoundryPrincipalId, storageQueueDataContributorRoleId)
   scope: storageAccount2
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageQueueDataContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }

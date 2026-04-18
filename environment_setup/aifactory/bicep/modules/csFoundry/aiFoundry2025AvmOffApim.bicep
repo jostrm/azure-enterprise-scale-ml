@@ -506,6 +506,7 @@ module searchRbac 'rbacAISearchForAIFv2.bicep' = if (enableAISearch && searchInC
   params: {
     aiSearchName: aiSearchName
     aiFoundryAccountName: aiAccountName
+    aiFoundryPrincipalId: reference(aiAccountResourceId, '2025-04-01-preview', 'full').identity.principalId
     projectPrincipalId: projectPrincipalId
     searchServiceContributorRoleId: searchServiceContributorRoleId
     searchIndexDataReaderRoleId: searchIndexDataReaderRoleId
@@ -523,6 +524,7 @@ module storageRbac 'rbacAIStorageAccountsForAIFv2.bicep' = if (storageInCurrentR
     storageAccountName: storageAccountName
     storageAccountName2: storageAccountNameSecondary
     aiFoundryAccountName: aiAccountName
+    aiFoundryPrincipalId: reference(aiAccountResourceId, '2025-04-01-preview', 'full').identity.principalId
     projectPrincipalId: projectPrincipalId
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId

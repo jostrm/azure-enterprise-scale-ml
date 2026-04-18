@@ -1005,6 +1005,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
   params: {
     aiSearchName: aiSearchName
     aiFoundryAccountName: aifV2Name
+    aiFoundryPrincipalId: aiFoundrySystemAssignedPrincipalId
     projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     searchServiceContributorRoleId: searchServiceContributorRoleId
     searchIndexDataReaderRoleId: searchIndexDataReaderRoleId
@@ -1050,6 +1051,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     storageAccountName: storageAccount1001Name
     storageAccountName2: storageAccount2001Name
     aiFoundryAccountName: aifV2Name
+    aiFoundryPrincipalId: aiFoundrySystemAssignedPrincipalId
     projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     storageBlobDataContributorRoleId: storageBlobDataContributorRoleId
     storageFileDataPrivilegedContributorRoleId: storageFileDataPrivilegedContributorRoleId
