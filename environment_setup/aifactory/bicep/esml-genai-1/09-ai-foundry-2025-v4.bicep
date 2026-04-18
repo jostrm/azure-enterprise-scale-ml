@@ -322,7 +322,7 @@ var aifV2ProjectName = addAIFoundry? namingConvention.outputs.aifV2PrjNameAdd: n
 
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
-var projectCapHostName  = '${aifV2Name}caphost'
+var projectCapHostName  = '${replace(aifV2Name, '-', '')}caphost' // Caphost name must be globally unique, so we derive it from the Foundry name with no dashes
 var defaultProjectName = enableAIFactoryCreatedDefaultProjectForAIFv2 ? aifV2ProjectName : '${aifV2ProjectName}def'
 var defaultProjectDescription = 'Enterprise Scale AI Factory (v1.24) Foundry creation of project for with enterprise grade security and your corp networking.'
 
