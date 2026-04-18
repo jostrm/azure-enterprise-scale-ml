@@ -757,7 +757,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
     ipAllowList: filteredIpWhitelist_array
-    enableCapabilityHost: enableCaphost
+    enableCapabilityHost: false // Caphost is created directly by v4 (addAccountCapabilityHost + addProjectCapabilityHost) for deterministic naming and enhanced RBAC
     projectCapHost: projectCapHostName
     userRoleObjectIds: p011_genai_team_lead_array
     servicePrincipalIds: spAndMiArray
@@ -808,7 +808,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
     ipAllowList: filteredIpWhitelist_array
-    enableCapabilityHost: enableCaphost
+    enableCapabilityHost: false // Caphost is created directly by v4 (addAccountCapabilityHost + addProjectCapabilityHost) for deterministic naming and enhanced RBAC
     projectCapHost: projectCapHostName
     userRoleObjectIds: p011_genai_team_lead_array
     servicePrincipalIds: spAndMiArray
@@ -1066,8 +1066,34 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   ]
 }
 
-// This module creates the capability host for the project and account
+// This module creates the capability host for account and project
 // Only executes in scenario 2b (non-APIM)
+// Step 1: Account-level capability host MUST be created BEFORE project-level
+module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV21_AccCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    accountName: aifV2Name
+    projectName: aifV2ProjectName
+    #disable-next-line BCP318
+    cosmosDBConnection: namingConvention.outputs.cosmosDBName
+    #disable-next-line BCP318
+    azureStorageConnection: namingConvention.outputs.storageAccount1001Name
+    #disable-next-line BCP318
+    aiSearchConnection: aiSearchName
+    projectCapHostName: projectCapHostName
+    accountLevel: true  // Account-level first
+  }
+  dependsOn: [
+    rbacPreCaphost
+    projectV21
+    rbacAISearchForAIFv21
+    rbacAIStorageAccountsForAIFv21
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
+  ]
+}
+
+// Step 2: Project-level capability host AFTER account-level succeeds
 module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
@@ -1081,10 +1107,12 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     #disable-next-line BCP318
     aiSearchConnection: aiSearchName
     projectCapHostName: projectCapHostName
+    accountLevel: false  // Project-level (after account-level)
   }
   dependsOn: [
+    addAccountCapabilityHost  // CRITICAL: Account-level caphost must be created first
     rbacPreCaphost
-    projectV21  // CRITICAL: Must wait for project and all connections to be fully created
+    projectV21
     rbacAISearchForAIFv21
     rbacAIStorageAccountsForAIFv21
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
