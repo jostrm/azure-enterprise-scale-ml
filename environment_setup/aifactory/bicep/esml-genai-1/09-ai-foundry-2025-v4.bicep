@@ -1139,6 +1139,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
     aiFoundryAccountName: aifV2Name
+    aiFoundryPrincipalId: aiFoundrySystemAssignedPrincipalId
     projectPrincipalId: projectModuleEnabled ? projectPrincipal : ''
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
     keyVaultContributorRoleId: keyVaultContributorRoleId
@@ -1161,6 +1162,7 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
   params: {
     keyVaultName: namingConvention.outputs.keyvaultName
     aiFoundryAccountName: aifV2Name
+    aiFoundryPrincipalId: aiFoundrySystemAssignedPrincipalId
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }

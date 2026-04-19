@@ -11,6 +11,9 @@ param keyVaultName string
 @description('The name of the AI Foundry account to get the principal ID from')
 param aiFoundryAccountName string
 
+@description('The principal ID of the AI Foundry account system-assigned managed identity (passed as param to ensure deploy-time determinism for role assignment names)')
+param aiFoundryPrincipalId string
+
 @description('The principal ID of the AI Foundry project system-assigned managed identity')
 param projectPrincipalId string = ''
 
@@ -23,15 +26,6 @@ param keyVaultContributorRoleId string = 'f25e0fa2-a7c8-4377-a976-54943a77a395'
 @description('Key Vault Secrets Officer role ID - For Agent operations')
 param keyVaultSecretsOfficerRoleId string = 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
 
-// Reference the AI Foundry account to get its system-assigned managed identity
-#disable-next-line BCP081
-resource aiFoundryAccount 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
-  name: aiFoundryAccountName
-}
-
-// Get the principal ID from the AI Foundry account's system-assigned managed identity
-var principalId = aiFoundryAccount.identity.principalId
-
 // Reference the existing Key Vault service
 resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyVaultName
@@ -39,22 +33,22 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
 
 // Assign Key Vault Secrets User role to AI Foundry system-assigned MI
 resource keyVaultSecretsUserSystemMIAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, aiFoundryAccount.id, keyVaultSecretsUserRoleId)
+  name: guid(keyVault.id, aiFoundryPrincipalId, keyVaultSecretsUserRoleId)
   scope: keyVault
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
 
 // Assign Key Vault Contributor role to AI Foundry system-assigned MI
 resource keyVaultContributorSystemMIAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, aiFoundryAccount.id, keyVaultContributorRoleId)
+  name: guid(keyVault.id, aiFoundryPrincipalId, keyVaultContributorRoleId)
   scope: keyVault
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultContributorRoleId)
-    principalId: principalId
+    principalId: aiFoundryPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
