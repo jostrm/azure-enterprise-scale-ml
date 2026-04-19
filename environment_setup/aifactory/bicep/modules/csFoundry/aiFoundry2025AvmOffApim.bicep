@@ -424,32 +424,11 @@ var projectWorkspaceGuid = enableProject && !empty(projectWorkspaceRawId)
 
 var projectCapHostUnique = '${projectCapHost}-${uniqueSuffix}'
 
-// Step 1: Create account-level capability host FIRST
-module capabilityHostAccount 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost && enableProject && enableAISearch && enableCosmosDb) {
-  name: take('aifoundry-caphost-acct-${uniqueSuffix}', 64)
-  params: {
-    #disable-next-line BCP318
-    cosmosDBConnection: string(projectModule.outputs.cosmosDBConnection)
-    #disable-next-line BCP318
-    azureStorageConnection: string(projectModule.outputs.azureStorageConnection)
-    #disable-next-line BCP318
-    aiSearchConnection: string(projectModule.outputs.aiSearchConnection)
-    #disable-next-line BCP318
-    projectName: projectModule.outputs.projectName
-    accountName: aiAccountName
-    projectCapHostName: projectCapHostUnique
-    accountLevel: true  // Create at account level first
-  }
-  dependsOn: [
-    projectModule
-    // Wait for ALL RBAC assignments to complete before creating capability host
-    caphostRbacPre
-    ...(searchInCurrentRg ? [searchRbac] : [])
-    ...(storageInCurrentRg ? [storageRbac] : [])
-  ]
-}
+// Account-level capability host is auto-provisioned by the platform when networkInjections
+// contains scenario:'agent' + subnetArmId. Do NOT create via Bicep — it times out (15-30 min).
+// Reference: microsoft-foundry/foundry-samples/15-private-network-standard-agent-setup
 
-// Step 2: Create project-level capability host AFTER account-level succeeds
+// Project-level capability host only
 module capabilityHostProject 'aiFoundry2025caphost.bicep' = if (enableCapabilityHost && enableProject && enableAISearch && enableCosmosDb) {
   name: take('aifoundry-caphost-proj-${uniqueSuffix}', 64)
   params: {
@@ -463,10 +442,13 @@ module capabilityHostProject 'aiFoundry2025caphost.bicep' = if (enableCapability
     projectName: projectModule.outputs.projectName
     accountName: aiAccountName
     projectCapHostName: projectCapHostUnique
-    accountLevel: false  // Create at project level
   }
   dependsOn: [
-    capabilityHostAccount  // CRITICAL: Wait for account capability host first!
+    projectModule
+    // Wait for ALL RBAC assignments to complete before creating capability host
+    caphostRbacPre
+    ...(searchInCurrentRg ? [searchRbac] : [])
+    ...(storageInCurrentRg ? [storageRbac] : [])
   ]
 }
 

@@ -1160,10 +1160,101 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
   if [ -n "$aif2_name" ]; then
     echo "Found AI Foundry V2 account: $aif2_name"
 
-    # --- Delete nested projects first (CannotDeleteResource if skipped) ---
+    # --- PREREQUISITE: Delete capability hosts BEFORE account/projects ---
+    # Per Microsoft guidance: "Before deleting an Account, delete the associated Account Capability Host.
+    # Failure to do so may result in residual dependencies (subnets, ACA apps) causing 'Subnet already in use' errors."
+    # Reference: microsoft-foundry/foundry-samples/15-private-network-standard-agent-setup
+    aif2_sub=$(az account show --query id -o tsv 2>/dev/null)
+
+    # Step 1: Delete project-level capability hosts
+    aif2_projects_for_caphost=$(az rest \
+      --method GET \
+      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2025-04-01-preview" \
+      --query "value[].name" -o tsv 2>/dev/null)
+
+    if [ -n "$aif2_projects_for_caphost" ]; then
+      while IFS= read -r proj_name; do
+        [ -z "$proj_name" ] && continue
+        echo "  Checking project-level capability hosts for project: $proj_name"
+        proj_caphosts=$(az rest \
+          --method GET \
+          --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}/capabilityHosts?api-version=2025-04-01-preview" \
+          --query "value[].name" -o tsv 2>/dev/null)
+        if [ -n "$proj_caphosts" ]; then
+          while IFS= read -r ch_name; do
+            [ -z "$ch_name" ] && continue
+            echo "    Deleting project caphost: $ch_name"
+            delete_response=$(az rest \
+              --method DELETE \
+              --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}/capabilityHosts/${ch_name}?api-version=2025-04-01-preview" \
+              --headers "Content-Type=application/json" \
+              -o json 2>&1) && echo "    ✅ Delete initiated for project caphost: $ch_name" || echo "    ⚠️  Could not delete project caphost: $ch_name"
+          done <<< "$proj_caphosts"
+        fi
+      done <<< "$aif2_projects_for_caphost"
+    fi
+
+    # Step 2: Delete account-level capability hosts (long-running async operation — poll for completion)
+    echo "  Checking account-level capability hosts for: $aif2_name"
+    acct_caphosts=$(az rest \
+      --method GET \
+      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/capabilityHosts?api-version=2025-04-01-preview" \
+      --query "value[].name" -o tsv 2>/dev/null)
+
+    if [ -n "$acct_caphosts" ]; then
+      while IFS= read -r ch_name; do
+        [ -z "$ch_name" ] && continue
+        echo "    Deleting account caphost: $ch_name (this may take several minutes...)"
+        # Capture response headers for async polling
+        http_response=$(curl -s -w "\n%{http_code}" -X DELETE \
+          -H "Authorization: Bearer $(az account get-access-token --query accessToken -o tsv)" \
+          -H "Content-Type: application/json" \
+          "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/capabilityHosts/${ch_name}?api-version=2025-04-01-preview" \
+          -D /tmp/caphost_delete_headers.txt 2>/dev/null)
+        http_code=$(echo "$http_response" | tail -n1)
+
+        if [ "$http_code" = "202" ] || [ "$http_code" = "200" ]; then
+          # Poll async operation if Azure-AsyncOperation header present
+          async_url=$(grep -i "Azure-AsyncOperation" /tmp/caphost_delete_headers.txt 2>/dev/null | sed 's/.*: //' | tr -d '\r')
+          if [ -n "$async_url" ]; then
+            echo "    Polling deletion status..."
+            poll_count=0
+            max_polls=120  # 10 min max (120 * 5s)
+            while [ $poll_count -lt $max_polls ]; do
+              sleep 5
+              poll_count=$((poll_count + 1))
+              status=$(az rest --method GET --url "$async_url" --query "status" -o tsv 2>/dev/null)
+              if [ "$status" = "Succeeded" ]; then
+                echo "    ✅ Account caphost deleted: $ch_name"
+                break
+              elif [ "$status" = "Failed" ] || [ "$status" = "Canceled" ]; then
+                echo "    ⚠️  Account caphost deletion $status: $ch_name"
+                break
+              fi
+              # Print progress every 30 seconds
+              if [ $((poll_count % 6)) -eq 0 ]; then
+                echo "    ⏳ Still deleting... (${poll_count}x5s elapsed, status: $status)"
+              fi
+            done
+            if [ $poll_count -ge $max_polls ]; then
+              echo "    ⚠️  Timed out waiting for account caphost deletion: $ch_name"
+            fi
+          else
+            echo "    ✅ Account caphost deleted: $ch_name"
+          fi
+        else
+          echo "    ⚠️  Could not delete account caphost: $ch_name (HTTP $http_code)"
+        fi
+        rm -f /tmp/caphost_delete_headers.txt
+      done <<< "$acct_caphosts"
+    else
+      echo "  No account-level capability hosts found."
+    fi
+    # --- End capability host cleanup ---
+
+    # --- Delete nested projects (CannotDeleteResource if skipped) ---
     # AI Foundry V2 accounts have child resources: Microsoft.CognitiveServices/accounts/projects
     # Azure RM requires all nested resources to be removed before the parent account can be deleted.
-    aif2_sub=$(az account show --query id -o tsv 2>/dev/null)
     aif2_projects=$(az rest \
       --method GET \
       --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2025-04-01-preview" \

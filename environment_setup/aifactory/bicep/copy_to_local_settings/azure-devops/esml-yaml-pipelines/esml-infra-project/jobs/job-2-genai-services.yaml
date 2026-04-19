@@ -2937,6 +2937,17 @@ steps:
     arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
+  displayName: '110_Cleanup_CapabilityHosts_Before_AccountDeletion'
+  continueOnError: true
+  condition: and(failed(), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/74_Cleanup_CapabilityHosts.sh'
+    arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
   displayName: '111_If_Error_AIFoundryHubAndProject_DeleteIt'
   condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
