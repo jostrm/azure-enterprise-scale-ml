@@ -35,7 +35,7 @@ fi
 # Extract account names starting with "aif2" using grep and sed
 echo "$response" | grep -o '"name":"aif2[^"]*"' | sed 's/"name":"//g' | sed 's/"//g' | while read -r account_name; do
     if [ -n "$account_name" ]; then
-        caphost_url="https://management.azure.com/subscriptions/${subscription_id}/resourceGroups/${resource_group}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2025-04-01-preview"
+        caphost_url="https://management.azure.com/subscriptions/${subscription_id}/resourceGroups/${resource_group}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2026-01-15-preview"
         caphost_response=$(curl -s -X GET \
             -H "Authorization: Bearer ${access_token}" \
             -H "Content-Type: application/json" \

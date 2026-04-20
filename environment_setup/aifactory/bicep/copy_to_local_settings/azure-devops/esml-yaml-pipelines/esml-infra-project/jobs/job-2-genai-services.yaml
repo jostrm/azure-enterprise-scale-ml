@@ -830,7 +830,7 @@ steps:
         # contains "aif2-p" (e.g. aif2-p002x46), whether returned as a short name or full id.
         aifV2ProjRaw=$(az rest \
           --method get \
-          --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryV2ActualName}/projects?api-version=2025-12-01" \
+          --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryV2ActualName}/projects?api-version=2026-01-15-preview" \
           -o json 2>/dev/null || echo "")
         if echo "$aifV2ProjRaw" | grep -q "aif2-p"; then
           echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]true"
@@ -2818,7 +2818,7 @@ steps:
      # Projects are sub-resources of the account - query via REST API (Microsoft.CognitiveServices/accounts/projects)
      project_list=$(az rest \
        --method GET \
-       --url "https://management.azure.com${account_id}/projects?api-version=2025-04-01-preview" \
+       --url "https://management.azure.com${account_id}/projects?api-version=2026-01-15-preview" \
        --query "value[?starts_with(name, 'aif2-p${projectNumber}')].{name:name, id:id}" \
        -o json 2>/dev/null || echo "[]")
      
@@ -2830,7 +2830,7 @@ steps:
        # Alternative: List all projects and filter
        project_list=$(az rest \
          --method GET \
-         --url "https://management.azure.com${account_id}/projects?api-version=2025-04-01-preview" \
+         --url "https://management.azure.com${account_id}/projects?api-version=2026-01-15-preview" \
          --query "value[].{name:name, id:id}" \
          -o json 2>/dev/null || echo "[]")
        

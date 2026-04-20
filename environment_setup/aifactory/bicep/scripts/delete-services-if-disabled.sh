@@ -1169,7 +1169,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
     # Step 1: Delete project-level capability hosts
     aif2_projects_for_caphost=$(az rest \
       --method GET \
-      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2025-04-01-preview" \
+      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2026-01-15-preview" \
       --query "value[].name" -o tsv 2>/dev/null)
 
     if [ -n "$aif2_projects_for_caphost" ]; then
@@ -1178,7 +1178,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
         echo "  Checking project-level capability hosts for project: $proj_name"
         proj_caphosts=$(az rest \
           --method GET \
-          --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}/capabilityHosts?api-version=2025-04-01-preview" \
+          --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}/capabilityHosts?api-version=2026-01-15-preview" \
           --query "value[].name" -o tsv 2>/dev/null)
         if [ -n "$proj_caphosts" ]; then
           while IFS= read -r ch_name; do
@@ -1186,7 +1186,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
             echo "    Deleting project caphost: $ch_name"
             delete_response=$(az rest \
               --method DELETE \
-              --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}/capabilityHosts/${ch_name}?api-version=2025-04-01-preview" \
+              --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}/capabilityHosts/${ch_name}?api-version=2026-01-15-preview" \
               --headers "Content-Type=application/json" \
               -o json 2>&1) && echo "    ✅ Delete initiated for project caphost: $ch_name" || echo "    ⚠️  Could not delete project caphost: $ch_name"
           done <<< "$proj_caphosts"
@@ -1198,7 +1198,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
     echo "  Checking account-level capability hosts for: $aif2_name"
     acct_caphosts=$(az rest \
       --method GET \
-      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/capabilityHosts?api-version=2025-04-01-preview" \
+      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/capabilityHosts?api-version=2026-01-15-preview" \
       --query "value[].name" -o tsv 2>/dev/null)
 
     if [ -n "$acct_caphosts" ]; then
@@ -1209,7 +1209,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
         http_response=$(curl -s -w "\n%{http_code}" -X DELETE \
           -H "Authorization: Bearer $(az account get-access-token --query accessToken -o tsv)" \
           -H "Content-Type: application/json" \
-          "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/capabilityHosts/${ch_name}?api-version=2025-04-01-preview" \
+          "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/capabilityHosts/${ch_name}?api-version=2026-01-15-preview" \
           -D /tmp/caphost_delete_headers.txt 2>/dev/null)
         http_code=$(echo "$http_response" | tail -n1)
 
@@ -1257,7 +1257,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
     # Azure RM requires all nested resources to be removed before the parent account can be deleted.
     aif2_projects=$(az rest \
       --method GET \
-      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2025-04-01-preview" \
+      --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2026-01-15-preview" \
       --query "value[].name" -o tsv 2>/dev/null)
 
     if [ -n "$aif2_projects" ]; then
@@ -1267,7 +1267,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
         echo "  Deleting project: $proj_name"
         az rest \
           --method DELETE \
-          --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}?api-version=2025-04-01-preview" \
+          --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}?api-version=2026-01-15-preview" \
           2>&1 && echo "  ✅ Deleted project: $proj_name" || echo "  ⚠️  Could not delete project: $proj_name"
       done <<< "$aif2_projects"
       echo "All nested projects processed."
