@@ -82,33 +82,67 @@ get_private_ip_from_endpoint() {
   local resource_name="$1"
   local endpoint_suffix="$2"
   local private_endpoint_name="${resource_name}${endpoint_suffix}-pend"
-  local nic_name="${private_endpoint_name}-nic"
   
   echo "  Checking private endpoint: $private_endpoint_name" >&2
   
-  # Option A: Get IP from private endpoint DNS configuration
+  # Option A: Get IP from private endpoint's customDnsConfigs (populated when PE has a privateDnsZoneGroup)
   local ip_from_dns=$(az network private-endpoint show \
     --name "$private_endpoint_name" \
     --resource-group "$targetResourceGroup" \
     --query "customDnsConfigs[0].ipAddresses[0]" \
     -o tsv 2>/dev/null)
   
-  if [ -n "$ip_from_dns" ] && [ "$ip_from_dns" != "null" ]; then
+  if [ -n "$ip_from_dns" ] && [ "$ip_from_dns" != "null" ] && [ "$ip_from_dns" != "None" ]; then
     echo "$ip_from_dns"
     return 0
   fi
   
-  # Option B: Get IP from network interface
-  echo "  Fallback: Checking network interface: $nic_name" >&2
-  local ip_from_nic=$(az network nic show \
-    --name "$nic_name" \
+  # Option B: Get NIC resource ID from the PE, then query the NIC for its private IP.
+  # This works even when customDnsConfigs is empty (hub-based DNS via Azure Policy)
+  # and regardless of the NIC naming convention or resource group.
+  echo "  Fallback: Resolving NIC from private endpoint..." >&2
+  local nic_id=$(az network private-endpoint show \
+    --name "$private_endpoint_name" \
     --resource-group "$targetResourceGroup" \
-    --query "ipConfigurations[0].privateIpAddress" \
+    --query "networkInterfaces[0].id" \
     -o tsv 2>/dev/null)
   
-  if [ -n "$ip_from_nic" ] && [ "$ip_from_nic" != "null" ]; then
-    echo "$ip_from_nic"
-    return 0
+  if [ -n "$nic_id" ] && [ "$nic_id" != "null" ] && [ "$nic_id" != "None" ]; then
+    local ip_from_nic=$(az network nic show \
+      --ids "$nic_id" \
+      --query "ipConfigurations[0].privateIpAddress" \
+      -o tsv 2>/dev/null)
+    
+    if [ -n "$ip_from_nic" ] && [ "$ip_from_nic" != "null" ] && [ "$ip_from_nic" != "None" ]; then
+      echo "$ip_from_nic"
+      return 0
+    fi
+  fi
+  
+  # Option C: PE not found by constructed name — scan all PEs in the RG and match by prefix
+  echo "  Fallback: Scanning all private endpoints in $targetResourceGroup..." >&2
+  local matching_pe=$(az network private-endpoint list \
+    --resource-group "$targetResourceGroup" \
+    --query "[?starts_with(name, '${resource_name}')].name" \
+    -o tsv 2>/dev/null | grep -i "${endpoint_suffix}-pend\|${endpoint_suffix}pend" | head -n1)
+  
+  if [ -n "$matching_pe" ]; then
+    local nic_id_scan=$(az network private-endpoint show \
+      --name "$matching_pe" \
+      --resource-group "$targetResourceGroup" \
+      --query "networkInterfaces[0].id" \
+      -o tsv 2>/dev/null)
+    if [ -n "$nic_id_scan" ] && [ "$nic_id_scan" != "null" ]; then
+      local ip_scan=$(az network nic show \
+        --ids "$nic_id_scan" \
+        --query "ipConfigurations[0].privateIpAddress" \
+        -o tsv 2>/dev/null)
+      if [ -n "$ip_scan" ] && [ "$ip_scan" != "null" ] && [ "$ip_scan" != "None" ]; then
+        echo "  Found via scan: $matching_pe" >&2
+        echo "$ip_scan"
+        return 0
+      fi
+    fi
   fi
   
   echo "  No IP found for $private_endpoint_name" >&2
