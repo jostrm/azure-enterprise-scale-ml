@@ -451,12 +451,13 @@ output rbacSecurityPhaseCompleted bool = true
 
 
 var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
-var safeNameAISearchOrg = enableAISearch? namingConvention.outputs.safeNameAISearch: ''
-var safeNameAISearchBase = (enableAISearch && !empty(safeNameAISearchOrg))
+var needsAISearch = enableAISearch || (enableCaphost && enableAIFoundry && enableAISearchSharedPrivateLink)
+var safeNameAISearchOrg = needsAISearch ? namingConvention.outputs.safeNameAISearch: ''
+var safeNameAISearchBase = (needsAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
   : ''
 
-var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
+var safeNameAISearchSuffix = (needsAISearch && !empty(safeNameAISearchOrg))
   ? substring(
       safeNameAISearchOrg,
       max(length(safeNameAISearchOrg) - 3, 0),
@@ -464,7 +465,7 @@ var safeNameAISearchSuffix = (enableAISearch && !empty(safeNameAISearchOrg))
     )
   : ''
 
-var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
+var aiSearchName = (needsAISearch && !empty(safeNameAISearchOrg))
   ? take(
       addAISearch
         ? '${safeNameAISearchBase}${cleanRandomValue2}${safeNameAISearchSuffix}'
@@ -475,7 +476,7 @@ var aiSearchName = (enableAISearch && !empty(safeNameAISearchOrg))
 
   
 // Get AI Search principal ID conditionally
-module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearch && !foundryV22AccountOnly) {
+module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (needsAISearch && !foundryV22AccountOnly) {
   name: take('09-getAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -483,7 +484,7 @@ module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (enableAISearc
   }
 }
 
-var aiSearchPrincipalId = enableAISearch ? getAISearchInfo!.outputs.principalId : ''
+var aiSearchPrincipalId = needsAISearch ? getAISearchInfo!.outputs.principalId : ''
 
 // Create role assignments module to build the dynamic array
 module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = if(enableAIFoundry && !foundryV22AccountOnly && (!aiFoundryV2Exists || updateAIFoundry)) {
@@ -501,7 +502,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
     keyVaultContributorRoleId: keyVaultContributorRoleId
     storageBlobDataReaderRoleId: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1' // Storage Blob Data Reader for AI Search
     useAdGroups: useAdGroups
-    enableAISearch: enableAISearch
+    enableAISearch: needsAISearch
     aiSearchPrincipalId: aiSearchPrincipalId
   }
   dependsOn: [
@@ -595,7 +596,7 @@ var aiFoundryDefinitionBase = {
 
 var aiFoundryDefinition = union(
   aiFoundryDefinitionBase,
-  deployAvmFoundry && enableAISearch ? {
+  deployAvmFoundry && needsAISearch ? {
     aiSearchConfiguration: {
       existingResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName)
       // privateDnsZoneResourceId: privateLinksDnsZones.searchService.id // Disabled to prevent duplicate PE creation
@@ -680,7 +681,7 @@ var fqdnRaw = [
   '${namingConvention.outputs.storageAccount2001Name}.queue.${environment().suffixes.storage}'
   
   // AI Search endpoint (conditionally included)
-  enableAISearch ? '${aiSearchName}.search.windows.net' : ''
+  needsAISearch ? '${aiSearchName}.search.windows.net' : ''
   
   // Key Vault endpoint
   '${namingConvention.outputs.keyvaultName}${environment().suffixes.keyvaultDns}'
@@ -769,7 +770,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     modelSkuName: defaultModelSkuNameV22
     modelCapacity: defaultModelCapacityV22
     enableCosmosDb: useCosmosForFoundry
-    enableAISearch: enableAISearch
+    enableAISearch: needsAISearch
     enableProject: enableAIFactoryCreatedDefaultProjectForAIFv2
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     restrictOutboundNetworkAccess: false
@@ -779,7 +780,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
     azureCosmosDBAccountResourceId: useCosmosForFoundry ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
-    aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
+    aiSearchResourceId: needsAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
     customerManagedKey: customerManagedKey
   }
   dependsOn: [
@@ -820,7 +821,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     modelSkuName: defaultModelSkuNameV22
     modelCapacity: defaultModelCapacityV22
     enableCosmosDb: useCosmosForFoundry
-    enableAISearch: enableAISearch
+    enableAISearch: needsAISearch
     enableProject: enableAIFactoryCreatedDefaultProjectForAIFv2
     centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     restrictOutboundNetworkAccess: false
@@ -832,7 +833,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     azureStorageAccountResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount1001Name)
     azureStorageAccountResourceIdSecondary: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', namingConvention.outputs.storageAccount2001Name)
     azureCosmosDBAccountResourceId: useCosmosForFoundry ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
-    aiSearchResourceId: enableAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
+    aiSearchResourceId: needsAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
     cmk: cmkForFoundry
     cmkKeyName: cmkForFoundry ? cmkKeyName : ''
     cmkKeyVersion: cmkForFoundry ? cmkKeyVersion : ''
@@ -891,7 +892,7 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
     storageName2: namingConvention.outputs.storageAccount2001Name
     #disable-next-line BCP318
     aiFoundryV2Name: aiFoundryAccountNameOutput
-    aiSearchName: enableAISearch ? aiSearchName : ''
+    aiSearchName: needsAISearch ? aiSearchName : ''
     cosmosDBname: useCosmosForFoundry ? namingConvention.outputs.cosmosDBName : ''
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
   }
@@ -925,7 +926,7 @@ module aiFoundryPrivateEndpoints '../modules/csFoundry/aiFoundry2025pend.bicep' 
     existingTargetRG
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(projectModuleEnabled ? [assignCognitiveServicesRoles] : [])
-    ...(enableAISearch ? [rbacAISearchForAIFv21] : [])
+    ...(needsAISearch ? [rbacAISearchForAIFv21] : [])
     rbacAIStorageAccountsForAIFv21
     rbacProjectKeyVaultForAIFoundry
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -980,7 +981,7 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   ]
 }
 
-module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_RBACpreCH_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -999,7 +1000,7 @@ var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7' //
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0' // SP, User, Search, AIHub, AIProject, App Service/FunctionApp -> AI Search
 // Assign RBAC in Task 2 (when foundryV22AccountOnly=false)
 // Only executes in scenario 2b (non-APIM)
-module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(enableAISearch && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' = if(needsAISearch && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1021,7 +1022,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
 }
 
 // Grant AI Search identity Cognitive Services OpenAI User on the Foundry account
-module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoundry.bicep' = if(!foundryV22AccountOnly && enableAISearch && enableAIFoundry) {
+module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoundry.bicep' = if(!foundryV22AccountOnly && needsAISearch && enableAIFoundry) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-rbacAISearchOAUser-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1072,7 +1073,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 // contains scenario:'agent' + subnetArmId on the account resource. Do NOT create it via Bicep —
 // it is a long-running async operation (15-30 min) that exceeds ARM deployment timeouts.
 // Reference: microsoft-foundry/foundry-samples/15-private-network-standard-agent-setup
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1095,7 +1096,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   ]
 }
 
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1107,11 +1108,10 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
   ]
 }
 
-// START CAPHOST RBAC: Explicit RBAC for COSMOS (Data Contributor), STORAGE & AI SEARCH.
-// The Cosmos DB Built-in Data Contributor role (data-plane) is required for agents to read/write Cosmos containers.
-// caphostRbac1 only assigns Cosmos DB Operator (control-plane) which is NOT sufficient.
-// Azure does NOT auto-provision the data-plane role during capability host creation.
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableAIFactoryCreatedDefaultProjectForAIFv2 && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// START CAPHOST RBAC: Explicit RBAC for COSMOS, STORAGE & AI SEARCH needed when caphost is DISABLED.
+// When enableCaphost=true, Azure auto-provisions these same role assignments during capability host creation.
+// Running this module WITH caphost enabled causes RoleAssignmentExists conflicts (different GUIDs, same principal+role+scope).
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(!enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -1204,7 +1204,7 @@ var aiFoundryResourceIdOutput = foundryV22AccountOnly
 //     exist before this bicep runs (ADO checks before the deployment, not after).
 // Therefore all modules gated on !aiFoundryV2ProjectExists will always be deployed in phase 2,
 // and their dependsOn references here are always safe.
-var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && enableAISearch && enableAIFoundry && !foundryV22AccountOnly
+var enableSharedLinkDeployment = enableAISearchSharedPrivateLink && needsAISearch && enableAIFoundry && !foundryV22AccountOnly
 
 module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bicep' = if (enableSharedLinkDeployment) {
   name: take('09-aiSearchSPL-${deploymentProjSpecificUniqueSuffix}', 64)
@@ -1219,7 +1219,7 @@ module aiSearchSharedPrivateLink '../modules/aiSearchSharedPrivateLinkFoundry.bi
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
     // Wait for AI Search RBAC to be in place before creating the shared private link
-    ...(enableAISearch ? [rbacAISearchForAIFv21] : [])
+    ...(needsAISearch ? [rbacAISearchForAIFv21] : [])
     // Wait for private endpoints if they are being deployed
     ...(!enablePublicAccessWithPerimeter && shouldDeployFoundryPrivateEndpoints ? [aiFoundryPrivateEndpoints] : [])
   ]
