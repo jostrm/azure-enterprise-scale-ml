@@ -1107,10 +1107,11 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
   ]
 }
 
-// START CAPHOST RBAC: Explicit RBAC for COSMOS, STORAGE & AI SEARCH needed when caphost is DISABLED.
-// When enableCaphost=true, Azure auto-provisions these same role assignments during capability host creation.
-// Running this module WITH caphost enabled causes RoleAssignmentExists conflicts (different GUIDs, same principal+role+scope).
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(!enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && enableAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// START CAPHOST RBAC: Explicit RBAC for COSMOS (Data Contributor), STORAGE & AI SEARCH.
+// The Cosmos DB Built-in Data Contributor role (data-plane) is required for agents to read/write Cosmos containers.
+// caphostRbac1 only assigns Cosmos DB Operator (control-plane) which is NOT sufficient.
+// Azure does NOT auto-provision the data-plane role during capability host creation.
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(enableAIFactoryCreatedDefaultProjectForAIFv2 && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
