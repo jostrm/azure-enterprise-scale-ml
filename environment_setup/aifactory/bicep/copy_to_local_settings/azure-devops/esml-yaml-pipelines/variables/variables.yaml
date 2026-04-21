@@ -215,8 +215,9 @@ variables:
   # === AI foundry 2025 ===
   enableAIFoundry: "true" # <mandatory>Enable AI Foundry<default>true<recommended> AI Foundry with default project; enterprise-grade private networking, BYOvNet, existing infra. GA.
   updateAIFoundry: "false" # <optional>Update AI Foundry properties<default>false<keep-as-is> <otherwise> true, re-run to update AI Foundry properties and RBAC.
-  addAIFoundry: "false" # <optional>Add new AI Foundry instance<default>false<keep-as-is> <otherwise> true, provisions a new AI Foundry with a new random name (for debugging or re-run).
+  addAIFoundry: "false" # <optional>Add new AI Foundry instance with new name<default>false<keep-as-is> <otherwise> true, provisions a new AI Foundry with a new random name (for debugging or re-run) to get a fresh start. Still you should delete the old instance.
   enableAFoundryCaphost: "true" # <optional>AI Foundry capability host<default>true<recommended> ensures agents metadata and history/threads are saved in your subscription using CosmosDB, Storage, AI Search.
+  cleanFoundryCaphost: "false" # <optional>Clean up capability host on deletion<default>true<keep-as-is> <otherwise> false, leaves capability host and its resources (such as VMs) in place when deleting the Foundry project.
   foundryDeploymentType: "2" # <optional>AI Foundry deployment type<default>2<keep-as-is> '1'=based on PG, '2'=based on AVM, '3'=both. '1' is tested first; falls back to '2' on failure.
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # <optional>AI Factory default project for AIFv2<default>true<keep-as-is> <otherwise> false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections.
   disableAgentNetworkInjection: "false" # <optional>Disable agent network injection<default>false<keep-as-is> false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. <otherwise> true, disables network injection.
