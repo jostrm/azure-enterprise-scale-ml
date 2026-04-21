@@ -1326,8 +1326,9 @@ steps:
 
       # ---------------------------------------------------------------
       # Read all exists/enable flags BEFORE the sleep so we can skip the
-      # 5-minute wait entirely when no resource qualifies for purging.
-      # Rule: only purge when existed=true AND (enable=false OR deleteAll=true).
+      # 3-minute wait entirely when no resource qualifies for purging.
+      # Rule: always try purge when enable=false OR deleteAll=true.
+      # The purge helper functions safely skip if nothing is soft-deleted.
       # ---------------------------------------------------------------
       amlExists="${amlExists:-false}"
       enableAML="${enableAzureMachineLearning:-true}"
@@ -1343,20 +1344,17 @@ steps:
       echo "enable flags  — AML=$enableAML AIFoundryHub=$enableAIFoundryHubFlag AIFoundry=$enableAIFoundry"
 
       needs_purge=false
-      if { [ "$amlExists" = "true" ]         && { [ "$enableAML"             = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$aifProjectExists" = "true" ]  && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$aiHubExists" = "true" ]       && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$aiFoundryV2Exists" = "true" ] && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$openaiExists" = "true" ]      && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
-         { [ "$aiServicesExists" = "true" ]  && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; }; then
+      if { [ "$enableAML"              = "false" ] || [ "$deleteAll" = "true" ]; } || \
+         { [ "$enableAIFoundryHubFlag"  = "false" ] || [ "$deleteAll" = "true" ]; } || \
+         { [ "$enableAIFoundry"         = "false" ] || [ "$deleteAll" = "true" ]; }; then
         needs_purge=true
       fi
 
       if [ "$needs_purge" = "true" ]; then
-        echo "=== 04_Purge_SoftDeleted: at least one resource qualifies — sleeping 5 minutes to allow soft-delete to settle ==="
-        sleep 300
+        echo "=== 06c_Purge_SoftDeleted: at least one enable flag is false — sleeping 3 minutes to allow soft-delete to settle ==="
+        sleep 180
       else
-        echo "=== 04_Purge_SoftDeleted: no resources qualify (exists=false or enable=true for all) — skipping sleep ==="
+        echo "=== 06c_Purge_SoftDeleted: all services enabled — skipping sleep and purge ==="
       fi
 
       # ---------------------------------------------------------------
@@ -1433,10 +1431,10 @@ steps:
       amlActualName="${amlActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       amlPrefixName="aml-${projectNumber}-${locationSuffix}-${envName}"
       amlPurgeName="${amlActualName:-$amlPrefixName}"
-      if [ "$amlExists" = "true" ] && { [ "$enableAML" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ "$enableAML" = "false" ] || [ "$deleteAll" = "true" ]; then
         purge_aml_workspace "$amlPurgeName" "$projectResourceGroup"
       else
-        echo "Skipping AML purge (amlExists=$amlExists, enableAML=$enableAML)"
+        echo "Skipping AML purge (enableAML=$enableAML)"
       fi
 
       # ---------------------------------------------------------------
@@ -1447,10 +1445,10 @@ steps:
       aifProjectActualName="${aifProjectActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aifProjectPrefixName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aifProjectPurgeName="${aifProjectActualName:-$aifProjectPrefixName}"
-      if [ "$aifProjectExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; then
         purge_aml_workspace "$aifProjectPurgeName" "$projectResourceGroup"
       else
-        echo "Skipping AI Foundry V1 Project purge (aifProjectExists=$aifProjectExists, enableAIFoundryHub=$enableAIFoundryHubFlag)"
+        echo "Skipping AI Foundry V1 Project purge (enableAIFoundryHub=$enableAIFoundryHubFlag)"
       fi
 
       # ---------------------------------------------------------------
@@ -1460,10 +1458,10 @@ steps:
       aiHubActualName="${aiHubActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aiHubPrefixName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
       aiHubPurgeName="${aiHubActualName:-$aiHubPrefixName}"
-      if [ "$aiHubExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; then
         purge_aml_workspace "$aiHubPurgeName" "$projectResourceGroup"
       else
-        echo "Skipping AI Foundry Hub purge (aiHubExists=$aiHubExists, enableAIFoundryHub=$enableAIFoundryHubFlag)"
+        echo "Skipping AI Foundry Hub purge (enableAIFoundryHub=$enableAIFoundryHubFlag)"
       fi
 
       # ---------------------------------------------------------------
@@ -1471,10 +1469,10 @@ steps:
       # Account name format: aif2{uniqueInAIFenv}{randomValue} — no dashes, max 12 chars
       # Use no_dash=true so the prefix 'aif2' does NOT accidentally match projects (aif2-p002x46)
       # ---------------------------------------------------------------
-      if [ "$aiFoundryV2Exists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; then
         purge_cognitive_service "aif2" "$projectResourceGroup" "true"
       else
-        echo "Skipping AI Foundry V2 purge (aiFoundryV2Exists=$aiFoundryV2Exists, enableAIFoundry=$enableAIFoundry)"
+        echo "Skipping AI Foundry V2 purge (enableAIFoundry=$enableAIFoundry)"
       fi
 
       # ---------------------------------------------------------------
@@ -1482,10 +1480,10 @@ steps:
       # Name prefix: aoai-{projectName}-{locationSuffix}-{envName} (may have resource suffix)
       # ---------------------------------------------------------------
       openaiPrefix="aoai-${projectName}-${locationSuffix}-${envName}"
-      if [ "$openaiExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; then
         purge_cognitive_service "$openaiPrefix" "$projectResourceGroup"
       else
-        echo "Skipping OpenAI purge (openaiExists=$openaiExists, enableAIFoundry=$enableAIFoundry)"
+        echo "Skipping OpenAI purge (enableAIFoundry=$enableAIFoundry)"
       fi
 
       # ---------------------------------------------------------------
@@ -1493,10 +1491,10 @@ steps:
       # Name prefix: aiservices{projectName}{locationSuffix}{envName} (may have resource suffix)
       # ---------------------------------------------------------------
       aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
-      if [ "$aiServicesExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; then
         purge_cognitive_service "$aiServicesPrefix" "$projectResourceGroup"
       else
-        echo "Skipping AI Services purge (aiServicesExists=$aiServicesExists, enableAIFoundry=$enableAIFoundry)"
+        echo "Skipping AI Services purge (enableAIFoundry=$enableAIFoundry)"
       fi
 
       echo "=== 04_Purge_SoftDeleted complete ==="
