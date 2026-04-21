@@ -1177,6 +1177,8 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
     if [ -n "$aif2_projects_for_caphost" ]; then
       while IFS= read -r proj_name; do
         [ -z "$proj_name" ] && continue
+        # REST API returns name as 'accountName/projectName' — strip parent prefix
+        proj_name="${proj_name##*/}"
         echo "  Checking project-level capability hosts for project: $proj_name"
         proj_caphosts=$(az rest \
           --method GET \
@@ -1185,6 +1187,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
         if [ -n "$proj_caphosts" ]; then
           while IFS= read -r ch_name; do
             [ -z "$ch_name" ] && continue
+            ch_name="${ch_name##*/}"
             echo "    Deleting project caphost: $ch_name"
             delete_response=$(az rest \
               --method DELETE \
@@ -1206,6 +1209,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
     if [ -n "$acct_caphosts" ]; then
       while IFS= read -r ch_name; do
         [ -z "$ch_name" ] && continue
+        ch_name="${ch_name##*/}"
         echo "    Deleting account caphost: $ch_name (this may take several minutes...)"
         # Capture response headers for async polling
         http_response=$(curl -s -w "\n%{http_code}" -X DELETE \
@@ -1266,6 +1270,8 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
       echo "Found nested AI Foundry V2 projects — deleting before account removal:"
       while IFS= read -r proj_name; do
         [ -z "$proj_name" ] && continue
+        # REST API returns name as 'accountName/projectName' — strip parent prefix
+        proj_name="${proj_name##*/}"
         echo "  Deleting project: $proj_name"
         az rest \
           --method DELETE \
