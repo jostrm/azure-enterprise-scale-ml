@@ -1140,32 +1140,45 @@ steps:
      echo "=== 06a Delete Capability Hosts ==="
      echo "Resource group: $projectResourceGroup"
 
-     # Discover AI Foundry account name (aif2* but not aif2-p*)
-     foundry_account_name=$(az cognitiveservices account list \
-       --subscription "$(dev_test_prod_sub_id)" \
-       --resource-group "$projectResourceGroup" \
-       --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+     # --- Construct Foundry names deterministically (same formula as CmnAIfactoryNaming.bicep) ---
+     # uniqueInAIFenv = aifactory_salt (5 chars), e.g. x46jf
+     # cleanRandomValue = aifactory_salt_random with dashes/underscores removed
+     # aifV2Name = take(replace(toLower('aif2' + uniqueInAIFenv + cleanRandomValue), '-', ''), 12)
+     # aifV2PrjName = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
+     uniqueInAIFenv="$(aifactory_salt)"
+     saltRandom10="$(aifactory_salt_random)"
+     cleanRandomValue=$(echo "$saltRandom10" | tr -d '-_' | tr '[:upper:]' '[:lower:]')
 
-     if [ -z "$foundry_account_name" ]; then
-       echo "No AI Foundry account found in $projectResourceGroup. Skipping caphost deletion."
-       exit 0
+     if [ -n "$uniqueInAIFenv" ] && [ -n "$cleanRandomValue" ]; then
+       # Deterministic name construction (matches Bicep naming convention)
+       foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | tr -d '-' | tr '[:upper:]' '[:lower:]' | cut -c1-12)
+       foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | tr '[:upper:]' '[:lower:]' | cut -c1-12)
+       echo "Constructed Foundry account name: $foundry_account_name (from salt)"
+       echo "Constructed Foundry project name: $foundry_project_name (from salt)"
+     else
+       echo "WARNING: aifactory_salt or aifactory_salt_random not available. Falling back to discovery."
+       # Fallback: try to discover from live resources
+       foundry_account_name=$(az cognitiveservices account list \
+         --subscription "$(dev_test_prod_sub_id)" \
+         --resource-group "$projectResourceGroup" \
+         --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+       if [ -z "$foundry_account_name" ]; then
+         echo "No AI Foundry account found and no salt available. Cannot determine caphost names. Skipping."
+         exit 0
+       fi
+       foundry_account_id="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${foundry_account_name}"
+       foundry_project_name=$(az rest --method GET \
+         --url "https://management.azure.com${foundry_account_id}/projects?api-version=2026-01-15-preview" \
+         --query "value[0].name" -o tsv 2>/dev/null || echo "")
+       if [ -z "$foundry_project_name" ]; then
+         echo "No AI Foundry project found. Using constructed name as best effort."
+         foundry_project_name=$(echo "aif2-p${projectNumber}" | tr '[:upper:]' '[:lower:]' | cut -c1-12)
+       fi
      fi
-     echo "AI Foundry account: $foundry_account_name"
 
-     # Discover AI Foundry project name (aif2-p*)
-     foundry_account_id="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${foundry_account_name}"
-     foundry_project_name=$(az rest --method GET \
-       --url "https://management.azure.com${foundry_account_id}/projects?api-version=2026-01-15-preview" \
-       --query "value[0].name" -o tsv 2>/dev/null || echo "")
-
-     if [ -z "$foundry_project_name" ]; then
-       echo "No AI Foundry project found under $foundry_account_name. Skipping caphost deletion."
-       exit 0
-     fi
-     echo "AI Foundry project: $foundry_project_name"
-
-     # Call the delete-capHost-command.sh script
+     # Call the delete-capHost-command.sh script (it uses || true internally, so it won't fail if caphost doesn't exist)
      script_path="$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/delete-capHost-command.sh"
+     echo "Attempting caphost deletion for account=$foundry_account_name project=$foundry_project_name (even if account is already deleted)"
      bash "$script_path" "$(dev_test_prod_sub_id)" "$projectResourceGroup" "$foundry_account_name" "$foundry_project_name"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
