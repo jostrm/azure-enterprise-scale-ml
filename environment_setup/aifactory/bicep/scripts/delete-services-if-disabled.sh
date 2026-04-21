@@ -1172,7 +1172,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
     aif2_projects_for_caphost=$(az rest \
       --method GET \
       --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects?api-version=2026-01-15-preview" \
-      --query "value[].name" -o tsv 2>/dev/null)
+      --query "value[].name" -o tsv 2>/dev/null || echo "")
 
     if [ -n "$aif2_projects_for_caphost" ]; then
       while IFS= read -r proj_name; do
@@ -1183,7 +1183,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
         proj_caphosts=$(az rest \
           --method GET \
           --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/projects/${proj_name}/capabilityHosts?api-version=2026-01-15-preview" \
-          --query "value[].name" -o tsv 2>/dev/null)
+          --query "value[].name" -o tsv 2>/dev/null || echo "")
         if [ -n "$proj_caphosts" ]; then
           while IFS= read -r ch_name; do
             [ -z "$ch_name" ] && continue
@@ -1204,7 +1204,7 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
     acct_caphosts=$(az rest \
       --method GET \
       --url "https://management.azure.com/subscriptions/${aif2_sub}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aif2_name}/capabilityHosts?api-version=2026-01-15-preview" \
-      --query "value[].name" -o tsv 2>/dev/null)
+      --query "value[].name" -o tsv 2>/dev/null || echo "")
 
     if [ -n "$acct_caphosts" ]; then
       while IFS= read -r ch_name; do

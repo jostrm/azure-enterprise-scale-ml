@@ -2700,6 +2700,77 @@ steps:
       fi
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
+  displayName: '06d_Cleanup_Disconnected_SharedPrivateLinks'
+  continueOnError: true
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['aiSearchExists'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      # Pre-cleanup: delete any shared private links on AI Search that are in "Disconnected" state.
+      # This happens when the Foundry account was previously deleted (06a/06b/06c) — the SPL target
+      # no longer exists, so Azure transitions the SPL to "Disconnected". Bicep cannot update a
+      # Disconnected SPL; it must be deleted first, then Bicep will re-create it.
+      set -e
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      # Build resource group and AI Search name
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+      projectNameReplaced="${projectName/prj/project}"
+      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      # Find AI Search by prefix (same pattern as 05b / delete script)
+      safeNameAISearch="aisearch${projectName}${locationSuffix}${envName}"
+      aisearch_name=$(az search service list \
+        --resource-group "$projectResourceGroup" \
+        --query "[?starts_with(name, '${safeNameAISearch}')].name" \
+        -o tsv 2>/dev/null | head -n1)
+
+      if [ -z "$aisearch_name" ]; then
+        echo "No AI Search service found with prefix $safeNameAISearch — nothing to clean up."
+        exit 0
+      fi
+
+      echo "=== 06d Cleanup Disconnected Shared Private Links ==="
+      echo "AI Search: $aisearch_name (rg=$projectResourceGroup)"
+
+      # List all shared private links and find disconnected ones
+      disconnected=$(az search shared-private-link-resource list \
+        --resource-group "$projectResourceGroup" \
+        --service-name "$aisearch_name" \
+        --query "[?properties.status=='Disconnected'].name" \
+        -o tsv 2>/dev/null || echo "")
+
+      if [ -z "$disconnected" ]; then
+        echo "No disconnected shared private links found — nothing to clean up."
+        exit 0
+      fi
+
+      echo "Found disconnected shared private links:"
+      while IFS= read -r spl_name; do
+        if [ -n "$spl_name" ]; then
+          echo "  Deleting disconnected SPL: $spl_name"
+          az search shared-private-link-resource delete \
+            --resource-group "$projectResourceGroup" \
+            --service-name "$aisearch_name" \
+            --name "$spl_name" \
+            --yes 2>&1 || echo "  Warning: Failed to delete $spl_name"
+          sleep 5
+        fi
+      done <<< "$disconnected"
+
+      echo "=== 06d Cleanup complete ==="
+- task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   inputs:
