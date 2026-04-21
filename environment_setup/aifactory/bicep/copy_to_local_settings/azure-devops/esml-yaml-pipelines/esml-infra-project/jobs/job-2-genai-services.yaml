@@ -1137,7 +1137,7 @@ steps:
      projectSuffix="$(projectSuffix)"
      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}project${projectNumber}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
 
-     echo "=== 06b Delete Capability Hosts ==="
+     echo "=== 06a Delete Capability Hosts ==="
      echo "Resource group: $projectResourceGroup"
 
      # Discover AI Foundry account name (aif2* but not aif2-p*)
