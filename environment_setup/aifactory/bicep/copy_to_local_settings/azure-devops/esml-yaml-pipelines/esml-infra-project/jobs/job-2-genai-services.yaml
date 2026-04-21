@@ -1116,7 +1116,7 @@ steps:
 - task: AzureCLI@2
   displayName: '06a_Delete_CapabilityHosts'
   continueOnError: true
-  condition: and(succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')))
+  condition: and(succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

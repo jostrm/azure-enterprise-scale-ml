@@ -83,7 +83,7 @@ delete_private_endpoints() {
         az network private-endpoint delete \
           --resource-group "$projectResourceGroup" \
           --name "$pend_name" \
-          --yes 2>&1 || echo "  Warning: Failed to delete private endpoint $pend_name"
+          2>&1 || echo "  Warning: Failed to delete private endpoint $pend_name"
       fi
     done <<< "$pend_list"
   else
@@ -136,7 +136,7 @@ delete_storage_private_endpoints() {
           az network private-endpoint delete \
             --resource-group "$projectResourceGroup" \
             --name "$pend_name" \
-            --yes 2>&1 || echo "  Warning: Failed to delete $pend_name"
+            2>&1 || echo "  Warning: Failed to delete $pend_name"
         fi
       done <<< "$pend_list"
     fi
@@ -180,7 +180,8 @@ echo "enableAIFoundry: $enableAIFoundry"
 # When deleteAllServicesForProject=true, override enable_ flag regardless of Foundry dependencies
 if [ "$deleteAllServicesForProject" = "true" ]; then enableAISearch="false"; addAISearch="false"; fi
 # Check if AI Search is a dependency for Foundry with capability host (bypassed when deleteAllServicesForProject=true)
-if [ "$enableAFoundryCaphost" = "true" ] && [ "$enableAIFoundry" = "true" ] && [ "$deleteAllServicesForProject" != "true" ]; then
+# NOTE: Only enableAFoundryCaphost matters here — AI Search is needed as a caphost dependency even when enableAIFoundry=false
+if [ "$enableAFoundryCaphost" = "true" ] && [ "$deleteAllServicesForProject" != "true" ]; then
   echo "🔒 AI Search is required as dependency for AI Foundry with capability host - skipping deletion"
   skip_aisearch_deletion=true
 else
@@ -255,6 +256,7 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
     foundry_shared_endpoints=(
       "shared-pe-foundry-openai"
       "shared-pe-foundry-cogsvc"
+      "shared-pe-foundry-account"
     )
     
     for shared_pe_name in "${foundry_shared_endpoints[@]}"; do
@@ -401,7 +403,7 @@ if [ "$enableWebApp" = "false" ] && [ "$webAppExists" = "true" ]; then
           az network private-endpoint delete \
             --resource-group "$projectResourceGroup" \
             --name "$pend_name" \
-            --yes 2>&1 || echo "  Warning: could not delete $pend_name"
+            2>&1 || echo "  Warning: could not delete $pend_name"
         fi
       done <<< "$pend_list"
     else
@@ -512,7 +514,7 @@ if [ "$enableFunction" = "false" ] && [ "$functionAppExists" = "true" ]; then
           az network private-endpoint delete \
             --resource-group "$projectResourceGroup" \
             --name "$pend_name" \
-            --yes 2>&1 || echo "  Warning: could not delete $pend_name"
+            2>&1 || echo "  Warning: could not delete $pend_name"
         fi
       done <<< "$pend_list"
     else
