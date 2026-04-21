@@ -1114,7 +1114,62 @@ steps:
 
       echo "All required parameters are set and valid."
 - task: AzureCLI@2
-  displayName: '04_Delete_Service_If_Not_Enabled_And_Exists'
+  displayName: '06a_Delete_CapabilityHosts'
+  continueOnError: true
+  condition: and(succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     #!/bin/bash
+     set -e
+
+     az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Build resource group name
+     commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+     projectNumber="$(project_number_000)"
+     locationSuffix="$(admin_locationSuffix)"
+     envName="$(dev_test_prod)"
+     aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+     projectPrefix="$(projectPrefix)"
+     projectSuffix="$(projectSuffix)"
+     projectResourceGroup="${commonRGNamePrefix}${projectPrefix}project${projectNumber}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+     echo "=== 06b Delete Capability Hosts ==="
+     echo "Resource group: $projectResourceGroup"
+
+     # Discover AI Foundry account name (aif2* but not aif2-p*)
+     foundry_account_name=$(az cognitiveservices account list \
+       --subscription "$(dev_test_prod_sub_id)" \
+       --resource-group "$projectResourceGroup" \
+       --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+     if [ -z "$foundry_account_name" ]; then
+       echo "No AI Foundry account found in $projectResourceGroup. Skipping caphost deletion."
+       exit 0
+     fi
+     echo "AI Foundry account: $foundry_account_name"
+
+     # Discover AI Foundry project name (aif2-p*)
+     foundry_account_id="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${foundry_account_name}"
+     foundry_project_name=$(az rest --method GET \
+       --url "https://management.azure.com${foundry_account_id}/projects?api-version=2026-01-15-preview" \
+       --query "value[0].name" -o tsv 2>/dev/null || echo "")
+
+     if [ -z "$foundry_project_name" ]; then
+       echo "No AI Foundry project found under $foundry_account_name. Skipping caphost deletion."
+       exit 0
+     fi
+     echo "AI Foundry project: $foundry_project_name"
+
+     # Call the delete-capHost-command.sh script
+     script_path="$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/delete-capHost-command.sh"
+     bash "$script_path" "$(dev_test_prod_sub_id)" "$projectResourceGroup" "$foundry_account_name" "$foundry_project_name"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '06b_Delete_Service_If_Not_Enabled_And_Exists'
   condition: and(succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1191,7 +1246,7 @@ steps:
     enableContentSafety: $(enableContentSafety)
     contentSafetyExists: $(contentSafetyExists)
 - task: AzureCLI@2
-  displayName: '04_Purge_SoftDeleted'
+  displayName: '06c_Purge_SoftDeleted'
   # Runs after deletion (deleteAllServicesForProject=true OR enableDeleteForDisabledResources=true).
   # Purges CognitiveServices-based resources (AI Foundry V2, OpenAI, AI Services) and AML workspaces
   # that were deleted in the previous task and are now in soft-deleted state.
@@ -2074,6 +2129,11 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Safe-default pipeline vars that may not be set if detection task was skipped
+     _aiFoundryV2Exists="$(aiFoundryV2Exists)"
+     if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
+
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-65-compute-services" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -2137,7 +2197,7 @@ steps:
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
-     --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
+     --parameters aiFoundryV2Exists="$_aiFoundryV2Exists" \
      --parameters enableAIFoundry="$(enableAIFoundry)" \
      --parameters disableAgentNetworkInjection="$(disableAgentNetworkInjection)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
@@ -2520,6 +2580,13 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Safe-default pipeline vars that may not be set if detection task was skipped
+     _aiFoundryV2Exists="$(aiFoundryV2Exists)"
+     _aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)"
+     if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
+     if [[ "$_aiFoundryV2ProjectExists" == *"aiFoundryV2ProjectExists"* ]]; then _aiFoundryV2ProjectExists="false"; fi
+
      az deployment sub create \
       --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aifoundry-2025-account-1st" \
       --subscription "$(dev_test_prod_sub_id)" \
@@ -2552,8 +2619,8 @@ steps:
       --parameters addAIFoundry="$(addAIFoundry)" \
       --parameters enableAISearch="$(enableAISearch)" \
       --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
-      --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
-      --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
+      --parameters aiFoundryV2Exists="$_aiFoundryV2Exists" \
+      --parameters aiFoundryV2ProjectExists="$_aiFoundryV2ProjectExists" \
       --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
       --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
       --debug
@@ -2578,6 +2645,12 @@ steps:
      _BYO="$(BYO_subnets)"
      _subnet_common="$(subnetCommon)"
      if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
+
+     # Safe-default pipeline vars that may not be set if detection task was skipped
+     _aiFoundryV2Exists="$(aiFoundryV2Exists)"
+     _aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)"
+     if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
+     if [[ "$_aiFoundryV2ProjectExists" == *"aiFoundryV2ProjectExists"* ]]; then _aiFoundryV2ProjectExists="false"; fi
 
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-a" \
@@ -2650,8 +2723,8 @@ steps:
      --parameters cmkKeyVersion="$(cmkKeyVersion)" \
      --parameters addAISearch="$(addAISearch)" \
      --parameters enableAIFoundry="$(enableAIFoundry)" \
-     --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
-     --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
+     --parameters aiFoundryV2Exists="$_aiFoundryV2Exists" \
+     --parameters aiFoundryV2ProjectExists="$_aiFoundryV2ProjectExists" \
      --parameters useAVMFoundry="false" \
      --parameters updateAIFoundry="$(updateAIFoundry)" \
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
@@ -2686,7 +2759,14 @@ steps:
      _subnet_common="$(subnetCommon)"
      if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
 
-     az deployment sub create \
+     # Safe-default pipeline vars that may not be set if detection task was skipped
+     _aiFoundryV2Exists="$(aiFoundryV2Exists)"
+     _aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)"
+     # If ADO left the literal macro text, default to false
+     if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
+     if [[ "$_aiFoundryV2ProjectExists" == *"aiFoundryV2ProjectExists"* ]]; then _aiFoundryV2ProjectExists="false"; fi
+
+     deploy_output=$(az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-b" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
@@ -2759,26 +2839,205 @@ steps:
      --parameters addAISearch="$(addAISearch)" \
      --parameters useAVMFoundry="false" \
      --parameters updateAIFoundry="$(updateAIFoundry)" \
-     --parameters aiFoundryV2Exists="$(aiFoundryV2Exists)" \
-     --parameters aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)" \
+     --parameters aiFoundryV2Exists="$_aiFoundryV2Exists" \
+     --parameters aiFoundryV2ProjectExists="$_aiFoundryV2ProjectExists" \
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
-     --parameters addAIFoundry="$(addAIFoundry)"
+     --parameters addAIFoundry="$(addAIFoundry)" 2>&1) && deploy_rc=0 || deploy_rc=$?
+
+     echo "$deploy_output"
+
+     if [ "$deploy_rc" -ne 0 ]; then
+       # Check if RoleAssignmentExists is the ONLY real error code
+       non_wrapper=$(echo "$deploy_output" | grep -o '"code":"[^"]*"' | sort -u \
+         | grep -v '"code":"DeploymentFailed"' \
+         | grep -v '"code":"ResourceDeploymentFailure"' \
+         | grep -v '"code":"RoleAssignmentExists"')
+       if [ -z "$non_wrapper" ]; then
+         # RoleAssignmentExists only: the capability host auto-provisioning already created
+         # the same role assignments. The desired RBAC state IS achieved.
+         # However, this means aiFoundryV2ProjectExists was incorrectly false.
+         # Emit warning but do NOT fail — the deployment itself is idempotent.
+         echo "##[warning]RoleAssignmentExists: Role assignment(s) already exist (created by capability host auto-provisioning). Desired RBAC state is achieved."
+         echo "##[warning]This indicates aiFoundryV2ProjectExists should have been 'true'. Check detection task."
+         echo "##[warning]Overriding exit code to 0 — RBAC is correctly configured."
+       else
+         echo "##[error]Deployment failed with errors beyond RoleAssignmentExists:"
+         echo "$non_wrapper"
+         exit 1
+       fi
+     fi
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
+  displayName: '100a_approve_AI_Search_shared_private_links'
+  continueOnError: true
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAISearch'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     #!/bin/bash
+     set -e
+
+     # Approve pending shared private link connections from AI Search on:
+     #   1) The AI Foundry account (openai_account, cognitiveservices_account, foundry_account)
+     #   2) The Storage Account 2001 (blob)
+     # These land in "Pending" state and must be approved before AI Search
+     # can reach the target resources over the private channel.
+
+     az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Build resource group name
+     commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+     projectNumber="$(project_number_000)"
+     locationSuffix="$(admin_locationSuffix)"
+     envName="$(dev_test_prod)"
+     aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+     projectPrefix="$(projectPrefix)"
+     projectSuffix="$(projectSuffix)"
+     projectResourceGroup="${commonRGNamePrefix}${projectPrefix}project${projectNumber}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+     echo "=== Approve AI Search Shared Private Links ==="
+     echo "Resource group: $projectResourceGroup"
+
+     total_approved=0
+     total_failed=0
+
+     # --- Helper function to approve pending PE connections on a resource ---
+     approve_pending_connections() {
+       local resource_type="$1"  # display name
+       local resource_url="$2"   # ARM URL for privateEndpointConnections
+       local api_version="$3"
+
+       echo ""
+       echo "--- $resource_type ---"
+       local connections
+       connections=$(az rest --method GET \
+         --url "${resource_url}?api-version=${api_version}" \
+         -o json 2>/dev/null || echo '{"value":[]}')
+
+       local pending
+       pending=$(echo "$connections" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name')
+
+       if [ -z "$pending" ]; then
+         echo "  No pending connections found."
+         return
+       fi
+
+       for conn_name in $pending; do
+         echo "  Approving: $conn_name ..."
+         local approve_result rc
+         approve_result=$(az rest --method PUT \
+           --url "${resource_url}/${conn_name}?api-version=${api_version}" \
+           --body '{"properties":{"privateLinkServiceConnectionState":{"status":"Approved","description":"Approved by AIFactory pipeline - AI Search shared private link"}}}' \
+           --headers "Content-Type=application/json" \
+           -o json 2>&1) && rc=0 || rc=$?
+         if [ $rc -eq 0 ]; then
+           echo "    Approved: $conn_name"
+           total_approved=$((total_approved + 1))
+         else
+           echo "    Failed: $conn_name"
+           echo "    $approve_result"
+           total_failed=$((total_failed + 1))
+         fi
+       done
+     }
+
+     # ── 1. Approve on AI Foundry account (openai_account, cognitiveservices_account, foundry_account) ──
+     foundry_account_name=$(az cognitiveservices account list \
+       --subscription "$(dev_test_prod_sub_id)" \
+       --resource-group "$projectResourceGroup" \
+       --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+     if [ -n "$foundry_account_name" ]; then
+       echo "AI Foundry account: $foundry_account_name"
+       foundry_pe_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${foundry_account_name}/privateEndpointConnections"
+       approve_pending_connections "AI Foundry account ($foundry_account_name)" "$foundry_pe_url" "2024-10-01"
+     else
+       echo "No AI Foundry account found in $projectResourceGroup. Skipping Foundry approval."
+     fi
+
+     # ── 2. Approve on Storage Account 2001 (blob shared private link) ──
+     storage_2001_name=$(az storage account list \
+       --subscription "$(dev_test_prod_sub_id)" \
+       --resource-group "$projectResourceGroup" \
+       --query "[?contains(name, '2001')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+     if [ -n "$storage_2001_name" ]; then
+       echo "Storage account 2001: $storage_2001_name"
+       storage_pe_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.Storage/storageAccounts/${storage_2001_name}/privateEndpointConnections"
+       approve_pending_connections "Storage account ($storage_2001_name)" "$storage_pe_url" "2024-01-01"
+     else
+       echo "No storage account with '2001' found in $projectResourceGroup. Skipping storage approval."
+     fi
+
+     echo ""
+     echo "=== Summary: $total_approved approved, $total_failed failed ==="
+- task: AzureCLI@2
   displayName: '100b_create_foundry_agent'
+  continueOnError: true
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-     set -e
-     
+     # Non-fatal: agent creation may fail due to private network isolation
+     # when using MS-hosted agents that cannot reach private endpoints.
+
      az account set --subscription "$(dev_test_prod_sub_id)"
-     
-     echo "=== AI Foundry Agent Creation ==="
-     
+
+     echo "=== AI Foundry Agent Creation (SDK) ==="
+
+     # ── 0. Early network check using pipeline variables ──
+     # Networking modes from variables.yaml:
+     #   [false, false, false] = fully private        → skip (unreachable)
+     #   [true,  true,  false] = hybrid (IP whitelist) → skip (agent IP not in allow-list)
+     #   [true,  true,  true ] = public network        → proceed
+     _enablePublicGenAI="$(enablePublicGenAIAccess)"
+     _enablePublicPerimeter="$(enablePublicAccessWithPerimeter)"
+
+     if [ "$_enablePublicGenAI" != "true" ] || [ "$_enablePublicPerimeter" != "true" ]; then
+       echo "⚠️  Networking mode: enablePublicGenAIAccess=$_enablePublicGenAI, enablePublicAccessWithPerimeter=$_enablePublicPerimeter"
+       echo "   MS-hosted ADO agents can only create agents when both are 'true' (public network mode)."
+       echo "   Current mode is private or hybrid — data-plane endpoint is unreachable."
+       echo ""
+       echo "   To create agents, use one of:"
+       echo "     • Self-hosted ADO agent on a VM inside the VNet"
+       echo "     • Azure Bastion → DSVM → run: python usecase_code/agent_foundry/agent_03_reponses_api.py"
+       echo "     • Azure AI Foundry portal (via VPN/ExpressRoute)"
+       echo ""
+       echo "   Discovering project endpoint for manual use..."
+
+       # Still discover and save the endpoint (ARM control-plane is always reachable)
+       foundry_account_id=$(az cognitiveservices account list \
+         --subscription "$(dev_test_prod_sub_id)" \
+         --resource-group "$(admin_aifactoryPrefixRG)$(projectPrefix)project$(project_number_000)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)$(projectSuffix)" \
+         --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].id | [0]" -o tsv 2>/dev/null || echo "")
+
+       if [ -n "$foundry_account_id" ]; then
+         _ep=$(az rest --method GET \
+           --url "https://management.azure.com${foundry_account_id}/projects?api-version=2026-01-15-preview" \
+           -o json 2>/dev/null | jq -r ".value[0].properties.endpoint // empty")
+         if [ -n "$_ep" ]; then
+           echo "✅ Project endpoint: $_ep"
+           echo "##vso[task.setvariable variable=foundryProjectEndpoint]$_ep"
+           echo ""
+           echo "   Manual command:"
+           echo "     export FOUNDRY_PROJECT_ENDPOINT=\"$_ep\""
+           echo "     pip install azure-ai-projects>=2.0.0 azure-identity"
+           echo "     python usecase_code/agent_foundry/agent_03_reponses_api.py"
+         fi
+       fi
+
+       echo "##vso[task.setvariable variable=foundryAgentCreated]skipped-private-network"
+       echo "=== Agent creation task completed (skipped — private/hybrid network) ==="
+       exit 0
+     fi
+
+     # ── 1. Public network mode — proceed with agent creation ──
+
      # Build resource group name
      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
      projectNumber="$(project_number_000)"
@@ -2786,14 +3045,13 @@ steps:
      locationSuffix="$(admin_locationSuffix)"
      envName="$(dev_test_prod)"
      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-     vnetResourceGroupBase="$(vnetResourceGroupBase)"
      projectPrefix="$(projectPrefix)"
      projectSuffix="$(projectSuffix)"
      projectNameReplaced="${projectName/prj/project}"
      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-     
+
      echo "Target resource group: $projectResourceGroup"
-     
+
      # Find the AI Foundry account (aif2* but not aif2-p*)
      echo "Searching for AI Foundry account..."
      foundry_account=$(az cognitiveservices account list \
@@ -2801,130 +3059,84 @@ steps:
        --resource-group "$projectResourceGroup" \
        --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].{name:name, id:id}" \
        -o json | jq -r '.[0]')
-     
+
      if [ "$foundry_account" = "null" ] || [ -z "$foundry_account" ]; then
        echo "❌ No AI Foundry account found in resource group. Skipping agent creation."
        exit 0
      fi
-     
+
      account_name=$(echo "$foundry_account" | jq -r '.name')
      account_id=$(echo "$foundry_account" | jq -r '.id')
-     
+
      echo "✅ Found AI Foundry account: $account_name"
-     
-     # Find the AI Foundry project (aif2-p*)
+
+     # ── 2. Discover project endpoint (ARM control-plane — always reachable) ──
      echo "Searching for AI Foundry project..."
-     
-     # Projects are sub-resources of the account - query via REST API (Microsoft.CognitiveServices/accounts/projects)
-     project_list=$(az rest \
+     project_json=$(az rest \
        --method GET \
        --url "https://management.azure.com${account_id}/projects?api-version=2026-01-15-preview" \
-       --query "value[?starts_with(name, 'aif2-p${projectNumber}')].{name:name, id:id}" \
-       -o json 2>/dev/null || echo "[]")
-     
-     project_info=$(echo "$project_list" | jq -r '.[0]')
-     
-     if [ "$project_info" = "null" ] || [ -z "$project_info" ]; then
-       echo "⚠️  No AI Foundry project found for project ${projectNumber}. Trying alternative approach..."
-       
-       # Alternative: List all projects and filter
-       project_list=$(az rest \
-         --method GET \
-         --url "https://management.azure.com${account_id}/projects?api-version=2026-01-15-preview" \
-         --query "value[].{name:name, id:id}" \
-         -o json 2>/dev/null || echo "[]")
-       
-       project_info=$(echo "$project_list" | jq -r '.[0]')
-       
-       if [ "$project_info" = "null" ] || [ -z "$project_info" ]; then
-         echo "❌ No AI Foundry projects found. Agent creation requires a project. Skipping."
-         exit 0
-       fi
+       -o json 2>/dev/null || echo '{"value":[]}')
+
+     project_endpoint=$(echo "$project_json" | jq -r \
+       "[.value[] | select(.name | startswith(\"aif2-p${projectNumber}\"))] | .[0].properties.endpoint // empty")
+
+     if [ -z "$project_endpoint" ]; then
+       project_endpoint=$(echo "$project_json" | jq -r '.value[0].properties.endpoint // empty')
      fi
-     
-     project_name=$(echo "$project_info" | jq -r '.name')
-     project_id=$(echo "$project_info" | jq -r '.id')
-     project_endpoint=$(echo "$project_info" | jq -r '.endpoint // empty')
-     
-     echo "✅ Found AI Foundry project: $project_name"
-     
-     # If no discovery URL, construct from account endpoint
-     if [ -z "$project_endpoint" ] || [ "$project_endpoint" = "null" ]; then
-       account_endpoint=$(az cognitiveservices account show \
-         --name "$account_name" \
-         --resource-group "$projectResourceGroup" \
-         --query "properties.endpoint" -o tsv)
-       
-       # Remove trailing slash from account endpoint
-       account_endpoint=$(echo "$account_endpoint" | sed 's:/*$::')
-       
-       # Construct project endpoint
-       project_endpoint="${account_endpoint}/projects/${project_name}"
-       echo "Constructed project endpoint: $project_endpoint"
-     else
-       echo "Using project discovery endpoint: $project_endpoint"
-     fi
-     
-     # Get access token
-     echo "Acquiring access token..."
-     access_token=$(az account get-access-token \
-       --resource https://cognitiveservices.azure.com/ \
-       --query accessToken -o tsv)
-     
-     if [ -z "$access_token" ]; then
-       echo "❌ Failed to acquire access token. Skipping agent creation."
+
+     if [ -z "$project_endpoint" ]; then
+       echo "❌ No AI Foundry project with endpoint found. Skipping agent creation."
        exit 0
      fi
-     
-     # Try to create agent with correct project-scoped endpoint
-     echo "Creating agent 'agent-001' in project..."
-     
-     payload='{"name":"agent-001","model":"gpt-4o-mini","description":"Pipeline-created agent","instructions":"You are a helpful AI assistant.","metadata":{"source":"ado-pipeline"}}'
-     
-     # Try multiple API versions and paths
-     api_versions=("2024-10-01-preview" "2024-07-01-preview" "2024-05-01-preview")
-     agent_created=false
-     
-     for api_version in "${api_versions[@]}"; do
-       echo "Attempting with API version: $api_version"
-       
-       # Remove trailing slash and construct proper URL
-       base_url=$(echo "$project_endpoint" | sed 's:/*$::')
-       agent_url="${base_url}/agents?api-version=${api_version}"
-       
-       echo "POST URL: $agent_url"
-       
-       response=$(curl -sS -w "\nHTTP_STATUS:%{http_code}" -X POST "$agent_url" \
-         -H "Content-Type: application/json" \
-         -H "Authorization: Bearer $access_token" \
-         -d "$payload" 2>&1 || echo "CURL_ERROR")
-       
-       http_status=$(echo "$response" | grep "HTTP_STATUS" | cut -d: -f2)
-       response_body=$(echo "$response" | sed '/HTTP_STATUS/d')
-       
-       echo "Response (HTTP $http_status): $response_body"
-       
-       if [ "$http_status" = "200" ] || [ "$http_status" = "201" ]; then
-         echo "✅ Agent created successfully!"
-         agent_created=true
-         echo "##vso[task.setvariable variable=foundryAgentCreated]true"
-         break
-       elif [ "$http_status" = "409" ]; then
-         echo "ℹ️  Agent already exists (409 Conflict)"
-         agent_created=true
-         echo "##vso[task.setvariable variable=foundryAgentCreated]true"
-         break
-       else
-         echo "⚠️  Attempt failed with API version $api_version"
-       fi
-     done
-     
-     if [ "$agent_created" = false ]; then
-       echo "❌ Failed to create agent with all attempted API versions."
-       echo "This may require using Azure AI Foundry SDK or portal to create agents."
+
+     echo "✅ Found project endpoint: $project_endpoint"
+     echo "##vso[task.setvariable variable=foundryProjectEndpoint]$project_endpoint"
+
+     # ── 3. Create agent via SDK (public network mode confirmed in step 0) ──
+     echo "Installing azure-ai-projects SDK..."
+     pip install azure-ai-projects>=2.0.0 azure-identity --quiet
+
+     echo "Creating agent via Azure AI Projects SDK..."
+     export FOUNDRY_PROJECT_ENDPOINT="$project_endpoint"
+
+     # AzureCliCredential works on MS-hosted agents (AzureCLI@2 already did az login)
+     _pyscript="/tmp/_ado_create_agent_$$.py"
+     printf '%s\n' \
+       'import os, sys' \
+       'from azure.identity import AzureCliCredential' \
+       'from azure.ai.projects import AIProjectClient' \
+       'from azure.ai.projects.models import PromptAgentDefinition' \
+       'endpoint = os.environ["FOUNDRY_PROJECT_ENDPOINT"]' \
+       'print("Using project endpoint: " + endpoint)' \
+       'credential = AzureCliCredential()' \
+       'project_client = AIProjectClient(endpoint=endpoint, credential=credential)' \
+       'try:' \
+       '    agent = project_client.agents.create_version(' \
+       '        agent_name="agent-001",' \
+       '        definition=PromptAgentDefinition(' \
+       '            model="gpt-4o-mini",' \
+       '            instructions="You are a helpful AI assistant.",' \
+       '        ),' \
+       '    )' \
+       '    print("Agent created/updated: name=" + agent.name)' \
+       'except Exception as e:' \
+       '    msg = str(e).lower()' \
+       '    if "timed out" in msg or "name resolution" in msg or "connection" in msg:' \
+       '        print("Network error, endpoint likely behind private network: " + str(e))' \
+       '        sys.exit(0)' \
+       '    print("Agent creation failed: " + str(e), file=sys.stderr)' \
+       '    sys.exit(1)' \
+       > "$_pyscript"
+     python3 "$_pyscript"
+     _rc=$?
+     rm -f "$_pyscript"
+
+     if [ $_rc -eq 0 ]; then
+       echo "##vso[task.setvariable variable=foundryAgentCreated]true"
+     else
        echo "##vso[task.setvariable variable=foundryAgentCreated]false"
      fi
-     
+
      echo "=== Agent creation task completed ==="
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'
