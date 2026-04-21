@@ -1067,12 +1067,25 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   ]
 }
 
+// Account-level capability host — required BEFORE the project-level capability host.
+// When disableAgentNetworkInjection=true the platform does NOT auto-provision this via networkInjections,
+// so we create it explicitly. When networkInjection IS enabled the platform auto-provisions it (skip).
+module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(enableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('09-AifV21_AccCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    accountName: aifV2Name
+    capabilityHostName: '${replace(aifV2Name, '-', '')}caphost'
+  }
+  dependsOn: [
+    rbacPreCaphost
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
+  ]
+}
+
 // This module creates the project-level capability host
 // Only executes in scenario 2b (non-APIM)
-// NOTE: Account-level capability host is auto-provisioned by the platform when networkInjections
-// contains scenario:'agent' + subnetArmId on the account resource. Do NOT create it via Bicep —
-// it is a long-running async operation (15-30 min) that exceeds ARM deployment timeouts.
-// Reference: microsoft-foundry/foundry-samples/15-private-network-standard-agent-setup
 module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
@@ -1092,6 +1105,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     projectV21  // CRITICAL: Must wait for project and all connections to be fully created
     rbacAISearchForAIFv21
     rbacAIStorageAccountsForAIFv21
+    ...(disableAgentNetworkInjection ? [addAccountCapabilityHost] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
