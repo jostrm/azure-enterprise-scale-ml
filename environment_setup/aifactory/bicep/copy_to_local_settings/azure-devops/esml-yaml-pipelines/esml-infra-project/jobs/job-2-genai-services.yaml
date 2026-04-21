@@ -1147,6 +1147,35 @@ steps:
      # aifV2PrjName = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
      uniqueInAIFenv="$(aifactory_salt)"
      saltRandom10="$(aifactory_salt_random)"
+
+     # If saltRandom10 is empty, extract it from the managed identity (same logic as 05b)
+     if [ -z "$saltRandom10" ]; then
+       echo "aifactory_salt_random not set by pipeline. Extracting from managed identity..."
+       miPrefix="mi-prj${projectNumber}-${locationSuffix}-${envName}"
+       miName=$(az resource list \
+         --resource-group "$projectResourceGroup" \
+         --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
+         --query "[?starts_with(name, '$miPrefix')].name" \
+         -o tsv 2>/dev/null | head -n 1)
+       if [ -n "$miName" ]; then
+         echo "Found managed identity: $miName"
+         miNoSuffix="${miName%-*}"
+         saltSegment="${miNoSuffix##*-}"
+         echo "Salt segment from MI: $saltSegment (length: ${#saltSegment})"
+         if [ ${#saltSegment} -ge 15 ]; then
+           uniqueInAIFenv="${saltSegment:0:5}"
+           saltRandom10="${saltSegment:5:10}"
+           echo "Extracted salt=$uniqueInAIFenv random=$saltRandom10 from MI"
+         elif [ ${#saltSegment} -gt 5 ]; then
+           uniqueInAIFenv="${saltSegment:0:5}"
+           saltRandom10="${saltSegment:5}"
+           echo "Extracted partial salt=$uniqueInAIFenv random=$saltRandom10 from MI"
+         fi
+       else
+         echo "No managed identity found with prefix $miPrefix in $projectResourceGroup"
+       fi
+     fi
+
      cleanRandomValue=$(echo "$saltRandom10" | tr -d '-_' | tr '[:upper:]' '[:lower:]')
 
      if [ -n "$uniqueInAIFenv" ] && [ -n "$cleanRandomValue" ]; then
