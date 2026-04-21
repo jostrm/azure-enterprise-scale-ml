@@ -1157,10 +1157,14 @@ steps:
      # Construct Foundry names deterministically (same formula as CmnAIfactoryNaming.bicep)
      # aifV2Name = take(replace(toLower('aif2' + uniqueInAIFenv + cleanRandomValue), '-', ''), 12)
      # aifV2PrjName = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
-     cleanRandomValue=$(echo "$saltRandom10" | tr -d '-_' | tr '[:upper:]' '[:lower:]')
-     foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | tr -d '-' | tr '[:upper:]' '[:lower:]' | cut -c1-12)
-     foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | tr '[:upper:]' '[:lower:]' | cut -c1-12)
+     # NOTE: Using bash builtins + awk instead of tr (tr can fail silently on some hosted agents due to locale issues)
+     cleanRandomValue="${saltRandom10//-/}"
+     cleanRandomValue="${cleanRandomValue//_/}"
+     cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
+     foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
+     foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
 
+     echo "DEBUG 06a: cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
      echo "Foundry account name: $foundry_account_name"
      echo "Foundry project name: $foundry_project_name"
 
@@ -1429,15 +1433,73 @@ steps:
       fi
 
       # ---------------------------------------------------------------
-      # AI Foundry V2 account (CognitiveServices/accounts)
-      # Account name format: aif2{uniqueInAIFenv}{randomValue} — no dashes, max 12 chars
-      # Use no_dash=true so the prefix 'aif2' does NOT accidentally match projects (aif2-p002x46)
-      # ALWAYS purge soft-deleted Foundry V2 accounts/projects (prevents FlagMustBeSetForRestore on next create)
-      # Safe: uses || true so purge failures never break the pipeline
+      # AI Foundry V2 account + project (CognitiveServices/accounts)
+      # Use deterministic naming from salt values (same formula as 06a / CmnAIfactoryNaming.bicep)
+      # ALWAYS try purge (prevents FlagMustBeSetForRestore on next create)
+      # Safe: || true so purge failures never break the pipeline
       # ---------------------------------------------------------------
-      echo "Purging any soft-deleted AI Foundry V2 resources (enableAIFoundry=$enableAIFoundry, aiFoundryV2Exists=$aiFoundryV2Exists)"
-      purge_cognitive_service "aif2" "$projectResourceGroup" "true" || true
-      purge_cognitive_service "aif2-p" "$projectResourceGroup" "false" || true
+      uniqueInAIFenv="${aifactory_salt:-}"
+      saltRandom10="${aifactory_salt_random:-}"
+
+      # Fallback: if saltRandom10 is empty, re-extract from managed identity (same logic as 05b)
+      if [ -z "$saltRandom10" ] || [ -z "$uniqueInAIFenv" ]; then
+        echo "Salt variables empty (salt='$uniqueInAIFenv', random='$saltRandom10'). Re-extracting from managed identity..."
+        MI_PREFIX="mi-${projectName}-${locationSuffix}-${envName}"
+        MI_NAME=$(az resource list \
+          --resource-group "$projectResourceGroup" \
+          --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
+          --query "[?starts_with(name, '$MI_PREFIX')].name" \
+          -o tsv 2>/dev/null | head -n 1)
+        if [ -n "$MI_NAME" ]; then
+          echo "Found managed identity: $MI_NAME"
+          MI_NO_SUFFIX="${MI_NAME%-*}"
+          SALT_SEGMENT="${MI_NO_SUFFIX##*-}"
+          echo "Extracted salt segment: $SALT_SEGMENT (length: ${#SALT_SEGMENT})"
+          if [ ${#SALT_SEGMENT} -ge 15 ]; then
+            uniqueInAIFenv="${SALT_SEGMENT:0:5}"
+            saltRandom10="${SALT_SEGMENT:5:10}"
+            echo "Re-extracted: uniqueInAIFenv=$uniqueInAIFenv saltRandom10=$saltRandom10"
+          elif [ ${#SALT_SEGMENT} -ge 5 ]; then
+            uniqueInAIFenv="${SALT_SEGMENT:0:5}"
+            saltRandom10="${SALT_SEGMENT:5}"
+            echo "Re-extracted (partial): uniqueInAIFenv=$uniqueInAIFenv saltRandom10=$saltRandom10"
+          fi
+        else
+          echo "Warning: Could not find managed identity with prefix $MI_PREFIX in $projectResourceGroup"
+        fi
+      fi
+
+      echo "DEBUG 06c salt: uniqueInAIFenv='$uniqueInAIFenv' saltRandom10='$saltRandom10'"
+
+      if [ -n "$uniqueInAIFenv" ] && [ -n "$saltRandom10" ]; then
+        # Clean the random value (remove dashes/underscores, lowercase) — same as CmnAIfactoryNaming.bicep cleanRandomValue
+        cleanRandomValue="${saltRandom10//-/}"
+        cleanRandomValue="${cleanRandomValue//_/}"
+        cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
+        foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
+        foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+
+        echo "DEBUG 06c: cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
+        echo "Purging AI Foundry V2 by exact name: account=$foundry_account_name project=$foundry_project_name (rg=$projectResourceGroup)"
+
+        echo "--- Purging soft-deleted Foundry V2 project: $foundry_project_name"
+        az cognitiveservices account purge \
+          --subscription "$subscription" \
+          --location "$location" \
+          --resource-group "$projectResourceGroup" \
+          --name "$foundry_project_name" 2>/dev/null && echo "✅ Purged project: $foundry_project_name" || echo "ℹ️  Project $foundry_project_name not in soft-deleted state or already purged — skipping"
+
+        echo "--- Purging soft-deleted Foundry V2 account: $foundry_account_name"
+        az cognitiveservices account purge \
+          --subscription "$subscription" \
+          --location "$location" \
+          --resource-group "$projectResourceGroup" \
+          --name "$foundry_account_name" 2>/dev/null && echo "✅ Purged account: $foundry_account_name" || echo "ℹ️  Account $foundry_account_name not in soft-deleted state or already purged — skipping"
+      else
+        echo "⚠️  Salt variables not available (salt='$uniqueInAIFenv', random='$saltRandom10'). Falling back to list-deleted prefix scan."
+        purge_cognitive_service "aif2" "$projectResourceGroup" "true" || true
+        purge_cognitive_service "aif2-p" "$projectResourceGroup" "false" || true
+      fi
 
       # ---------------------------------------------------------------
       # Azure OpenAI (CognitiveServices/accounts) — tied to AI Foundry lifecycle
@@ -1478,6 +1540,8 @@ steps:
     enableAzureMachineLearning: $(enableAzureMachineLearning)
     enableAIFoundryHub: $(enableAIFoundryHub)
     enableAIFoundry: $(enableAIFoundry)
+    aifactory_salt: $(aifactory_salt)
+    aifactory_salt_random: $(aifactory_salt_random)
 - task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
