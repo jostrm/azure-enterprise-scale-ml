@@ -4,14 +4,19 @@ set -e
 # =============================================================================
 # Delete Capability Hosts for AI Foundry Account & Project
 # Order: 1) project caphost, 2) account caphost
+#
+# Usage:
+#   bash delete-capHost-command.sh <subscription_id> <resource_group> <foundry_account_name> <foundry_project_name> [api_version]
+#
+# If no arguments are provided, falls back to the TODO placeholders below.
 # =============================================================================
 
-# --- PARAMETERS (edit these) ---
-SUBSCRIPTION_ID="TODO-subscription-id"
-RESOURCE_GROUP="TODO-resource-group"
-FOUNDRY_ACCOUNT_NAME="TODO-foundry-account-name"
-FOUNDRY_PROJECT_NAME="TODO-foundry-project-name"
-API_VERSION="2026-01-15-preview"
+# --- PARAMETERS (from args or defaults) ---
+SUBSCRIPTION_ID="${1:-TODO-subscription-id}"
+RESOURCE_GROUP="${2:-TODO-resource-group}"
+FOUNDRY_ACCOUNT_NAME="${3:-TODO-foundry-account-name}"
+FOUNDRY_PROJECT_NAME="${4:-TODO-foundry-project-name}"
+API_VERSION="${5:-2026-01-15-preview}"
 
 # --- CALCULATED ---
 PROJECT_CAPHOST_NAME="${FOUNDRY_ACCOUNT_NAME}caphost"
