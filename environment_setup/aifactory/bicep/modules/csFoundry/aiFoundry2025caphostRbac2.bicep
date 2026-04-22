@@ -66,6 +66,24 @@ var roleDefinitionId = resourceId(
   '00000000-0000-0000-0000-000000000002'
 )
 
+// Cosmos DB Built-in Data Reader (account-level) – grants readMetadata on the account,
+// required by AI Foundry project MI to load agents (prevents 403 on readMetadata).
+var cosmosDataReaderRoleDefinitionId = resourceId(
+  'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions',
+  cosmosAccountName,
+  '00000000-0000-0000-0000-000000000001' // Cosmos DB Built-in Data Reader
+)
+
+resource cosmosDataReaderRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-12-01-preview' = {
+  parent: cosmosAccount
+  name: guid(projectPrincipalId, cosmosDataReaderRoleDefinitionId, cosmosAccount.id)
+  properties: {
+    principalId: projectPrincipalId
+    roleDefinitionId: cosmosDataReaderRoleDefinitionId
+    scope: cosmosAccount.id
+  }
+}
+
 var scopeSystemContainer = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosAccountName}/dbs/enterprise_memory/colls/${systemThreadName}'
 var scopeUserContainer = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosAccountName}/dbs/enterprise_memory/colls/${userThreadName}'
 var scopeEntityContainer = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmosAccountName}/dbs/enterprise_memory/colls/${entityStoreName}'
