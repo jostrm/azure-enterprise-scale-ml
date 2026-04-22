@@ -458,6 +458,8 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
     user_object_ids: p011_genai_team_lead_array   
     bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
     useAdGroups: useAdGroups
+    servicePrincipleAndMIArray: spAndMiArray
+    vNetName: vnetNameFull
   }
   dependsOn: [
     existingTargetRG
