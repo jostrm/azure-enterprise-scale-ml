@@ -3025,7 +3025,7 @@ steps:
 - task: AzureCLI@2
   displayName: '100a_approve_AI_Search_shared_private_links'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAISearch'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAISearchSharedPrivateLink'], 'true'), or(and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true')), eq(variables['enableAISearch'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
