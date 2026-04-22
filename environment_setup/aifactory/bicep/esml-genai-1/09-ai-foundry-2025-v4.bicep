@@ -1068,10 +1068,11 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 }
 
 // Account-level capability host — required BEFORE the project-level capability host.
-// Always deploy explicitly so the dependsOn chain guarantees the account caphost reaches
-// Succeeded before the project caphost starts. This is idempotent — if the platform also
-// auto-provisions it via networkInjection, ARM treats the duplicate as a no-op.
-module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(enableCaphost && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// When disableAgentNetworkInjection=true the platform does NOT auto-provision this via networkInjections,
+// so we create it explicitly. When networkInjection IS enabled the platform auto-provisions it;
+// deploying it explicitly would conflict and cause a timeout. The YAML pipeline includes a
+// wait task (69-wait-account-caphost) that polls until the auto-provisioned caphost reaches Succeeded.
+module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(enableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_AccCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1107,7 +1108,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
     projectV21  // CRITICAL: Must wait for project and all connections to be fully created
     rbacAISearchForAIFv21
     rbacAIStorageAccountsForAIFv21
-    addAccountCapabilityHost  // CRITICAL: Account caphost must be Succeeded before project caphost
+    ...(disableAgentNetworkInjection ? [addAccountCapabilityHost] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }

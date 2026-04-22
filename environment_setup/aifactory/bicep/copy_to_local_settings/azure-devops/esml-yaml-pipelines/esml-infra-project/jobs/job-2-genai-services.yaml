@@ -2898,6 +2898,78 @@ steps:
      echo "Rehydration takes 2.5 to 5 minutes to allow AI Foundry account to finish..."
      sleep 300
 - task: AzureCLI@2
+  displayName: '69-wait-account-caphost-succeeded'
+  continueOnError: false
+  condition: and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['disableAgentNetworkInjection'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     #!/bin/bash
+     set -e
+
+     # When disableAgentNetworkInjection=false the platform auto-provisions the
+     # account-level capability host asynchronously. The project-level caphost
+     # (deployed inside 69b) will fail if the account caphost is not yet Succeeded.
+     # This task polls until it reaches Succeeded (or times out after ~15 min).
+
+     az account set --subscription "$(dev_test_prod_sub_id)"
+
+     commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+     projectNumber="$(project_number_000)"
+     projectName="prj${projectNumber}"
+     locationSuffix="$(admin_locationSuffix)"
+     envName="$(dev_test_prod)"
+     aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+     projectPrefix="$(projectPrefix)"
+     projectSuffix="$(projectSuffix)"
+     projectNameReplaced="${projectName/prj/project}"
+     projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+     # Find the AI Foundry account
+     account_name=$(az cognitiveservices account list \
+       --subscription "$(dev_test_prod_sub_id)" \
+       --resource-group "$projectResourceGroup" \
+       --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+     if [ -z "$account_name" ]; then
+       echo "No AI Foundry account found in $projectResourceGroup. Skipping wait."
+       exit 0
+     fi
+
+     echo "=== Waiting for account-level capability host to reach Succeeded ==="
+     echo "Account: $account_name  RG: $projectResourceGroup"
+
+     caphost_name="${account_name//\-/}caphost"
+     caphost_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${caphost_name}?api-version=2025-07-01-preview"
+
+     max_attempts=45   # 45 x 20s = 15 min
+     for i in $(seq 1 $max_attempts); do
+       caphost_json=$(az rest --method GET --url "$caphost_url" -o json 2>/dev/null || echo "")
+       if [ -z "$caphost_json" ]; then
+         echo "  [$i/$max_attempts] Account caphost not found yet — platform may still be provisioning..."
+         sleep 20
+         continue
+       fi
+
+       prov_state=$(echo "$caphost_json" | jq -r '.properties.provisioningState // "Unknown"')
+       echo "  [$i/$max_attempts] Account caphost provisioningState: $prov_state"
+
+       if [ "$prov_state" = "Succeeded" ]; then
+         echo "✅ Account capability host is Succeeded. Proceeding to 69b."
+         exit 0
+       elif [ "$prov_state" = "Failed" ]; then
+         echo "##[error]Account capability host is in Failed state. 69b will likely fail."
+         exit 1
+       fi
+
+       sleep 20
+     done
+
+     echo "##[warning]Account capability host did not reach Succeeded within 15 min (last state: $prov_state)."
+     echo "##[warning]Proceeding to 69b anyway — retryCountOnTaskFailure may recover."
+- task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   retryCountOnTaskFailure: 2
