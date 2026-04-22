@@ -1077,6 +1077,7 @@ module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphos
   params: {
     accountName: aifV2Name
     capabilityHostName: '${replace(aifV2Name, '-', '')}caphost'
+    customerSubnet: (!disableAgentNetworkInjection && !empty(aca2SubnetId)) ? aca2SubnetId : ''
   }
   dependsOn: [
     rbacPreCaphost
