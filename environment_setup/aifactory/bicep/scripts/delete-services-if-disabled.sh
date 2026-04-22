@@ -240,32 +240,28 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
     # Also try to find and delete using naming patterns (fallback method)
     echo "  Checking for shared private endpoints using naming patterns..."
     
-    # Delete pattern: {aisearch_name}-shared-pe-*
+    # Delete pattern: {aisearch_name}-shared-pe-* via REST API
+    subscriptionId=${subscriptionId:-$(az account show --query id -o tsv)}
     for i in 0 1 2 3; do
       shared_pe_pattern="${aisearch_name}-shared-pe-${i}"
       echo "    Checking for: $shared_pe_pattern"
-      
-      az search shared-private-link-resource delete \
-        --resource-group "$projectResourceGroup" \
-        --service-name "$aisearch_name" \
-        --name "$shared_pe_pattern" \
-        --yes 2>/dev/null && echo "    ✓ Deleted $shared_pe_pattern" || true
+      rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources/${shared_pe_pattern}?api-version=2025-02-01-preview"
+      az rest --method DELETE --url "$rest_url" --headers "Content-Type=application/json" -o none 2>/dev/null && echo "    ✓ Deleted $shared_pe_pattern" || true
     done
     
-    # Delete common foundry-related shared endpoints
+    # Delete common foundry-related shared endpoints via REST API
+    # (az search shared-private-link-resource delete fails with Bad Request for disconnected SPLs)
     foundry_shared_endpoints=(
       "shared-pe-foundry-openai"
       "shared-pe-foundry-cogsvc"
       "shared-pe-foundry-account"
     )
+    subscriptionId=$(az account show --query id -o tsv)
     
     for shared_pe_name in "${foundry_shared_endpoints[@]}"; do
       echo "    Checking for: $shared_pe_name"
-      az search shared-private-link-resource delete \
-        --resource-group "$projectResourceGroup" \
-        --service-name "$aisearch_name" \
-        --name "$shared_pe_name" \
-        --yes 2>/dev/null && echo "    ✓ Deleted $shared_pe_name" || true
+      rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources/${shared_pe_name}?api-version=2025-02-01-preview"
+      az rest --method DELETE --url "$rest_url" --headers "Content-Type=application/json" -o none 2>/dev/null && echo "    ✓ Deleted $shared_pe_name" || true
     done
     
     echo "  Shared private endpoints deletion completed"

@@ -2713,7 +2713,6 @@ steps:
       # This happens when the Foundry account was previously deleted (06a/06b/06c) — the SPL target
       # no longer exists, so Azure transitions the SPL to "Disconnected". Bicep cannot update a
       # Disconnected SPL; it must be deleted first, then Bicep will re-create it.
-      set -e
 
       az account set --subscription "$(dev_test_prod_sub_id)"
 
@@ -2757,15 +2756,31 @@ steps:
       fi
 
       echo "Found disconnected shared private links:"
+      subscriptionId=$(az account show --query id -o tsv)
       while IFS= read -r spl_name; do
         if [ -n "$spl_name" ]; then
           echo "  Deleting disconnected SPL: $spl_name"
-          az search shared-private-link-resource delete \
-            --resource-group "$projectResourceGroup" \
-            --service-name "$aisearch_name" \
-            --name "$spl_name" \
-            --yes 2>&1 || echo "  Warning: Failed to delete $spl_name"
-          sleep 5
+          rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources/${spl_name}?api-version=2025-02-01-preview"
+          delete_ok=false
+          for attempt in 1 2 3; do
+            http_response=$(az rest --method DELETE --url "$rest_url" --headers "Content-Type=application/json" -o none 2>&1) && delete_ok=true && break
+            echo "    Attempt $attempt failed: $http_response"
+            sleep 10
+          done
+          if [ "$delete_ok" = true ]; then
+            echo "    Delete accepted for $spl_name — waiting for provisioning..."
+            for wait_i in $(seq 1 24); do
+              spl_status=$(az rest --method GET --url "$rest_url" --query 'properties.provisioningState' -o tsv 2>/dev/null || echo "NotFound")
+              if [ "$spl_status" = "NotFound" ] || [ -z "$spl_status" ]; then
+                echo "    SPL $spl_name deleted successfully."
+                break
+              fi
+              echo "    Waiting for delete... status=$spl_status (${wait_i}/24)"
+              sleep 10
+            done
+          else
+            echo "  Warning: Failed to delete $spl_name after 3 attempts"
+          fi
         fi
       done <<< "$disconnected"
 
