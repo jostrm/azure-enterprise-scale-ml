@@ -3300,7 +3300,8 @@ steps:
        # ARM returns .name as "parentName/childName" for child resources.
        # Extract only the last segment (the actual connection name) to avoid
        # duplicating the parent in the URL.
-       pending=$(echo "$connections" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name | split("/") | .[-1]')
+       # tr -d '\r' strips Windows carriage returns that corrupt URLs.
+       pending=$(echo "$connections" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name | split("/") | .[-1]' | tr -d '\r')
 
        if [ -z "$pending" ]; then
          echo "  No pending connections found."
