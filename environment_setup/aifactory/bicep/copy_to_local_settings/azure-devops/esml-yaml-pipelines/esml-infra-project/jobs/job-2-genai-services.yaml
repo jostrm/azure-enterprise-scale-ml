@@ -216,7 +216,11 @@ steps:
       $randomValue = [System.Guid]::NewGuid().ToString("N").Substring(0, 10)
       Write-Host "Generated deployment random value: $randomValue"
       echo "##vso[task.setvariable variable=deployment_random_value]$randomValue"
-
+      
+      Write-Host ""
+      # Write-Host "Sleeping 15 minutes to allow Azure resource propagation..."
+      # Start-Sleep -Seconds 900
+      Write-Host "Sleep complete — resuming pipeline."
 - task: AzureCLI@2
   displayName: '00_pwsh_print_info'
   condition: ne(variables['debug_disable_validation_tasks'], 'true')
@@ -225,14 +229,22 @@ steps:
     scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
+        Write-Host " - FOUNDRY"
+        Write-Host "enableAIFoundry is: $(enableAIFoundry)"
+        Write-Host "disableAgentNetworkInjection is: $(disableAgentNetworkInjection)"
+        Write-Host "updateAIFoundry is: $(updateAIFoundry)"
+        Write-Host "addAIFoundry is: $(addAIFoundry)"
+        Write-Host "enableAFoundryCaphost is: $(enableAFoundryCaphost)"
+        Write-Host "cleanFoundryCaphost is: $(cleanFoundryCaphost)"
+        Write-Host "foundryDeploymentType is: $(foundryDeploymentType)"
         Write-Host " - AI FACTORY: NAMING"
+        Write-Host "project_number_000 (001) is: $(project_number_000)"
         Write-Host "projectPrefix (esml-) is: $(projectPrefix)"
         Write-Host "projectSuffix (-rg) is: $(projectSuffix)"
         Write-Host "dev_test_prod is: $(dev_test_prod)"
         Write-Host "AI Factory version is: $(aifactory_version_major).$(aifactory_version_minor)"
         Write-Host "AI Factory scale set (-001) is: $(admin_aifactorySuffixRG)"
         Write-Host "Resource group suffix (-001) is: $(admin_commonResourceSuffix)"
-        Write-Host "project_number_000 (001) is: $(project_number_000)"
         Write-Host "admin_projectType (all) is: $(admin_projectType)"
         Write-Host " - NETWORKING:"
         Write-Host "runNetworkingVar (true) is: $(runNetworkingVar)"
@@ -1583,22 +1595,24 @@ steps:
         exit 0
       fi
 
-      echo "=== 06d Cleanup Disconnected Shared Private Links ==="
+      echo "=== 06d Cleanup Disconnected / Failed Shared Private Links ==="
       echo "AI Search: $aisearch_name (rg=$projectResourceGroup)"
 
-      # List all shared private links and find disconnected ones
+      # List all shared private links that are disconnected OR in failed provisioning state.
+      # NOTE: Azure CLI/REST API always returns English enum values (Disconnected, Failed)
+      # regardless of portal language. 'Bortkopplad' (Swedish) added as a defensive fallback.
       disconnected=$(az search shared-private-link-resource list \
         --resource-group "$projectResourceGroup" \
         --service-name "$aisearch_name" \
-        --query "[?properties.status=='Disconnected'].name" \
+        --query "[?properties.status=='Disconnected' || properties.status=='Bortkopplad' || properties.provisioningState=='Failed'].name" \
         -o tsv 2>/dev/null | tr -d '\r' || echo "")
 
       if [ -z "$disconnected" ]; then
-        echo "No disconnected shared private links found — nothing to clean up."
+        echo "No disconnected or failed shared private links found — nothing to clean up."
         exit 0
       fi
 
-      echo "Found disconnected shared private links:"
+      echo "Found disconnected/failed shared private links:"
       subscriptionId=$(az account show --query id -o tsv)
       while IFS= read -r spl_name; do
         if [ -n "$spl_name" ]; then
@@ -3106,6 +3120,10 @@ steps:
      #!/bin/bash
      set -e
 
+     # Prevent Git-for-Windows (MSYS) from converting /subscriptions/... paths
+     # to C:/Program Files/Git/subscriptions/... — breaks Azure resource IDs.
+     export MSYS_NO_PATHCONV=1
+
      # Assign Cosmos DB Built-in Data Contributor role to the AI Foundry project's
      # system-assigned managed identity. This is required for the Agent playground
      # (thread storage via CosmosDB). If the role is already assigned, the command
@@ -3147,11 +3165,36 @@ steps:
 
      # Find the project and its system-assigned identity principal ID
      project_json=$(az rest --method GET \
-       --url "https://management.azure.com${foundry_account_id}/projects?api-version=2026-01-15-preview" \
-       -o json 2>/dev/null || echo '{"value":[]}')
+       --url "https://management.azure.com${foundry_account_id}/projects?api-version=2025-04-01-preview" \
+       -o json 2>/dev/null | tr -d '\r' || echo '{"value":[]}')
+
+     echo "DEBUG: Projects found: $(echo "$project_json" | jq '.value | length')"
+     echo "DEBUG: Project names: $(echo "$project_json" | jq -r '[.value[].name] | join(", ")')"
 
      project_principal_id=$(echo "$project_json" | jq -r \
-       "[.value[] | select(.name | startswith(\"aif2-p${projectNumber}\"))] | .[0].identity.principalId // empty")
+       '[.value[] | select(.identity.principalId != null and .identity.principalId != "")] | .[0].identity.principalId // empty')
+
+     # Fallback: if REST list didn't yield a principalId, construct the project name
+     # from salt variables (same formula as 06a / CmnAIfactoryNaming.bicep) and query directly.
+     if [ -z "$project_principal_id" ]; then
+       echo "REST list did not return a principalId. Trying fallback: construct project name from salt."
+       uniqueInAIFenv="${aifactory_salt}"
+       saltRandom10="${aifactory_salt_random}"
+       if [ -n "$uniqueInAIFenv" ] && [ -n "$saltRandom10" ]; then
+         cleanRandomValue="${saltRandom10//-/}"
+         cleanRandomValue="${cleanRandomValue//_/}"
+         cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
+         foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+         echo "DEBUG 69c fallback: constructed project name='$foundry_project_name'"
+         fallback_json=$(az rest --method GET \
+           --url "https://management.azure.com${foundry_account_id}/projects/${foundry_project_name}?api-version=2025-04-01-preview" \
+           -o json 2>/dev/null | tr -d '\r' || echo '{}')
+         project_principal_id=$(echo "$fallback_json" | jq -r '.identity.principalId // empty')
+         echo "DEBUG 69c fallback: principalId='$project_principal_id'"
+       else
+         echo "Salt variables not available (salt='$uniqueInAIFenv', random='$saltRandom10'). Cannot construct project name."
+       fi
+     fi
 
      if [ -z "$project_principal_id" ]; then
        echo "No AI Foundry project with system-assigned identity found. Skipping."
@@ -3197,6 +3240,9 @@ steps:
      fi
 
      echo "=== 69c completed ==="
+  env:
+    aifactory_salt: $(aifactory_salt)
+    aifactory_salt_random: $(aifactory_salt_random)
 - task: AzureCLI@2
   displayName: '100a_approve_AI_Search_shared_private_links'
   continueOnError: true
@@ -3208,6 +3254,10 @@ steps:
     inlineScript: |
      #!/bin/bash
      set -e
+
+     # Prevent Git-for-Windows (MSYS) from converting /subscriptions/... paths
+     # to C:/Program Files/Git/subscriptions/... — breaks Azure resource URLs.
+     export MSYS_NO_PATHCONV=1
 
      # Approve pending shared private link connections from AI Search on:
      #   1) The AI Foundry account (openai_account, cognitiveservices_account, foundry_account)
@@ -3247,7 +3297,10 @@ steps:
          -o json 2>/dev/null || echo '{"value":[]}')
 
        local pending
-       pending=$(echo "$connections" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name')
+       # ARM returns .name as "parentName/childName" for child resources.
+       # Extract only the last segment (the actual connection name) to avoid
+       # duplicating the parent in the URL.
+       pending=$(echo "$connections" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name | split("/") | .[-1]')
 
        if [ -z "$pending" ]; then
          echo "  No pending connections found."
