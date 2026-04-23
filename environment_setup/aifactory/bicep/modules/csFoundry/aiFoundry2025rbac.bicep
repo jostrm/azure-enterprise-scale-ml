@@ -26,13 +26,17 @@
 │  │  │  Role: a001fd3d-188f-4b5d-821b-7da978bf7442      │ │
 │  │  ├─ Cognitive Services Contributor                  │ │
 │  │  │  Role: a97b65f3-24c7-4388-baec-2e87135dc908      │ │
-│  │  └─ Cognitive Services User                         │ │
-│  │     Role: a97b65f3-24c7-4388-baec-2e87135dc908      │ │
+│  │  ├─ Cognitive Services User                         │ │
+│  │  │  Role: a97b65f3-24c7-4388-baec-2e87135dc908      │ │
+│  │  └─ Cognitive Services Data Contributor (Preview)   │ │
+│  │     Role: 19c28022-e58e-450d-a464-0b2a53034789      │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  ┌─────────────────────────────────────────────────────┐ │
 │  │  For Service Principals:                            │ │
-│  │  └─ OpenAI User                                     │ │
-│  │     Role: 5e0bd9bd-7b93-4f28-af87-19fc36ad61bd      │ │
+│  │  ├─ OpenAI User                                     │ │
+│  │  │  Role: 5e0bd9bd-7b93-4f28-af87-19fc36ad61bd      │ │
+│  │  └─ Cognitive Services Data Contributor (Preview)   │ │
+│  │     Role: 19c28022-e58e-450d-a464-0b2a53034789      │ │
 │  └─────────────────────────────────────────────────────┘ │
 │  📝 Fixed schema - specific role combinations           
 └─────────────────────────────────────────────────────────┘
@@ -64,6 +68,9 @@ param openAIUserRoleId string
 @description('Whether to use AD Groups instead of individual users')
 param useAdGroups bool = false
 
+@description('Role definition ID for Cognitive Services Data Contributor (Preview)')
+param cognitiveServicesDataContributorRoleId string = '19c28022-e58e-450d-a464-0b2a53034789'
+
 resource cognitiveServicesAccount 'Microsoft.CognitiveServices/accounts@2023-10-01-preview' existing = {
   name: cognitiveServicesAccountName
 }
@@ -89,6 +96,18 @@ resource cognitiveServicesContributorRoleAssignmentUsers 'Microsoft.Authorizatio
     principalId: userObjectId
     principalType: useAdGroups ? 'Group' : 'User'
     description: '!02: user-cs-contributor-manual'
+  }
+}]
+
+// Assign Cognitive Services Data Contributor (Preview) role to users
+resource cognitiveServicesDataContributorRoleAssignmentUsers 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (userObjectId, i) in userObjectIds: {
+  name: guid(cognitiveServicesAccount.id, userObjectId, cognitiveServicesDataContributorRoleId, 'user-cs-data-contributor-manual')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesDataContributorRoleId)
+    principalId: userObjectId
+    principalType: useAdGroups ? 'Group' : 'User'
+    description: '!02b: user-cs-data-contributor-manual'
   }
 }]
 
@@ -133,6 +152,18 @@ resource openAIUserRoleAssignmentServicePrincipals 'Microsoft.Authorization/role
   }
 }]
 
+// Assign Cognitive Services Data Contributor (Preview) role to service principals
+resource cognitiveServicesDataContributorRoleAssignmentSPs 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (spId, i) in servicePrincipalIds: {
+  name: guid(cognitiveServicesAccount.id, spId, cognitiveServicesDataContributorRoleId, 'sp-cs-data-contributor-manual')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesDataContributorRoleId)
+    principalId: spId
+    principalType: 'ServicePrincipal'
+    description: '!05b: sp-cs-data-contributor-manual'
+  }
+}]
+
 // Assign OpenAI Contributor role to project principal
 resource openAIContributorRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
   name: guid(cognitiveServicesAccount.id, projectPrincipalId, openAIContributorRoleId, 'project-openai-contributor-manual')
@@ -166,6 +197,18 @@ resource cognitiveServicesUserRoleAssignmentProject 'Microsoft.Authorization/rol
     principalId: projectPrincipalId
     principalType: 'ServicePrincipal'
     description: '!08:project-cs-user-manual: AI Foundry project managed identity - Cognitive Services User for project operations'
+  }
+}
+
+// Assign Cognitive Services Data Contributor (Preview) role to project principal
+resource cognitiveServicesDataContributorRoleAssignmentProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(projectPrincipalId)) {
+  name: guid(cognitiveServicesAccount.id, projectPrincipalId, cognitiveServicesDataContributorRoleId, 'project-cs-data-contributor-manual')
+  scope: cognitiveServicesAccount
+  properties: {
+    roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', cognitiveServicesDataContributorRoleId)
+    principalId: projectPrincipalId
+    principalType: 'ServicePrincipal'
+    description: '!08b:project-cs-data-contributor-manual: AI Foundry project managed identity - Cognitive Services Data Contributor (Preview)'
   }
 }
 

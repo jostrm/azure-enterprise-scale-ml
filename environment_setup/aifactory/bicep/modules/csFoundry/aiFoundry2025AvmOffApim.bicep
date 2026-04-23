@@ -456,6 +456,7 @@ var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68'
 var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 var openAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442'
 var openAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+var cognitiveServicesDataContributorRoleId = '19c28022-e58e-450d-a464-0b2a53034789' // Cognitive Services Data Contributor (Preview)
 var searchServiceContributorRoleId = '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
 var searchIndexDataReaderRoleId = '1407120a-92aa-4202-b7e9-c0e197c71c8f'
 var searchIndexDataContributorRoleId = '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
@@ -475,6 +476,7 @@ module aiFoundryRbac 'aiFoundry2025rbac.bicep' = if (!empty(userRoleObjectIds) |
     cognitiveServicesUserRoleId: cognitiveServicesUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
     openAIUserRoleId: openAIUserRoleId
+    cognitiveServicesDataContributorRoleId: cognitiveServicesDataContributorRoleId
     useAdGroups: useAdGroups
   }
   dependsOn: [
