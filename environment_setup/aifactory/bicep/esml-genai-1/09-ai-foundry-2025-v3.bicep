@@ -433,6 +433,7 @@ var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908' // Cogn
 var openAIContributorRoleId = 'a001fd3d-188f-4b5d-821b-7da978bf7442' // Cognitive Services OpenAI Contributor
 var openAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
 var azureAIDeveloperRoleId = '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer - CRITICAL for Chat with data
+var cognitiveServicesDataContributorRoleId = '19c28022-e58e-450d-a464-0b2a53034789' // Cognitive Services Data Contributor (Preview)
 
 // Additional roles for complete AI Foundry functionality
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6' // Key Vault Secrets User - for Agent secrets
@@ -492,6 +493,7 @@ module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' 
     openAIUserRoleId: openAIUserRoleId
     openAIContributorRoleId: openAIContributorRoleId
     azureAIDeveloperRoleId: azureAIDeveloperRoleId // Add Azure AI Developer role
+    cognitiveServicesDataContributorRoleId: cognitiveServicesDataContributorRoleId // Cognitive Services Data Contributor (Preview)
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId // Add Key Vault roles
     keyVaultContributorRoleId: keyVaultContributorRoleId
     storageBlobDataReaderRoleId: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1' // Storage Blob Data Reader for AI Search

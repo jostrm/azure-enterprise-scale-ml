@@ -14,12 +14,14 @@
 │  │  ┌─────────────────────────────────────────────────┐││
 │  │  │  For Users/Groups:                              │ │
 │  │  │  ├─ Cognitive Services User                     │ │
-│  │  │  └─ OpenAI User                                 │ │
+│  │  │  ├─ OpenAI User                                 │ │
+│  │  │  └─ Cognitive Services Data Contributor (Preview)│ │
 │  │  └─────────────────────────────────────────────────┘ │
 │  │  ┌─────────────────────────────────────────────────┐ │
 │  │  │  For Service Principals:                        │ │ 
 │  │  │  ├─ Cognitive Services Contributor              │ │
-│  │  │  └─ OpenAI Contributor                          │ │
+│  │  │  ├─ OpenAI Contributor                          │ │
+│  │  │  └─ Cognitive Services Data Contributor (Preview)│ │
 │  │  └─────────────────────────────────────────────────┘ │
 │  │  📤 Output: roleAssignmentType[] for AVM            
 │  └─────────────────────────────────────────────────────┘
@@ -58,6 +60,9 @@ param keyVaultContributorRoleId string = 'f25e0fa2-a7c8-4377-a976-54943a77a395'
 
 @description('Storage Blob Data Reader role ID - Required for AI Search to access storage')
 param storageBlobDataReaderRoleId string = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+
+@description('Cognitive Services Data Contributor (Preview) role ID - Required for data plane operations on Foundry account')
+param cognitiveServicesDataContributorRoleId string = '19c28022-e58e-450d-a464-0b2a53034789'
 
 @description('Whether to use AD Groups')
 param useAdGroups bool
@@ -151,6 +156,24 @@ var spAzureAIDeveloperRoleAssignments = [
 ]
 */
 
+// Build Cognitive Services Data Contributor (Preview) roles for users/groups
+var userCognitiveServicesDataContributorRoleAssignments = [
+  for userId in userObjectIds: {
+    principalId: userId
+    roleDefinitionIdOrName: cognitiveServicesDataContributorRoleId
+    principalType: useAdGroups ? 'Group' : 'User'
+  }
+]
+
+// Build Cognitive Services Data Contributor (Preview) roles for service principals/managed identities
+var spCognitiveServicesDataContributorRoleAssignments = [
+  for spId in servicePrincipalIds: {
+    principalId: spId
+    roleDefinitionIdOrName: cognitiveServicesDataContributorRoleId
+    principalType: 'ServicePrincipal'
+  }
+]
+
 // Build Key Vault roles for users (required for Agent playground)
 var userKeyVaultRoleAssignments = [
   // Key Vault Secrets User roles for users/groups
@@ -175,11 +198,13 @@ var spKeyVaultRoleAssignments = [
 var allRoleAssignments = concat(
   userRoleAssignments,
   userOpenAIRoleAssignments,
+  userCognitiveServicesDataContributorRoleAssignments, // Cognitive Services Data Contributor (Preview) for users
   //userAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for users
   //spAzureAIDeveloperRoleAssignments, // Add Azure AI Developer for service principals
   userKeyVaultRoleAssignments, // Add Key Vault Secrets User for users
   spCognitiveRoleAssignments,
   spOpenAIRoleAssignments,
+  spCognitiveServicesDataContributorRoleAssignments, // Cognitive Services Data Contributor (Preview) for SPs/MIs
   spKeyVaultRoleAssignments, // Add Key Vault Contributor for service principals
   aiSearchRoleAssignments
 )
