@@ -141,7 +141,8 @@ jobs:
       updateAIFoundry: ${{ vars.UPDATE_AI_FOUNDRY || 'false' }}
       addAIFoundry: ${{ vars.ADD_AI_FOUNDRY || 'false' }}
       enableAFoundryCaphost: ${{ vars.ENABLE_FOUNDRY_CAPHOST || 'true' }}
-      foundryDeploymentType: ${{ vars.FOUNDRY_DEPLOYMENT_TYPE || '1' }}
+      cleanFoundryCaphost: ${{ vars.CLEAN_FOUNDRY_CAPHOST || 'false' }}
+      foundryDeploymentType: ${{ vars.FOUNDRY_DEPLOYMENT_TYPE || '2' }}
       enableAIFactoryCreatedDefaultProjectForAIFv2: ${{ vars.ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2 || 'true' }}
       disableAgentNetworkInjection: ${{ vars.DISABLE_AGENT_NETWORK_INJECTION || 'false' }}
       enableDatafactory: ${{ vars.ENABLE_DATAFACTORY || 'false' }}
@@ -226,6 +227,8 @@ jobs:
       cmk: ${{ vars.CMK || 'false' }}
       cmkKeyName: ${{ vars.CMK_KEY_NAME || 'aifactory-cmk-key' }}
       cmkKeyVersion: ${{ vars.CMK_KEY_VERSION || '' }}
+      cmkDisableForAISearch: ${{ vars.CMK_DISABLE_FOR_AI_SEARCH || 'true' }}
+      cmkDisableForFoundry: ${{ vars.CMK_DISABLE_FOR_FOUNDRY || 'true' }}
 
       # ACR / compute options
       acr_adminUserEnabled: ${{ vars.ACR_ADMIN_USER_ENABLED || 'false' }}
@@ -272,6 +275,8 @@ jobs:
       acrProjectExists: 'false'
       databricksExists: 'false'
       skipACRAssignments: 'false'
+      pre_foundry_gate_passed: 'false'
+      foundry_1st_option_succeeded: 'false'
       sntGenaiExists: 'false'
       sntAcaExists: 'false'
       sntAca002Exists: 'false'
@@ -1006,6 +1011,93 @@ jobs:
               salt="${miName: -14:10}"
               echo "aifactory_salt_random=$salt" >> $GITHUB_ENV
             fi
+
+      - name: 06a_Delete_CapabilityHosts
+        if: |
+          env.enableAFoundryCaphost == 'true' && env.cleanFoundryCaphost == 'true' &&
+          (env.deleteAllServicesForProject == 'true' || (env.enableDeleteForDisabledResources == 'true' && env.enableAIFoundry == 'false'))
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -e
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            projectNameReplaced="${projectName/prj/project}"
+            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+            echo "=== 06a: Delete Capability Hosts in $projectResourceGroup ==="
+
+            # Find AI Foundry account (aif2* but not aif2-p*)
+            account_name=$(az cognitiveservices account list \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --resource-group "$projectResourceGroup" \
+              --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+            if [ -z "$account_name" ]; then
+              echo "No AI Foundry account found in $projectResourceGroup. Skipping."
+              exit 0
+            fi
+
+            echo "AI Foundry account: $account_name"
+
+            # Delete project-level capability hosts first
+            projects_json=$(az rest --method GET \
+              --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/projects?api-version=2025-04-01-preview" \
+              -o json 2>/dev/null || echo '{"value":[]}')
+
+            project_names=$(echo "$projects_json" | jq -r '.value[].name // empty' | tr -d '\r')
+            if [ -n "$project_names" ]; then
+              while IFS= read -r proj; do
+                [ -z "$proj" ] && continue
+                proj="${proj##*/}"
+                caphost_name="${proj//\-/}caphost"
+                echo "Deleting project caphost: $caphost_name on project $proj ..."
+                az rest --method DELETE \
+                  --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/projects/${proj}/capabilityHosts/${caphost_name}?api-version=2025-07-01-preview" \
+                  2>/dev/null || echo "INFO: Project caphost '$caphost_name' not found or already deleted"
+              done <<< "$project_names"
+
+              # Wait for project caphost deletion
+              echo "Waiting 60s for project capability host deletion to propagate..."
+              sleep 60
+            fi
+
+            # Delete account-level capability host
+            acct_caphost_name="${account_name//\-/}caphost"
+            echo "Deleting account caphost: $acct_caphost_name ..."
+            az rest --method DELETE \
+              --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${acct_caphost_name}?api-version=2025-07-01-preview" \
+              2>/dev/null || echo "INFO: Account caphost '$acct_caphost_name' not found or already deleted"
+
+            # Poll until account caphost is gone (max 5 min)
+            echo "Polling until account caphost is deleted (max 5 min)..."
+            for i in $(seq 1 30); do
+              status=$(az rest --method GET \
+                --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${acct_caphost_name}?api-version=2025-07-01-preview" \
+                -o json 2>/dev/null || echo "")
+              if [ -z "$status" ]; then
+                echo "Account caphost deleted successfully."
+                break
+              fi
+              prov=$(echo "$status" | jq -r '.properties.provisioningState // "Unknown"')
+              echo "  [$i/30] Account caphost state: $prov"
+              if [ "$prov" = "Deleting" ] || [ "$prov" = "Succeeded" ]; then
+                sleep 10
+              else
+                break
+              fi
+            done
+
+            echo "=== 06a completed ==="
 
       - name: 18_Delete_Service_If_Not_Enabled_And_Exists
         if: env.enableDeleteForDisabledResources == 'true'
@@ -2026,12 +2118,22 @@ jobs:
             if [ -n "$assignments" ]; then echo "skipACRAssignments=true" >> $GITHUB_ENV; else echo "skipACRAssignments=false" >> $GITHUB_ENV; fi
 
       - name: 100-rbac-security
-        if: env.deleteAllServicesForProject != 'true'
+        if: env.deleteAllServicesForProject != 'true' && env.debug_disable_100_rbac_security != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
           inlineScript: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            # Compute effective RBAC flags: only true if the feature is enabled AND the resource
+            # actually exists. This prevents RBAC Bicep from failing with ResourceNotFound.
+            AML_RBAC="false"
+            if [ "${{ env.enableAzureMachineLearning }}" = "true" ] && [ "${{ env.amlExists }}" = "true" ]; then AML_RBAC="true"; fi
+            AKS_RBAC_EXISTS="${{ env.aksExists }}"
+            if [ "${{ env.enableAksForAzureML }}" != "true" ]; then AKS_RBAC_EXISTS="false"; fi
+            echo "Effective enableAzureMachineLearning for RBAC: $AML_RBAC (amlExists=${{ env.amlExists }})"
+            echo "Effective aksExists for RBAC: $AKS_RBAC_EXISTS"
+
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-100-rbac-security" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -2062,7 +2164,7 @@ jobs:
               --parameters useAdGroups="${{ env.use_groups }}" \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
-              --parameters enableAzureMachineLearning="${{ env.enableAzureMachineLearning }}" \
+              --parameters enableAzureMachineLearning="$AML_RBAC" \
               --parameters enableAIFoundryHub="${{ env.enableAIFoundryHub }}" \
               --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
               --parameters enableAIServices="${{ env.enableAIServices }}" \
@@ -2093,7 +2195,7 @@ jobs:
               --parameters projectPrefix="${{ env.projectPrefix }}" \
               --parameters projectSuffix="${{ env.projectSuffix }}" \
               --parameters dataFactoryExists="${{ env.dataFactoryExists }}" \
-              --parameters aksExists="${{ env.aksExists }}" \
+              --parameters aksExists="$AKS_RBAC_EXISTS" \
               --parameters amlExists="${{ env.amlExists }}" \
               --parameters aiHubExists="${{ env.aiHubExists }}" \
               --parameters aiServicesExists="${{ env.aiServicesExists }}" \
@@ -2104,9 +2206,14 @@ jobs:
               --parameters addAISearch="${{ env.addAISearch }}" \
               --parameters skipExistingRoleAssignments="${{ env.skipACRAssignments }}" \
               --debug
+            echo "pre_foundry_gate_passed=true" >> $GITHUB_ENV
 
       - name: 69a-aifoundry-2025-2ndOption-Account
-        if: env.deleteAllServicesForProject != 'true' && env.debug_disable_69_aifoundry_2025 != 'true' && env.aiFoundryV2Exists != 'true'
+        if: |
+          env.enableAIFoundry == 'true' && env.deleteAllServicesForProject != 'true' &&
+          env.debug_disable_69_aifoundry_2025 != 'true' && env.pre_foundry_gate_passed == 'true' &&
+          env.foundry_1st_option_succeeded != 'true' && env.aiFoundryV2Exists != 'true' &&
+          (env.foundryDeploymentType == '2' || env.foundryDeploymentType == '3')
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -2194,14 +2301,88 @@ jobs:
               --debug
 
       - name: 69-Rehydrate
-        if: success() && env.deleteAllServicesForProject != 'true' && env.debug_disable_69_aifoundry_2025 != 'true' && env.aiFoundryV2Exists != 'true'
+        if: |
+          success() && env.enableAIFoundry == 'true' && env.deleteAllServicesForProject != 'true' &&
+          env.debug_disable_69_aifoundry_2025 != 'true' && env.aiFoundryV2Exists != 'true' &&
+          (env.foundryDeploymentType == '2' || env.foundryDeploymentType == '3')
         shell: bash
         run: |
           echo "Rehydration takes 2.5 to 5 minutes to allow AI Foundry account to finish..."
-          sleep 15
+          sleep 300
+
+      - name: 69-wait-account-caphost-succeeded
+        if: |
+          env.enableAIFoundry == 'true' && env.enableAFoundryCaphost == 'true' &&
+          env.deleteAllServicesForProject != 'true' && env.debug_disable_69_aifoundry_2025 != 'true' &&
+          env.disableAgentNetworkInjection != 'true' &&
+          (env.foundryDeploymentType == '2' || env.foundryDeploymentType == '3')
+        continue-on-error: false
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -e
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            projectNameReplaced="${projectName/prj/project}"
+            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+            # Find the AI Foundry account
+            account_name=$(az cognitiveservices account list \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --resource-group "$projectResourceGroup" \
+              --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+            if [ -z "$account_name" ]; then
+              echo "No AI Foundry account found in $projectResourceGroup. Skipping wait."
+              exit 0
+            fi
+
+            echo "=== Waiting for account-level capability host to reach Succeeded ==="
+            echo "Account: $account_name  RG: $projectResourceGroup"
+
+            caphost_name="${account_name//\-/}caphost"
+            caphost_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${caphost_name}?api-version=2025-07-01-preview"
+
+            max_attempts=45   # 45 x 20s = 15 min
+            for i in $(seq 1 $max_attempts); do
+              caphost_json=$(az rest --method GET --url "$caphost_url" -o json 2>/dev/null || echo "")
+              if [ -z "$caphost_json" ]; then
+                echo "  [$i/$max_attempts] Account caphost not found yet — platform may still be provisioning..."
+                sleep 20
+                continue
+              fi
+
+              prov_state=$(echo "$caphost_json" | jq -r '.properties.provisioningState // "Unknown"')
+              echo "  [$i/$max_attempts] Account caphost provisioningState: $prov_state"
+
+              if [ "$prov_state" = "Succeeded" ]; then
+                echo "Account capability host is Succeeded. Proceeding to 69b."
+                exit 0
+              elif [ "$prov_state" = "Failed" ]; then
+                echo "::error::Account capability host is in Failed state. 69b will likely fail."
+                exit 1
+              fi
+
+              sleep 20
+            done
+
+            echo "::warning::Account capability host did not reach Succeeded within 15 min (last state: $prov_state)."
+            echo "::warning::Proceeding to 69b anyway — deployment may still succeed."
 
       - name: 69b-aifoundry-2025-2ndOption-AccountUpdate
-        if: success() && env.deleteAllServicesForProject != 'true' && env.debug_disable_69_aifoundry_2025 != 'true'
+        if: |
+          success() && env.enableAIFoundry == 'true' && env.deleteAllServicesForProject != 'true' &&
+          env.debug_disable_69_aifoundry_2025 != 'true' && env.foundry_1st_option_succeeded != 'true' &&
+          (env.foundryDeploymentType == '2' || env.foundryDeploymentType == '3')
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -2287,13 +2468,266 @@ jobs:
               --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
               --parameters addAIFoundry="${{ env.addAIFoundry }}"
 
-      - name: Foundry agent (optional)
+      - name: 69c_cosmosdb_data_contributor_for_foundry_project
+        if: success() && env.enableAIFoundry == 'true' && env.enableCosmosDB == 'true' && env.deleteAllServicesForProject != 'true'
+        continue-on-error: true
+        uses: azure/cli@v2
+        env:
+          aifactory_salt: ${{ env.AIFACTORY_SALT }}
+          aifactory_salt_random: ${{ env.aifactory_salt_random }}
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -e
+            export MSYS_NO_PATHCONV=1
+
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            projectNameReplaced="${projectName/prj/project}"
+            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+            echo "=== Cosmos DB Data Contributor RBAC for AI Foundry project ==="
+            echo "Resource group: $projectResourceGroup"
+
+            # 1. Discover AI Foundry account and project
+            foundry_account_name=$(az cognitiveservices account list \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --resource-group "$projectResourceGroup" \
+              --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+            if [ -z "$foundry_account_name" ]; then
+              echo "No AI Foundry account found in $projectResourceGroup. Skipping."
+              exit 0
+            fi
+            echo "AI Foundry account: $foundry_account_name"
+
+            foundry_account_id=$(az cognitiveservices account show \
+              --name "$foundry_account_name" \
+              --resource-group "$projectResourceGroup" \
+              --query "id" -o tsv)
+
+            # Find project and its system-assigned identity
+            project_json=$(az rest --method GET \
+              --url "https://management.azure.com${foundry_account_id}/projects?api-version=2025-04-01-preview" \
+              -o json 2>/dev/null | tr -d '\r' || echo '{"value":[]}')
+
+            project_principal_id=$(echo "$project_json" | jq -r \
+              '[.value[] | select(.identity.principalId != null and .identity.principalId != "")] | .[0].identity.principalId // empty')
+
+            # Fallback: construct project name from salt
+            if [ -z "$project_principal_id" ]; then
+              echo "REST list did not return a principalId. Trying fallback."
+              uniqueInAIFenv="${aifactory_salt}"
+              saltRandom10="${aifactory_salt_random}"
+              if [ -n "$uniqueInAIFenv" ] && [ -n "$saltRandom10" ]; then
+                cleanRandomValue="${saltRandom10//-/}"
+                cleanRandomValue="${cleanRandomValue//_/}"
+                cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
+                foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+                echo "Fallback: trying project name='$foundry_project_name'"
+                fallback_json=$(az rest --method GET \
+                  --url "https://management.azure.com${foundry_account_id}/projects/${foundry_project_name}?api-version=2025-04-01-preview" \
+                  -o json 2>/dev/null | tr -d '\r' || echo '{}')
+                project_principal_id=$(echo "$fallback_json" | jq -r '.identity.principalId // empty')
+              fi
+            fi
+
+            if [ -z "$project_principal_id" ]; then
+              echo "No AI Foundry project with system-assigned identity found. Skipping."
+              exit 0
+            fi
+            echo "Project system-assigned identity (principalId): $project_principal_id"
+
+            # 2. Discover CosmosDB account
+            cosmos_account_name=$(az cosmosdb list \
+              --resource-group "$projectResourceGroup" \
+              --query "[?starts_with(name, 'cosmos-')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+            if [ -z "$cosmos_account_name" ]; then
+              echo "No Cosmos DB account found in $projectResourceGroup. Skipping."
+              exit 0
+            fi
+            echo "Cosmos DB account: $cosmos_account_name"
+
+            # 3. Assign Cosmos DB Built-in Data Contributor
+            role_definition_id="/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.DocumentDB/databaseAccounts/${cosmos_account_name}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+
+            echo "Assigning Cosmos DB Built-in Data Contributor role..."
+            assign_output=$(az cosmosdb sql role assignment create \
+              --account-name "$cosmos_account_name" \
+              --resource-group "$projectResourceGroup" \
+              --principal-id "$project_principal_id" \
+              --role-definition-id "$role_definition_id" \
+              --scope "/" 2>&1) && assign_rc=0 || assign_rc=$?
+
+            if [ $assign_rc -eq 0 ]; then
+              echo "Cosmos DB Data Contributor role assigned successfully."
+            else
+              if echo "$assign_output" | grep -qi "already exists\|conflict\|RoleAssignmentAlreadyExists"; then
+                echo "::warning::Role assignment already exists. Desired RBAC state is achieved."
+              else
+                echo "::warning::Role assignment command failed (rc=$assign_rc), but continuing pipeline."
+                echo "$assign_output"
+              fi
+            fi
+
+            echo "=== 69c completed ==="
+
+      - name: 100a_approve_AI_Search_shared_private_links
+        if: |
+          success() && env.deleteAllServicesForProject != 'true' &&
+          env.enableAISearchSharedPrivateLink == 'true' &&
+          ((env.enableAIFoundry == 'true' && env.enableAFoundryCaphost == 'true') || env.enableAISearch == 'true')
+        continue-on-error: true
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -e
+            export MSYS_NO_PATHCONV=1
+
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}project${projectNumber}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+            echo "=== Approve AI Search Shared Private Links ==="
+            echo "Resource group: $projectResourceGroup"
+
+            total_approved=0
+            total_failed=0
+
+            approve_pending_connections() {
+              local resource_type="$1"
+              local resource_url="$2"
+              local api_version="$3"
+
+              echo ""
+              echo "--- $resource_type ---"
+              local connections
+              connections=$(az rest --method GET \
+                --url "${resource_url}?api-version=${api_version}" \
+                -o json 2>/dev/null || echo '{"value":[]}')
+
+              local pending
+              pending=$(echo "$connections" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name | split("/") | .[-1]' | tr -d '\r')
+
+              if [ -z "$pending" ]; then
+                echo "  No pending connections found."
+                return
+              fi
+
+              for conn_name in $pending; do
+                echo "  Approving: $conn_name ..."
+                local approve_result rc
+                approve_result=$(az rest --method PUT \
+                  --url "${resource_url}/${conn_name}?api-version=${api_version}" \
+                  --body '{"properties":{"privateLinkServiceConnectionState":{"status":"Approved","description":"Approved by AIFactory pipeline - AI Search shared private link"}}}' \
+                  --headers "Content-Type=application/json" \
+                  -o json 2>&1) && rc=0 || rc=$?
+                if [ $rc -eq 0 ]; then
+                  echo "    Approved: $conn_name"
+                  total_approved=$((total_approved + 1))
+                else
+                  echo "    Failed: $conn_name"
+                  echo "    $approve_result"
+                  total_failed=$((total_failed + 1))
+                fi
+              done
+            }
+
+            # 1. Approve on AI Foundry account
+            foundry_account_name=$(az cognitiveservices account list \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --resource-group "$projectResourceGroup" \
+              --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+            if [ -n "$foundry_account_name" ]; then
+              echo "AI Foundry account: $foundry_account_name"
+              foundry_pe_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${foundry_account_name}/privateEndpointConnections"
+              approve_pending_connections "AI Foundry account ($foundry_account_name)" "$foundry_pe_url" "2024-10-01"
+            else
+              echo "No AI Foundry account found in $projectResourceGroup. Skipping Foundry approval."
+            fi
+
+            # 2. Approve on Storage Account 2001 (blob shared private link)
+            storage_2001_name=$(az storage account list \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --resource-group "$projectResourceGroup" \
+              --query "[?contains(name, '2001')].name | [0]" -o tsv 2>/dev/null || echo "")
+
+            if [ -n "$storage_2001_name" ]; then
+              echo "Storage account 2001: $storage_2001_name"
+              storage_pe_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Storage/storageAccounts/${storage_2001_name}/privateEndpointConnections"
+              approve_pending_connections "Storage account ($storage_2001_name)" "$storage_pe_url" "2024-01-01"
+            else
+              echo "No storage account with '2001' found in $projectResourceGroup. Skipping storage approval."
+            fi
+
+            echo ""
+            echo "=== Summary: $total_approved approved, $total_failed failed ==="
+
+      - name: 100b_create_foundry_agent
         if: success() && env.deleteAllServicesForProject != 'true' && env.enableAIFoundry == 'true'
+        continue-on-error: true
         uses: azure/cli@v2
         with:
           azcliversion: latest
           inlineScript: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            echo "=== AI Foundry Agent Creation ==="
+
+            # Early network check: skip if private/hybrid networking
+            _enablePublicGenAI="${{ env.enablePublicGenAIAccess }}"
+            _enablePublicPerimeter="${{ env.enablePublicAccessWithPerimeter }}"
+
+            if [ "$_enablePublicGenAI" != "true" ] || [ "$_enablePublicPerimeter" != "true" ]; then
+              echo "Networking mode: enablePublicGenAIAccess=$_enablePublicGenAI, enablePublicAccessWithPerimeter=$_enablePublicPerimeter"
+              echo "GH runner can only create agents when both are 'true' (public network mode)."
+              echo "Current mode is private or hybrid — data-plane endpoint is unreachable."
+              echo ""
+              echo "To create agents, use one of:"
+              echo "  - Self-hosted runner on a VM inside the VNet"
+              echo "  - Azure Bastion > DSVM > run: python usecase_code/agent_foundry/agent_03_reponses_api.py"
+              echo "  - Azure AI Foundry portal (via VPN/ExpressRoute)"
+
+              # Still discover and save the endpoint for manual use
+              foundry_account_id=$(az cognitiveservices account list \
+                --subscription "${{ env.dev_test_prod_sub_id }}" \
+                --resource-group "${{ env.admin_aifactoryPrefixRG }}${{ env.projectPrefix }}project${{ env.project_number_000 }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}${{ env.projectSuffix }}" \
+                --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].id | [0]" -o tsv 2>/dev/null || echo "")
+
+              if [ -n "$foundry_account_id" ]; then
+                _ep=$(az rest --method GET \
+                  --url "https://management.azure.com${foundry_account_id}/projects?api-version=2026-01-15-preview" \
+                  -o json 2>/dev/null | jq -r ".value[0].properties.endpoint // empty")
+                if [ -n "$_ep" ]; then
+                  echo "Project endpoint: $_ep"
+                  echo "foundryProjectEndpoint=$_ep" >> $GITHUB_ENV
+                fi
+              fi
+
+              echo "foundryAgentCreated=skipped-private-network" >> $GITHUB_ENV
+              echo "=== Agent creation task completed (skipped — private/hybrid network) ==="
+              exit 0
+            fi
+
+            # Public network mode — proceed with agent creation
             projectNumber="${{ env.project_number_000 }}"
             projectName="prj${projectNumber}"
             locationSuffix="${{ env.admin_locationSuffix }}"
@@ -2301,18 +2735,109 @@ jobs:
             projectPrefix="${{ env.projectPrefix }}"
             projectSuffix="${{ env.projectSuffix }}"
             projectNameReplaced="${projectName/prj/project}"
-            projectRG="${{ env.admin_aifactoryPrefixRG }}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${{ env.admin_aifactorySuffixRG }}${projectSuffix}"
-            foundry=$(az cognitiveservices account list --subscription "${{ env.dev_test_prod_sub_id }}" --resource-group "$projectRG" --query "[?starts_with(name, 'aif2')].[name,resourceGroup]" -o tsv | head -n1)
-            foundryName=$(echo "$foundry" | cut -f1)
-            foundryRg=$(echo "$foundry" | cut -f2)
-            if [ -z "$foundryName" ]; then echo "No Foundry found; skipping agent"; exit 0; fi
-            endpoint=$(az cognitiveservices account show --name "$foundryName" --resource-group "$foundryRg" --query properties.endpoint -o tsv)
-            access_token=$(az account get-access-token --resource https://cognitiveservices.azure.com/ --query accessToken -o tsv)
-            payload='{"name":"agent-001","model":"gpt-4o-mini","description":"Created by workflow","metadata":{"source":"gha"}}'
-            curl -sS -X POST "$endpoint/openai/agents?api-version=2024-10-01-preview" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $access_token" \
-              -d "$payload" || true
+            projectResourceGroup="${{ env.admin_aifactoryPrefixRG }}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${{ env.admin_aifactorySuffixRG }}${projectSuffix}"
+
+            echo "Target resource group: $projectResourceGroup"
+
+            # Find AI Foundry account
+            foundry_account=$(az cognitiveservices account list \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --resource-group "$projectResourceGroup" \
+              --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].{name:name, id:id}" \
+              -o json | jq -r '.[0]')
+
+            if [ "$foundry_account" = "null" ] || [ -z "$foundry_account" ]; then
+              echo "No AI Foundry account found in resource group. Skipping agent creation."
+              exit 0
+            fi
+
+            account_name=$(echo "$foundry_account" | jq -r '.name')
+            account_id=$(echo "$foundry_account" | jq -r '.id')
+            echo "Found AI Foundry account: $account_name"
+
+            # Discover project endpoint
+            project_json=$(az rest \
+              --method GET \
+              --url "https://management.azure.com${account_id}/projects?api-version=2026-01-15-preview" \
+              -o json 2>/dev/null || echo '{"value":[]}')
+
+            project_endpoint=$(echo "$project_json" | jq -r \
+              "[.value[] | select(.name | startswith(\"aif2-p${projectNumber}\"))] | .[0].properties.endpoint // empty")
+
+            if [ -z "$project_endpoint" ]; then
+              project_endpoint=$(echo "$project_json" | jq -r '.value[0].properties.endpoint // empty')
+            fi
+
+            if [ -z "$project_endpoint" ]; then
+              echo "No AI Foundry project with endpoint found. Skipping agent creation."
+              exit 0
+            fi
+
+            echo "Found project endpoint: $project_endpoint"
+            echo "foundryProjectEndpoint=$project_endpoint" >> $GITHUB_ENV
+
+            # Create agent via SDK
+            echo "Installing azure-ai-projects SDK..."
+            pip install azure-ai-projects>=2.0.0 azure-identity --quiet
+
+            echo "Creating agent via Azure AI Projects SDK..."
+            export FOUNDRY_PROJECT_ENDPOINT="$project_endpoint"
+
+            python3 -c "
+            import os, sys
+            from azure.identity import AzureCliCredential
+            from azure.ai.projects import AIProjectClient
+            from azure.ai.projects.models import PromptAgentDefinition
+            endpoint = os.environ['FOUNDRY_PROJECT_ENDPOINT']
+            print('Using project endpoint: ' + endpoint)
+            credential = AzureCliCredential()
+            project_client = AIProjectClient(endpoint=endpoint, credential=credential)
+            try:
+                agent = project_client.agents.create_version(
+                    agent_name='agent-001',
+                    definition=PromptAgentDefinition(
+                        model='gpt-4o-mini',
+                        instructions='You are a helpful AI assistant.',
+                    ),
+                )
+                print('Agent created/updated: name=' + agent.name)
+            except Exception as e:
+                msg = str(e).lower()
+                if 'timed out' in msg or 'name resolution' in msg or 'connection' in msg:
+                    print('Network error, endpoint likely behind private network: ' + str(e))
+                    sys.exit(0)
+                print('Agent creation failed: ' + str(e), file=sys.stderr)
+                sys.exit(1)
+            "
+            _rc=$?
+            if [ $_rc -eq 0 ]; then
+              echo "foundryAgentCreated=true" >> $GITHUB_ENV
+            else
+              echo "foundryAgentCreated=false" >> $GITHUB_ENV
+            fi
+
+            echo "=== Agent creation task completed ==="
+
+      - name: 101_generate_hosts_file_info
+        if: success() && env.deleteAllServicesForProject != 'true'
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            bash "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/70_generate_hosts_file_info.sh" \
+              "${{ env.dev_test_prod_sub_id }}" \
+              "${{ env.admin_aifactoryPrefixRG }}" \
+              "${{ env.project_number_000 }}" \
+              "${{ env.admin_locationSuffix }}" \
+              "${{ env.dev_test_prod }}" \
+              "${{ env.admin_aifactorySuffixRG }}" \
+              "${{ env.admin_prjResourceSuffix }}" \
+              "${{ env.AIFACTORY_SALT }}" \
+              "${{ env.aifactory_salt_random }}" \
+              "${{ env.deployment_random_value }}" \
+              "${{ env.projectPrefix }}" \
+              "${{ env.projectSuffix }}"
 
       - name: Remove runner IP from seeding Key Vault
         if: always() && env.disable_whitelisting_for_build_agents != 'true'
