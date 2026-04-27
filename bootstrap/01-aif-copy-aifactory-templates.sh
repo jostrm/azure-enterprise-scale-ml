@@ -59,10 +59,10 @@ cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-de
 
 ## TEMPLATES: infra orchestration (pipelines) - GHA(Bicep, Terraform)
 mkdir -p "$aif_dir/esml-infra/github-actions/bicep/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/bicep/"
+cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/bicep/" -r
 
 mkdir -p "$aif_dir/esml-infra/github-actions/terraform/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/terraform/"
+cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/terraform/" -r
 
 ## Azure Dashboards
 mkdir -p "$aif_dir/esml-infra/azure_dashboards/"
