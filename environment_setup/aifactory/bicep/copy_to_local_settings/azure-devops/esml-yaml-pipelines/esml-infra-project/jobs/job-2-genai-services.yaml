@@ -1167,16 +1167,32 @@ steps:
      fi
 
      # Construct Foundry names deterministically (same formula as CmnAIfactoryNaming.bicep)
-     # aifV2Name = take(replace(toLower('aif2' + uniqueInAIFenv + cleanRandomValue), '-', ''), 12)
-     # aifV2PrjName = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
+     # When addAIFoundry=false (default):
+     #   aifV2Name = take(replace(toLower('aif2' + uniqueInAIFenv + cleanRandomValue), '-', ''), 12)
+     #   aifV2PrjName = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
+     # When addAIFoundry=true:
+     #   aifV2NameAdd = take('aif2' + lastSuffixChar + cleanRandomValue, 12)
+     #   aifV2PrjNameAdd = take('aif2-p' + projectNumber + lastSuffixChar + cleanRandomValue, 12)
      # NOTE: Using bash builtins + awk instead of tr (tr can fail silently on some hosted agents due to locale issues)
      cleanRandomValue="${saltRandom10//-/}"
      cleanRandomValue="${cleanRandomValue//_/}"
      cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
-     foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
-     foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
 
-     echo "DEBUG 06a: cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
+     addAIFoundryFlag="${addAIFoundry}"
+     resourceSuffix="${admin_prjResourceSuffix}"
+
+     if [ "$addAIFoundryFlag" == "true" ]; then
+       # addAIFoundry=true: use lastSuffixChar (last char of resourceSuffix, e.g. '1' from '-001')
+       lastSuffixChar="${resourceSuffix: -1}"
+       foundry_account_name=$(echo "aif2${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
+       foundry_project_name=$(echo "aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
+     else
+       # Default: use uniqueInAIFenv (5-char salt)
+       foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
+       foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+     fi
+
+     echo "DEBUG 06a: addAIFoundry='$addAIFoundryFlag' cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
      echo "Foundry account name: $foundry_account_name"
      echo "Foundry project name: $foundry_project_name"
 
@@ -1188,6 +1204,8 @@ steps:
   env:
     aifactory_salt: $(aifactory_salt)
     aifactory_salt_random: $(aifactory_salt_random)
+    addAIFoundry: $(addAIFoundry)
+    admin_prjResourceSuffix: $(admin_prjResourceSuffix)
 - task: AzureCLI@2
   displayName: '06b_Delete_Service_If_Not_Enabled_And_Exists'
   condition: and(succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
