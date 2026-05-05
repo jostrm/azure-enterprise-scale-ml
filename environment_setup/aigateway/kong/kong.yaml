@@ -1,0 +1,133 @@
+# Kong Gateway Declarative Configuration (DB-less mode)
+# This file configures Kong to proxy requests to Azure OpenAI via private endpoint.
+# ============================================================================
+# Docs: https://docs.konghq.com/gateway/latest/production/deployment-topologies/db-less-and-declarative-config/
+# ============================================================================
+_format_version: "3.0"
+_transform: true
+
+# ============================================================================
+# Services - Backend upstream definitions
+# ============================================================================
+services:
+  # Azure OpenAI Service (via private endpoint)
+  - name: azure-openai-service
+    url: https://aif2x46jfc2e.openai.azure.com
+    protocol: https
+    port: 443
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 120000
+    retries: 3
+    routes:
+      # Route: /openai/* -> Azure OpenAI API
+      - name: azure-openai-route
+        paths:
+          - /openai
+        strip_path: true
+        protocols:
+          - http
+          - https
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+    plugins:
+      # Add Azure OpenAI API key header to upstream requests
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - "api-key:${AZURE_OPENAI_API_KEY}"
+          replace:
+            headers:
+              - "Host:aif2x46jfc2e.openai.azure.com"
+
+      # Rate limiting per consumer
+      - name: rate-limiting
+        config:
+          minute: 60
+          hour: 1000
+          policy: local
+          fault_tolerant: true
+          hide_client_headers: false
+
+      # Request size limiting (Azure OpenAI max ~4MB)
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 4
+          size_unit: megabytes
+
+  # Azure OpenAI - Chat Completions shortcut
+  - name: azure-openai-chat
+    url: https://aif2x46jfc2e.openai.azure.com/openai/deployments
+    protocol: https
+    port: 443
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 180000
+    retries: 2
+    routes:
+      - name: azure-openai-chat-route
+        paths:
+          - /ai/chat
+        strip_path: true
+        protocols:
+          - http
+          - https
+        methods:
+          - POST
+    plugins:
+      - name: request-transformer
+        config:
+          add:
+            headers:
+              - "api-key:${AZURE_OPENAI_API_KEY}"
+          replace:
+            headers:
+              - "Host:aif2x46jfc2e.openai.azure.com"
+
+      - name: rate-limiting
+        config:
+          minute: 30
+          hour: 500
+          policy: local
+          fault_tolerant: true
+
+# ============================================================================
+# Consumers - API clients
+# ============================================================================
+consumers:
+  - username: aifactory-default-consumer
+    keyauth_credentials:
+      - key: "${KONG_CONSUMER_API_KEY}"
+
+# ============================================================================
+# Plugins (global)
+# ============================================================================
+plugins:
+  # Key Authentication - clients must provide an API key to access Kong
+  - name: key-auth
+    config:
+      key_names:
+        - apikey
+        - x-api-key
+      key_in_query: true
+      key_in_header: true
+      key_in_body: false
+      hide_credentials: true
+
+  # Correlation ID for request tracing
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true
+
+  # Logging
+  - name: file-log
+    config:
+      path: /dev/stdout
+      reopen: false
