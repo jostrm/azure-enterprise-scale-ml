@@ -137,7 +137,7 @@ jobs:
       enableBingCustomSearch: ${{ vars.ENABLE_BING_CUSTOM_SEARCH || 'false' }}
       enableAIFoundryHub: ${{ vars.ENABLE_AI_FOUNDRY_HUB || 'false' }}
       addAIFoundryHub: ${{ vars.ADD_AI_FOUNDRY_HUB || 'false' }}
-      enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'false' }}
+      enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
       updateAIFoundry: ${{ vars.UPDATE_AI_FOUNDRY || 'false' }}
       addAIFoundry: ${{ vars.ADD_AI_FOUNDRY || 'false' }}
       enableAFoundryCaphost: ${{ vars.ENABLE_FOUNDRY_CAPHOST || 'true' }}
@@ -213,8 +213,8 @@ jobs:
       deployModel_gpt_4o: ${{ vars.DEPLOY_MODEL_GPT_4O || 'true' }}
       deployModel_gpt_4: ${{ vars.DEPLOY_MODEL_GPT_4 || 'false' }}
       default_gpt_4o_version: ${{ vars.DEFAULT_GPT_4O_VERSION || '2024-11-20' }}
-      deployModel_gpt_54_mini: ${{ vars.DEPLOY_MODEL_GPT_54_MINI || 'false' }}
-      default_gpt_54_mini_version: ${{ vars.DEFAULT_GPT_54_MINI_VERSION || '2026-03-17' }}
+      deployModel_gpt_4o_mini: ${{ vars.DEPLOY_MODEL_GPT_4O_MINI || 'false' }}
+      default_gpt_4o_mini_version: ${{ vars.DEFAULT_GPT_4O_MINI_VERSION || '2024-07-18' }}
       default_gpt_capacity: ${{ vars.DEFAULT_GPT_CAPACITY || '40' }}
       default_model_sku: ${{ vars.DEFAULT_MODEL_SKU || 'Standard' }}
 
@@ -407,48 +407,13 @@ jobs:
 
       - name: 00_Print_Info
         run: |
-          Write-Host " - FOUNDRY"
-          Write-Host "enableAIFoundry is: ${{ env.enableAIFoundry }}"
-          Write-Host "disableAgentNetworkInjection is: ${{ env.disableAgentNetworkInjection }}"
-          Write-Host "updateAIFoundry is: ${{ env.updateAIFoundry }}"
-          Write-Host "addAIFoundry is: ${{ env.addAIFoundry }}"
-          Write-Host "enableAFoundryCaphost is: ${{ env.enableAFoundryCaphost }}"
-          Write-Host "cleanFoundryCaphost is: ${{ env.cleanFoundryCaphost }}"
-          Write-Host "foundryDeploymentType is: ${{ env.foundryDeploymentType }}"
-          Write-Host " - AI FACTORY: NAMING"
-          Write-Host "project_number_000 (001) is: ${{ env.project_number_000 }}"
-          Write-Host "projectPrefix (esml-) is: ${{ env.projectPrefix }}"
-          Write-Host "projectSuffix (-rg) is: ${{ env.projectSuffix }}"
-          Write-Host "dev_test_prod is: ${{ env.dev_test_prod }}"
-          Write-Host "AI Factory version is: ${{ env.aifactory_version_major }}.${{ env.aifactory_version_minor }}"
-          Write-Host "AI Factory scale set (-001) is: ${{ env.admin_aifactorySuffixRG }}"
-          Write-Host "Resource group suffix (-001) is: ${{ env.admin_commonResourceSuffix }}"
-          Write-Host "admin_projectType (all) is: ${{ env.admin_projectType }}"
-          Write-Host " - NETWORKING:"
-          Write-Host "runNetworkingVar (true) is: ${{ env.runNetworkingVar }}"
-          Write-Host "allowPublicAccessWhenBehindVnet is: ${{ env.allowPublicAccessWhenBehindVnet }}"
-          Write-Host "enablePublicGenAIAccess is: ${{ env.enablePublicGenAIAccess }}"
-          Write-Host "enablePublicAccessWithPerimeter is: ${{ env.enablePublicAccessWithPerimeter }}"
-          Write-Host "privDnsResourceGroup_param is: ${{ env.privDnsResourceGroup_param }}"
-          Write-Host "centralDnsZoneByPolicyInHub (false) is: ${{ env.centralDnsZoneByPolicyInHub }}"
-          Write-Host "vnetResourceGroup_param is: ${{ env.vnetResourceGroup_param }}"
-          Write-Host "vnetNameFull_param is: ${{ env.vnetNameFull_param }}"
-          Write-Host "commonResourceGroup_param is: ${{ env.commonResourceGroup_param }}"
-          Write-Host "vnetNameBase is: ${{ env.vnetNameBase }}"
-          Write-Host "BYO_subnets (false) is: ${{ env.BYO_subnets }}"
-          Write-Host "vnetResourceGroupBase (esml-common) is: ${{ env.vnetResourceGroupBase }}"
-          Write-Host "common_subnet_name is: ${{ env.common_subnet_name }}"
-          Write-Host "network_env is: ${{ env.network_env }}"
-          Write-Host " - ENCRYPTION:"
-          Write-Host "CMK (false): ${{ env.cmk }}"
-          Write-Host "cmkKeyName (aifactory-cmk-key): ${{ env.cmkKeyName }}"
-          Write-Host "useCommonACR (true): ${{ env.useCommonACR }}"
-          Write-Host " - FOUNDRY (repeat for caphost):"
-          Write-Host "Foundry:enableAFoundryCaphost (false) is: ${{ env.enableAFoundryCaphost }}"
-          Write-Host "Foundry:disableAgentNetworkInjection (true) is: ${{ env.disableAgentNetworkInjection }}"
-          Write-Host " - PERMISSION and OTHER:"
-          Write-Host "use_ad_groups (true) is: ${{ env.use_ad_groups }}"
-          Write-Host "deployment_random_value is: ${{ env.deployment_random_value }}"
+          echo "env.dev_test_prod=${{ env.dev_test_prod }}"
+          echo "env.project_number_000=${{ env.project_number_000 }}"
+          echo "env.runNetworkingVar=${{ env.runNetworkingVar }}"
+          echo "env.BYO_subnets=${{ env.BYO_subnets }}"
+          echo "env.admin_projectType=${{ env.admin_projectType }}"
+          echo "env.useCommonACR=${{ env.useCommonACR }}"
+          echo "env.network_env=${{ env.network_env }}"
 
       - name: 00_Validate_Project_Subnet_Exists_(Networking-START)
         if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
@@ -1045,6 +1010,8 @@ jobs:
             if [ -n "$miName" ]; then
               salt="${miName: -14:10}"
               echo "aifactory_salt_random=$salt" >> $GITHUB_ENV
+              salt5="${miName: -19:5}"
+              echo "aifactory_salt=$salt5" >> $GITHUB_ENV
             fi
 
       - name: 06a_Delete_CapabilityHosts
@@ -1069,68 +1036,55 @@ jobs:
             projectNameReplaced="${projectName/prj/project}"
             projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
 
-            echo "=== 06a: Delete Capability Hosts in $projectResourceGroup ==="
+            echo "=== 06a: Delete Capability Hosts ==="
+            echo "Resource group: $projectResourceGroup"
 
-            # Find AI Foundry account (aif2* but not aif2-p*)
-            account_name=$(az cognitiveservices account list \
-              --subscription "${{ env.dev_test_prod_sub_id }}" \
-              --resource-group "$projectResourceGroup" \
-              --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+            # Salt variables set by step 17_Extract_aifactory_salt_random
+            # uniqueInAIFenv = 5-char salt (e.g. x46jf), saltRandom10 = 10-char random (e.g. c2ebe6a898)
+            uniqueInAIFenv="${{ env.aifactory_salt }}"
+            saltRandom10="${{ env.aifactory_salt_random }}"
 
-            if [ -z "$account_name" ]; then
-              echo "No AI Foundry account found in $projectResourceGroup. Skipping."
+            echo "DEBUG: uniqueInAIFenv='$uniqueInAIFenv' saltRandom10='$saltRandom10'"
+
+            if [ -z "$uniqueInAIFenv" ] || [ -z "$saltRandom10" ]; then
+              echo "Salt variables not available from pipeline. Cannot construct Foundry names. Skipping."
               exit 0
             fi
 
-            echo "AI Foundry account: $account_name"
+            # Construct Foundry names deterministically (same formula as CmnAIfactoryNaming.bicep)
+            # When addAIFoundry=false (default):
+            #   aifV2Name = take(replace(toLower('aif2' + uniqueInAIFenv + cleanRandomValue), '-', ''), 12)
+            #   aifV2PrjName = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
+            # When addAIFoundry=true:
+            #   aifV2NameAdd = take('aif2' + lastSuffixChar + cleanRandomValue, 12)
+            #   aifV2PrjNameAdd = take('aif2-p' + projectNumber + lastSuffixChar + cleanRandomValue, 12)
+            # NOTE: Using awk instead of tr to avoid locale issues on hosted agents
+            cleanRandomValue="${saltRandom10//-/}"
+            cleanRandomValue="${cleanRandomValue//_/}"
+            cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
 
-            # Delete project-level capability hosts first
-            projects_json=$(az rest --method GET \
-              --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/projects?api-version=2025-04-01-preview" \
-              -o json 2>/dev/null || echo '{"value":[]}')
+            addAIFoundryFlag="${{ env.addAIFoundry }}"
+            resourceSuffix="${{ env.admin_prjResourceSuffix }}"
 
-            project_names=$(echo "$projects_json" | jq -r '.value[].name // empty' | tr -d '\r')
-            if [ -n "$project_names" ]; then
-              while IFS= read -r proj; do
-                [ -z "$proj" ] && continue
-                proj="${proj##*/}"
-                caphost_name="${proj//\-/}caphost"
-                echo "Deleting project caphost: $caphost_name on project $proj ..."
-                az rest --method DELETE \
-                  --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/projects/${proj}/capabilityHosts/${caphost_name}?api-version=2025-07-01-preview" \
-                  2>/dev/null || echo "INFO: Project caphost '$caphost_name' not found or already deleted"
-              done <<< "$project_names"
-
-              # Wait for project caphost deletion
-              echo "Waiting 60s for project capability host deletion to propagate..."
-              sleep 60
+            if [ "$addAIFoundryFlag" == "true" ]; then
+              # addAIFoundry=true: use lastSuffixChar (last char of resourceSuffix, e.g. '1' from '-001')
+              lastSuffixChar="${resourceSuffix: -1}"
+              foundry_account_name=$(echo "aif2${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
+              foundry_project_name=$(echo "aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
+            else
+              # Default: use uniqueInAIFenv (5-char salt)
+              foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
+              foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
             fi
 
-            # Delete account-level capability host
-            acct_caphost_name="${account_name//\-/}caphost"
-            echo "Deleting account caphost: $acct_caphost_name ..."
-            az rest --method DELETE \
-              --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${acct_caphost_name}?api-version=2025-07-01-preview" \
-              2>/dev/null || echo "INFO: Account caphost '$acct_caphost_name' not found or already deleted"
+            echo "DEBUG 06a: addAIFoundry='$addAIFoundryFlag' cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
+            echo "Foundry account name: $foundry_account_name"
+            echo "Foundry project name: $foundry_project_name"
 
-            # Poll until account caphost is gone (max 5 min)
-            echo "Polling until account caphost is deleted (max 5 min)..."
-            for i in $(seq 1 30); do
-              status=$(az rest --method GET \
-                --url "https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${acct_caphost_name}?api-version=2025-07-01-preview" \
-                -o json 2>/dev/null || echo "")
-              if [ -z "$status" ]; then
-                echo "Account caphost deleted successfully."
-                break
-              fi
-              prov=$(echo "$status" | jq -r '.properties.provisioningState // "Unknown"')
-              echo "  [$i/30] Account caphost state: $prov"
-              if [ "$prov" = "Deleting" ] || [ "$prov" = "Succeeded" ]; then
-                sleep 10
-              else
-                break
-              fi
-            done
+            # Call the delete-capHost-command.sh script
+            script_path="${GITHUB_WORKSPACE}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/delete-capHost-command.sh"
+            echo "Attempting caphost deletion (even if account is already deleted)..."
+            bash "$script_path" "${{ env.dev_test_prod_sub_id }}" "$projectResourceGroup" "$foundry_account_name" "$foundry_project_name"
 
             echo "=== 06a completed ==="
 
@@ -1633,7 +1587,7 @@ jobs:
               --parameters DEBUG_deployModel_text_embedding_ada_002="${{ env.deployModel_text_embedding_ada_002 }}" \
               --parameters DEBUG_deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters DEBUG_deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
-              --parameters DEBUG_deployModel_gpt_4o_mini="${{ env.deployModel_gpt_54_mini }}" \
+              --parameters DEBUG_deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
               --parameters tags='${{ env.tags }}' \
               --parameters tagsProject='${{ env.tagsProject }}' \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
@@ -1767,9 +1721,7 @@ jobs:
               --parameters deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
               --parameters deployModel_text_embedding_ada_002="${{ env.deployModel_text_embedding_ada_002 }}" \
-              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
-              --parameters default_gpt_54_mini_version="${{ env.default_gpt_54_mini_version }}" \
-              --parameters deployModel_gpt_X="${{ env.deployModel_gpt_X }}" \
+              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters modelGPTXName="${{ env.modelGPTXName }}" \
@@ -1984,7 +1936,7 @@ jobs:
               --parameters deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
               --parameters default_embedding_capacity="${{ env.default_embedding_capacity }}" \
-              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
+              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters deployModel_gpt_4o="${{ env.deployModel_gpt_4o }}" \
@@ -2282,8 +2234,8 @@ jobs:
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters deployModel_gpt_4o="${{ env.deployModel_gpt_4o }}" \
               --parameters default_gpt_4o_version="${{ env.default_gpt_4o_version }}" \
-              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
-              --parameters default_gpt_54_mini_version="${{ env.default_gpt_54_mini_version }}" \
+              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+              --parameters default_gpt_4o_mini_version="${{ env.default_gpt_4o_mini_version }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
               --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
@@ -2439,7 +2391,6 @@ jobs:
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
               --parameters enableAISearch="${{ env.enableAISearch }}" \
-              --parameters enableAISearchSharedPrivateLink="${{ env.enableAISearchSharedPrivateLink }}" \
               --parameters enableCosmosDB="${{ env.enableCosmosDB }}" \
               --parameters deployModel_gpt_X="${{ env.deployModel_gpt_X }}" \
               --parameters modelGPTXName="${{ env.modelGPTXName }}" \
@@ -2453,8 +2404,8 @@ jobs:
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters deployModel_gpt_4o="${{ env.deployModel_gpt_4o }}" \
               --parameters default_gpt_4o_version="${{ env.default_gpt_4o_version }}" \
-              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
-              --parameters default_gpt_54_mini_version="${{ env.default_gpt_54_mini_version }}" \
+              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+              --parameters default_gpt_4o_mini_version="${{ env.default_gpt_4o_mini_version }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
               --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
