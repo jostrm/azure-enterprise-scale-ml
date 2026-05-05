@@ -293,6 +293,97 @@ resource genAINsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             destinationAddressPrefix: 'AzureMachineLearning'
         }
       }
+      // --- UDR / Azure Firewall: explicit outbound rules to avoid NSG blocking when traffic is routed via UDR ---
+      {
+        name: 'AzureCosmosDB_Outbound'
+        properties: {
+          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Azure Cosmos DB service tag.'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'AzureCosmosDB'
+          access: 'Allow'
+          priority: 260
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'AzureCognitiveSearch_Outbound'
+        properties: {
+          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Azure AI Search (Cognitive Search) service tag.'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'AzureCognitiveSearch'
+          access: 'Allow'
+          priority: 270
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'AzureMonitor_Outbound'
+        properties: {
+          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Azure Monitor (Log Analytics, Application Insights, diagnostics) service tag.'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'AzureMonitor'
+          access: 'Allow'
+          priority: 280
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'PowerBI_Fabric_Outbound'
+        properties: {
+          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Microsoft Fabric / Power BI service tag (covers Fabric REST API, OneLake, Fabric Data Agent).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'PowerBI'
+          access: 'Allow'
+          priority: 290
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'CognitiveServicesManagement_Outbound'
+        properties: {
+          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Cognitive Services management plane (AI Foundry, OpenAI, Speech, Vision, Document Intelligence).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'CognitiveServicesManagement'
+          access: 'Allow'
+          priority: 300
+          direction: 'Outbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
     ]
   }
 }
