@@ -78,6 +78,9 @@ param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string = ''
 
+@description('Whether AI Foundry was added (addAIFoundry=true) — affects AI Foundry V2 account naming')
+param addAIFoundry bool = false
+
 // ============================================================================
 // PARAMETERS - Random Values & Salts
 // ============================================================================
@@ -151,6 +154,9 @@ module projectDashboard '../modules/projectDash01.bicep' = {
     genaiSubnetId: genaiSubnetId
     aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
+
+    // AI Foundry naming mode
+    addAIFoundry: addAIFoundry
     
     // Tags
     tags: union(tags, tagsProject, {

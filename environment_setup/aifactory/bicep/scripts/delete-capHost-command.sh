@@ -16,7 +16,7 @@ SUBSCRIPTION_ID="${1:-TODO-subscription-id}"
 RESOURCE_GROUP="${2:-TODO-resource-group}"
 FOUNDRY_ACCOUNT_NAME="${3:-TODO-foundry-account-name}"
 FOUNDRY_PROJECT_NAME="${4:-TODO-foundry-project-name}"
-API_VERSION="${5:-2026-01-15-preview}"
+API_VERSION="${5:-2025-04-01-preview}"
 
 # --- CALCULATED ---
 PROJECT_CAPHOST_NAME="${FOUNDRY_ACCOUNT_NAME}caphost"
