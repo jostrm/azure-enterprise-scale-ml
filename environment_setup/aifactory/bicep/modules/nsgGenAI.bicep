@@ -333,7 +333,7 @@ resource genAINsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       {
         name: 'AzureMonitor_Outbound'
         properties: {
-          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Azure Monitor (Log Analytics, Application Insights, diagnostics) service tag.'
+          description: 'UDR/Firewall: Allow outbound to Azure Monitor (Log Analytics, Application Insights, diagnostics).'
           protocol: 'Tcp'
           sourcePortRange: '*'
           destinationPortRange: '443'
@@ -351,7 +351,7 @@ resource genAINsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       {
         name: 'PowerBI_Fabric_Outbound'
         properties: {
-          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Microsoft Fabric / Power BI service tag (covers Fabric REST API, OneLake, Fabric Data Agent).'
+          description: 'UDR/Firewall: Allow outbound to Microsoft Fabric / Power BI (REST API, OneLake, Data Agent).'
           protocol: 'Tcp'
           sourcePortRange: '*'
           destinationPortRange: '443'
@@ -369,7 +369,7 @@ resource genAINsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       {
         name: 'CognitiveServicesManagement_Outbound'
         properties: {
-          description: 'Required when UDR routes through Azure Firewall. Allows outbound to Cognitive Services management plane (AI Foundry, OpenAI, Speech, Vision, Document Intelligence).'
+          description: 'UDR/Firewall: Allow outbound to Cognitive Services mgmt (AI Foundry, OpenAI, Speech, Vision, Doc Intel).'
           protocol: 'Tcp'
           sourcePortRange: '*'
           destinationPortRange: '443'
