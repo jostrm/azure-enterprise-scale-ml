@@ -52,6 +52,40 @@ API_VERSION="2025-04-01-preview"
 deleted_count=0
 project_caphosts_deleted=0
 
+# Helper: delete a caphost via az rest with error classification
+# Args: $1=full_delete_url $2=display_label
+# Returns: 0 if deleted/not-found, 1 if failed (non-fatal)
+delete_caphost_with_error_handling() {
+  local delete_url="$1"
+  local label="$2"
+
+  echo "    Deleting: $label ..."
+  local delete_output
+  delete_output=$(az rest --method DELETE --url "$delete_url" --headers "Content-Type=application/json" 2>&1) || true
+  
+  if echo "$delete_output" | grep -q "ParentResourceNotFound"; then
+    echo "    ⚠️  ParentResourceNotFound: parent resource no longer exists (e.g., project deleted)."
+    echo "       Caphost was implicitly removed. Continuing."
+    return 0
+  elif echo "$delete_output" | grep -qi "Workspace not found"; then
+    echo "    ⚠️  'Workspace not found': internal workspace reference broken (project deleted externally)."
+    echo "       Azure will clean up in background. Continuing."
+    return 0
+  elif echo "$delete_output" | grep -qi "ResourceNotFound\|NotFound"; then
+    echo "    ℹ️  Not found — already deleted or never created."
+    return 0
+  elif echo "$delete_output" | grep -qi '"status":"Succeeded"\|"provisioningState":"Succeeded"\|Accepted'; then
+    echo "    ✅ Delete accepted/succeeded: $label"
+    deleted_count=$((deleted_count + 1))
+    return 0
+  else
+    # Unknown response — log but don't fail the pipeline
+    echo "    ⚠️  Unexpected response (non-fatal): $label"
+    echo "$delete_output" | head -5
+    return 1
+  fi
+}
+
 # Helper: strip "parent/" prefix from resource names returned by the API
 # The API returns name as "accountName/projectName" or "accountName/caphostName"
 # We only need the last segment.
@@ -60,120 +94,62 @@ strip_parent_prefix() {
   echo "${full_name##*/}"
 }
 
-# Helper: delete a caphost via curl with async polling
-# Args: $1=full_delete_url $2=display_label
-delete_caphost_with_poll() {
-  local delete_url="$1"
-  local label="$2"
-
-  local access_token
-  access_token=$(az account get-access-token --query accessToken -o tsv 2>/dev/null)
-  local tmp_headers="/tmp/caphost_delete_headers_$$.txt"
-
-  local http_response
-  http_response=$(curl -s -w "\n%{http_code}" -X DELETE \
-    -H "Authorization: Bearer $access_token" \
-    -H "Content-Type: application/json" \
-    "$delete_url" \
-    -D "$tmp_headers" 2>/dev/null)
-  local http_body
-  http_body=$(echo "$http_response" | head -n -1)
-  local http_code
-  http_code=$(echo "$http_response" | tail -n1)
-
-  if [ "$http_code" = "202" ] || [ "$http_code" = "200" ]; then
-    # Poll async operation if header present
-    local async_url
-    async_url=$(grep -i "Azure-AsyncOperation" "$tmp_headers" 2>/dev/null | sed 's/.*: //' | tr -d '\r')
-    if [ -n "$async_url" ]; then
-      echo "    Polling deletion status for $label..."
-      local poll_count=0
-      local max_polls=120  # 10 min max (120 * 5s)
-      while [ $poll_count -lt $max_polls ]; do
-        sleep 5
-        poll_count=$((poll_count + 1))
-        local status
-        status=$(az rest --method GET --url "$async_url" --query "status" -o tsv 2>/dev/null)
-        if [ "$status" = "Succeeded" ]; then
-          echo "    ✅ Deleted: $label"
-          deleted_count=$((deleted_count + 1))
-          rm -f "$tmp_headers"
-          return 0
-        elif [ "$status" = "Failed" ] || [ "$status" = "Canceled" ]; then
-          echo "    ⚠️  Deletion $status: $label (non-fatal)"
-          rm -f "$tmp_headers"
-          return 1
-        fi
-        if [ $((poll_count % 6)) -eq 0 ]; then
-          echo "    ⏳ Still deleting $label... ($((poll_count * 5))s elapsed, status: $status)"
-        fi
-      done
-      echo "    ⚠️  Timed out waiting for deletion: $label (non-fatal)"
-      rm -f "$tmp_headers"
-      return 1
-    else
-      echo "    ✅ Deleted (sync): $label"
-      deleted_count=$((deleted_count + 1))
-      rm -f "$tmp_headers"
-      return 0
-    fi
-  elif [ "$http_code" = "404" ]; then
-    echo "    ℹ️  Not found (already deleted): $label"
-    rm -f "$tmp_headers"
-    return 0
-  else
-    echo "    ⚠️  Could not delete: $label (HTTP $http_code, non-fatal)"
-    [ -n "$http_body" ] && echo "    Response: $http_body"
-    rm -f "$tmp_headers"
-    return 1
-  fi
-}
-
 while IFS= read -r account_name; do
   [ -z "$account_name" ] && continue
   echo ""
   echo "Processing account: $account_name"
 
   # --- Step 1: Delete PROJECT-level capability hosts (must be done BEFORE account caphost) ---
+  # Strategy: List projects, then for each project attempt to delete its caphosts.
+  # If a project was already deleted externally, LIST won't return it but the account
+  # caphost may still reference it. The delete_caphost_with_error_handling function
+  # handles ParentResourceNotFound gracefully.
+  
   projects_raw=$(az rest \
     --method GET \
     --url "https://management.azure.com/subscriptions/${dev_test_prod_sub_id}/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/projects?api-version=${API_VERSION}" \
-    --query "value[].name" -o tsv 2>/dev/null)
+    --query "value[].name" -o tsv 2>/dev/null || echo "")
 
   if [ -n "$projects_raw" ]; then
     while IFS= read -r proj_name_raw; do
       [ -z "$proj_name_raw" ] && continue
       # API may return "accountName/projectName" — strip to just "projectName"
       proj_name=$(strip_parent_prefix "$proj_name_raw")
-      echo "  Checking project-level caphosts for project: $proj_name"
+      echo "  Project: $proj_name — checking for capability hosts..."
 
+      # List caphosts for this project (may be empty if none exist)
       proj_caphosts_raw=$(az rest \
         --method GET \
         --url "https://management.azure.com/subscriptions/${dev_test_prod_sub_id}/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/projects/${proj_name}/capabilityHosts?api-version=${API_VERSION}" \
-        --query "value[].name" -o tsv 2>/dev/null)
+        --query "value[].name" -o tsv 2>/dev/null || echo "")
 
       if [ -n "$proj_caphosts_raw" ]; then
         while IFS= read -r ch_name_raw; do
           [ -z "$ch_name_raw" ] && continue
           ch_name=$(strip_parent_prefix "$ch_name_raw")
-          echo "    Deleting project caphost: ${account_name}/${proj_name}/${ch_name}"
 
           delete_url="https://management.azure.com/subscriptions/${dev_test_prod_sub_id}/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/projects/${proj_name}/capabilityHosts/${ch_name}?api-version=${API_VERSION}"
-          delete_caphost_with_poll "$delete_url" "project caphost ${proj_name}/${ch_name}" \
+          delete_caphost_with_error_handling "$delete_url" "project caphost ${proj_name}/${ch_name}" \
             && project_caphosts_deleted=$((project_caphosts_deleted + 1))
         done <<< "$proj_caphosts_raw"
       else
-        echo "    No project-level capability hosts found for $proj_name."
+        echo "    No project-level capability hosts found (or project already deleted)."
       fi
     done <<< "$projects_raw"
   else
-    echo "  No projects found under account $account_name."
+    echo "  No projects found under account $account_name (may have been deleted already)."
+    echo "  Will still attempt to clean up account-level caphosts."
   fi
 
   # --- Step 1b: Wait for project caphost cleanup to propagate before deleting account caphost ---
+  # Always sleep if we deleted any project caphosts OR if no projects were found (to be safe)
   if [ $project_caphosts_deleted -gt 0 ]; then
     echo ""
     echo "  ⏳ Waiting 60s for project caphost deletion to propagate before deleting account caphost..."
+    sleep 60
+  elif [ -z "$projects_raw" ]; then
+    echo ""
+    echo "  ⏳ No projects listed (may be deleted) — waiting 60s before account caphost cleanup (ordering safety)..."
     sleep 60
   fi
 
@@ -183,19 +159,18 @@ while IFS= read -r account_name; do
   acct_caphosts_raw=$(az rest \
     --method GET \
     --url "https://management.azure.com/subscriptions/${dev_test_prod_sub_id}/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=${API_VERSION}" \
-    --query "value[].name" -o tsv 2>/dev/null)
+    --query "value[].name" -o tsv 2>/dev/null || echo "")
 
   if [ -n "$acct_caphosts_raw" ]; then
     while IFS= read -r ch_name_raw; do
       [ -z "$ch_name_raw" ] && continue
       ch_name=$(strip_parent_prefix "$ch_name_raw")
-      echo "    Deleting account caphost: ${account_name}/${ch_name} (this may take several minutes...)"
 
       delete_url="https://management.azure.com/subscriptions/${dev_test_prod_sub_id}/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${ch_name}?api-version=${API_VERSION}"
-      delete_caphost_with_poll "$delete_url" "account caphost ${account_name}/${ch_name}"
+      delete_caphost_with_error_handling "$delete_url" "account caphost ${account_name}/${ch_name}"
     done <<< "$acct_caphosts_raw"
   else
-    echo "  No account-level capability hosts found."
+    echo "  No account-level capability hosts found (or already deleted)."
   fi
 
 done <<< "$aif2_accounts"
