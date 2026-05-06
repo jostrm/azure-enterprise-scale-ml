@@ -30,11 +30,13 @@ param privateLinkServiceNetworkPolicies string = 'Enabled'
 param centralDnsZoneByPolicyInHub bool = false
 param routeTableId string = ''
 param natGatewayId string = ''
+param allowDefaultOutboundAccess bool = false
 
 resource snt 'Microsoft.Network/virtualNetworks/subnets@2023-05-01' = {
   name: '${virtualNetworkName}/${name}'
   properties: {
     addressPrefix: addressPrefix
+    defaultOutboundAccess: allowDefaultOutboundAccess
     serviceEndpoints: [ for x in serviceEndpoints: {
         service: x
         locations: [

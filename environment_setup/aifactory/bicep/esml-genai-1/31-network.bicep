@@ -321,6 +321,7 @@ module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && 
     delegations: []
     nsgId: !empty(aca2SubnetCidr) ? nsg2Aca!.outputs.nsgId : ''
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+    allowDefaultOutboundAccess: true
   }
   dependsOn: [
     ...(!sntAca002Exists && !empty(aca2SubnetCidr) ? [nsg2Aca] : [])
