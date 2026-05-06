@@ -143,8 +143,6 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
       {
         order: 0
         parts: [
-
-          // ── ROW 0-1: Full-width title banner ─────────────────────────────────
           {
             position: { x: 0, y: 0, colSpan: 12, rowSpan: 2 }
             metadata: {
@@ -153,7 +151,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               settings: {
                 content: {
                   settings: {
-                    content: '# ${dashboardTitle}\n**RG:** [${targetResourceGroup}](${rgPortalUrl})\u2003|\u2003**Admin:** ${technicalAdminsEmail}\u2003|\u2003**Scale set:** ${aifactorySuffixRG}\u2003|\u2003[🤖 AI Foundry](${aiFoundryProjectUrl})\u2003|\u2003[💰 Cost Analysis](${costAnalysisUrl})'
+                    content: '# ${dashboardTitle}\n**RG:** [${targetResourceGroup}](${rgPortalUrl})\u{2003}|\u{2003}**Admin:** ${technicalAdminsEmail}\u{2003}|\u{2003}**Scale set:** ${aifactorySuffixRG}\u{2003}|\u{2003}[🤖 AI Foundry](${aiFoundryProjectUrl})\u{2003}|\u{2003}[💰 Cost Analysis](${costAnalysisUrl})'
                     title: ''
                     subtitle: ''
                     markdownSource: 1
