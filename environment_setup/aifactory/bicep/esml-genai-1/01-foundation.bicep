@@ -132,22 +132,17 @@ param inputKeyvaultSubscription string
 // PARAMETERS - Policy Exemptions (Foundry ACA subnet safety)
 // ============================================================================
 
-@description('''Array of policy assignment IDs (deployIfNotExists or auditIfNotExists effect)
-that target VNet / subnet resources in the VNet resource group. One exemption per entry is
-created, scoped to vnetResourceGroupName, so Foundry Standard Agent can inject into
-snt-*-aca* subnets without remediation race conditions.
+@description('''Informational only — consumed by pipeline task 06e_Create_Policy_Exemptions_FoundrySubnets.
+Bicep accepts this param so --parameters in the CLI does not fail, but does NOT create exemptions.
+Reason: Microsoft.Authorization/policyExemptions/write is a privileged action the deployment SP
+may not have; the pipeline task runs with continueOnError:true so missing RBAC is non-fatal.
 
-Leave empty ([]) in greenfield or non-ALZ environments — no exemptions will be created.
-
-To discover relevant IDs before deployment run:
-  az policy assignment list \\
-    --scope /subscriptions/<dev_test_prod_sub_id>/resourceGroups/<vnetResourceGroup> \\
-    --query "[].id" -o tsv
+Array of policy assignment IDs (deployIfNotExists or auditIfNotExists) scoped to the VNet RG.
+Leave empty ([]) in greenfield or non-ALZ environments.
 ''')
 param policyExemptionAssignmentIds string[] = []
 
-@description('''Optional: restrict each exemption to specific policyDefinitionReferenceIds within
-an initiative. Leave empty ([]) to exempt the full assignment.''')
+@description('Informational only — see policyExemptionAssignmentIds. Optional policyDefinitionReferenceIds to narrow exemptions within an initiative.')
 param policyExemptionDefinitionReferenceIds string[] = []
 
 // ============================================================================
@@ -810,22 +805,11 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resour
   ]
 }
 
-// ============================================================================
-// Policy Exemptions — Foundry ACA subnets (DINE / auditIfNotExists guard)
-// Scoped to vnetResourceGroupName so all subnet resources in that RG are
-// shielded from remediation while Foundry performs network injection.
-// ============================================================================
-module foundrySubnetPolicyExemptions '../modules/policyExcemptions/policy-exempt-foundry-subnets.bicep' = if (length(policyExemptionAssignmentIds) > 0) {
-  scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
-  name: take('01-policyExemptFoundry-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    policyAssignmentIds: policyExemptionAssignmentIds
-    policyDefinitionReferenceIds: policyExemptionDefinitionReferenceIds
-  }
-  dependsOn: [
-    projectResourceGroup
-  ]
-}
+// NOTE: Policy exemptions for Foundry ACA subnets are NOT created here.
+// The policyExemptionAssignmentIds param is accepted so the CLI --parameters call does not fail,
+// but the actual exemption is created by pipeline task 06e_Create_Policy_Exemptions_FoundrySubnets
+// using az rest with continueOnError:true — avoiding the need for policyExemptions/write RBAC
+// on the deployment service principal.
 
 // ============================================================================
 // OUTPUTS

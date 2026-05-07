@@ -1661,6 +1661,62 @@ steps:
 
       echo "=== 06d Cleanup complete ==="
 - task: AzureCLI@2
+  displayName: '06e_Create_Policy_Exemptions_FoundrySubnets'
+  continueOnError: true
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['policyExemptionAssignmentIds'], '[]'), ne(variables['policyExemptionAssignmentIds'], ''), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     #!/bin/bash
+     # Create policy exemptions on the VNet RG to guard Foundry ACA subnets from DINE remediation.
+     # Requires Microsoft.Authorization/policyExemptions/write on the VNet RG.
+     # continueOnError: true — missing RBAC is non-fatal; exemption is best-effort.
+     #
+     # To grant the required role to the deployment SP:
+     #   az role assignment create --assignee <sp-object-id> \
+     #     --role "Resource Policy Contributor" \
+     #     --scope /subscriptions/<sub>/resourceGroups/<vnetRG>
+
+     ASSIGNMENT_IDS_JSON='$(policyExemptionAssignmentIds)'
+     SUBSCRIPTION_ID="$(dev_test_prod_sub_id)"
+     VNET_RG="$(vnetResourceGroup_resolved)"
+
+     if [ -z "$VNET_RG" ]; then
+       VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+     fi
+
+     echo "=== 06e Create Policy Exemptions ==="
+     echo "VNet RG: $VNET_RG"
+     echo "Assignment IDs JSON: $ASSIGNMENT_IDS_JSON"
+
+     az account set --subscription "$SUBSCRIPTION_ID"
+
+     # Parse JSON array using Python (available on all ADO hosted agents)
+     ASSIGNMENT_IDS=$(python3 -c "import json,sys; ids=json.loads(sys.argv[1]); print('\n'.join(ids))" "$ASSIGNMENT_IDS_JSON" 2>/dev/null || echo "")
+
+     if [ -z "$ASSIGNMENT_IDS" ]; then
+       echo "No policy assignment IDs configured — skipping."
+       exit 0
+     fi
+
+     while IFS= read -r assignment_id; do
+       [ -z "$assignment_id" ] && continue
+       short_name=$(echo "$assignment_id" | awk -F'/' '{print $NF}')
+       # 16-char hex suffix derived from assignment ID — stable across re-runs
+       exemption_name="foundry-aca-$(echo -n "${assignment_id}" | md5sum | cut -c1-16)"
+       echo "Creating exemption '$exemption_name' for assignment '$short_name'..."
+       az rest --method PUT \
+         --url "https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${VNET_RG}/providers/Microsoft.Authorization/policyExemptions/${exemption_name}?api-version=2022-07-01-preview" \
+         --body "{\"properties\":{\"policyAssignmentId\":\"${assignment_id}\",\"exemptionCategory\":\"Waiver\",\"displayName\":\"Foundry ACA subnet exemption - ${short_name}\",\"description\":\"Foundry Standard Agent requires subnet immutability during network injection into snt-*-aca* subnets. DINE/auditIfNotExists remediation causes 409 conflicts on capability host provisioning.\"}}" \
+         --headers "Content-Type=application/json" \
+         && echo "✅ Exemption created: $exemption_name" \
+         || echo "⚠️  Failed to create exemption $exemption_name — SP may lack Microsoft.Authorization/policyExemptions/write on $VNET_RG. Grant 'Resource Policy Contributor' to fix."
+     done <<< "$ASSIGNMENT_IDS"
+
+     echo "=== 06e Policy Exemptions complete ==="
+- task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:

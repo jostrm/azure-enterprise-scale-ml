@@ -1597,6 +1597,57 @@ jobs:
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --debug
 
+      - name: 06e-policy-exemptions-foundry-subnets
+        # Best-effort: creates policy exemptions on the VNet RG so DINE/auditIfNotExists policies
+        # cannot mutate the ACA subnet while Foundry Standard Agent performs network injection.
+        # Requires Microsoft.Authorization/policyExemptions/write on the VNet RG.
+        # To grant: az role assignment create --assignee <sp-oid> --role "Resource Policy Contributor"
+        #           --scope /subscriptions/<sub>/resourceGroups/<vnetRG>
+        if: |
+          env.deleteAllServicesForProject != 'true' &&
+          env.policyExemptionAssignmentIds != '[]' &&
+          env.policyExemptionAssignmentIds != ''
+        continue-on-error: true
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            ASSIGNMENT_IDS_JSON='${{ env.policyExemptionAssignmentIds }}'
+            SUBSCRIPTION_ID='${{ env.dev_test_prod_sub_id }}'
+            VNET_RG='${{ env.vnetResourceGroup_resolved }}'
+
+            if [ -z "$VNET_RG" ]; then
+              VNET_RG='${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}'
+            fi
+
+            echo "=== 06e Create Policy Exemptions ==="
+            echo "VNet RG: $VNET_RG"
+            echo "Assignment IDs JSON: $ASSIGNMENT_IDS_JSON"
+
+            az account set --subscription "$SUBSCRIPTION_ID"
+
+            ASSIGNMENT_IDS=$(python3 -c "import json,sys; ids=json.loads(sys.argv[1]); print('\n'.join(ids))" "$ASSIGNMENT_IDS_JSON" 2>/dev/null || echo "")
+
+            if [ -z "$ASSIGNMENT_IDS" ]; then
+              echo "No policy assignment IDs configured — skipping."
+              exit 0
+            fi
+
+            while IFS= read -r assignment_id; do
+              [ -z "$assignment_id" ] && continue
+              short_name=$(echo "$assignment_id" | awk -F'/' '{print $NF}')
+              exemption_name="foundry-aca-$(echo -n "${assignment_id}" | md5sum | cut -c1-16)"
+              echo "Creating exemption '$exemption_name' for '$short_name'..."
+              az rest --method PUT \
+                --url "https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${VNET_RG}/providers/Microsoft.Authorization/policyExemptions/${exemption_name}?api-version=2022-07-01-preview" \
+                --body "{\"properties\":{\"policyAssignmentId\":\"${assignment_id}\",\"exemptionCategory\":\"Waiver\",\"displayName\":\"Foundry ACA subnet exemption - ${short_name}\",\"description\":\"Foundry Standard Agent requires subnet immutability during network injection into snt-*-aca* subnets. DINE/auditIfNotExists remediation causes 409 conflicts on capability host provisioning.\"}}" \
+                --headers "Content-Type=application/json" \
+                && echo "Exemption created: $exemption_name" \
+                || echo "Failed: SP may lack Microsoft.Authorization/policyExemptions/write on $VNET_RG"
+            done <<< "$ASSIGNMENT_IDS"
+
+            echo "=== 06e Policy Exemptions complete ==="
+
       - name: 62-core-infrastructure
         if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
