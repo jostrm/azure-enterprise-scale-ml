@@ -14,10 +14,28 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 
 | Platform | File |
 |---|---|
-| Windows | [aifactory-config-windows.zip](aifactory-config-windows.zip) |
-| Linux | [aifactory-config-linux.tar.gz.zip](aifactory-config-linux.tar.gz.zip) |
-| macOS | [aifactory-config-macos.tar.gz.zip](aifactory-config-macos.tar.gz.zip) |
+| Windows | [aifactory-config-windows (3).zip](windows/aifactory-config-windows%20%283%29.zip) |
+| Linux | [aifactory-config-linux.tar.gz](linux/aifactory-config-linux.tar.gz) |
+| macOS | [aifactory-config-macos.tar.gz](macos/aifactory-config-macos.tar.gz) |
 
+### ⚠️ Security warning on first run
+
+The app is not yet signed with a commercial certificate. Your OS may show a warning the first time you run it — this is expected. The source code is fully open and auditable in this repository.
+
+**Windows — "Windows protected your PC" (SmartScreen)**
+1. Click **More info**
+2. Click **Run anyway**
+
+**macOS — "cannot be opened because it is from an unidentified developer"**
+1. Right-click (or Control-click) the app
+2. Select **Open**
+3. Click **Open** in the dialog
+
+**Linux** — no warning expected; you may need to make the file executable:
+```bash
+chmod +x aifactory-config
+./aifactory-config
+```
 ## Documentation
 
 [Quickstart Documentation](https://jostrm.github.io/azure-enterprise-scale-ml/)
@@ -45,7 +63,7 @@ In most cases you do **not** need Python installed — just download, extract, a
 | **Python** | **Not required.** Python is bundled inside the `.exe`. |
 
 ### Run
-1. Download `aifactory-config-windows.zip`.
+1. Download [`aifactory-config-windows (3).zip`](windows/aifactory-config-windows%20%283%29.zip).
 2. Extract the archive (right-click → *Extract All…*).
 3. Double-click **`aifactory-config.exe`**.
 
@@ -65,7 +83,7 @@ In most cases you do **not** need Python installed — just download, extract, a
 ### Run
 ```bash
 # 1. Extract
-tar -xzf aifactory-config-macos.tar.gz
+tar -xzf macos/aifactory-config-macos.tar.gz
 
 # 2. Allow execution
 chmod +x aifactory-config
@@ -106,7 +124,7 @@ sudo pacman -S tk
 ### Run
 ```bash
 # 1. Extract
-tar -xzf aifactory-config-linux.tar.gz
+tar -xzf linux/aifactory-config-linux.tar.gz
 
 # 2. Allow execution
 chmod +x aifactory-config
