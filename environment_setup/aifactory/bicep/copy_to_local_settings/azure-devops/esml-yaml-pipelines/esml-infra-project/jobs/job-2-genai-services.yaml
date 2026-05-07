@@ -2059,6 +2059,8 @@ steps:
      --parameters DEBUG_deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
      --parameters DEBUG_deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
      --parameters DEBUG_deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
+     --parameters policyExemptionAssignmentIds='$(policyExemptionAssignmentIds)' \
+     --parameters policyExemptionDefinitionReferenceIds='$(policyExemptionDefinitionReferenceIds)' \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \

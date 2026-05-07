@@ -129,6 +129,28 @@ param inputKeyvaultResourcegroup string
 param inputKeyvaultSubscription string
 
 // ============================================================================
+// PARAMETERS - Policy Exemptions (Foundry ACA subnet safety)
+// ============================================================================
+
+@description('''Array of policy assignment IDs (deployIfNotExists or auditIfNotExists effect)
+that target VNet / subnet resources in the VNet resource group. One exemption per entry is
+created, scoped to vnetResourceGroupName, so Foundry Standard Agent can inject into
+snt-*-aca* subnets without remediation race conditions.
+
+Leave empty ([]) in greenfield or non-ALZ environments — no exemptions will be created.
+
+To discover relevant IDs before deployment run:
+  az policy assignment list \\
+    --scope /subscriptions/<dev_test_prod_sub_id>/resourceGroups/<vnetResourceGroup> \\
+    --query "[].id" -o tsv
+''')
+param policyExemptionAssignmentIds string[] = []
+
+@description('''Optional: restrict each exemption to specific policyDefinitionReferenceIds within
+an initiative. Leave empty ([]) to exempt the full assignment.''')
+param policyExemptionDefinitionReferenceIds string[] = []
+
+// ============================================================================
 // PARAMETERS - Tags
 // ============================================================================
 
@@ -782,6 +804,23 @@ module vmAdminLoginPermissions '../modules/vmAdminLoginRbac.bicep' = if (!resour
     additionalUserEmails: p011_genai_team_lead_email_array
     additionalUserIds: p011_genai_team_lead_array
     useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    projectResourceGroup
+  ]
+}
+
+// ============================================================================
+// Policy Exemptions — Foundry ACA subnets (DINE / auditIfNotExists guard)
+// Scoped to vnetResourceGroupName so all subnet resources in that RG are
+// shielded from remediation while Foundry performs network injection.
+// ============================================================================
+module foundrySubnetPolicyExemptions '../modules/policyExcemptions/policy-exempt-foundry-subnets.bicep' = if (length(policyExemptionAssignmentIds) > 0) {
+  scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
+  name: take('01-policyExemptFoundry-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    policyAssignmentIds: policyExemptionAssignmentIds
+    policyDefinitionReferenceIds: policyExemptionDefinitionReferenceIds
   }
   dependsOn: [
     projectResourceGroup

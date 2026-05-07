@@ -223,6 +223,13 @@ variables:
   disableAgentNetworkInjection: "false" # <optional>Disable agent network injection<default>false<keep-as-is> false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. <otherwise> true, disables network injection.
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.
   # NetworkInjection -> Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
+  # === Policy Exemptions (Foundry ACA subnet safety) ===
+  # Prevents deployIfNotExists/auditIfNotExists remediation tasks from mutating the ACA subnet
+  # while AI Foundry Standard Agent performs network injection — avoids 409 conflicts on capability host.
+  # To discover IDs: az policy assignment list --scope /subscriptions/<sub>/resourceGroups/<vnetRG> --query "[].id" -o tsv
+  # Leave as '[]' in greenfield or non-ALZ environments.
+  policyExemptionAssignmentIds: "[]" # <optional>JSON array of policy assignment IDs (deployIfNotExists or auditIfNotExists) to exempt on the VNet RG<default>[]<keep-as-is> <otherwise> e.g. '["/subscriptions/<sub>/providers/Microsoft.Authorization/policyAssignments/<name>"]'
+  policyExemptionDefinitionReferenceIds: "[]" # <optional>JSON array of policyDefinitionReferenceIds within an initiative to narrow the exemption<default>[]<keep-as-is> Leave empty to exempt the full assignment.
 
   # === Data & Machine Learning ===
   enableDatafactory: "false" # <optional>Deploy Azure Data Factory in project RG<default>false<keep-as-is>

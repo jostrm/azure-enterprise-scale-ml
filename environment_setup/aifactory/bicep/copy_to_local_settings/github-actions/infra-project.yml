@@ -145,6 +145,8 @@ jobs:
       foundryDeploymentType: ${{ vars.FOUNDRY_DEPLOYMENT_TYPE || '2' }}
       enableAIFactoryCreatedDefaultProjectForAIFv2: ${{ vars.ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2 || 'true' }}
       disableAgentNetworkInjection: ${{ vars.DISABLE_AGENT_NETWORK_INJECTION || 'false' }}
+      policyExemptionAssignmentIds: ${{ vars.POLICY_EXEMPTION_ASSIGNMENT_IDS || '[]' }}
+      policyExemptionDefinitionReferenceIds: ${{ vars.POLICY_EXEMPTION_DEFINITION_REFERENCE_IDS || '[]' }}
       enableDatafactory: ${{ vars.ENABLE_DATAFACTORY || 'false' }}
       enableAzureMachineLearning: ${{ vars.ENABLE_AZURE_MACHINE_LEARNING || 'false' }}
       addAzureMachineLearning: ${{ vars.ADD_AZURE_MACHINE_LEARNING || 'false' }}
@@ -1588,6 +1590,8 @@ jobs:
               --parameters DEBUG_deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters DEBUG_deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
               --parameters DEBUG_deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+              --parameters policyExemptionAssignmentIds='${{ env.policyExemptionAssignmentIds }}' \
+              --parameters policyExemptionDefinitionReferenceIds='${{ env.policyExemptionDefinitionReferenceIds }}' \
               --parameters tags='${{ env.tags }}' \
               --parameters tagsProject='${{ env.tagsProject }}' \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
