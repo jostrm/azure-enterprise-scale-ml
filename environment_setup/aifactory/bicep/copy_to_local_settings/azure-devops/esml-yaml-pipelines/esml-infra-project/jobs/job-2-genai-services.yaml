@@ -2669,7 +2669,7 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '99_check_acr_role_assignments'
+  displayName: '99_detect_existing_acr_role_assignments'
   condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -2677,8 +2677,10 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      #!/bin/bash
+     set -e
 
-     # Check if any user or group already has acrPush on the common ACR
+     # Query existing acrPush role assignments at the RESOURCE GROUP level
+     # This makes the deployment idempotent by detecting which principals already have the role
      az account set --subscription "$(dev_test_prod_sub_id)"
 
      # Input parameters
@@ -2696,29 +2698,44 @@ steps:
      commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
      echo "Common RG resolved to: ${commonResourceGroup}"
 
+     # ACR Push role ID
      acrPushRoleId="8311e382-0749-4cb8-b61a-304f252e45ec"
 
-     # Find the ACR in the common resource group (pick first if multiple)
-     acrName=$(az acr list --resource-group "$commonResourceGroup" --query "[0].name" -o tsv 2>/dev/null || true)
-
-     if [ -z "$acrName" ]; then
-       echo "No ACR found in ${commonResourceGroup}; will not skip ACR role assignments."
-       echo "##vso[task.setvariable variable=skipACRAssignments]false"
+     # Check if common RG exists
+     if ! az group show --name "$commonResourceGroup" &> /dev/null; then
+       echo "Common resource group does not exist yet. No existing assignments to check."
+       echo "##vso[task.setvariable variable=existingAcrPushUserPrincipals]"
+       echo "##vso[task.setvariable variable=existingAcrPushSPPrincipals]"
        exit 0
      fi
 
-     acrScope="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${commonResourceGroup}/providers/Microsoft.ContainerRegistry/registries/${acrName}"
-     echo "Checking existing acrPush assignments on ${acrName} at scope ${acrScope}"
+     # Query existing role assignments at the RG scope (not ACR scope)
+     rgScope="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${commonResourceGroup}"
+     echo "Querying existing acrPush role assignments at RG scope: ${rgScope}"
 
-     assignments=$(az role assignment list --scope "$acrScope" --role "$acrPushRoleId" --query "[?principalType=='User' || principalType=='Group']" -o tsv 2>/dev/null || true)
+     # Get existing User/Group principals with acrPush role
+     existingUserPrincipals=$(az role assignment list \
+       --resource-group "$commonResourceGroup" \
+       --role "$acrPushRoleId" \
+       --query "[?principalType=='User' || principalType=='Group'].principalId" \
+       -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
 
-     if [ -n "$assignments" ]; then
-       echo "Found existing user/group acrPush role assignment(s); setting skipACRAssignments=true"
-       echo "##vso[task.setvariable variable=skipACRAssignments]true"
-     else
-       echo "No user/group acrPush assignments found; setting skipACRAssignments=false"
-       echo "##vso[task.setvariable variable=skipACRAssignments]false"
-     fi
+     # Get existing ServicePrincipal principals with acrPush role
+     existingSPPrincipals=$(az role assignment list \
+       --resource-group "$commonResourceGroup" \
+       --role "$acrPushRoleId" \
+       --query "[?principalType=='ServicePrincipal'].principalId" \
+       -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
+
+     echo "Existing User/Group principals with acrPush: ${existingUserPrincipals:-none}"
+     echo "Existing ServicePrincipal principals with acrPush: ${existingSPPrincipals:-none}"
+
+     # Set pipeline variables with comma-separated principal IDs
+     echo "##vso[task.setvariable variable=existingAcrPushUserPrincipals]${existingUserPrincipals}"
+     echo "##vso[task.setvariable variable=existingAcrPushSPPrincipals]${existingSPPrincipals}"
+     
+     # Set skipACRAssignments to false since we're handling idempotency properly with filtering
+     echo "##vso[task.setvariable variable=skipACRAssignments]false"
 - task: AzureCLI@2
   displayName: '100-rbac-security'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
@@ -2813,6 +2830,70 @@ steps:
      --parameters skipExistingRoleAssignments="$(skipACRAssignments)" \
      --debug
      echo "##vso[task.setvariable variable=pre_foundry_gate_passed]true"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '101-rbac-common-rg'
+  continueOnError: true
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Compute effective RBAC flags: only true if the feature is enabled AND the resource
+     # actually exists. This prevents RBAC Bicep from failing with ResourceNotFound when
+     # a service is enabled in variables but was never deployed (e.g. debug_disable_67=true).
+     AML_RBAC="false"
+     if [ "$(enableAzureMachineLearning)" = "true" ] && [ "$(amlExists)" = "true" ]; then AML_RBAC="true"; fi
+     echo "Effective enableAzureMachineLearning for Common RG RBAC: $AML_RBAC (amlExists=$(amlExists))"
+
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-101-rbac-common-rg" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-genai-1/08b-rbac-common-rg.bicep" \
+     --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters useCommonACR="$(useCommonACR_override)" \
+     --parameters vnetNameBase="$(vnetNameBase)" \
+     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
+     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
+     --parameters network_env="$(network_env)" \
+     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
+     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
+     --parameters useAdGroups="$(use_ad_groups)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters enableAzureMachineLearning="$AML_RBAC" \
+     --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
+     --parameters addAIFoundryHub="$(addAIFoundryHub)" \
+     --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
+     --parameters addBastionHost="$(addBastionHost)" \
+     --parameters bastionResourceGroup="$(bastion_subscription_resource_group)" \
+     --parameters bastionName="$(bastion_custom_name)" \
+     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
+     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
+     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
+     --parameters commonLakeNamePrefixMax8chars="$(commonLakeNamePrefixMax8chars)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
+     --parameters amlExists="$(amlExists)" \
+     --parameters aiHubExists="$(aiHubExists)" \
+     --parameters existingAcrPushUserPrincipals="$(existingAcrPushUserPrincipals)" \
+     --parameters existingAcrPushSPPrincipals="$(existingAcrPushSPPrincipals)" \
+     --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025-1stOption'
@@ -3165,7 +3246,8 @@ steps:
 
      if [ "$deploy_rc" -ne 0 ]; then
        # Check for InvalidTemplate errors first - these are real failures that must not be ignored
-       if echo "$deploy_output" | grep -q '"code":"InvalidTemplate"'; then
+       # Match both with and without spaces after the colon: "code":"InvalidTemplate" or "code": "InvalidTemplate"
+       if echo "$deploy_output" | grep -qE '"code"\s*:\s*"InvalidTemplate"'; then
          echo "##[error]Deployment failed with InvalidTemplate error - template validation failed."
          echo "##[error]This usually means a resource reference doesn't exist or Bicep template has syntax errors."
          echo "##[error]Full error output above. Failing task."
