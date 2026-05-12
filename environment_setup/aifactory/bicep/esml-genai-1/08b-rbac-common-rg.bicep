@@ -56,8 +56,8 @@ param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''
 
 // Resource group naming
-param projectPrefix string = 'esml-'
-param projectSuffix string = '-rg'
+param projectPrefix string = ''
+param projectSuffix string = ''
 
 // Networking
 param vnetNameBase string
@@ -129,8 +129,8 @@ var skipACRRoleAssignments = skipExistingRoleAssignments
 // AI Factory - naming convention (imported from shared module)
 // ============================================================================
 module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
-  name: take('08b-naming-${targetResourceGroup}', 64)
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('08b-naming-${commonResourceGroup}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   params: {
     env: env
     projectNumber: projectNumber
