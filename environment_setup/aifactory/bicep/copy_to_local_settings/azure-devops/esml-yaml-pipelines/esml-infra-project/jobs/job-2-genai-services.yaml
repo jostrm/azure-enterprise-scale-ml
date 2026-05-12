@@ -3164,6 +3164,14 @@ steps:
      echo "$deploy_output"
 
      if [ "$deploy_rc" -ne 0 ]; then
+       # Check for InvalidTemplate errors first - these are real failures that must not be ignored
+       if echo "$deploy_output" | grep -q '"code":"InvalidTemplate"'; then
+         echo "##[error]Deployment failed with InvalidTemplate error - template validation failed."
+         echo "##[error]This usually means a resource reference doesn't exist or Bicep template has syntax errors."
+         echo "##[error]Full error output above. Failing task."
+         exit 1
+       fi
+       
        # Check if RoleAssignmentExists is the ONLY real error code
        non_wrapper=$(echo "$deploy_output" | grep -o '"code":"[^"]*"' | sort -u \
          | grep -v '"code":"DeploymentFailed"' \
@@ -3172,10 +3180,8 @@ steps:
        if [ -z "$non_wrapper" ]; then
          # RoleAssignmentExists only: the capability host auto-provisioning already created
          # the same role assignments. The desired RBAC state IS achieved.
-         # However, this means aiFoundryV2ProjectExists was incorrectly false.
          # Emit warning but do NOT fail — the deployment itself is idempotent.
          echo "##[warning]RoleAssignmentExists: Role assignment(s) already exist (created by capability host auto-provisioning). Desired RBAC state is achieved."
-         echo "##[warning]This indicates aiFoundryV2ProjectExists should have been 'true'. Check detection task."
          echo "##[warning]Overriding exit code to 0 — RBAC is correctly configured."
        else
          echo "##[error]Deployment failed with errors beyond RoleAssignmentExists:"
@@ -3657,6 +3663,43 @@ steps:
     scriptLocation: scriptPath
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/79_Purge_If_SoftDeleted_71_72_After5minutes.sh'
     arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix) $(71_deleted) $(72_deleted) $(admin_location)
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '10-aifactory-dashboards'
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_10_aifactory_dashboards'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     az account set --subscription "$(dev_test_prod_sub_id)"
+     az deployment sub create \
+     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)-10-dashboards" \
+     --subscription "$(dev_test_prod_sub_id)" \
+     --location "$(admin_location)" \
+     --template-file "esml-genai-1/10-aifactory-dashboards.bicep" \
+     --parameters env="$(dev_test_prod)" \
+     --parameters projectNumber="$(project_number_000)" \
+     --parameters location="$(admin_location)" \
+     --parameters locationSuffix="$(admin_locationSuffix)" \
+     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
+     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters randomValue="$(deployment_random_value)" \
+     --parameters projectPrefix="$(projectPrefix)" \
+     --parameters projectSuffix="$(projectSuffix)" \
+     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
+     --parameters technicalAdminsEmail="$(technical_admins_email)" \
+     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
+     --parameters commonResourceName="$(vnetResourceGroupBase)" \
+     --parameters addAIFoundry="$(addAIFoundry)" \
+     --parameters genaiSubnetId="" \
+     --parameters aksSubnetId="" \
+     --parameters acaSubnetId="" \
+     --parameters tags='$(tags)' \
+     --parameters tagsProject='$(tagsProject)'
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'

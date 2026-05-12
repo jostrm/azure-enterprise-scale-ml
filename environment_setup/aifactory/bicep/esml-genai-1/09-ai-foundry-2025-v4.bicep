@@ -1018,6 +1018,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
   }
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1064,6 +1065,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   }
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1168,6 +1170,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
   }
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1189,6 +1192,7 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
   }
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     namingConvention
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
