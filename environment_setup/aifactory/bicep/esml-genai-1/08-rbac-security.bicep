@@ -8,13 +8,16 @@ targetScope = 'subscription'
 // - AI Hub and ML platform security
 // - Storage and network access control
 // - External bastion and VNet permissions
-// - Common resource group access
+// - Common resource group access (ACR, VNet)
+// - VNet Reader access for all identities (unless skipExistingRoleAssignments=true)
 //
 // IMPORTANT NOTES FOR DEPLOYMENT:
 // 1. This template should only run AFTER resources are created
 // 2. Set resource existence flags correctly (amlExists, aiHubExists, etc.)
 // 3. If encountering RoleAssignmentExists errors, set skipExistingRoleAssignments=true
 // 4. For ResourceNotFound errors, ensure resources exist before running this template
+// 5. VNet Reader access granted by default; set skipExistingRoleAssignments=true on existing projects to avoid conflicts
+// 6. On existing projects: Set skipExistingRoleAssignments=true if role assignments already exist
 // ================================================================
 
 @description('Diagnostic setting level for monitoring and logging')
@@ -463,6 +466,7 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
   }
   dependsOn: [
     existingTargetRG
+    rbacVnetReaderCommon
     rbacReadUsersToCmnVnetBastion
   ]
 }
@@ -495,6 +499,7 @@ module rbacExternalBastion '../modules/rbacBastionExternal.bicep' = if(!empty(ba
   }
   dependsOn: [
     existingTargetRG
+    rbacVnetReaderCommon
     rbacReadUsersToCmnVnetBastion
   ]
 }
@@ -744,6 +749,23 @@ module rbacDocs '../modules/aihubRbacDoc.bicep' = if(enableAIDocIntelligence) {
 
 // ============== RBAC MODULES - NETWORK AND VNET ACCESS ==============
 
+// RBAC - VNet Reader access for all users, groups, SPs, and MIs
+// Allows reading VNet/subnet status, endpoint status, etc. regardless of bastion configuration
+// Respects skipExistingRoleAssignments flag to avoid conflicts on existing projects
+module rbacVnetReaderCommon '../modules/vnetRBACReaderOnly.bicep' = if (!skipExistingRoleAssignments) {
+  scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
+  name: take('08-rbacVnetReader${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    user_object_ids: userIdsUnique
+    vNetName: vnetNameFull
+    servicePrincipleAndMIArray: spAndMiUnique
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    existingTargetRG
+  ]
+}
+
 // RBAC - Read users to Bastion, IF Bastion is added in common resource group
 module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addBastionHost && empty(bastionSubscription)) {
   scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
@@ -757,6 +779,7 @@ module rbacReadUsersToCmnVnetBastion '../modules/vnetRBACReader.bicep' = if(addB
   }
   dependsOn: [
     existingTargetRG
+    rbacVnetReaderCommon
   ]
 }
 
@@ -773,12 +796,16 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
   }
   dependsOn: [
     existingTargetRG
+    rbacVnetReaderCommon
   ]
 }
 
 // ============== RBAC MODULES - COMMON RESOURCE GROUP ACCESS ==============
 
-// RBAC on ACR Push/Pull for users in Common Resource group
+// RBAC on Common Resource Group for ACR Push/Pull access
+// Grants users, groups, service principals, and managed identities access to:
+// - Azure Container Registry (ACR) Push/Pull roles
+// - Allows publishing and consuming container images
 // Note: If you get RoleAssignmentExists errors, set skipACRRoleAssignments=true in your parameter file
 module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR && !skipACRRoleAssignments) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
@@ -912,10 +939,13 @@ output aiHubMlRbacDeployed bool = (!aiHubExists && !empty(azureMachineLearningOb
 output optionalCognitiveRbacDeployed bool = enableAzureAIVision || enableAzureSpeech || enableAIDocIntelligence
 
 @description('Network and VNet RBAC deployment status')
-output networkRbacDeployed bool = (addBastionHost && empty(bastionSubscription)) || (addBastionHost && !empty(bastionSubscription))
+output networkRbacDeployed bool = !skipExistingRoleAssignments // True if VNet reader module runs
 
-@description('Common Resource Group RBAC deployment status')
-output commonResourceGroupRbacDeployed bool = useCommonACR
+@description('VNet Reader access granted (unless skipExistingRoleAssignments=true)')
+output vnetReaderRbacDeployed bool = !skipExistingRoleAssignments
+
+@description('Common Resource Group RBAC deployment status (includes ACR access)')
+output commonResourceGroupRbacDeployed bool = useCommonACR && !skipACRRoleAssignments
 
 @description('Data Lake RBAC deployment status')
 output dataLakeRbacDeployed bool = (!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning)
