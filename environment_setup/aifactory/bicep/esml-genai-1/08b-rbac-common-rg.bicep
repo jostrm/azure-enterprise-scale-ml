@@ -103,8 +103,12 @@ param addAzureMachineLearning bool = false
 // Resource exists flags
 param aiHubExists bool = false
 param amlExists bool = false
-@description('Skip creating role assignments that may already exist to avoid RoleAssignmentExists errors')
-param skipExistingRoleAssignments bool = false
+
+@description('Comma-separated list of principal IDs that already have acrPush role (Users/Groups)')
+param existingAcrPushUserPrincipals string = ''
+
+@description('Comma-separated list of principal IDs that already have acrPush role (ServicePrincipals/MIs)')
+param existingAcrPushSPPrincipals string = ''
 
 @description('Unique deployment identifier to avoid conflicts')
 param deploymentId string = utcNow('yyyyMMddHHmmss')
@@ -122,8 +126,9 @@ var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 
 
 var deploymentProjSpecificUniqueSuffix = '${projectName}-${env}-${randomValue}-${deploymentId}'
 
-// Allow skipping ACR role assignments if they already exist or project MI is pre-provisioned
-var skipACRRoleAssignments = skipExistingRoleAssignments
+// Parse comma-separated principal ID strings into arrays for filtering
+var existingUserPrincipalsArray = !empty(existingAcrPushUserPrincipals) ? split(existingAcrPushUserPrincipals, ',') : []
+var existingSPPrincipalsArray = !empty(existingAcrPushSPPrincipals) ? split(existingAcrPushSPPrincipals, ',') : []
 
 // ============================================================================
 // AI Factory - naming convention (imported from shared module)
@@ -195,6 +200,11 @@ var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
 // De-duplicate principals to avoid duplicate role assignments
 var userIdsUnique = union(p011_genai_team_lead_array, p011_genai_team_lead_array)
 var spAndMiUnique = union(spAndMiArray, spAndMiArray)
+
+// Filter out principals that already have acrPush role at RG level (idempotency)
+// This makes the deployment truly idempotent by skipping only specific assignments that exist
+var userIdsFiltered = filter(userIdsUnique, userId => !contains(existingUserPrincipalsArray, userId))
+var spAndMiFiltered = filter(spAndMiUnique, principalId => !contains(existingSPPrincipalsArray, principalId))
 
 // ============================================================================
 // GET STATIC UNIQUE VALUES FOR NAMING
@@ -279,13 +289,14 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
 // Grants users, groups, service principals, and managed identities access to:
 // - Azure Container Registry (ACR) Push/Pull roles
 // - Allows publishing and consuming container images
-module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR && !skipACRRoleAssignments) {
+// Uses filtered arrays to skip principals that already have the role (idempotent)
+module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('08b-rbacUsCmnACR${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
-    servicePrincipleAndMIArray: spAndMiUnique
-    userObjectIds: userIdsUnique
+    servicePrincipleAndMIArray: spAndMiFiltered
+    userObjectIds: userIdsFiltered
     useAdGroups: useAdGroups
   }
   dependsOn: [
@@ -336,8 +347,14 @@ module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExist
 @description('Common Resource Group Key Vault and Bastion RBAC deployment status')
 output commonKeyVaultBastionRbacDeployed bool = empty(bastionResourceGroup) && addBastionHost
 
-@description('Common Resource Group ACR RBAC deployment status')
-output commonAcrRbacDeployed bool = useCommonACR && !skipACRRoleAssignments
+@description('Common Resource Group ACR RBAC deployment status (with idempotent filtering)')
+output commonAcrRbacDeployed bool = useCommonACR
+
+@description('Number of filtered user principals for ACR RBAC (after removing existing assignments)')
+output acrUserPrincipalsFiltered int = length(userIdsFiltered)
+
+@description('Number of filtered SP/MI principals for ACR RBAC (after removing existing assignments)')
+output acrSPPrincipalsFiltered int = length(spAndMiFiltered)
 
 @description('Common Resource Group Data Lake RBAC deployment status')
 output commonDataLakeRbacDeployed bool = (!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning)
