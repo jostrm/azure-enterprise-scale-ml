@@ -345,7 +345,9 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
     cmkUserAssignedIdentityId: cmk ? cmkIdentityId : ''
     // Removed provisionedThroughput - using defaults from module
     enablePublicGenAIAccess: enablePublicGenAIAccess
-    ipRules: (empty(ipWhitelist_array) || !enablePublicGenAIAccess || enablePublicAccessWithPerimeter) ? [] : ipWhitelist_array
+    // IP Rules: When public access is enabled, always whitelist Azure data centers (0.0.0.0) + any user-provided IPs
+    // 0.0.0.0 allows access from Azure services (compute, functions, etc.)
+    ipRules: (!enablePublicGenAIAccess || enablePublicAccessWithPerimeter) ? [] : union(['0.0.0.0'], ipWhitelist_array)
     totalThroughputLimit: cosmosTotalThroughputLimit
     subnetNamePend: defaultSubnet
     vnetName: vnetNameFull

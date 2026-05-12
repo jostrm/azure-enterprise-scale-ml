@@ -1036,6 +1036,8 @@ module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoun
   }
   dependsOn: [
     // Ensure Foundry deployment is present before assigning RBAC
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     getAISearchInfo
     namingConvention
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
