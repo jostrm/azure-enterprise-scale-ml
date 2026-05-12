@@ -452,24 +452,7 @@ resource existingTargetRG 'Microsoft.Resources/resourceGroups@2024-07-01' existi
 
 // ============== RBAC MODULES - KEY VAULT AND BASTION ==============
 
-// Bastion in AIFactory COMMON RG, but with a custom name
-module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(empty(bastionResourceGroup) && addBastionHost) {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('08-rbac1GenAIRUsCmnKV${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    common_kv_name: namingConvention.outputs.kvNameCommon
-    user_object_ids: p011_genai_team_lead_array   
-    bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
-    useAdGroups: useAdGroups
-    servicePrincipleAndMIArray: spAndMiArray
-    vNetName: vnetNameFull
-  }
-  dependsOn: [
-    existingTargetRG
-    rbacVnetReaderCommon
-    rbacReadUsersToCmnVnetBastion
-  ]
-}
+// NOTE: Common RG Key Vault and Bastion RBAC moved to 08b-rbac-common-rg.bicep for modularity
 
 // RBAC for Project Key Vault - Service Principals only (Managed Identities already handled in 02-core-infrastructure.bicep)
 module rbacKeyvaultProject '../modules/kvRbacAssignments.bicep' = {
@@ -801,64 +784,7 @@ module rbacReadUsersToCmnVnetBastionExt '../modules/vnetRBACReader.bicep' = if(a
 }
 
 // ============== RBAC MODULES - COMMON RESOURCE GROUP ACCESS ==============
-
-// RBAC on Common Resource Group for ACR Push/Pull access
-// Grants users, groups, service principals, and managed identities access to:
-// - Azure Container Registry (ACR) Push/Pull roles
-// - Allows publishing and consuming container images
-// Note: If you get RoleAssignmentExists errors, set skipACRRoleAssignments=true in your parameter file
-module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR && !skipACRRoleAssignments) {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('08-rbacUsCmnACR${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    commonRGId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', commonResourceGroup)
-    servicePrincipleAndMIArray: spAndMiUnique
-    userObjectIds: userIdsUnique
-    useAdGroups: useAdGroups
-  }
-  dependsOn: [
-    existingTargetRG
-    rbacModuleUsers
-  ]
-}
-
-// ============== RBAC MODULES - DATA LAKE ACCESS ==============
-
-// RBAC for Data Lake - AI Foundry Integration
-module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!aiHubExists && enableAIFoundryHub) {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('08-rbacLake4Prj${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
-    aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
-    projectTeamGroupOrUser: p011_genai_team_lead_array
-    adfPrincipalId: ''
-    datalakeName: datalakeName
-    useAdGroups: useAdGroups
-  }
-  dependsOn: [
-    esmlCommonLake
-    existingTargetRG
-  ]
-}
-
-// RBAC for Data Lake - Azure ML Integration
-module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExists && enableAzureMachineLearning) {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
-  name: take('08-rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    amlPrincipalId: var_amlPrincipalId // Using computed variable for AML principal ID
-    aiHubPrincipleId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
-    projectTeamGroupOrUser: [] // Empty array to avoid duplicate permissions
-    adfPrincipalId: ''
-    datalakeName: datalakeName
-    useAdGroups: useAdGroups
-  }
-  dependsOn: [
-    esmlCommonLake
-    existingTargetRG
-  ]
-}
+// NOTE: Common RG RBAC (ACR and Data Lake) moved to 08b-rbac-common-rg.bicep for modularity
 
 // ============== RBAC MODULES - AZURE ML COMPUTE CLUSTER PERMISSIONS ==============
 
@@ -926,8 +852,8 @@ module rbacSubnetNetworkContributorHub '../modules/subnetRbacNetworkContributor.
 // Note: Outputs simplified to avoid conditional module reference issues
 // RBAC deployment status information
 
-@description('Key Vault and Bastion RBAC deployment status')
-output keystoreAndBastionRbacDeployed bool = (empty(bastionResourceGroup) && addBastionHost) || (!empty(bastionResourceGroup) && !empty(bastionSubscription))
+@description('Key Vault and Bastion RBAC deployment status (external bastion only - common RG bastion in 08b)')
+output keystoreAndBastionRbacDeployed bool = (!empty(bastionResourceGroup) && !empty(bastionSubscription))
 
 @description('AI Services RBAC deployment status')
 output aiServicesRbacDeployed bool = (enableAzureOpenAI && !openaiExists) || (!aiServicesExists && enableAIServices) || (!aiSearchExists && enableAISearch)
@@ -944,8 +870,5 @@ output networkRbacDeployed bool = !skipExistingRoleAssignments // True if VNet r
 @description('VNet Reader access granted (unless skipExistingRoleAssignments=true)')
 output vnetReaderRbacDeployed bool = !skipExistingRoleAssignments
 
-@description('Common Resource Group RBAC deployment status (includes ACR access)')
-output commonResourceGroupRbacDeployed bool = useCommonACR && !skipACRRoleAssignments
-
-@description('Data Lake RBAC deployment status')
-output dataLakeRbacDeployed bool = (!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning)
+@description('NOTE: Common RG RBAC (ACR and Data Lake) moved to separate deployment (08b-rbac-common-rg.bicep)')
+output commonRgRbacMovedToSeparateDeployment bool = true
