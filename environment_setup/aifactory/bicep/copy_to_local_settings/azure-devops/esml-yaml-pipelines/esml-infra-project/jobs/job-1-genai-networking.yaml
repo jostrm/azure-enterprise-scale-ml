@@ -285,21 +285,35 @@ steps:
       Write-Output "PowerShell Version: $($PSVersionTable.PSVersion)"
 - task: AzureCLI@2
   displayName: '01_pwsh_get_IP_for_ADO_agent'
-  condition: ne(variables['disable_whitelisting_for_built_agents'], 'true')
+  condition: ne(variables['disable_whitelisting_for_build_agents'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
-    scriptLocation: 'inlineScript'
+    scriptType: bash
+    scriptLocation: inlineScript
     inlineScript: |
-      $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
-      Write-Host $resp
-      Write-Host "##vso[task.setvariable variable=admin_ip_fw]$resp"
-      $ipAddr = $resp
-      Write-Host "ipAddr is: $(admin_ip_fw) or $ipAddr"
+      # Get primary IP with fallback to multiple services
+      PRIMARY_IP=$(curl -s http://ipinfo.io/ip 2>/dev/null || curl -s https://api.ipify.org 2>/dev/null || curl -s https://checkip.amazonaws.com 2>/dev/null || curl -s https://icanhazip.com 2>/dev/null)
+      echo "Primary IP: $PRIMARY_IP"
+      echo "##vso[task.setvariable variable=admin_ip_fw]$PRIMARY_IP"
+      
+      # Get all possible IPs that might be used
+      echo "All network interfaces:"
+      ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1
+      
+      # Try alternative IP detection services as backup
+      ALT_IP1=$(curl -s https://api.ipify.org 2>/dev/null)
+      ALT_IP2=$(curl -s https://checkip.amazonaws.com 2>/dev/null)
+      
+      echo "Alternative IP 1: $ALT_IP1"
+      echo "Alternative IP 2: $ALT_IP2"
+      
+      # Set variables for all IPs
+      echo "##vso[task.setvariable variable=admin_ip_fw_alt1]$ALT_IP1"
+      echo "##vso[task.setvariable variable=admin_ip_fw_alt2]$ALT_IP2"
 
 - task: AzureCLI@2
   displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
-  condition: ne(variables['disable_whitelisting_for_built_agents'], 'true')
+  condition: ne(variables['disable_whitelisting_for_build_agents'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -601,7 +615,7 @@ steps:
 
 - task: AzureCLI@1
   displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
-  condition: and(always(), ne(variables['disable_whitelisting_for_built_agents'], 'true'))
+  condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptLocation: 'inlineScript'
