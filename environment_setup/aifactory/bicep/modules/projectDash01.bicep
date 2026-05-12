@@ -179,19 +179,43 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-          // ── ROW 2-9: Accumulated cost analysis chart (right half) ─────────────
+          // ── ROW 2-9: Cost Analysis link (right half) ──────────────────────────
+          // Note: CostAnalysisPinnedChartPart is deprecated. Using direct link instead.
           {
             position: { x: 6, y: 2, colSpan: 6, rowSpan: 8 }
             metadata: {
-              inputs: [
-                { name: 'scope', isOptional: false, value: rgResourceId }
-                { name: 'dateRange', isOptional: true, value: 'MonthToDate' }
-                { name: 'granularity', isOptional: true, value: 'Daily' }
-                { name: 'chartType', isOptional: true, value: 'StackedColumn' }
-              ]
+              inputs: []
               #disable-next-line BCP036
-              type: 'Extension/Microsoft_Azure_CostManagement/PartType/CostAnalysisPinnedChartPart'
-              settings: {}
+              type: 'Extension/HubsExtension/PartType/MarkdownPart'
+              settings: {
+                content: {
+                  settings: {
+                    content: '''
+## 📊 Cost Analysis
+
+View detailed cost breakdown and trends for this project.
+
+**Quick Links:**
+- [Open Cost Analysis](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${rgResourceId})
+- [Cost Alerts](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${rgResourceId}/alerts)
+- [Budgets](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${rgResourceId})
+
+**Current Scope:** ${targetResourceGroupName}
+
+---
+
+### 💡 Cost Optimization Tips
+- Review [Azure Advisor](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost) recommendations
+- Set up [budget alerts](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/budgets) to monitor spending
+- Check for idle resources and right-size workloads
+'''
+                    title: ''
+                    subtitle: ''
+                    markdownSource: 1
+                    markdownUri: null
+                  }
+                }
+              }
             }
           }
 
