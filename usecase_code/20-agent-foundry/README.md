@@ -14,19 +14,87 @@ IF you have a "core team", ask your core team to enable them:
     - Windows: `python -m venv .venv && .venv\Scripts\activate`
     - macOS/Linux: `python -m venv .venv && source .venv/bin/activate`
 - Install deps: `pip install -r requirements.txt`
-- Sign in to Azure so `DefaultAzureCredential` works: `az login` (needs RBAC access to the AI Foundry account/project, AI Search, and the resource group noted in the scripts).
 
-## 1a) Set the .env variables
-- TODO: Rename [../.env.template](../.env.template) to `.env` and set the variables.
+## 1a) Authentication Setup
 
-## 1b) Run code: 
+These scripts use **`DefaultAzureCredential`** from the Azure Identity SDK, which provides a flexible authentication chain supporting multiple credential types. You can easily switch between authentication modes using the `.env` configuration.
+
+### Option A: User Authentication (Local Development with Azure CLI)
+
+**Best for:** Local development on your workstation
+
+1. **Sign in to Azure CLI:**
+   ```bash
+   az login
+   ```
+   This authenticates you as a user and caches credentials locally.
+
+2. **Configure `.env` file:**
+   ```env
+   AUTH_MODE=user
+   # AZURE_CLIENT_ID is not needed for user mode
+   ```
+
+3. **What happens:** `DefaultAzureCredential` will use your Azure CLI credentials automatically. You need RBAC access to the AI Foundry account/project, AI Search, and the resource group.
+
+### Option B: User-Assigned Managed Identity (UAMI)
+
+**Best for:** Running in Azure compute (VMs, Container Apps, Azure Functions, etc.) with a managed identity assigned
+
+1. **Ensure your compute resource has a User-Assigned Managed Identity (UAMI) assigned** with appropriate RBAC permissions on:
+   - AI Foundry account/project
+   - AI Search service
+   - Resource group
+
+2. **Get the UAMI Client ID** (from Azure Portal → Managed Identities → your MI → Properties → Client ID)
+
+3. **Configure `.env` file:**
+   ```env
+   AUTH_MODE=uami
+   AZURE_CLIENT_ID=<your-managed-identity-client-id>
+   ```
+
+4. **What happens:** `DefaultAzureCredential` will use the specified managed identity to authenticate. No `az login` required.
+
+### Switching Between Modes
+
+Simply update the `AUTH_MODE` in your `.env` file and restart your application:
+
+| Mode | `AUTH_MODE` value | `AZURE_CLIENT_ID` | Use case |
+|------|-------------------|-------------------|----------|
+| **User (Azure CLI)** | `user` | Not required | Local development |
+| **Managed Identity** | `uami` | Required | Azure compute resources |
+| **Default Chain** | (empty/omit) | Not required | Let SDK try all methods |
+
+### Troubleshooting Authentication
+
+- **"No credentials available" error:**
+  - For `user` mode: Run `az login` first
+  - For `uami` mode: Verify UAMI is assigned to your compute resource and `AZURE_CLIENT_ID` is correct
+  
+- **"Insufficient permissions" error:**
+  - Verify your user/UAMI has the necessary RBAC roles (Reader, Cognitive Services User, Search Index Data Contributor, etc.)
+
+- **Test your authentication:**
+  ```bash
+  # For user mode
+  az account show
+  
+  # For UAMI mode (from within Azure compute)
+  curl "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/&client_id=<your-client-id>" -H "Metadata: true"
+  ```
+
+## 1b) Set the .env variables
+- TODO: Rename [../.env.template](../.env.template) to `.env` and set the variables (see authentication section above for `AUTH_MODE` and `AZURE_CLIENT_ID` details).
+
+## 1c) Run code: 
 `python .\agent_02_multiagent.py`
 
 , or with a default question: 
 
 `python agent_02_multiagent.py --query "top 5 fruits by calorie"`
 
-## 1c) Agent examples: Common behaviour
+## 1d) Agent examples: Common behaviour
 - On start you are prompted to create new agents or reuse existing ones; choose reuse unless you need fresh names.
 - On exit you are prompted to keep or delete the agents (and indexes); choose cleanup to remove them.
 - Configuration: Subscription ID, Tenant ID, Foundry name, AI Search name etc, are read from the .env file
