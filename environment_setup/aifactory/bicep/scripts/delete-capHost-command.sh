@@ -23,6 +23,9 @@ FOUNDRY_PROJECT_NAME="${4:-TODO-foundry-project-name}"
 API_VERSION="${5:-2025-04-01-preview}"
 
 # --- CALCULATED ---
+# Capability host names:
+# - Project caphost: ${FOUNDRY_ACCOUNT_NAME}caphost (account name already has no hyphens + "caphost")
+# - Account caphost: ${FOUNDRY_ACCOUNT_NAME}@aml_aiagentservice (URL-encoded as %40 in API calls)
 PROJECT_CAPHOST_NAME="${FOUNDRY_ACCOUNT_NAME}caphost"
 ACCOUNT_CAPHOST_NAME="${FOUNDRY_ACCOUNT_NAME}%40aml_aiagentservice"
 BASE_URL="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.CognitiveServices/accounts/${FOUNDRY_ACCOUNT_NAME}"
@@ -34,7 +37,28 @@ echo "Account:         $FOUNDRY_ACCOUNT_NAME"
 echo "Project:         $FOUNDRY_PROJECT_NAME"
 echo "Project Caphost: $PROJECT_CAPHOST_NAME"
 echo "Account Caphost: ${FOUNDRY_ACCOUNT_NAME}@aml_aiagentservice"
+echo "API Version:     $API_VERSION"
+echo "API Version:     $API_VERSION"
 echo "====================="
+
+# --- Helper: List capability hosts for debugging ---
+list_capability_hosts() {
+  echo ""
+  echo "=== Listing Capability Hosts ==="
+  
+  echo "📋 Account-level capability hosts:"
+  account_list_url="${BASE_URL}/capabilityHosts?api-version=${API_VERSION}"
+  az rest --method GET --url "${account_list_url}" --query "value[].name" -o table 2>/dev/null || echo "  (none or error)"
+  
+  echo ""
+  echo "📋 Project-level capability hosts:"
+  project_list_url="${BASE_URL}/projects/${FOUNDRY_PROJECT_NAME}/capabilityHosts?api-version=${API_VERSION}"
+  az rest --method GET --url "${project_list_url}" --query "value[].name" -o table 2>/dev/null || echo "  (none or error)"
+  echo "================================="
+}
+
+# List caphosts before deletion (optional - comment out if causing issues)
+list_capability_hosts
 
 # --- Step 1: Delete project-level capability host ---
 # Always attempt the delete. If the Foundry project itself is already gone the REST call
@@ -96,8 +120,20 @@ STATE=$(az rest --method GET \
 echo "Account caphost state: $STATE"
 
 if [ "$STATE" = "NotFound" ]; then
-  echo "Both caphosts fully deleted."
+  echo "✅ Both capability hosts fully deleted."
 else
-  echo "Account caphost still in state: $STATE. Typically takes 2-5 min (up to 15 min)."
-  echo "Re-run the GET check or wait before deleting the Foundry account to avoid 409 conflict."
+  echo "⏳ Account caphost still in state: $STATE. Typically takes 2-5 min (up to 15 min)."
+  echo "   Re-run the GET check or wait before deleting the Foundry account to avoid 409 conflict."
 fi
+
+echo ""
+echo "=== IMPORTANT: Next Steps for Complete Cleanup ==="
+echo "1. ✅ Project capability host: deleted"
+echo "2. ✅ Account capability host: delete initiated"
+echo "3. ⏳ Wait 2-5 minutes for account caphost to fully unlink"
+echo "4. 🗑️  Delete/purge the Foundry account (if desired)"
+echo "5. ⏰ Wait ~20 minutes after account purge for complete subnet release"
+echo "6. ✅ Subnet can be safely reused after the 20-minute wait"
+echo ""
+echo "📖 Reference: https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup#account-deletion-prerequisites-and-cleanup-guidance"
+echo "=================================================="
