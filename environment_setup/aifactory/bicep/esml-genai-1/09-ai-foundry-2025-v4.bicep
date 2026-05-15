@@ -875,13 +875,17 @@ resource aiFoundryAccountAvm 'Microsoft.CognitiveServices/accounts@2025-07-01-pr
 }
 
 // Simplified: Get system-assigned managed identity principal ID based on deployment scenario
+// This variable must align with actual module deployment conditions to avoid InvalidTemplate errors
 #disable-next-line BCP318
 var aiFoundrySystemAssignedPrincipalId = foundryV22AccountOnly
   ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountPrincipalId
   : (deployAvmFoundry
       ? (aiFoundryAccountAvm!.identity!.principalId ?? '')
-      // In second deployment, use existing resource if account was created in first deployment
-      : (aiFoundryV2Exists ? (aiAccountExistingFromFirstDeployment!.identity!.principalId ?? '') : aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId))
+      // When account exists and we're not updating it, use existing resource reference
+      : (aiFoundryV2Exists && !updateAIFoundry && !cmkForFoundry
+          ? (aiAccountExistingFromFirstDeployment!.identity!.principalId ?? '')
+          // Otherwise use deployment module output (module will deploy in this case)
+          : aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId))
 
 // Project module - now always enabled when projects are allowed
 var projectModuleEnabled = enableAIFactoryCreatedDefaultProjectForAIFv2
