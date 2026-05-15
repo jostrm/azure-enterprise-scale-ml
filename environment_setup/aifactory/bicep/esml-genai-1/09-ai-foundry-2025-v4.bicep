@@ -487,6 +487,16 @@ module getAISearchInfo '../modules/get-ai-search-info.bicep' = if (needsAISearch
 
 var aiSearchPrincipalId = needsAISearch ? getAISearchInfo!.outputs.principalId : ''
 
+// Get AI Foundry principal ID when account exists and we're not updating it
+// This avoids ARM template 'reference' function errors when accessing existing resource properties directly
+module getAIFoundryInfo '../modules/get-ai-foundry-info.bicep' = if (aiFoundryV2Exists && !updateAIFoundry && !cmkForFoundry && enableAIFoundry && !foundryV22AccountOnly) {
+  name: take('09-getAIFoundry-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    aiFoundryAccountName: aifV2Name
+  }
+}
+
 // Create role assignments module to build the dynamic array
 module roleAssignmentsBuilder '../modules/csFoundry/buildRoleAssignments.bicep' = if(enableAIFoundry && !foundryV22AccountOnly && (!aiFoundryV2Exists || updateAIFoundry)) {
   name: take('09-roleBuilder-${deploymentProjSpecificUniqueSuffix}', 64)
@@ -876,14 +886,15 @@ resource aiFoundryAccountAvm 'Microsoft.CognitiveServices/accounts@2025-07-01-pr
 
 // Simplified: Get system-assigned managed identity principal ID based on deployment scenario
 // This variable must align with actual module deployment conditions to avoid InvalidTemplate errors
+// Uses helper module (getAIFoundryInfo) to avoid ARM template 'reference' function errors
 #disable-next-line BCP318
 var aiFoundrySystemAssignedPrincipalId = foundryV22AccountOnly
   ? aiFoundry2025NoAvmV22AccountOnly!.outputs.aiAccountPrincipalId
   : (deployAvmFoundry
       ? (aiFoundryAccountAvm!.identity!.principalId ?? '')
-      // When account exists and we're not updating it, use existing resource reference
+      // When account exists and we're not updating it, use helper module output
       : (aiFoundryV2Exists && !updateAIFoundry && !cmkForFoundry
-          ? (aiAccountExistingFromFirstDeployment!.identity!.principalId ?? '')
+          ? getAIFoundryInfo!.outputs.principalId
           // Otherwise use deployment module output (module will deploy in this case)
           : aiFoundry2025NoAvmV22!.outputs.aiAccountPrincipalId))
 
@@ -1029,6 +1040,7 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(aiFoundryV2Exists && !updateAIFoundry && !cmkForFoundry ? [getAIFoundryInfo] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1078,6 +1090,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(aiFoundryV2Exists && !updateAIFoundry && !cmkForFoundry ? [getAIFoundryInfo] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1183,6 +1196,7 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(aiFoundryV2Exists && !updateAIFoundry && !cmkForFoundry ? [getAIFoundryInfo] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1205,6 +1219,7 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
   dependsOn: [
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    ...(aiFoundryV2Exists && !updateAIFoundry && !cmkForFoundry ? [getAIFoundryInfo] : [])
     namingConvention
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
