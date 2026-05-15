@@ -900,7 +900,11 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
   }
   dependsOn: [
     existingTargetRG
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    // Only depend on deployment modules if they're actually deploying
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    // When account exists, depend on the existing resource
+    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
@@ -978,7 +982,11 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   dependsOn: [
     spAndMI2ArrayModule
     namingConvention
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
+    // Only depend on deployment modules if they're actually deploying
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry) ? [aiFoundry2025NoAvmV22] : [])
+    // When account exists, depend on the existing resource
+    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     projectV21
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
