@@ -735,10 +735,12 @@ var fqdn = reduce(fqdnFiltered, [], (current, next) => contains(current, next) ?
 var deployAvmFoundry = useAVMFoundry && enableAIFoundry && (!aiFoundryV2Exists || updateAIFoundry || !foundryV22AccountOnly)
 var shouldDeployFoundryPrivateEndpoints = !foundryV22AccountOnly && enableAIFoundry // ensures PE creation for full V21/V22 builds
 
-// Reference to existing AI Account created in first deployment (when foundryV22AccountOnly was true)
-// Used in second deployment to get principal ID without relying on module outputs from previous deployment
+// Reference to existing AI Account when it already exists from a previous deployment.
+// Simplified condition: only check if account exists and Foundry is enabled.
+// This ensures the resource is accessible in all scenarios where aiFoundryV2Exists=true,
+// regardless of foundryV22AccountOnly, useAVMFoundry, or updateAIFoundry flags.
 #disable-next-line BCP081
-resource aiAccountExistingFromFirstDeployment 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && aiFoundryV2Exists) {
+resource aiAccountExistingFromFirstDeployment 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = if(aiFoundryV2Exists && enableAIFoundry) {
   name: aifV2Name
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
@@ -903,8 +905,6 @@ module projectV21 '../modules/csFoundry/aiFoundry2025project.bicep' = if(project
     // Only depend on deployment modules if they're actually deploying
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry) ? [aiFoundry2025NoAvmV22] : [])
-    // When account exists, depend on the existing resource
-    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
@@ -985,8 +985,6 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
     // Only depend on deployment modules if they're actually deploying
     ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
     ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry || cmkForFoundry) ? [aiFoundry2025NoAvmV22] : [])
-    // When account exists, depend on the existing resource
-    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
     projectV21
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
@@ -1025,8 +1023,8 @@ module rbacAISearchForAIFv21 '../modules/csFoundry/rbacAISearchForAIFv2.bicep' =
     azureAIDeveloperRoleId: azureAIDeveloperRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
-    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1044,8 +1042,8 @@ module rbacAISearchOpenAIUser '../modules/csFoundry/rbacAISearchOpenAIUserOnFoun
   }
   dependsOn: [
     // Ensure Foundry deployment is present before assigning RBAC
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
-    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
     getAISearchInfo
     namingConvention
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1074,8 +1072,8 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
     storageQueueDataContributorRoleId: storageQueueDataContributorRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
-    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1179,8 +1177,8 @@ module rbacKeyVaultForAgents '../modules/csFoundry/rbacKeyVaultForAgents.bicep' 
     keyVaultSecretsOfficerRoleId: keyVaultSecretsOfficerRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
-    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
     namingConvention
     ...(projectModuleEnabled ? [projectV21] : [])
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
@@ -1201,8 +1199,8 @@ module rbacProjectKeyVaultForAIFoundry '../modules/kvRbacAIFoundryMI.bicep' = if
     keyVaultSecretsUserRoleId: keyVaultSecretsUserRoleId
   }
   dependsOn: [
-    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [aiFoundry2025NoAvmV22])
-    ...(aiFoundryV2Exists && !foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry ? [aiAccountExistingFromFirstDeployment] : [])
+    ...(deployAvmFoundry ? [aiFoundry2025Avm] : [])
+    ...(!foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && (!aiFoundryV2Exists || updateAIFoundry) ? [aiFoundry2025NoAvmV22] : [])
     namingConvention
     ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
