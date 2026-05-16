@@ -1119,7 +1119,12 @@ module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphos
 
 // This module creates the project-level capability host
 // Only executes in scenario 2b (non-APIM)
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+// CRITICAL: When disableAgentNetworkInjection=false, Azure auto-provisions account caphost (takes 15-60min).
+// Project caphost REQUIRES account caphost to exist first. Therefore:
+// - If disableAgentNetworkInjection=true: Create in same deployment (account caphost created explicitly)
+// - If disableAgentNetworkInjection=false AND aiFoundryV2Exists=false: SKIP (first deployment, wait for auto-provision)
+// - If aiFoundryV2Exists=true: Create (second deployment, account caphost already exists)
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1143,7 +1148,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   ]
 }
 
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
