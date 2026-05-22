@@ -238,6 +238,12 @@ variables:
   addAzureMachineLearning: "false" # <optional>Add new Azure ML workspace<default>false<keep-as-is>
   # === AKS for Azure ML ===
   enableAksForAzureML: "false" # <optional>Deploy AKS for Azure ML inference<default>true<keep-as-is>
+  # === Standalone AKS (without Azure ML) ===
+  enableAKS: "false" # <optional>Deploy standalone AKS cluster in project RG<default>false<keep-as-is>
+  aksSkuName: "Base" # <optional>AKS SKU name<default>Base<keep-as-is> <otherwise> "Standard" for production workloads.
+  aksSkuTier: "Standard" # <optional>AKS SKU tier<default>Standard<keep-as-is> <otherwise> "Free" or "Premium".
+  aksEnablePrivateCluster: "true" # <optional>Enable private AKS cluster<default>true<recommended> <otherwise> false for public access.
+  # === AKS Network Configuration (applies to both standalone and Azure ML AKS) ===
   aksOutboundType: "loadBalancer" # <optional>AKS outbound traffic type<default>loadBalancer<keep-as-is> <otherwise> userDefinedRouting, if you have Azure Firewall and UDR configured.
   aksPrivateDNSZone: "system" # <optional>AKS private DNS zone<default>system<keep-as-is> <otherwise> "none" or full resource ID of a private DNS zone.
   aksAzureFirewallPrivateIp: "" # <optional>AKS Azure Firewall private IP<default>""<mandatory> if aksOutboundType:'userDefinedRouting' <ensure> IP within the Azure Firewall subnet range.

@@ -84,6 +84,9 @@ param cmk bool = false
 @description('Resource ID of the Disk Encryption Set for CMK')
 param diskEncryptionSetID string = ''
 
+@description('User-assigned managed identities to assign to the AKS cluster')
+param userAssignedIdentities object = {}
+
 resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if(!aksExists) {
   name: name
   tags: tags
@@ -92,7 +95,10 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     name: skuName
     tier: skuTier
   }
-  identity: {
+  identity: !empty(userAssignedIdentities) ? {
+    type: 'SystemAssigned'
+    userAssignedIdentities: userAssignedIdentities
+  } : {
     type: 'SystemAssigned'
   }
   properties: {
@@ -125,3 +131,4 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
 }
 
 output aksId string = aksCluster.id
+output clusterIdentity string = aksExists ? '' : aksCluster!.identity.principalId

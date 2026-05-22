@@ -48,9 +48,52 @@ param webappSKU object = {
   capacity: 1
 }
 
+// ============== AKS SKUs ==============
+@description('Specifies the SKU name for the AKS cluster')
+@allowed([
+  'Base'
+  'Standard'
+])
+param aksSkuName string = 'Base'
+
+@description('Specifies the SKU tier for the AKS cluster')
+@allowed([
+  'Free'
+  'Standard'
+  'Premium'
+])
+param aksSkuTier string = 'Standard'
+param aksLoadBalancerSku string = 'standard' // 'basic' or 'standard'
+param aksEnablePrivateCluster bool = true
+param aksManagedOutboundIPs int = 1
+@description('Specifies the outbound (egress) routing method for the AKS cluster')
+@allowed([
+  'loadBalancer'
+  'userDefinedRouting'
+  'managedNATGateway'
+  'userAssignedNATGateway'
+])
+param aksOutboundType string = 'loadBalancer'
+param aksPrivateDNSZone string = 'system' // 'none', 'system' or resource ID
+
+// AKS compute configuration
+param aksServiceCidr string = '10.0.0.0/16'
+param aksDnsServiceIP string = '10.0.0.10'
+param aks_dev_sku_override string = ''
+param aks_test_prod_sku_override string = ''
+param aks_version_override string = ''
+param aks_dev_nodes_override int = -1
+param aks_test_prod_nodes_override int = -1
+
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
+
+@description('Enable Customer Managed Keys (CMK) encryption')
+param cmk bool = false
+
+@description('Name of the Customer Managed Key in Key Vault')
+param cmkKeyName string = ''
 
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
@@ -82,6 +125,7 @@ param webAppExists bool = false
 param funcAppServicePlanExists bool = false
 param webAppServicePlanExists bool = false
 param bingExists bool = false
+param aksExists bool = false
 
 param aiFoundryV2Exists bool = false
 param enableAIFoundry bool = false
@@ -99,6 +143,9 @@ param enableFunction bool = false
 
 @description('Enable Azure Web App deployment')
 param enableWebApp bool = false
+
+@description('Enable standalone AKS deployment')
+param enableAKS bool = false
 
 param enableAzureOpenAI bool = false
 param enableAISearch bool = false
@@ -383,7 +430,34 @@ var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var aksSubnetName = namingConvention.outputs.aksSubnetName
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 var aca2SubnetName = namingConvention.outputs.aca2SubnetName
+var aks2SubnetName = namingConvention.outputs.aks2SubnetName
 var defaultSubnet = namingConvention.outputs.defaultSubnet
+
+// AKS naming from naming convention
+var aksClusterName = namingConvention.outputs.aksClusterName
+var aksNodeResourceGroupName = 'aks-${targetResourceGroup}' // AKS node resource group name follows the pattern 'aks-<project-rg-name>'
+
+// AKS default compute sizes and versions
+var aksDefaultVersion = '1.33.2'
+var aks_dev_defaults = [
+  'Standard_B4ms'
+  'Standard_A4m_v2'
+  'Standard_D3_v2'
+]
+var aks_testProd_defaults = [
+  'Standard_DS13-2_v2'
+  'Standard_A8m_v2'
+]
+
+// Resolved AKS compute parameters
+var aks_dev_sku_param = !empty(aks_dev_sku_override) ? aks_dev_sku_override : aks_dev_defaults[0]
+var aks_test_prod_sku_param = !empty(aks_test_prod_sku_override) ? aks_test_prod_sku_override : aks_testProd_defaults[0]
+var aks_version_param = !empty(aks_version_override) ? aks_version_override : aksDefaultVersion
+var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
+var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
+
+// AKS subnet selection: prefer aksSubnetId, fall back to aks2SubnetId
+var aksSubnetIdResolved = !empty(aksSubnetId) ? aksSubnetId : aks2SubnetId
 
 // VNet integration subnet: prefer aksSubnetName (dedicated, at least /28), fall back to acaSubnetName when AKS is disabled
 var vnetIntegrationSubnetName = !empty(aksSubnetName) ? aksSubnetName : acaSubnetName
@@ -685,6 +759,10 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
     byoAseAppServicePlanRID: byoAseAppServicePlanResourceId
     runtimeVersion: webAppRuntimeVersion
     ipRules: ipWhitelist_array
+    // Assign UAMI to Web App
+    userAssignedIdentities: {
+      '${resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)}': {}
+    }
     appSettings: [
       {
         name: 'AZURE_OPENAI_ENDPOINT'
@@ -766,6 +844,10 @@ module function '../modules/function.bicep' = if(!functionAppExists && enableFun
     byoAseFullResourceId: aseIdNormalized
     byoAseAppServicePlanRID: byoAseAppServicePlanResourceId
     ipRules: ipWhitelist_array
+    // Assign UAMI to Function App
+    userAssignedIdentities: {
+      '${resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)}': {}
+    }
     appSettings: [
       {
         name: 'AZURE_OPENAI_ENDPOINT'
@@ -982,6 +1064,157 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (enableCo
   ]
 }
 
+// ============== AZURE KUBERNETES SERVICE (AKS) ==============
+
+// AKS CMK: Disk Encryption Set Configuration
+var aksDesKeyName = 'aks-des-key-${randomSalt}'
+var aksDesName = 'aks-des-${projectNumber}-${locationSuffix}-${env}-${randomSalt}${resourceSuffix}'
+
+module aksDesKey '../modules/keyVaultKey.bicep' = if (cmk && !empty(cmkKeyName) && !aksExists && !empty(aksSubnetIdResolved) && enableAKS) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-AKS-DES-Key-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    keyVaultName: keyvaultName
+    keyName: aksDesKeyName
+    kty: 'RSA'
+    keySize: 2048
+    keyOps: [
+      'encrypt'
+      'decrypt'
+      'wrapKey'
+      'unwrapKey'
+    ]
+  }
+}
+
+module aksDiskEncryptionSet '../modules/diskEncryptionSet.bicep' = if (cmk && !empty(cmkKeyName) && !aksExists && !empty(aksSubnetIdResolved) && enableAKS) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-AKS-DES-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    desName: aksDesName
+    location: location
+    keyVaultId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.KeyVault/vaults', keyvaultName)
+    keyUrl: aksDesKey!.outputs.keyUriWithVersion
+    tags: tagsProject
+  }
+  dependsOn: [
+    aksDesKey
+  ]
+}
+
+module aksDesKvRbac '../modules/kvRbacSingleAssignment.bicep' = if (cmk && !empty(cmkKeyName) && !aksExists && !empty(aksSubnetIdResolved) && enableAKS) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-AKS-DES-RBAC-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    keyVaultName: keyvaultName
+    principalId: aksDiskEncryptionSet!.outputs.desPrincipalId
+    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
+    principalType: 'ServicePrincipal'
+    assignmentName: 'aks-des-kv-${randomSalt}'
+    roleDescription: 'Allows Disk Encryption Set to access Key Vault for AKS disk encryption'
+  }
+  dependsOn: [
+    aksDiskEncryptionSet
+  ]
+}
+
+module aksDev '../modules/aksCluster.bicep' = if(env == 'dev' && !aksExists && !empty(aksSubnetIdResolved) && enableAKS) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-AKS-Dev-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    name: aksClusterName
+    tags: tagsProject
+    location: location
+    skuName: aksSkuName
+    skuTier: aksSkuTier
+    aksExists: aksExists
+    kubernetesVersion: aks_version_param
+    dnsPrefix: '${aksClusterName}-dns'
+    enableRbac: true
+    nodeResourceGroup: aksNodeResourceGroupName
+    aksDnsServiceIP: aksDnsServiceIP
+    aksServiceCidr: aksServiceCidr
+    outboundType: aksOutboundType
+    privateDNSZone: aksPrivateDNSZone
+    cmk: cmk
+    diskEncryptionSetID: cmk && !empty(cmkKeyName) ? aksDiskEncryptionSet!.outputs.desId : ''
+    // Assign UAMI to AKS cluster
+    userAssignedIdentities: {
+      '${resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)}': {}
+    }
+    agentPoolProfiles: [
+      {
+        name: toLower('agentpool')
+        count: aks_dev_nodes_param
+        vmSize: aks_dev_sku_param
+        osType: 'Linux'
+        osSKU: 'Ubuntu'
+        mode: 'System'
+        vnetSubnetID: aksSubnetIdResolved
+        type: 'VirtualMachineScaleSets'
+        maxPods: 30
+        orchestratorVersion: aks_version_param
+        osDiskSizeGB: 128
+      }
+    ]
+    enablePrivateCluster: aksEnablePrivateCluster
+    managedOutboundIPs: aksManagedOutboundIPs
+    loadBalancerSku: aksLoadBalancerSku
+  }
+  dependsOn: [
+    existingTargetRG
+    ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])
+  ]
+}
+
+module aksTestProd '../modules/aksCluster.bicep' = if((env == 'test' || env == 'prod') && !aksExists && !empty(aksSubnetIdResolved) && enableAKS) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('05-AKS-TestProd-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    name: aksClusterName
+    tags: tagsProject
+    location: location
+    skuName: aksSkuName
+    skuTier: aksSkuTier
+    aksExists: aksExists
+    kubernetesVersion: aks_version_param
+    dnsPrefix: '${aksClusterName}-dns'
+    enableRbac: true
+    nodeResourceGroup: aksNodeResourceGroupName
+    aksDnsServiceIP: aksDnsServiceIP
+    aksServiceCidr: aksServiceCidr
+    outboundType: aksOutboundType
+    privateDNSZone: aksPrivateDNSZone
+    cmk: cmk
+    diskEncryptionSetID: cmk && !empty(cmkKeyName) ? aksDiskEncryptionSet!.outputs.desId : ''
+    // Assign UAMI to AKS cluster
+    userAssignedIdentities: {
+      '${resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)}': {}
+    }
+    agentPoolProfiles: [
+      {
+        name: 'agentpool'
+        count: aks_test_prod_nodes_param
+        vmSize: aks_test_prod_sku_param
+        osType: 'Linux'
+        osSKU: 'Ubuntu'
+        mode: 'System'
+        vnetSubnetID: aksSubnetIdResolved
+        type: 'VirtualMachineScaleSets'
+        maxPods: 30
+        orchestratorVersion: aks_version_param
+      }
+    ]
+    enablePrivateCluster: aksEnablePrivateCluster
+    managedOutboundIPs: aksManagedOutboundIPs
+    loadBalancerSku: aksLoadBalancerSku
+  }
+  dependsOn: [
+    existingTargetRG
+    ...(cmk && !empty(cmkKeyName) ? [aksDesKvRbac] : [])
+  ]
+}
+
 // ============== DIAGNOSTIC SETTINGS ==============
 
 // Application Insights Diagnostic Settings
@@ -1078,3 +1311,9 @@ output acrRbacVerified bool = enableContainerApps
 
 @description('ACR RBAC verification timestamp')
 output acrRbacVerificationCompleted string = enableContainerApps ? 'RBAC verification included in deployment' : 'RBAC verification not required'
+
+@description('AKS deployment status')
+output aksDeployed bool = (!aksExists && enableAKS)
+
+@description('AKS cluster name')
+output aksClusterNameOutput string = enableAKS ? aksClusterName : ''
