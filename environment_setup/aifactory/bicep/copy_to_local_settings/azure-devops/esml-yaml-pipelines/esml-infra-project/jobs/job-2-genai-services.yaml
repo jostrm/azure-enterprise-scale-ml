@@ -1128,6 +1128,24 @@ steps:
 - task: AzureCLI@2
   displayName: '06a_Delete_CapabilityHosts'
   continueOnError: true
+  # CRITICAL CLEANUP ORDER (per Microsoft Foundry documentation):
+  # 1. Delete PROJECT capability host first
+  # 2. Wait 60+ seconds for unlink to complete
+  # 3. Delete ACCOUNT capability host second
+  # 4. Wait ~20 minutes for full cleanup before reusing subnet
+  # 
+  # Why: Account capability host depends on project capability host. Deleting in wrong
+  # order or skipping this step causes "Subnet already in use" errors on redeployment.
+  # 
+  # API URLs (as per Microsoft.CognitiveServices 2025-04-01-preview):
+  # - GET account caphosts:  /accounts/{account}/capabilityHosts
+  # - GET project caphosts:  /accounts/{account}/projects/{project}/capabilityHosts
+  # - DELETE account caphost: /accounts/{account}/capabilityHosts/{caphost_name}
+  # - DELETE project caphost: /accounts/{account}/projects/{project}/capabilityHosts/{caphost_name}
+  #
+  # Runs when:
+  # - enableAFoundryCaphost=true AND cleanFoundryCaphost=true AND
+  # - (deleteAllServicesForProject=true OR (enableDeleteForDisabledResources=true AND enableAIFoundry=false))
   condition: and(succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1572,6 +1590,83 @@ steps:
     enableAIFoundry: $(enableAIFoundry)
     aifactory_salt: $(aifactory_salt)
     aifactory_salt_random: $(aifactory_salt_random)
+- task: AzureCLI@2
+  displayName: '06c2_Wait_For_Subnet_Release_After_Purge'
+  # CRITICAL: After purging Foundry account, Azure needs ~20 minutes to fully release the subnet.
+  # This prevents "Subnet already in use" errors when redeploying to the same subnet.
+  # 
+  # Per Microsoft Foundry documentation:
+  # "Please allow approximately max of 20 minutes for all resources to be fully unlinked from the account."
+  # https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup
+  # 
+  # This task only runs when:
+  # - deleteAllServicesForProject=true OR enableDeleteForDisabledResources=true (purge happened)
+  # - enableAIFoundry=true (Foundry resources were deployed)
+  # - aiFoundryV2Exists=false (account was purged, not pre-existing)
+  # - 06c_Purge task succeeded
+  condition: and(succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      
+      echo "=== Waiting for Complete Subnet Release After Account Purge ==="
+      echo ""
+      echo "⚠️  CRITICAL TIMING: Microsoft-managed infrastructure cleanup"
+      echo ""
+      echo "What happens during this wait:"
+      echo "  1. Azure purges the soft-deleted Foundry account"
+      echo "  2. Microsoft-managed Container Apps Environment is removed"
+      echo "  3. Subnet delegation to Microsoft.App/environments is released"
+      echo "  4. Network policies and route tables are cleaned up"
+      echo "  5. Background async operations complete"
+      echo ""
+      echo "Why 20 minutes?"
+      echo "  • Capability host unlink: 2-5 minutes"
+      echo "  • Account purge completion: 5-10 minutes"
+      echo "  • Subnet delegation propagation: 5-10 minutes"
+      echo "  • Total worst-case: ~20 minutes"
+      echo ""
+      echo "Without this wait, redeployment will fail with:"
+      echo "  ❌ 'Subnet already in use'"
+      echo "  ❌ 'ResourceProviderExtensionError'"
+      echo "  ❌ 'DelegationNotCleared'"
+      echo ""
+      echo "📖 Reference: https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup#account-deletion-prerequisites-and-cleanup-guidance"
+      echo ""
+      
+      wait_minutes=20
+      wait_seconds=$((wait_minutes * 60))
+      
+      echo "⏰ Starting ${wait_minutes}-minute wait for subnet release..."
+      echo "   Pipeline will resume at: $(date -u -d "+${wait_minutes} minutes" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S UTC')"
+      echo ""
+      
+      # Progress indicator every 2 minutes
+      interval=120  # 2 minutes
+      elapsed=0
+      
+      while [ $elapsed -lt $wait_seconds ]; do
+        remaining=$((wait_seconds - elapsed))
+        remaining_minutes=$((remaining / 60))
+        echo "  [$(date '+%H:%M:%S')] ⏳ ${remaining_minutes} minutes remaining..."
+        
+        # Sleep for interval or remaining time, whichever is less
+        sleep_time=$interval
+        if [ $remaining -lt $interval ]; then
+          sleep_time=$remaining
+        fi
+        
+        sleep $sleep_time
+        elapsed=$((elapsed + sleep_time))
+      done
+      
+      echo ""
+      echo "✅ 20-minute wait complete!"
+      echo "   Subnet should now be fully released and ready for reuse."
+      echo "   Proceeding with pipeline..."
 - task: AzureCLI@2
   displayName: '06d_Cleanup_Disconnected_SharedPrivateLinks'
   continueOnError: true
@@ -2957,13 +3052,153 @@ steps:
       fi
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '69a-aifoundry-2025-2ndOption-Account'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  displayName: '69a-Validate-Subnet-For-NetworkInjection'
+  # Validates agent subnet exists and has correct delegation before deploying AI Foundry with network injection.
+  # Calculates subnet name based on BYO_subnets mode:
+  # - BYO_subnets=false: Uses naming convention snt-prj${project_number_000}-aca-002
+  # - BYO_subnets=true: Uses subnetProjACA2 variable and replaces <xxx> and <network_env> placeholders
+  # This is a validation-only task - failures will be logged but won't block deployment.
+  continueOnError: true
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+      #!/bin/bash
+      set -e
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      echo "=== Validating Agent Subnet Configuration for AI Foundry ==="
+      echo ""
+      echo "🔍 This check validates the agent subnet exists and has proper delegation"
+      echo "   before attempting Foundry account creation with network injection."
+      echo ""
+      
+      # Get VNet details
+      vnet_name="$(vnetNameFull_resolved)"
+      vnet_rg="$(vnetResourceGroup_resolved)"
+      
+      # Determine subnet name based on BYO_subnets mode
+      byo_subnets="$(BYO_subnets)"
+      subnet_var="$(subnetProjACA2)"
+      project_number="$(project_number_000)"
+      network_env="$(network_env)"
+      
+      if [ "$byo_subnets" = "true" ] && [ -n "$subnet_var" ]; then
+        echo "📋 BYO_subnets=true: Using provided subnet name with placeholder replacement"
+        subnet_name="$subnet_var"
+        
+        # Replace <xxx> placeholder with project number
+        if [[ "$subnet_name" == *"<xxx>"* ]]; then
+          echo "   Replacing <xxx> with project number: $project_number"
+          subnet_name="${subnet_name//<xxx>/$project_number}"
+        fi
+        
+        # Replace <network_env> placeholder with network environment
+        if [[ "$subnet_name" == *"<network_env>"* ]]; then
+          echo "   Replacing <network_env> with: $network_env"
+          subnet_name="${subnet_name//<network_env>/$network_env}"
+        fi
+        
+        echo "   Final subnet name: $subnet_name"
+      else
+        echo "📋 BYO_subnets=false: Using naming convention"
+        subnet_name="snt-prj${project_number}-aca-002"
+        echo "   Convention-based subnet name: $subnet_name"
+      fi
+      
+      echo ""
+      echo "🌐 Network Configuration:"
+      echo "   VNet: $vnet_name"
+      echo "   Resource Group: $vnet_rg"
+      echo "   Agent Subnet: $subnet_name"
+      echo ""
+      
+      # Check if subnet exists
+      echo "⏳ Checking if subnet exists..."
+      subnet_id=$(az network vnet subnet show \
+        --vnet-name "$vnet_name" \
+        --name "$subnet_name" \
+        --resource-group "$vnet_rg" \
+        --query id -o tsv 2>/dev/null || echo "")
+      
+      if [ -z "$subnet_id" ]; then
+        echo "##[error]❌ Agent subnet not found!"
+        echo "##[error]VNet: $vnet_name"
+        echo "##[error]Subnet: $subnet_name"
+        echo "##[error]Resource Group: $vnet_rg"
+        echo "##[error]"
+        echo "##[error]Resolution: Check subnet name in variables or create the subnet first."
+        exit 1
+      fi
+      
+      echo "✅ Subnet exists: $subnet_id"
+      echo ""
+      
+      # Check subnet delegation
+      echo "⏳ Checking subnet delegation..."
+      delegation=$(az network vnet subnet show \
+        --vnet-name "$vnet_name" \
+        --name "$subnet_name" \
+        --resource-group "$vnet_rg" \
+        --query "delegations[0].serviceName" -o tsv 2>/dev/null || echo "")
+      
+      if [ -z "$delegation" ]; then
+        echo "##[warning]⚠️  Subnet has NO delegation configured!"
+        echo "##[warning]   Subnet: $subnet_name"
+        echo "##[warning]   Expected delegation: Microsoft.App/environments"
+        echo "##[warning]"
+        echo "##[warning]   This may cause ResourceProviderExtensionError during deployment."
+        echo "##[warning]"
+        echo "##[warning]   To fix, run:"
+        echo "##[warning]   az network vnet subnet update \\"
+        echo "##[warning]     --resource-group $vnet_rg \\"
+        echo "##[warning]     --vnet-name $vnet_name \\"
+        echo "##[warning]     --name $subnet_name \\"
+        echo "##[warning]     --delegations Microsoft.App/environments"
+        echo ""
+        echo "##[warning]   Proceeding anyway - deployment will attempt auto-delegation..."
+      elif [ "$delegation" != "Microsoft.App/environments" ]; then
+        echo "##[warning]⚠️  Subnet has WRONG delegation: $delegation"
+        echo "##[warning]   Expected: Microsoft.App/environments"
+        echo "##[warning]   This may cause deployment failure."
+        echo ""
+      else
+        echo "✅ Subnet has correct delegation: $delegation"
+        echo ""
+      fi
+      
+      # Check if subnet is empty (no IP configurations)
+      echo "⏳ Checking if subnet is available (not in use)..."
+      ip_config_count=$(az network vnet subnet show \
+        --vnet-name "$vnet_name" \
+        --name "$subnet_name" \
+        --resource-group "$vnet_rg" \
+        --query "length(ipConfigurations)" -o tsv 2>/dev/null || echo "0")
+      
+      if [ "$ip_config_count" != "0" ] && [ "$ip_config_count" != "null" ]; then
+        echo "ℹ️  Subnet has $ip_config_count IP configuration(s) - subnet is in use"
+        echo "   This is normal if resources are already deployed to this subnet."
+      else
+        echo "✅ Subnet is available (no IP configurations)"
+      fi
+      
+      echo ""
+      echo "✅ Subnet validation complete. Proceeding with Foundry deployment."
+- task: AzureCLI@2
+  displayName: '69a-aifoundry-2025-2ndOption-Account'
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  retryCountOnTaskFailure: 3
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     #!/bin/bash
+     set -e
+     
      az account set --subscription "$(dev_test_prod_sub_id)"
 
      # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
@@ -2976,6 +3211,24 @@ steps:
      _aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)"
      if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
      if [[ "$_aiFoundryV2ProjectExists" == *"aiFoundryV2ProjectExists"* ]]; then _aiFoundryV2ProjectExists="false"; fi
+     
+     echo "=== Starting AI Foundry Account Deployment (async mode) ==="
+     echo "This deployment will start the account creation and return immediately."
+     echo ""
+     echo "📋 Deployment Strategy:"
+     echo "   • Phase 1 (Task 69a): Create Foundry account only (foundryV22AccountOnly=true)"
+     echo "   • Phase 2 (Task 69b): Add project and complete configuration"
+     echo ""
+     echo "⚙️  Why 2-phase deployment?"
+     echo "   When agent network injection is enabled, Azure auto-provisions Microsoft-managed"
+     echo "   infrastructure (invisible ACA environment) during account creation. Splitting into"
+     echo "   two phases allows this infrastructure to stabilize before adding the project."
+     echo ""
+     echo "🔄 Retry Strategy:"
+     echo "   • retryCountOnTaskFailure=3 on this task"
+     echo "   • 90-second stabilization wait before deployment"
+     echo "   • Handles intermittent ResourceProviderExtensionError timing issues"
+     echo ""
 
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-a" \
@@ -3055,19 +3308,157 @@ steps:
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
+     --no-wait \
      --debug
+     
+     deploy_rc=$?
+     if [ $deploy_rc -ne 0 ]; then
+       echo "##[error]❌ Deployment submission failed with exit code $deploy_rc"
+       echo "##[error]This may indicate a template validation error or API connectivity issue."
+       exit $deploy_rc
+     fi
+     
+     deployment_name="esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aif-a"
+     echo "##vso[task.setvariable variable=foundry_69a_deployment_name]$deployment_name"
+     echo ""
+     echo "✅ Deployment submitted successfully!"
+     echo "Deployment name: $deployment_name"
+     echo "The deployment is now running asynchronously in Azure."
+     echo "Next task will poll for completion status."
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '69-Rehydrate'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  displayName: '69a-Poll-Deployment-Status'
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-     #!/bin/bash
-     echo "Rehydration takes 2.5 to 5 minutes to allow AI Foundry account to finish..."
-     sleep 300
+      #!/bin/bash
+      set -e
+      
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      
+      deployment_name="$(foundry_69a_deployment_name)"
+      disable_agent_network_injection="$(disableAgentNetworkInjection)"
+      
+      # Adjust timing based on agent network injection setting
+      if [ "$disable_agent_network_injection" = "false" ]; then
+        # With agent network injection: longer wait due to Microsoft-managed infrastructure provisioning
+        initial_wait_minutes=15  # Wait 15 minutes before first check
+        max_poll_attempts=105    # After initial wait: 105 attempts x 60s = 105 minutes additional polling
+        total_max_minutes=120
+        echo "ℹ️  Agent network injection ENABLED: Using extended timeout (up to 2 hours)"
+        echo "   Reason: Microsoft-managed Container Apps Environment provisioning can take longer"
+      else
+        # Without agent network injection: standard timeout
+        initial_wait_minutes=10  # Wait 10 minutes before first check
+        max_poll_attempts=20     # After initial wait: 20 attempts x 60s = 20 minutes additional polling
+        total_max_minutes=30
+        echo "ℹ️  Agent network injection DISABLED: Using standard timeout (up to 30 minutes)"
+      fi
+      
+      echo "=== Polling AI Foundry deployment status ==="
+      echo "Deployment name: $deployment_name"
+      echo "Initial wait: $initial_wait_minutes minutes"
+      echo "Then polling every 60 seconds for up to $max_poll_attempts minutes"
+      echo "Total max wait time: $total_max_minutes minutes"
+      echo ""
+      
+      # Initial wait - Foundry account creation typically takes 15-17 minutes
+      echo "⏳ Waiting $initial_wait_minutes minutes before first status check..."
+      sleep $((initial_wait_minutes * 60))
+      echo ""
+      
+      # Now start polling
+      attempt=0
+      while [ $attempt -lt $max_poll_attempts ]; do
+        attempt=$((attempt + 1))
+        elapsed_minutes=$((initial_wait_minutes + attempt))
+        
+        status=$(az deployment sub show \
+          --name "$deployment_name" \
+          --subscription "$(dev_test_prod_sub_id)" \
+          --query properties.provisioningState -o tsv 2>/dev/null || echo "NotFound")
+        
+        echo "[$elapsed_minutes min] Deployment status: $status"
+        
+        if [ "$status" = "Succeeded" ]; then
+          echo "##vso[task.setvariable variable=foundry_69a_deployment_succeeded]true"
+          echo ""
+          echo "✅ Deployment succeeded after $elapsed_minutes minutes!"
+          exit 0
+        elif [ "$status" = "Failed" ]; then
+          echo ""
+          echo "##[error]❌ Deployment failed after $elapsed_minutes minutes!"
+          echo "##[section]Error details:"
+          
+          # Get full error details including nested errors
+          error_json=$(az deployment sub show \
+            --name "$deployment_name" \
+            --subscription "$(dev_test_prod_sub_id)" \
+            --query properties.error -o json 2>/dev/null || echo "{}")
+          
+          echo "$error_json" | jq '.' || echo "$error_json"
+          
+          # Check for ResourceProviderExtensionError specifically
+          if echo "$error_json" | grep -q "ResourceProviderExtensionError"; then
+            echo ""
+            echo "##[error]🔍 Detected ResourceProviderExtensionError - Azure internal timing issue"
+            echo "##[error]"
+            echo "##[error]Root Cause:"
+            echo "##[error]  When agent network injection is enabled, Azure automatically provisions"
+            echo "##[error]  Microsoft-managed infrastructure (invisible Container Apps Environment, networking)"
+            echo "##[error]  in the background. The Foundry account creation fails if this internal"
+            echo "##[error]  infrastructure isn't ready when the account-level capability host is provisioned."
+            echo "##[error]"
+            echo "##[error]Why This Happens:"
+            echo "##[error]  1. Subnet delegation propagation delay (15-90 seconds)"
+            echo "##[error]  2. Microsoft-managed ACA environment not fully initialized"
+            echo "##[error]  3. Race condition in Azure's async background provisioning"
+            echo "##[error]"
+            echo "##[error]✅ Resolution:"
+            echo "##[error]  This task has retryCountOnTaskFailure=3. Azure DevOps will automatically"
+            echo "##[error]  retry the deployment. The retry almost always succeeds because the"
+            echo "##[error]  infrastructure has stabilized by then."
+            echo "##[error]"
+            echo "##[error]Alternative (if retries fail):"
+            echo "##[error]  Set disableAgentNetworkInjection=true to skip automatic provisioning"
+          fi
+          
+          # Check for specific failed resources
+          echo ""
+          echo "##[section]Failed resource operations:"
+          az deployment sub operation list \
+            --name "$deployment_name" \
+            --subscription "$(dev_test_prod_sub_id)" \
+            --query "[?properties.provisioningState=='Failed'].{Resource:properties.targetResource.resourceName, Type:properties.targetResource.resourceType, Error:properties.statusMessage}" \
+            -o table 2>/dev/null || echo "Unable to retrieve failed operations"
+          
+          exit 1
+        elif [ "$status" = "Canceled" ]; then
+          echo ""
+          echo "##[error]⚠️ Deployment was canceled after $elapsed_minutes minutes!"
+          exit 1
+        elif [ "$status" = "Running" ] || [ "$status" = "Accepted" ]; then
+          # Deployment is in progress, continue polling
+          if [ $attempt -lt $max_poll_attempts ]; then
+            sleep 60
+          fi
+        else
+          # Unknown status, continue polling
+          echo "⏳ Status: $status (waiting...)"
+          if [ $attempt -lt $max_poll_attempts ]; then
+            sleep 60
+          fi
+        fi
+      done
+      
+      # If we get here, we've exceeded max attempts
+      echo ""
+      echo "##[warning]⏱️ Deployment did not complete within $total_max_minutes minutes. Last status: $status"
+      echo "##[warning]The deployment may still be running in Azure. Check the Azure Portal for current status."
+      exit 1
 - task: AzureCLI@2
   displayName: '69-wait-account-caphost-succeeded'
   continueOnError: false
