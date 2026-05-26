@@ -206,13 +206,7 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
     --query "[?starts_with(name, '${safeNameAISearch}')].name" \
     -o tsv | head -n1)
   
-  if [ -n "$aisearch_name" ]; then
-    echo "Found AI Search service: $aisearch_name"
-    
-    # STEP 1: Delete AI Search shared private endpoints (special for AI Search)
-    echo "Deleting AI Search shared private endpoints..."
-    
-    # Pattern 1: {aisearch_name}-shared-pe-0, {aisearch_name}-shared-pe-1
+  if [Get all shared private link resources
     shared_pe_list=$(az search shared-private-link-resource list \
       --resource-group "$projectResourceGroup" \
       --service-name "$aisearch_name" \
@@ -224,45 +218,60 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
       while IFS= read -r shared_pe_name; do
         if [ -n "$shared_pe_name" ]; then
           echo "    - $shared_pe_name"
-          echo "    Deleting shared private endpoint: $shared_pe_name"
+          echo "    Deleting shared private endpoint: $shared_pe_name (async, no-wait)"
+          # Use --no-wait to avoid blocking on locked resources
           az search shared-private-link-resource delete \
             --resource-group "$projectResourceGroup" \
             --service-name "$aisearch_name" \
             --name "$shared_pe_name" \
-            --yes 2>&1 || echo "    Warning: Failed to delete $shared_pe_name"
-          
-          # Wait a bit for deletion to propagate
-          sleep 5
+            --yes \
+            --no-wait 2>&1 || echo "    Warning: Failed to initiate deletion of $shared_pe_name"
         fi
       done <<< "$shared_pe_list"
       
       # Wait for shared private endpoints to be fully deleted
-      echo "  Waiting for shared private endpoints deletion to complete..."
-      sleep 10
+      echo "  Waiting 30 seconds for shared private endpoints deletion to complete..."
+      sleep 30
+      
+      # Verify deletion
+      echo "  Verifying shared private endpoints deletion..."
+      remaining_spl=$(az search shared-private-link-resource list \
+        --resource-group "$projectResourceGroup" \
+        --service-name "$aisearch_name" \
+        --query "[].name" \
+        -o tsv 2>/dev/null || echo "")
+      
+      if [ -z "$remaining_spl" ]; then
+        echo "  ✓ All shared private endpoints deleted successfully"
+      else
+        echo "  ⚠️  Some shared private endpoints still exist, waiting additional 30 seconds..."
+        sleep 30
+        
+        # Final check and force delete any remaining via REST API
+        remaining_spl=$(az search shared-private-link-resource list \
+          --resource-group "$projectResourceGroup" \
+          --service-name "$aisearch_name" \
+          --query "[].name" \
+          -o tsv 2>/dev/null || echo "")
+        
+        if [ -n "$remaining_spl" ]; then
+          echo "  Force deleting remaining shared private endpoints via REST API..."
+          subscriptionId=$(az account show --query id -o tsv)
+          while IFS= read -r remaining_pe; do
+            if [ -n "$remaining_pe" ]; then
+              echo "    Force deleting: $remaining_pe"
+              rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources/${remaining_pe}?api-version=2025-02-01-preview"
+              az rest --method DELETE --url "$rest_url" --headers "Content-Type=application/json" 2>&1 || echo "    Warning: Force delete failed for $remaining_pe"
+            fi
+          done <<< "$remaining_spl"
+          
+          echo "  Waiting additional 20 seconds after force deletion..."
+          sleep 20
+        fi
+      fi
     else
-      echo "  No shared private endpoints found via Azure CLI"
-    fi
-    
-    # Also try to find and delete using naming patterns (fallback method)
-    echo "  Checking for shared private endpoints using naming patterns..."
-    
-    # Delete pattern: {aisearch_name}-shared-pe-* via REST API
-    subscriptionId=${subscriptionId:-$(az account show --query id -o tsv)}
-    for i in 0 1 2 3; do
-      shared_pe_pattern="${aisearch_name}-shared-pe-${i}"
-      echo "    Checking for: $shared_pe_pattern"
-      rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources/${shared_pe_pattern}?api-version=2025-02-01-preview"
-      az rest --method DELETE --url "$rest_url" --headers "Content-Type=application/json" -o none 2>/dev/null && echo "    ✓ Deleted $shared_pe_pattern" || true
-    done
-    
-    # Delete common foundry-related shared endpoints via REST API
-    # (az search shared-private-link-resource delete fails with Bad Request for disconnected SPLs)
-    foundry_shared_endpoints=(
-      "shared-pe-foundry-openai"
-      "shared-pe-foundry-cogsvc"
-      "shared-pe-foundry-account"
-    )
-    subscriptionId=$(az account show --query id -o tsv)
+      echo "  No shared private endpoints found"
+    ficriptionId=$(az account show --query id -o tsv)
     
     for shared_pe_name in "${foundry_shared_endpoints[@]}"; do
       echo "    Checking for: $shared_pe_name"

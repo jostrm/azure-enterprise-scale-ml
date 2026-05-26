@@ -785,8 +785,12 @@ steps:
       suffixAcr="${prjResourceSuffixNoDash}"
       suffixKeyvault="${twoNumbers}"
 
+      # AI Hub - support both old (aif-hub-) and new (ai-hub-prj) naming
       aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+      aiHubNameAlt="ai-hub-prj${projectNumber}"
+      # AI Project - support both old (aif-p-) and new (ai-prj) naming
       aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+      aifProjectNameAlt="ai-prj${projectNumber}"
       aiFoundryV2Name="aif2"
       aiFoundryV2ProjectName="aif2-p${projectNumber}"
 
@@ -818,6 +822,7 @@ steps:
       postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}"
       sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
       sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}"
+      elasticName="elastic-${projectName}-${locationSuffix}-${envName}"
       acrProjectName="acr${projectName}genai${locationSuffix}"
       vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
       logicAppsName="adf-${projectNumber}-${locationSuffix}-${envName}"
@@ -825,9 +830,24 @@ steps:
       databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
       contentSafetyName="cs-${projectName}-${locationSuffix}-${envName}"
 
-      # Check resources (fuzzy for those with randomSalt,unique, exact for others)
-      echo "##vso[task.setvariable variable=aiHubExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=aifProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
+      # AI Hub: check both naming patterns
+      aiHubCheck1=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")
+      aiHubCheck2=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aiHubNameAlt" "$suffixStandard")
+      if [ "$aiHubCheck1" = "true" ] || [ "$aiHubCheck2" = "true" ]; then
+        echo "##vso[task.setvariable variable=aiHubExists]true"
+      else
+        echo "##vso[task.setvariable variable=aiHubExists]false"
+      fi
+      
+      # AI Project: check both naming patterns
+      aifProjectCheck1=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")
+      aifProjectCheck2=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifProjectNameAlt" "$suffixStandard")
+      if [ "$aifProjectCheck1" = "true" ] || [ "$aifProjectCheck2" = "true" ]; then
+        echo "##vso[task.setvariable variable=aifProjectExists]true"
+      else
+        echo "##vso[task.setvariable variable=aifProjectExists]false"
+      fi
+      
       echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$noSuffix")"
       # aiFoundryV2ProjectExists: child resources (CognitiveServices/accounts/projects) are NOT returned
       # by az resource list. Find the account first, then use az rest to list projects.
@@ -869,7 +889,7 @@ steps:
       echo "##vso[task.setvariable variable=dashboardInsightsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$dashboardInsightsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=applicationInsightExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Insights/components" "$applicationInsightName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=aiServicesExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiServicesPrefix" "$suffixStandardNoDash")"
-      echo "##vso[task.setvariable variable=bingExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$bingName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=bingExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Bing/accounts" "$bingName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=containerAppsEnvExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/managedEnvironments" "$containerAppsEnvName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=containerAppAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=containerAppWExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")"
@@ -900,6 +920,7 @@ steps:
       echo "##vso[task.setvariable variable=postgreSQLExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=sqlServerExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "*")"
+      echo "##vso[task.setvariable variable=elasticExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Elastic/monitors" "$elasticName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
       echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=contentSafetyExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$contentSafetyName" "$noSuffix")"
@@ -1243,6 +1264,7 @@ steps:
     projectSuffix: $(projectSuffix)
     allowPublicAccessWhenBehindVnet: $(allowPublicAccessWhenBehindVnet)
     enablePublicGenAIAccess: $(enablePublicGenAIAccess)
+    deleteAllForProject: $(deleteAllForProject)
     enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
     deleteAllServicesForProject: $(deleteAllServicesForProject)
     enableDeleteForDisabledResources: $(enableDeleteForDisabledResources)
@@ -2284,6 +2306,7 @@ steps:
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters vmExists="$(vmExists)" \
+     --parameters bingExists="$(bingExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
@@ -2441,6 +2464,12 @@ steps:
      --parameters postgreSQLVersion="17" \
      --parameters enableRedisCache="$(enableRedisCache)" \
      --parameters enableSQLDatabase="$(enableSQLDatabase)" \
+     --parameters enableElasticsearch="$(enableElasticsearch)" \
+     --parameters elasticExists="$(elasticExists)" \
+     --parameters elasticType="$(elasticType)" \
+     --parameters elasticEmail="$(elasticEmail)" \
+     --parameters elasticDeploymentSize="$(elasticDeploymentSize)" \
+     --parameters elasticSku="$(elasticSku)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \

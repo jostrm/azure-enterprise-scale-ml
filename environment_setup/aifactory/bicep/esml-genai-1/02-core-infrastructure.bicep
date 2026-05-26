@@ -26,6 +26,7 @@ param diagnosticSettingLevel string = 'silver'
 // CMK Parameters
 param cmk bool = false
 param cmkKeyName string = ''
+param bingExists bool = false
 
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')
