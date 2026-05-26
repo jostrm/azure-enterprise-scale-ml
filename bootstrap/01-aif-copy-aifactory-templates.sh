@@ -68,6 +68,12 @@ cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-a
 mkdir -p "$aif_dir/esml-infra/azure_dashboards/"
 cp "$start_dir/environment_setup/aifactory/azure_dashboards" "$aif_dir/esml-infra/azure_dashboards/" -r
 
+## UseCase Code - Copy to root level (including dotfiles like .env.template)
+usecase_code_dir="$current_dir/aifactory-usecase-code"
+rm -rf "$usecase_code_dir"
+mkdir -p "$usecase_code_dir"
+cp -r "$start_dir/usecase_code/." "$usecase_code_dir/"
+
 # Git Ignore
 cp "$start_dir/bootstrap/.gitignore.template" "$start_dir/../.gitignore"
 
