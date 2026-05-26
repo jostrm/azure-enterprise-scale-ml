@@ -818,7 +818,6 @@ steps:
       postgreSQLName="pg-flex-${projectName}-${locationSuffix}-${envName}"
       sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
       sqlDBName="sqldb-${projectName}-${locationSuffix}-${envName}"
-      elasticName="elastic-${projectName}-${locationSuffix}-${envName}"
       acrProjectName="acr${projectName}genai${locationSuffix}"
       vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
       logicAppsName="adf-${projectNumber}-${locationSuffix}-${envName}"
@@ -901,7 +900,6 @@ steps:
       echo "##vso[task.setvariable variable=postgreSQLExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=sqlServerExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "*")"
-      echo "##vso[task.setvariable variable=elasticExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Elastic/monitors" "$elasticName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
       echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=contentSafetyExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$contentSafetyName" "$noSuffix")"
@@ -2286,7 +2284,6 @@ steps:
      --parameters miACAExists="$(miACAExists)" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters vmExists="$(vmExists)" \
-     --parameters bingExists="$(bingExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
@@ -2444,12 +2441,6 @@ steps:
      --parameters postgreSQLVersion="17" \
      --parameters enableRedisCache="$(enableRedisCache)" \
      --parameters enableSQLDatabase="$(enableSQLDatabase)" \
-     --parameters enableElasticsearch="$(enableElasticsearch)" \
-     --parameters elasticExists="$(elasticExists)" \
-     --parameters elasticType="$(elasticType)" \
-     --parameters elasticEmail="$(elasticEmail)" \
-     --parameters elasticDeploymentSize="$(elasticDeploymentSize)" \
-     --parameters elasticSku="$(elasticSku)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \

@@ -21,14 +21,20 @@ projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced
 echo "Target resource group: $projectResourceGroup"
 
 # Override mode: deleteAllServicesForProject bypasses all enable_ flags (except KeyVault, Storage, AppInsights)
+# Ultra mode: deleteAllForProject deletes EVERYTHING including KeyVault, Storage, AppInsights, and networking in common RG
 # Normalize to lowercase because ADO serializes unquoted YAML booleans as "True"/"False" (capital T/F)
 # and all bash comparisons in this script use lowercase "true"/"false"
 deleteAllServicesForProject=$(echo "${deleteAllServicesForProject:-false}" | tr '[:upper:]' '[:lower:]')
+deleteAllForProject=$(echo "${deleteAllForProject:-false}" | tr '[:upper:]' '[:lower:]')
 echo ""
 echo "=== Delete Mode ==="
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
+echo "deleteAllForProject: $deleteAllForProject"
 if [ "$deleteAllServicesForProject" = "true" ]; then
   echo "⚠️  deleteAllServicesForProject=true: ALL services will be deleted (except KeyVault, Storage, AppInsights)"
+fi
+if [ "$deleteAllForProject" = "true" ]; then
+  echo "🔥 deleteAllForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources"
 fi
 
 # =============================================================================
@@ -1067,16 +1073,30 @@ echo "aifProjectExists: $aifProjectExists"
 if [ "$enableAIFoundryHub" = "false" ] && [ "$aifProjectExists" = "true" ]; then
   echo "✓ AI Foundry V1 project exists - proceeding with deletion (will go to soft-delete)"
 
-  aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+  # Support both old naming (aif-p-) and new naming (ai-prj)
+  aifProjectName1="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+  aifProjectName2="ai-prj${projectNumber}"
 
   aif_proj_name=$(az ml workspace list \
     --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${aifProjectName}')].name" \
+    --query "[?starts_with(name, '${aifProjectName1}') || starts_with(name, '${aifProjectName2}')].name" \
     -o tsv 2>/dev/null | head -n1)
 
   if [ -n "$aif_proj_name" ]; then
     echo "Found AI Foundry V1 Project: $aif_proj_name"
     echo "##vso[task.setvariable variable=aifProjectActualName]$aif_proj_name"
+    # Delete any ML endpoints before deleting the workspace
+    echo "Checking for ML endpoints in workspace: $aif_proj_name"
+    endpoint_list=$(az ml online-endpoint list --workspace-name "$aif_proj_name" --resource-group "$projectResourceGroup" --query "[].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$endpoint_list" ]; then
+      while IFS= read -r ep_name; do
+        if [ -n "$ep_name" ]; then
+          echo "  Deleting ML endpoint: $ep_name"
+          az ml online-endpoint delete --workspace-name "$aif_proj_name" --resource-group "$projectResourceGroup" --name "$ep_name" --yes 2>&1 || echo "  Warning: Failed to delete endpoint $ep_name"
+        fi
+      done <<< "$endpoint_list"
+    fi
+    
     delete_private_endpoints "$aif_proj_name" "AI Foundry V1 Project"
     echo "Deleting AI Foundry V1 Project: $aif_proj_name"
     az ml workspace delete \
@@ -1084,7 +1104,7 @@ if [ "$enableAIFoundryHub" = "false" ] && [ "$aifProjectExists" = "true" ]; then
       --name "$aif_proj_name" \
       --yes 2>&1 && echo "✅ Deleted AI Foundry V1 Project (soft-deleted)" || echo "⚠️  Could not delete AI Foundry V1 Project"
   else
-    echo "⚠️  AI Foundry V1 Project not found with prefix: $aifProjectName"
+    echo "⚠️  AI Foundry V1 Project not found with prefixes: $aifProjectName1 or $aifProjectName2"
   fi
 else
   echo "ℹ️  AI Foundry V1 Project skipped (enableAIFoundryHub=$enableAIFoundryHub, aifProjectExists=$aifProjectExists)"
@@ -1106,16 +1126,30 @@ echo "aiHubExists: $aiHubExists"
 if [ "$enableAIFoundryHub" = "false" ] && [ "$aiHubExists" = "true" ]; then
   echo "✓ AI Hub exists - proceeding with deletion (will go to soft-delete)"
 
-  aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+  # Support both old naming (aif-hub-) and new naming (ai-hub-prj)
+  aiHubName1="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+  aiHubName2="ai-hub-prj${projectNumber}"
 
   ai_hub_name=$(az ml workspace list \
     --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${aiHubName}')].name" \
+    --query "[?starts_with(name, '${aiHubName1}') || starts_with(name, '${aiHubName2}')].name" \
     -o tsv 2>/dev/null | head -n1)
 
   if [ -n "$ai_hub_name" ]; then
     echo "Found AI Hub: $ai_hub_name"
     echo "##vso[task.setvariable variable=aiHubActualName]$ai_hub_name"
+    # Delete any ML endpoints before deleting the hub
+    echo "Checking for ML endpoints in hub: $ai_hub_name"
+    endpoint_list=$(az ml online-endpoint list --workspace-name "$ai_hub_name" --resource-group "$projectResourceGroup" --query "[].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$endpoint_list" ]; then
+      while IFS= read -r ep_name; do
+        if [ -n "$ep_name" ]; then
+          echo "  Deleting ML endpoint: $ep_name"
+          az ml online-endpoint delete --workspace-name "$ai_hub_name" --resource-group "$projectResourceGroup" --name "$ep_name" --yes 2>&1 || echo "  Warning: Failed to delete endpoint $ep_name"
+        fi
+      done <<< "$endpoint_list"
+    fi
+    
     delete_private_endpoints "$ai_hub_name" "AI Hub"
     echo "Deleting AI Hub: $ai_hub_name (soft-delete, purge by 04_Purge_SoftDeleted)"
     az ml workspace delete \
@@ -1123,7 +1157,7 @@ if [ "$enableAIFoundryHub" = "false" ] && [ "$aiHubExists" = "true" ]; then
       --name "$ai_hub_name" \
       --yes 2>&1 && echo "✅ Deleted AI Hub (soft-deleted)" || echo "⚠️  Could not delete AI Hub"
   else
-    echo "⚠️  AI Hub not found with prefix: $aiHubName"
+    echo "⚠️  AI Hub not found with prefixes: $aiHubName1 or $aiHubName2"
   fi
 else
   echo "ℹ️  AI Hub skipped (enableAIFoundryHub=$enableAIFoundryHub, aiHubExists=$aiHubExists)"
@@ -1442,6 +1476,18 @@ if [ "$enableAzureMachineLearning" = "false" ] && [ "$amlExists" = "true" ]; the
     echo "Found Azure ML workspace: $aml_name"
     echo "##vso[task.setvariable variable=amlActualName]$aml_name"
 
+    # Delete any ML endpoints before deleting the workspace
+    echo "Checking for ML endpoints in workspace: $aml_name"
+    endpoint_list=$(az ml online-endpoint list --workspace-name "$aml_name" --resource-group "$projectResourceGroup" --query "[].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$endpoint_list" ]; then
+      while IFS= read -r ep_name; do
+        if [ -n "$ep_name" ]; then
+          echo "  Deleting ML endpoint: $ep_name"
+          az ml online-endpoint delete --workspace-name "$aml_name" --resource-group "$projectResourceGroup" --name "$ep_name" --yes 2>&1 || echo "  Warning: Failed to delete endpoint $ep_name"
+        fi
+      done <<< "$endpoint_list"
+    fi
+
     # Always attempt to delete private endpoints (fail silently if not found)
     delete_private_endpoints "$aml_name" "Azure ML"
 
@@ -1704,8 +1750,10 @@ if [ "$enableBing" = "false" ] && [ "$bingExists" = "true" ]; then
   
   bingName="bing-${projectName}-${locationSuffix}-${envName}"
   
-  bing_name=$(az cognitiveservices account list \
+  # Use az resource list for Microsoft.Bing/accounts (not cognitiveservices)
+  bing_name=$(az resource list \
     --resource-group "$projectResourceGroup" \
+    --resource-type "Microsoft.Bing/accounts" \
     --query "[?starts_with(name, '${bingName}')].name" \
     -o tsv | head -n1)
   
@@ -1716,9 +1764,10 @@ if [ "$enableBing" = "false" ] && [ "$bingExists" = "true" ]; then
     delete_private_endpoints "$bing_name" "Bing Search"
     
     echo "Deleting Bing Search: $bing_name"
-    az cognitiveservices account delete \
+    az resource delete \
       --resource-group "$projectResourceGroup" \
-      --name "$bing_name" 2>&1
+      --name "$bing_name" \
+      --resource-type "Microsoft.Bing/accounts" 2>&1
     
     if [ $? -eq 0 ]; then
       echo "✅ Successfully deleted Bing Search"
@@ -1960,6 +2009,224 @@ elif [ "$enableBingCustomSearch" = "true" ]; then
   echo "ℹ️  Bing Custom Search is enabled - skipping deletion"
 else
   echo "ℹ️  Conditions not met for Bing Custom Search deletion"
+fi
+
+echo ""
+echo "=== Standard deletion completed ==="
+
+# =============================================================================
+# ULTRA DELETE MODE: deleteAllForProject=true
+# Delete everything remaining in project RG + networking resources in common RG
+# =============================================================================
+
+if [ "$deleteAllForProject" = "true" ]; then
+  echo ""
+  echo "🔥🔥🔥 ======================================== 🔥🔥🔥"
+  echo "🔥 ULTRA DELETE MODE: deleteAllForProject=true"
+  echo "🔥🔥🔥 ======================================== 🔥🔥🔥"
+  echo ""
+  
+  # Step 1: Delete Storage Accounts
+  echo "=== Step 1: Deleting Storage Accounts ==="
+  storage_accounts=$(az storage account list \
+    --resource-group "$projectResourceGroup" \
+    --query "[].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$storage_accounts" ]; then
+    while IFS= read -r sa_name; do
+      if [ -n "$sa_name" ]; then
+        echo "Deleting storage account: $sa_name"
+        # Delete private endpoints first
+        delete_storage_private_endpoints "$sa_name"
+        # Delete the storage account
+        az storage account delete \
+          --name "$sa_name" \
+          --resource-group "$projectResourceGroup" \
+          --yes 2>&1 || echo "  Warning: Failed to delete storage account $sa_name"
+      fi
+    done <<< "$storage_accounts"
+    echo "✓ Storage accounts deleted"
+  else
+    echo "No storage accounts found"
+  fi
+  
+  # Step 2: Delete Application Insights
+  echo ""
+  echo "=== Step 2: Deleting Application Insights ==="
+  app_insights=$(az monitor app-insights component list \
+    --resource-group "$projectResourceGroup" \
+    --query "[].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$app_insights" ]; then
+    while IFS= read -r ai_name; do
+      if [ -n "$ai_name" ]; then
+        echo "Deleting Application Insights: $ai_name"
+        az monitor app-insights component delete \
+          --resource-group "$projectResourceGroup" \
+          --app "$ai_name" \
+          --yes 2>&1 || echo "  Warning: Failed to delete $ai_name"
+      fi
+    done <<< "$app_insights"
+    echo "✓ Application Insights deleted"
+  else
+    echo "No Application Insights found"
+  fi
+  
+  # Step 3: Delete Dashboards
+  echo ""
+  echo "=== Step 3: Deleting Dashboards ==="
+  dashboards=$(az portal dashboard list \
+    --resource-group "$projectResourceGroup" \
+    --query "[].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$dashboards" ]; then
+    while IFS= read -r dash_name; do
+      if [ -n "$dash_name" ]; then
+        echo "Deleting dashboard: $dash_name"
+        az portal dashboard delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$dash_name" \
+          --yes 2>&1 || echo "  Warning: Failed to delete $dash_name"
+      fi
+    done <<< "$dashboards"
+    echo "✓ Dashboards deleted"
+  else
+    echo "No dashboards found"
+  fi
+  
+  # Step 4: Delete Key Vaults
+  echo ""
+  echo "=== Step 4: Deleting Key Vaults ==="
+  keyvaults=$(az keyvault list \
+    --resource-group "$projectResourceGroup" \
+    --query "[].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$keyvaults" ]; then
+    while IFS= read -r kv_name; do
+      if [ -n "$kv_name" ]; then
+        echo "Deleting Key Vault: $kv_name"
+        # Delete private endpoints first
+        delete_private_endpoints "$kv_name" "Microsoft.KeyVault/vaults"
+        # Delete the Key Vault (soft delete)
+        az keyvault delete \
+          --name "$kv_name" \
+          --resource-group "$projectResourceGroup" \
+          2>&1 || echo "  Warning: Failed to delete Key Vault $kv_name"
+      fi
+    done <<< "$keyvaults"
+    echo "✓ Key Vaults deleted (soft-deleted, use purge later if needed)"
+  else
+    echo "No Key Vaults found"
+  fi
+  
+  # Step 5: Delete All Remaining Private Endpoints
+  echo ""
+  echo "=== Step 5: Deleting All Remaining Private Endpoints ==="
+  all_pends=$(az network private-endpoint list \
+    --resource-group "$projectResourceGroup" \
+    --query "[].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$all_pends" ]; then
+    while IFS= read -r pend_name; do
+      if [ -n "$pend_name" ]; then
+        echo "Deleting private endpoint: $pend_name"
+        az network private-endpoint delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$pend_name" \
+          2>&1 || echo "  Warning: Failed to delete $pend_name"
+      fi
+    done <<< "$all_pends"
+    echo "✓ All private endpoints deleted"
+  else
+    echo "No private endpoints found"
+  fi
+  
+  # Step 6: Wait for resources to fully release
+  echo ""
+  echo "=== Step 6: Waiting 5 minutes for resources to release ==="
+  echo "Waiting for Azure to process deletions and release subnet dependencies..."
+  sleep 300
+  echo "✓ Wait completed"
+  
+  # Step 7: Build common resource group name
+  commonResourceGroup="${commonRGNamePrefix}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+  echo ""
+  echo "=== Step 7: Deleting Subnets in Common Resource Group ==="
+  echo "Common resource group: $commonResourceGroup"
+  echo "Looking for subnets containing: $projectName"
+  
+  # Find all VNets in common resource group
+  vnets=$(az network vnet list \
+    --resource-group "$commonResourceGroup" \
+    --query "[].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$vnets" ]; then
+    while IFS= read -r vnet_name; do
+      if [ -n "$vnet_name" ]; then
+        echo "Checking VNet: $vnet_name"
+        # List subnets containing project identifier
+        subnets=$(az network vnet subnet list \
+          --resource-group "$commonResourceGroup" \
+          --vnet-name "$vnet_name" \
+          --query "[?contains(name, '$projectName')].name" \
+          -o tsv 2>/dev/null || echo "")
+        
+        if [ -n "$subnets" ]; then
+          while IFS= read -r subnet_name; do
+            if [ -n "$subnet_name" ]; then
+              echo "  Deleting subnet: $subnet_name from VNet: $vnet_name"
+              az network vnet subnet delete \
+                --resource-group "$commonResourceGroup" \
+                --vnet-name "$vnet_name" \
+                --name "$subnet_name" \
+                2>&1 || echo "    Warning: Failed to delete subnet $subnet_name"
+            fi
+          done <<< "$subnets"
+        fi
+      fi
+    done <<< "$vnets"
+    echo "✓ Subnets deleted"
+  else
+    echo "No VNets found in common resource group"
+  fi
+  
+  # Step 8: Delete Network Security Groups
+  echo ""
+  echo "=== Step 8: Deleting Network Security Groups in Common Resource Group ==="
+  echo "Looking for NSGs containing: $projectName"
+  
+  nsgs=$(az network nsg list \
+    --resource-group "$commonResourceGroup" \
+    --query "[?contains(name, '$projectName')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$nsgs" ]; then
+    while IFS= read -r nsg_name; do
+      if [ -n "$nsg_name" ]; then
+        echo "Deleting NSG: $nsg_name"
+        az network nsg delete \
+          --resource-group "$commonResourceGroup" \
+          --name "$nsg_name" \
+          2>&1 || echo "  Warning: Failed to delete NSG $nsg_name"
+      fi
+    done <<< "$nsgs"
+    echo "✓ Network Security Groups deleted"
+  else
+    echo "No NSGs found containing $projectName"
+  fi
+  
+  echo ""
+  echo "🔥 ======================================== 🔥"
+  echo "🔥 ULTRA DELETE MODE COMPLETED"
+  echo "🔥 ======================================== 🔥"
+else
+  echo "ℹ️  deleteAllForProject not enabled - skipping complete cleanup"
 fi
 
 echo ""

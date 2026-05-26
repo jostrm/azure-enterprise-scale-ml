@@ -191,6 +191,8 @@ variables:
   # === Complete mode vs Incremental mode ===
   enableDeleteForDisabledResources: true # <optional>Delete disabled services<default>true<keep-as-is> <otherwise> false, keeps all existing resources regardless of ENABLE_* flags.
   deleteAllServicesForProject: false # <optional>Delete all project services<default>false<keep-as-is> <otherwise> true, deletes all services in project RG in step 04 then quits pipeline (foundational services like KV, Storage, AppInsights are retained).
+  deleteAllForProject: false # <optional>Delete EVERYTHING for project, including networking, KV, Storage, AppInsights, and networking resources (subnets, NSGs) in common RG.<default>false<keep-as-is> <otherwise> true, deletes ALL resources in project RG including KV, Storage, AppInsights, and networking resources (subnets, NSGs) in common RG. Use with extreme caution!
+
   # === Defender for Cloud: Defender for AI ===
   enableDefenderforAISubLevel: "false" # <optional>Defender for AI at subscription level<default>false<keep-as-is> <otherwise> true, enable Microsoft Defender for AI at subscription level.
   enableDefenderforAIResourceLevel: "false" # <optional>Defender for AI at resource level<default>false<keep-as-is> <otherwise> true, enable Microsoft Defender for AI at per-resource level.

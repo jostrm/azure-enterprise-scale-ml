@@ -54,7 +54,6 @@ param storageAccount2001Exists bool = false
 param acrProjectExists bool = false
 param applicationInsightExists bool = false
 param vmExists bool = false
-param bingExists bool = false
 param miACAExists bool = false
 param miPrjExists bool = false
 

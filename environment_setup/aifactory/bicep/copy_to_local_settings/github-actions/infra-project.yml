@@ -153,6 +153,10 @@ jobs:
       enableDatafactoryCommon: ${{ vars.ENABLE_DATAFACTORY_COMMON || 'false' }}
       enableDatabricks: ${{ vars.ENABLE_DATABRICKS || 'false' }}
       enableAksForAzureML: ${{ vars.ENABLE_AKS_FOR_AZURE_ML || 'true' }}
+      enableAKS: ${{ vars.ENABLE_AKS || 'false' }}
+      aksSkuName: ${{ vars.AKS_SKU_NAME || 'Base' }}
+      aksSkuTier: ${{ vars.AKS_SKU_TIER || 'Standard' }}
+      aksEnablePrivateCluster: ${{ vars.AKS_ENABLE_PRIVATE_CLUSTER || 'true' }}
       aksOutboundType: ${{ vars.AKS_OUTBOUND_TYPE || 'loadBalancer' }}
       aksPrivateDNSZone: ${{ vars.AKS_PRIVATE_DNS_ZONE || 'system' }}
       aksAzureFirewallPrivateIp: ${{ vars.AKS_AZURE_FIREWALL_PRIVATE_IP || '' }}
@@ -175,6 +179,11 @@ jobs:
       enablePostgreSQL: ${{ vars.ENABLE_POSTGRESQL || 'false' }}
       enableRedisCache: ${{ vars.ENABLE_REDIS_CACHE || 'false' }}
       enableSQLDatabase: ${{ vars.ENABLE_SQL_DATABASE || 'false' }}
+      enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+      elasticType: ${{ vars.ELASTIC_TYPE || 'ElasticCloud' }}
+      elasticEmail: ${{ vars.ELASTIC_EMAIL || 'admin@example.com' }}
+      elasticDeploymentSize: ${{ vars.ELASTIC_DEPLOYMENT_SIZE || 'small' }}
+      elasticSku: ${{ vars.ELASTIC_SKU || 'ess-consumption-2024_Monthly' }}
       enablePublicGenAIAccess: ${{ vars.ENABLE_PUBLIC_GENAI_ACCESS || 'false' }}
       allowPublicAccessWhenBehindVnet: ${{ vars.ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET || 'false' }}
       enablePublicAccessWithPerimeter: ${{ vars.ENABLE_PUBLIC_ACCESS_WITH_PERIMETER || 'false' }}
@@ -255,6 +264,8 @@ jobs:
       openaiExists: 'false'
       aiSearchExists: 'false'
       aiServicesExists: 'false'
+      bingExists: 'false'
+      bingCustomSearchExists: 'false'
       containerAppsEnvExists: 'false'
       containerAppAExists: 'false'
       containerAppWExists: 'false'
@@ -267,6 +278,7 @@ jobs:
       redisExists: 'false'
       postgreSQLExists: 'false'
       sqlServerExists: 'false'
+      elasticExists: 'false'
       logicAppsExists: 'false'
       eventHubsExists: 'false'
       functionAppExists: 'false'
@@ -899,8 +911,13 @@ jobs:
             suffixStandardNoDash="${suffixStandard#-}"
             suffixAppServicePlan="${suffixStandard}-plan"
             twoNumbers="${suffixStandard: -2}"
+            
+            # AI Hub - support both old (aif-hub-) and new (ai-hub-prj) naming
             aiHubName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
+            aiHubNameAlt="ai-hub-prj${projectNumber}"
+            # AI Project - support both old (aif-p-) and new (ai-prj) naming
             aifProjectName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
+            aifProjectNameAlt="ai-prj${projectNumber}"
             aiFoundryV2Name="aif2"
             aiFoundryV2ProjectName="aif2-p${projectNumber}"
             botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
@@ -933,8 +950,24 @@ jobs:
               echo "${key}=${val}" >> $GITHUB_ENV
               echo "Checking variable: ${key}, Value: ${val}"
             }
-            set_env "aiHubExists"            "$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")"
-            set_env "aifProjectExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")"
+            
+            # AI Hub: check both naming patterns
+            aiHubCheck1=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aiHubName" "$suffixStandard")
+            aiHubCheck2=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aiHubNameAlt" "$suffixStandard")
+            if [ "$aiHubCheck1" = "true" ] || [ "$aiHubCheck2" = "true" ]; then
+              set_env "aiHubExists" "true"
+            else
+              set_env "aiHubExists" "false"
+            fi
+            
+            # AI Project: check both naming patterns
+            aifProjectCheck1=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aifProjectName" "$suffixStandard")
+            aifProjectCheck2=$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$aifProjectNameAlt" "$suffixStandard")
+            if [ "$aifProjectCheck1" = "true" ] || [ "$aifProjectCheck2" = "true" ]; then
+              set_env "aifProjectExists" "true"
+            else
+              set_env "aifProjectExists" "false"
+            fi
             set_env "aiFoundryV2Exists"      "$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "")"
             # Nested projects can't be enumerated with az resource list — use REST API instead
             _subId=$(az account show --query id -o tsv)
