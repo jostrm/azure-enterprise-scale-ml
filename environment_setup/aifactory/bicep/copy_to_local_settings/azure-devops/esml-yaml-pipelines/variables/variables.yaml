@@ -270,6 +270,11 @@ variables:
   postGresAdminEmails: "email_adress_only" # <optional>PostgreSQL admin emails<default>email_adress_only<mandatory> if enablePostgreSQL:'true' <ensure> valid comma-separated email addresses.
   enableRedisCache: "false" # <optional>Deploy Azure Cache for Redis<default>false<keep-as-is>
   enableSQLDatabase: "false" # <optional>Deploy Azure SQL Database<default>false<keep-as-is>
+  enableElasticsearch: "false" # <optional>Deploy Elasticsearch<default>false<keep-as-is> Elastic Cloud managed service.
+  elasticType: "ElasticCloud" # <optional>Elasticsearch deployment type<default>ElasticCloud<keep-as-is> <otherwise> "SelfManagedOnAKS" (future support).
+  elasticEmail: "admin@example.com" # <optional>Elastic Cloud account email<default>admin@example.com<mandatory> if enableElasticsearch:'true' <ensure> valid email address.
+  elasticDeploymentSize: "small" # <optional>Elasticsearch deployment size<default>small<keep-as-is> <otherwise> "medium" or "large".
+  elasticSku: "ess-consumption-2024_Monthly" # <optional>Elastic Cloud SKU<default>ess-consumption-2024_Monthly<keep-as-is>
   # === Azure Function ===
   enableFunction: "false" # <optional>Deploy Azure Function App<default>false<keep-as-is>
   functionRuntime: "dotnet" # <optional>Azure Function runtime<default>dotnet<keep-as-is> <otherwise> "python", "node", "java", "powershell".

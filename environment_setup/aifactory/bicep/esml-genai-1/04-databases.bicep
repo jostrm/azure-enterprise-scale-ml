@@ -62,6 +62,7 @@ param cosmosDBExists bool = false
 param postgreSQLExists bool = false
 param redisExists bool = false
 param sqlServerExists bool = false
+param elasticExists bool = false
 
 // Enable flags from parameter files
 @description('Enable Cosmos DB deployment')
@@ -75,6 +76,9 @@ param enableRedisCache bool = false
 
 @description('Enable SQL Database deployment')
 param enableSQLDatabase bool = false
+
+@description('Enable Elasticsearch deployment')
+param enableElasticsearch bool = false
 
 @description('Enable AI Foundry Caphost feature')
 param enableAFoundryCaphost bool = false
@@ -154,6 +158,25 @@ param postgresEnableCustomerManagedKey bool = false
 // SQL Server
 param sqlServerCapacity_DTU int = 10
 
+// Elasticsearch
+@description('Elasticsearch deployment type')
+@allowed(['ElasticCloud', 'SelfManagedOnAKS'])
+param elasticType string = 'ElasticCloud'
+
+@description('Email associated with Elastic Cloud account')
+param elasticEmail string = 'admin@example.com'
+
+@description('Elasticsearch deployment size')
+@allowed(['small', 'medium', 'large'])
+param elasticDeploymentSize string = 'small'
+
+@description('Elastic Cloud SKU')
+@allowed(['ess-consumption-2024_Monthly'])
+param elasticSku string = 'ess-consumption-2024_Monthly'
+
+@description('Enable Elasticsearch monitoring')
+param elasticMonitoringEnabled bool = true
+
 // Access control
 param useAdGroups bool = false
 
@@ -232,6 +255,7 @@ var postgreSQLName = namingConvention.outputs.postgreSQLName
 var redisName = namingConvention.outputs.redisName
 var sqlServerName = namingConvention.outputs.sqlServerName
 var sqlDBName = namingConvention.outputs.sqlDBName
+var elasticName = 'elastic-${projectName}-${locationSuffix}-${env}'
 var keyvaultName = namingConvention.outputs.keyvaultName
 var laWorkspaceName = namingConvention.outputs.laWorkspaceName
 
@@ -312,6 +336,8 @@ var var_postgreSQL_dnsConfig = postgreSQL.outputs.dnsConfig
 var var_redisCache_dnsConfig = redisCache.outputs.dnsConfig
 #disable-next-line BCP318
 var var_sqlServer_dnsConfig = sqlServer.outputs.dnsConfig
+#disable-next-line BCP318
+var var_elastic_dnsConfig = elastic.outputs.dnsConfig
 
 resource existingTargetRG 'Microsoft.Resources/resourceGroups@2025-04-01' existing = {
   name: targetResourceGroup
@@ -554,6 +580,44 @@ module privateDnsRedisCache '../modules/privateDns.bicep' = if(!redisExists && !
   ]
 }
 
+// ============== ELASTICSEARCH ==============
+
+module elastic '../modules/databases/elasticsearch/elasticsearch.bicep' = if(!elasticExists && enableElasticsearch && elasticType == 'ElasticCloud') {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-Elasticsearch4${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    name: elasticName
+    location: location
+    skuName: elasticSku
+    elasticEmail: elasticEmail
+    monitoringEnabled: elasticMonitoringEnabled
+    deploymentSize: elasticDeploymentSize
+    tags: tagsProject
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    subnetNamePend: defaultSubnet
+    vnetName: vnetNameFull
+    vnetResourceGroupName: vnetResourceGroupName
+    createPrivateEndpoint: enablePublicAccessWithPerimeter ? false : true
+  }
+  dependsOn: [
+    existingTargetRG
+  ]
+}
+
+module privateDnsElastic '../modules/privateDns.bicep' = if(!elasticExists && !centralDnsZoneByPolicyInHub && enableElasticsearch && elasticType == 'ElasticCloud' && !enablePublicAccessWithPerimeter) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-privDnsElastic${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    dnsConfig: var_elastic_dnsConfig
+    privateLinksDnsZones: privateLinksDnsZones
+  }
+  dependsOn: [
+    existingTargetRG
+    elastic
+  ]
+}
+
 // ============== SQL SERVER & DATABASE ==============
 
 module sqlServer '../modules/databases/sqldatabase/sqldatabase.bicep' = if(!sqlServerExists && enableSQLDatabase) {
@@ -608,6 +672,20 @@ module privateDnsSql '../modules/privateDns.bicep' = if(!sqlServerExists && !cen
 }
 
 // ============== DIAGNOSTIC SETTINGS ==============
+
+// Elasticsearch Diagnostic Settings
+module elasticDiagnostics '../modules/diagnostics/elasticDiagnostics.bicep' = if (!elasticExists && enableElasticsearch && elasticType == 'ElasticCloud') {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('04-diagElastic-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    elasticName: elasticName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+  }
+  dependsOn: [
+    elastic
+  ]
+}
 
 // Cosmos DB Diagnostic Settings
 module cosmosDbDiagnostics '../modules/diagnostics/cosmosDbDiagnostics.bicep' = if (!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry))) {
@@ -681,3 +759,6 @@ output redisCacheDeployed bool = (!redisExists && enableRedisCache)
 
 @description('SQL Server deployment status')
 output sqlServerDeployed bool = (!sqlServerExists && enableSQLDatabase)
+
+@description('Elasticsearch deployment status')
+output elasticsearchDeployed bool = (!elasticExists && enableElasticsearch && elasticType == 'ElasticCloud')
