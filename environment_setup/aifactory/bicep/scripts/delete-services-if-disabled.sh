@@ -206,7 +206,8 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
     --query "[?starts_with(name, '${safeNameAISearch}')].name" \
     -o tsv | head -n1)
   
-  if [Get all shared private link resources
+  if [ -n "$aisearch_name" ]; then
+    # Get all shared private link resources
     shared_pe_list=$(az search shared-private-link-resource list \
       --resource-group "$projectResourceGroup" \
       --service-name "$aisearch_name" \
@@ -271,7 +272,8 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
       fi
     else
       echo "  No shared private endpoints found"
-    ficriptionId=$(az account show --query id -o tsv)
+    fi
+    subscriptionId=$(az account show --query id -o tsv)
     
     for shared_pe_name in "${foundry_shared_endpoints[@]}"; do
       echo "    Checking for: $shared_pe_name"
