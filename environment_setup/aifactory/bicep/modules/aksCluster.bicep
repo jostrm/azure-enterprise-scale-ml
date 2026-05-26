@@ -96,7 +96,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
     tier: skuTier
   }
   identity: !empty(userAssignedIdentities) ? {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
     userAssignedIdentities: userAssignedIdentities
   } : {
     type: 'SystemAssigned'
