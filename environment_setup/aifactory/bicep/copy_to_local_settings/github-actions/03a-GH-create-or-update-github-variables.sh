@@ -285,6 +285,7 @@ repo_level_vars=(
   # === Complete mode vs Incremental mode ===
   "ENABLE_DELETE_FOR_DISABLED_RESOURCES"
   "DELETE_ALL_SERVICES_FOR_PROJECT"
+  "DELETE_ALL_FOR_PROJECT"
   # All ENABLE_* flags moved to repo-level
   "ENABLE_AI_SERVICES"
   "ENABLE_AI_FOUNDRY_HUB"

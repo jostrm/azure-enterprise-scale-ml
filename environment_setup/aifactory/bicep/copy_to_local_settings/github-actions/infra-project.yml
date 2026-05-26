@@ -197,7 +197,8 @@ jobs:
 
       # Complete mode vs Incremental mode
       enableDeleteForDisabledResources: ${{ vars.ENABLE_DELETE_FOR_DISABLED_RESOURCES || 'true' }}
-      deleteAllServicesForProject: ${{ vars.DELETE_ALL_SERVICES_FOR_PROJECT || 'true' }}
+      deleteAllServicesForProject: ${{ vars.DELETE_ALL_SERVICES_FOR_PROJECT || 'false' }}
+      deleteAllForProject: ${{ vars.DELETE_ALL_FOR_PROJECT || 'false' }}
 
       # DNS zone existence flags (for parity with ADO debug params)
       zoneAzurecontainerappsExists: ${{ vars.ZONE_AZURECONTAINERAPPS_EXISTS || 'false' }}
@@ -430,7 +431,7 @@ jobs:
           echo "env.network_env=${{ env.network_env }}"
 
       - name: 00_Validate_Project_Subnet_Exists_(Networking-START)
-        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true' && env.deleteAllServicesForProject != 'true'
         shell: bash
         run: |
           set -e
@@ -568,7 +569,7 @@ jobs:
           }
 
       - name: 04_Create_Temporary_JSON_Parameter_Files
-        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true' && env.deleteAllServicesForProject != 'true'
         run: |
           $paramDir = Join-Path $Env:GITHUB_WORKSPACE 'aifactory/parameters'
           New-Item -ItemType Directory -Force -Path $paramDir | Out-Null
@@ -625,7 +626,7 @@ jobs:
           $override | ConvertTo-Json -Depth 5 | Out-File (Join-Path $paramDir '10-esml-globals-override.json') -Encoding utf8
 
       - name: 05_Calculate_Subnet_Allocations
-        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true' && env.deleteAllServicesForProject != 'true'
         working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
         run: |
           sudo pwsh -Command '
@@ -717,7 +718,7 @@ jobs:
             check_subnet_exists "snt-prj${projectNumber}-dbxpub" "sntDatabricksPubExists"
 
       - name: 07_Deploy_Subnet_IfNotExists
-        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true' && env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
         with:
           azcliversion: latest
@@ -786,7 +787,7 @@ jobs:
           git submodule status
 
       - name: 10_Check_Subnet_Existence
-        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true'
+        if: env.runNetworkingVar != 'false' && env.BYO_subnets != 'true' && env.deleteAllServicesForProject != 'true'
         run: |
           Write-Host "Subnet existence flags:"
           Write-Host "  sntGenaiExists=${{ env.sntGenaiExists }}"
