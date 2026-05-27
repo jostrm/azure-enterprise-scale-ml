@@ -91,13 +91,16 @@ resource elastic 'Microsoft.Elastic/monitors@2024-03-01' = {
 }
 
 // ============== RBAC ROLE ASSIGNMENTS ==============
-// Azure Elastic built-in roles
+// Azure built-in roles (verified from Microsoft docs)
 // https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
 
-// Elastic Admin: bfb6c928-ebaa-4e44-bd4a-7468c1c7b2da
-// Elastic Reader: e71e9d0e-0384-4d07-b5eb-d3154b9a6a56
+// Standard Azure roles:
+// Owner: 8e3af657-a8ff-443c-a75c-2fe8c4bcb635
 // Contributor: b24988ac-6180-42a0-ab88-20f7382dd24c
 // Reader: acdd72a7-3385-48ef-bd42-f606fba81ae7
+//
+// Note: Use Contributor for management access, Reader for read-only access
+// Elasticsearch-specific built-in roles do not appear to exist in standard Azure RBAC
 
 // Role assignments for users or AD groups
 resource userElasticRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in usersOrAdGroupArray: {

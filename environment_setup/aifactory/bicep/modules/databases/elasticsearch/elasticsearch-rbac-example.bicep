@@ -6,17 +6,25 @@
 param location string = 'swedencentral'
 param elasticEmail string = 'admin@example.com'
 
-// Example: Entra ID Group, Users, Service Principals, and Managed Identities Object IDs
-param dataScientistsGroupId string = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-param adminUserId string = 'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy'
-param appServicePrincipalId string = 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'
-param uamiPrincipalId string = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+// Arrays of principal IDs - replace with your actual Entra ID object IDs
+param usersOrAdGroupArray array = [
+  'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'  // Data Scientists Group
+  'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy'  // Admin User
+]
 
-// Built-in Azure RBAC role IDs
-var elasticAdminRoleId = 'bfb6c928-ebaa-4e44-bd4a-7468c1c7b2da'  // Elastic Admin
-var elasticReaderRoleId = 'e71e9d0e-0384-4d07-b5eb-d3154b9a6a56' // Elastic Reader
+param servicePrincipleAndMIArray array = [
+  'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'  // Service Principal (App Registration)
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'  // User Assigned Managed Identity
+]
+
+// Built-in Azure RBAC role IDs (verified from Microsoft docs)
+// https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+var ownerRoleId = '8e3af657-a8ff-443c-a75c-2fe8c4bcb635'          // Owner
 var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c'   // Contributor
 var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'        // Reader
+
+// Note: Elasticsearch/Elastic-specific roles may not exist as separate built-in roles
+// Use Contributor for management access and Reader for read-only access
 
 module elasticsearch './elasticsearch.bicep' = {
   name: 'elasticsearch-with-rbac'
@@ -28,24 +36,16 @@ module elasticsearch './elasticsearch.bicep' = {
     deploymentSize: 'medium'
     monitoringEnabled: true
     
-    // RBAC for users or Entra ID groups
-    usersOrAdGroupArray: [
-      dataScientistsGroupId  // Entra ID Group
-      adminUserId            // Individual User
-    ]
-    
-    // RBAC for service principals and managed identities (UAMI/SAMI)
-    servicePrincipleAndMIArray: [
-      appServicePrincipalId  // Service Principal (App Registration)
-      uamiPrincipalId        // User Assigned Managed Identity
-    ]
+    // RBAC arrays - directly pass the arrays
+    usersOrAdGroupArray: usersOrAdGroupArray
+    servicePrincipleAndMIArray: servicePrincipleAndMIArray
     
     // Set to true if using Entra ID groups, false for individual users
     useAdGroups: true
     
     // Role assignments (can be different for users vs service principals)
-    userRoleId: elasticAdminRoleId      // Users/Groups get Elastic Admin
-    spRoleId: contributorRoleId         // Service Principals/MI get Contributor
+    userRoleId: contributorRoleId       // Users/Groups get Contributor access
+    spRoleId: ownerRoleId         // Service Principals/MI get Owner access
     
     // Private endpoint configuration
     createPrivateEndpoint: true
@@ -62,14 +62,17 @@ module elasticsearch './elasticsearch.bicep' = {
 }
 
 // ============== AVAILABLE AZURE BUILT-IN ROLE IDs ==============
-// Elastic-specific roles:
-// - Elastic Admin: bfb6c928-ebaa-4e44-bd4a-7468c1c7b2da
-// - Elastic Reader: e71e9d0e-0384-4d07-b5eb-d3154b9a6a56
+// Standard Azure roles (verified):
+// - Owner: 8e3af657-a8ff-443c-a75c-2fe8c4bcb635 (full access including RBAC)
+// - Contributor: b24988ac-6180-42a0-ab88-20f7382dd24c (manage resources, no RBAC)
+// - Reader: acdd72a7-3385-48ef-bd42-f606fba81ae7 (read-only access)
 //
-// General Azure roles:
-// - Owner: 8e3af657-a8ff-443c-a75c-2fe8c4bcb635
-// - Contributor: b24988ac-6180-42a0-ab88-20f7382dd24c
-// - Reader: acdd72a7-3385-48ef-bd42-f606fba81ae7
+// Note: Elasticsearch-specific built-in roles do not appear to exist in Azure RBAC.
+// Use Contributor for full management access and Reader for read-only access.
+
+// ============== HOW TO CHECK FOR ELASTIC-SPECIFIC ROLES ==============
+// Run this Azure CLI command to check if Elastic-specific roles exist:
+// az role definition list --query "[?contains(roleName, 'Elastic')].{Name:roleName, Id:name}" -o table
 
 // ============== PRINCIPAL TYPES ==============
 // - usersOrAdGroupArray: Use for Entra ID users or groups (set useAdGroups appropriately)
