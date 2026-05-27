@@ -5,7 +5,7 @@
 
 @description('Elasticsearch monitor name')
 param name string
-
+// available regions for the Elasticsearch resource type is 'westus2,uksouth,eastus,eastus2,westeurope,francecentral,centralus,southcentralus,japaneast,southeastasia,australiaeast,northeurope,canadacentral,brazilsouth,southafricanorth,centralindia,spaincentral,germanywestcentral'.
 @description('Azure region')
 param location string
 
@@ -50,11 +50,19 @@ param subnetNamePend string = ''
 @description('Create private endpoint')
 param createPrivateEndpoint bool = true
 
+// ============== LOCATION CONVERSION ==============
+// Elasticsearch: If Sweden Central is chosen, use North Europe instead
+var actualLocation = (toLower(location) == 'swedencentral' || toLower(location) == 'sweden central') ? 'northeurope' : location
+
+// ============== NAME CONVERSION ==============
+// Convert naming convention: sdc (Sweden Central) -> neu (North Europe)
+var actualName = (toLower(location) == 'swedencentral' || toLower(location) == 'sweden central') ? replace(name, 'sdc', 'neu') : name
+
 // ============== RESOURCE DEPLOYMENT ==============
 
 resource elastic 'Microsoft.Elastic/monitors@2024-03-01' = {
-  name: name
-  location: location
+  name: actualName
+  location: actualLocation
   sku: {
     name: skuName
   }
@@ -69,13 +77,13 @@ resource elastic 'Microsoft.Elastic/monitors@2024-03-01' = {
 
 // ============== PRIVATE ENDPOINT ==============
 
-var privateEndpointName = 'pend-${name}'
-var privateLinkServiceConnectionName = 'plsc-${name}'
+var privateEndpointName = 'pend-${actualName}'
+var privateLinkServiceConnectionName = 'plsc-${actualName}'
 var groupId = 'es'
 
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if (!enablePublicGenAIAccess && !enablePublicAccessWithPerimeter && createPrivateEndpoint && !empty(vnetName)) {
   name: privateEndpointName
-  location: location
+  location: actualLocation
   tags: tags
   properties: {
     subnet: {
@@ -102,6 +110,9 @@ output elasticResourceId string = elastic.id
 
 @description('Elasticsearch name')
 output elasticName string = elastic.name
+
+@description('Actual location used (converted from Sweden Central to North Europe if applicable)')
+output actualLocation string = actualLocation
 
 @description('Private endpoint ID')
 output privateEndpointId string = createPrivateEndpoint && !enablePublicGenAIAccess && !enablePublicAccessWithPerimeter && !empty(vnetName) ? privateEndpoint.id : ''
