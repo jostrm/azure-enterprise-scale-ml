@@ -51,18 +51,18 @@ param subnetNamePend string = ''
 param createPrivateEndpoint bool = true
 
 // ============== LOCATION CONVERSION ==============
-// Elasticsearch: If Sweden Central is chosen, use North Europe instead
-var actualLocation = (toLower(location) == 'swedencentral' || toLower(location) == 'sweden central') ? 'northeurope' : location
+// Elasticsearch: If Sweden Central is chosen, use North Europe instead (Elasticsearch service requirement)
+var elasticsearchLocation = (toLower(location) == 'swedencentral' || toLower(location) == 'sweden central') ? 'northeurope' : location
 
 // ============== NAME CONVERSION ==============
-// Convert naming convention: sdc (Sweden Central) -> neu (North Europe)
-var actualName = (toLower(location) == 'swedencentral' || toLower(location) == 'sweden central') ? replace(name, 'sdc', 'neu') : name
+// Convert naming convention: sdc (Sweden Central) -> neu (North Europe) for Elasticsearch resource
+var elasticsearchName = (toLower(location) == 'swedencentral' || toLower(location) == 'sweden central') ? replace(name, 'sdc', 'neu') : name
 
 // ============== RESOURCE DEPLOYMENT ==============
 
 resource elastic 'Microsoft.Elastic/monitors@2024-03-01' = {
-  name: actualName
-  location: actualLocation
+  name: elasticsearchName
+  location: elasticsearchLocation
   sku: {
     name: skuName
   }
@@ -76,14 +76,14 @@ resource elastic 'Microsoft.Elastic/monitors@2024-03-01' = {
 }
 
 // ============== PRIVATE ENDPOINT ==============
-
-var privateEndpointName = 'pend-${actualName}'
-var privateLinkServiceConnectionName = 'plsc-${actualName}'
+// Note: Private endpoint must be in same location as VNet (original location, not converted)
+var privateEndpointName = 'pend-${name}'
+var privateLinkServiceConnectionName = 'plsc-${name}'
 var groupId = 'es'
 
 resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if (!enablePublicGenAIAccess && !enablePublicAccessWithPerimeter && createPrivateEndpoint && !empty(vnetName)) {
   name: privateEndpointName
-  location: actualLocation
+  location: location  // Keep original location for private endpoint (must match VNet location)
   tags: tags
   properties: {
     subnet: {
@@ -108,11 +108,11 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-11-01' = if (!
 @description('Elasticsearch resource ID')
 output elasticResourceId string = elastic.id
 
-@description('Elasticsearch name')
+@description('Elasticsearch name (converted from sdc to neu if Sweden Central was specified)')
 output elasticName string = elastic.name
 
-@description('Actual location used (converted from Sweden Central to North Europe if applicable)')
-output actualLocation string = actualLocation
+@description('Actual location used for Elasticsearch (North Europe if Sweden Central was specified)')
+output elasticsearchLocation string = elasticsearchLocation
 
 @description('Private endpoint ID')
 output privateEndpointId string = createPrivateEndpoint && !enablePublicGenAIAccess && !enablePublicAccessWithPerimeter && !empty(vnetName) ? privateEndpoint.id : ''
