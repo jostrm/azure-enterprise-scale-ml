@@ -14,6 +14,7 @@ envName="$dev_test_prod"
 aifactorySuffixRG="$admin_aifactorySuffixRG"
 projectPrefix="$projectPrefix"
 projectSuffix="$projectSuffix"
+vnetResourceGroupBase="$vnetResourceGroupBase"
 
 projectNameReplaced="${projectName/prj/project}"
 projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
@@ -76,30 +77,51 @@ delete_private_endpoints() {
   
   echo "Searching for private endpoints for $resource_type: $resource_name"
   
-  # Find private endpoints matching pattern: resourcename-pend or resourcename-pend-*
+  # Find private endpoints matching patterns:
+  # 1. Exact match: resourcename
+  # 2. With -pend suffix: resourcename-pend or resourcename-pend-*
+  # 3. With p- prefix: p-resourcename or pend-resourcename
   pend_list=$(az network private-endpoint list \
     --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${resource_name}-pend')].name" \
+    --query "[?(name == '${resource_name}' || starts_with(name, '${resource_name}-pend') || starts_with(name, 'p-${resource_name}') || starts_with(name, 'pend-${resource_name}'))].name" \
     -o tsv 2>/dev/null || echo "")
   
   if [ -n "$pend_list" ]; then
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
         echo "  Deleting private endpoint: $pend_name"
+        
+        # Step 1: Get the private endpoint connection ID from the target resource
+        connection_id=$(az network private-endpoint show \
+          --resource-group "$projectResourceGroup" \
+          --name "$pend_name" \
+          --query "privateLinkServiceConnections[0].id" \
+          -o tsv 2>/dev/null || echo "")
+        
+        # Step 2: Try to delete using --no-wait to avoid blocking on connection state
         az network private-endpoint delete \
           --resource-group "$projectResourceGroup" \
           --name "$pend_name" \
-          2>&1 || echo "  Warning: Failed to delete private endpoint $pend_name"
+          --no-wait \
+          2>&1 || echo "  Warning: Failed to delete private endpoint $pend_name (trying force delete)"
+        
+        # Step 3: If normal delete failed, try REST API force delete
+        if [ $? -ne 0 ]; then
+          echo "  Attempting force delete via REST API for: $pend_name"
+          subscriptionId=$(az account show --query id -o tsv)
+          rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
+          az rest --method DELETE --url "$rest_url" 2>&1 || echo "  Warning: Force delete also failed for $pend_name"
+        fi
       fi
     done <<< "$pend_list"
   else
     echo "  No private endpoints found for $resource_name"
   fi
   
-  # Also check for NICs with pattern: resourcename-pend-nic or resourcename-pend-*-nic
+  # Also check for NICs with similar patterns
   nic_list=$(az network nic list \
     --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${resource_name}-pend')].name" \
+    --query "[?(starts_with(name, '${resource_name}-pend') || starts_with(name, '${resource_name}.nic'))].name" \
     -o tsv 2>/dev/null || echo "")
   
   if [ -n "$nic_list" ]; then
@@ -108,7 +130,8 @@ delete_private_endpoints() {
         echo "  Deleting NIC: $nic_name"
         az network nic delete \
           --resource-group "$projectResourceGroup" \
-          --name "$nic_name" 2>&1 || echo "  Warning: Failed to delete NIC $nic_name"
+          --name "$nic_name" \
+          2>&1 || echo "  Warning: Failed to delete NIC $nic_name"
       fi
     done <<< "$nic_list"
   fi
@@ -139,9 +162,11 @@ delete_storage_private_endpoints() {
       while IFS= read -r pend_name; do
         if [ -n "$pend_name" ]; then
           echo "  Deleting storage private endpoint: $pend_name"
+          # Use --no-wait to avoid blocking on connection state
           az network private-endpoint delete \
             --resource-group "$projectResourceGroup" \
             --name "$pend_name" \
+            --no-wait \
             2>&1 || echo "  Warning: Failed to delete $pend_name"
         fi
       done <<< "$pend_list"
@@ -164,6 +189,10 @@ delete_storage_private_endpoints() {
       done <<< "$nic_list"
     fi
   done
+  
+  # Wait a bit for private endpoint deletions to process
+  echo "  Waiting 10 seconds for private endpoint deletions to process..."
+  sleep 10
 }
 
 # =============================================================================
@@ -2062,9 +2091,54 @@ if [ "$deleteAllForProject" = "true" ]; then
     echo "No storage accounts found"
   fi
   
+  # Step 1a: Delete Storage Private Endpoints and NICs (pattern: p-sa-prj*)
+  echo ""
+  echo "=== Step 1a: Deleting Storage Private Endpoints (p-sa-prj*) ==="
+  storage_pends=$(az network private-endpoint list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'p-sa-prj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$storage_pends" ]; then
+    while IFS= read -r pend_name; do
+      if [ -n "$pend_name" ]; then
+        echo "Deleting storage private endpoint: $pend_name"
+        az network private-endpoint delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$pend_name" \
+          2>&1 || echo "  Warning: Failed to delete $pend_name"
+      fi
+    done <<< "$storage_pends"
+    echo "✓ Storage private endpoints deleted"
+  else
+    echo "No storage private endpoints found with prefix p-sa-prj"
+  fi
+  
+  # Delete storage NICs (pattern: p-sa-prj*)
+  echo "Deleting storage NICs (p-sa-prj*)"
+  storage_nics=$(az network nic list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'p-sa-prj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$storage_nics" ]; then
+    while IFS= read -r nic_name; do
+      if [ -n "$nic_name" ]; then
+        echo "Deleting storage NIC: $nic_name"
+        az network nic delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$nic_name" \
+          2>&1 || echo "  Warning: Failed to delete $nic_name"
+      fi
+    done <<< "$storage_nics"
+    echo "✓ Storage NICs deleted"
+  else
+    echo "No storage NICs found with prefix p-sa-prj"
+  fi
+  
   # Step 2: Delete Application Insights
   echo ""
-  echo "=== Step 2: Deleting Application Insights ==="
+  echo "=== Step 2: Deleting Application Insights (all in resource group) ==="
   app_insights=$(az monitor app-insights component list \
     --resource-group "$projectResourceGroup" \
     --query "[].name" \
@@ -2082,7 +2156,7 @@ if [ "$deleteAllForProject" = "true" ]; then
     done <<< "$app_insights"
     echo "✓ Application Insights deleted"
   else
-    echo "No Application Insights found"
+    echo "No Application Insights found with prefix ain-prj"
   fi
   
   # Step 3: Delete Dashboards
@@ -2134,27 +2208,204 @@ if [ "$deleteAllForProject" = "true" ]; then
     echo "No Key Vaults found"
   fi
   
+  # Step 4a: Delete AI Search Private Endpoints (aisearchprj*)
+  echo ""
+  echo "=== Step 4a: Deleting AI Search Private Endpoints (aisearchprj*) ==="
+  aisearch_pends=$(az network private-endpoint list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'aisearchprj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$aisearch_pends" ]; then
+    while IFS= read -r pend_name; do
+      if [ -n "$pend_name" ]; then
+        echo "Deleting AI Search private endpoint: $pend_name"
+        az network private-endpoint delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$pend_name" \
+          2>&1 || echo "  Warning: Failed to delete $pend_name"
+      fi
+    done <<< "$aisearch_pends"
+    echo "✓ AI Search private endpoints deleted"
+  else
+    echo "No AI Search private endpoints found with prefix aisearchprj"
+  fi
+  
+  # Delete AI Search NICs
+  aisearch_nics=$(az network nic list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'aisearchprj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$aisearch_nics" ]; then
+    while IFS= read -r nic_name; do
+      if [ -n "$nic_name" ]; then
+        echo "Deleting AI Search NIC: $nic_name"
+        az network nic delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$nic_name" \
+          2>&1 || echo "  Warning: Failed to delete $nic_name"
+      fi
+    done <<< "$aisearch_nics"
+    echo "✓ AI Search NICs deleted"
+  fi
+  
+  # Step 4b: Delete AI Hub Private Endpoints (p-aihub-prj*)
+  echo ""
+  echo "=== Step 4b: Deleting AI Hub Private Endpoints (p-aihub-prj*) ==="
+  aihub_pends=$(az network private-endpoint list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'p-aihub-prj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$aihub_pends" ]; then
+    while IFS= read -r pend_name; do
+      if [ -n "$pend_name" ]; then
+        echo "Deleting AI Hub private endpoint: $pend_name"
+        az network private-endpoint delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$pend_name" \
+          2>&1 || echo "  Warning: Failed to delete $pend_name"
+      fi
+    done <<< "$aihub_pends"
+    echo "✓ AI Hub private endpoints deleted"
+  else
+    echo "No AI Hub private endpoints found with prefix p-aihub-prj"
+  fi
+  
+  # Delete AI Hub NICs
+  aihub_nics=$(az network nic list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'p-aihub-prj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$aihub_nics" ]; then
+    while IFS= read -r nic_name; do
+      if [ -n "$nic_name" ]; then
+        echo "Deleting AI Hub NIC: $nic_name"
+        az network nic delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$nic_name" \
+          2>&1 || echo "  Warning: Failed to delete $nic_name"
+      fi
+    done <<< "$aihub_nics"
+    echo "✓ AI Hub NICs deleted"
+  fi
+  
+  # Step 4c: Delete User Assigned Managed Identities (mi-prj* and mi-aca-prj*)
+  echo ""
+  echo "=== Step 4c: Deleting User Assigned Managed Identities (mi-prj*, mi-aca-prj*) ==="
+  uamis=$(az identity list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'mi-prj') || starts_with(name, 'mi-aca-prj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$uamis" ]; then
+    while IFS= read -r uami_name; do
+      if [ -n "$uami_name" ]; then
+        echo "Deleting User Assigned Managed Identity: $uami_name"
+        az identity delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$uami_name" \
+          2>&1 || echo "  Warning: Failed to delete $uami_name"
+      fi
+    done <<< "$uamis"
+    echo "✓ User Assigned Managed Identities deleted"
+  else
+    echo "No User Assigned Managed Identities found with prefix mi-prj or mi-aca-prj"
+  fi
+  
   # Step 5: Delete All Remaining Private Endpoints
   echo ""
-  echo "=== Step 5: Deleting All Remaining Private Endpoints ==="
+  echo "=== Step 5: Deleting All Remaining Private Endpoints (with force delete) ==="
+  pend_deletion_failures=0
   all_pends=$(az network private-endpoint list \
     --resource-group "$projectResourceGroup" \
     --query "[].name" \
     -o tsv 2>/dev/null || echo "")
   
   if [ -n "$all_pends" ]; then
+    subscriptionId=$(az account show --query id -o tsv)
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
-        echo "Deleting private endpoint: $pend_name"
+        echo "Deleting private endpoint: $pend_name (using --no-wait)"
+        # Try normal delete with --no-wait first
         az network private-endpoint delete \
           --resource-group "$projectResourceGroup" \
           --name "$pend_name" \
-          2>&1 || echo "  Warning: Failed to delete $pend_name"
+          --no-wait \
+          2>&1
+        
+        # If that fails, try REST API force delete
+        if [ $? -ne 0 ]; then
+          echo "  Normal delete failed, attempting force delete via REST API"
+          rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
+          az rest --method DELETE --url "$rest_url" 2>&1
+          if [ $? -ne 0 ]; then
+            echo "  ❌ Force delete also failed for $pend_name"
+            pend_deletion_failures=$((pend_deletion_failures + 1))
+          fi
+        fi
       fi
     done <<< "$all_pends"
-    echo "✓ All private endpoints deleted"
+    
+    # Wait for deletions to process
+    echo "  Waiting 30 seconds for private endpoint deletions to process..."
+    sleep 30
+    
+    if [ $pend_deletion_failures -gt 0 ]; then
+      echo "⚠️  Private endpoint deletion completed with $pend_deletion_failures failures"
+    else
+      echo "✓ All private endpoints deletion initiated successfully"
+    fi
   else
     echo "No private endpoints found"
+  fi
+  
+  # Step 5a: Delete All Remaining NICs
+  echo ""
+  echo "=== Step 5a: Deleting All Remaining Network Interfaces ==="
+  nic_deletion_failures=0
+  all_nics=$(az network nic list \
+    --resource-group "$projectResourceGroup" \
+    --query "[].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$all_nics" ]; then
+    while IFS= read -r nic_name; do
+      if [ -n "$nic_name" ]; then
+        echo "Deleting NIC: $nic_name"
+        az network nic delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$nic_name" \
+          2>&1
+        if [ $? -ne 0 ]; then
+          echo "  ❌ Failed to delete $nic_name"
+          nic_deletion_failures=$((nic_deletion_failures + 1))
+        fi
+      fi
+    done <<< "$all_nics"
+    
+    if [ $nic_deletion_failures -gt 0 ]; then
+      echo "⚠️  NIC deletion completed with $nic_deletion_failures failures"
+    else
+      echo "✓ All NICs deleted successfully"
+    fi
+  else
+    echo "No NICs found"
+  fi
+  
+  # Check if we should proceed with subnet/NSG deletion
+  total_network_failures=$((pend_deletion_failures + nic_deletion_failures))
+  if [ $total_network_failures -gt 0 ]; then
+    echo ""
+    echo "⚠️⚠️⚠️ WARNING: $total_network_failures private endpoint/NIC deletion failures detected"
+    echo "⚠️  Skipping subnet and NSG deletion to avoid errors"
+    echo "⚠️  Private endpoints and NICs must be fully deleted before subnets/NSGs can be removed"
+    echo "⚠️  Please resolve the failures and run the deletion again"
+    skip_subnet_nsg_deletion=true
+  else
+    skip_subnet_nsg_deletion=false
   fi
   
   # Step 6: Wait for resources to fully release
@@ -2164,53 +2415,70 @@ if [ "$deleteAllForProject" = "true" ]; then
   sleep 300
   echo "✓ Wait completed"
   
-  # Step 7: Build common resource group name
-  commonResourceGroup="${commonRGNamePrefix}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+  # Step 7: Build common resource group name (with vnetResourceGroupBase)
+  # Match the naming convention from pipeline: ${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}
+  commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
   echo ""
   echo "=== Step 7: Deleting Subnets in Common Resource Group ==="
-  echo "Common resource group: $commonResourceGroup"
-  echo "Looking for subnets containing: $projectName"
   
-  # Find all VNets in common resource group
-  vnets=$(az network vnet list \
-    --resource-group "$commonResourceGroup" \
-    --query "[].name" \
-    -o tsv 2>/dev/null || echo "")
-  
-  if [ -n "$vnets" ]; then
-    while IFS= read -r vnet_name; do
-      if [ -n "$vnet_name" ]; then
-        echo "Checking VNet: $vnet_name"
-        # List subnets containing project identifier
-        subnets=$(az network vnet subnet list \
-          --resource-group "$commonResourceGroup" \
-          --vnet-name "$vnet_name" \
-          --query "[?contains(name, '$projectName')].name" \
-          -o tsv 2>/dev/null || echo "")
-        
-        if [ -n "$subnets" ]; then
-          while IFS= read -r subnet_name; do
-            if [ -n "$subnet_name" ]; then
-              echo "  Deleting subnet: $subnet_name from VNet: $vnet_name"
-              az network vnet subnet delete \
-                --resource-group "$commonResourceGroup" \
-                --vnet-name "$vnet_name" \
-                --name "$subnet_name" \
-                2>&1 || echo "    Warning: Failed to delete subnet $subnet_name"
-            fi
-          done <<< "$subnets"
-        fi
-      fi
-    done <<< "$vnets"
-    echo "✓ Subnets deleted"
+  if [ "$skip_subnet_nsg_deletion" = "true" ]; then
+    echo "⚠️  SKIPPED: Private endpoint/NIC deletion failures detected"
+    echo "⚠️  Subnets cannot be deleted until all private endpoints and NICs are removed"
   else
-    echo "No VNets found in common resource group"
+    echo "Common resource group: $commonResourceGroup"
+    echo "Looking for subnets containing: $projectName"
+    echo "Debug - commonRGNamePrefix: $commonRGNamePrefix"
+    echo "Debug - vnetResourceGroupBase: $vnetResourceGroupBase"
+    echo "Debug - locationSuffix: $locationSuffix"
+    echo "Debug - envName: $envName"
+    echo "Debug - aifactorySuffixRG: $aifactorySuffixRG"
+  
+    # Find all VNets in common resource group
+    vnets=$(az network vnet list \
+      --resource-group "$commonResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null || echo "")
+    
+    if [ -n "$vnets" ]; then
+      while IFS= read -r vnet_name; do
+        if [ -n "$vnet_name" ]; then
+          echo "Checking VNet: $vnet_name"
+          # List subnets containing project identifier
+          subnets=$(az network vnet subnet list \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --query "[?contains(name, '$projectName')].name" \
+            -o tsv 2>/dev/null || echo "")
+          
+          if [ -n "$subnets" ]; then
+            while IFS= read -r subnet_name; do
+              if [ -n "$subnet_name" ]; then
+                echo "  Deleting subnet: $subnet_name from VNet: $vnet_name"
+                az network vnet subnet delete \
+                  --resource-group "$commonResourceGroup" \
+                  --vnet-name "$vnet_name" \
+                  --name "$subnet_name" \
+                  2>&1 || echo "    Warning: Failed to delete subnet $subnet_name"
+              fi
+            done <<< "$subnets"
+          fi
+        fi
+      done <<< "$vnets"
+      echo "✓ Subnets deleted"
+    else
+      echo "No VNets found in common resource group"
+    fi
   fi
   
   # Step 8: Delete Network Security Groups
   echo ""
   echo "=== Step 8: Deleting Network Security Groups in Common Resource Group ==="
-  echo "Looking for NSGs containing: $projectName"
+  
+  if [ "$skip_subnet_nsg_deletion" = "true" ]; then
+    echo "⚠️  SKIPPED: Private endpoint/NIC deletion failures detected"
+    echo "⚠️  NSGs cannot be deleted until all private endpoints and NICs are removed"
+  else
+    echo "Looking for NSGs containing: $projectName"
   
   nsgs=$(az network nsg list \
     --resource-group "$commonResourceGroup" \
@@ -2229,7 +2497,31 @@ if [ "$deleteAllForProject" = "true" ]; then
     done <<< "$nsgs"
     echo "✓ Network Security Groups deleted"
   else
-    echo "No NSGs found containing $projectName"
+  if [ "$skip_subnet_nsg_deletion" = "true" ]; then
+    echo "⚠️  SKIPPED: Private endpoint/NIC deletion failures detected"
+    echo "⚠️  NSGs cannot be deleted until all private endpoints and NICs are removed"
+  else
+    echo "Looking for NSGs containing: $projectName"
+  
+    nsgs=$(az network nsg list \
+      --resource-group "$commonResourceGroup" \
+      --query "[?contains(name, '$projectName')].name" \
+      -o tsv 2>/dev/null || echo "")
+    
+    if [ -n "$nsgs" ]; then
+      while IFS= read -r nsg_name; do
+        if [ -n "$nsg_name" ]; then
+          echo "Deleting NSG: $nsg_name"
+          az network nsg delete \
+            --resource-group "$commonResourceGroup" \
+            --name "$nsg_name" \
+            2>&1 || echo "  Warning: Failed to delete NSG $nsg_name"
+        fi
+      done <<< "$nsgs"
+      echo "✓ Network Security Groups deleted"
+    else
+      echo "No NSGs found containing $projectName"
+    fi
   fi
   
   echo ""
