@@ -50,6 +50,21 @@ param subnetNamePend string = ''
 @description('Create private endpoint')
 param createPrivateEndpoint bool = true
 
+@description('Array of principal IDs for users or AD groups')
+param usersOrAdGroupArray array = []
+
+@description('Array of principal IDs for service principals and managed identities')
+param servicePrincipleAndMIArray array = []
+
+@description('Use AD Groups instead of individual users')
+param useAdGroups bool = false
+
+@description('Role to assign to users/groups - defaults to Contributor')
+param userRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
+
+@description('Role to assign to service principals/managed identities - defaults to Contributor')
+param spRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
+
 // ============== LOCATION CONVERSION ==============
 // Elasticsearch: If Sweden Central is chosen, use North Europe instead (Elasticsearch service requirement)
 var elasticsearchLocation = (toLower(location) == 'swedencentral' || toLower(location) == 'sweden central') ? 'northeurope' : location
@@ -74,6 +89,37 @@ resource elastic 'Microsoft.Elastic/monitors@2024-03-01' = {
     email: elasticEmail
   })
 }
+
+// ============== RBAC ROLE ASSIGNMENTS ==============
+// Azure Elastic built-in roles
+// https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+
+// Elastic Admin: bfb6c928-ebaa-4e44-bd4a-7468c1c7b2da
+// Elastic Reader: e71e9d0e-0384-4d07-b5eb-d3154b9a6a56
+// Contributor: b24988ac-6180-42a0-ab88-20f7382dd24c
+// Reader: acdd72a7-3385-48ef-bd42-f606fba81ae7
+
+// Role assignments for users or AD groups
+resource userElasticRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in usersOrAdGroupArray: {
+  name: guid(elastic.id, userRoleId, principalId)
+  scope: elastic
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', userRoleId)
+    principalId: principalId
+    principalType: useAdGroups ? 'Group' : 'User'
+  }
+}]
+
+// Role assignments for service principals and managed identities
+resource spElasticRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in servicePrincipleAndMIArray: {
+  name: guid(elastic.id, spRoleId, principalId)
+  scope: elastic
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', spRoleId)
+    principalId: principalId
+    principalType: 'ServicePrincipal'
+  }
+}]
 
 // ============== PRIVATE ENDPOINT ==============
 // Note: Private endpoint must be in same location as VNet (original location, not converted)
@@ -113,6 +159,18 @@ output elasticName string = elastic.name
 
 @description('Actual location used for Elasticsearch (North Europe if Sweden Central was specified)')
 output elasticsearchLocation string = elasticsearchLocation
+
+@description('RBAC role assignments for users/groups')
+output userElasticRoleAssignments array = [for i in range(0, length(usersOrAdGroupArray)): {
+  id: userElasticRoleAssignment[i].id
+  name: userElasticRoleAssignment[i].name
+}]
+
+@description('RBAC role assignments for service principals/managed identities')
+output spElasticRoleAssignments array = [for i in range(0, length(servicePrincipleAndMIArray)): {
+  id: spElasticRoleAssignment[i].id
+  name: spElasticRoleAssignment[i].name
+}]
 
 @description('Private endpoint ID')
 output privateEndpointId string = createPrivateEndpoint && !enablePublicGenAIAccess && !enablePublicAccessWithPerimeter && !empty(vnetName) ? privateEndpoint.id : ''
