@@ -87,30 +87,22 @@ delete_private_endpoints() {
     -o tsv 2>/dev/null || echo "")
   
   if [ -n "$pend_list" ]; then
+    subscriptionId=$(az account show --query id -o tsv)
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
         echo "  Deleting private endpoint: $pend_name"
         
-        # Step 1: Get the private endpoint connection ID from the target resource
-        connection_id=$(az network private-endpoint show \
-          --resource-group "$projectResourceGroup" \
-          --name "$pend_name" \
-          --query "privateLinkServiceConnections[0].id" \
-          -o tsv 2>/dev/null || echo "")
-        
-        # Step 2: Try to delete using --no-wait to avoid blocking on connection state
+        # Try normal delete, fallback to REST API force delete
         az network private-endpoint delete \
           --resource-group "$projectResourceGroup" \
           --name "$pend_name" \
-          --no-wait \
-          2>&1 || echo "  Warning: Failed to delete private endpoint $pend_name (trying force delete)"
+          2>&1
         
-        # Step 3: If normal delete failed, try REST API force delete
+        # If normal delete failed, try REST API force delete
         if [ $? -ne 0 ]; then
-          echo "  Attempting force delete via REST API for: $pend_name"
-          subscriptionId=$(az account show --query id -o tsv)
+          echo "    Attempting force delete via REST API for: $pend_name"
           rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
-          az rest --method DELETE --url "$rest_url" 2>&1 || echo "  Warning: Force delete also failed for $pend_name"
+          az rest --method DELETE --url "$rest_url" 2>&1 || echo "    Warning: Force delete also failed for $pend_name"
         fi
       fi
     done <<< "$pend_list"
@@ -151,6 +143,8 @@ delete_storage_private_endpoints() {
     "${storage_name}-table-pend"
   )
   
+  subscriptionId=$(az account show --query id -o tsv)
+  
   for pattern in "${storage_pend_patterns[@]}"; do
     # Find exact match or with suffix
     pend_list=$(az network private-endpoint list \
@@ -162,12 +156,17 @@ delete_storage_private_endpoints() {
       while IFS= read -r pend_name; do
         if [ -n "$pend_name" ]; then
           echo "  Deleting storage private endpoint: $pend_name"
-          # Use --no-wait to avoid blocking on connection state
+          # Try normal delete, fallback to REST API force delete
           az network private-endpoint delete \
             --resource-group "$projectResourceGroup" \
             --name "$pend_name" \
-            --no-wait \
-            2>&1 || echo "  Warning: Failed to delete $pend_name"
+            2>&1
+          
+          if [ $? -ne 0 ]; then
+            echo "    Normal delete failed, attempting force delete via REST API"
+            rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
+            az rest --method DELETE --url "$rest_url" 2>&1 || echo "    Warning: Force delete also failed for $pend_name"
+          fi
         fi
       done <<< "$pend_list"
     fi
@@ -189,10 +188,6 @@ delete_storage_private_endpoints() {
       done <<< "$nic_list"
     fi
   done
-  
-  # Wait a bit for private endpoint deletions to process
-  echo "  Waiting 10 seconds for private endpoint deletions to process..."
-  sleep 10
 }
 
 # =============================================================================
@@ -2328,35 +2323,35 @@ if [ "$deleteAllForProject" = "true" ]; then
     subscriptionId=$(az account show --query id -o tsv)
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
-        echo "Deleting private endpoint: $pend_name (using --no-wait)"
-        # Try normal delete with --no-wait first
-        az network private-endpoint delete \
+        echo "Deleting private endpoint: $pend_name"
+        # Try normal delete first (without --no-wait to detect failures)
+        delete_output=$(az network private-endpoint delete \
           --resource-group "$projectResourceGroup" \
           --name "$pend_name" \
-          --no-wait \
-          2>&1
+          2>&1)
+        delete_exit_code=$?
         
-        # If that fails, try REST API force delete
-        if [ $? -ne 0 ]; then
+        # If normal delete fails, try REST API force delete
+        if [ $delete_exit_code -ne 0 ]; then
           echo "  Normal delete failed, attempting force delete via REST API"
           rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
           az rest --method DELETE --url "$rest_url" 2>&1
           if [ $? -ne 0 ]; then
             echo "  ❌ Force delete also failed for $pend_name"
             pend_deletion_failures=$((pend_deletion_failures + 1))
+          else
+            echo "  ✓ Force delete succeeded for $pend_name"
           fi
+        else
+          echo "  ✓ Deleted successfully"
         fi
       fi
     done <<< "$all_pends"
     
-    # Wait for deletions to process
-    echo "  Waiting 30 seconds for private endpoint deletions to process..."
-    sleep 30
-    
     if [ $pend_deletion_failures -gt 0 ]; then
       echo "⚠️  Private endpoint deletion completed with $pend_deletion_failures failures"
     else
-      echo "✓ All private endpoints deletion initiated successfully"
+      echo "✓ All private endpoints deleted successfully"
     fi
   else
     echo "No private endpoints found"
