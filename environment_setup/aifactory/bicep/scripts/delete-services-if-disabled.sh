@@ -2497,31 +2497,8 @@ if [ "$deleteAllForProject" = "true" ]; then
     done <<< "$nsgs"
     echo "✓ Network Security Groups deleted"
   else
-  if [ "$skip_subnet_nsg_deletion" = "true" ]; then
-    echo "⚠️  SKIPPED: Private endpoint/NIC deletion failures detected"
-    echo "⚠️  NSGs cannot be deleted until all private endpoints and NICs are removed"
-  else
-    echo "Looking for NSGs containing: $projectName"
-  
-    nsgs=$(az network nsg list \
-      --resource-group "$commonResourceGroup" \
-      --query "[?contains(name, '$projectName')].name" \
-      -o tsv 2>/dev/null || echo "")
-    
-    if [ -n "$nsgs" ]; then
-      while IFS= read -r nsg_name; do
-        if [ -n "$nsg_name" ]; then
-          echo "Deleting NSG: $nsg_name"
-          az network nsg delete \
-            --resource-group "$commonResourceGroup" \
-            --name "$nsg_name" \
-            2>&1 || echo "  Warning: Failed to delete NSG $nsg_name"
-        fi
-      done <<< "$nsgs"
-      echo "✓ Network Security Groups deleted"
-    else
-      echo "No NSGs found containing $projectName"
-    fi
+    echo "No NSGs found containing $projectName"
+  fi
   fi
   
   echo ""
