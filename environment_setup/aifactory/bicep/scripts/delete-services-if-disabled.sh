@@ -88,42 +88,58 @@ delete_private_endpoints() {
   
   if [ -n "$pend_list" ]; then
     subscriptionId=$(az account show --query id -o tsv)
+    declare -a successfully_deleted=()
+    
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
         echo "  Deleting private endpoint: $pend_name"
         
-        # Try normal delete, fallback to REST API force delete
-        az network private-endpoint delete \
+        # Try normal delete first
+        if az network private-endpoint delete \
           --resource-group "$projectResourceGroup" \
           --name "$pend_name" \
-          2>&1
-        
-        # If normal delete failed, try REST API force delete
-        if [ $? -ne 0 ]; then
-          echo "    Attempting force delete via REST API for: $pend_name"
+          2>&1; then
+          successfully_deleted+=("$pend_name")
+          echo "    ✓ Successfully deleted $pend_name"
+        else
+          # Normal delete failed, try REST API force delete
+          echo "    Normal delete failed, attempting force delete via REST API"
           rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
-          az rest --method DELETE --url "$rest_url" 2>&1 || echo "    Warning: Force delete also failed for $pend_name"
+          
+          if az rest --method DELETE --url "$rest_url" 2>&1; then
+            successfully_deleted+=("$pend_name")
+            echo "    ✓ Force delete succeeded for $pend_name"
+          else
+            echo "    ⚠️  Both normal and force delete failed for $pend_name"
+          fi
         fi
       fi
     done <<< "$pend_list"
+    
+    # Wait for deletions to complete
+    if [ ${#successfully_deleted[@]} -gt 0 ]; then
+      echo "  Waiting 10 seconds for private endpoint deletions to complete..."
+      sleep 10
+    fi
   else
     echo "  No private endpoints found for $resource_name"
   fi
   
-  # Also check for NICs with similar patterns
+  # Also check for NICs with similar patterns (only after private endpoints are handled)
   nic_list=$(az network nic list \
     --resource-group "$projectResourceGroup" \
     --query "[?(starts_with(name, '${resource_name}-pend') || starts_with(name, '${resource_name}.nic'))].name" \
     -o tsv 2>/dev/null || echo "")
   
   if [ -n "$nic_list" ]; then
+    echo "  Cleaning up NICs for $resource_name..."
     while IFS= read -r nic_name; do
       if [ -n "$nic_name" ]; then
-        echo "  Deleting NIC: $nic_name"
+        echo "    Deleting NIC: $nic_name"
         az network nic delete \
           --resource-group "$projectResourceGroup" \
           --name "$nic_name" \
-          2>&1 || echo "  Warning: Failed to delete NIC $nic_name"
+          2>&1 || echo "      ⚠️  Failed to delete NIC $nic_name"
       fi
     done <<< "$nic_list"
   fi
@@ -137,57 +153,118 @@ delete_storage_private_endpoints() {
   
   # Storage has special naming: storagename-file-pend, storagename-blob-pend, etc.
   storage_pend_patterns=(
-    "${storage_name}-file-pend"
-    "${storage_name}-blob-pend"
-    "${storage_name}-queue-pend"
-    "${storage_name}-table-pend"
+    "${storage_name}-file"
+    "${storage_name}-blob"
+    "${storage_name}-queue"
+    "${storage_name}-table"
   )
   
   subscriptionId=$(az account show --query id -o tsv)
+  declare -a all_pends_to_delete=()
   
+  # First, collect all private endpoints to delete
   for pattern in "${storage_pend_patterns[@]}"; do
-    # Find exact match or with suffix
+    # Find exact match or with suffix (e.g., pattern-genai, pattern-genaiml)
     pend_list=$(az network private-endpoint list \
       --resource-group "$projectResourceGroup" \
-      --query "[?starts_with(name, '${pattern}')].name" \
+      --query "[?starts_with(name, 'p-${pattern}') || starts_with(name, '${pattern}-pend')].name" \
       -o tsv 2>/dev/null || echo "")
     
     if [ -n "$pend_list" ]; then
       while IFS= read -r pend_name; do
         if [ -n "$pend_name" ]; then
-          echo "  Deleting storage private endpoint: $pend_name"
-          # Try normal delete, fallback to REST API force delete
-          az network private-endpoint delete \
-            --resource-group "$projectResourceGroup" \
-            --name "$pend_name" \
-            2>&1
-          
-          if [ $? -ne 0 ]; then
-            echo "    Normal delete failed, attempting force delete via REST API"
-            rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
-            az rest --method DELETE --url "$rest_url" 2>&1 || echo "    Warning: Force delete also failed for $pend_name"
-          fi
+          all_pends_to_delete+=("$pend_name")
         fi
       done <<< "$pend_list"
     fi
+  done
+  
+  # Delete all collected private endpoints
+  if [ ${#all_pends_to_delete[@]} -gt 0 ]; then
+    echo "  Found ${#all_pends_to_delete[@]} storage private endpoints to delete"
     
-    # Also clean up NICs
+    for pend_name in "${all_pends_to_delete[@]}"; do
+      echo "  Deleting storage private endpoint: $pend_name"
+      
+      # Try normal delete first
+      if az network private-endpoint delete \
+        --resource-group "$projectResourceGroup" \
+        --name "$pend_name" \
+        2>&1; then
+        echo "    ✓ Successfully deleted $pend_name"
+      else
+        # Normal delete failed, try REST API force delete
+        echo "    Normal delete failed, attempting force delete via REST API"
+        rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
+        
+        if az rest --method DELETE --url "$rest_url" 2>&1; then
+          echo "    ✓ Force delete succeeded for $pend_name"
+        else
+          echo "    ⚠️  Both normal and force delete failed for $pend_name"
+        fi
+      fi
+    done
+    
+    # Wait for deletions to complete
+    echo "  Waiting 15 seconds for private endpoint deletions to complete..."
+    sleep 15
+    
+    # Verify deletions
+    local retry_needed=false
+    for pattern in "${storage_pend_patterns[@]}"; do
+      remaining=$(az network private-endpoint list \
+        --resource-group "$projectResourceGroup" \
+        --query "[?starts_with(name, 'p-${pattern}') || starts_with(name, '${pattern}-pend')].name" \
+        -o tsv 2>/dev/null || echo "")
+      
+      if [ -n "$remaining" ]; then
+        echo "  ⚠️  Some private endpoints still exist, will retry"
+        retry_needed=true
+        
+        while IFS= read -r pend_name; do
+          if [ -n "$pend_name" ]; then
+            echo "    Retrying force delete for: $pend_name"
+            rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
+            az rest --method DELETE --url "$rest_url" 2>&1 || echo "      Warning: Retry failed for $pend_name"
+          fi
+        done <<< "$remaining"
+      fi
+    done
+    
+    if [ "$retry_needed" = true ]; then
+      echo "  Waiting additional 15 seconds after retries..."
+      sleep 15
+    fi
+  else
+    echo "  No storage private endpoints found for $storage_name"
+  fi
+  
+  # Now clean up NICs (only after private endpoints are handled)
+  echo "  Cleaning up storage NICs..."
+  local any_nics_found=false
+  
+  for pattern in "${storage_pend_patterns[@]}"; do
     nic_list=$(az network nic list \
       --resource-group "$projectResourceGroup" \
-      --query "[?starts_with(name, '${pattern}')].name" \
+      --query "[?starts_with(name, 'p-${pattern}') || starts_with(name, '${pattern}-pend')].name" \
       -o tsv 2>/dev/null || echo "")
     
     if [ -n "$nic_list" ]; then
+      any_nics_found=true
       while IFS= read -r nic_name; do
         if [ -n "$nic_name" ]; then
-          echo "  Deleting storage NIC: $nic_name"
+          echo "    Deleting storage NIC: $nic_name"
           az network nic delete \
             --resource-group "$projectResourceGroup" \
-            --name "$nic_name" 2>&1 || echo "  Warning: Failed to delete $nic_name"
+            --name "$nic_name" 2>&1 || echo "      ⚠️  Failed to delete $nic_name (may still be in use)"
         fi
       done <<< "$nic_list"
     fi
   done
+  
+  if [ "$any_nics_found" = false ]; then
+    echo "    No storage NICs found"
+  fi
 }
 
 # =============================================================================
@@ -2094,23 +2171,84 @@ if [ "$deleteAllForProject" = "true" ]; then
     --query "[?starts_with(name, 'p-sa-prj')].name" \
     -o tsv 2>/dev/null || echo "")
   
+  subscriptionId=$(az account show --query id -o tsv)
+  
   if [ -n "$storage_pends" ]; then
+    # Track which endpoints were successfully deleted
+    declare -a successfully_deleted_pends=()
+    
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
         echo "Deleting storage private endpoint: $pend_name"
-        az network private-endpoint delete \
+        
+        # Try normal delete first
+        if az network private-endpoint delete \
           --resource-group "$projectResourceGroup" \
           --name "$pend_name" \
-          2>&1 || echo "  Warning: Failed to delete $pend_name"
+          2>&1; then
+          successfully_deleted_pends+=("$pend_name")
+        else
+          # Normal delete failed, try REST API force delete
+          echo "  Normal delete failed, attempting force delete via REST API"
+          rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
+          
+          if az rest --method DELETE --url "$rest_url" 2>&1; then
+            successfully_deleted_pends+=("$pend_name")
+            echo "  ✓ Force delete succeeded for $pend_name"
+          else
+            echo "  ⚠️  Force delete also failed for $pend_name - will retry after pause"
+          fi
+        fi
       fi
     done <<< "$storage_pends"
-    echo "✓ Storage private endpoints deleted"
+    
+    # Wait for private endpoints to be fully deleted before attempting NIC deletion
+    echo ""
+    echo "Waiting 15 seconds for private endpoint deletions to complete..."
+    sleep 15
+    
+    # Verify and retry failed deletions
+    echo "Verifying private endpoint deletions..."
+    remaining_pends=$(az network private-endpoint list \
+      --resource-group "$projectResourceGroup" \
+      --query "[?starts_with(name, 'p-sa-prj')].name" \
+      -o tsv 2>/dev/null || echo "")
+    
+    if [ -n "$remaining_pends" ]; then
+      echo "⚠️  Some private endpoints still exist, retrying with force delete..."
+      while IFS= read -r pend_name; do
+        if [ -n "$pend_name" ]; then
+          echo "  Retrying force delete for: $pend_name"
+          rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
+          az rest --method DELETE --url "$rest_url" 2>&1 || echo "    Warning: Retry failed for $pend_name"
+        fi
+      done <<< "$remaining_pends"
+      
+      echo "Waiting additional 15 seconds..."
+      sleep 15
+    fi
+    
+    echo "✓ Storage private endpoints deletion initiated"
   else
     echo "No storage private endpoints found with prefix p-sa-prj"
   fi
   
-  # Delete storage NICs (pattern: p-sa-prj*)
+  # Delete storage NICs (pattern: p-sa-prj*) - only after private endpoints are gone
+  echo ""
   echo "Deleting storage NICs (p-sa-prj*)"
+  
+  # Re-check for remaining private endpoints before deleting NICs
+  remaining_pends=$(az network private-endpoint list \
+    --resource-group "$projectResourceGroup" \
+    --query "[?starts_with(name, 'p-sa-prj')].name" \
+    -o tsv 2>/dev/null || echo "")
+  
+  if [ -n "$remaining_pends" ]; then
+    echo "⚠️  WARNING: Some private endpoints still exist. NICs may fail to delete:"
+    echo "$remaining_pends"
+    echo "Proceeding with NIC deletion (may encounter errors)..."
+  fi
+  
   storage_nics=$(az network nic list \
     --resource-group "$projectResourceGroup" \
     --query "[?starts_with(name, 'p-sa-prj')].name" \
@@ -2123,10 +2261,10 @@ if [ "$deleteAllForProject" = "true" ]; then
         az network nic delete \
           --resource-group "$projectResourceGroup" \
           --name "$nic_name" \
-          2>&1 || echo "  Warning: Failed to delete $nic_name"
+          2>&1 || echo "  ⚠️  Failed to delete $nic_name (may still be in use by private endpoint)"
       fi
     done <<< "$storage_nics"
-    echo "✓ Storage NICs deleted"
+    echo "✓ Storage NICs deletion attempted"
   else
     echo "No storage NICs found with prefix p-sa-prj"
   fi
