@@ -2,6 +2,56 @@
 // ELASTICSEARCH (ELASTIC CLOUD) MODULE
 // Deploys Azure Elastic Cloud integration
 // ================================================================
+//
+// NETWORKING ARCHITECTURE:
+// This module implements APPROACH 1: Cross-Region Private Endpoint (recommended for most scenarios)
+//
+// APPROACH 1: Single VNet with Cross-Region Private Endpoint (CURRENT IMPLEMENTATION)
+// ---------------------------------------------------------------------------------
+// Architecture:
+//   Sweden Central VNet
+//   ├── All services (AI Hub, Storage, AI Search, etc.)
+//   ├── Private Endpoint for Elasticsearch ───────┐
+//                                                  │ Cross-region Azure Backbone
+//   North Europe                                   │
+//   └── Elasticsearch Service ◄────────────────────┘
+//
+// How it works:
+//   - Elasticsearch service: Deployed to North Europe (required region)
+//   - Private Endpoint: Deployed to Sweden Central (where VNet exists)
+//   - Connection: Private endpoint connects cross-region over Microsoft backbone
+//
+// Use this approach when:
+//   ✅ Most services are in Sweden Central
+//   ✅ Only Elasticsearch needs North Europe
+//   ✅ Latency < 10ms is acceptable
+//   ✅ You want simpler network management
+//   ✅ Lower cost is priority
+//
+// APPROACH 2: Dual VNet with Peering (Alternative - not implemented here)
+// ------------------------------------------------------------------------
+// Architecture:
+//   Sweden Central VNet                    North Europe VNet
+//   ├── All services                       ├── Elasticsearch Service
+//   ├── AI Hub, Storage, etc.              ├── Private Endpoint (local)
+//   └── Peered ◄────────────────────────► └── Peered
+//
+// Use this approach when:
+//   ✅ You have 3+ services in North Europe (not just Elasticsearch)
+//   ✅ You need sub-5ms latency from North Europe compute
+//   ✅ You're building multi-region infrastructure
+//   ✅ You need regional network isolation/segmentation
+//   ✅ Bandwidth-intensive workloads (multi-GB/s)
+//   ✅ Multi-region DR architecture
+//   ✅ Compliance requires traffic to stay within North Europe
+//
+// To implement Approach 2, you would need to:
+//   1. Create a separate VNet in North Europe
+//   2. Deploy private endpoint in North Europe VNet (not Sweden Central)
+//   3. Establish VNet peering between Sweden Central and North Europe VNets
+//   4. Configure routing and NSGs appropriately
+//
+// ================================================================
 
 @description('Elasticsearch monitor name')
 param name string
