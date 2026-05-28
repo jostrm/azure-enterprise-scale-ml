@@ -2275,21 +2275,37 @@ if [ "$deleteAllForProject" = "true" ]; then
   app_insights=$(az monitor app-insights component list \
     --resource-group "$projectResourceGroup" \
     --query "[].name" \
-    -o tsv 2>/dev/null || echo "")
+    -o tsv 2>/dev/null | tr -d '\r' || echo "")
   
   if [ -n "$app_insights" ]; then
+    ai_count=$(echo "$app_insights" | wc -l)
+    echo "Found $ai_count Application Insights instance(s)"
+    
     while IFS= read -r ai_name; do
       if [ -n "$ai_name" ]; then
-        echo "Deleting Application Insights: $ai_name"
-        az monitor app-insights component delete \
+        echo "  Deleting Application Insights: $ai_name"
+        if az monitor app-insights component delete \
           --resource-group "$projectResourceGroup" \
           --app "$ai_name" \
-          --yes 2>&1 || echo "  Warning: Failed to delete $ai_name"
+          --yes 2>&1; then
+          echo "    ✓ Successfully deleted: $ai_name"
+        else
+          echo "    ✗ Failed to delete: $ai_name"
+          # Try with REST API as fallback
+          subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
+          echo "    Attempting REST API force delete for $ai_name..."
+          if az rest --method DELETE \
+            --url "https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/microsoft.insights/components/${ai_name}?api-version=2020-02-02" 2>&1; then
+            echo "    ✓ REST API delete succeeded: $ai_name"
+          else
+            echo "    ✗ REST API delete also failed: $ai_name"
+          fi
+        fi
       fi
     done <<< "$app_insights"
-    echo "✓ Application Insights deleted"
+    echo "✓ Application Insights deletion completed"
   else
-    echo "No Application Insights found with prefix ain-prj"
+    echo "No Application Insights found in resource group"
   fi
   
   # Step 3: Delete Dashboards
