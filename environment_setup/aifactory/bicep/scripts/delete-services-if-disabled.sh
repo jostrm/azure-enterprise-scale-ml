@@ -84,10 +84,10 @@ delete_private_endpoints() {
   pend_list=$(az network private-endpoint list \
     --resource-group "$projectResourceGroup" \
     --query "[?(name == '${resource_name}' || starts_with(name, '${resource_name}-pend') || starts_with(name, 'p-${resource_name}') || starts_with(name, 'pend-${resource_name}'))].name" \
-    -o tsv 2>/dev/null || echo "")
+    -o tsv 2>/dev/null | tr -d '\r' || echo "")
   
   if [ -n "$pend_list" ]; then
-    subscriptionId=$(az account show --query id -o tsv)
+    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     declare -a successfully_deleted=()
     
     while IFS= read -r pend_name; do
@@ -159,7 +159,7 @@ delete_storage_private_endpoints() {
     "${storage_name}-table"
   )
   
-  subscriptionId=$(az account show --query id -o tsv)
+  subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
   declare -a all_pends_to_delete=()
   
   # First, collect all private endpoints to delete
@@ -168,7 +168,7 @@ delete_storage_private_endpoints() {
     pend_list=$(az network private-endpoint list \
       --resource-group "$projectResourceGroup" \
       --query "[?starts_with(name, 'p-${pattern}') || starts_with(name, '${pattern}-pend')].name" \
-      -o tsv 2>/dev/null || echo "")
+      -o tsv 2>/dev/null | tr -d '\r' || echo "")
     
     if [ -n "$pend_list" ]; then
       while IFS= read -r pend_name; do
@@ -215,13 +215,7 @@ delete_storage_private_endpoints() {
       remaining=$(az network private-endpoint list \
         --resource-group "$projectResourceGroup" \
         --query "[?starts_with(name, 'p-${pattern}') || starts_with(name, '${pattern}-pend')].name" \
-        -o tsv 2>/dev/null || echo "")
-      
-      if [ -n "$remaining" ]; then
-        echo "  ⚠️  Some private endpoints still exist, will retry"
-        retry_needed=true
-        
-        while IFS= read -r pend_name; do
+      -o tsv 2>/dev/null | tr -d '\r' || echo "")
           if [ -n "$pend_name" ]; then
             echo "    Retrying force delete for: $pend_name"
             rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"
@@ -354,11 +348,11 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
           --resource-group "$projectResourceGroup" \
           --service-name "$aisearch_name" \
           --query "[].name" \
-          -o tsv 2>/dev/null || echo "")
+          -o tsv 2>/dev/null | tr -d '\r' || echo "")
         
         if [ -n "$remaining_spl" ]; then
           echo "  Force deleting remaining shared private endpoints via REST API..."
-          subscriptionId=$(az account show --query id -o tsv)
+          subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
           while IFS= read -r remaining_pe; do
             if [ -n "$remaining_pe" ]; then
               echo "    Force deleting: $remaining_pe"
@@ -374,7 +368,7 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
     else
       echo "  No shared private endpoints found"
     fi
-    subscriptionId=$(az account show --query id -o tsv)
+    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     
     for shared_pe_name in "${foundry_shared_endpoints[@]}"; do
       echo "    Checking for: $shared_pe_name"
@@ -2169,9 +2163,9 @@ if [ "$deleteAllForProject" = "true" ]; then
   storage_pends=$(az network private-endpoint list \
     --resource-group "$projectResourceGroup" \
     --query "[?starts_with(name, 'p-sa-prj')].name" \
-    -o tsv 2>/dev/null || echo "")
+    -o tsv 2>/dev/null | tr -d '\r' || echo "")
   
-  subscriptionId=$(az account show --query id -o tsv)
+  subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
   
   if [ -n "$storage_pends" ]; then
     # Track which endpoints were successfully deleted
@@ -2212,7 +2206,7 @@ if [ "$deleteAllForProject" = "true" ]; then
     remaining_pends=$(az network private-endpoint list \
       --resource-group "$projectResourceGroup" \
       --query "[?starts_with(name, 'p-sa-prj')].name" \
-      -o tsv 2>/dev/null || echo "")
+      -o tsv 2>/dev/null | tr -d '\r' || echo "")
     
     if [ -n "$remaining_pends" ]; then
       echo "⚠️  Some private endpoints still exist, retrying with force delete..."
@@ -2455,10 +2449,10 @@ if [ "$deleteAllForProject" = "true" ]; then
   all_pends=$(az network private-endpoint list \
     --resource-group "$projectResourceGroup" \
     --query "[].name" \
-    -o tsv 2>/dev/null || echo "")
+    -o tsv 2>/dev/null | tr -d '\r' || echo "")
   
   if [ -n "$all_pends" ]; then
-    subscriptionId=$(az account show --query id -o tsv)
+    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
         echo "Deleting private endpoint: $pend_name"
