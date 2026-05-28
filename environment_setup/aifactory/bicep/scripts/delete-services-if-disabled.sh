@@ -21,8 +21,8 @@ projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced
 
 echo "Target resource group: $projectResourceGroup"
 
-# Override mode: deleteAllServicesForProject bypasses all enable_ flags (except KeyVault, Storage, AppInsights)
-# Ultra mode: deleteAllForProject deletes EVERYTHING including KeyVault, Storage, AppInsights, and networking in common RG
+# Complete mode: deleteAllServicesForProject deletes EVERYTHING including KeyVault, Storage, AppInsights, and networking resources in common RG (subnets, NSGs)
+# Ultra mode: deleteAllForProject does everything from deleteAllServicesForProject PLUS deletes the project resource group itself
 # Normalize to lowercase because ADO serializes unquoted YAML booleans as "True"/"False" (capital T/F)
 # and all bash comparisons in this script use lowercase "true"/"false"
 deleteAllServicesForProject=$(echo "${deleteAllServicesForProject:-false}" | tr '[:upper:]' '[:lower:]')
@@ -32,22 +32,23 @@ echo "=== Delete Mode ==="
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
 echo "deleteAllForProject: $deleteAllForProject"
 if [ "$deleteAllServicesForProject" = "true" ]; then
-  echo "⚠️  deleteAllServicesForProject=true: ALL services will be deleted (except KeyVault, Storage, AppInsights)"
+  echo "🔥 deleteAllServicesForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources in common RG"
 fi
 if [ "$deleteAllForProject" = "true" ]; then
-  echo "🔥 deleteAllForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources"
+  echo "💀 deleteAllForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, networking resources, AND the entire project resource group"
 fi
 
 # =============================================================================
 # SERVICES THAT ARE ** NEVER ** DELETED BY THIS SCRIPT (any flag value):
-#   - Key Vault          (foundational secret store)
-#   - Storage Accounts   (foundational data plane)
-#   - Application Insights / Dashboard Insights (foundational observability)
+#   - Key Vault          (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
+#   - Storage Accounts   (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
+#   - Application Insights / Dashboard Insights (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
 #   - AI Foundry Hub v1 (MachineLearningServices/workspaces kind=Hub)
 #   - AI Foundry V2 / Azure OpenAI / AI Services (CognitiveServices) -
 #       these are handled by 04_Purge_SoftDeleted after soft-delete settles
-#   - Managed Identities (miPrjExists / miACAExists)
+#   - Managed Identities (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
 # =============================================================================
+# IMPORTANT: Common RG and VNet RG are NEVER deleted - only project resources and networking resources (subnets, NSGs) in common RG
 
 # Check networking mode to determine if private endpoints are expected
 allowPublic="$allowPublicAccessWhenBehindVnet"
@@ -2127,14 +2128,20 @@ echo ""
 echo "=== Standard deletion completed ==="
 
 # =============================================================================
-# ULTRA DELETE MODE: deleteAllForProject=true
+# COMPLETE DELETE MODE: deleteAllServicesForProject=true OR deleteAllForProject=true
 # Delete everything remaining in project RG + networking resources in common RG
 # =============================================================================
 
-if [ "$deleteAllForProject" = "true" ]; then
+if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "true" ]; then
   echo ""
   echo "🔥🔥🔥 ======================================== 🔥🔥🔥"
-  echo "🔥 ULTRA DELETE MODE: deleteAllForProject=true"
+  if [ "$deleteAllForProject" = "true" ]; then
+    echo "💀 ULTRA DELETE MODE: deleteAllForProject=true"
+    echo "💀 Will delete everything + project resource group"
+  else
+    echo "🔥 COMPLETE DELETE MODE: deleteAllServicesForProject=true"
+    echo "🔥 Will delete everything except project resource group"
+  fi
   echo "🔥🔥🔥 ======================================== 🔥🔥🔥"
   echo ""
   
@@ -2652,10 +2659,61 @@ if [ "$deleteAllForProject" = "true" ]; then
   
   echo ""
   echo "🔥 ======================================== 🔥"
-  echo "🔥 ULTRA DELETE MODE COMPLETED"
+  if [ "$deleteAllForProject" = "true" ]; then
+    echo "💀 COMPLETE DELETE MODE FINISHED (resources deleted)"
+    echo "💀 Proceeding to ULTRA mode: deleting project resource group"
+  else
+    echo "🔥 COMPLETE DELETE MODE COMPLETED"
+  fi
   echo "🔥 ======================================== 🔥"
 else
-  echo "ℹ️  deleteAllForProject not enabled - skipping complete cleanup"
+  echo "ℹ️  deleteAllServicesForProject not enabled - skipping complete cleanup"
+fi
+
+# =============================================================================
+# ULTRA DELETE MODE: deleteAllForProject=true
+# Delete the entire project resource group (after all resources cleaned up)
+# =============================================================================
+
+if [ "$deleteAllForProject" = "true" ]; then
+  echo ""
+  echo "💀💀💀 ======================================== 💀💀💀"
+  echo "💀 ULTRA MODE: Deleting Project Resource Group"
+  echo "💀💀💀 ======================================== 💀💀💀"
+  echo ""
+  echo "Target resource group: $projectResourceGroup"
+  echo ""
+  echo "⚠️  WARNING: This will delete the ENTIRE resource group!"
+  echo "⚠️  All resources within will be permanently removed."
+  echo ""
+  
+  # Check if resource group exists
+  rg_exists=$(az group exists --name "$projectResourceGroup" 2>/dev/null || echo "false")
+  
+  if [ "$rg_exists" = "true" ]; then
+    echo "Deleting resource group: $projectResourceGroup"
+    
+    if az group delete \
+      --name "$projectResourceGroup" \
+      --subscription "$dev_test_prod_sub_id" \
+      --yes \
+      --no-wait 2>&1; then
+      echo "✓ Resource group deletion initiated (running in background)"
+      echo "ℹ️  Resource group deletion may take several minutes to complete"
+      echo "ℹ️  Check Azure Portal or run 'az group show --name $projectResourceGroup' to verify"
+    else
+      echo "❌ Failed to initiate resource group deletion"
+      echo "⚠️  You may need to manually delete the resource group from Azure Portal"
+    fi
+  else
+    echo "ℹ️  Resource group does not exist or already deleted: $projectResourceGroup"
+  fi
+  
+  echo ""
+  echo "💀 ======================================== 💀"
+  echo "💀 ULTRA DELETE MODE COMPLETED"
+  echo "💀 Resource group deletion initiated"
+  echo "💀 ======================================== 💀"
 fi
 
 echo ""
