@@ -1887,6 +1887,15 @@ jobs:
               --parameters enablePostgreSQL="${{ env.enablePostgreSQL }}" \
               --parameters enableRedisCache="${{ env.enableRedisCache }}" \
               --parameters enableSQLDatabase="${{ env.enableSQLDatabase }}" \
+              --parameters enableElasticsearch="${{ env.enableElasticsearch }}" \
+              --parameters elasticExists="${{ env.elasticExists }}" \
+              --parameters elasticType="${{ env.elasticType }}" \
+              --parameters elasticEmail="${{ env.elasticEmail }}" \
+              --parameters elasticFirstName="${{ env.elasticFirstName }}" \
+              --parameters elasticLastName="${{ env.elasticLastName }}" \
+              --parameters elasticCompanyName="${{ env.elasticCompanyName }}" \
+              --parameters elasticDeploymentSize="${{ env.elasticDeploymentSize }}" \
+              --parameters elasticSku="${{ env.elasticSku }}" \
               --parameters useAdGroups="${{ env.use_groups }}" \
               --parameters tags='${{ env.tags }}' \
               --parameters tagsProject='${{ env.tagsProject }}' \
