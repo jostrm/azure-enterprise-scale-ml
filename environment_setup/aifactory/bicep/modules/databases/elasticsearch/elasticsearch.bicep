@@ -18,6 +18,15 @@ param skuName string = 'ess-consumption-2024_Monthly'
 @description('Email associated with Elastic Cloud account')
 param elasticEmail string
 
+@description('First name of contact person')
+param elasticFirstName string = 'AI'
+
+@description('Last name of contact person')
+param elasticLastName string = 'Factory'
+
+@description('Company name')
+param elasticCompanyName string = 'Organization'
+
 @description('Enable monitoring')
 param monitoringEnabled bool = true
 
@@ -83,6 +92,12 @@ resource elastic 'Microsoft.Elastic/monitors@2024-03-01' = {
   }
   properties: {
     monitoringStatus: monitoringEnabled ? 'Enabled' : 'Disabled'
+    userInfo: {
+      emailAddress: elasticEmail
+      firstName: elasticFirstName
+      lastName: elasticLastName
+      companyName: elasticCompanyName
+    }
   }
   tags: union(tags, {
     size: deploymentSize

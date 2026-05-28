@@ -275,6 +275,9 @@ variables:
   enableElasticsearch: "false" # <optional>Deploy Elasticsearch<default>false<keep-as-is> Elastic Cloud managed service.
   elasticType: "ElasticCloud" # <optional>Elasticsearch deployment type<default>ElasticCloud<keep-as-is> <otherwise> "SelfManagedOnAKS" (future support).
   elasticEmail: "admin@example.com" # <optional>Elastic Cloud account email<default>admin@example.com<mandatory> if enableElasticsearch:'true' <ensure> valid email address.
+  elasticFirstName: "AI" # <optional>Elastic Cloud contact first name<default>AI<mandatory> if enableElasticsearch:'true'
+  elasticLastName: "Factory" # <optional>Elastic Cloud contact last name<default>Factory<mandatory> if enableElasticsearch:'true'
+  elasticCompanyName: "Organization" # <optional>Elastic Cloud company name<default>Organization<mandatory> if enableElasticsearch:'true'
   elasticDeploymentSize: "small" # <optional>Elasticsearch deployment size<default>small<keep-as-is> <otherwise> "medium" or "large".
   elasticSku: "ess-consumption-2024_Monthly" # <optional>Elastic Cloud SKU<default>ess-consumption-2024_Monthly<keep-as-is>
   # === Azure Function ===

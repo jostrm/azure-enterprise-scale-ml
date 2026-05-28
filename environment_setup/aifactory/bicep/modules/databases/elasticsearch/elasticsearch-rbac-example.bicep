@@ -5,6 +5,9 @@
 
 param location string = 'swedencentral'
 param elasticEmail string = 'admin@example.com'
+param elasticFirstName string = 'John'
+param elasticLastName string = 'Doe'
+param elasticCompanyName string = 'My Company'
 
 // Arrays of principal IDs - replace with your actual Entra ID object IDs
 param usersOrAdGroupArray array = [
@@ -32,6 +35,9 @@ module elasticsearch './elasticsearch.bicep' = {
     name: 'es-myproject-sdc-001'
     location: location
     elasticEmail: elasticEmail
+    elasticFirstName: elasticFirstName
+    elasticLastName: elasticLastName
+    elasticCompanyName: elasticCompanyName
     skuName: 'ess-consumption-2024_Monthly'
     deploymentSize: 'medium'
     monitoringEnabled: true

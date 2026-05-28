@@ -182,6 +182,9 @@ jobs:
       enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
       elasticType: ${{ vars.ELASTIC_TYPE || 'ElasticCloud' }}
       elasticEmail: ${{ vars.ELASTIC_EMAIL || 'admin@example.com' }}
+      elasticFirstName: ${{ vars.ELASTIC_FIRST_NAME || 'AI' }}
+      elasticLastName: ${{ vars.ELASTIC_LAST_NAME || 'Factory' }}
+      elasticCompanyName: ${{ vars.ELASTIC_COMPANY_NAME || 'Organization' }}
       elasticDeploymentSize: ${{ vars.ELASTIC_DEPLOYMENT_SIZE || 'small' }}
       elasticSku: ${{ vars.ELASTIC_SKU || 'ess-consumption-2024_Monthly' }}
       enablePublicGenAIAccess: ${{ vars.ENABLE_PUBLIC_GENAI_ACCESS || 'false' }}

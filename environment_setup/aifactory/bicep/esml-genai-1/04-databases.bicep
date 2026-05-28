@@ -166,6 +166,15 @@ param elasticType string = 'ElasticCloud'
 @description('Email associated with Elastic Cloud account')
 param elasticEmail string = 'admin@example.com'
 
+@description('First name of Elastic Cloud contact person')
+param elasticFirstName string = 'AI'
+
+@description('Last name of Elastic Cloud contact person')
+param elasticLastName string = 'Factory'
+
+@description('Company name for Elastic Cloud account')
+param elasticCompanyName string = 'Organization'
+
 @description('Elasticsearch deployment size')
 @allowed(['small', 'medium', 'large'])
 param elasticDeploymentSize string = 'small'
@@ -590,6 +599,9 @@ module elastic '../modules/databases/elasticsearch/elasticsearch.bicep' = if(!el
     location: location
     skuName: elasticSku
     elasticEmail: elasticEmail
+    elasticFirstName: elasticFirstName
+    elasticLastName: elasticLastName
+    elasticCompanyName: elasticCompanyName
     monitoringEnabled: elasticMonitoringEnabled
     deploymentSize: elasticDeploymentSize
     tags: tagsProject

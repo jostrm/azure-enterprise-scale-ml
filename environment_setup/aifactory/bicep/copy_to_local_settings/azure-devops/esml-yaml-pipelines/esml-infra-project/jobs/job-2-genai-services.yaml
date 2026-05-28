@@ -2468,6 +2468,9 @@ steps:
      --parameters elasticExists="$(elasticExists)" \
      --parameters elasticType="$(elasticType)" \
      --parameters elasticEmail="$(elasticEmail)" \
+     --parameters elasticFirstName="$(elasticFirstName)" \
+     --parameters elasticLastName="$(elasticLastName)" \
+     --parameters elasticCompanyName="$(elasticCompanyName)" \
      --parameters elasticDeploymentSize="$(elasticDeploymentSize)" \
      --parameters elasticSku="$(elasticSku)" \
      --parameters useAdGroups="$(use_ad_groups)" \
