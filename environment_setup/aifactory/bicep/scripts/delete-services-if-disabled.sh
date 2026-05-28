@@ -215,7 +215,13 @@ delete_storage_private_endpoints() {
       remaining=$(az network private-endpoint list \
         --resource-group "$projectResourceGroup" \
         --query "[?starts_with(name, 'p-${pattern}') || starts_with(name, '${pattern}-pend')].name" \
-      -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        -o tsv 2>/dev/null | tr -d '\r' || echo "")
+
+      if [ -n "$remaining" ]; then
+        echo "  ⚠️  Some private endpoints still exist, will retry"
+        retry_needed=true
+
+        while IFS= read -r pend_name; do
           if [ -n "$pend_name" ]; then
             echo "    Retrying force delete for: $pend_name"
             rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Network/privateEndpoints/${pend_name}?api-version=2023-11-01"

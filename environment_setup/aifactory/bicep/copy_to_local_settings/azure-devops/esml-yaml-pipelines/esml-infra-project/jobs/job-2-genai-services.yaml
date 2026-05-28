@@ -3026,6 +3026,7 @@ steps:
      --parameters aiHubExists="$(aiHubExists)" \
      --parameters existingAcrPushUserPrincipals="$(existingAcrPushUserPrincipals)" \
      --parameters existingAcrPushSPPrincipals="$(existingAcrPushSPPrincipals)" \
+     --parameters disableSubnetJoinAction="$(disableSubnetJoinAction)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2

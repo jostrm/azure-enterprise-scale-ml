@@ -96,6 +96,7 @@ variables:
   BYOContributorRoleID: "b24988ac-6180-42a0-ab88-20f7382dd24c" # <optional>Contributor role ID<default>b24988ac-6180-42a0-ab88-20f7382dd24c<keep-as-is> Azure built-in Contributor. <otherwise> provide a custom role ID for finer-grained access control.
   disableContributorAccessForUsers: "false" # <optional>Disable Contributor for project users<default>false<recommended> false, enables users to create artifacts (managed online endpoints etc). <otherwise> true, restrict Contributor access.
   disableRBACAdminOnRGForUsers: "true" # <optional>Disable RBAC Admin on RG for project users<default>true<recommended> true, restricts users from assigning RBAC at resource group scope.
+  disableSubnetJoinAction: "false" # <optional>Disable VNet subnet join RBAC<default>false<recommended> false, grants Network Contributor role for subnet join actions (required for APIM, Container Apps, AKS). <otherwise> true, skip if subnet permissions managed externally.
   # ============================================================================
   # MANDATORY(CHANGE RARELY):Client Access: Services to be added to deployment. CreateIfNotExists logic
   # ============================================================================

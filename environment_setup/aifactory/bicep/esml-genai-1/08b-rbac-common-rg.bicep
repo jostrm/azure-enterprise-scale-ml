@@ -76,6 +76,9 @@ param bastionResourceGroup string = ''
 param bastionName string = ''
 param useAdGroups bool = true
 
+@description('Disable VNet subnet join action RBAC assignment (Network Contributor role)')
+param disableSubnetJoinAction bool = false
+
 // Common ACR usage
 param useCommonACR bool = true
 
@@ -304,6 +307,29 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
   ]
 }
 
+// ============== VNET/SUBNET JOIN ACCESS ==============
+// RBAC for VNet - Network Contributor role to allow subnet join actions
+// Required for services like API Management, Container Apps, AKS to join subnets
+// Grants users, service principals, and managed identities:
+// - Microsoft.Network/virtualNetworks/subnets/join/action permission
+// - Required for deploying services into subnets across resource groups
+// Can be disabled with disableSubnetJoinAction=true if subnet join permissions
+// are managed separately (e.g., via Azure Policy or external RBAC)
+module cmnRbacVNet '../modules/vnetRBACReader.bicep' = if (!disableSubnetJoinAction) {
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  name: take('08b-rbacVNetSubnetJoin${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    vNetName: vnetNameFull
+    common_bastion_subnet_name: 'AzureBastionSubnet'
+    servicePrincipleAndMIArray: spAndMiArray
+    user_object_ids: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    existingTargetRG
+  ]
+}
+
 // ============== DATA LAKE ACCESS ==============
 // RBAC for Data Lake - AI Foundry Integration
 module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!aiHubExists && enableAIFoundryHub) {
@@ -349,6 +375,9 @@ output commonKeyVaultBastionRbacDeployed bool = empty(bastionResourceGroup) && a
 
 @description('Common Resource Group ACR RBAC deployment status (with idempotent filtering)')
 output commonAcrRbacDeployed bool = useCommonACR
+
+@description('Common VNet Network Contributor RBAC deployment status (for subnet join permissions)')
+output commonVNetRbacDeployed bool = !disableSubnetJoinAction
 
 @description('Number of filtered user principals for ACR RBAC (after removing existing assignments)')
 output acrUserPrincipalsFiltered int = length(userIdsFiltered)
