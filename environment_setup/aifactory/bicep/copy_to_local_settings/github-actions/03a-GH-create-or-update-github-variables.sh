@@ -73,6 +73,12 @@ create_or_update_variable() {
   local env=$1
   local name=$2
   local value=$3
+  
+  # Skip if single parameter mode is active and this isn't the target parameter
+  if [[ -n "$single_param_name" && "$name" != "$single_param_name" ]]; then
+    return
+  fi
+  
   # Check if the value is empty
   if [[ -z "$value" ]]; then
     # #echo -e "${RED}Error: Variable '$name' for environment '$env' has an empty value. Skipping.${NC}"
@@ -101,6 +107,12 @@ create_or_update_secret() {
   local env=$1
   local name=$2
   local value=$3
+  
+  # Skip if single parameter mode is active and this isn't the target parameter
+  if [[ -n "$single_param_name" && "$name" != "$single_param_name" ]]; then
+    return
+  fi
+  
   increment_counter "secret $env/$name"
   if [[ "$run_current_op" != "true" ]]; then
     return
@@ -116,10 +128,18 @@ create_or_update_secret() {
 create_or_update_repo_variable() {
   local name=$1
   local value=$2
+  
+  # Skip if single parameter mode is active and this isn't the target parameter
+  if [[ -n "$single_param_name" && "$name" != "$single_param_name" ]]; then
+    return
+  fi
+  
   if [[ -z "$value" ]]; then
     echo -e "${YELLOW}Skipping repo variable '$name' because the value is empty.${NC}"
     return
   fi
+  
+  echo -e "${YELLOW}[Repo] Setting variable: $name${NC}"
   gh variable set "$name" --repo "$GITHUB_NEW_REPO" --body "$value"
 }
 
@@ -133,6 +153,18 @@ case "${env_choice,,}" in
   d|dev|"") selected_environments=("dev") ;;
   *) echo -e "${YELLOW}Unrecognized choice. Defaulting to DEV.${NC}"; selected_environments=("dev") ;;
 esac
+
+# Prompt for single parameter update (optional)
+single_param_name=""
+echo -e "${YELLOW}Do you want to update a single parameter only?${NC}"
+echo -e "${YELLOW}Enter the parameter name (e.g., ENABLE_ELASTICSEARCH) or press Enter to update all:${NC}"
+read -p "parameter name: " single_param_input
+if [[ -n "$single_param_input" ]]; then
+  single_param_name="$single_param_input"
+  echo -e "${GREEN}Will update only parameter: ${single_param_name}${NC}"
+else
+  echo -e "${YELLOW}Will update all parameters.${NC}"
+fi
 
 # Prompt for optional resume position
 echo -e "${YELLOW}Optional: resume from operation number (1-based). Leave empty to start from 1.${NC}"
@@ -251,6 +283,58 @@ service_and_byo_vars=(
 
 # Repo-scoped variables to reduce env variable count (applied once per repo)
 repo_level_vars=(
+  # === Global AI Factory settings ===
+  "AIFACTORY_LOCATION"
+  "AIFACTORY_LOCATION_SHORT"
+  "AIFACTORY_SUFFIX"
+  "AIFACTORY_PREFIX"
+  "TENANT_AZUREML_OID"
+  "LAKE_PREFIX"
+  "AISEARCH_SEMANTIC_TIER"
+  
+  # === RBAC model ===
+  "USE_AD_GROUPS"
+  "GROUPS_PROJECT_MEMBERS_ESML"
+  "GROUPS_PROJECT_MEMBERS_GENAI_1"
+  "GROUPS_CORETEAM_MEMBERS"
+  "PERSONAS_PROJECT_ESML"
+  "PERSONAS_PROJECT_GENAI_1"
+  "PERSONAS_CORE_TEAM"
+  
+  # === Keyvault and security ===
+  "KEYVAULT_SOFT_DELETE"
+  "AIFACTORY_SEEDING_KEYVAULT_NAME"
+  "AIFACTORY_SEEDING_KEYVAULT_RG"
+  "COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID"
+  "COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET"
+  "INPUT_COMMON_SPID_KEY"
+  "INPUT_COMMON_SPSECRET_KEY"
+  "INPUT_COMMON_SP_SECRET_KEY"
+  "COMMON_SERVICE_PRINCIPLE_OID_KEY"
+  
+  # === Project settings ===
+  "PROJECT_TYPE"
+  "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID"
+  "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID"
+  "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S"
+  "PROJECT_NUMBER"
+  "PROJECT_MEMBERS_EMAILS"
+  "PROJECT_IP_WHITELIST"
+  "TAGS_PROJECT"
+  
+  # === Versioning ===
+  "AIFACTORY_VERSION_MAJOR"
+  "AIFACTORY_VERSION_MINOR"
+  "AIFACTORY_SALT"
+  "AIFACTORY_SALT_RANDOM"
+  
+  # === Networking ===
+  "BYO_SUBNETS"
+  "RUN_JOB1_NETWORKING"
+  
+  # === Cost optimization ===
+  "USE_COMMON_ACR_FOR_PROJECTS"
+  
   "ENABLE_DEFENDER_FOR_AI_SUB_LEVEL"
   "ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL"
   "CMK"
@@ -347,10 +431,81 @@ repo_level_vars=(
   "SERVICE_SETTING_DEPLOY_PROJECT_VM"
   "DEBUG_DISABLE_VALIDATION_TASKS"
   "ADMIN_AI_SEARCH_TIER"
-  "INPUT_COMMON_SPID_KEY"
-  "INPUT_COMMON_SPSECRET_KEY"
-  "INPUT_COMMON_SP_SECRET_KEY"
-  "COMMON_SERVICE_PRINCIPLE_OID_KEY"
+  
+  # === All service_and_byo_vars moved to repo-level ===
+  "UPDATE_AI_FOUNDRY"
+  "FOUNDRY_DEPLOYMENT_TYPE"
+  "DISABLE_AGENT_NETWORK_INJECTION"
+  "ADMIN_AISEARCH_TIER"
+  "VNET_RESOURCE_GROUP_PARAM"
+  "VNET_NAME_FULL_PARAM"
+  "SUBNET_COMMON"
+  "SUBNET_COMMON_SCORING"
+  "SUBNET_COMMON_POWERBI_GW"
+  "SUBNET_PROJ_GENAI"
+  "SUBNET_PROJ_AKS"
+  "SUBNET_PROJ_AKS2"
+  "SUBNET_PROJ_ACA"
+  "SUBNET_PROJ_ACA2"
+  "SUBNET_PROJ_DATABRICKS_PUBLIC"
+  "SUBNET_PROJ_DATABRICKS_PRIVATE"
+  "BYO_ASEV3"
+  "BYO_ASE_FULL_RESOURCE_ID"
+  "BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID"
+  "DEPLOY_MODEL_GPT_X"
+  "MODEL_GPTX_NAME"
+  "MODEL_GPTX_VERSION"
+  "MODEL_GPTX_SKU"
+  "MODEL_GPTX_CAPACITY"
+  "DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002"
+  "DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE"
+  "DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL"
+  "DEFAULT_EMBEDDING_CAPACITY"
+  "DEPLOY_MODEL_GPT_54_MINI"
+  "DEFAULT_GPT_54_MINI_VERSION"
+  "DEPLOY_MODEL_GPT_4O"
+  "DEFAULT_GPT_4O_VERSION"
+  "DEFAULT_GPT_CAPACITY"
+  "DEFAULT_MODEL_SKU"
+  "COSMOS_KIND"
+  "POSTGRES_ADMIN_EMAILS"
+  "ELASTIC_TYPE"
+  "ELASTIC_EMAIL"
+  "ELASTIC_FIRST_NAME"
+  "ELASTIC_LAST_NAME"
+  "ELASTIC_COMPANY_NAME"
+  "ELASTIC_DEPLOYMENT_SIZE"
+  "ELASTIC_SKU"
+  "FUNCTION_RUNTIME"
+  "FUNCTION_VERSION"
+  "WEBAPP_RUNTIME"
+  "WEBAPP_RUNTIME_VERSION"
+  "ASE_SKU"
+  "ASE_SKU_CODE"
+  "ASE_SKU_WORKERS"
+  "ACA_W_REGISTRY_IMAGE"
+  "FOUNDRY_API_MANAGEMENT_RESOURCE_ID"
+  "AKS_SKU_NAME"
+  "AKS_SKU_TIER"
+  "AKS_ENABLE_PRIVATE_CLUSTER"
+  "DEBUG_DISABLE_05_BUILD_ACR_IMAGE"
+  "DEBUG_DISABLE_61_FOUNDATION"
+  "DEBUG_DISABLE_62_CORE_INFRASTRUCTURE"
+  "DEBUG_DISABLE_63_COGNITIVE_SERVICES"
+  "DEBUG_DISABLE_64_DATABASES"
+  "DEBUG_DISABLE_65_COMPUTE_SERVICES"
+  "DEBUG_DISABLE_66_AI_PLATFORM"
+  "DEBUG_DISABLE_67_ML_PLATFORM"
+  "DEBUG_DISABLE_68_INTEGRATION"
+  "DEBUG_DISABLE_69_AIFOUNDRY_2025"
+  "DEBUG_DISABLE_100_RBAC_SECURITY"
+  "DEBUG_DISABLE_10_AIFACTORY_DASHBOARDS"
+  "ADD_AI_FOUNDRY_HUB"
+  "ADD_AI_FOUNDRY"
+  "ADD_AI_SEARCH"
+  "ADD_AZURE_MACHINE_LEARNING"
+  "POLICY_EXEMPTION_ASSIGNMENT_IDS"
+  "POLICY_EXEMPTION_DEFINITION_REFERENCE_IDS"
 )
 
 # Apply repo-level variables once to reduce environment-level count
@@ -383,83 +538,20 @@ for env in "${selected_environments[@]}"; do
   create_or_update_variable "$env" "AZURE_ENV_NAME" "$(get_azure_env_name "$env")"
 done
 
-# AI Factory globals: variables and secrets
+# AI Factory globals: variables and secrets (environment-specific only)
 for env in "${selected_environments[@]}"; do
-    echo -e "${YELLOW}Setting variables and secrets for environment: $env${NC}"
+    echo -e "${YELLOW}Setting environment-specific variables and secrets for: $env${NC}"
     
-    # Global: Variables
-    create_or_update_variable $env "AIFACTORY_LOCATION" "$AIFACTORY_LOCATION"
-    create_or_update_variable $env "AIFACTORY_LOCATION_SHORT" "$AIFACTORY_LOCATION_SHORT"
-    create_or_update_variable $env "AIFACTORY_SUFFIX" "$AIFACTORY_SUFFIX"
-    create_or_update_variable $env "AIFACTORY_PREFIX" "$AIFACTORY_PREFIX"
-    create_or_update_variable $env "TENANT_AZUREML_OID" "$TENANT_AZUREML_OID"
-    create_or_update_variable $env "LAKE_PREFIX" "$LAKE_PREFIX"
-    create_or_update_variable $env "AISEARCH_SEMANTIC_TIER" "$AISEARCH_SEMANTIC_TIER"
-
-    #RBAC model
-    create_or_update_variable $env "USE_AD_GROUPS" "$USE_AD_GROUPS"
-    create_or_update_variable $env "GROUPS_PROJECT_MEMBERS_ESML" "$GROUPS_PROJECT_MEMBERS_ESML"
-    create_or_update_variable $env "GROUPS_PROJECT_MEMBERS_GENAI_1" "$GROUPS_PROJECT_MEMBERS_GENAI_1"
-    create_or_update_variable $env "GROUPS_CORETEAM_MEMBERS" "$GROUPS_CORETEAM_MEMBERS"
-
-    # Other
-    create_or_update_variable $env "KEYVAULT_SOFT_DELETE" "$KEYVAULT_SOFT_DELETE"
-    
-    # Cost optimization
-    create_or_update_variable $env "USE_COMMON_ACR_FOR_PROJECTS" "$USE_COMMON_ACR_FOR_PROJECTS"
-
-    # Seeding keyvault
-    create_or_update_variable $env "AIFACTORY_SEEDING_KEYVAULT_NAME" "$AIFACTORY_SEEDING_KEYVAULT_NAME"
-    create_or_update_variable $env "AIFACTORY_SEEDING_KEYVAULT_RG" "$AIFACTORY_SEEDING_KEYVAULT_RG"
-    create_or_update_variable $env "COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID" "$COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID"
-    create_or_update_variable $env "COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET" "$COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET"
-    create_or_update_variable $env "INPUT_COMMON_SPID_KEY" "$INPUT_COMMON_SPID_KEY"
-    create_or_update_variable $env "INPUT_COMMON_SPSECRET_KEY" "$INPUT_COMMON_SPSECRET_KEY"
-    create_or_update_variable $env "INPUT_COMMON_SP_SECRET_KEY" "$INPUT_COMMON_SP_SECRET_KEY"
-    create_or_update_variable $env "COMMON_SERVICE_PRINCIPLE_OID_KEY" "$COMMON_SERVICE_PRINCIPLE_OID_KEY"
-
-    # Networking
-    create_or_update_variable $env "AIFACTORY_LOCATION_SHORT" "$AIFACTORY_LOCATION_SHORT"
-    
-    # Project specific settings, for all environments
-    create_or_update_variable $env "PROJECT_TYPE" "$PROJECT_TYPE"
-    create_or_update_variable $env "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID" "$PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID"
-    create_or_update_variable $env "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID" "$PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID"
-    create_or_update_variable $env "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S" "$PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S"
-
-    # Misc
-    create_or_update_variable $env "RUN_JOB1_NETWORKING" "$RUN_JOB1_NETWORKING"
-
-    # Global: Secrets
+    # Environment-specific secrets
     create_or_update_secret $env "AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID" "$AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID"
-    
-    # Project Specifics (1st project bootstrap): 
     create_or_update_secret $env "TENANT_ID" "$TENANT_ID"
-    # Variables: 
-    create_or_update_variable $env "BYO_SUBNETS" "$BYO_SUBNETS"
-    create_or_update_variable $env "AIFACTORY_VERSION_MAJOR" "$AIFACTORY_VERSION_MAJOR"
-    create_or_update_variable $env "AIFACTORY_VERSION_MINOR" "$AIFACTORY_VERSION_MINOR"
-    create_or_update_variable $env "AIFACTORY_SALT" "$AIFACTORY_SALT"
-    create_or_update_variable $env "AIFACTORY_SALT_RANDOM" "$AIFACTORY_SALT_RANDOM"
+    create_or_update_secret $env "PROJECT_MEMBERS" "$PROJECT_MEMBERS"
+    create_or_update_secret $env "PROJECT_MEMBERS_IP_ADDRESS" "$PROJECT_MEMBERS_IP_ADDRESS"
 
     # ========================================================================
     # FREQUENTLY UPDATED VARIABLES - Positioned last for quick start_from_op
     # ========================================================================
     echo -e "${GREEN}>>> QUICK UPDATE SECTION for $env - Note the operation number above! <<<${NC}"
-    # Project-specific variables (moved to end for quick updates)
-    create_or_update_variable $env "PROJECT_NUMBER" "$PROJECT_NUMBER"
-    create_or_update_variable $env "PROJECT_MEMBERS_EMAILS" "$PROJECT_MEMBERS_EMAILS"
-    create_or_update_variable $env "PROJECT_IP_WHITELIST" "$PROJECT_IP_WHITELIST"
-    create_or_update_variable $env "TAGS_PROJECT" "$TAGS_PROJECT"
-    
-    # Project member secrets
-    create_or_update_secret $env "PROJECT_MEMBERS" "$PROJECT_MEMBERS"
-    create_or_update_secret $env "PROJECT_MEMBERS_IP_ADDRESS" "$PROJECT_MEMBERS_IP_ADDRESS"
-
-    # v1.23+ enable flags + BYO customization variables (includes all ENABLE_* flags)
-    for var_name in "${service_and_byo_vars[@]}"; do
-      create_or_update_variable "$env" "$var_name" "${!var_name}"
-    done
 done
 
 if [[ " ${selected_environments[*]} " == *" dev "* ]]; then

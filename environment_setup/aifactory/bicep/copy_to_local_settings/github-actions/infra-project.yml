@@ -229,8 +229,8 @@ jobs:
       deployModel_gpt_4o: ${{ vars.DEPLOY_MODEL_GPT_4O || 'true' }}
       deployModel_gpt_4: ${{ vars.DEPLOY_MODEL_GPT_4 || 'false' }}
       default_gpt_4o_version: ${{ vars.DEFAULT_GPT_4O_VERSION || '2024-11-20' }}
-      deployModel_gpt_4o_mini: ${{ vars.DEPLOY_MODEL_GPT_4O_MINI || 'false' }}
-      default_gpt_4o_mini_version: ${{ vars.DEFAULT_GPT_4O_MINI_VERSION || '2024-07-18' }}
+      deployModel_gpt_54_mini: ${{ vars.DEPLOY_MODEL_GPT_54_MINI || 'false' }}
+      default_gpt_54_mini_version: ${{ vars.DEFAULT_GPT_54_MINI_VERSION || '2024-07-18' }}
       default_gpt_capacity: ${{ vars.DEFAULT_GPT_CAPACITY || '40' }}
       default_model_sku: ${{ vars.DEFAULT_MODEL_SKU || 'Standard' }}
 
@@ -1098,10 +1098,10 @@ jobs:
             # When addAIFoundry=true:
             #   aifV2NameAdd = take('aif2' + lastSuffixChar + cleanRandomValue, 12)
             #   aifV2PrjNameAdd = take('aif2-p' + projectNumber + lastSuffixChar + cleanRandomValue, 12)
-            # NOTE: Using awk instead of tr to avoid locale issues on hosted agents
+            # NOTE: Using bash built-ins for portability (awk not available in Azure CLI container)
             cleanRandomValue="${saltRandom10//-/}"
             cleanRandomValue="${cleanRandomValue//_/}"
-            cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
+            cleanRandomValue="${cleanRandomValue,,}"
 
             addAIFoundryFlag="${{ env.addAIFoundry }}"
             resourceSuffix="${{ env.admin_prjResourceSuffix }}"
@@ -1113,8 +1113,10 @@ jobs:
               foundry_project_name=$(echo "aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
             else
               # Default: use uniqueInAIFenv (5-char salt)
-              foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
-              foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+              temp_account="${uniqueInAIFenv}${cleanRandomValue}"
+              temp_account="${temp_account//-/}"
+              foundry_account_name=$(echo "aif2${temp_account,,}" | cut -c1-12)
+              foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | cut -c1-12 | tr '[:upper:]' '[:lower:]')
             fi
 
             echo "DEBUG 06a: addAIFoundry='$addAIFoundryFlag' cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
@@ -1627,7 +1629,7 @@ jobs:
               --parameters DEBUG_deployModel_text_embedding_ada_002="${{ env.deployModel_text_embedding_ada_002 }}" \
               --parameters DEBUG_deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters DEBUG_deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
-              --parameters DEBUG_deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+              --parameters DEBUG_deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
               --parameters policyExemptionAssignmentIds='${{ env.policyExemptionAssignmentIds }}' \
               --parameters policyExemptionDefinitionReferenceIds='${{ env.policyExemptionDefinitionReferenceIds }}' \
               --parameters tags='${{ env.tags }}' \
@@ -1814,7 +1816,7 @@ jobs:
               --parameters deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
               --parameters deployModel_text_embedding_ada_002="${{ env.deployModel_text_embedding_ada_002 }}" \
-              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters modelGPTXName="${{ env.modelGPTXName }}" \
@@ -2038,7 +2040,7 @@ jobs:
               --parameters deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
               --parameters default_embedding_capacity="${{ env.default_embedding_capacity }}" \
-              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
+              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters deployModel_gpt_4o="${{ env.deployModel_gpt_4o }}" \
@@ -2337,8 +2339,8 @@ jobs:
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters deployModel_gpt_4o="${{ env.deployModel_gpt_4o }}" \
               --parameters default_gpt_4o_version="${{ env.default_gpt_4o_version }}" \
-              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
-              --parameters default_gpt_4o_mini_version="${{ env.default_gpt_4o_mini_version }}" \
+              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
+              --parameters default_gpt_54_mini_version="${{ env.default_gpt_54_mini_version }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
               --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
@@ -2507,8 +2509,8 @@ jobs:
               --parameters default_gpt_capacity="${{ env.default_gpt_capacity }}" \
               --parameters deployModel_gpt_4o="${{ env.deployModel_gpt_4o }}" \
               --parameters default_gpt_4o_version="${{ env.default_gpt_4o_version }}" \
-              --parameters deployModel_gpt_4o_mini="${{ env.deployModel_gpt_4o_mini }}" \
-              --parameters default_gpt_4o_mini_version="${{ env.default_gpt_4o_mini_version }}" \
+              --parameters deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
+              --parameters default_gpt_54_mini_version="${{ env.default_gpt_54_mini_version }}" \
               --parameters default_model_sku="${{ env.default_model_sku }}" \
               --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
               --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
