@@ -297,3 +297,24 @@ output aiAccountEndpoint string = aiAccountEndpoint
 
 @description('The principal ID of the system assigned identity.')
 output aiAccountPrincipalId string = aiAccountPrincipalId
+
+// ============== NETWORK CONFIGURATION VALIDATION OUTPUTS ==============
+@description('Network configuration validation for troubleshooting')
+output networkConfiguration object = {
+  agentNetworkInjectionEnabled: agentNetworkInjectionEnabled
+  agentSubnetResourceId: agentSubnetResourceId
+  disableAgentNetworkInjection: disableAgentNetworkInjection
+  publicNetworkAccess: publicNetworkAccess
+  networkAclsApplied: hasNetworkAcls
+  privateEndpointSubnetId: privateEndpointSubnetResourceId
+  setupType: disableAgentNetworkInjection 
+    ? 'Basic setup - no agent network injection' 
+    : (agentNetworkInjectionEnabled 
+        ? 'Standard setup with private networking - networkInjections configured' 
+        : 'INCOMPLETE - agent subnet not configured')
+  validationStatus: disableAgentNetworkInjection || agentNetworkInjectionEnabled 
+    ? 'OK' 
+    : 'WARNING: disableAgentNetworkInjection=false but agentSubnetResourceId is empty'
+  accountLevelCaphostAutoProvisioned: agentNetworkInjectionEnabled
+  requiresSecondDeploymentForProjectCaphost: agentNetworkInjectionEnabled
+}

@@ -637,3 +637,30 @@ output aiSearchService object = enableAISearch ? {
   subscriptionId: ''
   resourceGroup: ''
 }
+
+// ============== NETWORK CONFIGURATION VALIDATION OUTPUTS ==============
+@description('Network configuration validation for troubleshooting')
+output networkConfiguration object = {
+  agentNetworkInjectionEnabled: agentNetworkInjectionEnabled
+  agentSubnetResourceId: agentSubnetResourceId
+  disableAgentNetworkInjection: disableAgentNetworkInjection
+  publicNetworkAccess: publicNetworkAccess
+  networkAclsApplied: hasNetworkAcls
+  privateEndpointSubnetId: privateEndpointSubnetResourceId
+  setupType: disableAgentNetworkInjection 
+    ? 'Basic setup - no agent network injection' 
+    : (agentNetworkInjectionEnabled 
+        ? 'Standard setup with private networking' 
+        : 'INCOMPLETE - agent subnet not configured')
+  validationStatus: disableAgentNetworkInjection || agentNetworkInjectionEnabled 
+    ? 'OK' 
+    : 'WARNING: disableAgentNetworkInjection=false but agentSubnetResourceId is empty'
+}
+
+@description('Capability host configuration')
+output capabilityHostConfiguration object = {
+  enabled: enableCapabilityHost
+  projectLevel: enableCapabilityHost && enableProject && enableAISearch && enableCosmosDb
+  accountLevelAutoProvisioned: agentNetworkInjectionEnabled
+  requiresSecondDeployment: agentNetworkInjectionEnabled && foundryV22AccountOnly
+}

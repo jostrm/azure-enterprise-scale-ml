@@ -9,6 +9,16 @@ param customerSubnet string = ''
 
 var resolvedName = !empty(capabilityHostName) ? capabilityHostName : '${replace(accountName, '-', '')}caphost'
 
+// VALIDATION: Log configuration for troubleshooting
+var configValidation = {
+  capabilityHostName: resolvedName
+  customerSubnetProvided: !empty(customerSubnet)
+  customerSubnetId: customerSubnet
+  warning: empty(customerSubnet) 
+    ? 'Basic setup - no customerSubnet. Suitable when disableAgentNetworkInjection=true' 
+    : 'Standard setup - customerSubnet provided. Must match account networkInjections.subnetArmId'
+}
+
 // AI Foundry account — must already exist
 #disable-next-line BCP081
 resource account 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' existing = {
@@ -21,6 +31,10 @@ resource account 'Microsoft.CognitiveServices/accounts@2025-07-01-preview' exist
 // When the account has networkInjections with a subnet, the customerSubnet property
 // must match — otherwise the API returns "The customerSubnet property must match the
 // subnet recorded on the Foundry account."
+// 
+// CRITICAL: This resource should ONLY be deployed when:
+// - enableCaphost=true AND disableAgentNetworkInjection=true (Basic setup)
+// OR when explicitly creating after account already exists with networkInjections
 #disable-next-line BCP081
 resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-07-01-preview' = {
   name: resolvedName
@@ -33,3 +47,4 @@ resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityH
 }
 
 output accountCapabilityHostName string = accountCapabilityHost.name
+output configValidation object = configValidation
