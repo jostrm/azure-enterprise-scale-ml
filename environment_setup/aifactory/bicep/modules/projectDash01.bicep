@@ -2,15 +2,15 @@
 // AI Factory - Project Dashboard (projectDash01.bicep)
 // ============================================================================
 // Creates a rich Azure Portal dashboard for an AI Factory GenAI project with:
-//   - Full-width title banner (project number, env, admin contact, shortcuts)
-//   - Resource Group resources list tile  (left half)
-//   - Accumulated cost chart tile         (right half)
-//   - 4 quick-access resource tiles       (AI Foundry V2, Key Vault, Storage 2001, AI Search)
+//   - Full-width H1 banner (project number, environment, region)
+//   - Resource Group resources list tile      (left half)
+//   - Cost Analysis tile                       (right half — to the right of the RG)
+//   - 4 small 1x1 quick-access shortcut tiles  (AI Foundry project, Storage, Key Vault, AI Search)
 //
 // Layout (12-column grid):
-//   Row 0-1:  [  Title banner — Project{N} - {ENV} (GenAI)  ] (12 cols)
-//   Row 2-9:  [ Resources (RG) ][  Cost Analysis chart       ] (6+6 cols)
-//   Row 10-11:[ AI Foundry V2  ][ Key Vault ][ SA-2001 ][ AI Search ] (3+3+3+3)
+//   Row 0-1:  [ Banner H1 — Project {N} · {ENV} · {REGION} ]                    (colSpan 12, rowSpan 2)
+//   Row 2-9:  [ Resources (RG) ][ Cost Analysis ]                                (6 + 6)
+//   Row 10:   [Foundry][Storage][KeyVault][AISearch]                             (1 + 1 + 1 + 1)
 
 // ============================================================================
 // PARAMETERS
@@ -78,6 +78,19 @@ param addAIFoundry bool = false
 @description('Resource tags')
 param tags object = {}
 
+// ── Project metadata (shown in banner — defaults to placeholder "-") ─────────
+@description('Team members (comma-separated names) — banner placeholder')
+param projectTeam string = '-'
+
+@description('Project owner name — banner placeholder')
+param projectOwner string = '-'
+
+@description('Monthly budget in $ — banner placeholder')
+param projectBudget string = 'TBA'
+
+@description('Use case description — banner placeholder')
+param projectUseCase string = 'TBA'
+
 // ============================================================================
 // MODULE: NAMING CONVENTION
 // ============================================================================
@@ -143,6 +156,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
       {
         order: 0
         parts: [
+          // ── ROW 0-1: Full-width H1 banner (project · env · region) ────────────
           {
             position: { x: 0, y: 0, colSpan: 12, rowSpan: 2 }
             metadata: {
@@ -151,7 +165,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               settings: {
                 content: {
                   settings: {
-                    content: '# ${dashboardTitle}\n**RG:** [${targetResourceGroup}](${rgPortalUrl})\u{2003}|\u{2003}**Admin:** ${technicalAdminsEmail}\u{2003}|\u{2003}**Scale set:** ${aifactorySuffixRG}\u{2003}|\u{2003}[🤖 AI Foundry](${aiFoundryProjectUrl})\u{2003}|\u{2003}[💰 Cost Analysis](${costAnalysisUrl})'
+                    content: '# Project ${projectNumber} - ${toUpper(env)} (GenAI)\n\n**Team:** ${projectTeam}\n\n**Owner:** ${projectOwner}\n\n**Budget:** ${projectBudget} $/mon\n\n**Use case:** ${projectUseCase}\n\n[🗂️ Resource Group](${rgPortalUrl}) \u{2003}|\u{2003} [🤖 AI Foundry](${aiFoundryProjectUrl}) \u{2003}|\u{2003} [💰 Cost Analysis](${costAnalysisUrl})'
                     title: ''
                     subtitle: ''
                     markdownSource: 1
@@ -169,7 +183,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               inputs: [
                 { name: 'id', isOptional: false, value: rgResourceId }
               ]
-              #disable-next-line BCP036
+              #disable-next-line BCP088
               type: 'Extension/HubsExtension/PartType/ResourcePart'
               #disable-next-line BCP037
               asset: {
@@ -179,36 +193,20 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-          // ── ROW 2-9: Cost Analysis link (right half) ──────────────────────────
-          // Note: CostAnalysisPinnedChartPart is deprecated. Using direct link instead.
+          // ── ROW 2-9: Cost Analysis tile (right half — to the right of the RG) ─
+          // Note: CostAnalysisPinnedChartPart is deprecated; we use a rich Markdown
+          // tile with direct cost-management links instead so the dashboard always
+          // deploys cleanly across tenants.
           {
             position: { x: 6, y: 2, colSpan: 6, rowSpan: 8 }
             metadata: {
               inputs: []
-              #disable-next-line BCP036
+              #disable-next-line BCP088
               type: 'Extension/HubsExtension/PartType/MarkdownPart'
               settings: {
                 content: {
                   settings: {
-                    content: '''
-## 📊 Cost Analysis
-
-View detailed cost breakdown and trends for this project.
-
-**Quick Links:**
-- [Open Cost Analysis](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${rgResourceId})
-- [Cost Alerts](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${rgResourceId}/alerts)
-- [Budgets](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${rgResourceId})
-
-**Current Scope:** ${targetResourceGroupName}
-
----
-
-### 💡 Cost Optimization Tips
-- Review [Azure Advisor](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost) recommendations
-- Set up [budget alerts](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/budgets) to monitor spending
-- Check for idle resources and right-size workloads
-'''
+                    content: '## 💰 Cost Analysis\n\nDetailed cost breakdown and trends for **${targetResourceGroup}**.\n\n**Quick Links:**\n- [📊 Open Cost Analysis](${costAnalysisUrl})\n- [🔔 Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts)\n- [💵 Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')})\n- [🧠 Azure Advisor — Cost Recommendations](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)\n\n---\n\n### 💡 Optimization Tips\n- Review **Azure Advisor** for right-sizing recommendations\n- Set **budget alerts** to monitor monthly spend\n- Identify and stop **idle compute / storage**\n- Use the **AzqrCostOptimizeAgent** skill for a full audit'
                     title: ''
                     subtitle: ''
                     markdownSource: 1
@@ -219,14 +217,14 @@ View detailed cost breakdown and trends for this project.
             }
           }
 
-          // ── ROW 10-11: AI Foundry V2 account shortcut ────────────────────────
+          // ── ROW 10: 1x1 shortcut — AI Foundry V2 project ─────────────────────
           {
-            position: { x: 0, y: 10, colSpan: 3, rowSpan: 2 }
+            position: { x: 0, y: 10, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: foundryAccountResId }
               ]
-              #disable-next-line BCP036
+              #disable-next-line BCP088
               type: 'Extension/HubsExtension/PartType/ResourcePart'
               #disable-next-line BCP037
               asset: {
@@ -236,31 +234,14 @@ View detailed cost breakdown and trends for this project.
             }
           }
 
-          // ── ROW 10-11: Key Vault shortcut ─────────────────────────────────────
+          // ── ROW 10: 1x1 shortcut — Storage Account 2001 ──────────────────────
           {
-            position: { x: 3, y: 10, colSpan: 3, rowSpan: 2 }
-            metadata: {
-              inputs: [
-                { name: 'id', isOptional: false, value: keyvaultResId }
-              ]
-              #disable-next-line BCP036
-              type: 'Extension/HubsExtension/PartType/ResourcePart'
-              #disable-next-line BCP037
-              asset: {
-                idInputName: 'id'
-                type: 'Microsoft.KeyVault/vaults'
-              }
-            }
-          }
-
-          // ── ROW 10-11: Storage Account 2001 shortcut ──────────────────────────
-          {
-            position: { x: 6, y: 10, colSpan: 3, rowSpan: 2 }
+            position: { x: 1, y: 10, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: storage2001ResId }
               ]
-              #disable-next-line BCP036
+              #disable-next-line BCP088
               type: 'Extension/HubsExtension/PartType/ResourcePart'
               #disable-next-line BCP037
               asset: {
@@ -270,14 +251,31 @@ View detailed cost breakdown and trends for this project.
             }
           }
 
-          // ── ROW 10-11: AI Search shortcut ─────────────────────────────────────
+          // ── ROW 10: 1x1 shortcut — Key Vault ─────────────────────────────────
           {
-            position: { x: 9, y: 10, colSpan: 3, rowSpan: 2 }
+            position: { x: 2, y: 10, colSpan: 1, rowSpan: 1 }
+            metadata: {
+              inputs: [
+                { name: 'id', isOptional: false, value: keyvaultResId }
+              ]
+              #disable-next-line BCP088
+              type: 'Extension/HubsExtension/PartType/ResourcePart'
+              #disable-next-line BCP037
+              asset: {
+                idInputName: 'id'
+                type: 'Microsoft.KeyVault/vaults'
+              }
+            }
+          }
+
+          // ── ROW 10: 1x1 shortcut — AI Search ─────────────────────────────────
+          {
+            position: { x: 3, y: 10, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: aiSearchResId }
               ]
-              #disable-next-line BCP036
+              #disable-next-line BCP088
               type: 'Extension/HubsExtension/PartType/ResourcePart'
               #disable-next-line BCP037
               asset: {
