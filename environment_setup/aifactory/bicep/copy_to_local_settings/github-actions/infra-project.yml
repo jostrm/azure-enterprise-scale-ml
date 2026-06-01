@@ -897,9 +897,40 @@ jobs:
             projectNameReplaced="${projectName/prj/project}"
             targetRG="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
             echo "targetRG=$targetRG"
+
+            # -----------------------------------------------------------------
+            # Initialize ALL *Exists env variables to "false" BEFORE doing any
+            # resource-group / resource lookups. This guarantees downstream
+            # steps always see a resolvable value (e.g. ${{ env.aiFoundryV2Exists }})
+            # even when the RG does not exist yet (first-time deployment) or
+            # when an individual lookup is skipped. Without this, an unresolved
+            # variable becomes empty and downstream bash conditions may misbehave.
+            # The real existence checks below will overwrite the defaults when
+            # the resource group actually exists.
+            # -----------------------------------------------------------------
+            echo "Initializing all *Exists variables to 'false' (defaults)..."
+            for _var in \
+              aiHubExists aifProjectExists aiFoundryV2Exists aiFoundryV2ProjectExists \
+              databricksExists logicAppsExists eventHubsExists dataFactoryExists \
+              botServiceExists aksExists amlExists openaiExists aiSearchExists \
+              dashboardInsightsExists applicationInsightExists aiServicesExists \
+              bingExists bingCustomSearchExists containerAppsEnvExists containerAppAExists containerAppWExists \
+              cosmosDBExists functionAppExists webAppExists funcAppServicePlanExists \
+              webAppServicePlanExists keyvaultExists miACAExists miPrjExists \
+              storageAccount1001Exists storageAccount2001Exists aifExists redisExists \
+              postgreSQLExists sqlServerExists sqlDBExists elasticExists \
+              acrProjectExists vmExists contentSafetyExists; do
+              echo "${_var}=false" >> $GITHUB_ENV
+            done
+
             if ! az group show --name "$targetRG" >/dev/null 2>&1; then
+              echo "Resource group '$targetRG' does not exist."
+              echo "All *Exists variables remain set to 'false' (initialized above)."
+              echo "This is expected on a first-time deployment; downstream steps will create the resources."
               exit 0
             fi
+
+            echo "Resource group '$targetRG' exists. Proceeding with resource checks."
             resource_exists_fuzzy(){
               local rg=$1; local type=$2; local prefix=$3; local suffix=$4
               local output

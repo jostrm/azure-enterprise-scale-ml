@@ -665,44 +665,39 @@ steps:
       echo "Final targetResourceGroup: '$targetResourceGroup'"
       echo "================================================"
 
+      # -----------------------------------------------------------------
+      # Initialize ALL *Exists pipeline variables to "false" BEFORE doing
+      # any resource-group / resource lookups. This guarantees downstream
+      # tasks always see a resolvable macro (e.g. $(aiFoundryV2Exists))
+      # even when the RG does not exist yet (first-time deployment) or
+      # when an individual lookup is skipped. Without this, an unresolved
+      # $(varName) is left as a literal in later bash scripts and is
+      # interpreted as a command substitution — producing errors such as:
+      #   "aiFoundryV2Exists: command not found"
+      # The real existence checks below will overwrite the defaults when
+      # the resource group actually exists.
+      # -----------------------------------------------------------------
+      echo "Initializing all *Exists variables to 'false' (defaults)..."
+      for _var in \
+        aiHubExists aifProjectExists aiFoundryV2Exists aiFoundryV2ProjectExists \
+        databricksExists logicAppsExists eventHubsExists dataFactoryExists \
+        botServiceExists aksExists amlExists openaiExists aiSearchExists \
+        dashboardInsightsExists applicationInsightExists aiServicesExists \
+        bingExists containerAppsEnvExists containerAppAExists containerAppWExists \
+        cosmosDBExists functionAppExists webAppExists funcAppServicePlanExists \
+        webAppServicePlanExists keyvaultExists miACAExists miPrjExists \
+        storageAccount1001Exists storageAccount2001Exists aifExists redisExists \
+        postgreSQLExists sqlServerExists sqlDBExists elasticExists \
+        acrProjectExists vmExists contentSafetyExists; do
+        echo "##vso[task.setvariable variable=${_var}]false"
+      done
+
       # Check if target resource group exists
       echo "Checking if resource group exists: $targetResourceGroup"
       if ! az group show --name "$targetResourceGroup" &> /dev/null; then
         echo "Resource group '$targetResourceGroup' does not exist."
-        return 1
-        
-        # Set all resource existence variables to false
-        echo "##vso[task.setvariable variable=aiHubExists]false"
-        echo "##vso[task.setvariable variable=aifProjectExists]false"
-        echo "##vso[task.setvariable variable=amlExists]false"
-        echo "##vso[task.setvariable variable=openaiExists]false"
-        echo "##vso[task.setvariable variable=aiSearchExists]false"
-        echo "##vso[task.setvariable variable=dashboardInsightsExists]false"
-        echo "##vso[task.setvariable variable=applicationInsightExists]false"
-        echo "##vso[task.setvariable variable=aiServicesExists]false"
-        echo "##vso[task.setvariable variable=bingExists]false"
-        echo "##vso[task.setvariable variable=containerAppsEnvExists]false"
-        echo "##vso[task.setvariable variable=containerAppAExists]false"
-        echo "##vso[task.setvariable variable=containerAppWExists]false"
-        echo "##vso[task.setvariable variable=cosmosDBExists]false"
-        echo "##vso[task.setvariable variable=functionAppExists]false"
-        echo "##vso[task.setvariable variable=webAppExists]false"
-        echo "##vso[task.setvariable variable=funcAppServicePlanExists]false"
-        echo "##vso[task.setvariable variable=webAppServicePlanExists]false"
-        echo "##vso[task.setvariable variable=keyvaultExists]false"
-        echo "##vso[task.setvariable variable=miACAExists]false"
-        echo "##vso[task.setvariable variable=miPrjExists]false"
-        echo "##vso[task.setvariable variable=storageAccount1001Exists]false"
-        echo "##vso[task.setvariable variable=storageAccount2001Exists]false"
-        echo "##vso[task.setvariable variable=aifExists]false"
-        echo "##vso[task.setvariable variable=redisExists]false"
-        echo "##vso[task.setvariable variable=postgreSQLExists]false"
-        echo "##vso[task.setvariable variable=sqlServerExists]false"
-        echo "##vso[task.setvariable variable=sqlDBExists]false"
-        echo "##vso[task.setvariable variable=acrProjectExists]false"
-        echo "##vso[task.setvariable variable=vmExists]false"
-        echo "##vso[task.setvariable variable=contentSafetyExists]false"
-        
+        echo "All *Exists variables remain set to 'false' (initialized above)."
+        echo "This is expected on a first-time deployment; downstream tasks will create the resources."
         exit 0
       fi
 
@@ -3245,11 +3240,18 @@ steps:
      _subnet_common="$(subnetCommon)"
      if [ "$_BYO" != "true" ]; then _subnet_common=""; fi
 
-     # Safe-default pipeline vars that may not be set if detection task was skipped
-     _aiFoundryV2Exists="$(aiFoundryV2Exists)"
-     _aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)"
-     if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
-     if [[ "$_aiFoundryV2ProjectExists" == *"aiFoundryV2ProjectExists"* ]]; then _aiFoundryV2ProjectExists="false"; fi
+     # Safe-default pipeline vars that may not be set if detection task was skipped.
+     # NOTE: do NOT use "$(aiFoundryV2Exists)" inline here. If the pipeline variable is
+     # undefined, Azure DevOps leaves the literal "$(aiFoundryV2Exists)" in the script,
+     # which bash then interprets as a command substitution and fails with
+     # "aiFoundryV2Exists: command not found". Instead we receive them via the env:
+     # block at the bottom of this task — unresolved macros are kept as literal strings
+     # in env vars (no bash re-evaluation), so the defensive fallback below works.
+     _aiFoundryV2Exists="${AIFOUNDRYV2EXISTS_RAW:-false}"
+     _aiFoundryV2ProjectExists="${AIFOUNDRYV2PROJECTEXISTS_RAW:-false}"
+     if [ -z "$_aiFoundryV2Exists" ] || [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]] || [[ "$_aiFoundryV2Exists" == *'$('* ]]; then _aiFoundryV2Exists="false"; fi
+     if [ -z "$_aiFoundryV2ProjectExists" ] || [[ "$_aiFoundryV2ProjectExists" == *"aiFoundryV2ProjectExists"* ]] || [[ "$_aiFoundryV2ProjectExists" == *'$('* ]]; then _aiFoundryV2ProjectExists="false"; fi
+     echo "Resolved _aiFoundryV2Exists=$_aiFoundryV2Exists, _aiFoundryV2ProjectExists=$_aiFoundryV2ProjectExists"
      
      echo "=== Starting AI Foundry Account Deployment (async mode) ==="
      echo "This deployment will start the account creation and return immediately."
@@ -3365,6 +3367,13 @@ steps:
      echo "The deployment is now running asynchronously in Azure."
      echo "Next task will poll for completion status."
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    # Pass possibly-undefined detection-task pipeline variables via env so that an
+    # unresolved $(var) macro becomes a harmless literal env value instead of being
+    # evaluated by bash as a command substitution (which caused
+    # "aiFoundryV2Exists: command not found").
+    AIFOUNDRYV2EXISTS_RAW: $(aiFoundryV2Exists)
+    AIFOUNDRYV2PROJECTEXISTS_RAW: $(aiFoundryV2ProjectExists)
 - task: AzureCLI@2
   displayName: '69a-Poll-Deployment-Status'
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
