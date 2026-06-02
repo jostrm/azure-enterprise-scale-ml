@@ -202,6 +202,7 @@ jobs:
       # Complete mode vs Incremental mode
       enableDeleteForDisabledResources: ${{ vars.ENABLE_DELETE_FOR_DISABLED_RESOURCES || 'true' }}
       deleteAllServicesForProject: ${{ vars.DELETE_ALL_SERVICES_FOR_PROJECT || 'false' }}
+      deleteKeyvaultAlso: ${{ vars.DELETE_KEYVAULT_ALSO || 'false' }}
       deleteAllForProject: ${{ vars.DELETE_ALL_FOR_PROJECT || 'false' }}
 
       # DNS zone existence flags (for parity with ADO debug params)

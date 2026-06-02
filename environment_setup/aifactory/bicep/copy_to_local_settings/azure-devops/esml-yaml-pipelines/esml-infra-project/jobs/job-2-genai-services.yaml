@@ -1262,6 +1262,7 @@ steps:
     deleteAllForProject: $(deleteAllForProject)
     enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
     deleteAllServicesForProject: $(deleteAllServicesForProject)
+    deleteKeyvaultAlso: $(deleteKeyvaultAlso)
     enableDeleteForDisabledResources: $(enableDeleteForDisabledResources)
     enableAISearch: $(enableAISearch)
     aiSearchExists: $(aiSearchExists)

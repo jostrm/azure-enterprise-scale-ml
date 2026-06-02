@@ -21,18 +21,26 @@ projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced
 
 echo "Target resource group: $projectResourceGroup"
 
-# Complete mode: deleteAllServicesForProject deletes EVERYTHING including KeyVault, Storage, AppInsights, and networking resources in common RG (subnets, NSGs)
+# Complete mode: deleteAllServicesForProject deletes EVERYTHING including KeyVault (if deleteKeyvaultAlso=true), Storage, AppInsights, and networking resources in common RG (subnets, NSGs)
 # Ultra mode: deleteAllForProject does everything from deleteAllServicesForProject PLUS deletes the project resource group itself
+# Safety flag: deleteKeyvaultAlso (default false) preserves the project Key Vault when deleteAllServicesForProject=true.
+#              Set to true to also delete the Key Vault (e.g. for a full teardown).
 # Normalize to lowercase because ADO serializes unquoted YAML booleans as "True"/"False" (capital T/F)
 # and all bash comparisons in this script use lowercase "true"/"false"
 deleteAllServicesForProject=$(echo "${deleteAllServicesForProject:-false}" | tr '[:upper:]' '[:lower:]')
 deleteAllForProject=$(echo "${deleteAllForProject:-false}" | tr '[:upper:]' '[:lower:]')
+deleteKeyvaultAlso=$(echo "${deleteKeyvaultAlso:-false}" | tr '[:upper:]' '[:lower:]')
 echo ""
 echo "=== Delete Mode ==="
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
 echo "deleteAllForProject: $deleteAllForProject"
+echo "deleteKeyvaultAlso: $deleteKeyvaultAlso"
 if [ "$deleteAllServicesForProject" = "true" ]; then
-  echo "🔥 deleteAllServicesForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources in common RG"
+  if [ "$deleteKeyvaultAlso" = "true" ]; then
+    echo "🔥 deleteAllServicesForProject=true + deleteKeyvaultAlso=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources in common RG"
+  else
+    echo "🔥 deleteAllServicesForProject=true (deleteKeyvaultAlso=false): EVERYTHING will be deleted EXCEPT KeyVault (Storage, AppInsights, and networking resources in common RG are deleted)"
+  fi
 fi
 if [ "$deleteAllForProject" = "true" ]; then
   echo "💀 deleteAllForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, networking resources, AND the entire project resource group"
@@ -40,7 +48,8 @@ fi
 
 # =============================================================================
 # SERVICES THAT ARE ** NEVER ** DELETED BY THIS SCRIPT (any flag value):
-#   - Key Vault          (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
+#   - Key Vault          (deleted only when deleteAllServicesForProject=true AND deleteKeyvaultAlso=true,
+#                         OR when deleteAllForProject=true which removes the whole RG)
 #   - Storage Accounts   (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
 #   - Application Insights / Dashboard Insights (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
 #   - AI Foundry Hub v1 (MachineLearningServices/workspaces kind=Hub)
@@ -2338,30 +2347,35 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     echo "No dashboards found"
   fi
   
-  # Step 4: Delete Key Vaults
+  # Step 4: Delete Key Vaults (gated by deleteKeyvaultAlso flag)
   echo ""
   echo "=== Step 4: Deleting Key Vaults ==="
-  keyvaults=$(az keyvault list \
-    --resource-group "$projectResourceGroup" \
-    --query "[].name" \
-    -o tsv 2>/dev/null || echo "")
-  
-  if [ -n "$keyvaults" ]; then
-    while IFS= read -r kv_name; do
-      if [ -n "$kv_name" ]; then
-        echo "Deleting Key Vault: $kv_name"
-        # Delete private endpoints first
-        delete_private_endpoints "$kv_name" "Microsoft.KeyVault/vaults"
-        # Delete the Key Vault (soft delete)
-        az keyvault delete \
-          --name "$kv_name" \
-          --resource-group "$projectResourceGroup" \
-          2>&1 || echo "  Warning: Failed to delete Key Vault $kv_name"
-      fi
-    done <<< "$keyvaults"
-    echo "✓ Key Vaults deleted (soft-deleted, use purge later if needed)"
+  if [ "$deleteKeyvaultAlso" != "true" ]; then
+    echo "⏭  Skipping Key Vault deletion: deleteKeyvaultAlso=false (Key Vault is preserved as a safety net)."
+    echo "   Set deleteKeyvaultAlso=true to also delete the project Key Vault."
   else
-    echo "No Key Vaults found"
+    keyvaults=$(az keyvault list \
+      --resource-group "$projectResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null || echo "")
+
+    if [ -n "$keyvaults" ]; then
+      while IFS= read -r kv_name; do
+        if [ -n "$kv_name" ]; then
+          echo "Deleting Key Vault: $kv_name"
+          # Delete private endpoints first
+          delete_private_endpoints "$kv_name" "Microsoft.KeyVault/vaults"
+          # Delete the Key Vault (soft delete)
+          az keyvault delete \
+            --name "$kv_name" \
+            --resource-group "$projectResourceGroup" \
+            2>&1 || echo "  Warning: Failed to delete Key Vault $kv_name"
+        fi
+      done <<< "$keyvaults"
+      echo "✓ Key Vaults deleted (soft-deleted, use purge later if needed)"
+    else
+      echo "No Key Vaults found"
+    fi
   fi
   
   # Step 4a: Delete AI Search Private Endpoints (aisearchprj*)
@@ -2479,11 +2493,62 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     --resource-group "$projectResourceGroup" \
     --query "[].name" \
     -o tsv 2>/dev/null | tr -d '\r' || echo "")
-  
+
+  # When deleteKeyvaultAlso=false, build a list of Key Vault private endpoints to PRESERVE
+  # (and capture their NIC names so the Step 5a NIC sweep also skips them).
+  kv_pends_to_preserve=""
+  kv_nics_to_preserve=""
+  if [ "$deleteKeyvaultAlso" != "true" ]; then
+    kv_names_preserve=$(az keyvault list \
+      --resource-group "$projectResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null || echo "")
+    if [ -n "$kv_names_preserve" ]; then
+      while IFS= read -r _kv_name; do
+        if [ -n "$_kv_name" ]; then
+          # Match the same naming patterns as delete_private_endpoints()
+          _kv_pends=$(az network private-endpoint list \
+            --resource-group "$projectResourceGroup" \
+            --query "[?(name == '${_kv_name}' || starts_with(name, '${_kv_name}-pend') || starts_with(name, 'p-${_kv_name}') || starts_with(name, 'pend-${_kv_name}') || contains(name, '-${_kv_name}-') || contains(name, '-${_kv_name}'))].name" \
+            -o tsv 2>/dev/null | tr -d '\r' || echo "")
+          if [ -n "$_kv_pends" ]; then
+            kv_pends_to_preserve="${kv_pends_to_preserve}${_kv_pends}"$'\n'
+            # Capture NIC names attached to those PEs (PE NIC name pattern: <pend>.nic.<guid>)
+            while IFS= read -r _kv_pend; do
+              if [ -n "$_kv_pend" ]; then
+                _kv_pe_nics=$(az network private-endpoint show \
+                  --resource-group "$projectResourceGroup" \
+                  --name "$_kv_pend" \
+                  --query "networkInterfaces[].id" \
+                  -o tsv 2>/dev/null | awk -F'/' '{print $NF}' | tr -d '\r' || echo "")
+                if [ -n "$_kv_pe_nics" ]; then
+                  kv_nics_to_preserve="${kv_nics_to_preserve}${_kv_pe_nics}"$'\n'
+                fi
+              fi
+            done <<< "$_kv_pends"
+          fi
+        fi
+      done <<< "$kv_names_preserve"
+    fi
+    if [ -n "$kv_pends_to_preserve" ]; then
+      echo "⏭  Preserving Key Vault private endpoints (deleteKeyvaultAlso=false):"
+      echo "$kv_pends_to_preserve" | sed '/^$/d' | sed 's/^/    - /'
+    fi
+    if [ -n "$kv_nics_to_preserve" ]; then
+      echo "⏭  Preserving Key Vault NICs (deleteKeyvaultAlso=false):"
+      echo "$kv_nics_to_preserve" | sed '/^$/d' | sed 's/^/    - /'
+    fi
+  fi
+
   if [ -n "$all_pends" ]; then
     subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
+        # Skip KV-related private endpoints when preserving the Key Vault
+        if [ -n "$kv_pends_to_preserve" ] && echo "$kv_pends_to_preserve" | grep -Fxq "$pend_name"; then
+          echo "⏭  Skipping Key Vault private endpoint: $pend_name (deleteKeyvaultAlso=false)"
+          continue
+        fi
         echo "Deleting private endpoint: $pend_name"
         # Try normal delete first (without --no-wait to detect failures)
         delete_output=$(az network private-endpoint delete \
@@ -2530,6 +2595,11 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   if [ -n "$all_nics" ]; then
     while IFS= read -r nic_name; do
       if [ -n "$nic_name" ]; then
+        # Skip NICs attached to Key Vault private endpoints when preserving the Key Vault
+        if [ -n "$kv_nics_to_preserve" ] && echo "$kv_nics_to_preserve" | grep -Fxq "$nic_name"; then
+          echo "⏭  Skipping Key Vault NIC: $nic_name (deleteKeyvaultAlso=false)"
+          continue
+        fi
         echo "Deleting NIC: $nic_name"
         az network nic delete \
           --resource-group "$projectResourceGroup" \
