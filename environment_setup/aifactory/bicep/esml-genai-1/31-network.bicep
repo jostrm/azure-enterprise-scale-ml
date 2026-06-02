@@ -261,7 +261,14 @@ var acaSubnetSettings =   {
 var aca2SubnetSettings =   {
   cidr: aca2SubnetCidr
   name: 'aca2SubnetSettings'
-  delegations: []
+  // REQUIRED for AI Foundry agent network injection (auto-provisioned ACA env behind the agent service).
+  // Set at subnet-creation time so task '69a-Validate-Subnet-For-NetworkInjection' in job-2 does not have
+  // to mutate the subnet on the fly. The bicep 09-ai-foundry-2025-v4.bicep keeps a conditional
+  // subnetDelegationAca safety-net (idempotent) for upgrade scenarios where this snt-...-aca-002 subnet
+  // was created before this delegation was added.
+  delegations: [
+    'Microsoft.App/environments'
+  ]
   serviceEndpoints: [
     'Microsoft.KeyVault'
     'Microsoft.Storage'
@@ -318,7 +325,7 @@ module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && 
     addressPrefix: aca2SubnetSettings.cidr
     location: location
     serviceEndpoints: aca2SubnetSettings.serviceEndpoints
-    delegations: []
+    delegations: aca2SubnetSettings.delegations
     nsgId: !empty(aca2SubnetCidr) ? nsg2Aca!.outputs.nsgId : ''
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     allowDefaultOutboundAccess: true
@@ -403,7 +410,7 @@ module dbxPrivSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPrivSubnetCidr
   }
 
   // Make sure that no overlapping processes are created
-  // On some cases AzureRm will return an error if paralell
+  // On some cases AzureRm will return an error if parallel
   // subnet creation processes are started
   dependsOn: [
     ...(!sntDatabricksPrivExists && !empty(dbxPrivSubnetCidr) ? [nsgDbx] : [])

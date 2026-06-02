@@ -180,32 +180,6 @@ param enableDefenderforAIResourceLevel bool = false
 // If you're using individual users, set useAdGroups = false
 // Mismatch will cause: UnmatchedPrincipalType error
 
-// ============== CRITICAL VALIDATION: NETWORK CONFIGURATION ==============
-// Ensures proper setup to avoid:
-// 1. Not injected into the expected subnet
-// 2. Using a different DNS path
-// 3. Missing VNet integration
-// 4. Using "Basic setup" instead of "Standard setup with private networking"
-// 5. Capability host provisioned before DNS/private endpoint existed
-
-// VALIDATION 1: Ensure agent subnet is provided when network injection is enabled
-var agentSubnetMissing = !disableAgentNetworkInjection && empty(aca2SubnetId)
-var agentSubnetValidationMessage = agentSubnetMissing 
-  ? 'ERROR: Standard setup with private networking requires aca2SubnetId when disableAgentNetworkInjection=false. Either set disableAgentNetworkInjection=true (Basic setup) or provide aca2SubnetId (Standard setup).'
-  : 'OK: Agent network configuration is valid.'
-
-// VALIDATION 2: Ensure subnet delegation will be configured when using Standard setup
-var requiresSubnetDelegationButMayFail = !disableAgentNetworkInjection && !empty(aca2SubnetId) && !aiFoundryV2Exists
-
-// VALIDATION 3: Warn if using Basic setup when capability host is enabled (suboptimal for private networking)
-var usingBasicSetupWithCaphost = disableAgentNetworkInjection && enableCaphost
-var basicSetupWarning = usingBasicSetupWithCaphost
-  ? 'WARNING: Using Basic setup (disableAgentNetworkInjection=true) with capability host. Consider Standard setup (disableAgentNetworkInjection=false with aca2SubnetId) for full private networking.'
-  : 'OK: Network setup is appropriate for capability host configuration.'
-
-// VALIDATION 4: Ensure DNS zones and private endpoints are properly configured before capability host
-var requiresDnsAndPeBeforeCaphost = enableCaphost && enableAIFoundry && !foundryV22AccountOnly
-
 // Calculated variables
 var projectName = 'prj${projectNumber}'
 var commonResourceGroup = !empty(commonResourceGroup_param) ? commonResourceGroup_param : '${commonRGNamePrefix}${commonResourceName}-${locationSuffix}-${env}${aifactorySuffixRG}'
@@ -608,18 +582,6 @@ var aiFoundryNetworkingConfig = union({
   agentServiceSubnetResourceId: aca2SubnetId
 } : {})
 
-// CRITICAL VALIDATION: Log network configuration for troubleshooting
-var networkConfigValidation = {
-  agentNetworkInjectionEnabled: !disableAgentNetworkInjection && !empty(aca2SubnetId)
-  agentSubnetProvided: !empty(aca2SubnetId)
-  agentSubnetId: aca2SubnetId
-  disableAgentNetworkInjection: disableAgentNetworkInjection
-  setupType: disableAgentNetworkInjection ? 'Basic setup - no agent network injection' : (!empty(aca2SubnetId) ? 'Standard setup with private networking' : 'INCOMPLETE - missing agent subnet')
-  subnetDelegationRequired: !disableAgentNetworkInjection && !empty(aca2SubnetId) && !aiFoundryV2Exists
-  validationMessage: agentSubnetValidationMessage
-  caphostWarning: basicSetupWarning
-}
-
 var aiFoundryDefinitionBase = {
   baseName: aifV2Name
   includeAssociatedResources: false
@@ -679,17 +641,38 @@ var aiFoundryDefinition = union(
   } : {}
 )
 
-// Subnet delegation for Container Apps
-var aca2SubnetName = namingConvention.outputs.aca2SubnetName
-var requiresAcaDelegation = enableAIFoundry && !aiFoundryV2Exists && !disableAgentNetworkInjection
+// Subnet delegation for Container Apps (agent network injection)
+// -----------------------------------------------------------------
+// This module ensures the ACA-002 subnet is delegated to Microsoft.App/environments,
+// which the auto-provisioned (invisible) ACA environment behind the AI Foundry agent
+// service requires. It must run BOTH when:
+//   (a) job-1 created the subnet via 31-network.bicep (delegation is baked in there) —
+//       this acts as an idempotent re-assertion, AND
+//   (b) BYO_subnets = true / sntAca002Exists = true, i.e. job-1 did NOT create the
+//       subnet — here this module is the ONLY place that guarantees the delegation.
+//
+// To support BYO across different VNet/RG/subscription than the naming convention,
+// we parse aca2SubnetId when provided and target that exact resource. The underlying
+// subnetDelegation.bicep preserves existing NSG/routeTable/serviceEndpoints and is
+// idempotent in ARM when the delegation already matches.
+var aca2SubnetSegmentsRaw = split(aca2SubnetId, '/')
+// Pad to guarantee Bicep can safely index positions 2/4/8/10 at compile time even
+// when aca2SubnetId is empty (split('', '/') returns ['']).
+var aca2SubnetSegments = concat(aca2SubnetSegmentsRaw, ['', '', '', '', '', '', '', '', '', '', ''])
+var aca2SubnetIdParsed = length(aca2SubnetSegmentsRaw) >= 11
+var aca2SubnetTargetSubId = aca2SubnetIdParsed ? aca2SubnetSegments[2] : subscriptionIdDevTestProd
+var aca2SubnetTargetRg    = aca2SubnetIdParsed ? aca2SubnetSegments[4] : vnetResourceGroupName
+var aca2SubnetTargetVnet  = aca2SubnetIdParsed ? aca2SubnetSegments[8] : vnetNameFull
+var aca2SubnetName        = aca2SubnetIdParsed ? aca2SubnetSegments[10] : namingConvention.outputs.aca2SubnetName
+var requiresAcaDelegation = enableAIFoundry && !aiFoundryV2Exists && !disableAgentNetworkInjection && !empty(aca2SubnetId)
 module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (requiresAcaDelegation) {
   name: take('09-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(vnetResourceGroupName)
+  scope: resourceGroup(aca2SubnetTargetSubId, aca2SubnetTargetRg)
   params: {
-    vnetName: vnetNameFull
+    vnetName: aca2SubnetTargetVnet
     subnetName: aca2SubnetName
     location: location
-    vnetResourceGroupName: vnetResourceGroupName
+    vnetResourceGroupName: aca2SubnetTargetRg
     delegations: [
       {
         name: 'aca-delegation'
@@ -1140,19 +1123,12 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 // so we create it explicitly. When networkInjection IS enabled the platform auto-provisions it;
 // deploying it explicitly would conflict and cause a timeout. The YAML pipeline includes a
 // wait task (69-wait-account-caphost) that polls until the auto-provisioned caphost reaches Succeeded.
-// 
-// CRITICAL: When network injection IS enabled (Standard setup), the customerSubnet property MUST match
-// the subnet recorded on the Foundry account (networkInjections.subnetArmId). If they don't match,
-// the API returns: "The customerSubnet property must match the subnet recorded on the Foundry account."
-// This is why we explicitly pass aca2SubnetId when available.
 module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(enableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_AccCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     accountName: aifV2Name
     capabilityHostName: '${replace(aifV2Name, '-', '')}caphost'
-    // IMPORTANT: Pass subnet when network injection is configured to ensure consistency
-    // If disableAgentNetworkInjection=false, account already has networkInjections with subnet
     customerSubnet: (!disableAgentNetworkInjection && !empty(aca2SubnetId)) ? aca2SubnetId : ''
   }
   dependsOn: [
@@ -1169,13 +1145,6 @@ module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphos
 // - If disableAgentNetworkInjection=true: Create in same deployment (account caphost created explicitly)
 // - If disableAgentNetworkInjection=false AND aiFoundryV2Exists=false: SKIP (first deployment, wait for auto-provision)
 // - If aiFoundryV2Exists=true: Create (second deployment, account caphost already exists)
-//
-// NETWORK SAFEGUARDS:
-// 1. Subnet configuration: Account must have networkInjections configured if using Standard setup
-// 2. DNS zones: Private DNS zones must be deployed and linked before capability host
-// 3. Private endpoints: All private endpoints should be provisioned before capability host
-// 4. RBAC: All role assignments must be propagated before capability host creation
-// 5. Connections: All project connections (Cosmos, Storage, AI Search) must exist before capability host
 module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
@@ -1193,10 +1162,10 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   dependsOn: [
     rbacPreCaphost
     projectV21  // CRITICAL: Must wait for project and all connections to be fully created
-    rbacAISearchForAIFv21  // CRITICAL: AI Search RBAC must be in place
-    rbacAIStorageAccountsForAIFv21  // CRITICAL: Storage RBAC must be in place
-    ...(disableAgentNetworkInjection ? [addAccountCapabilityHost] : [])  // CRITICAL: Account caphost must exist first
-    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])  // CRITICAL: Subnet delegation must be configured
+    rbacAISearchForAIFv21
+    rbacAIStorageAccountsForAIFv21
+    ...(disableAgentNetworkInjection ? [addAccountCapabilityHost] : [])
+    ...(requiresAcaDelegation ? [subnetDelegationAca] : [])
   ]
 }
 
@@ -1392,61 +1361,3 @@ output debugCmkUpdate object = (!foundryV22AccountOnly && enableAIFoundry && !us
 
 @description('AI Models deployed count')
 output aiModelsDeployed int = length(aiModels)
-
-// ============== NETWORK CONFIGURATION VALIDATION OUTPUTS ==============
-// These outputs help diagnose networking and DNS issues:
-// 1. Not injected into the expected subnet
-// 2. Using a different DNS path  
-// 3. Missing VNet integration
-// 4. Using "Basic setup" instead of "Standard setup with private networking"
-// 5. Capability host provisioned before DNS/private endpoint existed
-
-@description('Network configuration validation - check for warnings and errors')
-output networkConfigurationValidation object = networkConfigValidation
-
-@description('Agent subnet configuration status')
-output agentSubnetStatus string = agentSubnetValidationMessage
-
-@description('Capability host setup warning')
-output caphostSetupWarning string = basicSetupWarning
-
-@description('Subnet delegation status')
-output subnetDelegationRequired bool = requiresSubnetDelegationButMayFail
-
-@description('DNS and private endpoint readiness for capability host')
-output dnsAndPeReadyForCaphost bool = requiresDnsAndPeBeforeCaphost
-
-@description('Network setup type being used')
-output networkSetupType string = disableAgentNetworkInjection 
-  ? 'Basic setup - no agent network injection' 
-  : (!empty(aca2SubnetId) 
-      ? 'Standard setup with private networking' 
-      : 'INCOMPLETE - missing agent subnet configuration')
-
-@description('Agent network injection configuration')
-output agentNetworkInjection object = {
-  enabled: !disableAgentNetworkInjection && !empty(aca2SubnetId)
-  agentSubnetId: aca2SubnetId
-  agentSubnetProvided: !empty(aca2SubnetId)
-  disableAgentNetworkInjection: disableAgentNetworkInjection
-  requiresCosmosDB: useCosmosForFoundry
-  subnetDelegationConfigured: !disableAgentNetworkInjection && !empty(aca2SubnetId) && !aiFoundryV2Exists
-}
-
-@description('Private DNS zone configuration')
-output privateDnsConfiguration object = {
-  zonesProvided: !empty(privateLinksDnsZones)
-  centralDnsInHub: centralDnsZoneByPolicyInHub
-  privDnsResourceGroup: privDnsResourceGroupName
-  privDnsSubscription: privDnsSubscription
-}
-
-@description('Capability host deployment status')
-output capabilityHostStatus object = {
-  enabled: enableCaphost
-  accountLevelDeployed: enableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists
-  projectLevelDeployed: enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)
-  accountLevelAutoProvisioned: !disableAgentNetworkInjection && !empty(aca2SubnetId)
-  requiresSecondDeployment: !disableAgentNetworkInjection && !aiFoundryV2Exists
-}
-

@@ -613,12 +613,13 @@ steps:
     deploymentMode: 'Incremental'
     deploymentName: 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj'
 
-- task: AzureCLI@1
+- task: AzureCLI@2
   displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
     scriptLocation: 'inlineScript'
-    inlineScript: | 
+    inlineScript: |
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
      az keyvault network-rule remove --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
