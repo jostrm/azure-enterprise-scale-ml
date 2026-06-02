@@ -665,16 +665,38 @@ if [ "$enableFunction" = "false" ] && [ "$functionAppExists" = "true" ]; then
     fi
     
     # STEP 3: Delete the Function App itself
+    # NOTE: az functionapp delete is known to spuriously print
+    #   "ERROR: Operation returned an invalid status 'Not Found'"
+    # even on a successful delete (the LRO polling URL 404s once the resource
+    # is gone). We therefore ignore the CLI exit code and instead VERIFY the
+    # resource is actually absent by re-querying ARM.
     echo "Deleting Function App: $func_name"
-    az functionapp delete \
+    delete_output=$(az functionapp delete \
       --resource-group "$projectResourceGroup" \
-      --name "$func_name" 2>&1
-    
-    if [ $? -eq 0 ]; then
-      echo "✅ Successfully deleted Function App"
+      --name "$func_name" 2>&1) || true
+    if [ -n "$delete_output" ]; then
+      echo "$delete_output"
+    fi
+
+    # Verify deletion (give ARM up to ~30s to propagate)
+    func_still_there=""
+    for attempt in 1 2 3 4 5 6; do
+      func_still_there=$(az functionapp show \
+        --resource-group "$projectResourceGroup" \
+        --name "$func_name" \
+        --query "id" -o tsv 2>/dev/null || echo "")
+      if [ -z "$func_still_there" ]; then
+        break
+      fi
+      sleep 5
+    done
+
+    if [ -z "$func_still_there" ]; then
+      echo "✅ Successfully deleted Function App: $func_name"
       echo "##vso[task.setvariable variable=functionAppExists]false"
     else
-      echo "❌ Failed to delete Function App"
+      echo "##[warning]❌ Function App still present after delete attempt: $func_still_there"
+      echo "##[warning]   CLI output was: ${delete_output:-<empty>}"
     fi
     
     # STEP 4: Delete App Service Plan (only if NOT using BYO ASE v3)
