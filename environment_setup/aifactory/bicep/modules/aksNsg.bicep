@@ -14,6 +14,35 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   properties: {
     securityRules: [
       // --- Inbound ---
+      // Highest-priority VNet allow rule: lets every subnet in the VNet reach this subnet on any port/protocol.
+      {
+        name: 'Allow_VNet_Inbound'
+        properties: {
+          description: 'Allow all inbound traffic from any subnet in the same VNet (all ports, all protocols).'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
+          destinationAddressPrefix: 'VirtualNetwork'
+          access: 'Allow'
+          priority: 100
+          direction: 'Inbound'
+        }
+      }
+      {
+        name: 'Allow_APIM'
+        properties: {
+          description: 'Allow inbound from Azure API Management control plane (port 3443).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '3443'
+          sourceAddressPrefix: 'ApiManagement'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 110
+          direction: 'Inbound'
+        }
+      }
       { // AML copy start
         name: 'AzureMachineLearning'
         properties: {
@@ -27,6 +56,23 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           direction: 'Inbound'
         }
       }
+      // --- Outbound ---
+      // Highest-priority VNet allow rule: lets this subnet reach any subnet in the same VNet on any port/protocol.
+      // Priorities for the rest of the outbound rules start at 1000 so 100-999 stays free for future higher-priority overrides.
+      {
+        name: 'Allow_VNet_Outbound'
+        properties: {
+          description: 'Allow all outbound traffic to any subnet in the same VNet (all ports, all protocols).'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
+          destinationAddressPrefix: 'VirtualNetwork'
+          access: 'Allow'
+          priority: 100
+          direction: 'Outbound'
+        }
+      }
       {
         name: 'AzureActiveDirectory'
         properties: {
@@ -36,11 +82,10 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureActiveDirectory'
           access: 'Allow'
-          priority: 140
+          priority: 1000
           direction: 'Outbound'
         }
       } 
-      // --- Outbound ---
       {// !!
         name: 'MicrosoftContainerRegistry'
         properties: {
@@ -51,7 +96,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'MicrosoftContainerRegistry' // 'MicrosoftContainerRegistry.${location}'
           access: 'Allow'
-          priority: 200
+          priority: 1010
           direction: 'Outbound'
         }
       }
@@ -64,7 +109,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureMachineLearning'
           access: 'Allow'
-          priority: 150
+          priority: 1020
           direction: 'Outbound'
         }
       }
@@ -77,7 +122,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureResourceManager'
           access: 'Allow'
-          priority: 160
+          priority: 1030
           direction: 'Outbound'
         }
       }
@@ -90,7 +135,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'Storage.${location}'
           access: 'Allow'
-          priority: 170
+          priority: 1040
           direction: 'Outbound'
         }
       }
@@ -103,7 +148,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureFrontDoor.FrontEnd'
           access: 'Allow'
-          priority: 180
+          priority: 1050
           direction: 'Outbound'
         }
       }
@@ -116,7 +161,35 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureContainerRegistry.${location}'
           access: 'Allow'
-          priority: 190
+          priority: 1060
+          direction: 'Outbound'
+        }
+      }
+      {
+        name: 'AzureFrontDoorFirstParty'
+        properties: {
+          description: 'Required for MCR pulls — MCR layers/manifests are served via FrontDoor FirstParty backend.'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'AzureFrontDoor.FirstParty'
+          access: 'Allow'
+          priority: 1070
+          direction: 'Outbound'
+        }
+      }
+      {
+        name: 'AzureMonitor'
+        properties: {
+          description: 'Required for AKS / ACA log + metric egress (Container Insights, Log Analytics, App Insights).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'AzureMonitor'
+          access: 'Allow'
+          priority: 1080
           direction: 'Outbound'
         }
       }

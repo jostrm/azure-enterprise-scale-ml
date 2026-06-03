@@ -14,6 +14,35 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   properties: {
     securityRules: [
       // --- Inbound ---
+      // Highest-priority VNet allow rule: lets every subnet in the VNet reach this subnet on any port/protocol.
+      {
+        name: 'Allow_VNet_Inbound'
+        properties: {
+          description: 'Allow all inbound traffic from any subnet in the same VNet (all ports, all protocols).'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
+          destinationAddressPrefix: 'VirtualNetwork'
+          access: 'Allow'
+          priority: 110
+          direction: 'Inbound'
+        }
+      }
+      {
+        name: 'Allow_APIM'
+        properties: {
+          description: 'Allow inbound from Azure API Management control plane (port 3443).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '3443'
+          sourceAddressPrefix: 'ApiManagement'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 120
+          direction: 'Inbound'
+        }
+      }
       {
         name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-worker-inbound'
         properties: {
@@ -69,6 +98,25 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       // --- Outbound --- 
+      // Highest-priority VNet allow rule. Subsequent outbound rules start at 1000 so 100-999 stays free for future higher-priority overrides.
+      {
+        name: 'Allow_VNet_Outbound'
+        properties: {
+            description: 'Allow all outbound traffic to any subnet in the same VNet (all ports, all protocols).'
+            protocol: '*'
+            sourcePortRange: '*'
+            destinationPortRange: '*'
+            sourceAddressPrefix: 'VirtualNetwork'
+            destinationAddressPrefix: 'VirtualNetwork'
+            access: 'Allow'
+            priority: 110
+            direction: 'Outbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
       {
         name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-databricks-webapp'
         properties: {
@@ -79,7 +127,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'AzureDatabricks'
             access: 'Allow'
-            priority: 100
+            priority: 1000
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -97,7 +145,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'Sql'
             access: 'Allow'
-            priority: 101
+            priority: 1010
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -115,7 +163,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'Storage'
             access: 'Allow'
-            priority: 102
+            priority: 1020
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -133,7 +181,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 103
+            priority: 1030
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -151,7 +199,43 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'EventHub'
             access: 'Allow'
-            priority: 104
+            priority: 1040
+            direction: 'Outbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'AzureFrontDoorFirstParty'
+        properties: {
+            description: 'Required for MCR pulls — MCR layers/manifests are served via FrontDoor FirstParty backend.'
+            protocol: 'Tcp'
+            sourcePortRange: '*'
+            destinationPortRange: '443'
+            sourceAddressPrefix: 'VirtualNetwork'
+            destinationAddressPrefix: 'AzureFrontDoor.FirstParty'
+            access: 'Allow'
+            priority: 1050
+            direction: 'Outbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'AzureMonitor'
+        properties: {
+            description: 'Required for log + metric egress (Container Insights, Log Analytics, App Insights).'
+            protocol: 'Tcp'
+            sourcePortRange: '*'
+            destinationPortRange: '443'
+            sourceAddressPrefix: 'VirtualNetwork'
+            destinationAddressPrefix: 'AzureMonitor'
+            access: 'Allow'
+            priority: 1060
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []

@@ -103,17 +103,36 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       */
-       {
+      // Highest-priority VNet allow rule: lets every subnet in the VNet reach this subnet on any port/protocol.
+      {
         name: 'Allow_VNet_Inbound'
         properties: {
-            description: 'Allow traffic from other subnets in same VNet'
+            description: 'Allow all inbound traffic from any subnet in the same VNet (all ports, all protocols).'
             protocol: '*'
             sourcePortRange: '*'
             destinationPortRange: '*'
             sourceAddressPrefix: 'VirtualNetwork'
+            destinationAddressPrefix: 'VirtualNetwork'
+            access: 'Allow'
+            priority: 100
+            direction: 'Inbound'
+            sourcePortRanges: []
+            destinationPortRanges: []
+            sourceAddressPrefixes: []
+            destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'Allow_APIM'
+        properties: {
+            description: 'Allow inbound from Azure API Management control plane (port 3443).'
+            protocol: 'Tcp'
+            sourcePortRange: '*'
+            destinationPortRange: '3443'
+            sourceAddressPrefix: 'ApiManagement'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 1400
+            priority: 110
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -291,6 +310,34 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           direction: 'Outbound'
         }
       }
+      {
+        name: 'AzureFrontDoorFirstParty'
+        properties: {
+          description: 'Required for MCR pulls — MCR layers/manifests are served via FrontDoor FirstParty backend (AKS/ACA system images).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'AzureFrontDoor.FirstParty'
+          access: 'Allow'
+          priority: 2710
+          direction: 'Outbound'
+        }
+      }
+      {
+        name: 'AzureMonitor'
+        properties: {
+          description: 'Required for AKS / ACA / VM log + metric egress (Container Insights, Log Analytics, App Insights).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: 'AzureMonitor'
+          access: 'Allow'
+          priority: 2720
+          direction: 'Outbound'
+        }
+      }
       {// !!
         name: 'AzureContainerRegistry'
         properties: {
@@ -443,14 +490,14 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       {
         name: 'Allow_VNet_Outbound'
         properties: {
-            description: 'Allow traffic to other subnets in same VNet'
+            description: 'Allow all outbound traffic to any subnet in the same VNet (all ports, all protocols). Highest priority — keep 101-999 free for future overrides.'
             protocol: '*'
             sourcePortRange: '*'
             destinationPortRange: '*'
-            sourceAddressPrefix: '*'
+            sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 1500
+            priority: 100
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
