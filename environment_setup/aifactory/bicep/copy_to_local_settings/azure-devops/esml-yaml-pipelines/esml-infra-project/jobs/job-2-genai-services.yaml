@@ -2420,14 +2420,18 @@ steps:
 
       echo "🔎 Scanning $targetResourceGroup for pre-existing diagnostic settings..."
 
-      # Default all skip flags to false; flip to true on detection.
-      skipDiagAOAI=false
-      skipDiagAISearch=false
-      skipDiagAIServices=false
-      skipDiagContentSafety=false
-      skipDiagVision=false
-      skipDiagSpeech=false
-      skipDiagDocIntelligence=false
+      # Honor any pre-set "true" coming from variables.yaml (Option A override pattern):
+      # if the operator has already forced a flag to true at pipeline-var level, keep it true
+      # regardless of detection. Detection can only ESCALATE false→true, never demote true→false.
+      norm() { case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in true|1|yes) echo "true";; *) echo "false";; esac; }
+      skipDiagAOAI=$(norm "$(skipDiagAOAI)")
+      skipDiagAISearch=$(norm "$(skipDiagAISearch)")
+      skipDiagAIServices=$(norm "$(skipDiagAIServices)")
+      skipDiagContentSafety=$(norm "$(skipDiagContentSafety)")
+      skipDiagVision=$(norm "$(skipDiagVision)")
+      skipDiagSpeech=$(norm "$(skipDiagSpeech)")
+      skipDiagDocIntelligence=$(norm "$(skipDiagDocIntelligence)")
+      echo "   Initial (from variables.yaml): AOAI=$skipDiagAOAI Search=$skipDiagAISearch AIServices=$skipDiagAIServices ContentSafety=$skipDiagContentSafety Vision=$skipDiagVision Speech=$skipDiagSpeech DocInt=$skipDiagDocIntelligence"
 
       # Map a Cognitive Services account 'kind' to the corresponding skip-flag.
       # Anything we don't recognize is logged but not gated.
@@ -2455,9 +2459,12 @@ steps:
           [ -z "$acc_id" ] && continue
           # List diagnostic settings on this resource
           ds_json=$(az monitor diagnostic-settings list --resource "$acc_id" -o json 2>/dev/null || echo '{"value":[]}')
-          # Settings whose workspaceId is non-empty (i.e. routing to a LAW), excluding our own naming convention "diag-<accountName>"
-          conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${acc_name}" '
-            .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
+          # ANY existing setting routing to a LAW (workspaceId set) blocks bicep from creating
+          # another setting on the same sink + category. So we skip our bicep diag if anything
+          # is already there — legacy 'diag-<acc>' from prior deployments, policy-created 'default',
+          # or third-party named settings.
+          conflict=$(echo "$ds_json" | jq -r '
+            .value[]? | select((.workspaceId // "") != "") | .name
           ' | head -n1)
           var=$(kind_to_var "$acc_kind")
           if [ -n "$conflict" ] && [ -n "$var" ]; then
@@ -2482,8 +2489,9 @@ steps:
         while IFS=$'\t' read -r srv_name srv_id; do
           [ -z "$srv_id" ] && continue
           ds_json=$(az monitor diagnostic-settings list --resource "$srv_id" -o json 2>/dev/null || echo '{"value":[]}')
-          conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${srv_name}" '
-            .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
+          # ANY existing LAW-routed setting blocks creation of a second one (sink+category reuse rule).
+          conflict=$(echo "$ds_json" | jq -r '
+            .value[]? | select((.workspaceId // "") != "") | .name
           ' | head -n1)
           if [ -n "$conflict" ]; then
             echo "   ⚠️  AI Search $srv_name already has diagnostic setting '$conflict' to a LAW → setting skipDiagAISearch=true"

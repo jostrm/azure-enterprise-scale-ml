@@ -107,7 +107,19 @@ variables:
   # ============================================================================
   diagnosticSettingLevel: "gold" # <optional>Diagnostics level<default>gold<keep-as-is> <otherwise> silver or bronze for less verbose (lower cost) logging.
   # ============================================================================
-
+  # Skip AIFactory-managed diagnostic settings on Cognitive Services / AI Search
+  # accounts when an Azure Policy (deployIfNotExists) already creates a
+  # `diag-<account>` setting pinned to the same Log Analytics workspace.
+  # Azure rejects a second diagnostic setting reusing the same (sink + category)
+  # tuple with 409 "Data sinks can't be reused". The policy-managed setting
+  # already satisfies log routing / compliance, so we skip the bicep one.
+  skipDiagAOAI: "true"
+  skipDiagAISearch: "true"
+  skipDiagAIServices: "true"
+  skipDiagContentSafety: "true"
+  skipDiagVision: "true"
+  skipDiagSpeech: "true"
+  skipDiagDocIntelligence: "true"
   # ============================================================================
   # MANDATORY(CHANGE RARELY): AI Factory scale set.
   # WHAT: 
