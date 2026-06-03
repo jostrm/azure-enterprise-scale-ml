@@ -405,6 +405,34 @@ jobs:
         shell: bash
         run: |
           set -e
+
+          # ---------------------------------------------------------------
+          # ULTRA DELETE MODE PROMOTION (must run FIRST, before any later
+          # step's `if:` is evaluated). Mirrors ADO job-2 logic.
+          #
+          # When deleteAllForProject=true, force the two upstream delete
+          # flags to true so:
+          #   - All 61–68 / 69 / 99 / 100 / 100a / 100b / 101 CREATION steps
+          #     (already gated on `env.deleteAllServicesForProject != 'true'`) SKIP.
+          #   - 06a_Delete_CapabilityHosts runs (gated on deleteAllServicesForProject=true).
+          #   - 18_Delete_Service_If_Not_Enabled_And_Exists runs (gated on
+          #     enableDeleteForDisabledResources=true) and its
+          #     `delete-services-if-disabled.sh` script sees
+          #     deleteAllForProject=true and tears down the project RG.
+          #   - 18_Purge_Soft_Deleted runs.
+          #   - 18b_Wait_For_Subnet_Release_After_Purge is excluded
+          #     (no redeploy follows in ULTRA mode).
+          #   - 110_Cleanup_CapabilityHosts_Before_AccountDeletion runs
+          #     (belt-and-braces caphost cleanup before RG deletion).
+          # ---------------------------------------------------------------
+          if [ "${{ env.deleteAllForProject }}" = "true" ]; then
+            echo "💀 ULTRA DELETE MODE detected (deleteAllForProject=true) — promoting upstream flags:"
+            echo "   - deleteAllServicesForProject -> true (skips ALL creation tasks)"
+            echo "   - enableDeleteForDisabledResources -> true (enables 18 delete-services script)"
+            echo "deleteAllServicesForProject=true" >> "$GITHUB_ENV"
+            echo "enableDeleteForDisabledResources=true" >> "$GITHUB_ENV"
+          fi
+
           NETWORK_ENV="${{ env.network_env }}"
           VNET_RG="${{ env.vnetResourceGroup_param }}"
           VNET_NAME="${{ env.vnetNameFull_param }}"
@@ -1560,6 +1588,114 @@ jobs:
             fi
 
             echo "18_Purge_Soft_Deleted completed."
+
+      # ============================================================================
+      # 18b — Wait for full subnet release after Foundry account purge.
+      # Mirrors ADO task '06c2_Wait_For_Subnet_Release_After_Purge'.
+      #
+      # CRITICAL: After purging a Foundry account, Azure needs ~20 minutes to fully
+      # release the subnet. This prevents "Subnet already in use" errors when
+      # redeploying to the same subnet (Microsoft Foundry docs:
+      # https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup).
+      #
+      # Runs only when:
+      #   - deleteAllForProject != true  (ULTRA mode tears down RG + networking;
+      #                                   no redeploy follows, so waiting is pointless)
+      #   - (deleteAllServicesForProject == true OR enableDeleteForDisabledResources == true)
+      #   - enableAIFoundry == true  (Foundry resources were deployed)
+      #   - aiFoundryV2Exists != true (account was purged, not pre-existing)
+      # ============================================================================
+      - name: 18b_Wait_For_Subnet_Release_After_Purge
+        if: |
+          env.deleteAllForProject != 'true'
+          && (env.deleteAllServicesForProject == 'true' || env.enableDeleteForDisabledResources == 'true')
+          && env.enableAIFoundry == 'true'
+          && env.aiFoundryV2Exists != 'true'
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            #!/bin/bash
+
+            # ---------------------------------------------------------------
+            # FAST-PATH: if the project resource group does not exist, no Foundry
+            # account / capability host / subnet delegation was ever created for
+            # this project. The 20-minute subnet-release wait is pointless — skip.
+            # ---------------------------------------------------------------
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            subscription="${{ env.dev_test_prod_sub_id }}"
+            projectNameReplaced="${projectName/prj/project}"
+            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+            az account set --subscription "$subscription" >/dev/null 2>&1 || true
+            rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" 2>/dev/null || echo "false")
+            if [ "$rg_exists" != "true" ]; then
+              echo "ℹ️  Project resource group '$projectResourceGroup' does not exist — no Foundry account / subnet delegation was ever created."
+              echo "=== 18b_Wait_For_Subnet_Release_After_Purge: skipping 20-minute wait (project RG missing) ==="
+              exit 0
+            fi
+
+            echo "=== Waiting for Complete Subnet Release After Account Purge ==="
+            echo ""
+            echo "⚠️  CRITICAL TIMING: Microsoft-managed infrastructure cleanup"
+            echo ""
+            echo "What happens during this wait:"
+            echo "  1. Azure purges the soft-deleted Foundry account"
+            echo "  2. Microsoft-managed Container Apps Environment is removed"
+            echo "  3. Subnet delegation to Microsoft.App/environments is released"
+            echo "  4. Network policies and route tables are cleaned up"
+            echo "  5. Background async operations complete"
+            echo ""
+            echo "Why 20 minutes?"
+            echo "  • Capability host unlink: 2-5 minutes"
+            echo "  • Account purge completion: 5-10 minutes"
+            echo "  • Subnet delegation propagation: 5-10 minutes"
+            echo "  • Total worst-case: ~20 minutes"
+            echo ""
+            echo "Without this wait, redeployment will fail with:"
+            echo "  ❌ 'Subnet already in use'"
+            echo "  ❌ 'ResourceProviderExtensionError'"
+            echo "  ❌ 'DelegationNotCleared'"
+            echo ""
+            echo "📖 Reference: https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup#account-deletion-prerequisites-and-cleanup-guidance"
+            echo ""
+
+            wait_minutes=20
+            wait_seconds=$((wait_minutes * 60))
+
+            echo "⏰ Starting ${wait_minutes}-minute wait for subnet release..."
+            echo "   Pipeline will resume at: $(date -u -d "+${wait_minutes} minutes" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+
+            # Progress indicator every 2 minutes
+            interval=120
+            elapsed=0
+
+            while [ $elapsed -lt $wait_seconds ]; do
+              remaining=$((wait_seconds - elapsed))
+              remaining_minutes=$((remaining / 60))
+              echo "  [$(date '+%H:%M:%S')] ⏳ ${remaining_minutes} minutes remaining..."
+
+              sleep_time=$interval
+              if [ $remaining -lt $interval ]; then
+                sleep_time=$remaining
+              fi
+
+              sleep $sleep_time
+              elapsed=$((elapsed + sleep_time))
+            done
+
+            echo ""
+            echo "✅ 20-minute wait complete!"
+            echo "   Subnet should now be fully released and ready for reuse."
+            echo "   Proceeding with workflow..."
 
       # === Deploy sequences ===
 
@@ -3115,6 +3251,43 @@ jobs:
           inlineScript: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
             bash "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/70_generate_hosts_file_info.sh" \
+              "${{ env.dev_test_prod_sub_id }}" \
+              "${{ env.admin_aifactoryPrefixRG }}" \
+              "${{ env.project_number_000 }}" \
+              "${{ env.admin_locationSuffix }}" \
+              "${{ env.dev_test_prod }}" \
+              "${{ env.admin_aifactorySuffixRG }}" \
+              "${{ env.admin_prjResourceSuffix }}" \
+              "${{ env.AIFACTORY_SALT }}" \
+              "${{ env.aifactory_salt_random }}" \
+              "${{ env.deployment_random_value }}" \
+              "${{ env.projectPrefix }}" \
+              "${{ env.projectSuffix }}"
+
+      # ============================================================================
+      # 110 — Cleanup capability hosts BEFORE Foundry account deletion.
+      # Mirrors ADO task '110_Cleanup_CapabilityHosts_Before_AccountDeletion'.
+      #
+      # Runs when:
+      #   - any prior step failed AND Foundry caphost was enabled
+      #     (safety cleanup before retry), OR
+      #   - ULTRA delete mode (deleteAllForProject=true) — belt-and-braces
+      #     caphost cleanup before `delete-services-if-disabled.sh` deletes
+      #     the project RG containing the account.
+      # ============================================================================
+      - name: 110_Cleanup_CapabilityHosts_Before_AccountDeletion
+        if: |
+          always()
+          && (failure() || env.deleteAllForProject == 'true')
+          && env.enableAIFoundry == 'true'
+          && env.enableAFoundryCaphost == 'true'
+        continue-on-error: true
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            bash "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/74_Cleanup_CapabilityHosts.sh" \
               "${{ env.dev_test_prod_sub_id }}" \
               "${{ env.admin_aifactoryPrefixRG }}" \
               "${{ env.project_number_000 }}" \

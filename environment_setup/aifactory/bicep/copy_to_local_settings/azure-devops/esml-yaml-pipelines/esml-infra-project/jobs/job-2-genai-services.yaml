@@ -15,6 +15,27 @@ steps:
       #!/bin/bash
 
       # ---------------------------------------------------------------
+      # ULTRA DELETE MODE PROMOTION (must run FIRST, before any condition is evaluated)
+      # When deleteAllForProject=true, force the two upstream delete flags to true so:
+      #   - All 61–68 / 69 / 99 / 100 / 101 / 100a / 100b / dashboards CREATION tasks
+      #     (already gated on `ne(deleteAllServicesForProject, 'true')`) SKIP.
+      #   - 06a_Delete_CapabilityHosts runs (gated on deleteAllServicesForProject=true).
+      #   - 06b_Delete_Service_If_Not_Enabled_And_Exists runs (gated on
+      #     enableDeleteForDisabledResources=true) and its `delete-services-if-disabled.sh`
+      #     script sees deleteAllForProject=true and tears down the project RG.
+      #   - 06c_Purge_SoftDeleted runs.
+      #   - 06c2 (subnet-release wait) is excluded (no redeploy follows).
+      #   - 07/08 firewall-cleanup tasks already run via `always()`.
+      # ---------------------------------------------------------------
+      if [ "$(deleteAllForProject)" = "true" ]; then
+        echo "💀 ULTRA DELETE MODE detected (deleteAllForProject=true) — promoting upstream flags:"
+        echo "   - deleteAllServicesForProject -> true (skips ALL creation tasks)"
+        echo "   - enableDeleteForDisabledResources -> true (enables 06b delete-services script)"
+        echo "##vso[task.setvariable variable=deleteAllServicesForProject]true"
+        echo "##vso[task.setvariable variable=enableDeleteForDisabledResources]true"
+      fi
+
+      # ---------------------------------------------------------------
       # BYO_subnets guard: evaluated FIRST before any variable usage.
       # When BYO_subnets=false (default), network_env and all subnet name
       # variables are documentation examples only and must be treated as
@@ -1655,7 +1676,8 @@ steps:
   # - enableAIFoundry=true (Foundry resources were deployed)
   # - aiFoundryV2Exists=false (account was purged, not pre-existing)
   # - 06c_Purge task succeeded
-  condition: and(succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
+  # - deleteAllForProject != true (ULTRA mode tears down RG + networking; no redeploy follows, so waiting for subnet release is pointless)
+  condition: and(succeeded(), ne(variables['deleteAllForProject'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4443,7 +4465,11 @@ steps:
 - task: AzureCLI@2
   displayName: '110_Cleanup_CapabilityHosts_Before_AccountDeletion'
   continueOnError: true
-  condition: and(failed(), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  # Runs when:
+  #  - any prior task failed AND Foundry caphost was enabled (safety cleanup before retry), OR
+  #  - ULTRA delete mode (deleteAllForProject=true) — belt-and-braces caphost cleanup before
+  #    `delete-services-if-disabled.sh` deletes the project RG containing the account.
+  condition: and(or(failed(), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
