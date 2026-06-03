@@ -2333,10 +2333,14 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     while IFS= read -r ai_name; do
       if [ -n "$ai_name" ]; then
         echo "  Deleting Application Insights: $ai_name"
-        if az monitor app-insights component delete \
+        # NOTE: 'az monitor app-insights component delete' requires the application-insights
+        # extension AND does NOT support --yes (it has no prompt, but rejects the flag).
+        # Use 'az resource delete' which is built-in, non-interactive, and works for both
+        # classic and workspace-based components.
+        if az resource delete \
           --resource-group "$projectResourceGroup" \
-          --app "$ai_name" \
-          --yes 2>&1; then
+          --resource-type "microsoft.insights/components" \
+          --name "$ai_name" 2>&1; then
           echo "    ✓ Successfully deleted: $ai_name"
         else
           echo "    ✗ Failed to delete: $ai_name"
@@ -2744,10 +2748,52 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
       -o tsv 2>/dev/null || echo "")
     
     if [ -n "$vnets" ]; then
+      # ---------------------------------------------------------------
+      # PASS 1: Detach NSG / RouteTable / Delegations / ServiceEndpoints from
+      # every project subnet across all VNets. This MUST happen before we try
+      # to delete the NSGs (Step 8), otherwise NSG delete returns
+      # InUseNetworkSecurityGroupCannotBeDeleted. We do this even if the
+      # subnet itself ultimately can't be removed (e.g. Service Association
+      # Links from ACA / Foundry managed env — those only clear when the
+      # parent caphost / account fully deletes).
+      # ---------------------------------------------------------------
+      echo ""
+      echo "--- Pass 1/2: Detaching NSG / RouteTable / Delegations from project subnets ---"
+      while IFS= read -r vnet_name; do
+        [ -z "$vnet_name" ] && continue
+        subnets=$(az network vnet subnet list \
+          --resource-group "$commonResourceGroup" \
+          --vnet-name "$vnet_name" \
+          --query "[?contains(name, '$projectName')].name" \
+          -o tsv 2>/dev/null || echo "")
+        [ -z "$subnets" ] && continue
+        while IFS= read -r subnet_name; do
+          [ -z "$subnet_name" ] && continue
+          echo "  Detaching from subnet: $vnet_name/$subnet_name"
+          # Each --remove is silently ignored if the attribute is absent.
+          az network vnet subnet update \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --name "$subnet_name" \
+            --remove networkSecurityGroup \
+            --remove routeTable \
+            --remove delegations \
+            --remove serviceEndpoints \
+            >/dev/null 2>&1 || echo "    (detach reported error — may already be detached or owned by service)"
+        done <<< "$subnets"
+      done <<< "$vnets"
+
+      # ---------------------------------------------------------------
+      # PASS 2: Try to delete subnets. Subnets with surviving Service
+      # Association Links (SALs) from ACA / Foundry managed environments
+      # cannot be force-removed — those only release when 06a/06c finish
+      # tearing down the parent service. We log and continue.
+      # ---------------------------------------------------------------
+      echo ""
+      echo "--- Pass 2/2: Deleting project subnets ---"
       while IFS= read -r vnet_name; do
         if [ -n "$vnet_name" ]; then
           echo "Checking VNet: $vnet_name"
-          # List subnets containing project identifier
           subnets=$(az network vnet subnet list \
             --resource-group "$commonResourceGroup" \
             --vnet-name "$vnet_name" \
@@ -2758,17 +2804,26 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
             while IFS= read -r subnet_name; do
               if [ -n "$subnet_name" ]; then
                 echo "  Deleting subnet: $subnet_name from VNet: $vnet_name"
-                az network vnet subnet delete \
+                if ! az network vnet subnet delete \
                   --resource-group "$commonResourceGroup" \
                   --vnet-name "$vnet_name" \
-                  --name "$subnet_name" \
-                  2>&1 || echo "    Warning: Failed to delete subnet $subnet_name"
+                  --name "$subnet_name" 2>&1; then
+                  echo "    ⚠️  Warning: Failed to delete subnet $subnet_name"
+                  # Diagnose what's still holding it
+                  echo "    Diagnosis — remaining references on $subnet_name:"
+                  az network vnet subnet show \
+                    --resource-group "$commonResourceGroup" \
+                    --vnet-name "$vnet_name" \
+                    --name "$subnet_name" \
+                    --query "{pe:privateEndpoints, ipconfigs:ipConfigurations, sal:serviceAssociationLinks, deleg:delegations, nsg:networkSecurityGroup.id, rt:routeTable.id}" \
+                    -o json 2>/dev/null || true
+                fi
               fi
             done <<< "$subnets"
           fi
         fi
       done <<< "$vnets"
-      echo "✓ Subnets deleted"
+      echo "✓ Subnets deletion pass complete"
     else
       echo "No VNets found in common resource group"
     fi
@@ -2783,6 +2838,9 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     echo "⚠️  NSGs cannot be deleted until all private endpoints and NICs are removed"
   else
     echo "Looking for NSGs containing: $projectName"
+    # NOTE: Pass 1 of Step 7 already detached every project subnet from its NSG.
+    # If a subnet delete failed (e.g. surviving SAL), the NSG is still free
+    # because we explicitly --removed networkSecurityGroup from the subnet.
   
   nsgs=$(az network nsg list \
     --resource-group "$commonResourceGroup" \
@@ -2793,13 +2851,21 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     while IFS= read -r nsg_name; do
       if [ -n "$nsg_name" ]; then
         echo "Deleting NSG: $nsg_name"
-        az network nsg delete \
+        if ! az network nsg delete \
           --resource-group "$commonResourceGroup" \
-          --name "$nsg_name" \
-          2>&1 || echo "  Warning: Failed to delete NSG $nsg_name"
+          --name "$nsg_name" 2>&1; then
+          echo "  ⚠️  Warning: Failed to delete NSG $nsg_name"
+          # Diagnose remaining references (subnet/NIC associations)
+          echo "  Diagnosis — subnets/NICs still referencing $nsg_name:"
+          az network nsg show \
+            --resource-group "$commonResourceGroup" \
+            --name "$nsg_name" \
+            --query "{subnets:subnets[].id, nics:networkInterfaces[].id}" \
+            -o json 2>/dev/null || true
+        fi
       fi
     done <<< "$nsgs"
-    echo "✓ Network Security Groups deleted"
+    echo "✓ Network Security Groups deletion pass complete"
   else
     echo "No NSGs found containing $projectName"
   fi
