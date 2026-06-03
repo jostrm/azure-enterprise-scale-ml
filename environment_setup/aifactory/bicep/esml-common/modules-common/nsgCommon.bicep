@@ -103,7 +103,8 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       */
-      // Highest-priority VNet allow rule: lets every subnet in the VNet reach this subnet on any port/protocol.
+      // All rule priorities live in the 1000+ range so that 100-999 stays free for future higher-priority overrides.
+      // Lower number = higher priority. VNet-wide allow sits at 1000 (highest).
       {
         name: 'Allow_VNet_Inbound'
         properties: {
@@ -114,7 +115,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 100
+            priority: 1000
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -132,7 +133,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'ApiManagement'
             destinationAddressPrefix: '*'
             access: 'Allow'
-            priority: 110
+            priority: 1010
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -497,7 +498,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 100
+            priority: 1000
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []

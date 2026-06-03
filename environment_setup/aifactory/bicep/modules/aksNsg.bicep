@@ -14,7 +14,8 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   properties: {
     securityRules: [
       // --- Inbound ---
-      // Highest-priority VNet allow rule: lets every subnet in the VNet reach this subnet on any port/protocol.
+      // All rule priorities live in the 1000+ range so that 100-999 stays free for future higher-priority overrides.
+      // Lower number = higher priority. VNet-wide allow sits at 1000 (highest).
       {
         name: 'Allow_VNet_Inbound'
         properties: {
@@ -25,7 +26,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'VirtualNetwork'
           access: 'Allow'
-          priority: 100
+          priority: 1000
           direction: 'Inbound'
         }
       }
@@ -39,7 +40,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'ApiManagement'
           destinationAddressPrefix: '*'
           access: 'Allow'
-          priority: 110
+          priority: 1010
           direction: 'Inbound'
         }
       }
@@ -52,13 +53,12 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'AzureMachineLearning'
           destinationAddressPrefix: '*'
           access: 'Allow'
-          priority: 130
+          priority: 1020
           direction: 'Inbound'
         }
       }
       // --- Outbound ---
-      // Highest-priority VNet allow rule: lets this subnet reach any subnet in the same VNet on any port/protocol.
-      // Priorities for the rest of the outbound rules start at 1000 so 100-999 stays free for future higher-priority overrides.
+      // Same 1000+ convention as Inbound. VNet-wide allow at 1000 (highest), then service-tag rules.
       {
         name: 'Allow_VNet_Outbound'
         properties: {
@@ -69,7 +69,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'VirtualNetwork'
           access: 'Allow'
-          priority: 100
+          priority: 1000
           direction: 'Outbound'
         }
       }
@@ -82,7 +82,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureActiveDirectory'
           access: 'Allow'
-          priority: 1000
+          priority: 1010
           direction: 'Outbound'
         }
       } 
@@ -96,7 +96,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'MicrosoftContainerRegistry' // 'MicrosoftContainerRegistry.${location}'
           access: 'Allow'
-          priority: 1010
+          priority: 1020
           direction: 'Outbound'
         }
       }
@@ -109,7 +109,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureMachineLearning'
           access: 'Allow'
-          priority: 1020
+          priority: 1030
           direction: 'Outbound'
         }
       }
@@ -122,7 +122,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureResourceManager'
           access: 'Allow'
-          priority: 1030
+          priority: 1040
           direction: 'Outbound'
         }
       }
@@ -135,7 +135,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'Storage.${location}'
           access: 'Allow'
-          priority: 1040
+          priority: 1050
           direction: 'Outbound'
         }
       }
@@ -148,7 +148,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureFrontDoor.FrontEnd'
           access: 'Allow'
-          priority: 1050
+          priority: 1060
           direction: 'Outbound'
         }
       }
@@ -161,7 +161,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureContainerRegistry.${location}'
           access: 'Allow'
-          priority: 1060
+          priority: 1070
           direction: 'Outbound'
         }
       }
@@ -175,7 +175,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureFrontDoor.FirstParty'
           access: 'Allow'
-          priority: 1070
+          priority: 1080
           direction: 'Outbound'
         }
       }
@@ -189,7 +189,7 @@ resource aksNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: '*'
           destinationAddressPrefix: 'AzureMonitor'
           access: 'Allow'
-          priority: 1080
+          priority: 1090
           direction: 'Outbound'
         }
       }

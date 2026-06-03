@@ -14,7 +14,8 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   properties: {
     securityRules: [
       // --- Inbound ---
-      // Highest-priority VNet allow rule: lets every subnet in the VNet reach this subnet on any port/protocol.
+      // All rule priorities live in the 1000+ range so that 100-999 stays free for future higher-priority overrides.
+      // Lower number = higher priority. VNet-wide allow sits at 1000 (highest).
       {
         name: 'Allow_VNet_Inbound'
         properties: {
@@ -25,7 +26,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'VirtualNetwork'
           access: 'Allow'
-          priority: 110
+          priority: 1000
           direction: 'Inbound'
         }
       }
@@ -39,7 +40,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'ApiManagement'
           destinationAddressPrefix: '*'
           access: 'Allow'
-          priority: 120
+          priority: 1010
           direction: 'Inbound'
         }
       }
@@ -53,7 +54,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'VirtualNetwork'
           access: 'Allow'
-          priority: 100
+          priority: 1020
           direction: 'Inbound'
           sourcePortRanges: []
           destinationPortRanges: []
@@ -71,7 +72,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'AzureDatabricks'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 101
+            priority: 1030
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -89,7 +90,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'AzureDatabricks'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 102
+            priority: 1040
             direction: 'Inbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -98,7 +99,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       // --- Outbound --- 
-      // Highest-priority VNet allow rule. Subsequent outbound rules start at 1000 so 100-999 stays free for future higher-priority overrides.
+      // Same 1000+ convention as Inbound. VNet-wide allow at 1000 (highest).
       {
         name: 'Allow_VNet_Outbound'
         properties: {
@@ -109,7 +110,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'VirtualNetwork'
             access: 'Allow'
-            priority: 110
+            priority: 1000
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
