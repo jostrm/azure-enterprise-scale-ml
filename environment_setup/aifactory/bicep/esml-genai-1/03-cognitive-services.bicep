@@ -49,6 +49,30 @@ var activeVersion = 122
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+// Skip diagnostic-setting modules per-resource. Set true (typically by the
+// pipeline pre-detect step) when a diagnostic setting already exists on that
+// resource routing to the SAME Log Analytics workspace (e.g. created by an
+// Azure Policy "DeployIfNotExists / Deploy diagnostic settings for Cognitive
+// Services to Log Analytics workspace" with the conventional name "default").
+// Azure rejects two diagnostic settings on the same resource that share a
+// category + sink, returning:
+//   "Data sink '<workspaceId>' is already used in diagnostic setting 'default'
+//    for category 'Audit'."
+@description('Skip creating the AOAI diagnostic setting (Azure Policy may already manage one).')
+param skipDiagAOAI bool = false
+@description('Skip creating the AI Search diagnostic setting (Azure Policy may already manage one).')
+param skipDiagAISearch bool = false
+@description('Skip creating the AI Services diagnostic setting (Azure Policy may already manage one).')
+param skipDiagAIServices bool = false
+@description('Skip creating the Content Safety diagnostic setting (Azure Policy may already manage one).')
+param skipDiagContentSafety bool = false
+@description('Skip creating the Vision diagnostic setting (Azure Policy may already manage one).')
+param skipDiagVision bool = false
+@description('Skip creating the Speech diagnostic setting (Azure Policy may already manage one).')
+param skipDiagSpeech bool = false
+@description('Skip creating the Document Intelligence diagnostic setting (Azure Policy may already manage one).')
+param skipDiagDocIntelligence bool = false
+
 // CMK Parameters
 param cmk bool = false
 param cmkKeyName string = ''
@@ -906,7 +930,7 @@ module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(!storageAccount
 // ============== DIAGNOSTIC SETTINGS ==============
 
 // AI Services Diagnostic Settings
-module aiServicesDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (!aiServicesExists && enableAIServices) {
+module aiServicesDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (!aiServicesExists && enableAIServices && !skipDiagAIServices) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagAIServices-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -920,7 +944,7 @@ module aiServicesDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostic
 }
 
 // Azure OpenAI Diagnostic Settings
-module openaiDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (!openaiExists && enableAzureOpenAI) {
+module openaiDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (!openaiExists && enableAzureOpenAI && !skipDiagAOAI) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagOpenAI-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -934,7 +958,7 @@ module openaiDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bi
 }
 
 // Content Safety Diagnostic Settings
-module contentSafetyDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableContentSafety) {
+module contentSafetyDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableContentSafety && !skipDiagContentSafety) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagContentSafety-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -948,7 +972,7 @@ module contentSafetyDiagnostics '../modules/diagnostics/cognitiveServicesDiagnos
 }
 
 // Vision Services Diagnostic Settings
-module visionDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAzureAIVision) {
+module visionDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAzureAIVision && !skipDiagVision) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagVision-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -962,7 +986,7 @@ module visionDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bi
 }
 
 // Speech Services Diagnostic Settings
-module speechDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAzureSpeech) {
+module speechDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAzureSpeech && !skipDiagSpeech) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagSpeech-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -976,7 +1000,7 @@ module speechDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bi
 }
 
 // Document Intelligence Diagnostic Settings
-module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAIDocIntelligence) {
+module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableAIDocIntelligence && !skipDiagDocIntelligence) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagDocInt-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -990,7 +1014,7 @@ module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagn
 }
 
 // AI Search Diagnostic Settings
-module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry))) {
+module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && !skipDiagAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
