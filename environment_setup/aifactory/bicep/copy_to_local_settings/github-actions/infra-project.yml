@@ -237,6 +237,21 @@ jobs:
 
       # Diagnostics / tags
       diagnosticSettingLevel: ${{ vars.DIAGNOSTIC_SETTING_LEVEL || 'gold' }}
+      # Skip AIFactory-managed diagnostic settings on Cognitive Services / AI Search
+      # accounts when an Azure Policy (deployIfNotExists) already creates a
+      # `diag-<account>` setting pinned to the same Log Analytics workspace.
+      # Azure rejects a second diagnostic setting reusing the same (sink + category)
+      # tuple with 409 "Data sinks can't be reused". The policy-managed setting
+      # already satisfies log routing / compliance, so we skip the bicep one.
+      # These act as the INITIAL value; step 63a may auto-flip any of them to 'true'
+      # on dynamic detection of a pre-existing diagnostic setting.
+      skipDiagAOAI: ${{ vars.SKIP_DIAG_AOAI || 'true' }}
+      skipDiagAISearch: ${{ vars.SKIP_DIAG_AI_SEARCH || 'true' }}
+      skipDiagAIServices: ${{ vars.SKIP_DIAG_AI_SERVICES || 'true' }}
+      skipDiagContentSafety: ${{ vars.SKIP_DIAG_CONTENT_SAFETY || 'true' }}
+      skipDiagVision: ${{ vars.SKIP_DIAG_VISION || 'true' }}
+      skipDiagSpeech: ${{ vars.SKIP_DIAG_SPEECH || 'true' }}
+      skipDiagDocIntelligence: ${{ vars.SKIP_DIAG_DOC_INTELLIGENCE || 'true' }}
       tags: ${{ vars.TAGS || '{}' }}
       tagsProject: ${{ vars.TAGS_PROJECT || '{}' }}
 
@@ -1835,14 +1850,23 @@ jobs:
 
             echo "🔎 Scanning $targetResourceGroup for pre-existing diagnostic settings..."
 
-            # Default all skip flags to false; flip to true on detection.
-            skipDiagAOAI=false
-            skipDiagAISearch=false
-            skipDiagAIServices=false
-            skipDiagContentSafety=false
-            skipDiagVision=false
-            skipDiagSpeech=false
-            skipDiagDocIntelligence=false
+            # Normalize a value to strict 'true'/'false' (lowercase, default 'false').
+            norm() {
+              local v
+              v=$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')
+              if [ "$v" = "true" ]; then echo "true"; else echo "false"; fi
+            }
+
+            # Seed skip flags from workflow-level env (variables.yaml equivalent — defaults to 'true').
+            # Detection below can only *flip true* (never back to false), matching ADO 63a behavior.
+            skipDiagAOAI=$(norm "${{ env.skipDiagAOAI }}")
+            skipDiagAISearch=$(norm "${{ env.skipDiagAISearch }}")
+            skipDiagAIServices=$(norm "${{ env.skipDiagAIServices }}")
+            skipDiagContentSafety=$(norm "${{ env.skipDiagContentSafety }}")
+            skipDiagVision=$(norm "${{ env.skipDiagVision }}")
+            skipDiagSpeech=$(norm "${{ env.skipDiagSpeech }}")
+            skipDiagDocIntelligence=$(norm "${{ env.skipDiagDocIntelligence }}")
+            echo "   Initial (from variables.yaml): AOAI=$skipDiagAOAI Search=$skipDiagAISearch AIServices=$skipDiagAIServices ContentSafety=$skipDiagContentSafety Vision=$skipDiagVision Speech=$skipDiagSpeech DocInt=$skipDiagDocIntelligence"
 
             # Map a Cognitive Services account 'kind' to the corresponding skip-flag.
             kind_to_var() {
