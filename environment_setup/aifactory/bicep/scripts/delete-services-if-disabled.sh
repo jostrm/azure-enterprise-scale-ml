@@ -2310,11 +2310,22 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   # Step 2: Delete Application Insights
   echo ""
   echo "=== Step 2: Deleting Application Insights (all in resource group) ==="
-  app_insights=$(az monitor app-insights component list \
+  # Use 'az resource list' as the primary query — it doesn't require the application-insights CLI
+  # extension and reliably surfaces both classic and workspace-based AI components.
+  app_insights=$(az resource list \
     --resource-group "$projectResourceGroup" \
+    --resource-type "microsoft.insights/components" \
     --query "[].name" \
     -o tsv 2>/dev/null | tr -d '\r' || echo "")
-  
+
+  # Fallback to the extension-based list in case the resource provider query was filtered out
+  if [ -z "$app_insights" ]; then
+    app_insights=$(az monitor app-insights component list \
+      --resource-group "$projectResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null | tr -d '\r' || echo "")
+  fi
+
   if [ -n "$app_insights" ]; then
     ai_count=$(echo "$app_insights" | wc -l)
     echo "Found $ai_count Application Insights instance(s)"
@@ -2493,16 +2504,48 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     -o tsv 2>/dev/null || echo "")
   
   if [ -n "$uamis" ]; then
+    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r uami_name; do
       if [ -n "$uami_name" ]; then
         echo "Deleting User Assigned Managed Identity: $uami_name"
-        az identity delete \
+
+        # Pre-step: remove any Federated Identity Credentials on the UAMI.
+        # A UAMI with attached FICs returns 'Bad Request' from az identity delete.
+        fic_names=$(az identity federated-credential list \
+          --identity-name "$uami_name" \
           --resource-group "$projectResourceGroup" \
-          --name "$uami_name" \
-          2>&1 || echo "  Warning: Failed to delete $uami_name"
+          --query "[].name" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        if [ -n "$fic_names" ]; then
+          while IFS= read -r fic_name; do
+            if [ -n "$fic_name" ]; then
+              echo "  Removing federated credential: $fic_name"
+              az identity federated-credential delete \
+                --identity-name "$uami_name" \
+                --resource-group "$projectResourceGroup" \
+                --name "$fic_name" \
+                --yes 2>&1 || echo "    Warning: failed to delete FIC $fic_name"
+            fi
+          done <<< "$fic_names"
+        fi
+
+        # Primary delete
+        if az identity delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$uami_name" 2>&1; then
+          echo "  ✓ Deleted: $uami_name"
+        else
+          # REST API fallback (uses 2023-01-31 GA API)
+          echo "  Primary delete failed for $uami_name — attempting REST fallback"
+          rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${uami_name}?api-version=2023-01-31"
+          if az rest --method DELETE --url "$rest_url" 2>&1; then
+            echo "  ✓ REST delete succeeded: $uami_name"
+          else
+            echo "  ⚠️  Warning: Failed to delete $uami_name (likely still referenced by an Azure resource — check role assignments, ACA env, or AKS workload identity)"
+          fi
+        fi
       fi
     done <<< "$uamis"
-    echo "✓ User Assigned Managed Identities deleted"
+    echo "✓ User Assigned Managed Identities deletion completed"
   else
     echo "No User Assigned Managed Identities found with prefix mi-prj or mi-aca-prj"
   fi
@@ -2664,8 +2707,21 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   echo "✓ Wait completed"
   
   # Step 7: Build common resource group name (with vnetResourceGroupBase)
-  # Match the naming convention from pipeline: ${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}
-  commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+  # Precedence:
+  #   1) BYO override: commonResourceGroup_param (full RG name) — used as-is when non-empty
+  #   2) Built name: ${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}
+  # Defensive fallback: if vnetResourceGroupBase is empty (e.g. missing from env block), default to "esml-common"
+  # to avoid building a malformed name like "ingka-aif--swe-dev-002".
+  if [ -z "${vnetResourceGroupBase:-}" ]; then
+    echo "⚠️  vnetResourceGroupBase is empty — defaulting to 'esml-common' (check that the 06b env block exports it)"
+    vnetResourceGroupBase="esml-common"
+  fi
+  if [ -n "${commonResourceGroup_param:-}" ]; then
+    commonResourceGroup="$commonResourceGroup_param"
+    echo "Using BYO commonResourceGroup_param: $commonResourceGroup"
+  else
+    commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+  fi
   echo ""
   echo "=== Step 7: Deleting Subnets in Common Resource Group ==="
   

@@ -1794,6 +1794,131 @@ jobs:
               --parameters enableLogicApps="${{ env.enableLogicApps }}" \
               --debug
 
+      # ============================================================================
+      # 63a — Detect EXISTING diagnostic settings on Cognitive / AI Search resources
+      # Mirrors ADO task '63a-detect-existing-diagnostic-settings'.
+      # Why: Azure ARM rejects two diagnostic settings on the same resource that
+      # share a (category, sink) tuple — typical when an Azure Policy already
+      # deployed a 'default' diagnostic setting routing to a Log Analytics
+      # workspace. We set skipDiag* env vars so 03-cognitive-services.bicep skips
+      # creating its own 'diag-<name>' setting and lets the policy-managed one
+      # satisfy compliance.
+      # ============================================================================
+      - name: 63a_Detect_Existing_Diagnostic_Settings
+        if: env.deleteAllServicesForProject != 'true' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            #!/bin/bash
+            set -u
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            # Reconstruct project RG name (same formula used by other GH steps)
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            projectNameReplaced="${projectName/prj/project}"
+            targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+            echo "🔎 Scanning $targetResourceGroup for pre-existing diagnostic settings..."
+
+            # Default all skip flags to false; flip to true on detection.
+            skipDiagAOAI=false
+            skipDiagAISearch=false
+            skipDiagAIServices=false
+            skipDiagContentSafety=false
+            skipDiagVision=false
+            skipDiagSpeech=false
+            skipDiagDocIntelligence=false
+
+            # Map a Cognitive Services account 'kind' to the corresponding skip-flag.
+            kind_to_var() {
+              case "$1" in
+                OpenAI)          echo "skipDiagAOAI" ;;
+                AIServices)      echo "skipDiagAIServices" ;;
+                ContentSafety)   echo "skipDiagContentSafety" ;;
+                ComputerVision)  echo "skipDiagVision" ;;
+                SpeechServices)  echo "skipDiagSpeech" ;;
+                FormRecognizer)  echo "skipDiagDocIntelligence" ;;
+                *)               echo "" ;;
+              esac
+            }
+
+            # 1) Cognitive Services accounts
+            cog_json=$(az cognitiveservices account list \
+              --resource-group "$targetResourceGroup" \
+              --query "[].{name:name,kind:kind,id:id}" -o json 2>/dev/null || echo "[]")
+            cog_count=$(echo "$cog_json" | jq 'length' 2>/dev/null || echo "0")
+            echo "   Found $cog_count Cognitive Services account(s)."
+
+            if [ "$cog_count" -gt 0 ]; then
+              while IFS=$'\t' read -r acc_name acc_kind acc_id; do
+                [ -z "$acc_id" ] && continue
+                ds_json=$(az monitor diagnostic-settings list --resource "$acc_id" -o json 2>/dev/null || echo '{"value":[]}')
+                conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${acc_name}" '
+                  .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
+                ' | head -n1)
+                var=$(kind_to_var "$acc_kind")
+                if [ -n "$conflict" ] && [ -n "$var" ]; then
+                  echo "   ⚠️  $acc_name (kind=$acc_kind) already has diagnostic setting '$conflict' to a LAW → setting $var=true"
+                  eval "$var=true"
+                elif [ -n "$conflict" ]; then
+                  echo "   ℹ️  $acc_name (kind=$acc_kind) has diagnostic setting '$conflict' but kind is not gated; nothing to skip."
+                else
+                  echo "   ✅ $acc_name (kind=$acc_kind) has no conflicting diagnostic setting."
+                fi
+              done < <(echo "$cog_json" | jq -r '.[] | [.name, .kind, .id] | @tsv')
+            fi
+
+            # 2) Azure AI Search
+            search_json=$(az search service list \
+              --resource-group "$targetResourceGroup" \
+              --query "[].{name:name,id:id}" -o json 2>/dev/null || echo "[]")
+            search_count=$(echo "$search_json" | jq 'length' 2>/dev/null || echo "0")
+            echo "   Found $search_count Azure AI Search service(s)."
+
+            if [ "$search_count" -gt 0 ]; then
+              while IFS=$'\t' read -r srv_name srv_id; do
+                [ -z "$srv_id" ] && continue
+                ds_json=$(az monitor diagnostic-settings list --resource "$srv_id" -o json 2>/dev/null || echo '{"value":[]}')
+                conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${srv_name}" '
+                  .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
+                ' | head -n1)
+                if [ -n "$conflict" ]; then
+                  echo "   ⚠️  AI Search $srv_name already has diagnostic setting '$conflict' to a LAW → setting skipDiagAISearch=true"
+                  skipDiagAISearch=true
+                else
+                  echo "   ✅ AI Search $srv_name has no conflicting diagnostic setting."
+                fi
+              done < <(echo "$search_json" | jq -r '.[] | [.name, .id] | @tsv')
+            fi
+
+            echo ""
+            echo "=== Diagnostic skip flags ==="
+            echo "skipDiagAOAI=$skipDiagAOAI"
+            echo "skipDiagAISearch=$skipDiagAISearch"
+            echo "skipDiagAIServices=$skipDiagAIServices"
+            echo "skipDiagContentSafety=$skipDiagContentSafety"
+            echo "skipDiagVision=$skipDiagVision"
+            echo "skipDiagSpeech=$skipDiagSpeech"
+            echo "skipDiagDocIntelligence=$skipDiagDocIntelligence"
+
+            {
+              echo "skipDiagAOAI=$skipDiagAOAI"
+              echo "skipDiagAISearch=$skipDiagAISearch"
+              echo "skipDiagAIServices=$skipDiagAIServices"
+              echo "skipDiagContentSafety=$skipDiagContentSafety"
+              echo "skipDiagVision=$skipDiagVision"
+              echo "skipDiagSpeech=$skipDiagSpeech"
+              echo "skipDiagDocIntelligence=$skipDiagDocIntelligence"
+            } >> "$GITHUB_ENV"
+
       - name: 63-cognitive-services
         if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
@@ -1872,6 +1997,13 @@ jobs:
               --parameters cmk="${{ env.cmk }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}" \
               --parameters addAISearch="${{ env.addAISearch }}" \
+              --parameters skipDiagAOAI="${{ env.skipDiagAOAI || 'false' }}" \
+              --parameters skipDiagAISearch="${{ env.skipDiagAISearch || 'false' }}" \
+              --parameters skipDiagAIServices="${{ env.skipDiagAIServices || 'false' }}" \
+              --parameters skipDiagContentSafety="${{ env.skipDiagContentSafety || 'false' }}" \
+              --parameters skipDiagVision="${{ env.skipDiagVision || 'false' }}" \
+              --parameters skipDiagSpeech="${{ env.skipDiagSpeech || 'false' }}" \
+              --parameters skipDiagDocIntelligence="${{ env.skipDiagDocIntelligence || 'false' }}" \
               --debug
 
       - name: 64-databases

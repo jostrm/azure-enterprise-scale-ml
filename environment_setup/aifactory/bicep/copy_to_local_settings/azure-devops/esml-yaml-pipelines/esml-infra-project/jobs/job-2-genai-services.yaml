@@ -1257,6 +1257,8 @@ steps:
     project_number_000: $(project_number_000)
     projectPrefix: $(projectPrefix)
     projectSuffix: $(projectSuffix)
+    vnetResourceGroupBase: $(vnetResourceGroupBase)
+    commonResourceGroup_param: $(commonResourceGroup_param)
     allowPublicAccessWhenBehindVnet: $(allowPublicAccessWhenBehindVnet)
     enablePublicGenAIAccess: $(enablePublicGenAIAccess)
     deleteAllForProject: $(deleteAllForProject)
@@ -2323,6 +2325,137 @@ steps:
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
+  displayName: '63a-detect-existing-diagnostic-settings'
+  # Detect diagnostic settings that ALREADY exist on cognitive / search resources
+  # in the project RG that are owned by something else (typically an Azure Policy
+  # "Deploy diagnostic settings for Cognitive Services / Azure Cognitive Search
+  # to Log Analytics workspace" — name is usually "default").
+  #
+  # Why: Azure ARM rejects two diagnostic settings on the same resource that share
+  # a (category, sink) tuple, with:
+  #   "Data sink '<workspaceId>' is already used in diagnostic setting 'default'
+  #    for category 'Audit'. Data sinks can't be reused in different settings on
+  #    the same category for the same resource."
+  # So we set skipDiag* pipeline vars to true and let 03-cognitive-services.bicep
+  # skip creating its `diag-<name>` setting for that resource. The policy-managed
+  # setting continues to satisfy compliance.
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      set -u
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      # Reconstruct project RG name (same formula as task '03c-Detect-...')
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      echo "🔎 Scanning $targetResourceGroup for pre-existing diagnostic settings..."
+
+      # Default all skip flags to false; flip to true on detection.
+      skipDiagAOAI=false
+      skipDiagAISearch=false
+      skipDiagAIServices=false
+      skipDiagContentSafety=false
+      skipDiagVision=false
+      skipDiagSpeech=false
+      skipDiagDocIntelligence=false
+
+      # Map a Cognitive Services account 'kind' to the corresponding skip-flag.
+      # Anything we don't recognize is logged but not gated.
+      kind_to_var() {
+        case "$1" in
+          OpenAI)          echo "skipDiagAOAI" ;;
+          AIServices)      echo "skipDiagAIServices" ;;
+          ContentSafety)   echo "skipDiagContentSafety" ;;
+          ComputerVision)  echo "skipDiagVision" ;;
+          SpeechServices)  echo "skipDiagSpeech" ;;
+          FormRecognizer)  echo "skipDiagDocIntelligence" ;;
+          *)               echo "" ;;
+        esac
+      }
+
+      # 1) Cognitive Services accounts
+      cog_json=$(az cognitiveservices account list \
+        --resource-group "$targetResourceGroup" \
+        --query "[].{name:name,kind:kind,id:id}" -o json 2>/dev/null || echo "[]")
+      cog_count=$(echo "$cog_json" | jq 'length' 2>/dev/null || echo "0")
+      echo "   Found $cog_count Cognitive Services account(s)."
+
+      if [ "$cog_count" -gt 0 ]; then
+        while IFS=$'\t' read -r acc_name acc_kind acc_id; do
+          [ -z "$acc_id" ] && continue
+          # List diagnostic settings on this resource
+          ds_json=$(az monitor diagnostic-settings list --resource "$acc_id" -o json 2>/dev/null || echo '{"value":[]}')
+          # Settings whose workspaceId is non-empty (i.e. routing to a LAW), excluding our own naming convention "diag-<accountName>"
+          conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${acc_name}" '
+            .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
+          ' | head -n1)
+          var=$(kind_to_var "$acc_kind")
+          if [ -n "$conflict" ] && [ -n "$var" ]; then
+            echo "   ⚠️  $acc_name (kind=$acc_kind) already has diagnostic setting '$conflict' to a LAW → setting $var=true"
+            eval "$var=true"
+          elif [ -n "$conflict" ]; then
+            echo "   ℹ️  $acc_name (kind=$acc_kind) has diagnostic setting '$conflict' but kind is not gated; nothing to skip."
+          else
+            echo "   ✅ $acc_name (kind=$acc_kind) has no conflicting diagnostic setting."
+          fi
+        done < <(echo "$cog_json" | jq -r '.[] | [.name, .kind, .id] | @tsv')
+      fi
+
+      # 2) Azure AI Search
+      search_json=$(az search service list \
+        --resource-group "$targetResourceGroup" \
+        --query "[].{name:name,id:id}" -o json 2>/dev/null || echo "[]")
+      search_count=$(echo "$search_json" | jq 'length' 2>/dev/null || echo "0")
+      echo "   Found $search_count Azure AI Search service(s)."
+
+      if [ "$search_count" -gt 0 ]; then
+        while IFS=$'\t' read -r srv_name srv_id; do
+          [ -z "$srv_id" ] && continue
+          ds_json=$(az monitor diagnostic-settings list --resource "$srv_id" -o json 2>/dev/null || echo '{"value":[]}')
+          conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${srv_name}" '
+            .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
+          ' | head -n1)
+          if [ -n "$conflict" ]; then
+            echo "   ⚠️  AI Search $srv_name already has diagnostic setting '$conflict' to a LAW → setting skipDiagAISearch=true"
+            skipDiagAISearch=true
+          else
+            echo "   ✅ AI Search $srv_name has no conflicting diagnostic setting."
+          fi
+        done < <(echo "$search_json" | jq -r '.[] | [.name, .id] | @tsv')
+      fi
+
+      echo ""
+      echo "=== Diagnostic skip flags ==="
+      echo "skipDiagAOAI=$skipDiagAOAI"
+      echo "skipDiagAISearch=$skipDiagAISearch"
+      echo "skipDiagAIServices=$skipDiagAIServices"
+      echo "skipDiagContentSafety=$skipDiagContentSafety"
+      echo "skipDiagVision=$skipDiagVision"
+      echo "skipDiagSpeech=$skipDiagSpeech"
+      echo "skipDiagDocIntelligence=$skipDiagDocIntelligence"
+
+      echo "##vso[task.setvariable variable=skipDiagAOAI]$skipDiagAOAI"
+      echo "##vso[task.setvariable variable=skipDiagAISearch]$skipDiagAISearch"
+      echo "##vso[task.setvariable variable=skipDiagAIServices]$skipDiagAIServices"
+      echo "##vso[task.setvariable variable=skipDiagContentSafety]$skipDiagContentSafety"
+      echo "##vso[task.setvariable variable=skipDiagVision]$skipDiagVision"
+      echo "##vso[task.setvariable variable=skipDiagSpeech]$skipDiagSpeech"
+      echo "##vso[task.setvariable variable=skipDiagDocIntelligence]$skipDiagDocIntelligence"
+- task: AzureCLI@2
   displayName: '63-cognitive-services'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   retryCountOnTaskFailure: 2
@@ -2407,6 +2540,13 @@ steps:
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters addAISearch="$(addAISearch)" \
      --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)" \
+     --parameters skipDiagAOAI="$(skipDiagAOAI)" \
+     --parameters skipDiagAISearch="$(skipDiagAISearch)" \
+     --parameters skipDiagAIServices="$(skipDiagAIServices)" \
+     --parameters skipDiagContentSafety="$(skipDiagContentSafety)" \
+     --parameters skipDiagVision="$(skipDiagVision)" \
+     --parameters skipDiagSpeech="$(skipDiagSpeech)" \
+     --parameters skipDiagDocIntelligence="$(skipDiagDocIntelligence)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -3088,12 +3228,22 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-Validate-Subnet-For-NetworkInjection'
-  # Validates agent subnet exists and has correct delegation before deploying AI Foundry with network injection.
-  # Calculates subnet name based on BYO_subnets mode:
-  # - BYO_subnets=false: Uses naming convention snt-prj${project_number_000}-aca-002
-  # - BYO_subnets=true: Uses subnetProjACA2 variable and replaces <xxx> and <network_env> placeholders
-  # This is a validation-only task - failures will be logged but won't block deployment.
-  continueOnError: true
+  # Validates the AGENT subnet (aca2SubnetId) actually written into dynamicNetworkParams.json
+  # — not just the conventional name — because that is the value Bicep injects into
+  # Microsoft.CognitiveServices/accounts.networkInjections[].subnetArmId. A mismatch
+  # there causes the aml_aiagentservice capability host to fail with:
+  #   "The environment network configuration is invalid: Invalid vnet resource ID
+  #    provided, or the virtual network could not be found."
+  #
+  # This task VALIDATES (no longer auto-applies) the Microsoft.App/environments
+  # delegation on the agent subnet — the delegation is now baked in at creation time
+  # by job-1 (esml-genai-1/31-network.bicep -> aca2SubnetSettings.delegations) and
+  # reinforced by the conditional subnetDelegationAca module in
+  # esml-genai-1/09-ai-foundry-2025-v4.bicep.
+  # It still ensures the Microsoft.App resource provider is registered on the target
+  # subscription, which is required by the auto-provisioned invisible ACA environment
+  # that backs the agent service.
+  continueOnError: false
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -3102,126 +3252,217 @@ steps:
     inlineScript: |
       #!/bin/bash
       set -e
-      
+
       az account set --subscription "$(dev_test_prod_sub_id)"
-      
+
       echo "=== Validating Agent Subnet Configuration for AI Foundry ==="
       echo ""
-      echo "🔍 This check validates the agent subnet exists and has proper delegation"
-      echo "   before attempting Foundry account creation with network injection."
+      echo "🔍 Resolving the ACTUAL aca2SubnetId from dynamicNetworkParams.json"
+      echo "   (this is the exact value Bicep passes to networkInjections)."
       echo ""
-      
-      # Get VNet details
-      vnet_name="$(vnetNameFull_resolved)"
-      vnet_rg="$(vnetResourceGroup_resolved)"
-      
-      # Determine subnet name based on BYO_subnets mode
-      byo_subnets="$(BYO_subnets)"
-      subnet_var="$(subnetProjACA2)"
-      project_number="$(project_number_000)"
-      network_env="$(network_env)"
-      
-      if [ "$byo_subnets" = "true" ] && [ -n "$subnet_var" ]; then
-        echo "📋 BYO_subnets=true: Using provided subnet name with placeholder replacement"
-        subnet_name="$subnet_var"
-        
-        # Replace <xxx> placeholder with project number
-        if [[ "$subnet_name" == *"<xxx>"* ]]; then
-          echo "   Replacing <xxx> with project number: $project_number"
-          subnet_name="${subnet_name//<xxx>/$project_number}"
-        fi
-        
-        # Replace <network_env> placeholder with network environment
-        if [[ "$subnet_name" == *"<network_env>"* ]]; then
-          echo "   Replacing <network_env> with: $network_env"
-          subnet_name="${subnet_name//<network_env>/$network_env}"
-        fi
-        
-        echo "   Final subnet name: $subnet_name"
-      else
-        echo "📋 BYO_subnets=false: Using naming convention"
-        subnet_name="snt-prj${project_number}-aca-002"
-        echo "   Convention-based subnet name: $subnet_name"
-      fi
-      
-      echo ""
-      echo "🌐 Network Configuration:"
-      echo "   VNet: $vnet_name"
-      echo "   Resource Group: $vnet_rg"
-      echo "   Agent Subnet: $subnet_name"
-      echo ""
-      
-      # Check if subnet exists
-      echo "⏳ Checking if subnet exists..."
-      subnet_id=$(az network vnet subnet show \
-        --vnet-name "$vnet_name" \
-        --name "$subnet_name" \
-        --resource-group "$vnet_rg" \
-        --query id -o tsv 2>/dev/null || echo "")
-      
-      if [ -z "$subnet_id" ]; then
-        echo "##[error]❌ Agent subnet not found!"
-        echo "##[error]VNet: $vnet_name"
-        echo "##[error]Subnet: $subnet_name"
-        echo "##[error]Resource Group: $vnet_rg"
-        echo "##[error]"
-        echo "##[error]Resolution: Check subnet name in variables or create the subnet first."
+
+      params_file="$(System.DefaultWorkingDirectory)/aifactory/parameters/dynamicNetworkParams.json"
+
+      if [ ! -f "$params_file" ]; then
+        echo "##[error]❌ dynamicNetworkParams.json not found at: $params_file"
+        echo "##[error]   Task 04_pwsh_fetch_network_parameters must run successfully first."
         exit 1
       fi
-      
-      echo "✅ Subnet exists: $subnet_id"
+
+      echo "📄 dynamicNetworkParams.json contents:"
+      cat "$params_file"
       echo ""
-      
-      # Check subnet delegation
-      echo "⏳ Checking subnet delegation..."
+
+      # Extract aca2SubnetId from the generated params file (authoritative value)
+      aca2_subnet_id=$(jq -r '.parameters.aca2SubnetId.value // empty' "$params_file" 2>/dev/null || echo "")
+
+      # Fallbacks for environments without jq
+      if [ -z "$aca2_subnet_id" ]; then
+        aca2_subnet_id=$(python -c "import json,sys;d=json.load(open('$params_file'));print(d['parameters'].get('aca2SubnetId',{}).get('value',''))" 2>/dev/null || echo "")
+      fi
+      if [ -z "$aca2_subnet_id" ]; then
+        aca2_subnet_id=$(grep -A1 '"aca2SubnetId"' "$params_file" | grep '"value"' | sed -E 's/.*"value"\s*:\s*"([^"]*)".*/\1/' | head -n1)
+      fi
+
+      echo ""
+      echo "🆔 Resolved aca2SubnetId = '$aca2_subnet_id'"
+      echo ""
+
+      # If empty: agent network injection is disabled in Bicep (!empty guard) → safe to skip.
+      if [ -z "$aca2_subnet_id" ] || [ "$aca2_subnet_id" = "null" ]; then
+        echo "##[warning]⚠️  aca2SubnetId is EMPTY in dynamicNetworkParams.json."
+        echo "##[warning]   Bicep will skip networkInjections (agentSubnetResourceId='')."
+        echo "##[warning]   AI Foundry account will be created WITHOUT agent network injection."
+        echo "##[warning]   If you DO want agent network injection, ensure either:"
+        echo "##[warning]     - BYO_subnets=true with subnetProjACA2 set, OR"
+        echo "##[warning]     - The prior SubnetDeplProj deployment outputs aca2SubnetId."
+        exit 0
+      fi
+
+      # Parse the resourceId: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>
+      if [[ "$aca2_subnet_id" != /subscriptions/*/resourceGroups/*/providers/Microsoft.Network/virtualNetworks/*/subnets/* ]]; then
+        echo "##[error]❌ aca2SubnetId is NOT a valid subnet resource ID:"
+        echo "##[error]   $aca2_subnet_id"
+        echo "##[error]"
+        echo "##[error]   Expected: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>"
+        echo "##[error]   Fix: check genDynamicNetworkParamFile.ps1 output and prior subnet deployment outputs."
+        exit 1
+      fi
+
+      sub_id=$(echo "$aca2_subnet_id" | awk -F'/' '{print $3}')
+      sub_rg=$(echo "$aca2_subnet_id" | awk -F'/' '{print $5}')
+      vnet_name=$(echo "$aca2_subnet_id" | awk -F'/' '{print $9}')
+      subnet_name=$(echo "$aca2_subnet_id" | awk -F'/' '{print $11}')
+
+      echo "   subscription: $sub_id"
+      echo "   resourceGroup: $sub_rg"
+      echo "   vnet:          $vnet_name"
+      echo "   subnet:        $subnet_name"
+      echo ""
+
+      # 1) Verify the parent VNet exists and is reachable
+      echo "⏳ Verifying parent VNet exists..."
+      vnet_loc=$(az network vnet show --subscription "$sub_id" --resource-group "$sub_rg" --name "$vnet_name" --query location -o tsv 2>/dev/null || echo "")
+      if [ -z "$vnet_loc" ]; then
+        echo "##[error]❌ VNet '$vnet_name' NOT FOUND in subscription '$sub_id' / RG '$sub_rg'."
+        echo "##[error]   This IS the root cause of the aml_aiagentservice error:"
+        echo "##[error]   'Invalid vnet resource ID provided, or the virtual network could not be found.'"
+        echo "##[error]   Fix the VNet name/RG/subscription resolution upstream (variables.yaml or genDynamicNetworkParamFile.ps1)."
+        exit 1
+      fi
+      echo "✅ VNet exists in region: $vnet_loc"
+
+      # 1b) Region must match Foundry account location (agent service does not support cross-region)
+      foundry_loc="$(admin_location)"
+      if [ "$(echo "$vnet_loc" | tr '[:upper:]' '[:lower:]')" != "$(echo "$foundry_loc" | tr '[:upper:]' '[:lower:]')" ]; then
+        echo "##[error]❌ VNet region '$vnet_loc' != Foundry region '$foundry_loc'."
+        echo "##[error]   AI Foundry agent network injection requires the agent subnet's VNet"
+        echo "##[error]   to be in the SAME region as the Foundry account."
+        exit 1
+      fi
+      echo "✅ VNet region matches Foundry region ($foundry_loc)"
+      echo ""
+
+      # 2) Verify the subnet exists at the exact resourceId
+      # IMPORTANT: do NOT use `az ... --ids ... 2>/dev/null` here — it hides the
+      # real error (e.g. transient CLI subscription context loss, throttling, or
+      # token refresh) and makes a healthy subnet look "missing". Instead:
+      #   - explicitly switch subscription context to the subnet's subscription
+      #   - call with named parameters (same shape as the VNet check above)
+      #   - capture stderr so the actual Azure error is logged
+      #   - retry once on transient failures
+      echo "⏳ Verifying subnet exists at the exact resourceId..."
+
+      # Switch context to the subnet's subscription (may differ from the
+      # service-connection default if VNet is in a hub subscription).
+      az account set --subscription "$sub_id" 1>/dev/null 2>&1 || true
+
+      subnet_err=""
+      subnet_resolved=""
+      for attempt in 1 2; do
+        subnet_resolved=$(az network vnet subnet show \
+          --subscription "$sub_id" \
+          --resource-group "$sub_rg" \
+          --vnet-name "$vnet_name" \
+          --name "$subnet_name" \
+          --query id -o tsv 2>/tmp/subnet_show_err) || subnet_resolved=""
+        subnet_err=$(cat /tmp/subnet_show_err 2>/dev/null || echo "")
+        if [ -n "$subnet_resolved" ]; then
+          break
+        fi
+        echo "##[warning]Attempt $attempt: subnet show returned empty. stderr: ${subnet_err:-<none>}"
+        sleep 5
+      done
+
+      if [ -z "$subnet_resolved" ]; then
+        echo "##[error]❌ Subnet NOT FOUND at: $aca2_subnet_id"
+        echo "##[error]   subscription: $sub_id"
+        echo "##[error]   resourceGroup: $sub_rg"
+        echo "##[error]   vnet:          $vnet_name"
+        echo "##[error]   subnet:        $subnet_name"
+        echo "##[error]   Azure CLI stderr: ${subnet_err:-<empty>}"
+        echo "##[error]   Possible causes:"
+        echo "##[error]     - The subnet was deleted between job-1 and job-2."
+        echo "##[error]     - The service connection lost Reader rights on the VNet RG."
+        echo "##[error]     - Transient CLI / ARM throttling (both retries failed)."
+        echo "##[error]   Sanity check (azure-cli list of subnets in the VNet):"
+        az network vnet subnet list \
+          --subscription "$sub_id" \
+          --resource-group "$sub_rg" \
+          --vnet-name "$vnet_name" \
+          --query "[].name" -o tsv || true
+        exit 1
+      fi
+      # Restore subscription context to the deployment target sub
+      az account set --subscription "$(dev_test_prod_sub_id)" 1>/dev/null 2>&1 || true
+      echo "✅ Subnet resolved: $subnet_resolved"
+      echo ""
+
+      # 3) Ensure Microsoft.App resource provider is registered on the target subscription
+      #    (required for the auto-provisioned invisible ACA environment behind the agent service)
+      echo "⏳ Checking Microsoft.App resource provider registration on subscription $sub_id..."
+      rp_state=$(az provider show --subscription "$sub_id" --namespace Microsoft.App --query registrationState -o tsv 2>/dev/null || echo "NotRegistered")
+      echo "   Microsoft.App state: $rp_state"
+      if [ "$rp_state" != "Registered" ]; then
+        echo "##[warning]⚠️  Microsoft.App is not Registered. Registering now (async)..."
+        az provider register --subscription "$sub_id" --namespace Microsoft.App --wait || {
+          echo "##[error]❌ Failed to register Microsoft.App on subscription $sub_id."
+          echo "##[error]   This RP is required by the agent capability host."
+          exit 1
+        }
+        echo "✅ Microsoft.App registered."
+      else
+        echo "✅ Microsoft.App already registered."
+      fi
+      echo ""
+
+      # 4) Validate the subnet has Microsoft.App/environments delegation.
+      #    The delegation is now baked in at subnet-creation time by job-1
+      #    (esml-genai-1/31-network.bicep -> aca2SubnetSettings.delegations) and
+      #    reinforced by the conditional subnetDelegationAca module in
+      #    esml-genai-1/09-ai-foundry-2025-v4.bicep. This step therefore only
+      #    VALIDATES — it no longer mutates the subnet on the fly.
       delegation=$(az network vnet subnet show \
+        --subscription "$sub_id" \
+        --resource-group "$sub_rg" \
         --vnet-name "$vnet_name" \
         --name "$subnet_name" \
-        --resource-group "$vnet_rg" \
         --query "delegations[0].serviceName" -o tsv 2>/dev/null || echo "")
-      
-      if [ -z "$delegation" ]; then
-        echo "##[warning]⚠️  Subnet has NO delegation configured!"
-        echo "##[warning]   Subnet: $subnet_name"
-        echo "##[warning]   Expected delegation: Microsoft.App/environments"
-        echo "##[warning]"
-        echo "##[warning]   This may cause ResourceProviderExtensionError during deployment."
-        echo "##[warning]"
-        echo "##[warning]   To fix, run:"
-        echo "##[warning]   az network vnet subnet update \\"
-        echo "##[warning]     --resource-group $vnet_rg \\"
-        echo "##[warning]     --vnet-name $vnet_name \\"
-        echo "##[warning]     --name $subnet_name \\"
-        echo "##[warning]     --delegations Microsoft.App/environments"
-        echo ""
-        echo "##[warning]   Proceeding anyway - deployment will attempt auto-delegation..."
-      elif [ "$delegation" != "Microsoft.App/environments" ]; then
-        echo "##[warning]⚠️  Subnet has WRONG delegation: $delegation"
-        echo "##[warning]   Expected: Microsoft.App/environments"
-        echo "##[warning]   This may cause deployment failure."
-        echo ""
+      echo "⏳ Current delegation: '${delegation:-<none>}'"
+
+      if [ "$delegation" = "Microsoft.App/environments" ]; then
+        echo "✅ Subnet correctly delegated to Microsoft.App/environments."
+      elif [ -z "$delegation" ]; then
+        echo "##[error]❌ Subnet has NO delegation to Microsoft.App/environments."
+        echo "##[error]   Expected: job-1 (31-network.bicep -> aca2SubnetSettings.delegations)"
+        echo "##[error]            to create the subnet WITH this delegation, and"
+        echo "##[error]            09-ai-foundry-2025-v4.bicep (subnetDelegationAca) to ensure it."
+        echo "##[error]   Likely cause:"
+        echo "##[error]     - The subnet pre-exists (sntAca002Exists=true) so neither bicep wrote it,"
+        echo "##[error]     - or job-1 was run from an older template that did not set delegations."
+        echo "##[error]   Remediation: manually delegate the subnet, or delete it and re-run job-1."
+        echo "##[error]     az network vnet subnet update \\"
+        echo "##[error]       --subscription $sub_id --resource-group $sub_rg \\"
+        echo "##[error]       --vnet-name $vnet_name --name $subnet_name \\"
+        echo "##[error]       --delegations Microsoft.App/environments"
+        # Restore subscription context before exit
+        az account set --subscription "$(dev_test_prod_sub_id)" 1>/dev/null 2>&1 || true
+        exit 1
       else
-        echo "✅ Subnet has correct delegation: $delegation"
-        echo ""
+        echo "##[error]❌ Subnet has CONFLICTING delegation: $delegation"
+        echo "##[error]   Required: Microsoft.App/environments"
+        echo "##[error]   Either: remove the wrong delegation or use a different subnet for the agent."
+        az account set --subscription "$(dev_test_prod_sub_id)" 1>/dev/null 2>&1 || true
+        exit 1
       fi
-      
-      # Check if subnet is empty (no IP configurations)
-      echo "⏳ Checking if subnet is available (not in use)..."
-      ip_config_count=$(az network vnet subnet show \
-        --vnet-name "$vnet_name" \
-        --name "$subnet_name" \
-        --resource-group "$vnet_rg" \
-        --query "length(ipConfigurations)" -o tsv 2>/dev/null || echo "0")
-      
-      if [ "$ip_config_count" != "0" ] && [ "$ip_config_count" != "null" ]; then
-        echo "ℹ️  Subnet has $ip_config_count IP configuration(s) - subnet is in use"
-        echo "   This is normal if resources are already deployed to this subnet."
-      else
-        echo "✅ Subnet is available (no IP configurations)"
-      fi
-      
       echo ""
-      echo "✅ Subnet validation complete. Proceeding with Foundry deployment."
+
+      # 5) Best-effort: ensure subnet is large enough (/27 minimum recommended for ACA)
+      prefix=$(az network vnet subnet show --ids "$aca2_subnet_id" --query "addressPrefix" -o tsv 2>/dev/null || echo "")
+      echo "ℹ️  Subnet address prefix: $prefix (Container Apps requires /27 or larger)"
+
+      echo ""
+      echo "✅ Agent subnet validation COMPLETE — Bicep will receive a valid aca2SubnetId."
 - task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
