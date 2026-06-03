@@ -1165,6 +1165,13 @@ jobs:
       - name: 18_Delete_Service_If_Not_Enabled_And_Exists
         if: env.enableDeleteForDisabledResources == 'true'
         uses: azure/cli@v2
+        env:
+          # Explicit parity with ADO '06b_Delete_Service_If_Not_Enabled_And_Exists' env block.
+          # Both are already set at job level, but exposing them here makes the contract
+          # explicit and ensures they are available to the inline script (and to the shared
+          # delete-services-if-disabled.sh script if this step is later migrated to it).
+          vnetResourceGroupBase: ${{ env.vnetResourceGroupBase }}
+          commonResourceGroup_param: ${{ env.commonResourceGroup_param }}
         with:
           azcliversion: latest
           inlineScript: |
