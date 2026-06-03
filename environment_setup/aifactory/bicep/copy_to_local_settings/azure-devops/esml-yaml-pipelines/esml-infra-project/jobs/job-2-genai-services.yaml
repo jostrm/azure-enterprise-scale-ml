@@ -788,6 +788,10 @@ steps:
       aifProjectNameAlt="ai-prj${projectNumber}"
       aiFoundryV2Name="aif2"
       aiFoundryV2ProjectName="aif2-p${projectNumber}"
+      # AI Foundry V2 names now encode project_number + env as trail (e.g. aif2h7amw6bc013dev / aif2-p013h7am9k2lcdev)
+      # see CmnAIfactoryNaming.bicep — pattern: <base 12 chars> + projectNumber + env, cap 20.
+      aiFoundryV2NameSuffix="${projectNumber}${envName}"
+      aiFoundryV2ProjectSuffix="${envName}"
 
       botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
       dataFactoryName="adf-${projectNumber}-${locationSuffix}-${envName}"
@@ -843,23 +847,23 @@ steps:
         echo "##vso[task.setvariable variable=aifProjectExists]false"
       fi
       
-      echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$noSuffix")"
+      echo "##vso[task.setvariable variable=aiFoundryV2Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$aiFoundryV2Name" "$aiFoundryV2NameSuffix")"
       # aiFoundryV2ProjectExists: child resources (CognitiveServices/accounts/projects) are NOT returned
       # by az resource list. Find the account first, then use az rest to list projects.
       aiFoundryV2ActualName=$(az resource list \
         --resource-group "$targetResourceGroup" \
         --resource-type "Microsoft.CognitiveServices/accounts" \
-        --query "[?starts_with(name, 'aif2')].name" \
+        --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p') && ends_with(name, '${aiFoundryV2NameSuffix}')].name" \
         -o tsv 2>/dev/null | head -n1)
       if [ -n "$aiFoundryV2ActualName" ]; then
-        # Dump the full JSON and grep for the project name pattern "aif2-p" — avoids JMESPath
-        # query issues with child resource response shapes. An AI Foundry V2 project name always
-        # contains "aif2-p" (e.g. aif2-p002x46), whether returned as a short name or full id.
+        # Dump the full JSON and grep for the project name pattern "aif2-p${projectNumber}" with env trail —
+        # avoids JMESPath query issues with child resource response shapes. An AI Foundry V2 project name
+        # always contains "aif2-p<projectNumber>" (e.g. aif2-p013h7am9k2lcdev), whether returned as a short name or full id.
         aifV2ProjRaw=$(az rest \
           --method get \
           --url "https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${targetResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${aiFoundryV2ActualName}/projects?api-version=2026-01-15-preview" \
           -o json 2>/dev/null || echo "")
-        if echo "$aifV2ProjRaw" | grep -q "aif2-p"; then
+        if echo "$aifV2ProjRaw" | grep -Eq "${aiFoundryV2ProjectName}[a-z0-9]*${aiFoundryV2ProjectSuffix}(\"|/|$)"; then
           echo "##vso[task.setvariable variable=aiFoundryV2ProjectExists]true"
           echo "Checking variable: aiFoundryV2ProjectExists, Value: true"
         else
@@ -1201,12 +1205,17 @@ steps:
      fi
 
      # Construct Foundry names deterministically (same formula as CmnAIfactoryNaming.bicep)
+     # Pattern (cap 20): <base 12 chars> + projectNumber + env
      # When addAIFoundry=false (default):
-     #   aifV2Name = take(replace(toLower('aif2' + uniqueInAIFenv + cleanRandomValue), '-', ''), 12)
-     #   aifV2PrjName = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
+     #   base account = take(replace(toLower('aif2' + uniqueInAIFenv + cleanRandomValue), '-', ''), 12)
+     #   base project = take(toLower('aif2-p' + projectNumber + uniqueInAIFenv + cleanRandomValue), 12)
+     #   aifV2Name    = take(<base account> + projectNumber + env, 20)   e.g. aif2h7amw6bc013dev
+     #   aifV2PrjName = take(<base project> + env, 20)                    e.g. aif2-p013h7adev
      # When addAIFoundry=true:
-     #   aifV2NameAdd = take('aif2' + lastSuffixChar + cleanRandomValue, 12)
-     #   aifV2PrjNameAdd = take('aif2-p' + projectNumber + lastSuffixChar + cleanRandomValue, 12)
+     #   base account = take('aif2' + lastSuffixChar + cleanRandomValue, 12)
+     #   base project = take('aif2-p' + projectNumber + lastSuffixChar + cleanRandomValue, 12)
+     #   aifV2NameAdd    = take(<base account> + projectNumber + env, 20)
+     #   aifV2PrjNameAdd = take(<base project> + env, 20)
      # NOTE: Using bash builtins + awk instead of tr (tr can fail silently on some hosted agents due to locale issues)
      cleanRandomValue="${saltRandom10//-/}"
      cleanRandomValue="${cleanRandomValue//_/}"
@@ -1218,13 +1227,16 @@ steps:
      if [ "$addAIFoundryFlag" == "true" ]; then
        # addAIFoundry=true: use lastSuffixChar (last char of resourceSuffix, e.g. '1' from '-001')
        lastSuffixChar="${resourceSuffix: -1}"
-       foundry_account_name=$(echo "aif2${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
-       foundry_project_name=$(echo "aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
+       account_base=$(echo "aif2${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
+       project_base=$(echo "aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}" | cut -c1-12)
      else
        # Default: use uniqueInAIFenv (5-char salt)
-       foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
-       foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+       account_base=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
+       project_base=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
      fi
+     # Append projectNumber + env trail, cap at 20 (Azure CognitiveServices/accounts limit is 64; caphost adds 'caphost' = 7 → 27 safe)
+     foundry_account_name=$(echo "${account_base}${projectNumber}${envName}" | awk '{print tolower($0)}' | cut -c1-20)
+     foundry_project_name=$(echo "${project_base}${envName}" | awk '{print tolower($0)}' | cut -c1-20)
 
      echo "DEBUG 06a: addAIFoundry='$addAIFoundryFlag' cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
      echo "Foundry account name: $foundry_account_name"
@@ -1357,6 +1369,22 @@ steps:
 
       echo "Project resource group: $projectResourceGroup"
       echo "deleteAllServicesForProject: $deleteAll"
+
+      # ---------------------------------------------------------------
+      # FAST-PATH: if the project resource group does not exist, no Foundry
+      # account / OpenAI / AI Services / AML workspace can possibly exist
+      # for this project — nothing to purge. Skip immediately to avoid the
+      # 5-minute settle sleep and unnecessary list-deleted scans.
+      # Also signal 06c2 (subnet-release wait) to skip its 20-minute wait
+      # by emitting a pipeline output variable.
+      # ---------------------------------------------------------------
+      rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" 2>/dev/null || echo "false")
+      if [ "$rg_exists" != "true" ]; then
+        echo "ℹ️  Project resource group '$projectResourceGroup' does not exist — no Foundry account has ever been created for this project."
+        echo "=== 04_Purge_SoftDeleted: skipping entirely (project RG missing) ==="
+        echo "##vso[task.setvariable variable=purgeRan;isOutput=true]false"
+        exit 0
+      fi
 
       # ---------------------------------------------------------------
       # Read all exists/enable flags BEFORE the sleep so we can skip the
@@ -1544,8 +1572,11 @@ steps:
         cleanRandomValue="${saltRandom10//-/}"
         cleanRandomValue="${cleanRandomValue//_/}"
         cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
-        foundry_account_name=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
-        foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+        # Pattern (cap 20): <12-char base> + projectNumber + env  e.g. aif2h7amw6bc013dev
+        account_base=$(echo "aif2${uniqueInAIFenv}${cleanRandomValue}" | awk '{gsub(/-/,""); print tolower($0)}' | cut -c1-12)
+        project_base=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
+        foundry_account_name=$(echo "${account_base}${projectNumber}${envName}" | awk '{print tolower($0)}' | cut -c1-20)
+        foundry_project_name=$(echo "${project_base}${envName}" | awk '{print tolower($0)}' | cut -c1-20)
 
         echo "DEBUG 06c: cleanRandomValue='$cleanRandomValue' account='$foundry_account_name' project='$foundry_project_name'"
         echo "Purging AI Foundry V2 by exact name: account=$foundry_account_name project=$foundry_project_name (rg=$projectResourceGroup)"
@@ -1631,7 +1662,32 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
       #!/bin/bash
-      
+
+      # ---------------------------------------------------------------
+      # FAST-PATH: if the project resource group does not exist, no Foundry
+      # account / capability host / subnet delegation was ever created for
+      # this project. The 20-minute subnet-release wait is pointless — skip.
+      # ---------------------------------------------------------------
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+      subscription="$(dev_test_prod_sub_id)"
+      projectNameReplaced="${projectName/prj/project}"
+      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      az account set --subscription "$subscription" >/dev/null 2>&1 || true
+      rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" 2>/dev/null || echo "false")
+      if [ "$rg_exists" != "true" ]; then
+        echo "ℹ️  Project resource group '$projectResourceGroup' does not exist — no Foundry account / subnet delegation was ever created."
+        echo "=== 06c2_Wait_For_Subnet_Release_After_Purge: skipping 20-minute wait (project RG missing) ==="
+        exit 0
+      fi
+
       echo "=== Waiting for Complete Subnet Release After Account Purge ==="
       echo ""
       echo "⚠️  CRITICAL TIMING: Microsoft-managed infrastructure cleanup"

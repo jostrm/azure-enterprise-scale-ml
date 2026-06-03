@@ -110,16 +110,22 @@ var aifV1HubName = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-$
 var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // TODO=DONE
 
 // AI Foundry V2 (2025)
-// Dont Add: aif2x46jfec0
-// Add: aif21ec07673
-var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${cleanRandomValue}'), '-', ''),12) // Dont Add: aif2x46jfec0
-var aifV2PrjName =take(toLower('aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}'),12) // aif2-p001x4d
+// Naming pattern: aif2 + envSalt(5) + cleanRandom(3) + projectNumber(3) + env(3-4)
+// Example: aif2h7amw6bc013dev  (18 chars). Max cap 20 to safely fit env='test'/'prod'.
+// Azure CognitiveServices/accounts limit is 2-64; caphost adds "caphost" (7) → max 27 → safe.
+// Keep cleanRandom inside the base name so we still survive soft-delete name collisions.
+var aifV2NameBase = take(replace(toLower('aif2${uniqueInAIFenv}${cleanRandomValue}'), '-', ''),12) // e.g. aif2h7amw6bc
+var aifV2PrjNameBase = take(toLower('aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}'),12) // e.g. aif2-p013h7a
+var aifV2Name = take(toLower('${aifV2NameBase}${projectNumber}${env}'),20) // e.g. aif2h7amw6bc013dev
+var aifV2PrjName = take(toLower('${aifV2PrjNameBase}${env}'),20)           // e.g. aif2-p013h7adev (projectNumber already in base)
 // Add
 var lastSuffixChar = (!empty(resourceSuffix) && length(resourceSuffix) > 0) ? substring(resourceSuffix, max(0, length(resourceSuffix) - 1), 1) : '' // Extract last character: -001 → 1
-var aif2Random = take('aif2${lastSuffixChar}${cleanRandomValue}',12)
-var aifp2Random = take('aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}',12)
-var aifV2NameAdd = aif2Random // Add: aif21ec07673
-var aifV2PrjNameAdd = aifp2Random // Add: aif2-p001xe1
+var aif2RandomBase = take('aif2${lastSuffixChar}${cleanRandomValue}',12)
+var aifp2RandomBase = take('aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}',12)
+var aif2Random = take(toLower('${aif2RandomBase}${projectNumber}${env}'),20)
+var aifp2Random = take(toLower('${aifp2RandomBase}${env}'),20)
+var aifV2NameAdd = aif2Random
+var aifV2PrjNameAdd = aifp2Random
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
