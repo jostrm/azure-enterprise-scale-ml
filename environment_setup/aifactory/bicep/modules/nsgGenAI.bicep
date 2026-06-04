@@ -17,6 +17,60 @@ resource genAINsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   properties: {
     securityRules: [
       // --- Inbound ---
+      {
+        name: 'Allow_Internet_443'
+        properties: {
+          description: 'External clients to APIM gateway (External VNet mode). Required for public callers to reach APIM on 443.'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: 'Internet'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 1000
+          direction: 'Inbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'Allow_AzureLB_HealthProbe'
+        properties: {
+          description: 'APIM internal load balancer health probe (required for External/Internal VNet APIM).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '6390'
+          sourceAddressPrefix: 'AzureLoadBalancer'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 1020
+          direction: 'Inbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
+      {
+        name: 'Allow_APIM_Management'
+        properties: {
+          description: 'APIM control-plane traffic from ApiManagement service tag on port 3443 (required for External/Internal VNet APIM).'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '3443'
+          sourceAddressPrefix: 'ApiManagement'
+          destinationAddressPrefix: '*'
+          access: 'Allow'
+          priority: 1030
+          direction: 'Inbound'
+          sourcePortRanges: []
+          destinationPortRanges: []
+          sourceAddressPrefixes: []
+          destinationAddressPrefixes: []
+        }
+      }
       { //!
         name: 'AML_CI_44224'
         properties: {
