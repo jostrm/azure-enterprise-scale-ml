@@ -2759,6 +2759,26 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
       # ---------------------------------------------------------------
       echo ""
       echo "--- Pass 1/2: Detaching NSG / RouteTable / Delegations from project subnets ---"
+      # Helper: wait until the VNet is back at provisioningState=Succeeded
+      # before issuing the next PATCH/DELETE. Azure serializes operations on
+      # a single VNet — concurrent calls return "Bad Request". We poll up to
+      # ~2 min per op, which is plenty for subnet PATCH/DELETE in practice.
+      _wait_vnet_idle() {
+        local _rg="$1" _vn="$2" _label="$3"
+        local _max=24 _i=0 _state=""
+        while [ "$_i" -lt "$_max" ]; do
+          _state=$(az network vnet show -g "$_rg" -n "$_vn" --query "provisioningState" -o tsv 2>/dev/null || echo "")
+          if [ "$_state" = "Succeeded" ] || [ -z "$_state" ]; then
+            return 0
+          fi
+          # Updating / Deleting / Failed — back off
+          sleep 5
+          _i=$((_i + 1))
+        done
+        echo "    (waited $((_max * 5))s for vnet idle after $_label; last state=$_state — proceeding anyway)"
+        return 0
+      }
+
       while IFS= read -r vnet_name; do
         [ -z "$vnet_name" ] && continue
         subnets=$(az network vnet subnet list \
@@ -2767,19 +2787,45 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
           --query "[?contains(name, '$projectName')].name" \
           -o tsv 2>/dev/null || echo "")
         [ -z "$subnets" ] && continue
+        # Make sure VNet is idle before we start the per-subnet PATCH cascade
+        _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-detach"
         while IFS= read -r subnet_name; do
           [ -z "$subnet_name" ] && continue
           echo "  Detaching from subnet: $vnet_name/$subnet_name"
-          # Each --remove is silently ignored if the attribute is absent.
-          az network vnet subnet update \
+          # IMPORTANT: do EACH detach as a separate PATCH. A bundled multi-remove
+          # rolls the WHOLE patch back if any one attribute is locked (e.g. by a
+          # surviving private endpoint or service-association-link), leaving the
+          # NSG still bound and breaking Step 8. Per-attribute PATCH = best-effort
+          # independent operations. After EACH PATCH we wait for the VNet to
+          # leave the Updating state, otherwise the next call returns 400.
+          for _attr in networkSecurityGroup routeTable delegations serviceEndpoints; do
+            az network vnet subnet update \
+              --resource-group "$commonResourceGroup" \
+              --vnet-name "$vnet_name" \
+              --name "$subnet_name" \
+              --remove "$_attr" \
+              >/dev/null 2>&1 || echo "    (could not remove $_attr — may already be absent or locked by SAL/PE)"
+            _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "remove-$_attr"
+          done
+
+          # Verify NSG is actually gone (this is the one that blocks Step 8)
+          remaining_nsg=$(az network vnet subnet show \
             --resource-group "$commonResourceGroup" \
             --vnet-name "$vnet_name" \
             --name "$subnet_name" \
-            --remove networkSecurityGroup \
-            --remove routeTable \
-            --remove delegations \
-            --remove serviceEndpoints \
-            >/dev/null 2>&1 || echo "    (detach reported error — may already be detached or owned by service)"
+            --query "networkSecurityGroup.id" -o tsv 2>/dev/null || echo "")
+          if [ -n "$remaining_nsg" ] && [ "$remaining_nsg" != "None" ]; then
+            echo "    ⚠️  NSG still attached to $subnet_name: $remaining_nsg"
+            echo "    Diagnosis — remaining holders on $subnet_name:"
+            az network vnet subnet show \
+              --resource-group "$commonResourceGroup" \
+              --vnet-name "$vnet_name" \
+              --name "$subnet_name" \
+              --query "{pe:privateEndpoints, ipconfigs:ipConfigurations[].name, sal:serviceAssociationLinks[].name, deleg:delegations[].serviceName}" \
+              -o json 2>/dev/null || true
+          else
+            echo "    ✓ NSG cleared on $subnet_name"
+          fi
         done <<< "$subnets"
       done <<< "$vnets"
 
@@ -2788,9 +2834,12 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
       # Association Links (SALs) from ACA / Foundry managed environments
       # cannot be force-removed — those only release when 06a/06c finish
       # tearing down the parent service. We log and continue.
+      # IMPORTANT: subnets are deleted strictly SEQUENTIALLY per VNet, with
+      # an idle-wait between each, because a VNet can only process one
+      # write operation at a time (concurrent calls return Bad Request).
       # ---------------------------------------------------------------
       echo ""
-      echo "--- Pass 2/2: Deleting project subnets ---"
+      echo "--- Pass 2/2: Deleting project subnets (sequential per VNet) ---"
       while IFS= read -r vnet_name; do
         if [ -n "$vnet_name" ]; then
           echo "Checking VNet: $vnet_name"
@@ -2801,6 +2850,8 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
             -o tsv 2>/dev/null || echo "")
           
           if [ -n "$subnets" ]; then
+            # Wait for VNet idle before starting the sequential delete loop
+            _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-subnet-delete"
             while IFS= read -r subnet_name; do
               if [ -n "$subnet_name" ]; then
                 echo "  Deleting subnet: $subnet_name from VNet: $vnet_name"
@@ -2817,7 +2868,13 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
                     --name "$subnet_name" \
                     --query "{pe:privateEndpoints, ipconfigs:ipConfigurations, sal:serviceAssociationLinks, deleg:delegations, nsg:networkSecurityGroup.id, rt:routeTable.id}" \
                     -o json 2>/dev/null || true
+                else
+                  echo "    ✓ Subnet $subnet_name deleted"
                 fi
+                # CRITICAL: wait for the VNet to settle before deleting the next
+                # subnet. Without this, the next call hits the still-Updating
+                # VNet and returns "Bad Request".
+                _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "delete-$subnet_name"
               fi
             done <<< "$subnets"
           fi
