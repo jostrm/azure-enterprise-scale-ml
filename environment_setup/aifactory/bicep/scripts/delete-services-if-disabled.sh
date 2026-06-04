@@ -2908,10 +2908,79 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     while IFS= read -r nsg_name; do
       if [ -n "$nsg_name" ]; then
         echo "Deleting NSG: $nsg_name"
-        if ! az network nsg delete \
+
+        # -------------------------------------------------------------
+        # SELF-HEAL: re-detach any subnet still referencing this NSG.
+        # Pass 1 (Step 7) does this preemptively, but a silently-failed
+        # PATCH there leaves the NSG bound and the delete here returns
+        # InUseNetworkSecurityGroupCannotBeDeleted. So we look at
+        # nsg.subnets right now and explicitly clear each reference
+        # before the delete attempt.
+        # -------------------------------------------------------------
+        still_attached=$(az network nsg show \
           --resource-group "$commonResourceGroup" \
-          --name "$nsg_name" 2>&1; then
-          echo "  ⚠️  Warning: Failed to delete NSG $nsg_name"
+          --name "$nsg_name" \
+          --query "subnets[].id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        if [ -n "$still_attached" ]; then
+          echo "  Self-heal: $nsg_name is still attached to subnets — detaching now"
+          while IFS= read -r subnet_id; do
+            [ -z "$subnet_id" ] && continue
+            # subnet_id form: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/virtualNetworks/{vnet}/subnets/{subnet}
+            s_rg=$(echo "$subnet_id"   | awk -F/ '{print $5}')
+            s_vnet=$(echo "$subnet_id" | awk -F/ '{print $9}')
+            s_sub=$(echo "$subnet_id"  | awk -F/ '{print $11}')
+            echo "    Detaching NSG from $s_rg / $s_vnet / $s_sub"
+            # Wait for VNet idle before PATCH
+            for _i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              _st=$(az network vnet show -g "$s_rg" -n "$s_vnet" --query provisioningState -o tsv 2>/dev/null || echo "")
+              [ "$_st" = "Succeeded" ] || [ -z "$_st" ] && break
+              sleep 5
+            done
+            if az network vnet subnet update \
+                 --resource-group "$s_rg" \
+                 --vnet-name "$s_vnet" \
+                 --name "$s_sub" \
+                 --remove networkSecurityGroup 2>&1; then
+              echo "    ✓ Detach PATCH accepted"
+            else
+              echo "    ⚠️  Detach PATCH failed — subnet may be locked by SAL/PE"
+            fi
+            # Wait for VNet idle after PATCH so the NSG delete that follows
+            # doesn't race on a still-Updating VNet
+            for _i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              _st=$(az network vnet show -g "$s_rg" -n "$s_vnet" --query provisioningState -o tsv 2>/dev/null || echo "")
+              [ "$_st" = "Succeeded" ] || [ -z "$_st" ] && break
+              sleep 5
+            done
+          done <<< "$still_attached"
+        fi
+
+        # -------------------------------------------------------------
+        # Delete NSG with retry. "Bad Request" here is almost always a
+        # transient race (parent VNet still in Updating state after the
+        # detach PATCH above). Retry with backoff before giving up.
+        # -------------------------------------------------------------
+        nsg_deleted=false
+        for attempt in 1 2 3 4; do
+          if az network nsg delete \
+            --resource-group "$commonResourceGroup" \
+            --name "$nsg_name" 2>&1; then
+            echo "  ✓ NSG $nsg_name deleted (attempt $attempt)"
+            nsg_deleted=true
+            break
+          fi
+          # Check whether it's already gone (NotFound on the show)
+          if ! az network nsg show -g "$commonResourceGroup" -n "$nsg_name" >/dev/null 2>&1; then
+            echo "  ✓ NSG $nsg_name no longer present (attempt $attempt)"
+            nsg_deleted=true
+            break
+          fi
+          echo "  Attempt $attempt failed for $nsg_name — backing off 20s and retrying"
+          sleep 20
+        done
+
+        if [ "$nsg_deleted" != "true" ]; then
+          echo "  ⚠️  Warning: Failed to delete NSG $nsg_name after retries"
           # Diagnose remaining references (subnet/NIC associations)
           echo "  Diagnosis — subnets/NICs still referencing $nsg_name:"
           az network nsg show \
