@@ -3560,7 +3560,11 @@ steps:
     inlineScript: |
      #!/bin/bash
      set -e
-     
+
+     # Mark that 69a actually started — used by task 110 to scope its cleanup
+     # ONLY to a real foundry-creation failure (instead of any failed() in the job).
+     echo "##vso[task.setvariable variable=foundry_69a_started]true"
+
      az account set --subscription "$(dev_test_prod_sub_id)"
 
      # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
@@ -3879,33 +3883,47 @@ steps:
      echo "=== Waiting for account-level capability host to reach Succeeded ==="
      echo "Account: $account_name  RG: $projectResourceGroup"
 
-     caphost_name="${account_name//\-/}caphost"
-     caphost_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${caphost_name}?api-version=2025-07-01-preview"
+     # IMPORTANT: the platform-auto-provisioned account caphost uses an INTERNAL
+     # name that we cannot guess. We therefore LIST capabilityHosts on the
+     # account and accept any entry that reaches Succeeded. This is what
+     # actually unblocks the project caphost in 69b.
+     list_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2025-07-01-preview"
 
-     max_attempts=45   # 45 x 20s = 15 min
+     max_attempts=60   # 60 x 20s = 20 min
+     prov_state="NotFound"
      for i in $(seq 1 $max_attempts); do
-       caphost_json=$(az rest --method GET --url "$caphost_url" -o json 2>/dev/null || echo "")
-       if [ -z "$caphost_json" ]; then
-         echo "  [$i/$max_attempts] Account caphost not found yet — platform may still be provisioning..."
+       caphost_list=$(az rest --method GET --url "$list_url" -o json 2>/dev/null || echo "")
+       caphost_count=$(echo "$caphost_list" | jq -r '.value | length // 0' 2>/dev/null || echo "0")
+
+       if [ "$caphost_count" = "0" ] || [ -z "$caphost_list" ]; then
+         echo "  [$i/$max_attempts] No account caphosts present yet — platform may still be provisioning..."
          sleep 20
          continue
        fi
 
-       prov_state=$(echo "$caphost_json" | jq -r '.properties.provisioningState // "Unknown"')
-       echo "  [$i/$max_attempts] Account caphost provisioningState: $prov_state"
+       # Dump names + states (helpful diagnostics)
+       echo "  [$i/$max_attempts] Found $caphost_count account caphost(s):"
+       echo "$caphost_list" | jq -r '.value[] | "    - \(.name): \(.properties.provisioningState)"'
 
-       if [ "$prov_state" = "Succeeded" ]; then
-         echo "✅ Account capability host is Succeeded. Proceeding to 69b."
+       # Succeed as soon as ANY caphost is Succeeded
+       succeeded_name=$(echo "$caphost_list" | jq -r '.value[] | select(.properties.provisioningState == "Succeeded") | .name' | head -n 1)
+       if [ -n "$succeeded_name" ]; then
+         echo "✅ Account capability host '$succeeded_name' is Succeeded. Proceeding to 69b."
          exit 0
-       elif [ "$prov_state" = "Failed" ]; then
-         echo "##[error]Account capability host is in Failed state. 69b will likely fail."
+       fi
+
+       # Fail fast if all caphosts are in terminal Failed state
+       any_inflight=$(echo "$caphost_list" | jq -r '.value[] | select(.properties.provisioningState != "Failed" and .properties.provisioningState != "Canceled") | .name' | head -n 1)
+       if [ -z "$any_inflight" ]; then
+         echo "##[error]All account capability hosts are in Failed/Canceled state. 69b will fail."
          exit 1
        fi
 
+       prov_state=$(echo "$caphost_list" | jq -r '.value[0].properties.provisioningState')
        sleep 20
      done
 
-     echo "##[warning]Account capability host did not reach Succeeded within 15 min (last state: $prov_state)."
+     echo "##[warning]Account capability host did not reach Succeeded within 20 min (last state: $prov_state)."
      echo "##[warning]Proceeding to 69b anyway — retryCountOnTaskFailure may recover."
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
@@ -3916,6 +3934,10 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+     # Mark that 69b actually started — used by task 110 to scope its cleanup
+     # ONLY to a real foundry-creation failure (instead of any failed() in the job).
+     echo "##vso[task.setvariable variable=foundry_69b_started]true"
+
      az account set --subscription "$(dev_test_prod_sub_id)"
 
      # BYO_subnets guard: when BYO_subnets != true, pass empty string for subnetCommon
@@ -4038,6 +4060,9 @@ steps:
          exit 1
        fi
      fi
+
+     # 69b reached the end without exit 1 — mark success for task 110's scoped cleanup.
+     echo "##vso[task.setvariable variable=foundry_69b_succeeded]true"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69c_cosmosdb_data_contributor_for_foundry_project'
@@ -4465,11 +4490,21 @@ steps:
 - task: AzureCLI@2
   displayName: '110_Cleanup_CapabilityHosts_Before_AccountDeletion'
   continueOnError: true
-  # Runs when:
-  #  - any prior task failed AND Foundry caphost was enabled (safety cleanup before retry), OR
-  #  - ULTRA delete mode (deleteAllForProject=true) — belt-and-braces caphost cleanup before
-  #    `delete-services-if-disabled.sh` deletes the project RG containing the account.
-  condition: and(or(failed(), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  # SCOPED CLEANUP (do NOT use failed() — it fires on ANY prior task failure,
+  # which would wipe healthy caphosts when e.g. task 62 cognitive-services fails).
+  #
+  # Runs ONLY when:
+  #  (1) Task 69a actually started but did not reach 'Succeeded' (foundry_69a_started=true
+  #      AND foundry_69a_deployment_succeeded != true), i.e. account-creation failed.
+  #  (2) Task 69b actually started but did not reach success marker
+  #      (foundry_69b_started=true AND foundry_69b_succeeded != true), i.e. project-update failed.
+  #  (3) ULTRA delete mode (deleteAllForProject=true) — belt-and-braces caphost cleanup
+  #      before delete-services-if-disabled.sh removes the project RG.
+  #
+  # If task 62 / 63 / etc. failed BEFORE 69a, the started markers are never set
+  # (69a/69b's own conditions require pre_foundry_gate_passed=true and succeeded()),
+  # so 110 stays skipped and any healthy caphost from a prior run is preserved.
+  condition: and(or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
