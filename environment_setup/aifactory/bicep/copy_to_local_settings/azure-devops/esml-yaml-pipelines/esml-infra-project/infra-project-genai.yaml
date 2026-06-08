@@ -31,7 +31,9 @@ stages:
     admin_bicep_kv_fw: "$(dev_admin_bicep_kv_fw)"
   jobs:
     - deployment: ESGenAI_Networking
-      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'))
+      # Skip networking job in ULTRA mode (deleteAllForProject=true) — the project RG is being torn down,
+      # so deploying/maintaining the private network is pointless.
+      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
@@ -50,7 +52,7 @@ stages:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
     - deployment: ESGenAI_Services
-      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
+      condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
@@ -82,7 +84,9 @@ stages:
     admin_bicep_kv_fw: "$(test_admin_bicep_kv_fw)"
   jobs:
     - deployment: ESGenAI_Networking
-      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'))
+      # Skip networking job in ULTRA mode (deleteAllForProject=true) — the project RG is being torn down,
+      # so deploying/maintaining the private network is pointless.
+      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
       timeoutInMinutes: 240
       pool:
@@ -101,7 +105,7 @@ stages:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
     - deployment: ESGenAI_Services
-      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
+      condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
@@ -135,7 +139,9 @@ stages:
     admin_bicep_kv_fw: "$(prod_admin_bicep_kv_fw)"
   jobs:
     - deployment: ESGenAI_Networking
-      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'))
+      # Skip networking job in ULTRA mode (deleteAllForProject=true) — the project RG is being torn down,
+      # so deploying/maintaining the private network is pointless.
+      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
@@ -154,7 +160,7 @@ stages:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
     - deployment: ESGenAI_Services
-      condition: or(succeeded(), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
+      condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
