@@ -21,10 +21,13 @@ jobs:
       dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       # Single source of truth for environment (matches ADO): dev_test_prod drives everything
       # network_env uses per-environment repo vars when provided, falls back to shared NETWORK_ENV or AZURE_ENV_NAME
-      network_env: ${{ github.event.inputs.environment == 'dev' && (vars.DEV_NETWORK_ENV || vars.NETWORK_ENV || 'dev')
-        || github.event.inputs.environment == 'stage' && (vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test')
-        || github.event.inputs.environment == 'prod' && (vars.PROD_NETWORK_ENV || vars.NETWORK_ENV || 'prod')
-        || vars.NETWORK_ENV || vars.AZURE_ENV_NAME || '' }}
+      network_env: >-
+        ${{
+          (github.event.inputs.environment == 'dev'   && (vars.DEV_NETWORK_ENV   || vars.NETWORK_ENV || 'dev'))
+          || (github.event.inputs.environment == 'stage' && (vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test'))
+          || (github.event.inputs.environment == 'prod'  && (vars.PROD_NETWORK_ENV  || vars.NETWORK_ENV || 'prod'))
+          || vars.NETWORK_ENV || vars.AZURE_ENV_NAME || ''
+        }}
 
       admin_location: ${{ vars.AIFACTORY_LOCATION }}
       admin_locationSuffix: ${{ vars.AIFACTORY_LOCATION_SHORT }}
@@ -150,6 +153,11 @@ jobs:
       enableDatafactory: ${{ vars.ENABLE_DATAFACTORY || 'false' }}
       enableAzureMachineLearning: ${{ vars.ENABLE_AZURE_MACHINE_LEARNING || 'false' }}
       addAzureMachineLearning: ${{ vars.ADD_AZURE_MACHINE_LEARNING || 'false' }}
+      addBastionHost: ${{ vars.ADD_BASTION_HOST || 'false' }}
+      bastion_subscription_resource_group: ${{ vars.BASTION_SUBSCRIPTION_RESOURCE_GROUP || '' }}
+      bastion_custom_name: ${{ vars.BASTION_CUSTOM_NAME || '' }}
+      existingAcrPushUserPrincipals: ''
+      existingAcrPushSPPrincipals: ''
       enableDatafactoryCommon: ${{ vars.ENABLE_DATAFACTORY_COMMON || 'false' }}
       enableDatabricks: ${{ vars.ENABLE_DATABRICKS || 'false' }}
       enableAksForAzureML: ${{ vars.ENABLE_AKS_FOR_AZURE_ML || 'true' }}
@@ -202,7 +210,6 @@ jobs:
       # Complete mode vs Incremental mode
       enableDeleteForDisabledResources: ${{ vars.ENABLE_DELETE_FOR_DISABLED_RESOURCES || 'true' }}
       deleteAllServicesForProject: ${{ vars.DELETE_ALL_SERVICES_FOR_PROJECT || 'false' }}
-      deleteKeyvaultAlso: ${{ vars.DELETE_KEYVAULT_ALSO || 'false' }}
       deleteAllForProject: ${{ vars.DELETE_ALL_FOR_PROJECT || 'false' }}
 
       # DNS zone existence flags (for parity with ADO debug params)
@@ -237,21 +244,6 @@ jobs:
 
       # Diagnostics / tags
       diagnosticSettingLevel: ${{ vars.DIAGNOSTIC_SETTING_LEVEL || 'gold' }}
-      # Skip AIFactory-managed diagnostic settings on Cognitive Services / AI Search
-      # accounts when an Azure Policy (deployIfNotExists) already creates a
-      # `diag-<account>` setting pinned to the same Log Analytics workspace.
-      # Azure rejects a second diagnostic setting reusing the same (sink + category)
-      # tuple with 409 "Data sinks can't be reused". The policy-managed setting
-      # already satisfies log routing / compliance, so we skip the bicep one.
-      # These act as the INITIAL value; step 63a may auto-flip any of them to 'true'
-      # on dynamic detection of a pre-existing diagnostic setting.
-      skipDiagAOAI: ${{ vars.SKIP_DIAG_AOAI || 'true' }}
-      skipDiagAISearch: ${{ vars.SKIP_DIAG_AI_SEARCH || 'true' }}
-      skipDiagAIServices: ${{ vars.SKIP_DIAG_AI_SERVICES || 'true' }}
-      skipDiagContentSafety: ${{ vars.SKIP_DIAG_CONTENT_SAFETY || 'true' }}
-      skipDiagVision: ${{ vars.SKIP_DIAG_VISION || 'true' }}
-      skipDiagSpeech: ${{ vars.SKIP_DIAG_SPEECH || 'true' }}
-      skipDiagDocIntelligence: ${{ vars.SKIP_DIAG_DOC_INTELLIGENCE || 'true' }}
       tags: ${{ vars.TAGS || '{}' }}
       tagsProject: ${{ vars.TAGS_PROJECT || '{}' }}
 
@@ -323,6 +315,19 @@ jobs:
 
       projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
       projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
+
+      # Placeholders for env vars populated at runtime via $GITHUB_ENV.
+      # Declared here so YAML/linters can resolve `${{ env.* }}` references in later steps.
+      # (aifactory_salt / aifactory_salt_random reuse the AIFACTORY_SALT* keys declared above —
+      #  GitHub Actions env keys are case-insensitive, so no duplicate placeholder is needed.)
+      vnetNameFull_resolved: 'unset'
+      vnetResourceGroup_resolved: 'unset'
+      runner_ip: 'unset'
+      common_sp_appid_value: 'unset'
+      common_sp_secret_value: 'unset'
+      project_sp_oid_value: 'unset'
+      debug_disable_100_rbac_security: 'false'
+      debug_disable_69_aifoundry_2025: 'false'
 
     steps:
       - name: 00_Azure_Login
@@ -405,34 +410,6 @@ jobs:
         shell: bash
         run: |
           set -e
-
-          # ---------------------------------------------------------------
-          # ULTRA DELETE MODE PROMOTION (must run FIRST, before any later
-          # step's `if:` is evaluated). Mirrors ADO job-2 logic.
-          #
-          # When deleteAllForProject=true, force the two upstream delete
-          # flags to true so:
-          #   - All 61–68 / 69 / 99 / 100 / 100a / 100b / 101 CREATION steps
-          #     (already gated on `env.deleteAllServicesForProject != 'true'`) SKIP.
-          #   - 06a_Delete_CapabilityHosts runs (gated on deleteAllServicesForProject=true).
-          #   - 18_Delete_Service_If_Not_Enabled_And_Exists runs (gated on
-          #     enableDeleteForDisabledResources=true) and its
-          #     `delete-services-if-disabled.sh` script sees
-          #     deleteAllForProject=true and tears down the project RG.
-          #   - 18_Purge_Soft_Deleted runs.
-          #   - 18b_Wait_For_Subnet_Release_After_Purge is excluded
-          #     (no redeploy follows in ULTRA mode).
-          #   - 110_Cleanup_CapabilityHosts_Before_AccountDeletion runs
-          #     (belt-and-braces caphost cleanup before RG deletion).
-          # ---------------------------------------------------------------
-          if [ "${{ env.deleteAllForProject }}" = "true" ]; then
-            echo "💀 ULTRA DELETE MODE detected (deleteAllForProject=true) — promoting upstream flags:"
-            echo "   - deleteAllServicesForProject -> true (skips ALL creation tasks)"
-            echo "   - enableDeleteForDisabledResources -> true (enables 18 delete-services script)"
-            echo "deleteAllServicesForProject=true" >> "$GITHUB_ENV"
-            echo "enableDeleteForDisabledResources=true" >> "$GITHUB_ENV"
-          fi
-
           NETWORK_ENV="${{ env.network_env }}"
           VNET_RG="${{ env.vnetResourceGroup_param }}"
           VNET_NAME="${{ env.vnetNameFull_param }}"
@@ -941,40 +918,9 @@ jobs:
             projectNameReplaced="${projectName/prj/project}"
             targetRG="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
             echo "targetRG=$targetRG"
-
-            # -----------------------------------------------------------------
-            # Initialize ALL *Exists env variables to "false" BEFORE doing any
-            # resource-group / resource lookups. This guarantees downstream
-            # steps always see a resolvable value (e.g. ${{ env.aiFoundryV2Exists }})
-            # even when the RG does not exist yet (first-time deployment) or
-            # when an individual lookup is skipped. Without this, an unresolved
-            # variable becomes empty and downstream bash conditions may misbehave.
-            # The real existence checks below will overwrite the defaults when
-            # the resource group actually exists.
-            # -----------------------------------------------------------------
-            echo "Initializing all *Exists variables to 'false' (defaults)..."
-            for _var in \
-              aiHubExists aifProjectExists aiFoundryV2Exists aiFoundryV2ProjectExists \
-              databricksExists logicAppsExists eventHubsExists dataFactoryExists \
-              botServiceExists aksExists amlExists openaiExists aiSearchExists \
-              dashboardInsightsExists applicationInsightExists aiServicesExists \
-              bingExists bingCustomSearchExists containerAppsEnvExists containerAppAExists containerAppWExists \
-              cosmosDBExists functionAppExists webAppExists funcAppServicePlanExists \
-              webAppServicePlanExists keyvaultExists miACAExists miPrjExists \
-              storageAccount1001Exists storageAccount2001Exists aifExists redisExists \
-              postgreSQLExists sqlServerExists sqlDBExists elasticExists \
-              acrProjectExists vmExists contentSafetyExists; do
-              echo "${_var}=false" >> $GITHUB_ENV
-            done
-
             if ! az group show --name "$targetRG" >/dev/null 2>&1; then
-              echo "Resource group '$targetRG' does not exist."
-              echo "All *Exists variables remain set to 'false' (initialized above)."
-              echo "This is expected on a first-time deployment; downstream steps will create the resources."
               exit 0
             fi
-
-            echo "Resource group '$targetRG' exists. Proceeding with resource checks."
             resource_exists_fuzzy(){
               local rg=$1; local type=$2; local prefix=$3; local suffix=$4
               local output
@@ -1208,13 +1154,6 @@ jobs:
       - name: 18_Delete_Service_If_Not_Enabled_And_Exists
         if: env.enableDeleteForDisabledResources == 'true'
         uses: azure/cli@v2
-        env:
-          # Explicit parity with ADO '06b_Delete_Service_If_Not_Enabled_And_Exists' env block.
-          # Both are already set at job level, but exposing them here makes the contract
-          # explicit and ensures they are available to the inline script (and to the shared
-          # delete-services-if-disabled.sh script if this step is later migrated to it).
-          vnetResourceGroupBase: ${{ env.vnetResourceGroupBase }}
-          commonResourceGroup_param: ${{ env.commonResourceGroup_param }}
         with:
           azcliversion: latest
           inlineScript: |
@@ -1589,114 +1528,6 @@ jobs:
 
             echo "18_Purge_Soft_Deleted completed."
 
-      # ============================================================================
-      # 18b — Wait for full subnet release after Foundry account purge.
-      # Mirrors ADO task '06c2_Wait_For_Subnet_Release_After_Purge'.
-      #
-      # CRITICAL: After purging a Foundry account, Azure needs ~20 minutes to fully
-      # release the subnet. This prevents "Subnet already in use" errors when
-      # redeploying to the same subnet (Microsoft Foundry docs:
-      # https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup).
-      #
-      # Runs only when:
-      #   - deleteAllForProject != true  (ULTRA mode tears down RG + networking;
-      #                                   no redeploy follows, so waiting is pointless)
-      #   - (deleteAllServicesForProject == true OR enableDeleteForDisabledResources == true)
-      #   - enableAIFoundry == true  (Foundry resources were deployed)
-      #   - aiFoundryV2Exists != true (account was purged, not pre-existing)
-      # ============================================================================
-      - name: 18b_Wait_For_Subnet_Release_After_Purge
-        if: |
-          env.deleteAllForProject != 'true'
-          && (env.deleteAllServicesForProject == 'true' || env.enableDeleteForDisabledResources == 'true')
-          && env.enableAIFoundry == 'true'
-          && env.aiFoundryV2Exists != 'true'
-        uses: azure/cli@v2
-        with:
-          azcliversion: latest
-          inlineScript: |
-            #!/bin/bash
-
-            # ---------------------------------------------------------------
-            # FAST-PATH: if the project resource group does not exist, no Foundry
-            # account / capability host / subnet delegation was ever created for
-            # this project. The 20-minute subnet-release wait is pointless — skip.
-            # ---------------------------------------------------------------
-            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
-            projectNumber="${{ env.project_number_000 }}"
-            projectName="prj${projectNumber}"
-            locationSuffix="${{ env.admin_locationSuffix }}"
-            envName="${{ env.dev_test_prod }}"
-            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
-            projectPrefix="${{ env.projectPrefix }}"
-            projectSuffix="${{ env.projectSuffix }}"
-            subscription="${{ env.dev_test_prod_sub_id }}"
-            projectNameReplaced="${projectName/prj/project}"
-            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-
-            az account set --subscription "$subscription" >/dev/null 2>&1 || true
-            rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" 2>/dev/null || echo "false")
-            if [ "$rg_exists" != "true" ]; then
-              echo "ℹ️  Project resource group '$projectResourceGroup' does not exist — no Foundry account / subnet delegation was ever created."
-              echo "=== 18b_Wait_For_Subnet_Release_After_Purge: skipping 20-minute wait (project RG missing) ==="
-              exit 0
-            fi
-
-            echo "=== Waiting for Complete Subnet Release After Account Purge ==="
-            echo ""
-            echo "⚠️  CRITICAL TIMING: Microsoft-managed infrastructure cleanup"
-            echo ""
-            echo "What happens during this wait:"
-            echo "  1. Azure purges the soft-deleted Foundry account"
-            echo "  2. Microsoft-managed Container Apps Environment is removed"
-            echo "  3. Subnet delegation to Microsoft.App/environments is released"
-            echo "  4. Network policies and route tables are cleaned up"
-            echo "  5. Background async operations complete"
-            echo ""
-            echo "Why 20 minutes?"
-            echo "  • Capability host unlink: 2-5 minutes"
-            echo "  • Account purge completion: 5-10 minutes"
-            echo "  • Subnet delegation propagation: 5-10 minutes"
-            echo "  • Total worst-case: ~20 minutes"
-            echo ""
-            echo "Without this wait, redeployment will fail with:"
-            echo "  ❌ 'Subnet already in use'"
-            echo "  ❌ 'ResourceProviderExtensionError'"
-            echo "  ❌ 'DelegationNotCleared'"
-            echo ""
-            echo "📖 Reference: https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup#account-deletion-prerequisites-and-cleanup-guidance"
-            echo ""
-
-            wait_minutes=20
-            wait_seconds=$((wait_minutes * 60))
-
-            echo "⏰ Starting ${wait_minutes}-minute wait for subnet release..."
-            echo "   Pipeline will resume at: $(date -u -d "+${wait_minutes} minutes" '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -u '+%Y-%m-%d %H:%M:%S UTC')"
-            echo ""
-
-            # Progress indicator every 2 minutes
-            interval=120
-            elapsed=0
-
-            while [ $elapsed -lt $wait_seconds ]; do
-              remaining=$((wait_seconds - elapsed))
-              remaining_minutes=$((remaining / 60))
-              echo "  [$(date '+%H:%M:%S')] ⏳ ${remaining_minutes} minutes remaining..."
-
-              sleep_time=$interval
-              if [ $remaining -lt $interval ]; then
-                sleep_time=$remaining
-              fi
-
-              sleep $sleep_time
-              elapsed=$((elapsed + sleep_time))
-            done
-
-            echo ""
-            echo "✅ 20-minute wait complete!"
-            echo "   Subnet should now be fully released and ready for reuse."
-            echo "   Proceeding with workflow..."
-
       # === Deploy sequences ===
 
       - name: 61-foundation
@@ -1819,7 +1650,6 @@ jobs:
               --parameters DEBUG_deployModel_text_embedding_ada_002="${{ env.deployModel_text_embedding_ada_002 }}" \
               --parameters DEBUG_deployModel_text_embedding_3_large="${{ env.deployModel_text_embedding_3_large }}" \
               --parameters DEBUG_deployModel_text_embedding_3_small="${{ env.deployModel_text_embedding_3_small }}" \
-              --parameters DEBUG_deployModel_gpt_54_mini="${{ env.deployModel_gpt_54_mini }}" \
               --parameters policyExemptionAssignmentIds='${{ env.policyExemptionAssignmentIds }}' \
               --parameters policyExemptionDefinitionReferenceIds='${{ env.policyExemptionDefinitionReferenceIds }}' \
               --parameters tags='${{ env.tags }}' \
@@ -1952,140 +1782,6 @@ jobs:
               --parameters enableLogicApps="${{ env.enableLogicApps }}" \
               --debug
 
-      # ============================================================================
-      # 63a — Detect EXISTING diagnostic settings on Cognitive / AI Search resources
-      # Mirrors ADO task '63a-detect-existing-diagnostic-settings'.
-      # Why: Azure ARM rejects two diagnostic settings on the same resource that
-      # share a (category, sink) tuple — typical when an Azure Policy already
-      # deployed a 'default' diagnostic setting routing to a Log Analytics
-      # workspace. We set skipDiag* env vars so 03-cognitive-services.bicep skips
-      # creating its own 'diag-<name>' setting and lets the policy-managed one
-      # satisfy compliance.
-      # ============================================================================
-      - name: 63a_Detect_Existing_Diagnostic_Settings
-        if: env.deleteAllServicesForProject != 'true' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
-        uses: azure/cli@v2
-        with:
-          azcliversion: latest
-          inlineScript: |
-            #!/bin/bash
-            set -u
-            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-
-            # Reconstruct project RG name (same formula used by other GH steps)
-            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
-            projectNumber="${{ env.project_number_000 }}"
-            projectName="prj${projectNumber}"
-            locationSuffix="${{ env.admin_locationSuffix }}"
-            envName="${{ env.dev_test_prod }}"
-            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
-            projectPrefix="${{ env.projectPrefix }}"
-            projectSuffix="${{ env.projectSuffix }}"
-            projectNameReplaced="${projectName/prj/project}"
-            targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-
-            echo "🔎 Scanning $targetResourceGroup for pre-existing diagnostic settings..."
-
-            # Normalize a value to strict 'true'/'false' (lowercase, default 'false').
-            norm() {
-              local v
-              v=$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')
-              if [ "$v" = "true" ]; then echo "true"; else echo "false"; fi
-            }
-
-            # Seed skip flags from workflow-level env (variables.yaml equivalent — defaults to 'true').
-            # Detection below can only *flip true* (never back to false), matching ADO 63a behavior.
-            skipDiagAOAI=$(norm "${{ env.skipDiagAOAI }}")
-            skipDiagAISearch=$(norm "${{ env.skipDiagAISearch }}")
-            skipDiagAIServices=$(norm "${{ env.skipDiagAIServices }}")
-            skipDiagContentSafety=$(norm "${{ env.skipDiagContentSafety }}")
-            skipDiagVision=$(norm "${{ env.skipDiagVision }}")
-            skipDiagSpeech=$(norm "${{ env.skipDiagSpeech }}")
-            skipDiagDocIntelligence=$(norm "${{ env.skipDiagDocIntelligence }}")
-            echo "   Initial (from variables.yaml): AOAI=$skipDiagAOAI Search=$skipDiagAISearch AIServices=$skipDiagAIServices ContentSafety=$skipDiagContentSafety Vision=$skipDiagVision Speech=$skipDiagSpeech DocInt=$skipDiagDocIntelligence"
-
-            # Map a Cognitive Services account 'kind' to the corresponding skip-flag.
-            kind_to_var() {
-              case "$1" in
-                OpenAI)          echo "skipDiagAOAI" ;;
-                AIServices)      echo "skipDiagAIServices" ;;
-                ContentSafety)   echo "skipDiagContentSafety" ;;
-                ComputerVision)  echo "skipDiagVision" ;;
-                SpeechServices)  echo "skipDiagSpeech" ;;
-                FormRecognizer)  echo "skipDiagDocIntelligence" ;;
-                *)               echo "" ;;
-              esac
-            }
-
-            # 1) Cognitive Services accounts
-            cog_json=$(az cognitiveservices account list \
-              --resource-group "$targetResourceGroup" \
-              --query "[].{name:name,kind:kind,id:id}" -o json 2>/dev/null || echo "[]")
-            cog_count=$(echo "$cog_json" | jq 'length' 2>/dev/null || echo "0")
-            echo "   Found $cog_count Cognitive Services account(s)."
-
-            if [ "$cog_count" -gt 0 ]; then
-              while IFS=$'\t' read -r acc_name acc_kind acc_id; do
-                [ -z "$acc_id" ] && continue
-                ds_json=$(az monitor diagnostic-settings list --resource "$acc_id" -o json 2>/dev/null || echo '{"value":[]}')
-                conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${acc_name}" '
-                  .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
-                ' | head -n1)
-                var=$(kind_to_var "$acc_kind")
-                if [ -n "$conflict" ] && [ -n "$var" ]; then
-                  echo "   ⚠️  $acc_name (kind=$acc_kind) already has diagnostic setting '$conflict' to a LAW → setting $var=true"
-                  eval "$var=true"
-                elif [ -n "$conflict" ]; then
-                  echo "   ℹ️  $acc_name (kind=$acc_kind) has diagnostic setting '$conflict' but kind is not gated; nothing to skip."
-                else
-                  echo "   ✅ $acc_name (kind=$acc_kind) has no conflicting diagnostic setting."
-                fi
-              done < <(echo "$cog_json" | jq -r '.[] | [.name, .kind, .id] | @tsv')
-            fi
-
-            # 2) Azure AI Search
-            search_json=$(az search service list \
-              --resource-group "$targetResourceGroup" \
-              --query "[].{name:name,id:id}" -o json 2>/dev/null || echo "[]")
-            search_count=$(echo "$search_json" | jq 'length' 2>/dev/null || echo "0")
-            echo "   Found $search_count Azure AI Search service(s)."
-
-            if [ "$search_count" -gt 0 ]; then
-              while IFS=$'\t' read -r srv_name srv_id; do
-                [ -z "$srv_id" ] && continue
-                ds_json=$(az monitor diagnostic-settings list --resource "$srv_id" -o json 2>/dev/null || echo '{"value":[]}')
-                conflict=$(echo "$ds_json" | jq -r --arg ourName "diag-${srv_name}" '
-                  .value[]? | select(.name != $ourName) | select((.workspaceId // "") != "") | .name
-                ' | head -n1)
-                if [ -n "$conflict" ]; then
-                  echo "   ⚠️  AI Search $srv_name already has diagnostic setting '$conflict' to a LAW → setting skipDiagAISearch=true"
-                  skipDiagAISearch=true
-                else
-                  echo "   ✅ AI Search $srv_name has no conflicting diagnostic setting."
-                fi
-              done < <(echo "$search_json" | jq -r '.[] | [.name, .id] | @tsv')
-            fi
-
-            echo ""
-            echo "=== Diagnostic skip flags ==="
-            echo "skipDiagAOAI=$skipDiagAOAI"
-            echo "skipDiagAISearch=$skipDiagAISearch"
-            echo "skipDiagAIServices=$skipDiagAIServices"
-            echo "skipDiagContentSafety=$skipDiagContentSafety"
-            echo "skipDiagVision=$skipDiagVision"
-            echo "skipDiagSpeech=$skipDiagSpeech"
-            echo "skipDiagDocIntelligence=$skipDiagDocIntelligence"
-
-            {
-              echo "skipDiagAOAI=$skipDiagAOAI"
-              echo "skipDiagAISearch=$skipDiagAISearch"
-              echo "skipDiagAIServices=$skipDiagAIServices"
-              echo "skipDiagContentSafety=$skipDiagContentSafety"
-              echo "skipDiagVision=$skipDiagVision"
-              echo "skipDiagSpeech=$skipDiagSpeech"
-              echo "skipDiagDocIntelligence=$skipDiagDocIntelligence"
-            } >> "$GITHUB_ENV"
-
       - name: 63-cognitive-services
         if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2
@@ -2164,13 +1860,6 @@ jobs:
               --parameters cmk="${{ env.cmk }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}" \
               --parameters addAISearch="${{ env.addAISearch }}" \
-              --parameters skipDiagAOAI="${{ env.skipDiagAOAI || 'false' }}" \
-              --parameters skipDiagAISearch="${{ env.skipDiagAISearch || 'false' }}" \
-              --parameters skipDiagAIServices="${{ env.skipDiagAIServices || 'false' }}" \
-              --parameters skipDiagContentSafety="${{ env.skipDiagContentSafety || 'false' }}" \
-              --parameters skipDiagVision="${{ env.skipDiagVision || 'false' }}" \
-              --parameters skipDiagSpeech="${{ env.skipDiagSpeech || 'false' }}" \
-              --parameters skipDiagDocIntelligence="${{ env.skipDiagDocIntelligence || 'false' }}" \
               --debug
 
       - name: 64-databases
@@ -2435,7 +2124,7 @@ jobs:
               --parameters projectPrefix="${{ env.projectPrefix }}" \
               --parameters projectSuffix="${{ env.projectSuffix }}" \
               --parameters aks_dev_sku_override="${{ env.admin_aks_gpu_sku_dev_override }}" \
-              --parameters aks_test_prod_sku_override="${{ env.admin_aks_gpu_sku_test_prod_override }}" \
+              --parameters aks_test_prod_sku_override="${{ env.admin_aks_gpu_sku_testProd_override }}" \
               --parameters aks_version_override="${{ env.admin_aks_version_override }}" \
               --parameters aks_dev_nodes_override="${{ env.admin_aks_nodes_dev_override }}" \
               --parameters aks_test_prod_nodes_override="${{ env.admin_aks_nodes_testProd_override }}" \
@@ -2541,6 +2230,26 @@ jobs:
             assignments=$(az role assignment list --scope "$acrScope" --role "$acrPushRoleId" --query "[?principalType=='User' || principalType=='Group']" -o tsv 2>/dev/null || true)
             if [ -n "$assignments" ]; then echo "skipACRAssignments=true" >> $GITHUB_ENV; else echo "skipACRAssignments=false" >> $GITHUB_ENV; fi
 
+            # Also detect existing acrPush principals at the RG scope for task 101-rbac-common-rg
+            # (ADO parity: existingAcrPushUserPrincipals / existingAcrPushSPPrincipals)
+            if az group show --name "$commonResourceGroup" &> /dev/null; then
+              existingUserPrincipals=$(az role assignment list \
+                --resource-group "$commonResourceGroup" \
+                --role "$acrPushRoleId" \
+                --query "[?principalType=='User' || principalType=='Group'].principalId" \
+                -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
+              existingSPPrincipals=$(az role assignment list \
+                --resource-group "$commonResourceGroup" \
+                --role "$acrPushRoleId" \
+                --query "[?principalType=='ServicePrincipal'].principalId" \
+                -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
+            else
+              existingUserPrincipals=""
+              existingSPPrincipals=""
+            fi
+            echo "existingAcrPushUserPrincipals=${existingUserPrincipals}" >> $GITHUB_ENV
+            echo "existingAcrPushSPPrincipals=${existingSPPrincipals}" >> $GITHUB_ENV
+
       - name: 100-rbac-security
         if: env.deleteAllServicesForProject != 'true' && env.debug_disable_100_rbac_security != 'true'
         uses: azure/cli@v2
@@ -2604,7 +2313,6 @@ jobs:
               --parameters enableAIDocIntelligence="${{ env.enableAIDocIntelligence }}" \
               --parameters disableContributorAccessForUsers="${{ env.disableContributorAccessForUsers }}" \
               --parameters disableRBACAdminOnRGForUsers="${{ env.disableRBACAdminOnRGForUsers }}" \
-              --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}" \
               --parameters enableCosmosDB="${{ env.enableCosmosDB }}" \
               --parameters enablePostgreSQL="${{ env.enablePostgreSQL }}" \
               --parameters enableRedisCache="${{ env.enableRedisCache }}" \
@@ -2632,6 +2340,69 @@ jobs:
               --parameters skipExistingRoleAssignments="${{ env.skipACRAssignments }}" \
               --debug
             echo "pre_foundry_gate_passed=true" >> $GITHUB_ENV
+
+      - name: 101-rbac-common-rg
+        if: env.deleteAllServicesForProject != 'true'
+        continue-on-error: true
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            # Compute effective RBAC flags: only true if the feature is enabled AND the resource
+            # actually exists. This prevents RBAC Bicep from failing with ResourceNotFound when
+            # a service is enabled in variables but was never deployed (e.g. debug_disable_67=true).
+            AML_RBAC="false"
+            if [ "${{ env.enableAzureMachineLearning }}" = "true" ] && [ "${{ env.amlExists }}" = "true" ]; then AML_RBAC="true"; fi
+            echo "Effective enableAzureMachineLearning for Common RG RBAC: $AML_RBAC (amlExists=${{ env.amlExists }})"
+
+            az deployment sub create \
+              --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-101-rbac-common-rg" \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --location "${{ env.admin_location }}" \
+              --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/08b-rbac-common-rg.bicep" \
+              --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
+              --parameters env="${{ env.dev_test_prod }}" \
+              --parameters projectNumber="${{ env.project_number_000 }}" \
+              --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+              --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+              --parameters location="${{ env.admin_location }}" \
+              --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+              --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+              --parameters vnetNameBase="${{ env.vnetNameBase }}" \
+              --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
+              --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
+              --parameters network_env="${{ env.network_env }}" \
+              --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+              --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+              --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+              --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+              --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+              --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+              --parameters useAdGroups="${{ env.use_groups }}" \
+              --parameters randomValue="${{ env.deployment_random_value }}" \
+              --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters enableAzureMachineLearning="$AML_RBAC" \
+              --parameters enableAIFoundryHub="${{ env.enableAIFoundryHub }}" \
+              --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
+              --parameters addAzureMachineLearning="${{ env.addAzureMachineLearning }}" \
+              --parameters addBastionHost="${{ env.addBastionHost }}" \
+              --parameters bastionResourceGroup="${{ env.bastion_subscription_resource_group }}" \
+              --parameters bastionName="${{ env.bastion_custom_name }}" \
+              --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
+              --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
+              --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
+              --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
+              --parameters commonLakeNamePrefixMax8chars="${{ env.LAKE_PREFIX }}" \
+              --parameters projectPrefix="${{ env.projectPrefix }}" \
+              --parameters projectSuffix="${{ env.projectSuffix }}" \
+              --parameters amlExists="${{ env.amlExists }}" \
+              --parameters aiHubExists="${{ env.aiHubExists }}" \
+              --parameters existingAcrPushUserPrincipals="${{ env.existingAcrPushUserPrincipals }}" \
+              --parameters existingAcrPushSPPrincipals="${{ env.existingAcrPushSPPrincipals }}" \
+              --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}" \
+              --debug
 
       - name: 69a-aifoundry-2025-2ndOption-Account
         if: |
@@ -2897,9 +2668,6 @@ jobs:
         if: success() && env.enableAIFoundry == 'true' && env.enableCosmosDB == 'true' && env.deleteAllServicesForProject != 'true'
         continue-on-error: true
         uses: azure/cli@v2
-        env:
-          aifactory_salt: ${{ env.AIFACTORY_SALT }}
-          aifactory_salt_random: ${{ env.aifactory_salt_random }}
         with:
           azcliversion: latest
           inlineScript: |
@@ -3251,43 +3019,6 @@ jobs:
           inlineScript: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
             bash "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/70_generate_hosts_file_info.sh" \
-              "${{ env.dev_test_prod_sub_id }}" \
-              "${{ env.admin_aifactoryPrefixRG }}" \
-              "${{ env.project_number_000 }}" \
-              "${{ env.admin_locationSuffix }}" \
-              "${{ env.dev_test_prod }}" \
-              "${{ env.admin_aifactorySuffixRG }}" \
-              "${{ env.admin_prjResourceSuffix }}" \
-              "${{ env.AIFACTORY_SALT }}" \
-              "${{ env.aifactory_salt_random }}" \
-              "${{ env.deployment_random_value }}" \
-              "${{ env.projectPrefix }}" \
-              "${{ env.projectSuffix }}"
-
-      # ============================================================================
-      # 110 — Cleanup capability hosts BEFORE Foundry account deletion.
-      # Mirrors ADO task '110_Cleanup_CapabilityHosts_Before_AccountDeletion'.
-      #
-      # Runs when:
-      #   - any prior step failed AND Foundry caphost was enabled
-      #     (safety cleanup before retry), OR
-      #   - ULTRA delete mode (deleteAllForProject=true) — belt-and-braces
-      #     caphost cleanup before `delete-services-if-disabled.sh` deletes
-      #     the project RG containing the account.
-      # ============================================================================
-      - name: 110_Cleanup_CapabilityHosts_Before_AccountDeletion
-        if: |
-          always()
-          && (failure() || env.deleteAllForProject == 'true')
-          && env.enableAIFoundry == 'true'
-          && env.enableAFoundryCaphost == 'true'
-        continue-on-error: true
-        uses: azure/cli@v2
-        with:
-          azcliversion: latest
-          inlineScript: |
-            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            bash "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/74_Cleanup_CapabilityHosts.sh" \
               "${{ env.dev_test_prod_sub_id }}" \
               "${{ env.admin_aifactoryPrefixRG }}" \
               "${{ env.project_number_000 }}" \
