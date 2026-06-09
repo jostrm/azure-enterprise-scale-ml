@@ -2799,12 +2799,18 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
 
       while IFS= read -r vnet_name; do
         [ -z "$vnet_name" ] && continue
-        # Case-insensitive, prefix-bounded match (see comment in Step 7 header).
+        # Case-insensitive, prefix-bounded match.
+        # IMPORTANT: do the filter in bash (grep -i), NOT in JMESPath.
+        # `lower()` is NOT a built-in JMESPath function in the jmespath
+        # library azure-cli uses (only contains/starts_with/ends_with etc.
+        # are spec). Using `lower(name)` made --query throw, the error
+        # was swallowed by `2>/dev/null || echo ""`, and we got back an
+        # empty list — the exact "no subnets matched" symptom.
         subnets=$(az network vnet subnet list \
           --resource-group "$commonResourceGroup" \
           --vnet-name "$vnet_name" \
-          --query "[?contains(lower(name), '${projectFilterToken}')].name" \
-          -o tsv 2>/dev/null || echo "")
+          --query "[].name" \
+          -o tsv 2>/dev/null | tr -d '\r' | grep -i -- "$projectFilterToken" || true)
         if [ -z "$subnets" ]; then
           echo "  (No project subnets matched in VNet $vnet_name for token '${projectFilterToken}')"
           continue
@@ -2931,12 +2937,13 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
       while IFS= read -r vnet_name; do
         if [ -n "$vnet_name" ]; then
           echo "Checking VNet: $vnet_name"
-          # Case-insensitive, prefix-bounded match (see comment in Step 7 header).
+          # Case-insensitive bash filter — same reason as Pass 1: JMESPath
+          # has no lower() builtin in the jmespath lib azure-cli uses.
           subnets=$(az network vnet subnet list \
             --resource-group "$commonResourceGroup" \
             --vnet-name "$vnet_name" \
-            --query "[?contains(lower(name), '${projectFilterToken}')].name" \
-            -o tsv 2>/dev/null || echo "")
+            --query "[].name" \
+            -o tsv 2>/dev/null | tr -d '\r' | grep -i -- "$projectFilterToken" || true)
           
           if [ -n "$subnets" ]; then
             match_count=$(echo "$subnets" | sed '/^$/d' | wc -l | tr -d ' ')
@@ -3004,8 +3011,8 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   
   nsgs=$(az network nsg list \
     --resource-group "$commonResourceGroup" \
-    --query "[?contains(lower(name), '${projectFilterToken}')].name" \
-    -o tsv 2>/dev/null || echo "")
+    --query "[].name" \
+    -o tsv 2>/dev/null | tr -d '\r' | grep -i -- "$projectFilterToken" || true)
   if [ -n "$nsgs" ]; then
     nsg_match_count=$(echo "$nsgs" | sed '/^$/d' | wc -l | tr -d ' ')
     echo "Matched $nsg_match_count project NSG(s) to delete (in order, after subnets are detached):"
