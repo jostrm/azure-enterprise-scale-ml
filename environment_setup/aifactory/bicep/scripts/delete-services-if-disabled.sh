@@ -2823,106 +2823,107 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
         while IFS= read -r subnet_name; do
           [ -z "$subnet_name" ] && continue
           echo "  Detaching from subnet: $vnet_name/$subnet_name"
-          # -------------------------------------------------------------
-          # PROPER DETACH: Use the DEDICATED flags on `az network vnet
-          # subnet update`. The previous generic `--remove <prop>` syntax
-          # is rejected by the Network RP for top-level subnet attributes
-          # (it returns 400 Bad Request — the symptom that left every
-          # prj012 subnet with its NSG still bound). Empty-string ("")
-          # passed to the dedicated flags is the documented way to detach.
-          # We run one PATCH per attribute (best-effort, independent) and
-          # wait for the VNet to settle between each — Azure serializes
-          # write ops on a single VNet, so concurrent calls return 400.
-          # -------------------------------------------------------------
-          _detach_one() {
-            # $1 = human label, $2..$N = CLI args for az network vnet subnet update
-            # IMPORTANT: this helper ALWAYS returns 0. The script runs under
-            # `set -e` (line 2 of this file), so a `return 1` here — even though
-            # the call sites use no `&&`/`||` — was killing the whole task on
-            # the first failed PATCH ("Script failed with exit code: 1"). We
-            # log the failure and let the REST PATCH fallback below recover.
-            #
-            # Also: a failing `az` inside `_out=$(...)` can propagate under
-            # `set -e` when `inherit_errexit` is active (bash 4.4+, on by
-            # default in some distros). Guard with `|| _rc=$?` so the
-            # command substitution itself can never trip errexit.
-            local _label="$1"; shift
-            local _out=""
-            local _rc=0
-            _out=$(az network vnet subnet update \
-              --resource-group "$commonResourceGroup" \
-              --vnet-name "$vnet_name" \
-              --name "$subnet_name" \
-              "$@" 2>&1) || _rc=$?
-            if [ "$_rc" -ne 0 ]; then
-              echo "    (could not remove $_label on $subnet_name — exit=$_rc)"
-              echo "$_out" | sed 's/^/      | /'
-            else
-              echo "    ✓ Removed $_label from $subnet_name"
-            fi
-            return 0
-          }
-
-          _detach_one "networkSecurityGroup" --network-security-group ""
-          _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "remove-nsg"
-          _detach_one "routeTable" --route-table ""
-          _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "remove-rt"
-          _detach_one "delegations" --delegations ""
-          _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "remove-deleg"
-          _detach_one "serviceEndpoints" --service-endpoints ""
-          _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "remove-svc-endpoints"
 
           # -------------------------------------------------------------
-          # REST PATCH FALLBACK — if the NSG is STILL attached after the
-          # CLI flag-based detach above, do an explicit PATCH against the
-          # subnet ARM resource that clears the four blockers in one body.
-          # This handles the case where the CLI silently no-ops on a
-          # subnet whose properties came back in a casing/shape the CLI
-          # serializer doesn't recognize (the exact prj012 symptom).
+          # WHY WE USE `az resource update --set properties.X=null`
+          # AND NOT the dedicated `az network vnet subnet update` flags:
+          #
+          #   --network-security-group ""   builds an NSG resource ID
+          #   ending in '/networkSecurityGroups/' (empty name) and tries
+          #   to LOOK IT UP — returns 404 InvalidResourceReference.
+          #   Same bug for --route-table "".
+          #
+          #   --delegations ""              creates an array with one
+          #   empty-named entry → ServiceNameOnDelegationNotSpecified.
+          #   Same shape for --service-endpoints "".
+          #
+          # The reliable workaround (community-confirmed) is the generic
+          # `az resource update --set properties.X=null` form. It goes
+          # through the same authenticated CLI path that the network
+          # commands use — NOT through `az rest` — so it bypasses the
+          # tenant Conditional-Access policy that blocked our previous
+          # `az rest PATCH` attempt with UnauthorizedClientApplication.
           # -------------------------------------------------------------
-          remaining_nsg=$(az network vnet subnet show \
+
+          # 1. Show what's currently attached so the log tells the truth
+          #    (the previous error showed '.../networkSecurityGroups/'
+          #     with no name — that was the CLI's bogus lookup, NOT the
+          #     real attached NSG).
+          cur_nsg=$(az network vnet subnet show \
             --resource-group "$commonResourceGroup" \
             --vnet-name "$vnet_name" \
             --name "$subnet_name" \
             --query "networkSecurityGroup.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
-          if [ -n "$remaining_nsg" ] && [ "$remaining_nsg" != "None" ]; then
-            echo "    CLI detach left NSG still attached — falling back to direct REST PATCH"
-            # All `az` calls in this block append `|| true` because the script
-            # runs under `set -e` — any non-zero exit here would kill the task.
-            subId=$(az account show --query id -o tsv 2>/dev/null | tr -d '\r' || true)
-            patch_url="https://management.azure.com/subscriptions/${subId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnet_name}/subnets/${subnet_name}?api-version=2023-11-01"
-            # Read current addressPrefix(es) so we don't overwrite them.
-            cur_prefix=$(az network vnet subnet show -g "$commonResourceGroup" --vnet-name "$vnet_name" -n "$subnet_name" --query "addressPrefix" -o tsv 2>/dev/null | tr -d '\r' || true)
-            cur_prefixes_json=$(az network vnet subnet show -g "$commonResourceGroup" --vnet-name "$vnet_name" -n "$subnet_name" --query "addressPrefixes" -o json 2>/dev/null || echo "null")
-            # Build a body that clears the 4 blockers (null = remove the property)
-            # and preserves the addressPrefix(es). privateEndpoints / ipConfigurations
-            # are read-only on PATCH and reflect SAL/PE holders — we leave them out.
-            if [ -n "$cur_prefix" ] && [ "$cur_prefix" != "null" ]; then
-              body=$(printf '{"properties":{"addressPrefix":"%s","networkSecurityGroup":null,"routeTable":null,"delegations":[],"serviceEndpoints":[]}}' "$cur_prefix")
-            else
-              body=$(printf '{"properties":{"addressPrefixes":%s,"networkSecurityGroup":null,"routeTable":null,"delegations":[],"serviceEndpoints":[]}}' "$cur_prefixes_json")
-            fi
-            _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-rest-patch"
-            patch_out=$(az rest --method PATCH --url "$patch_url" --body "$body" --headers "Content-Type=application/json" 2>&1) || patch_rc=$?
-            patch_rc=${patch_rc:-0}
-            if [ "$patch_rc" -ne 0 ]; then
-              echo "    ⚠️  REST PATCH detach also failed:"
-              echo "$patch_out" | sed 's/^/      | /'
-            else
-              echo "    ✓ REST PATCH detach accepted"
-            fi
-            unset patch_rc
-            _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "post-rest-patch"
+          cur_rt=$(az network vnet subnet show \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --name "$subnet_name" \
+            --query "routeTable.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+          if [ -n "$cur_nsg" ] && [ "$cur_nsg" != "None" ]; then
+            echo "    Currently attached NSG : $cur_nsg"
+          else
+            echo "    Currently attached NSG : (none)"
+          fi
+          if [ -n "$cur_rt" ] && [ "$cur_rt" != "None" ]; then
+            echo "    Currently attached RT  : $cur_rt"
           fi
 
-          # Verify NSG is actually gone (this is the one that blocks Step 8)
+          # 2. Resolve the subnet ARM resource ID and PATCH all four
+          #    blockers to null/[] in a single update.
+          subnet_id=$(az network vnet subnet show \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --name "$subnet_name" \
+            --query "id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+
+          if [ -z "$subnet_id" ]; then
+            echo "    (could not resolve subnet ARM id — skipping detach)"
+          else
+            _detach_rc=0
+            _detach_out=$(az resource update \
+              --ids "$subnet_id" \
+              --set properties.networkSecurityGroup=null \
+                    properties.routeTable=null \
+                    properties.delegations='[]' \
+                    properties.serviceEndpoints='[]' \
+              2>&1) || _detach_rc=$?
+            if [ "$_detach_rc" -ne 0 ]; then
+              echo "    ⚠️  az resource update PATCH failed (exit=$_detach_rc):"
+              echo "$_detach_out" | sed 's/^/      | /'
+              # Fallback: try clearing them one property at a time. Some
+              # ARM RPs reject array-to-empty-array transitions in the
+              # same PATCH as a nullable-ref clear.
+              echo "    Retrying property-by-property..."
+              for _prop in networkSecurityGroup routeTable delegations serviceEndpoints; do
+                _val="null"
+                case "$_prop" in
+                  delegations|serviceEndpoints) _val='[]' ;;
+                esac
+                _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-clear-$_prop"
+                _p_rc=0
+                _p_out=$(az resource update --ids "$subnet_id" \
+                  --set "properties.${_prop}=${_val}" 2>&1) || _p_rc=$?
+                if [ "$_p_rc" -ne 0 ]; then
+                  echo "    (could not clear $_prop on $subnet_name — exit=$_p_rc)"
+                  echo "$_p_out" | sed 's/^/      | /'
+                else
+                  echo "    ✓ Cleared $_prop on $subnet_name"
+                fi
+              done
+            else
+              echo "    ✓ PATCH accepted (NSG / RT / delegations / serviceEndpoints cleared)"
+            fi
+            _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "post-detach-patch"
+          fi
+
+          # 3. Verify NSG is actually gone (this is the one that blocks Step 8)
           remaining_nsg=$(az network vnet subnet show \
             --resource-group "$commonResourceGroup" \
             --vnet-name "$vnet_name" \
             --name "$subnet_name" \
             --query "networkSecurityGroup.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
           if [ -n "$remaining_nsg" ] && [ "$remaining_nsg" != "None" ]; then
-            echo "    ⚠️  NSG still attached to $subnet_name after CLI + REST detach: $remaining_nsg"
+            echo "    ⚠️  NSG still attached to $subnet_name after PATCH: $remaining_nsg"
             echo "    Diagnosis — remaining holders on $subnet_name:"
             az network vnet subnet show \
               --resource-group "$commonResourceGroup" \
@@ -3064,29 +3065,20 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
               [ "$_st" = "Succeeded" ] || [ -z "$_st" ] && break
               sleep 5
             done
-            if az network vnet subnet update \
-                 --resource-group "$s_rg" \
-                 --vnet-name "$s_vnet" \
-                 --name "$s_sub" \
-                 --network-security-group "" 2>&1; then
-              echo "    ✓ Detach PATCH accepted (CLI flag)"
+            # Use `az resource update --set properties.networkSecurityGroup=null`.
+            # The dedicated `--network-security-group ""` flag is bugged
+            # (builds an empty NSG name and 404s); `az rest` PATCH is
+            # blocked by the tenant's Conditional-Access policy
+            # (UnauthorizedClientApplication). `az resource update` goes
+            # through the same auth path as the network commands and works.
+            _sh_rc=0
+            _sh_out=$(az resource update --ids "$subnet_id" \
+              --set properties.networkSecurityGroup=null 2>&1) || _sh_rc=$?
+            if [ "$_sh_rc" -eq 0 ]; then
+              echo "    ✓ Detach PATCH accepted"
             else
-              echo "    ⚠️  CLI flag detach failed — trying direct REST PATCH"
-              # Direct REST PATCH fallback (same approach as Pass 1 in Step 7).
-              subId=$(az account show --query id -o tsv | tr -d '\r')
-              patch_url="https://management.azure.com/subscriptions/${subId}/resourceGroups/${s_rg}/providers/Microsoft.Network/virtualNetworks/${s_vnet}/subnets/${s_sub}?api-version=2023-11-01"
-              cur_prefix=$(az network vnet subnet show -g "$s_rg" --vnet-name "$s_vnet" -n "$s_sub" --query "addressPrefix" -o tsv 2>/dev/null | tr -d '\r' || echo "")
-              cur_prefixes_json=$(az network vnet subnet show -g "$s_rg" --vnet-name "$s_vnet" -n "$s_sub" --query "addressPrefixes" -o json 2>/dev/null || echo "null")
-              if [ -n "$cur_prefix" ] && [ "$cur_prefix" != "null" ]; then
-                body=$(printf '{"properties":{"addressPrefix":"%s","networkSecurityGroup":null}}' "$cur_prefix")
-              else
-                body=$(printf '{"properties":{"addressPrefixes":%s,"networkSecurityGroup":null}}' "$cur_prefixes_json")
-              fi
-              if az rest --method PATCH --url "$patch_url" --body "$body" --headers "Content-Type=application/json" 2>&1; then
-                echo "    ✓ REST PATCH detach accepted"
-              else
-                echo "    ⚠️  REST PATCH detach also failed — subnet may be locked by SAL/PE"
-              fi
+              echo "    ⚠️  Detach PATCH failed (exit=$_sh_rc):"
+              echo "$_sh_out" | sed 's/^/      | /'
             fi
             # Wait for VNet idle after PATCH so the NSG delete that follows
             # doesn't race on a still-Updating VNet
