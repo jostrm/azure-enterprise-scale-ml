@@ -2836,20 +2836,30 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
           # -------------------------------------------------------------
           _detach_one() {
             # $1 = human label, $2..$N = CLI args for az network vnet subnet update
+            # IMPORTANT: this helper ALWAYS returns 0. The script runs under
+            # `set -e` (line 2 of this file), so a `return 1` here — even though
+            # the call sites use no `&&`/`||` — was killing the whole task on
+            # the first failed PATCH ("Script failed with exit code: 1"). We
+            # log the failure and let the REST PATCH fallback below recover.
+            #
+            # Also: a failing `az` inside `_out=$(...)` can propagate under
+            # `set -e` when `inherit_errexit` is active (bash 4.4+, on by
+            # default in some distros). Guard with `|| _rc=$?` so the
+            # command substitution itself can never trip errexit.
             local _label="$1"; shift
-            local _out _rc
+            local _out=""
+            local _rc=0
             _out=$(az network vnet subnet update \
               --resource-group "$commonResourceGroup" \
               --vnet-name "$vnet_name" \
               --name "$subnet_name" \
-              "$@" 2>&1)
-            _rc=$?
-            if [ $_rc -ne 0 ]; then
-              echo "    (could not remove $_label on $subnet_name)"
+              "$@" 2>&1) || _rc=$?
+            if [ "$_rc" -ne 0 ]; then
+              echo "    (could not remove $_label on $subnet_name — exit=$_rc)"
               echo "$_out" | sed 's/^/      | /'
-              return 1
+            else
+              echo "    ✓ Removed $_label from $subnet_name"
             fi
-            echo "    ✓ Removed $_label from $subnet_name"
             return 0
           }
 
@@ -2877,10 +2887,12 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
             --query "networkSecurityGroup.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
           if [ -n "$remaining_nsg" ] && [ "$remaining_nsg" != "None" ]; then
             echo "    CLI detach left NSG still attached — falling back to direct REST PATCH"
-            subId=$(az account show --query id -o tsv | tr -d '\r')
+            # All `az` calls in this block append `|| true` because the script
+            # runs under `set -e` — any non-zero exit here would kill the task.
+            subId=$(az account show --query id -o tsv 2>/dev/null | tr -d '\r' || true)
             patch_url="https://management.azure.com/subscriptions/${subId}/resourceGroups/${commonResourceGroup}/providers/Microsoft.Network/virtualNetworks/${vnet_name}/subnets/${subnet_name}?api-version=2023-11-01"
             # Read current addressPrefix(es) so we don't overwrite them.
-            cur_prefix=$(az network vnet subnet show -g "$commonResourceGroup" --vnet-name "$vnet_name" -n "$subnet_name" --query "addressPrefix" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+            cur_prefix=$(az network vnet subnet show -g "$commonResourceGroup" --vnet-name "$vnet_name" -n "$subnet_name" --query "addressPrefix" -o tsv 2>/dev/null | tr -d '\r' || true)
             cur_prefixes_json=$(az network vnet subnet show -g "$commonResourceGroup" --vnet-name "$vnet_name" -n "$subnet_name" --query "addressPrefixes" -o json 2>/dev/null || echo "null")
             # Build a body that clears the 4 blockers (null = remove the property)
             # and preserves the addressPrefix(es). privateEndpoints / ipConfigurations
@@ -2891,14 +2903,15 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
               body=$(printf '{"properties":{"addressPrefixes":%s,"networkSecurityGroup":null,"routeTable":null,"delegations":[],"serviceEndpoints":[]}}' "$cur_prefixes_json")
             fi
             _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-rest-patch"
-            patch_out=$(az rest --method PATCH --url "$patch_url" --body "$body" --headers "Content-Type=application/json" 2>&1)
-            patch_rc=$?
-            if [ $patch_rc -ne 0 ]; then
+            patch_out=$(az rest --method PATCH --url "$patch_url" --body "$body" --headers "Content-Type=application/json" 2>&1) || patch_rc=$?
+            patch_rc=${patch_rc:-0}
+            if [ "$patch_rc" -ne 0 ]; then
               echo "    ⚠️  REST PATCH detach also failed:"
               echo "$patch_out" | sed 's/^/      | /'
             else
               echo "    ✓ REST PATCH detach accepted"
             fi
+            unset patch_rc
             _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "post-rest-patch"
           fi
 
