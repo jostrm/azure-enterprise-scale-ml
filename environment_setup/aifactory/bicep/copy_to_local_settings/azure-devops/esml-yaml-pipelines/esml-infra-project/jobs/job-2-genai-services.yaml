@@ -3159,7 +3159,7 @@ steps:
      --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
      --parameters disableRBACAdminOnRGForUsers="$(disableRBACAdminOnRGForUsers)" \
-    --parameters contributorRoleId="$(BYOContributorRoleID)" \
+     --parameters contributorRoleId="$(BYOContributorRoleID)" \
      --parameters enableCosmosDB="$(enableCosmosDB)" \
      --parameters enablePostgreSQL="$(enablePostgreSQL)" \
      --parameters enableRedisCache="$(enableRedisCache)" \
@@ -3637,7 +3637,7 @@ steps:
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
-    --parameters contributorRoleId="$(BYOContributorRoleID)" \
+     --parameters contributorRoleId="$(BYOContributorRoleID)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
@@ -3988,7 +3988,7 @@ steps:
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
-    --parameters contributorRoleId="$(BYOContributorRoleID)" \
+     --parameters contributorRoleId="$(BYOContributorRoleID)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters vnetNameBase="$(vnetNameBase)" \

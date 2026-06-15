@@ -13,23 +13,20 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   tags: tags
   properties: {
     securityRules: [
-      // --- Inbound ---
-      // All rule priorities live in the 1000+ range so that 100-999 stays free for future higher-priority overrides.
-      // Lower number = higher priority. VNet-wide allow sits at 1000 (highest).
-      {
-        name: 'Allow_VNet_Inbound'
-        properties: {
-          description: 'Allow all inbound traffic from any subnet in the same VNet (all ports, all protocols).'
-          protocol: '*'
-          sourcePortRange: '*'
-          destinationPortRange: '*'
-          sourceAddressPrefix: 'VirtualNetwork'
-          destinationAddressPrefix: 'VirtualNetwork'
-          access: 'Allow'
-          priority: 1000
-          direction: 'Inbound'
-        }
-      }
+      // IMPORTANT: Azure Databricks AUTO-PROVISIONS and MANAGES the required NSG rules for a
+      // VNet-injected workspace via subnet delegation to Microsoft.Databricks/workspaces. This
+      // includes ALL of the 'Microsoft.Databricks-workspaces_UseOnly_*' rules AND the
+      // VirtualNetwork -> VirtualNetwork allow-all inbound/outbound rules.
+      // Per Microsoft docs these rules must NOT be hand-authored or duplicated here:
+      // https://learn.microsoft.com/azure/databricks/security/network/classic/vnet-inject#network-security-group-rules
+      // Previously this module defined those rules manually, which caused a deployment-time
+      // SecurityRuleConflict ("Security rule Allow_VNet_Outbound conflicts with rule
+      // Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-databricks-webapp. Rules
+      // cannot have the same Priority and Direction") because the Databricks-injected rules
+      // collided with our duplicates.
+      // Only genuinely ADDITIONAL custom egress/ingress rules are defined below, placed in a high
+      // priority band (3900+) that never collides with the Databricks-managed rules.
+      // --- Inbound (custom additions only) ---
       {
         name: 'Allow_APIM'
         properties: {
@@ -40,174 +37,11 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
           sourceAddressPrefix: 'ApiManagement'
           destinationAddressPrefix: '*'
           access: 'Allow'
-          priority: 1010
+          priority: 3900
           direction: 'Inbound'
         }
       }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-worker-inbound'
-        properties: {
-          description: 'Required for worker nodes communication within a cluster.'
-          protocol: '*'
-          sourcePortRange: '*'
-          destinationPortRange: '*'
-          sourceAddressPrefix: 'VirtualNetwork'
-          destinationAddressPrefix: 'VirtualNetwork'
-          access: 'Allow'
-          priority: 1020
-          direction: 'Inbound'
-          sourcePortRanges: []
-          destinationPortRanges: []
-          sourceAddressPrefixes: []
-          destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-control-plane-to-worker-ssh'
-        properties: {
-            description: 'Required for Databricks control plane management of worker nodes.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '22'
-            sourceAddressPrefix: 'AzureDatabricks'
-            destinationAddressPrefix: 'VirtualNetwork'
-            access: 'Allow'
-            priority: 1030
-            direction: 'Inbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-control-plane-to-worker-proxy'
-        properties: {
-            description: 'Required for Databricks control plane communication with worker nodes.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '5557'
-            sourceAddressPrefix: 'AzureDatabricks'
-            destinationAddressPrefix: 'VirtualNetwork'
-            access: 'Allow'
-            priority: 1040
-            direction: 'Inbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      // --- Outbound --- 
-      // Same 1000+ convention as Inbound. VNet-wide allow at 1000 (highest).
-      {
-        name: 'Allow_VNet_Outbound'
-        properties: {
-            description: 'Allow all outbound traffic to any subnet in the same VNet (all ports, all protocols).'
-            protocol: '*'
-            sourcePortRange: '*'
-            destinationPortRange: '*'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'VirtualNetwork'
-            access: 'Allow'
-            priority: 1000
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-databricks-webapp'
-        properties: {
-            description: 'Required for workers communication with Databricks Webapp.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '443'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'AzureDatabricks'
-            access: 'Allow'
-            priority: 1005
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-sql'
-        properties: {
-            description: 'Required for workers communication with Azure SQL services.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '3306'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'Sql'
-            access: 'Allow'
-            priority: 1010
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-storage'
-        properties: {
-            description: 'Required for workers communication with Azure Storage services.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '443'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'Storage'
-            access: 'Allow'
-            priority: 1020
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-worker-outbound'
-        properties: {
-            description: 'Required for worker nodes communication within a cluster.'
-            protocol: '*'
-            sourcePortRange: '*'
-            destinationPortRange: '*'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'VirtualNetwork'
-            access: 'Allow'
-            priority: 1030
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-     }
-     {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-eventhub'
-        properties: {
-            description: 'Required for worker communication with Azure Eventhub services.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '9093'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'EventHub'
-            access: 'Allow'
-            priority: 1040
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
+      // --- Outbound (custom additions only) ---
       {
         name: 'AzureFrontDoorFirstParty'
         properties: {
@@ -218,7 +52,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'AzureFrontDoor.FirstParty'
             access: 'Allow'
-            priority: 1050
+            priority: 3900
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -236,7 +70,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'AzureMonitor'
             access: 'Allow'
-            priority: 1060
+            priority: 3910
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
