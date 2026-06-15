@@ -128,7 +128,7 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
             sourceAddressPrefix: 'VirtualNetwork'
             destinationAddressPrefix: 'AzureDatabricks'
             access: 'Allow'
-            priority: 1000
+            priority: 1005
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
