@@ -459,8 +459,10 @@ var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_pr
 // AKS subnet selection: prefer aksSubnetId, fall back to aks2SubnetId
 var aksSubnetIdResolved = !empty(aksSubnetId) ? aksSubnetId : aks2SubnetId
 
-// VNet integration subnet: prefer aksSubnetName (dedicated, at least /28), fall back to acaSubnetName when AKS is disabled
-var vnetIntegrationSubnetName = !empty(aksSubnetName) ? aksSubnetName : acaSubnetName
+// VNet integration subnet for WebApp/Function: use aksSubnetName ONLY when AKS is NOT enabled.
+// AKS requires its subnet to be undelegated (AgentPoolProfile cannot use a delegated subnet),
+// so when AKS is enabled we fall back to acaSubnetName and never delegate the AKS subnet to Microsoft.Web/serverFarms.
+var vnetIntegrationSubnetName = (!enableAKS && !empty(aksSubnetName)) ? aksSubnetName : acaSubnetName
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -671,12 +673,15 @@ var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
-module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3 && !empty(aksSubnetId)) {
+// Delegate the actual VNet-integration subnet (vnetIntegrationSubnetName), never the AKS subnet when AKS is enabled.
+// AKS requires an undelegated subnet, so vnetIntegrationSubnetName resolves to acaSubnetName when enableAKS is true.
+// Condition uses start-known params only: when AKS is enabled the integration subnet is the ACA subnet, otherwise the AKS subnet.
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3 && (enableAKS ? !empty(acaSubnetId) : !empty(aksSubnetId))) {
   name: take('05-snetDelegSF1${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
     vnetName: vnetNameFull
-    subnetName: aksSubnetName // TODO: Have a dedicated subnet for WebApp and FunctionApp
+    subnetName: vnetIntegrationSubnetName // delegate the WebApp/Function integration subnet (never the AKS subnet when AKS is enabled)
     location: location
     vnetResourceGroupName: vnetResourceGroupName
     delegations: [
