@@ -108,7 +108,7 @@ steps:
       echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
-  condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'))
+  condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'), ne(variables['deleteAllForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1677,7 +1677,8 @@ steps:
   # - aiFoundryV2Exists=false (account was purged, not pre-existing)
   # - 06c_Purge task succeeded
   # - deleteAllForProject != true (ULTRA mode tears down RG + networking; no redeploy follows, so waiting for subnet release is pointless)
-  condition: and(succeeded(), ne(variables['deleteAllForProject'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
+  # - BYO_subnets != true (externally managed subnets should not be held by this pipeline wait)
+  condition: and(succeeded(), ne(variables['deleteAllForProject'], 'true'), ne(variables['BYO_subnets'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3158,6 +3159,7 @@ steps:
      --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
      --parameters disableRBACAdminOnRGForUsers="$(disableRBACAdminOnRGForUsers)" \
+    --parameters contributorRoleId="$(BYOContributorRoleID)" \
      --parameters enableCosmosDB="$(enableCosmosDB)" \
      --parameters enablePostgreSQL="$(enablePostgreSQL)" \
      --parameters enableRedisCache="$(enableRedisCache)" \
@@ -3635,6 +3637,7 @@ steps:
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
+    --parameters contributorRoleId="$(BYOContributorRoleID)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
@@ -3985,6 +3988,7 @@ steps:
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
+    --parameters contributorRoleId="$(BYOContributorRoleID)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters vnetNameBase="$(vnetNameBase)" \

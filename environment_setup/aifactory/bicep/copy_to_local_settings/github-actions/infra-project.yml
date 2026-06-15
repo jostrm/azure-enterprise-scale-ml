@@ -2313,6 +2313,7 @@ jobs:
               --parameters enableAIDocIntelligence="${{ env.enableAIDocIntelligence }}" \
               --parameters disableContributorAccessForUsers="${{ env.disableContributorAccessForUsers }}" \
               --parameters disableRBACAdminOnRGForUsers="${{ env.disableRBACAdminOnRGForUsers }}" \
+              --parameters contributorRoleId="${{ env.BYO_CONTRIBUTOR_ROLE_ID }}" \
               --parameters enableCosmosDB="${{ env.enableCosmosDB }}" \
               --parameters enablePostgreSQL="${{ env.enablePostgreSQL }}" \
               --parameters enableRedisCache="${{ env.enableRedisCache }}" \

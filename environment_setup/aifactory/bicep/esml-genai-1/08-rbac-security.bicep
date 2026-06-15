@@ -136,6 +136,8 @@ param bastionName string = ''
 param vnetNameFullBastion string = ''
 param disableContributorAccessForUsers bool = false
 param disableRBACAdminOnRGForUsers bool = false
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 // Required resource references. Networking parameters for calculation
 param vnetNameBase string
@@ -579,6 +581,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
     aiHubPrincipalId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
     aiHubProjectName: aifV1ProjectName
     aiHubProjectPrincipalId: var_aiHubProjectPrincipalId // Using computed variable for AI Hub project principal ID
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG
@@ -601,6 +604,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if ((!aiHubExists && 
     useAdGroups: useAdGroups
     disableContributorAccessForUsers: disableContributorAccessForUsers
     disableRBACAdminOnRGForUsers:disableRBACAdminOnRGForUsers
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG
@@ -637,6 +641,7 @@ module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if (!u
     disableContributorAccessForUsers: disableContributorAccessForUsers
     disableRBACAdminOnRGForUsers: disableRBACAdminOnRGForUsers
     aiHubName: enableAIFoundryHub ? aifV1HubName : ''
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG
@@ -667,6 +672,7 @@ module rbacDatafactory '../modules/datafactoryRBAC.bicep' = if(!dataFactoryExist
     servicePrincipleAndMIArray: spAndMiArray
     datafactoryName:namingConvention.outputs.dataFactoryName
     disableContributorAccessForUsers: disableContributorAccessForUsers
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG
