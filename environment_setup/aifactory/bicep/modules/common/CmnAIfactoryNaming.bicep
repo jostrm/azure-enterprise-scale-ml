@@ -47,6 +47,7 @@ param aksSubnetId string
 param aks2SubnetId string = ''
 param acaSubnetId string = ''
 param aca2SubnetId string = ''
+param webappSubnetId string = ''
 
 param postGresAdminEmails string = ''
 
@@ -196,6 +197,8 @@ var segmentsACA = filter(split(acaSubnetId, '/'), s => !empty(s))
 var segmentsACA2 = filter(split(aca2SubnetId, '/'), s => !empty(s))
 var acaSubnetName = length(segmentsACA) > 0 ? segmentsACA[length(segmentsACA) - 1] : '' // Get the last segment, which is the subnet name
 var aca2SubnetName = length(segmentsACA2) > 0 ? segmentsACA2[length(segmentsACA2) - 1] : '' // Get the last segment, which is the subnet name
+var segmentsWebapp = filter(split(webappSubnetId, '/'), s => !empty(s))
+var webappSubnetName = length(segmentsWebapp) > 0 ? segmentsWebapp[length(segmentsWebapp) - 1] : '' // Get the last segment, which is the subnet name
 
 var adfName = 'adf-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
@@ -207,6 +210,7 @@ output aksSubnetName string = aksSubnetName
 output aks2SubnetName string = aks2SubnetName
 output acaSubnetName string = acaSubnetName
 output aca2SubnetName string = aca2SubnetName
+output webappSubnetName string = webappSubnetName
 output defaultSubnet string = defaultSubnet // pend subnet is genai
 
 output aoaiName string = aoaiName

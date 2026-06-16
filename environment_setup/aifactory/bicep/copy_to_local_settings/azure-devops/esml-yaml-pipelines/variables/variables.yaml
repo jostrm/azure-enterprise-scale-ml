@@ -390,6 +390,7 @@ variables:
   subnetProjAKS2: "snt-<network_env>prj<xxx>-aks2" # <optional>BYO project secondary AKS subnet<default>snt-<network_env>prj<xxx>-aks2<mandatory> if BYO_subnets:'true' <ensure> subnet exists.
   subnetProjACA: "snt-prj<xxx>-aca" # <optional>ContainerApps subnet. BYO project Container Apps subnet<default>snt-prj<xxx>-aca<mandatory> if BYO_subnets:'true' <ensure> subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.
   subnetProjACA2: "snt-prj<xxx>-aca2" # <optional>Agent subnet. BYO project secondary Container Apps subnet<default>snt-prj<xxx>-aca2<mandatory> if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false'
+  subnetProjWebapp: "snt-prj<xxx>-webapp" # <optional>App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)<default>snt-prj<xxx>-webapp<mandatory> if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') <ensure> subnet exists.
   subnetProjDatabricksPublic: "snt-prj001-dbxpub" # <optional>BYO Databricks public subnet<default>snt-prj001-dbxpub<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # <optional>BYO Databricks private subnet<default>snt-prj<xxx>-dbxpriv<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   byoASEv3: "false" # <optional>Use BYO App Service Environment v3<default>false<keep-as-is> <otherwise> true, use an existing ASEv3 specified in byoAseFullResourceId.

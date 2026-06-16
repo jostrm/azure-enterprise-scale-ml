@@ -119,6 +119,7 @@ jobs:
       subnetProjAKS2: ${{ vars.SUBNET_PROJ_AKS2 || '' }}
       subnetProjACA: ${{ vars.SUBNET_PROJ_ACA || '' }}
       subnetProjACA2: ${{ vars.SUBNET_PROJ_ACA2 || '' }}
+      subnetProjWebapp: ${{ vars.SUBNET_PROJ_WEBAPP || '' }}
       subnetProjDatabricksPublic: ${{ vars.SUBNET_PROJ_DATABRICKS_PUBLIC || '' }}
       subnetProjDatabricksPrivate: ${{ vars.SUBNET_PROJ_DATABRICKS_PRIVATE || '' }}
       byoASEv3: ${{ vars.BYO_ASEV3 || 'false' }}
@@ -309,6 +310,7 @@ jobs:
       sntAca002Exists: 'false'
       sntAksExists: 'false'
       sntAks002Exists: 'false'
+      sntWebappExists: 'false'
       sntDatabricksPrivExists: 'false'
       sntDatabricksPubExists: 'false'
       LAKE_PREFIX: ${{ vars.LAKE_PREFIX || 'lake' }}
@@ -739,6 +741,7 @@ jobs:
             check_subnet_exists "snt-prj${projectNumber}-aca-002" "sntAca002Exists"
             check_subnet_exists "snt-prj${projectNumber}-aks" "sntAksExists"
             check_subnet_exists "snt-prj${projectNumber}-aks-002" "sntAks002Exists"
+            check_subnet_exists "snt-prj${projectNumber}-webapp" "sntWebappExists"
             check_subnet_exists "snt-prj${projectNumber}-dbxpriv" "sntDatabricksPrivExists"
             check_subnet_exists "snt-prj${projectNumber}-dbxpub" "sntDatabricksPubExists"
 
@@ -788,6 +791,8 @@ jobs:
               --parameters sntAca002Exists="${{ env.sntAca002Exists }}" \
               --parameters sntAksExists="${{ env.sntAksExists }}" \
               --parameters sntAks002Exists="${{ env.sntAks002Exists }}" \
+              --parameters sntWebappExists="${{ env.sntWebappExists }}" \
+              --parameters subnetProjWebapp="${{ env.subnetProjWebapp }}" \
               --parameters sntDatabricksPrivExists="${{ env.sntDatabricksPrivExists }}" \
               --parameters sntDatabricksPubExists="${{ env.sntDatabricksPubExists }}" \
               --parameters aksOutboundType="${{ env.aksOutboundType }}" \
@@ -820,6 +825,7 @@ jobs:
           Write-Host "  sntAca002Exists=${{ env.sntAca002Exists }}"
           Write-Host "  sntAksExists=${{ env.sntAksExists }}"
           Write-Host "  sntAks002Exists=${{ env.sntAks002Exists }}"
+          Write-Host "  sntWebappExists=${{ env.sntWebappExists }}"
           Write-Host "  sntDatabricksPrivExists=${{ env.sntDatabricksPrivExists }}"
           Write-Host "  sntDatabricksPubExists=${{ env.sntDatabricksPubExists }}"
 
@@ -870,7 +876,14 @@ jobs:
             -projectNumber "${{ env.project_number_000 }}" `
             -subscriptionId "${{ env.dev_test_prod_sub_id }}" `
             -commonRGNamePrefixVar "${{ env.admin_aifactoryPrefixRG }}" `
-            -projectTypeADO "${{ env.admin_projectType }}"
+            -projectTypeADO "${{ env.admin_projectType }}" `
+            -enableAIFoundry "${{ env.enableAIFoundry }}" `
+            -enableAksForAzureML "${{ env.enableAksForAzureML }}" `
+            -enableContainerApps "${{ env.enableContainerApps }}" `
+            -enableDatabricks "${{ env.enableDatabricks }}" `
+            -disableAgentNetworkInjection "${{ env.disableAgentNetworkInjection }}" `
+            -enableWebApp "${{ env.enableWebApp }}" `
+            -enableFunction "${{ env.enableFunction }}"
           '
 
       - name: 15_Check_Private_DNS_Zones

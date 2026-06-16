@@ -411,6 +411,7 @@ steps:
       $subnetProjAKS2Val          = if ($_useSubnetNames) { "$(subnetProjAKS2)" }          else { "" }
       $subnetProjACAVal           = if ($_useSubnetNames) { "$(subnetProjACA)" }           else { "" }
       $subnetProjACA2Val          = if ($_useSubnetNames) { "$(subnetProjACA2)" }          else { "" }
+      $subnetProjWebappVal        = if ($_useSubnetNames) { "$(subnetProjWebapp)" }        else { "" }
       $subnetProjDatabricksPublicVal  = if ($_useSubnetNames) { "$(subnetProjDatabricksPublic)" }  else { "" }
       $subnetProjDatabricksPrivateVal = if ($_useSubnetNames) { "$(subnetProjDatabricksPrivate)" } else { "" }
       Write-Host "BYO_subnets=$_byo => subnetCommon='$subnetCommonVal', subnetProjGenAI='$subnetProjGenAIVal'"
@@ -428,6 +429,7 @@ steps:
           subnetProjAKS2 = @{ value = $subnetProjAKS2Val }
           subnetProjACA = @{ value = $subnetProjACAVal }
           subnetProjACA2 = @{ value = $subnetProjACA2Val }
+          subnetProjWebapp = @{ value = $subnetProjWebappVal }
           subnetProjDatabricksPublic = @{ value = $subnetProjDatabricksPublicVal }
           subnetProjDatabricksPrivate = @{ value = $subnetProjDatabricksPrivateVal }
         }

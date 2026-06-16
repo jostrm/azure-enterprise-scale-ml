@@ -36,6 +36,7 @@ steps:
         echo "##vso[task.setvariable variable=subnetProjAKS2]"
         echo "##vso[task.setvariable variable=subnetProjACA]"
         echo "##vso[task.setvariable variable=subnetProjACA2]"
+        echo "##vso[task.setvariable variable=subnetProjWebapp]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
       fi
@@ -86,6 +87,7 @@ steps:
       #   subnetProjAKS2              -> enableAksForAzureML=true
       #   subnetProjACA               -> enableContainerApps=true
       #   subnetProjACA2              -> enableAIFoundry=true AND disableAgentNetworkInjection=false
+      #   subnetProjWebapp            -> enableWebApp=true OR enableFunction=true
       #   subnetProjDatabricksPublic  -> enableDatabricks=true
       #   subnetProjDatabricksPrivate -> enableDatabricks=true
       # ---------------------------------------------------------------
@@ -118,6 +120,10 @@ steps:
 
       if [ "$(enableAIFoundry)" = "true" ] && [ "$(disableAgentNetworkInjection)" != "true" ]; then
         check_subnet "subnetProjACA2" "$(subnetProjACA2)" "enableAIFoundry=true and disableAgentNetworkInjection=false"
+      fi
+
+      if [ "$(enableWebApp)" = "true" ] || [ "$(enableFunction)" = "true" ]; then
+        check_subnet "subnetProjWebapp" "$(subnetProjWebapp)" "enableWebApp=true or enableFunction=true"
       fi
 
       if [ "$(enableDatabricks)" = "true" ]; then
@@ -526,6 +532,7 @@ steps:
       SNT_ACA_002="snt-prj${projectNumber}-aca-002"
       SNT_AKS="snt-prj${projectNumber}-aks"
       SNT_AKS_002="snt-prj${projectNumber}-aks-002"
+      SNT_WEBAPP="snt-prj${projectNumber}-webapp"
       SNT_DATABRICKS_PRIV="snt-prj${projectNumber}-dbxpriv"
       SNT_DATABRICKS_PUB="snt-prj${projectNumber}-dbxpub"
       
@@ -550,6 +557,7 @@ steps:
       check_subnet_exists "$SNT_ACA_002" "sntAca002Exists"
       check_subnet_exists "$SNT_AKS" "sntAksExists"
       check_subnet_exists "$SNT_AKS_002" "sntAks002Exists"
+      check_subnet_exists "$SNT_WEBAPP" "sntWebappExists"
       check_subnet_exists "$SNT_DATABRICKS_PRIV" "sntDatabricksPrivExists"
       check_subnet_exists "$SNT_DATABRICKS_PUB" "sntDatabricksPubExists"
       
@@ -595,6 +603,7 @@ steps:
       -subnetProjAKS2 "$(subnetProjAKS2)"
       -subnetProjACA "$(subnetProjACA)"
       -subnetProjACA2 "$(subnetProjACA2)"
+      -subnetProjWebapp "$(subnetProjWebapp)"
       -subnetProjDatabricksPublic "$(subnetProjDatabricksPublic)"
       -subnetProjDatabricksPrivate "$(subnetProjDatabricksPrivate)"
       -byoASEv3 "$(byoASEv3)"
@@ -606,6 +615,7 @@ steps:
       -sntAca002Exists "$(sntAca002Exists)"
       -sntAksExists "$(sntAksExists)"
       -sntAks002Exists "$(sntAks002Exists)"
+      -sntWebappExists "$(sntWebappExists)"
       -sntDatabricksPrivExists "$(sntDatabricksPrivExists)"
       -sntDatabricksPubExists "$(sntDatabricksPubExists)"
       -aksOutboundType "$(aksOutboundType)"
