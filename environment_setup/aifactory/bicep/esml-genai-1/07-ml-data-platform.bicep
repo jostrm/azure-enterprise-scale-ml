@@ -138,9 +138,10 @@ param dataFactoryExists bool = false
 param databricksExists bool = false
 
 // ================= DATARBRICKS PARAMETERS =================
-@description('Databricks SKU (trial, standard, premium)')
-@allowed(['trial','standard','premium'])
-param databricksSkuName string = 'standard'
+// NB! The 'standard' SKU is deprecated by Azure (DatabricksStandardSkuNotSupported). Use 'premium' (or 'trial').
+@description('Databricks SKU (trial, premium). The standard SKU is deprecated by Azure.')
+@allowed(['trial','premium'])
+param databricksSkuName string = 'premium'
 @description('Use custom VNet (customer-managed) for Databricks instead of managed networking')
 param useDatabricksCustomVNet bool = true
 
