@@ -106,20 +106,11 @@ variables:
   # MANDATORY(CHANGE RARELY):Diagnostics - on all resources.
   # ============================================================================
   diagnosticSettingLevel: "gold" # <optional>Diagnostics level<default>gold<keep-as-is> <otherwise> silver or bronze for less verbose (lower cost) logging.
-  # ============================================================================
-  # Skip AIFactory-managed diagnostic settings on Cognitive Services / AI Search
-  # accounts when an Azure Policy (deployIfNotExists) already creates a
-  # `diag-<account>` setting pinned to the same Log Analytics workspace.
-  # Azure rejects a second diagnostic setting reusing the same (sink + category)
-  # tuple with 409 "Data sinks can't be reused". The policy-managed setting
-  # already satisfies log routing / compliance, so we skip the bicep one.
-  skipDiagAOAI: "true"
-  skipDiagAISearch: "true"
-  skipDiagAIServices: "true"
-  skipDiagContentSafety: "true"
-  skipDiagVision: "true"
-  skipDiagSpeech: "true"
-  skipDiagDocIntelligence: "true"
+  # Note: skipDiag* flags (AOAI/AISearch/AIServices/ContentSafety/Vision/Speech/DocIntelligence)
+  # are no longer pipeline variables. They default to true in 03-cognitive-services.bicep so the
+  # AIFactory-managed diagnostic setting is skipped when an Azure Policy (deployIfNotExists)
+  # already manages one (avoids 409 "Data sinks can't be reused"). Override per-deployment via the
+  # bicep param only if you do NOT have such a policy and want bicep to create the diag setting.
   # ============================================================================
   # MANDATORY(CHANGE RARELY): AI Factory scale set.
   # WHAT: 

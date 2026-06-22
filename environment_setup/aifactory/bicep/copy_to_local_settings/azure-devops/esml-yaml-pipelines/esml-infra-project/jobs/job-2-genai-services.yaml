@@ -1738,7 +1738,7 @@ steps:
       echo "📖 Reference: https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup#account-deletion-prerequisites-and-cleanup-guidance"
       echo ""
       
-      wait_minutes=20
+      wait_minutes=10
       wait_seconds=$((wait_minutes * 60))
       
       echo "⏰ Starting ${wait_minutes}-minute wait for subnet release..."
@@ -1765,7 +1765,7 @@ steps:
       done
       
       echo ""
-      echo "✅ 20-minute wait complete!"
+      echo "✅ 10-minute wait complete!"
       echo "   Subnet should now be fully released and ready for reuse."
       echo "   Proceeding with pipeline..."
 - task: AzureCLI@2
@@ -2406,145 +2406,6 @@ steps:
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '63a-detect-existing-diagnostic-settings'
-  # Detect diagnostic settings that ALREADY exist on cognitive / search resources
-  # in the project RG that are owned by something else (typically an Azure Policy
-  # "Deploy diagnostic settings for Cognitive Services / Azure Cognitive Search
-  # to Log Analytics workspace" — name is usually "default").
-  #
-  # Why: Azure ARM rejects two diagnostic settings on the same resource that share
-  # a (category, sink) tuple, with:
-  #   "Data sink '<workspaceId>' is already used in diagnostic setting 'default'
-  #    for category 'Audit'. Data sinks can't be reused in different settings on
-  #    the same category for the same resource."
-  # So we set skipDiag* pipeline vars to true and let 03-cognitive-services.bicep
-  # skip creating its `diag-<name>` setting for that resource. The policy-managed
-  # setting continues to satisfy compliance.
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-      set -u
-
-      az account set --subscription "$(dev_test_prod_sub_id)"
-
-      # Reconstruct project RG name (same formula as task '03c-Detect-...')
-      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-      projectNumber="$(project_number_000)"
-      projectName="prj${projectNumber}"
-      locationSuffix="$(admin_locationSuffix)"
-      envName="$(dev_test_prod)"
-      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      projectPrefix="$(projectPrefix)"
-      projectSuffix="$(projectSuffix)"
-      projectNameReplaced="${projectName/prj/project}"
-      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-
-      echo "🔎 Scanning $targetResourceGroup for pre-existing diagnostic settings..."
-
-      # Honor any pre-set "true" coming from variables.yaml (Option A override pattern):
-      # if the operator has already forced a flag to true at pipeline-var level, keep it true
-      # regardless of detection. Detection can only ESCALATE false→true, never demote true→false.
-      norm() { case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in true|1|yes) echo "true";; *) echo "false";; esac; }
-      skipDiagAOAI=$(norm "$(skipDiagAOAI)")
-      skipDiagAISearch=$(norm "$(skipDiagAISearch)")
-      skipDiagAIServices=$(norm "$(skipDiagAIServices)")
-      skipDiagContentSafety=$(norm "$(skipDiagContentSafety)")
-      skipDiagVision=$(norm "$(skipDiagVision)")
-      skipDiagSpeech=$(norm "$(skipDiagSpeech)")
-      skipDiagDocIntelligence=$(norm "$(skipDiagDocIntelligence)")
-      echo "   Initial (from variables.yaml): AOAI=$skipDiagAOAI Search=$skipDiagAISearch AIServices=$skipDiagAIServices ContentSafety=$skipDiagContentSafety Vision=$skipDiagVision Speech=$skipDiagSpeech DocInt=$skipDiagDocIntelligence"
-
-      # Map a Cognitive Services account 'kind' to the corresponding skip-flag.
-      # Anything we don't recognize is logged but not gated.
-      kind_to_var() {
-        case "$1" in
-          OpenAI)          echo "skipDiagAOAI" ;;
-          AIServices)      echo "skipDiagAIServices" ;;
-          ContentSafety)   echo "skipDiagContentSafety" ;;
-          ComputerVision)  echo "skipDiagVision" ;;
-          SpeechServices)  echo "skipDiagSpeech" ;;
-          FormRecognizer)  echo "skipDiagDocIntelligence" ;;
-          *)               echo "" ;;
-        esac
-      }
-
-      # 1) Cognitive Services accounts
-      cog_json=$(az cognitiveservices account list \
-        --resource-group "$targetResourceGroup" \
-        --query "[].{name:name,kind:kind,id:id}" -o json 2>/dev/null || echo "[]")
-      cog_count=$(echo "$cog_json" | jq 'length' 2>/dev/null || echo "0")
-      echo "   Found $cog_count Cognitive Services account(s)."
-
-      if [ "$cog_count" -gt 0 ]; then
-        while IFS=$'\t' read -r acc_name acc_kind acc_id; do
-          [ -z "$acc_id" ] && continue
-          # List diagnostic settings on this resource
-          ds_json=$(az monitor diagnostic-settings list --resource "$acc_id" -o json 2>/dev/null || echo '{"value":[]}')
-          # ANY existing setting routing to a LAW (workspaceId set) blocks bicep from creating
-          # another setting on the same sink + category. So we skip our bicep diag if anything
-          # is already there — legacy 'diag-<acc>' from prior deployments, policy-created 'default',
-          # or third-party named settings.
-          conflict=$(echo "$ds_json" | jq -r '
-            .value[]? | select((.workspaceId // "") != "") | .name
-          ' | head -n1)
-          var=$(kind_to_var "$acc_kind")
-          if [ -n "$conflict" ] && [ -n "$var" ]; then
-            echo "   ⚠️  $acc_name (kind=$acc_kind) already has diagnostic setting '$conflict' to a LAW → setting $var=true"
-            eval "$var=true"
-          elif [ -n "$conflict" ]; then
-            echo "   ℹ️  $acc_name (kind=$acc_kind) has diagnostic setting '$conflict' but kind is not gated; nothing to skip."
-          else
-            echo "   ✅ $acc_name (kind=$acc_kind) has no conflicting diagnostic setting."
-          fi
-        done < <(echo "$cog_json" | jq -r '.[] | [.name, .kind, .id] | @tsv')
-      fi
-
-      # 2) Azure AI Search
-      search_json=$(az search service list \
-        --resource-group "$targetResourceGroup" \
-        --query "[].{name:name,id:id}" -o json 2>/dev/null || echo "[]")
-      search_count=$(echo "$search_json" | jq 'length' 2>/dev/null || echo "0")
-      echo "   Found $search_count Azure AI Search service(s)."
-
-      if [ "$search_count" -gt 0 ]; then
-        while IFS=$'\t' read -r srv_name srv_id; do
-          [ -z "$srv_id" ] && continue
-          ds_json=$(az monitor diagnostic-settings list --resource "$srv_id" -o json 2>/dev/null || echo '{"value":[]}')
-          # ANY existing LAW-routed setting blocks creation of a second one (sink+category reuse rule).
-          conflict=$(echo "$ds_json" | jq -r '
-            .value[]? | select((.workspaceId // "") != "") | .name
-          ' | head -n1)
-          if [ -n "$conflict" ]; then
-            echo "   ⚠️  AI Search $srv_name already has diagnostic setting '$conflict' to a LAW → setting skipDiagAISearch=true"
-            skipDiagAISearch=true
-          else
-            echo "   ✅ AI Search $srv_name has no conflicting diagnostic setting."
-          fi
-        done < <(echo "$search_json" | jq -r '.[] | [.name, .id] | @tsv')
-      fi
-
-      echo ""
-      echo "=== Diagnostic skip flags ==="
-      echo "skipDiagAOAI=$skipDiagAOAI"
-      echo "skipDiagAISearch=$skipDiagAISearch"
-      echo "skipDiagAIServices=$skipDiagAIServices"
-      echo "skipDiagContentSafety=$skipDiagContentSafety"
-      echo "skipDiagVision=$skipDiagVision"
-      echo "skipDiagSpeech=$skipDiagSpeech"
-      echo "skipDiagDocIntelligence=$skipDiagDocIntelligence"
-
-      echo "##vso[task.setvariable variable=skipDiagAOAI]$skipDiagAOAI"
-      echo "##vso[task.setvariable variable=skipDiagAISearch]$skipDiagAISearch"
-      echo "##vso[task.setvariable variable=skipDiagAIServices]$skipDiagAIServices"
-      echo "##vso[task.setvariable variable=skipDiagContentSafety]$skipDiagContentSafety"
-      echo "##vso[task.setvariable variable=skipDiagVision]$skipDiagVision"
-      echo "##vso[task.setvariable variable=skipDiagSpeech]$skipDiagSpeech"
-      echo "##vso[task.setvariable variable=skipDiagDocIntelligence]$skipDiagDocIntelligence"
-- task: AzureCLI@2
   displayName: '63-cognitive-services'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   retryCountOnTaskFailure: 2
@@ -2629,13 +2490,6 @@ steps:
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters addAISearch="$(addAISearch)" \
      --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)" \
-     --parameters skipDiagAOAI="$(skipDiagAOAI)" \
-     --parameters skipDiagAISearch="$(skipDiagAISearch)" \
-     --parameters skipDiagAIServices="$(skipDiagAIServices)" \
-     --parameters skipDiagContentSafety="$(skipDiagContentSafety)" \
-     --parameters skipDiagVision="$(skipDiagVision)" \
-     --parameters skipDiagSpeech="$(skipDiagSpeech)" \
-     --parameters skipDiagDocIntelligence="$(skipDiagDocIntelligence)" \
      --debug
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -2966,6 +2820,56 @@ steps:
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmkKeyName)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '67b-approve-adf-managed-private-endpoints'
+  # Data Factory managed VNet creates managed private endpoints (KV/Storage/Cosmos/Function)
+  # in 'Pending' state. They must be APPROVED on each TARGET resource before the ADF
+  # AutoResolve managed Integration Runtime can reach the data stores over Private Link.
+  # Reads the 67-data-ml-platform deployment output and approves any pending connection.
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), eq(variables['enableDatafactory'], 'true'), succeeded())
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      set -u
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      deplName="esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-67-data-ml-platform"
+      echo "🔎 Reading managed private endpoints from deployment: $deplName"
+
+      mpeEnabled=$(az deployment sub show --name "$deplName" \
+        --query "properties.outputs.dataFactoryManagedVnetEnabled.value" -o tsv 2>/dev/null || echo "false")
+      if [ "$mpeEnabled" != "true" ] && [ "$mpeEnabled" != "True" ]; then
+        echo "ℹ️  Data Factory managed VNet not enabled - nothing to approve."
+        exit 0
+      fi
+
+      targets=$(az deployment sub show --name "$deplName" \
+        --query "properties.outputs.dataFactoryManagedPrivateEndpoints.value[].targetResourceId" -o tsv 2>/dev/null || echo "")
+      if [ -z "$targets" ]; then
+        echo "ℹ️  No managed private endpoints reported by the deployment output."
+        exit 0
+      fi
+
+      for targetId in $targets; do
+        [ -z "$targetId" ] && continue
+        echo "   Checking pending private-endpoint-connections on: $targetId"
+        pendingIds=$(az network private-endpoint-connection list --id "$targetId" \
+          --query "[?properties.privateLinkServiceConnectionState.status=='Pending'].id" -o tsv 2>/dev/null || echo "")
+        if [ -z "$pendingIds" ]; then
+          echo "   ✅ No pending connections."
+          continue
+        fi
+        for connId in $pendingIds; do
+          echo "   ➡️  Approving $connId"
+          az network private-endpoint-connection approve --id "$connId" \
+            --description "Approved by AIFactory pipeline (ADF managed VNet)" >/dev/null \
+            && echo "   ✅ Approved" || echo "   ⚠️  Approve failed for $connId (continuing)"
+        done
+      done
+      echo "Done approving ADF managed private endpoints."
 - task: AzureCLI@2
   displayName: '68-integration'
   condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded())
@@ -3894,7 +3798,7 @@ steps:
      # actually unblocks the project caphost in 69b.
      list_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2025-07-01-preview"
 
-     max_attempts=60   # 60 x 20s = 20 min
+     max_attempts=30   # 30 x 20s = 10 min
      prov_state="NotFound"
      for i in $(seq 1 $max_attempts); do
        caphost_list=$(az rest --method GET --url "$list_url" -o json 2>/dev/null || echo "")
@@ -3928,7 +3832,7 @@ steps:
        sleep 20
      done
 
-     echo "##[warning]Account capability host did not reach Succeeded within 20 min (last state: $prov_state)."
+     echo "##[warning]Account capability host did not reach Succeeded within 10 min (last state: $prov_state)."
      echo "##[warning]Proceeding to 69b anyway — retryCountOnTaskFailure may recover."
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'

@@ -2171,6 +2171,54 @@ jobs:
               --parameters cmk="${{ env.cmk }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}"
 
+      - name: 67b-approve-adf-managed-private-endpoints
+        # Data Factory managed VNet creates managed private endpoints (KV/Storage/Cosmos/Function)
+        # in 'Pending' state. They must be APPROVED on each TARGET resource before the ADF
+        # AutoResolve managed Integration Runtime can reach the data stores over Private Link.
+        if: env.deleteAllServicesForProject != 'true' && env.enableDatafactory == 'true'
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            #!/bin/bash
+            set -u
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            deplName="esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-67-data-ml-platform"
+            echo "🔎 Reading managed private endpoints from deployment: $deplName"
+
+            mpeEnabled=$(az deployment sub show --name "$deplName" \
+              --query "properties.outputs.dataFactoryManagedVnetEnabled.value" -o tsv 2>/dev/null || echo "false")
+            if [ "$mpeEnabled" != "true" ] && [ "$mpeEnabled" != "True" ]; then
+              echo "ℹ️  Data Factory managed VNet not enabled - nothing to approve."
+              exit 0
+            fi
+
+            targets=$(az deployment sub show --name "$deplName" \
+              --query "properties.outputs.dataFactoryManagedPrivateEndpoints.value[].targetResourceId" -o tsv 2>/dev/null || echo "")
+            if [ -z "$targets" ]; then
+              echo "ℹ️  No managed private endpoints reported by the deployment output."
+              exit 0
+            fi
+
+            for targetId in $targets; do
+              [ -z "$targetId" ] && continue
+              echo "   Checking pending private-endpoint-connections on: $targetId"
+              pendingIds=$(az network private-endpoint-connection list --id "$targetId" \
+                --query "[?properties.privateLinkServiceConnectionState.status=='Pending'].id" -o tsv 2>/dev/null || echo "")
+              if [ -z "$pendingIds" ]; then
+                echo "   ✅ No pending connections."
+                continue
+              fi
+              for connId in $pendingIds; do
+                echo "   ➡️  Approving $connId"
+                az network private-endpoint-connection approve --id "$connId" \
+                  --description "Approved by AIFactory pipeline (ADF managed VNet)" >/dev/null \
+                  && echo "   ✅ Approved" || echo "   ⚠️  Approve failed for $connId (continuing)"
+              done
+            done
+            echo "Done approving ADF managed private endpoints."
+
       - name: 68-integration
         if: env.deleteAllServicesForProject != 'true'
         uses: azure/cli@v2

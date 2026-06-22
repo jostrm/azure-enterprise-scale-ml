@@ -58,20 +58,20 @@ param diagnosticSettingLevel string = 'silver'
 // category + sink, returning:
 //   "Data sink '<workspaceId>' is already used in diagnostic setting 'default'
 //    for category 'Audit'."
-@description('Skip creating the AOAI diagnostic setting (Azure Policy may already manage one).')
-param skipDiagAOAI bool = false
-@description('Skip creating the AI Search diagnostic setting (Azure Policy may already manage one).')
-param skipDiagAISearch bool = false
-@description('Skip creating the AI Services diagnostic setting (Azure Policy may already manage one).')
-param skipDiagAIServices bool = false
-@description('Skip creating the Content Safety diagnostic setting (Azure Policy may already manage one).')
-param skipDiagContentSafety bool = false
-@description('Skip creating the Vision diagnostic setting (Azure Policy may already manage one).')
-param skipDiagVision bool = false
-@description('Skip creating the Speech diagnostic setting (Azure Policy may already manage one).')
-param skipDiagSpeech bool = false
-@description('Skip creating the Document Intelligence diagnostic setting (Azure Policy may already manage one).')
-param skipDiagDocIntelligence bool = false
+@description('Skip creating the AOAI diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one; bicep-created setting would 409 on sink+category reuse).')
+param skipDiagAOAI bool = true
+@description('Skip creating the AI Search diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
+param skipDiagAISearch bool = true
+@description('Skip creating the AI Services diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
+param skipDiagAIServices bool = true
+@description('Skip creating the Content Safety diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
+param skipDiagContentSafety bool = true
+@description('Skip creating the Vision diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
+param skipDiagVision bool = true
+@description('Skip creating the Speech diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
+param skipDiagSpeech bool = true
+@description('Skip creating the Document Intelligence diagnostic setting (default true: Azure Policy deployIfNotExists typically manages one).')
+param skipDiagDocIntelligence bool = true
 
 // CMK Parameters
 param cmk bool = false
