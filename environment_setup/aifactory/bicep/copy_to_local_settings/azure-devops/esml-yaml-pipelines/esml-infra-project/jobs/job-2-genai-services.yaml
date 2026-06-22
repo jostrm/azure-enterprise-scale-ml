@@ -2833,10 +2833,9 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
       #!/bin/bash
-      set -u
       az account set --subscription "$(dev_test_prod_sub_id)"
 
-      deplName="esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-67-data-ml-platform"
+      deplName="esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)${PrjDepl:-}-67-data-ml-platform"
       echo "🔎 Reading managed private endpoints from deployment: $deplName"
 
       mpeEnabled=$(az deployment sub show --name "$deplName" \
@@ -3615,6 +3614,149 @@ steps:
     # "aiFoundryV2Exists: command not found").
     AIFOUNDRYV2EXISTS_RAW: $(aiFoundryV2Exists)
     AIFOUNDRYV2PROJECTEXISTS_RAW: $(aiFoundryV2ProjectExists)
+# -------------------------------------------------------------------------------------------------
+# 69a-Grant-NetworkContributor-For-Injection
+# -------------------------------------------------------------------------------------------------
+# WHY THIS TASK EXISTS (root cause of "Invalid vnet resource ID provided, or the virtual network
+# could not be found." during capability host / agent injection):
+#
+# When agent network injection is enabled, the Foundry account is created (task 69a, --no-wait) with
+# a `networkInjections` block (scenario=agent). Azure then AUTO-PROVISIONS an invisible, Microsoft-
+# managed Container Apps environment that JOINS the agent subnet (snt-...-aca-002). That join is
+# performed by the Foundry account's SystemAssigned managed identity. When the agent subnet lives in
+# a DIFFERENT resource group / VNet (the shared esml-common VNet), the account MI needs
+# "Network Contributor" on that cross-RG VNet — otherwise it cannot read/join the VNet and the
+# auto-provisioning fails with the error above, leaving the account in provisioningState=Failed.
+#
+# This is a genuine chicken-and-egg for a SystemAssigned identity: the MI does not exist until the
+# account is created, but the injection (which needs the role) runs DURING account creation.
+# Because task 69a submits the account with `--no-wait`, the account resource + its MI appear within
+# seconds while the ACA injection keeps running for many minutes. This task polls for that MI and
+# grants the role WHILE injection is still in flight, so the permission lands before injection
+# completes. Combined with `retryCountOnTaskFailure=3` on 69a, any first-attempt race is reconciled
+# on retry (the role is, by then, already present and the idempotent account PUT succeeds).
+#
+# Part A of the fix was applied manually for project014; this task makes it permanent for every
+# project so the failure cannot recur on fresh deployments.
+- task: AzureCLI@2
+  displayName: '69a-Grant-NetworkContributor-For-Injection'
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
+  retryCountOnTaskFailure: 2
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      set -uo pipefail
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      # Skip when agent network injection is OFF — no ACA injection, so no cross-RG VNet join is needed.
+      if [ "$(disableAgentNetworkInjection)" = "true" ]; then
+        echo "ℹ️  disableAgentNetworkInjection=true → agent network injection OFF. No Network Contributor grant needed. Skipping."
+        exit 0
+      fi
+
+      # 1) Resolve the agent subnet id from the authoritative params file (same source as 69a-Validate-Subnet).
+      params_file="../../../../aifactory/parameters/dynamicNetworkParams.json"
+      aca2_subnet_id=$(jq -r '.parameters.aca2SubnetId.value // empty' "$params_file" 2>/dev/null || echo "")
+      if [ -z "$aca2_subnet_id" ]; then
+        aca2_subnet_id=$(python -c "import json;d=json.load(open('$params_file'));print(d['parameters'].get('aca2SubnetId',{}).get('value',''))" 2>/dev/null || echo "")
+      fi
+      if [ -z "$aca2_subnet_id" ] || [ "$aca2_subnet_id" = "null" ]; then
+        echo "##[warning]aca2SubnetId is EMPTY → Bicep will skip networkInjections (no agent injection). No grant needed. Skipping."
+        exit 0
+      fi
+      if [[ "$aca2_subnet_id" != /subscriptions/*/resourceGroups/*/providers/Microsoft.Network/virtualNetworks/*/subnets/* ]]; then
+        echo "##[error]❌ aca2SubnetId is NOT a valid subnet resource ID: $aca2_subnet_id"
+        exit 1
+      fi
+
+      # Parse subnet id → subscription / rg / vnet, then build the parent VNet resource id.
+      sub_id=$(echo "$aca2_subnet_id" | awk -F'/' '{print $3}')
+      sub_rg=$(echo "$aca2_subnet_id"  | awk -F'/' '{print $5}')
+      vnet_name=$(echo "$aca2_subnet_id" | awk -F'/' '{print $9}')
+      vnet_id="/subscriptions/${sub_id}/resourceGroups/${sub_rg}/providers/Microsoft.Network/virtualNetworks/${vnet_name}"
+      echo "Agent subnet : $aca2_subnet_id"
+      echo "Parent VNet  : $vnet_id"
+
+      # 2) Resolve the project resource group (same construction as task 05b 'Check if resource exists').
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+      echo "targetResourceGroup: $targetResourceGroup"
+
+      # 3) Poll for the Foundry account + its SystemAssigned MI principalId.
+      #    The account is created async (69a used --no-wait), so the resource + MI appear within seconds
+      #    while the ACA injection keeps provisioning for many minutes — we grant the role in that window.
+      principal_id=""
+      account_name=""
+      for attempt in $(seq 1 30); do
+        account_name=$(az resource list \
+          --resource-group "$targetResourceGroup" \
+          --resource-type "Microsoft.CognitiveServices/accounts" \
+          --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name" \
+          -o tsv 2>/dev/null | head -n1)
+        if [ -n "$account_name" ]; then
+          principal_id=$(az cognitiveservices account show \
+            --name "$account_name" \
+            --resource-group "$targetResourceGroup" \
+            --query "identity.principalId" -o tsv 2>/dev/null || echo "")
+        fi
+        if [ -n "$principal_id" ] && [ "$principal_id" != "null" ]; then
+          echo "✅ Foundry account '$account_name' SystemAssigned MI principalId: $principal_id (attempt $attempt)"
+          break
+        fi
+        echo "⏳ Attempt $attempt/30: account/MI not ready yet (account='${account_name:-<none>}'). Waiting 10s..."
+        sleep 10
+      done
+
+      if [ -z "$principal_id" ] || [ "$principal_id" = "null" ]; then
+        echo "##[error]❌ Could not resolve the Foundry account SystemAssigned MI principalId in RG '$targetResourceGroup' after polling."
+        echo "##[error]   Without this, the auto-provisioned ACA managed environment cannot join the cross-RG agent VNet,"
+        echo "##[error]   causing: 'Invalid vnet resource ID provided, or the virtual network could not be found.'"
+        exit 1
+      fi
+
+      # 4) Grant Network Contributor on the agent VNet (covers the child subnet) AND the subnet itself.
+      #    Cross-RG, idempotent: skip when the assignment already exists.
+      grant_role() {
+        local scope="$1"
+        local existing
+        existing=$(az role assignment list \
+          --assignee "$principal_id" \
+          --role "Network Contributor" \
+          --scope "$scope" \
+          --query "[0].id" -o tsv 2>/dev/null || echo "")
+        if [ -n "$existing" ]; then
+          echo "✅ Network Contributor already assigned at: $scope"
+          return 0
+        fi
+        echo "➕ Granting Network Contributor to $principal_id at: $scope"
+        az role assignment create \
+          --assignee-object-id "$principal_id" \
+          --assignee-principal-type ServicePrincipal \
+          --role "Network Contributor" \
+          --scope "$scope" 1>/dev/null
+        echo "✅ Granted."
+      }
+
+      grant_role "$vnet_id"
+      grant_role "$aca2_subnet_id"
+
+      echo ""
+      echo "✅ Network Contributor granted to the Foundry account MI on the agent VNet/subnet."
+      echo "   The async ACA managed-environment injection (started by task 69a) can now join the cross-RG VNet,"
+      echo "   so capability host creation will no longer fail with 'Invalid vnet resource ID'."
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-Poll-Deployment-Status'
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
