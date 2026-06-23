@@ -301,23 +301,43 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      # Get primary IP
-      PRIMARY_IP=$(curl -s http://ipinfo.io/ip)
+      set -uo pipefail
+      # Detect the build agent's public IPv4. ipinfo.io can be unreachable/rate-limited from the
+      # ADO agent, which previously left admin_ip_fw empty and broke task 02 with
+      # "'' does not appear to be an IPv4 or IPv6 network". Try several services and validate.
+      IPV4_RE='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+      PRIMARY_IP=""
+      for svc in "https://api.ipify.org" "https://checkip.amazonaws.com" "https://ifconfig.me/ip" "http://ipinfo.io/ip"; do
+        candidate=$(curl -s --max-time 10 "$svc" | tr -d '[:space:]')
+        echo "  $svc -> '${candidate}'"
+        if [[ "$candidate" =~ $IPV4_RE ]]; then
+          PRIMARY_IP="$candidate"
+          echo "Selected public IP '$PRIMARY_IP' from $svc"
+          break
+        fi
+      done
+
+      if [ -z "$PRIMARY_IP" ]; then
+        echo "##[error]Could not determine the build agent public IPv4 from any detection service."
+        echo "##[error]Whitelisting cannot proceed. Set disable_whitelisting_for_build_agents=true if the agent IP is already allowed, or retry."
+        exit 1
+      fi
+
       echo "Primary IP: $PRIMARY_IP"
       echo "##vso[task.setvariable variable=admin_ip_fw]$PRIMARY_IP"
-      
-      # Get all possible IPs that might be used
-      echo "All network interfaces:"
-      ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1
-      
-      # Try alternative IP detection services
-      ALT_IP1=$(curl -s https://api.ipify.org)
-      ALT_IP2=$(curl -s https://checkip.amazonaws.com)
-      
+
+      # Diagnostics: list local interfaces (not used for whitelisting; the public IP above is authoritative).
+      # The `ip` command is absent on Windows-hosted agents, so guard it to avoid a spurious error line.
+      if command -v ip >/dev/null 2>&1; then
+        echo "All network interfaces:"
+        ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1
+      fi
+
+      # Keep alternates for visibility/debugging.
+      ALT_IP1=$(curl -s --max-time 10 https://api.ipify.org | tr -d '[:space:]')
+      ALT_IP2=$(curl -s --max-time 10 https://checkip.amazonaws.com | tr -d '[:space:]')
       echo "Alternative IP 1: $ALT_IP1"
       echo "Alternative IP 2: $ALT_IP2"
-      
-      # Set variables for all IPs
       echo "##vso[task.setvariable variable=admin_ip_fw_alt1]$ALT_IP1"
       echo "##vso[task.setvariable variable=admin_ip_fw_alt2]$ALT_IP2"
 
@@ -329,13 +349,20 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: | 
+     set -uo pipefail
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
-     
+
+     ip_to_add="$(admin_ip_fw)"
+     if [ -z "$ip_to_add" ]; then
+       echo "##[error]admin_ip_fw is empty — build agent public IP was not detected in task 01. Cannot add an empty network rule."
+       exit 1
+     fi
+
      az keyvault update --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --public-network-access Enabled --default-action Deny
      echo "Waiting for network rules to propagate..."
      sleep 10
      
-     az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
+     az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$ip_to_add"
 - task: AzureKeyVault@2
   displayName: '03_az_download_seeding_keyvault'
   inputs:

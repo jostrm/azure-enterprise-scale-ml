@@ -479,9 +479,37 @@ jobs:
       - name: 01_Get_Runner_Public_IP
         if: env.disable_whitelisting_for_build_agents != 'true'
         run: |
-          $resp = Invoke-RestMethod http://ipinfo.io/json | Select -exp ip
-          "runner_ip=$resp" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          echo "runner_ip=$resp"
+          $ErrorActionPreference = 'Stop'
+          $ipv4Re = '^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+          # ipinfo.io can return empty; try multiple services and validate the result is a real IPv4.
+          $services = @(
+            'https://api.ipify.org',
+            'https://checkip.amazonaws.com',
+            'https://ifconfig.me/ip',
+            'http://ipinfo.io/ip'
+          )
+          $runnerIp = ''
+          foreach ($svc in $services) {
+            try {
+              $candidate = (Invoke-RestMethod -Uri $svc -TimeoutSec 10).ToString().Trim()
+            } catch {
+              Write-Host "::warning::Failed to query $svc : $($_.Exception.Message)"
+              continue
+            }
+            if ($candidate -match $ipv4Re) {
+              $runnerIp = $candidate
+              Write-Host "Resolved public IP $runnerIp via $svc"
+              break
+            } else {
+              Write-Host "::warning::$svc returned invalid/empty value: '$candidate'"
+            }
+          }
+          if ([string]::IsNullOrWhiteSpace($runnerIp)) {
+            Write-Host "::error::Could not determine runner public IP from any service."
+            exit 1
+          }
+          "runner_ip=$runnerIp" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          echo "runner_ip=$runnerIp"
 
       - name: 02_Allow_Runner_IP_on_Seeding_KeyVault
         if: env.disable_whitelisting_for_build_agents != 'true'
@@ -497,10 +525,14 @@ jobs:
               --public-network-access Enabled
             echo "Waiting for Key Vault network rules to propagate..."
             sleep 15
+            ip_to_add="${{ env.runner_ip }}"
+            if [ -z "$ip_to_add" ]; then
+              echo "::error::runner_ip is empty; cannot add Key Vault network rule."; exit 1
+            fi
             az keyvault network-rule add \
               --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
               --name "${{ env.admin_bicep_kv_fw }}" \
-              --ip-address "${{ env.runner_ip }}"
+              --ip-address "$ip_to_add"
 
       - name: 03_Download_Secrets_From_Seeding_KeyVault
         uses: azure/cli@v2
@@ -850,10 +882,14 @@ jobs:
               --public-network-access Enabled
             echo "Waiting for Key Vault network rules to propagate..."
             sleep 10
+            ip_to_add="${{ env.runner_ip }}"
+            if [ -z "$ip_to_add" ]; then
+              echo "::error::runner_ip is empty; cannot add Key Vault network rule."; exit 1
+            fi
             az keyvault network-rule add \
               --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
               --name "${{ env.admin_bicep_kv_fw }}" \
-              --ip-address "${{ env.runner_ip }}"
+              --ip-address "$ip_to_add"
 
       - name: 14_Generate_Dynamic_Network_Parameters
         working-directory: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts
