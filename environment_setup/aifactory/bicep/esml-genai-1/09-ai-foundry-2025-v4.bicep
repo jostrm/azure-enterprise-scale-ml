@@ -792,6 +792,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     privateEndpointSubnetResourceId: genaiSubnetId
     agentSubnetResourceId: (!disableAgentNetworkInjection && !empty(aca2SubnetId)) ? aca2SubnetId : ''
     disableAgentNetworkInjection: disableAgentNetworkInjection
+    agentInjectionUserAssignedIdentityResourceId: getProjectMIPrincipalId.outputs.resourceId
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
     ipAllowList: filteredIpWhitelist_array
@@ -823,6 +824,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
   dependsOn: [
     existingTargetRG
     namingConvention
+    getProjectMIPrincipalId
     spAndMI2ArrayModule
     CmnZones
     subnetDelegationAca
@@ -843,6 +845,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     privateEndpointSubnetResourceId: genaiSubnetId
     agentSubnetResourceId: (!disableAgentNetworkInjection && !empty(aca2SubnetId)) ? aca2SubnetId : ''
     disableAgentNetworkInjection: disableAgentNetworkInjection
+    agentInjectionUserAssignedIdentityResourceId: getProjectMIPrincipalId.outputs.resourceId
     allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
     enablePublicGenAIAccess: enablePublicGenAIAccess
     ipAllowList: filteredIpWhitelist_array
@@ -879,6 +882,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
   dependsOn: [
     existingTargetRG
     namingConvention
+    getProjectMIPrincipalId
     spAndMI2ArrayModule
     CmnZones
     subnetDelegationAca

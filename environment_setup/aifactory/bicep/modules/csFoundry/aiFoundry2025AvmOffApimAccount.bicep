@@ -59,6 +59,9 @@ param agentSubnetResourceId string = ''
 @description('Disable agent network injection even when an agent subnet is provided.')
 param disableAgentNetworkInjection bool = false
 
+@description('Resource ID of the pre-provisioned project User-Assigned Managed Identity that already holds Network Contributor on the agent VNet. When provided (and agent injection is enabled), it is attached to the account identity so injection joins the cross-RG VNet without a SystemAssigned-MI timing race. Leave empty to fall back to SystemAssigned only.')
+param agentInjectionUserAssignedIdentityResourceId string = ''
+
 @description('Existing AI Search service resource ID. Leave empty to create a new instance.')
 param aiSearchResourceId string = ''
 
@@ -170,6 +173,18 @@ param aiAccountSku string = 'S0'
 //var accountName = length(overrideAccountName) >= 2 ? overrideAccountName : fallbackAccountName
 var accountName = aiAccountName
 var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agentSubnetResourceId)
+// When agent injection is enabled and a pre-provisioned project UAMI (already holding Network Contributor
+// on the agent VNet) is provided, attach it so Azure uses an identity that can read/join the cross-RG VNet
+// at injection time. SystemAssigned is retained for CMK RBAC (which depends on the SA principalId).
+var useAgentInjectionUami = agentNetworkInjectionEnabled && !empty(agentInjectionUserAssignedIdentityResourceId)
+var accountIdentity = useAgentInjectionUami ? {
+  type: 'SystemAssigned,UserAssigned'
+  userAssignedIdentities: {
+    '${agentInjectionUserAssignedIdentityResourceId}': {}
+  }
+} : {
+  type: 'SystemAssigned'
+}
 
 
 var ipRules = [for ip in ipAllowList: {
@@ -215,9 +230,7 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
   sku: {
     name: aiAccountSku
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: accountIdentity
   properties: {
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties

@@ -330,6 +330,7 @@ jobs:
       project_sp_oid_value: 'unset'
       debug_disable_100_rbac_security: 'false'
       debug_disable_69_aifoundry_2025: 'false'
+      debug_disable_10_aifactory_dashboards: ${{ vars.DEBUG_DISABLE_10_AIFACTORY_DASHBOARDS || 'true' }}
 
     steps:
       - name: 00_Azure_Login
@@ -1541,6 +1542,142 @@ jobs:
 
             echo "18_Purge_Soft_Deleted completed."
 
+      - name: 06c2_Wait_For_Subnet_Release_After_Purge
+        # After purging a Foundry account, Azure needs up to ~20 min to fully release the agent subnet
+        # (Microsoft-managed ACA environment removal + Microsoft.App/environments delegation release).
+        # Without this wait, redeploying to the same subnet fails with 'Subnet already in use' /
+        # 'ResourceProviderExtensionError' / 'DelegationNotCleared'. Fast-paths out if project RG is missing.
+        if: |
+          success() && env.deleteAllForProject != 'true' && env.BYO_subnets != 'true' &&
+          (env.deleteAllServicesForProject == 'true' || env.enableDeleteForDisabledResources == 'true') &&
+          env.enableAIFoundry == 'true' && env.aiFoundryV2Exists != 'true'
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            #!/bin/bash
+
+            # FAST-PATH: if the project resource group does not exist, no Foundry account /
+            # capability host / subnet delegation was ever created — the wait is pointless.
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            subscription="${{ env.dev_test_prod_sub_id }}"
+            projectNameReplaced="${projectName/prj/project}"
+            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+            az account set --subscription "$subscription" >/dev/null 2>&1 || true
+            rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" 2>/dev/null || echo "false")
+            if [ "$rg_exists" != "true" ]; then
+              echo "ℹ️  Project resource group '$projectResourceGroup' does not exist — no Foundry account / subnet delegation was ever created."
+              echo "=== 06c2_Wait_For_Subnet_Release_After_Purge: skipping wait (project RG missing) ==="
+              exit 0
+            fi
+
+            echo "=== Waiting for Complete Subnet Release After Account Purge ==="
+            echo "⚠️  Microsoft-managed infrastructure cleanup (ACA environment + subnet delegation release)."
+
+            wait_minutes=10
+            wait_seconds=$((wait_minutes * 60))
+            echo "⏰ Starting ${wait_minutes}-minute wait for subnet release..."
+
+            interval=120  # progress every 2 minutes
+            elapsed=0
+            while [ $elapsed -lt $wait_seconds ]; do
+              remaining=$((wait_seconds - elapsed))
+              remaining_minutes=$((remaining / 60))
+              echo "  [$(date '+%H:%M:%S')] ⏳ ${remaining_minutes} minutes remaining..."
+              sleep_time=$interval
+              if [ $remaining -lt $interval ]; then
+                sleep_time=$remaining
+              fi
+              sleep $sleep_time
+              elapsed=$((elapsed + sleep_time))
+            done
+
+            echo "✅ ${wait_minutes}-minute wait complete! Subnet should now be fully released and ready for reuse."
+
+      - name: Check and Delete Orphan Role Assignments
+        # Removes orphan role assignments (principalName==null) at the common + project RG scopes,
+        # left behind when principals (e.g. purged identities) were deleted. Idempotent best-effort.
+        if: success() && env.deleteAllServicesForProject != 'true'
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            set -e
+
+            echo "Checking for orphan role assignments..."
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            vnetResourceGroupBase="${{ env.vnetResourceGroupBase }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+
+            commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+            echo "commonResourceGroup resolved to: $commonResourceGroup"
+
+            projectNameReplaced="${projectName/prj/project}"
+            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+            echo "projectResourceGroup resolved to: $projectResourceGroup"
+
+            check_and_delete_orphans() {
+              local resourceGroup=$1
+              local rgScope="/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${resourceGroup}"
+
+              echo "Checking resource group: $resourceGroup"
+              echo "Scope: $rgScope"
+
+              if ! az group show --name "$resourceGroup" &>/dev/null; then
+                echo "Resource group $resourceGroup does not exist, skipping..."
+                return 0
+              fi
+
+              orphanCount=$(az role assignment list --scope "$rgScope" --query "[?principalName==null]" -o tsv | wc -l)
+
+              if [ "$orphanCount" -gt 0 ]; then
+                echo "Found $orphanCount orphan role assignment(s) in $resourceGroup"
+                orphanIds=$(az role assignment list --scope "$rgScope" --query "[?principalName==null].id" -o tsv)
+                while IFS= read -r assignmentId; do
+                  if [ -n "$assignmentId" ]; then
+                    echo "Attempting to delete orphan role assignment: $assignmentId"
+                    if az role assignment delete --ids "$assignmentId" 2>&1; then
+                      echo "Successfully deleted orphan role assignment: $assignmentId"
+                    else
+                      echo "Warning: Failed to delete orphan role assignment: $assignmentId (may require additional permissions)"
+                    fi
+                  fi
+                done <<< "$orphanIds"
+              else
+                echo "No orphan role assignments found in $resourceGroup"
+              fi
+            }
+
+            if [ -n "$commonResourceGroup" ]; then
+              echo "=== Checking Common Resource Group ==="
+              check_and_delete_orphans "$commonResourceGroup" || echo "Warning: Error processing common resource group, continuing..."
+            fi
+
+            if [ -n "$projectResourceGroup" ]; then
+              echo ""
+              echo "=== Checking Project Resource Group ==="
+              check_and_delete_orphans "$projectResourceGroup" || echo "Warning: Error processing project resource group, continuing..."
+            fi
+
+            echo ""
+            echo "Orphan role assignment check completed"
+
       # === Deploy sequences ===
 
       - name: 61-foundation
@@ -2466,6 +2603,173 @@ jobs:
               --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}" \
               --debug
 
+      - name: 69a-Validate-Subnet-For-NetworkInjection
+        # Validates the AGENT subnet (aca2SubnetId) actually written into dynamicNetworkParams.json
+        # — the exact value Bicep injects into networkInjections[].subnetArmId. A mismatch causes the
+        # aml_aiagentservice capability host to fail with "Invalid vnet resource ID provided...".
+        # Validate-only (no mutation): the Microsoft.App/environments delegation is baked in at
+        # subnet-creation time by job-1 (31-network.bicep) and reinforced by 09-ai-foundry-2025-v4.bicep.
+        if: |
+          env.enableAIFoundry == 'true' && env.deleteAllServicesForProject != 'true' &&
+          env.debug_disable_69_aifoundry_2025 != 'true' && env.pre_foundry_gate_passed == 'true' &&
+          env.foundry_1st_option_succeeded != 'true' && env.aiFoundryV2Exists != 'true' &&
+          (env.foundryDeploymentType == '2' || env.foundryDeploymentType == '3') &&
+          env.disableAgentNetworkInjection != 'true'
+        continue-on-error: false
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            #!/bin/bash
+            set -e
+
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            echo "=== Validating Agent Subnet Configuration for AI Foundry ==="
+            echo "🔍 Resolving the ACTUAL aca2SubnetId from dynamicNetworkParams.json (the exact value Bicep passes to networkInjections)."
+
+            params_file="./aifactory/parameters/dynamicNetworkParams.json"
+
+            if [ ! -f "$params_file" ]; then
+              echo "::error::❌ dynamicNetworkParams.json not found at: $params_file"
+              echo "::error::   The network parameter generation step must run successfully first."
+              exit 1
+            fi
+
+            echo "📄 dynamicNetworkParams.json contents:"
+            cat "$params_file"
+            echo ""
+
+            # Extract aca2SubnetId from the generated params file (authoritative value)
+            aca2_subnet_id=$(jq -r '.parameters.aca2SubnetId.value // empty' "$params_file" 2>/dev/null || echo "")
+            if [ -z "$aca2_subnet_id" ]; then
+              aca2_subnet_id=$(python -c "import json,sys;d=json.load(open('$params_file'));print(d['parameters'].get('aca2SubnetId',{}).get('value',''))" 2>/dev/null || echo "")
+            fi
+            if [ -z "$aca2_subnet_id" ]; then
+              aca2_subnet_id=$(grep -A1 '"aca2SubnetId"' "$params_file" | grep '"value"' | sed -E 's/.*"value"\s*:\s*"([^"]*)".*/\1/' | head -n1)
+            fi
+
+            echo "🆔 Resolved aca2SubnetId = '$aca2_subnet_id'"
+
+            # If empty: agent network injection is disabled in Bicep (!empty guard) → safe to skip.
+            if [ -z "$aca2_subnet_id" ] || [ "$aca2_subnet_id" = "null" ]; then
+              echo "::warning::⚠️  aca2SubnetId is EMPTY in dynamicNetworkParams.json. Bicep will skip networkInjections."
+              echo "::warning::   AI Foundry account will be created WITHOUT agent network injection."
+              echo "::warning::   If you DO want agent network injection, ensure BYO_subnets=true with subnetProjACA2 set, OR the prior subnet deployment outputs aca2SubnetId."
+              exit 0
+            fi
+
+            # Parse: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>
+            if [[ "$aca2_subnet_id" != /subscriptions/*/resourceGroups/*/providers/Microsoft.Network/virtualNetworks/*/subnets/* ]]; then
+              echo "::error::❌ aca2SubnetId is NOT a valid subnet resource ID: $aca2_subnet_id"
+              echo "::error::   Expected: /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>"
+              exit 1
+            fi
+
+            sub_id=$(echo "$aca2_subnet_id" | awk -F'/' '{print $3}')
+            sub_rg=$(echo "$aca2_subnet_id" | awk -F'/' '{print $5}')
+            vnet_name=$(echo "$aca2_subnet_id" | awk -F'/' '{print $9}')
+            subnet_name=$(echo "$aca2_subnet_id" | awk -F'/' '{print $11}')
+
+            echo "   subscription: $sub_id"
+            echo "   resourceGroup: $sub_rg"
+            echo "   vnet:          $vnet_name"
+            echo "   subnet:        $subnet_name"
+
+            # 1) Verify the parent VNet exists and is reachable
+            echo "⏳ Verifying parent VNet exists..."
+            vnet_loc=$(az network vnet show --subscription "$sub_id" --resource-group "$sub_rg" --name "$vnet_name" --query location -o tsv 2>/dev/null || echo "")
+            if [ -z "$vnet_loc" ]; then
+              echo "::error::❌ VNet '$vnet_name' NOT FOUND in subscription '$sub_id' / RG '$sub_rg'."
+              echo "::error::   This IS the root cause of 'Invalid vnet resource ID provided, or the virtual network could not be found.'"
+              exit 1
+            fi
+            echo "✅ VNet exists in region: $vnet_loc"
+
+            # 1b) Region must match Foundry account location (agent service does not support cross-region)
+            foundry_loc="${{ env.admin_location }}"
+            if [ "$(echo "$vnet_loc" | tr '[:upper:]' '[:lower:]')" != "$(echo "$foundry_loc" | tr '[:upper:]' '[:lower:]')" ]; then
+              echo "::error::❌ VNet region '$vnet_loc' != Foundry region '$foundry_loc'."
+              echo "::error::   AI Foundry agent network injection requires the agent subnet's VNet to be in the SAME region as the Foundry account."
+              exit 1
+            fi
+            echo "✅ VNet region matches Foundry region ($foundry_loc)"
+
+            # 2) Verify the subnet exists at the exact resourceId (explicit context switch + retry, capture stderr)
+            echo "⏳ Verifying subnet exists at the exact resourceId..."
+            az account set --subscription "$sub_id" 1>/dev/null 2>&1 || true
+
+            subnet_err=""
+            subnet_resolved=""
+            for attempt in 1 2; do
+              subnet_resolved=$(az network vnet subnet show \
+                --subscription "$sub_id" \
+                --resource-group "$sub_rg" \
+                --vnet-name "$vnet_name" \
+                --name "$subnet_name" \
+                --query id -o tsv 2>/tmp/subnet_show_err) || subnet_resolved=""
+              subnet_err=$(cat /tmp/subnet_show_err 2>/dev/null || echo "")
+              if [ -n "$subnet_resolved" ]; then
+                break
+              fi
+              echo "::warning::Attempt $attempt: subnet show returned empty. stderr: ${subnet_err:-<none>}"
+              sleep 5
+            done
+
+            if [ -z "$subnet_resolved" ]; then
+              echo "::error::❌ Subnet NOT FOUND at: $aca2_subnet_id"
+              echo "::error::   Azure CLI stderr: ${subnet_err:-<empty>}"
+              echo "::error::   Possible causes: subnet deleted between job-1 and job-2; lost Reader rights on the VNet RG; transient ARM throttling."
+              az network vnet subnet list --subscription "$sub_id" --resource-group "$sub_rg" --vnet-name "$vnet_name" --query "[].name" -o tsv || true
+              exit 1
+            fi
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}" 1>/dev/null 2>&1 || true
+            echo "✅ Subnet resolved: $subnet_resolved"
+
+            # 3) Ensure Microsoft.App resource provider is registered on the target subscription
+            echo "⏳ Checking Microsoft.App resource provider registration on subscription $sub_id..."
+            rp_state=$(az provider show --subscription "$sub_id" --namespace Microsoft.App --query registrationState -o tsv 2>/dev/null || echo "NotRegistered")
+            echo "   Microsoft.App state: $rp_state"
+            if [ "$rp_state" != "Registered" ]; then
+              echo "::warning::⚠️  Microsoft.App is not Registered. Registering now..."
+              az provider register --subscription "$sub_id" --namespace Microsoft.App --wait || {
+                echo "::error::❌ Failed to register Microsoft.App on subscription $sub_id. This RP is required by the agent capability host."
+                exit 1
+              }
+              echo "✅ Microsoft.App registered."
+            else
+              echo "✅ Microsoft.App already registered."
+            fi
+
+            # 4) Validate the subnet has Microsoft.App/environments delegation (validate-only; no mutation)
+            delegation=$(az network vnet subnet show \
+              --subscription "$sub_id" \
+              --resource-group "$sub_rg" \
+              --vnet-name "$vnet_name" \
+              --name "$subnet_name" \
+              --query "delegations[0].serviceName" -o tsv 2>/dev/null || echo "")
+            echo "⏳ Current delegation: '${delegation:-<none>}'"
+
+            if [ "$delegation" = "Microsoft.App/environments" ]; then
+              echo "✅ Subnet correctly delegated to Microsoft.App/environments."
+            elif [ -z "$delegation" ]; then
+              echo "::error::❌ Subnet has NO delegation to Microsoft.App/environments."
+              echo "::error::   Expected job-1 (31-network.bicep) to create the subnet WITH this delegation, and 09-ai-foundry-2025-v4.bicep to ensure it."
+              echo "::error::   Remediation: az network vnet subnet update --subscription $sub_id --resource-group $sub_rg --vnet-name $vnet_name --name $subnet_name --delegations Microsoft.App/environments"
+              az account set --subscription "${{ env.dev_test_prod_sub_id }}" 1>/dev/null 2>&1 || true
+              exit 1
+            else
+              echo "::error::❌ Subnet has CONFLICTING delegation: $delegation (required: Microsoft.App/environments)."
+              az account set --subscription "${{ env.dev_test_prod_sub_id }}" 1>/dev/null 2>&1 || true
+              exit 1
+            fi
+
+            # 5) Best-effort: ensure subnet is large enough (/27 minimum recommended for ACA)
+            prefix=$(az network vnet subnet show --ids "$aca2_subnet_id" --query "addressPrefix" -o tsv 2>/dev/null || echo "")
+            echo "ℹ️  Subnet address prefix: $prefix (Container Apps requires /27 or larger)"
+
+            echo "✅ Agent subnet validation COMPLETE — Bicep will receive a valid aca2SubnetId."
+
       - name: 69a-aifoundry-2025-2ndOption-Account
         if: |
           env.enableAIFoundry == 'true' && env.deleteAllServicesForProject != 'true' &&
@@ -2557,6 +2861,140 @@ jobs:
               --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
               --parameters addAIFoundry="${{ env.addAIFoundry }}" \
               --debug
+
+      - name: 69a-Grant-NetworkContributor-For-Injection
+        # Grants the Foundry account SystemAssigned MI 'Network Contributor' on the agent VNet + subnet
+        # so the auto-provisioned (Microsoft-managed) ACA environment can join the cross-RG agent VNet.
+        # Without it the capability host fails with 'Invalid vnet resource ID provided...'.
+        # Idempotent + best-effort: continue-on-error so a transient grant failure does NOT regress the
+        # otherwise-working synchronous Foundry path — the later 69-wait-account-caphost step surfaces any
+        # genuine injection failure with a clear error. Self-skips when injection is disabled.
+        if: |
+          env.enableAIFoundry == 'true' && env.deleteAllServicesForProject != 'true' &&
+          env.debug_disable_69_aifoundry_2025 != 'true' && env.pre_foundry_gate_passed == 'true' &&
+          env.foundry_1st_option_succeeded != 'true' && env.aiFoundryV2Exists != 'true' &&
+          (env.foundryDeploymentType == '2' || env.foundryDeploymentType == '3') &&
+          env.disableAgentNetworkInjection != 'true'
+        continue-on-error: true
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            #!/bin/bash
+            set -uo pipefail
+
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+
+            # Skip when agent network injection is OFF — no ACA injection, so no cross-RG VNet join is needed.
+            if [ "${{ env.disableAgentNetworkInjection }}" = "true" ]; then
+              echo "ℹ️  disableAgentNetworkInjection=true → agent network injection OFF. No Network Contributor grant needed. Skipping."
+              exit 0
+            fi
+
+            # 1) Resolve the agent subnet id from the authoritative params file (same source as 69a-Validate-Subnet).
+            params_file="./aifactory/parameters/dynamicNetworkParams.json"
+            aca2_subnet_id=$(jq -r '.parameters.aca2SubnetId.value // empty' "$params_file" 2>/dev/null || echo "")
+            if [ -z "$aca2_subnet_id" ]; then
+              aca2_subnet_id=$(python -c "import json;d=json.load(open('$params_file'));print(d['parameters'].get('aca2SubnetId',{}).get('value',''))" 2>/dev/null || echo "")
+            fi
+            if [ -z "$aca2_subnet_id" ] || [ "$aca2_subnet_id" = "null" ]; then
+              echo "::warning::aca2SubnetId is EMPTY → Bicep will skip networkInjections (no agent injection). No grant needed. Skipping."
+              exit 0
+            fi
+            if [[ "$aca2_subnet_id" != /subscriptions/*/resourceGroups/*/providers/Microsoft.Network/virtualNetworks/*/subnets/* ]]; then
+              echo "::error::❌ aca2SubnetId is NOT a valid subnet resource ID: $aca2_subnet_id"
+              exit 1
+            fi
+
+            # Parse subnet id → subscription / rg / vnet, then build the parent VNet resource id.
+            sub_id=$(echo "$aca2_subnet_id" | awk -F'/' '{print $3}')
+            sub_rg=$(echo "$aca2_subnet_id"  | awk -F'/' '{print $5}')
+            vnet_name=$(echo "$aca2_subnet_id" | awk -F'/' '{print $9}')
+            vnet_id="/subscriptions/${sub_id}/resourceGroups/${sub_rg}/providers/Microsoft.Network/virtualNetworks/${vnet_name}"
+            echo "Agent subnet : $aca2_subnet_id"
+            echo "Parent VNet  : $vnet_id"
+
+            # 2) Resolve the project resource group (same construction as the foundry account tasks).
+            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
+            projectNumber="${{ env.project_number_000 }}"
+            projectName="prj${projectNumber}"
+            locationSuffix="${{ env.admin_locationSuffix }}"
+            envName="${{ env.dev_test_prod }}"
+            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
+            projectPrefix="${{ env.projectPrefix }}"
+            projectSuffix="${{ env.projectSuffix }}"
+            projectNameReplaced="${projectName/prj/project}"
+            targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+            echo "targetResourceGroup: $targetResourceGroup"
+
+            # 3) Poll for the Foundry account + its SystemAssigned MI principalId.
+            principal_id=""
+            account_name=""
+            for attempt in $(seq 1 30); do
+              account_name=$(az resource list \
+                --resource-group "$targetResourceGroup" \
+                --resource-type "Microsoft.CognitiveServices/accounts" \
+                --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name" \
+                -o tsv 2>/dev/null | head -n1)
+              if [ -n "$account_name" ]; then
+                principal_id=$(az cognitiveservices account show \
+                  --name "$account_name" \
+                  --resource-group "$targetResourceGroup" \
+                  --query "identity.principalId" -o tsv 2>/dev/null || echo "")
+              fi
+              if [ -n "$principal_id" ] && [ "$principal_id" != "null" ]; then
+                echo "✅ Foundry account '$account_name' SystemAssigned MI principalId: $principal_id (attempt $attempt)"
+                break
+              fi
+              echo "⏳ Attempt $attempt/30: account/MI not ready yet (account='${account_name:-<none>}'). Waiting 10s..."
+              sleep 10
+            done
+
+            if [ -z "$principal_id" ] || [ "$principal_id" = "null" ]; then
+              echo "::error::❌ Could not resolve the Foundry account SystemAssigned MI principalId in RG '$targetResourceGroup' after polling."
+              echo "::error::   Without this, the auto-provisioned ACA managed environment cannot join the cross-RG agent VNet."
+              exit 1
+            fi
+
+            # 4) Grant Network Contributor on the agent VNet (covers the child subnet) AND the subnet itself.
+            #    Uses the ARM Authorization REST API directly via 'az rest' (NOT 'az role assignment', which
+            #    fails with MissingSubscription in the SP context). Cross-RG, idempotent via atScope() filter.
+            NET_CONTRIB_ROLE_GUID="4d97b98b-1d4f-4787-a291-c67834d212e7"  # built-in 'Network Contributor'
+            role_def_id="/subscriptions/${sub_id}/providers/Microsoft.Authorization/roleDefinitions/${NET_CONTRIB_ROLE_GUID}"
+
+            grant_role() {
+              local scope="$1"
+              local existing
+              existing=$(az rest --method get \
+                --url "https://management.azure.com${scope}/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01&\$filter=atScope()" \
+                --query "value[?properties.principalId=='${principal_id}' && properties.roleDefinitionId=='${role_def_id}'].id | [0]" \
+                -o tsv 2>/dev/null || echo "")
+              if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+                echo "✅ Network Contributor already assigned at: $scope"
+                return 0
+              fi
+              local ra_guid
+              ra_guid=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || python -c "import uuid;print(uuid.uuid4())")
+              echo "➕ Granting Network Contributor to $principal_id at: $scope"
+              if az rest --method put \
+                --url "https://management.azure.com${scope}/providers/Microsoft.Authorization/roleAssignments/${ra_guid}?api-version=2022-04-01" \
+                --body "{\"properties\":{\"roleDefinitionId\":\"${role_def_id}\",\"principalId\":\"${principal_id}\",\"principalType\":\"ServicePrincipal\"}}" 1>/dev/null; then
+                echo "✅ Granted."
+              else
+                echo "::error::❌ Failed to grant Network Contributor at: $scope"
+                return 1
+              fi
+            }
+
+            grant_rc=0
+            grant_role "$vnet_id"        || grant_rc=1
+            grant_role "$aca2_subnet_id" || grant_rc=1
+            if [ "$grant_rc" -ne 0 ]; then
+              echo "::error::❌ One or more Network Contributor grants failed — see errors above."
+              exit 1
+            fi
+
+            echo "✅ Network Contributor granted to the Foundry account MI on the agent VNet/subnet."
 
       - name: 69-Rehydrate
         if: |
@@ -3093,6 +3531,45 @@ jobs:
               "${{ env.deployment_random_value }}" \
               "${{ env.projectPrefix }}" \
               "${{ env.projectSuffix }}"
+
+      - name: 10-aifactory-dashboards
+        # Deploys the AI Factory monitoring dashboards. Disabled by default
+        # (DEBUG_DISABLE_10_AIFACTORY_DASHBOARDS defaults to 'true').
+        if: |
+          env.deleteAllServicesForProject != 'true' &&
+          env.debug_disable_10_aifactory_dashboards != 'true' && success()
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            az deployment sub create \
+              --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}-10-dashboards" \
+              --subscription "${{ env.dev_test_prod_sub_id }}" \
+              --location "${{ env.admin_location }}" \
+              --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/10-aifactory-dashboards.bicep" \
+              --parameters env="${{ env.dev_test_prod }}" \
+              --parameters projectNumber="${{ env.project_number_000 }}" \
+              --parameters location="${{ env.admin_location }}" \
+              --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
+              --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
+              --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
+              --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
+              --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
+              --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters randomValue="${{ env.deployment_random_value }}" \
+              --parameters projectPrefix="${{ env.projectPrefix }}" \
+              --parameters projectSuffix="${{ env.projectSuffix }}" \
+              --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
+              --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
+              --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
+              --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
+              --parameters addAIFoundry="${{ env.addAIFoundry }}" \
+              --parameters genaiSubnetId="" \
+              --parameters aksSubnetId="" \
+              --parameters acaSubnetId="" \
+              --parameters tags='${{ env.tags }}' \
+              --parameters tagsProject='${{ env.tagsProject }}'
 
       - name: Remove runner IP from seeding Key Vault
         if: always() && env.disable_whitelisting_for_build_agents != 'true'
