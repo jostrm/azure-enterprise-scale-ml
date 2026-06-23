@@ -36,6 +36,15 @@ Whether you want to use Azure DevOps or GitHub, we recommend using the [**AI Fac
 > - **ITSM-integrated (fully automated):** Many teams integrate the AI Factory pipelines directly with their ITSM system (ServiceNow, Jira Service Management, etc.), so that project teams can "order" an AI Factory project via a self-service ticket — triggering the pipeline with 100% automation and zero manual intervention.
 > - **Core-team managed:** Other teams prefer to route tickets to the AI Factory core team, who then uses the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to generate the correct configuration from the ticket information and trigger the pipeline on behalf of the requesting team.
 
+### Naming constraints
+
+Azure deployment names are limited to 64 characters. When configuring prefixes in your `.env` file, keep this in mind:
+- Keep AIFACTORY_PREFIX and PROJECT_PREFIX short (6 characters or less recommended)
+- Environment-specific prefixes (DEV_NETWORK_ENV, STAGE_NETWORK_ENV, PROD_NETWORK_ENV) add to the total length
+- Longer prefixes can cause deployment names to exceed the 64-character limit
+
+The Configuration Wizard validates prefix lengths and warns if deployment names would be truncated. If you configure prefixes manually, use shorter values to ensure all resource names deploy correctly.
+
 ### Option A — Azure DevOps
 
 [Setup AIFactory — Infra Automation (Azure DevOps YAML + Bicep)](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)

@@ -139,7 +139,7 @@ You need to login via `Azure CLI` and `Github CLI`, but recommendation is to als
         }
         ```
 
-    - OUTPUT: GitHub environments (Dev, Stage, Prod) are populated with variables based on your `.env` configuration. The count varies depending on which services are enabled and which optional fields are populated.
+    - OUTPUT: The environment in Github should now look something like below (~21 variables in each environment: Dev,Stage, Prod), though the exact count varies based on which services are enabled and optional fields populated.
     - ![](../../../../../documentation/v2/20-29/images/24-end-2-end-setup-repo-GH-env-vars.png)
 
 9) Run the Github action workflows for `infra-common.yml`
@@ -157,6 +157,8 @@ This is optional for common infrastructure only, but required if running step 11
 Then run the script to update GitHub variables:
 
     bash ./10-GH-create-or-update-github-variables.sh
+
+For more details on all available variables and their purposes, see the comments section in `variables.yaml`.
 
 Proceed to step 11 to deploy projects.
 
