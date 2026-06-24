@@ -1087,6 +1087,22 @@ jobs:
             set_env "dataFactoryExists"      "$(resource_exists_fuzzy "$targetRG" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
             set_env "botServiceExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"
             set_env "aksExists"              "$(resource_exists_fuzzy "$targetRG" "Microsoft.ContainerService/managedClusters" "$aksName" "$suffixStandard")"
+            # --- Orphaned AKS node resource group cleanup ---
+            # AKS provisioning fails with 'NodeResourceGroupAlreadyExists' when a previous failed/partial
+            # deployment left the managed node resource group (aks-<targetRG>) behind while the AKS cluster
+            # itself no longer exists. The node RG name is deterministic (aks-${targetResourceGroup}), so remove
+            # the orphan here so the next deployment can recreate the cluster cleanly. Only delete when no AKS
+            # cluster is currently bound to it (guard against deleting a live cluster's node RG).
+            aksNodeRG="aks-${targetRG}"
+            if az group show --name "$aksNodeRG" >/dev/null 2>&1; then
+              boundCluster=$(az aks list --query "[?nodeResourceGroup=='$aksNodeRG'].id" -o tsv 2>/dev/null)
+              if [ -z "$boundCluster" ]; then
+                echo "Found orphaned AKS node resource group '$aksNodeRG' (no cluster bound). Deleting..."
+                az group delete --name "$aksNodeRG" --yes || echo "WARNING: failed to delete orphaned node RG '$aksNodeRG'"
+              else
+                echo "AKS node resource group '$aksNodeRG' is in use by cluster: $boundCluster (not deleting)"
+              fi
+            fi
             set_env "amlExists"              "$(resource_exists_fuzzy "$targetRG" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
             set_env "openaiExists"           "$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
             set_env "aiSearchExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")"
