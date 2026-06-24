@@ -245,7 +245,8 @@ var storageInCurrentRg = storageResourceGroupName == resourceGroup().name && sto
 var searchInCurrentRg = aiSearchServiceResourceGroupName == resourceGroup().name
 var cosmosInCurrentRg = cosmosResourceGroupName == resourceGroup().name
 
-var defaultDeploymentName = take('${modelName}-${uniqueSuffix}', 64)
+// Deployment name must equal the model name exactly (no random suffix), e.g. 'text-embedding-3-large'
+var defaultDeploymentName = take(modelName, 64)
 
 #disable-next-line BCP036
 resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){

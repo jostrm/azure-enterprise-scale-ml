@@ -316,8 +316,8 @@ variables:
   # ============================================================================
   # OPTIONAL: GENAI: Default Models to start with.
   # ============================================================================
-  deployModel_gpt_X: "false" # <optional>Deploy custom GPT-X model<default>false<keep-as-is> <otherwise> true, deploy the model defined in modelGPTXName.
-  modelGPTXName: "gpt-5-mini" # <optional>GPT-X model name<default>gpt-5-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
+  deployModel_gpt_X: "true" # <optional>Deploy custom GPT-X model<default>false<keep-as-is> <otherwise> true, deploy the model defined in modelGPTXName.
+  modelGPTXName: "gpt-5.1" # <optional>GPT-X model name<default>gpt-5-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
   modelGPTXVersion: "" # <optional>GPT-X model version<default>""<keep-as-is> <otherwise> pin to a specific version string.
   modelGPTXSku: "DataZoneStandard" # <optional>GPT-X deployment SKU<default>DataZoneStandard<keep-as-is> ['Standard','DataZoneStandard','GlobalStandard']
   modelGPTXCapacity: 30 # <optional>GPT-X TPM capacity (K)<default>30<keep-as-is> 30 = 30K tokens per minute.
@@ -332,7 +332,7 @@ variables:
   deployModel_gpt_54_mini: "false"
   default_gpt_54_mini_version: "2026-03-17"
 
-  deployModel_gpt_4o: "true" # <optional>Deploy gpt-4o<default>true<keep-as-is> <recommended> for general-purpose AI Foundry scenarios.
+  deployModel_gpt_4o: "false" # <optional>Deploy gpt-4o<default>true<keep-as-is> <recommended> for general-purpose AI Foundry scenarios.
   default_gpt_4o_version: "2024-11-20" # <optional>gpt-4o version<default>2024-11-20<keep-as-is> <otherwise> "2024-08-06".
 
   default_gpt_capacity: 40 # <optional>GPT model TPM capacity (K)<default>40<keep-as-is> 40 = 40K tokens per minute.
