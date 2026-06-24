@@ -491,7 +491,7 @@ resource cmnNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
       {
         name: 'Allow_VNet_Outbound'
         properties: {
-            description: 'Allow all outbound traffic to any subnet in the same VNet (all ports, all protocols). Highest priority — keep 101-999 free for future overrides.'
+            description: 'Allow all outbound traffic to any subnet in the same VNet (all ports, all protocols).'
             protocol: '*'
             sourcePortRange: '*'
             destinationPortRange: '*'
