@@ -333,6 +333,17 @@ jobs:
       debug_disable_10_aifactory_dashboards: ${{ vars.DEBUG_DISABLE_10_AIFACTORY_DASHBOARDS || 'true' }}
 
     steps:
+      - name: 00_Fix_Azure_Config_Permissions
+        shell: bash
+        run: |
+          # On persistent/self-hosted runners, prior 'sudo pwsh' and azure/cli@v2
+          # container steps run 'az' as root and leave ~/.azure (e.g. config) owned
+          # by root:root. That breaks subsequent host 'az' commands such as
+          # 'az account set' with: PermissionError [Errno 13] .../.azure/config.
+          # Reset ownership to the current runner user before any host 'az' call.
+          mkdir -p "$HOME/.azure"
+          sudo chown -R "$(id -u):$(id -g)" "$HOME/.azure" 2>/dev/null || true
+
       - name: 00_Azure_Login
         uses: azure/login@v2
         with:

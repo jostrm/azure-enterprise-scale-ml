@@ -466,7 +466,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   ]
 }
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='test' || env=='prod'  && !empty(aksSubnetId) && enableAksForAzureML) {	
+resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && (env=='test' || env=='prod') && !empty(aksSubnetId) && enableAksForAzureML) {	
   name: aksName
   parent: amlv2TestProd
   location: location
