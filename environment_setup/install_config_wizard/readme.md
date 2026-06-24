@@ -137,4 +137,115 @@ chmod +x aifactory-config
 
 ---
 
+# HOW TO
+
+These guides assume the following starting point:
+
+- **Role**: Developer who has cloned the repository and activated the `azure-enterprise-scale-ml` submodule, per the [Update AI Factory](../../documentation/v2/20-29/26-update-AIFactory.md) instructions.
+- **Software installed on your laptop**:
+  - Bash terminal
+  - Azure CLI
+  - GitHub CLI
+  - Python
+- **Prerequisites**: see [Prerequisites — AIFactory Config Wizard](#prerequisites--aifactory-config-wizard) above.
+
+---
+
+## HOW TO: Set it up the first time (import settings)
+
+This is for the **first person** in your team to configure the AI Factory. You import a ready-made `.env` file so you don't have to set ~100 parameters by hand.
+
+**1) Download the wizard and run it**
+
+- Download for your platform from the [Download](#download) table and run it.
+- Your OS may warn you the first time you run an unsigned app — this is expected. See [Security warning on first run](#-security-warning-on-first-run) for how to allow it on Windows / macOS / Linux.
+
+**2) Import settings (page 2 of the wizard)**
+
+On the **2nd page** of the Configuration Wizard, you can **Import** settings from an `.env` file. This avoids manually setting the many enterprise-wide parameters that only need to be set once.
+
+- Click **IMPORT** and select your `.env` file to load the settings.
+- If the settings are already present, someone else has already done this step — you can skip to [HOW TO: Add a project](#how-to-add-a-project-2ndnth-person).
+
+**3) Save the state and the `.env`**
+
+- **Save State** — saves all AI Factory projects and scalesets locally and under the wizard's metadata folder in Git (so the whole team can fetch the correct state).
+- **Save `.env`** (or **Save Variables.yaml** for Azure DevOps) — overwrites the actual file at the repository root that the pipeline uses as its basis.
+
+**4) Apply the configuration (back in VS Code)**
+
+You will see the edited `.env` file at the repository **root**. This file is used to update the GitHub Actions variables/secrets in GitHub. Run the bootstrap script at the root that starts with `10-`:
+
+```bash
+bash 10-GH-create-or-update-github-variables.sh
+```
+
+> For Azure DevOps, use the generated `variables.yaml` instead of the `.env` file.
+
+---
+
+## HOW TO: Add a project (2nd/Nth person)
+
+Use this when the first-time setup has already been done by someone else (settings already imported), and you want to add a new project.
+
+**1) Download the wizard and run it** (see [Download](#download)).
+
+**2) Create a NEW project**
+
+The easiest way is to clone an existing project:
+
+1. Go to **page 9**, where you see the current project number (for example `003`).
+2. Change the project number from `003` to `004`.
+3. **Save State** and **Save `.env`**.
+
+Done — you now have an identical project `004`, copied from project `003`. You can then edit project `004` to enable/disable whichever services it should have, if different from `003`.
+
+- **Save State** saves the projects and scalesets locally and under the wizard's metadata folder in Git.
+- **Save `.env`** (or **Save Variables.yaml** for Azure DevOps) overwrites the actual file used as the basis for your pipeline execution.
+
+**3) Apply the configuration (back in VS Code)**
+
+```bash
+bash 10-GH-create-or-update-github-variables.sh
+```
+
+### Where is the project state stored? (two options)
+
+The wizard always keeps state **locally** and in **Git**. You can choose how to organize that state in Git:
+
+**Option 1 — One main branch (recommended for teams)**
+
+- All AI Factory projects are saved as metadata (with their states) and checked into your Git repository on a single main branch.
+- Every user fetches the correct, shared state from that branch.
+- Best when the core team or a single source of truth manages all project settings centrally.
+
+**Option 2 — One branch per project setting**
+
+- In addition to the local and Git wizard state, you can create a **branch per project setting** that you manage on your own.
+- Useful when individual teams or owners want to manage and review their own project's settings in isolation (for example via pull requests) before merging.
+
+---
+
+## HOW TO: Add a Scaleset
+
+A scaleset (compute scale set) is managed as part of the wizard state, alongside projects.
+
+**1) Download the wizard and run it** (see [Download](#download)).
+
+**2) Add the scaleset in the wizard**
+
+- Open the scaleset configuration in the wizard and add/edit the scaleset for the relevant project.
+- **Save State** — saves the projects **and** scalesets locally and under the wizard's metadata folder in Git.
+- **Save `.env`** (or **Save Variables.yaml** for Azure DevOps) — overwrites the actual file used as the basis for your pipeline execution.
+
+**3) Apply the configuration (back in VS Code)**
+
+```bash
+bash 10-GH-create-or-update-github-variables.sh
+```
+
+> **TODO** — detailed scaleset wizard screenshots and field-by-field guidance to be added.
+
+---
+
 

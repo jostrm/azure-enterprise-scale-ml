@@ -27,27 +27,27 @@ start_dir="azure-enterprise-scale-ml"
 ## TEMPLATES: DataOps, MLOps, GenAIOps
 if [ "$copy_notebooks" = true ]; then
     mkdir -p "$aif_dir/mlops/01_template_v14/"
-    cp "$start_dir/mlops/01_template_v14/" "$aif_dir/mlops/01_template_v14/" -r # mlops
+    cp -r "$start_dir/mlops/01_template_v14/." "$aif_dir/mlops/01_template_v14/" # mlops
 
     mkdir -p "$aif_dir/dataops/adf/"
-    cp "$start_dir/adf/v1_3/" "$aif_dir/dataops/adf/" -r
+    cp -r "$start_dir/adf/v1_3/." "$aif_dir/dataops/adf/"
     
     mkdir -p "$aif_dir/notebook_aml_v1_templates/"
-    cp "$start_dir/notebook_templates/1_quickstart/" "$aif_dir/notebook_aml_v1_templates/" -r
+    cp -r "$start_dir/notebook_templates/1_quickstart/." "$aif_dir/notebook_aml_v1_templates/"
     
     mkdir -p "$aif_dir/notebook_aml_v2_examples/"
-    cp "$start_dir/notebook_templates/notebook_aml_sdkv2_versus_sdkv1/" "$aif_dir/notebook_aml_v2_examples/" -r
+    cp -r "$start_dir/notebook_templates/notebook_aml_sdkv2_versus_sdkv1/." "$aif_dir/notebook_aml_v2_examples/"
 
     mkdir -p "$aif_dir/notebook_aml_v2_examples/model_diabetes/"
-    cp "$start_dir/notebook_templates/model_diabetes/" "$aif_dir/notebook_aml_v2_examples/model_diabetes/" -r
+    cp -r "$start_dir/notebook_templates/model_diabetes/." "$aif_dir/notebook_aml_v2_examples/model_diabetes/"
 
     mkdir -p "$aif_dir/notebook_databricks/"
-    cp "$start_dir/notebook_templates/notebook_databricks/" "$aif_dir/notebook_databricks/" -r
+    cp -r "$start_dir/notebook_templates/notebook_databricks/." "$aif_dir/notebook_databricks/"
 fi
 
 if [ "$init_esml_util" = true ]; then
     ## Util (Bicep, Powershell, Azure CLI)
-    cp "$start_dir/environment_setup/aifactory/bicep/esml-util/" "$aif_dir/esml-util/" -r
+    cp -r "$start_dir/environment_setup/aifactory/bicep/esml-util/." "$aif_dir/esml-util/"
 fi
 
 ## TEMPLATES: infra orchestration (pipelines) - ADO (Bicep)
@@ -55,18 +55,18 @@ fi
 # cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/classic/"
 
 mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/yaml/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/yaml/" -r
+cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/yaml/"
 
 ## TEMPLATES: infra orchestration (pipelines) - GHA(Bicep, Terraform)
 mkdir -p "$aif_dir/esml-infra/github-actions/bicep/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/bicep/" -r
+cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/bicep/"
 
 mkdir -p "$aif_dir/esml-infra/github-actions/terraform/"
-cp "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/terraform/" -r
+cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/terraform/"
 
 ## Azure Dashboards
 mkdir -p "$aif_dir/esml-infra/azure_dashboards/"
-cp "$start_dir/environment_setup/aifactory/azure_dashboards" "$aif_dir/esml-infra/azure_dashboards/" -r
+cp -r "$start_dir/environment_setup/aifactory/azure_dashboards/." "$aif_dir/esml-infra/azure_dashboards/"
 
 ## UseCase Code - Copy to root level (including dotfiles like .env.template)
 usecase_code_dir="$current_dir/aifactory-usecase-code"

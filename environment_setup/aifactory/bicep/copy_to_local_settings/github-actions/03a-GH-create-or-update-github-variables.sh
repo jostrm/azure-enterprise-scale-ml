@@ -113,6 +113,12 @@ create_or_update_secret() {
     return
   fi
   
+  # Check if the value is empty (prevents 'gh secret set' from prompting "Paste your secret" and hanging)
+  if [[ -z "$value" ]]; then
+    echo -e "${YELLOW}Skipping secret '$name' for environment '$env' because the value is empty.${NC}"
+    return
+  fi
+  
   increment_counter "secret $env/$name"
   if [[ "$run_current_op" != "true" ]]; then
     return
