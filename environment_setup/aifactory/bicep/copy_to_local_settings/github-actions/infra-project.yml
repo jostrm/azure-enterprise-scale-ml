@@ -1510,6 +1510,7 @@ jobs:
             echo "18_Delete_Service_If_Not_Enabled_And_Exists completed."
 
       - name: 18_Purge_Soft_Deleted
+        id: purge_soft_deleted
         if: env.enableDeleteForDisabledResources == 'true'
         uses: azure/cli@v2
         with:
@@ -1517,8 +1518,23 @@ jobs:
           inlineScript: |
             set -e
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            echo "Waiting 5 minutes for soft-delete to process before purging..."
-            sleep 300
+
+            # Determine whether anything could qualify for purge BEFORE the 5-minute settle sleep.
+            # If no Foundry/Hub/AML resource existed, there is nothing to purge — skip the wait.
+            purge_candidate=false
+            if [[ "${{ env.aiFoundryV2Exists }}" == "true" || "${{ env.aiHubExists }}" == "true" || "${{ env.amlExists }}" == "true" ]]; then
+              purge_candidate=true
+            fi
+            # Tracks whether an actual Foundry/Cognitive-Services account purge executed
+            # (consumed by 06c2 subnet-release wait — only that purge holds the agent subnet).
+            purged_something=false
+
+            if [ "$purge_candidate" = "true" ]; then
+              echo "Waiting 5 minutes for soft-delete to process before purging..."
+              sleep 300
+            else
+              echo "No soft-deleted Foundry/Hub/AML resources qualify — skipping 5-minute settle wait."
+            fi
             projectNumber="${{ env.project_number_000 }}"
             projectName="prj${projectNumber}"
             envName="${{ env.dev_test_prod }}"
@@ -1546,6 +1562,7 @@ jobs:
                     echo "ERROR: Failed to purge Cognitive Services account '$accountName'" >&2
                     exit 1
                   fi
+                  purged_something=true
                 done <<< "$deletedAccounts"
               else
                 echo "No soft-deleted Cognitive Services accounts found in $targetRG."
@@ -1576,15 +1593,21 @@ jobs:
               fi
             fi
 
-            echo "18_Purge_Soft_Deleted completed."
+            # Signal 06c2 (subnet-release wait): only a real Foundry/account purge holds the agent
+            # subnet, so emit whether one actually executed. Empty/false => 06c2 skips the wait.
+            echo "purgeRan=$purged_something" >> "$GITHUB_OUTPUT"
+            echo "18_Purge_Soft_Deleted completed (purgeRan=$purged_something)."
 
       - name: 06c2_Wait_For_Subnet_Release_After_Purge
         # After purging a Foundry account, Azure needs up to ~20 min to fully release the agent subnet
         # (Microsoft-managed ACA environment removal + Microsoft.App/environments delegation release).
         # Without this wait, redeploying to the same subnet fails with 'Subnet already in use' /
         # 'ResourceProviderExtensionError' / 'DelegationNotCleared'. Fast-paths out if project RG is missing.
+        # Skips entirely when 18_Purge_Soft_Deleted did not actually purge anything (purgeRan != 'true')
+        # in the enableDeleteForDisabledResources path — no purge => no subnet delegation to release.
         if: |
           success() && env.deleteAllForProject != 'true' && env.BYO_subnets != 'true' &&
+          (steps.purge_soft_deleted.outputs.purgeRan == 'true' || env.deleteAllServicesForProject == 'true') &&
           (env.deleteAllServicesForProject == 'true' || env.enableDeleteForDisabledResources == 'true') &&
           env.enableAIFoundry == 'true' && env.aiFoundryV2Exists != 'true'
         uses: azure/cli@v2

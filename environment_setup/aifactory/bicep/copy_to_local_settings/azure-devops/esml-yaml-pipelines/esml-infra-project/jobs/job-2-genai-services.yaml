@@ -1384,12 +1384,15 @@ steps:
     enableContentSafety: $(enableContentSafety)
     contentSafetyExists: $(contentSafetyExists)
 - task: AzureCLI@2
+  name: purgeSoftDeleted
   displayName: '06c_Purge_SoftDeleted'
   # Purges soft-deleted CognitiveServices-based resources (AI Foundry V2, OpenAI, AI Services) and AML workspaces.
   # Runs in TWO scenarios:
   #   1) After deletion (deleteAllServicesForProject=true OR enableDeleteForDisabledResources=true)
   #   2) When enableAIFoundry=true — preemptive purge to prevent FlagMustBeSetForRestore errors during creation
   # If a purge call fails the pipeline stops here (set -e) — Owner on subscription has purge rights.
+  # Emits output variable purgeSoftDeleted.purgeRan (true/false) so 06c2 can skip the subnet-release
+  # wait when nothing actually qualified for purge.
   condition: and(succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1463,6 +1466,11 @@ steps:
          { [ "$aiServicesExists" = "true" ]  && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; }; then
         needs_purge=true
       fi
+
+      # Signal 06c2 (subnet-release wait) whether any resource actually qualifies for purge.
+      # If nothing qualifies, there is no Foundry account / subnet delegation to release, so the
+      # 20-minute wait is pointless and 06c2 will skip via this output variable.
+      echo "##vso[task.setvariable variable=purgeRan;isOutput=true]$needs_purge"
 
       if [ "$needs_purge" = "true" ]; then
         echo "=== 04_Purge_SoftDeleted: at least one resource qualifies — sleeping 5 minutes to allow soft-delete to settle ==="
@@ -1701,13 +1709,15 @@ steps:
   # https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup
   # 
   # This task only runs when:
+  # - 06c actually purged something (purgeSoftDeleted.purgeRan=true) — if nothing was purged there is
+  #   no subnet delegation to release, so waiting is pointless.
   # - deleteAllServicesForProject=true OR enableDeleteForDisabledResources=true (purge happened)
   # - enableAIFoundry=true (Foundry resources were deployed)
   # - aiFoundryV2Exists=false (account was purged, not pre-existing)
   # - 06c_Purge task succeeded
   # - deleteAllForProject != true (ULTRA mode tears down RG + networking; no redeploy follows, so waiting for subnet release is pointless)
-  # - BYO_subnets != true (externally managed subnets should not be held by this pipeline wait)
-  condition: and(succeeded(), ne(variables['deleteAllForProject'], 'true'), ne(variables['BYO_subnets'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
+  # - BYO_subnets != true (customer manages their own subnets — never held by this pipeline, nothing to wait for)
+  condition: and(succeeded(), eq(variables['purgeSoftDeleted.purgeRan'], 'true'), ne(variables['deleteAllForProject'], 'true'), ne(variables['BYO_subnets'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1731,6 +1741,16 @@ steps:
       subscription="$(dev_test_prod_sub_id)"
       projectNameReplaced="${projectName/prj/project}"
       projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      # BYO_subnets: customer manages their own subnets — Azure never delegated/held them via this
+      # pipeline, so there is nothing to wait for. Skip entirely (defense-in-depth; the task
+      # condition also gates on BYO_subnets != true).
+      byo_subnets="$(BYO_subnets)"
+      if [ "$byo_subnets" = "true" ]; then
+        echo "ℹ️  BYO_subnets=true — customer-managed subnets are not held by this pipeline."
+        echo "=== 06c2_Wait_For_Subnet_Release_After_Purge: skipping wait (BYO_subnets) ==="
+        exit 0
+      fi
 
       az account set --subscription "$subscription" >/dev/null 2>&1 || true
       rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" 2>/dev/null || echo "false")
