@@ -39,6 +39,17 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
+# Git Bash / MSYS on Windows rewrites any argument that looks like a POSIX path
+# (e.g. an ARM resource ID starting with '/subscriptions/...') into a Windows
+# path like 'C:/Program Files/Git/subscriptions/...', which breaks
+# `az resource update --ids <id>`. The tested delete-services-if-disabled.sh
+# never hits this because it runs on Linux (ADO). Disable the conversion so the
+# resource IDs are passed through verbatim. Harmless on Linux/macOS.
+# -----------------------------------------------------------------------------
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
+
+# -----------------------------------------------------------------------------
 # Parse arguments
 # -----------------------------------------------------------------------------
 PROJECTS_FROM=""
