@@ -73,7 +73,15 @@ The below files will be updated via `bash` scripts:
     bash ./03-ADO-YAML-bootstrap-files-no-var-overwrite.sh
     ```
 
-4) Do a "file compare" (using VS code or similar) with  `variables.yaml` VS  `variables-template.yaml`
+4) Do a "file compare" (using VS code or similar) or Github copilot. Compare your `variables.yaml` VS `variables-template.yaml`
+
+
+**Github copilot prompt**
+
+`Compare the variables.yaml under my folder aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml with the newer variables-template.yaml in same folder. Copy all values from variables.yaml into the new template variables-template.yaml. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in variables-template.yaml. After this then rename variables.yaml to variables.bak and variables-template.yaml to variables.yaml`
+
+**Traditioanl compare tool**
+
     - Compare the file, to see if any new variables have been added, that you need to set, then set them
     - Example below: 
     ```yaml
@@ -109,14 +117,21 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
     git submodule foreach 'git checkout "release/v1.24" && git pull origin "release/v1.24"'
     ```
 
-2) Run the START script - to ensure you have the latest bootstrap scripts. 
+2) Run the START script - to ensure you have the latest bootstrap bash scripts at your root.
     - friendly, will never overwrite anything exist .sh files at root
     
     ```bash
     bash ./azure-enterprise-scale-ml/00-start.sh
     ```
 
-3) Run the below - It will UPDATE Azure Devops pipeline templates, under `aifactory/esml-infa/azure-devops`
+3) Run BASH script - to copy files to your repo `aifactory/esml-infa/github-actions/bicep` from the submodule
+    - friendly, will never overwrite anything exist .sh files at root
+    
+    ```bash
+    bash 01-aif-copy-aifactory-templates.sh
+    ```
+
+4) Run BASH script, to UPDATE pipeline templates, under `.github\workflows` in your repo, from your repos  `aifactory/esml-infa/github-actions/bicep`
     - Friendly: 
         - It will NOT overwrite your `.env`. This will create a new variable file next to your `.env` called `.env.template`
         - It will NOT overwrite your `parameter` folder. 
@@ -126,7 +141,14 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
     bash ./03-GH-bootstrap-files-no-env-overwrite.sh
     ```
 
-4) Do a "file compare" (using VS code or similar) with  `.env` VS  `.env.template`
+4) Do a "file compare" (using VS code or similar) or with Github Copilot with  `.env` VS  `.env.template`
+
+**Github copilot prompt**
+
+`Compare the .env file at root, with the newer .env.template. Copy all values from .env into the new template .env.template. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in .env.template. After this , then rename .env to .env.bak and env.template to .env`
+
+**Traditioanl compare tool**
+
 Compare the file, to see if any new environment variables have been added, that you need to set, then set them
 
 Example below: 
