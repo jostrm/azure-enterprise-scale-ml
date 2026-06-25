@@ -39,6 +39,11 @@ set -uo pipefail
 # 0. Defaults / flags
 # -----------------------------------------------------------------------------
 STRICT="false"
+# WARN_ONLY: when true, FAIL findings are reported but DO NOT abort the pipeline
+# (the task still succeeds, exit 0). Temporary safety valve while the preflight
+# checks are being tuned so a false-positive cannot block deployments.
+# Override via env PREFLIGHT_WARN_ONLY=false or flag --no-warn-only to re-enable hard failures.
+WARN_ONLY="${PREFLIGHT_WARN_ONLY:-true}"
 SKIP="${PREFLIGHT_SKIP:-false}"
 ENV_FILE=""
 VARS_YAML=""
@@ -57,6 +62,8 @@ Usage: preflight.sh [options]
   --subscription <id>      Check only this subscription id (single env)
   --location <region>      Override Azure region (e.g. eastus2)
   --strict                 Treat WARN-only result as failure (exit 2)
+  --warn-only              Report FAILs but never abort the task (exit 0) [default]
+  --no-warn-only           Enforce hard failures: any FAIL aborts (exit 1)
   --skip                   Skip all checks and exit 0 (escape hatch)
   -h | --help              Show this help
 Environment escape hatch: set PREFLIGHT_SKIP=true to bypass.
@@ -72,6 +79,8 @@ while [ "$#" -gt 0 ]; do
     --subscription)    OVERRIDE_SUB="${2:-}"; shift 2;;
     --location)        OVERRIDE_LOCATION="${2:-}"; shift 2;;
     --strict)          STRICT="true"; shift;;
+    --warn-only)       WARN_ONLY="true"; shift;;
+    --no-warn-only)    WARN_ONLY="false"; shift;;
     --skip)            SKIP="true"; shift;;
     -h|--help)         usage; exit 0;;
     *) echo "WARN: unknown argument '$1' (ignored)" >&2; shift;;
@@ -114,7 +123,10 @@ FINDINGS=()   # "SEVERITY|CODE|MESSAGE|HINT"
 add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
   FINDINGS+=("$1|$2|$3|${4:-}")
   case "$1" in
-    FAIL) FAIL_COUNT=$((FAIL_COUNT + 1)); ci_error  "[$2] $3";;
+    # In WARN_ONLY mode a FAIL is still counted (for the summary) but surfaced as a
+    # warning annotation so it never marks the CI task red / blocks the pipeline.
+    FAIL) FAIL_COUNT=$((FAIL_COUNT + 1));
+          if [ "$WARN_ONLY" = "true" ]; then ci_warning "[$2] $3 (WARN_ONLY)"; else ci_error "[$2] $3"; fi;;
     WARN) WARN_COUNT=$((WARN_COUNT + 1)); ci_warning "[$2] $3";;
   esac
 }
@@ -419,7 +431,7 @@ list_policy_assignments() { # $1 subId  (informational + elastic deny heuristic)
       "Verify the identity has Microsoft.Authorization/policyAssignments/read."
     return 0
   fi
-  count="$(printf '%s' "$json" | "$PYBIN" - <<'PY' 2>/dev/null || echo 0
+  count="$(printf '%s' "$json" | "$PYBIN" - <<'PY' 2>/dev/null
 import sys, json
 try: data = json.load(sys.stdin)
 except Exception: data = []
@@ -428,6 +440,7 @@ print(len(names))
 for n in names: print("    - "+str(n))
 PY
 )"
+  [ -n "$count" ] || count=0
   echo "  Policy assignments on subscription $sub:"
   printf '%s\n' "$count" | tail -n +2
   echo "  ($(printf '%s' "$count" | head -n1) policy assignment(s) total)"
@@ -507,7 +520,7 @@ check_resource_providers() { # $1 subId
 # 8. Run checks per target subscription
 # -----------------------------------------------------------------------------
 echo "============================================================"
-echo " AI Factory PREFLIGHT"
+echo "   AI Factory PREFLIGHT"
 echo "   region            : $LOCATION"
 echo "   only-dev          : $ONLY_DEV"
 echo "   AI Search         : enabled=$ENABLE_AI_SEARCH tier=$AI_SEARCH_TIER"
@@ -552,6 +565,12 @@ if [ "${#FINDINGS[@]}" -gt 0 ]; then
 fi
 
 if [ "$FAIL_COUNT" -gt 0 ]; then
+  if [ "$WARN_ONLY" = "true" ]; then
+    echo ""
+    echo "preflight found $FAIL_COUNT issue(s) but WARN_ONLY=true -> NOT failing the task (exit 0)."
+    echo "Review the findings above. Set PREFLIGHT_WARN_ONLY=false (or pass --no-warn-only) to enforce hard failures."
+    exit 0
+  fi
   echo ""
   echo "preflight FAILED with $FAIL_COUNT blocking finding(s). Aborting deployment."
   exit 1

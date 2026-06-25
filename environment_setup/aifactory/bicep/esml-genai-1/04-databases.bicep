@@ -330,7 +330,8 @@ module spAndMI2Array '../modules/spAndMiArray.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
-    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    // SP removal support: ignore the SP OID seeding secret when its name is empty or a placeholder (<todo>/<optional>) -> spAndMiArray yields an MI-only array
+    servicePrincipleOIDFromSecret: (!empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) ? externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
   }
   dependsOn: [
       getProjectMIPrincipalId

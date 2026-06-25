@@ -62,12 +62,12 @@ variables:
   privDnsSubscription_param: "<todo>_SubscriptionID" # <optional>Hub DNS subscription ID<default><todo>_SubscriptionID<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity subscription ID where central private DNS zones are deployed.
   privDnsResourceGroup_param: "<todo>_ResourceGroup_name" # <optional>Hub DNS resource group<default><todo>_ResourceGroup_name<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity resource group where central private DNS zones are deployed.
   tenantId: "<todo>_TenantId" # <mandatory>Azure tenant ID<default><todo>_TenantId<ensure> find in Azure Portal > Entra ID > Overview (Directory ID).
-  databricksOID: "<todo>_ObjectID" # <optional>Databricks object ID<default><todo>_ObjectID<mandatory> if enableDatabricks:'true' <ensure> find Databricks object ID in Entra ID.
+  databricksOID: "<optional>_ObjectID" # <optional>Databricks object ID<default><todo>_ObjectID<mandatory> if enableDatabricks:'true' <ensure> find Databricks object ID in Entra ID.
   databricksPrivate: "true" # <optional>Databricks private control plane<default>true<keep-as-is> <otherwise> false, only data plane is private; control plane is public.
   AMLStudioUIPrivate: "true" # <optional>AML Studio UI private access<default>true<keep-as-is> <otherwise> false, only data plane is private; control plane is public.
-  inputCommonSPIDKey: "<todo>esml-common-sp-id" # <mandatory>Seeding KV secret name for common SP App ID<default>esml-common-sp-id<ensure> name matches the secret in your Seeding Keyvault.
-  inputCommonSPSecretKey: "<todo>esml-common-sp-secret" # <mandatory>Seeding KV secret name for common SP secret<default>esml-common-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
-  commonServicePrincipleOIDKey: "<todo>esml-common-sp-oid" # <mandatory>Seeding KV secret name for common SP OID<default>esml-common-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
+  inputCommonSPIDKey: "<optional>esml-common-sp-id" # <optional>Seeding KV secret name for common SP App ID<default>esml-common-sp-id<ensure> name matches the secret in your Seeding Keyvault.
+  inputCommonSPSecretKey: "<optional>esml-common-sp-secret" # <optional>Seeding KV secret name for common SP secret<default>esml-common-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
+  commonServicePrincipleOIDKey: "<optional>esml-common-sp-oid" # <optional>Seeding KV secret name for common SP OID<default>esml-common-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
    
   # ============================================================================
   # MANDATORY(CHANGE ONCE): Azure Devops
@@ -157,9 +157,9 @@ variables:
 ## ============================================================================
 ## START - FOR EACH PROJECT (MANDATORY), PRE SETUP
 ## ============================================================================
-  project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # <mandatory>Project SP App ID secret name in seeding KV<default>esml-project001-sp-id<ensure> name matches the secret in your Seeding Keyvault.
-  project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # <mandatory>Project SP OID secret name in seeding KV<default>esml-project001-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
-  project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # <mandatory>Project SP secret name in seeding KV<default>esml-project001-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_AppID_seeding_kv_name: "<optional>esml-project001-sp-id" # <optional>Project SP App ID secret name in seeding KV<default>esml-project001-sp-id<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_OID_seeding_kv_name: "<optional>esml-project001-sp-oid" # <optional>Project SP OID secret name in seeding KV<default>esml-project001-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_Secret_seeding_kv_name: "<optional>esml-project001-sp-secret" # <optional>Project SP secret name in seeding KV<default>esml-project001-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
   project_number_000: "001" # <mandatory>Project number<default>001<keep-as-is> For 1st project. <otherwise> increment to '002', '003', etc.
   tag_costcenter: "1234" # <optional>Project cost center tag<default>1234<keep-as-is> Metadata for per-project cost tracking on resource group level.
   tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Branch":"$(tag_repository_branch)/project$(project_number_000)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'

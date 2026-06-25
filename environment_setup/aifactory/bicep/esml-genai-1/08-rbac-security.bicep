@@ -312,7 +312,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: enableLogicApps? '' : var_miPrj_PrincipalId
-    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    // SP removal support: ignore the SP OID seeding secret when its name is empty or a placeholder (<todo>/<optional>) -> spAndMiArray yields an MI-only array
+    servicePrincipleOIDFromSecret: (!empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) ? externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
     includeManagedIdentity: !enableLogicApps
   }
   dependsOn: [
@@ -325,8 +326,11 @@ var skipACRRoleAssignments = skipExistingRoleAssignments || miPrjExists
 
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
-// Extract only the service principal (first element) - MI already handled in file 02
-var servicePrincipalOnly = [spAndMiArray[0]]
+// Extract only the service principal (first element) - MI already handled in file 02.
+// SP removal support: when no SP is configured (empty/<todo>/<optional> name) the SP is NOT at index 0,
+// so emit an empty list instead of grabbing the managed identity by mistake.
+var var_useProjectSP = !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')
+var servicePrincipalOnly = var_useProjectSP ? [spAndMiArray[0]] : []
 
 // De-duplicate principals to avoid duplicate role assignments
 // - Ensure user list is unique
