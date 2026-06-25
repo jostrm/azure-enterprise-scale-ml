@@ -139,6 +139,35 @@ _wait_vnet_idle() {
   return 0
 }
 
+# -----------------------------------------------------------------------------
+# Helper: PATCH a subnet property (to null / []) WITHOUT passing a leading-slash
+# ARM resource ID to az.
+#
+# WHY: Git Bash / MSYS on Windows rewrites any argument that looks like an
+# absolute POSIX path (e.g. '/subscriptions/.../subnets/foo') into
+# 'C:/Program Files/Git/subscriptions/.../subnets/foo', which makes
+# `az resource update --ids <id>` fail with:
+#     argument --ids: invalid ResourceId value: 'C:/Program Files/Git/...'
+# Some Git-for-Windows builds ignore the MSYS_NO_PATHCONV / MSYS2_ARG_CONV_EXCL
+# exports above, so we don't rely on them. Addressing the subnet by its name
+# parts (--namespace / --resource-type subnets / --parent virtualNetworks/<vnet>)
+# avoids the leading slash entirely - that argument starts with a letter, so
+# MSYS never touches it. Behaviour is identical on Linux/macOS.
+#
+# Usage: _subnet_resource_update <rg> <vnet> <subnet> <set-arg> [<set-arg> ...]
+#   e.g. _subnet_resource_update rg vnet sn properties.networkSecurityGroup=null
+# -----------------------------------------------------------------------------
+_subnet_resource_update() {
+  local _rg="$1" _vn="$2" _sn="$3"; shift 3
+  az resource update \
+    --resource-group "$_rg" \
+    --namespace "Microsoft.Network" \
+    --resource-type "subnets" \
+    --parent "virtualNetworks/${_vn}" \
+    --name "$_sn" \
+    --set "$@"
+}
+
 # Verify the VNet exists
 vnet_exists=$(az network vnet show -g "$RESOURCE_GROUP" -n "$VNET_NAME" --query "name" -o tsv 2>/dev/null || echo "")
 if [ -z "$vnet_exists" ]; then
@@ -214,12 +243,11 @@ remove_project_networking() {
       #   authenticated CLI path as the network commands and works reliably.
       # -----------------------------------------------------------------------
       local _detach_rc=0 _detach_out
-      _detach_out=$(az resource update \
-        --ids "$subnet_id" \
-        --set properties.networkSecurityGroup=null \
-              properties.routeTable=null \
-              properties.delegations='[]' \
-              properties.serviceEndpoints='[]' \
+      _detach_out=$(_subnet_resource_update "$RESOURCE_GROUP" "$VNET_NAME" "$subnet_name" \
+        properties.networkSecurityGroup=null \
+        properties.routeTable=null \
+        properties.delegations='[]' \
+        properties.serviceEndpoints='[]' \
         2>&1) || _detach_rc=$?
       if [ "$_detach_rc" -ne 0 ]; then
         echo "    az resource update PATCH failed (exit=$_detach_rc) - retrying property-by-property..."
@@ -232,7 +260,7 @@ remove_project_networking() {
           esac
           _wait_vnet_idle "$RESOURCE_GROUP" "$VNET_NAME" "pre-clear-$_prop"
           _p_rc=0
-          _p_out=$(az resource update --ids "$subnet_id" --set "properties.${_prop}=${_val}" 2>&1) || _p_rc=$?
+          _p_out=$(_subnet_resource_update "$RESOURCE_GROUP" "$VNET_NAME" "$subnet_name" "properties.${_prop}=${_val}" 2>&1) || _p_rc=$?
           if [ "$_p_rc" -ne 0 ]; then
             echo "    (could not clear $_prop on $subnet_name - exit=$_p_rc)"
           else
@@ -339,7 +367,7 @@ remove_project_networking() {
         s_sub=$(echo "$subnet_id"  | awk -F/ '{print $11}')
         echo "      Detaching NSG from $s_rg / $s_vnet / $s_sub"
         _wait_vnet_idle "$s_rg" "$s_vnet" "pre-nsg-detach"
-        if az resource update --ids "$subnet_id" --set properties.networkSecurityGroup=null >/dev/null 2>&1; then
+        if _subnet_resource_update "$s_rg" "$s_vnet" "$s_sub" properties.networkSecurityGroup=null >/dev/null 2>&1; then
           echo "      Detach PATCH accepted"
         else
           echo "      Detach PATCH failed"
