@@ -181,8 +181,7 @@ jobs:
             --parameters useAdGroups="${{ env.useAdGroups }}" \
             --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
             --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
-            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
-            --debug
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
 
       - name: Debug networking inputs (before 02)
         shell: pwsh
@@ -248,8 +247,7 @@ jobs:
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
             --parameters cidr_range="${{ env.cidr_range }}" \
-            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
-            --debug
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
 
       - name: 03_az_bicep_deploy_resources
         shell: bash
@@ -318,8 +316,7 @@ jobs:
             --parameters network_env="${{ env.network_env }}" \
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
-            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
-            --debug
+            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
   common-stage:
     name: Stage Common
@@ -483,8 +480,7 @@ jobs:
             --parameters useAdGroups="${{ env.useAdGroups }}" \
             --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
             --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
-            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
-            --debug
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
 
       - name: Debug networking inputs (before 02)
         shell: pwsh
@@ -550,8 +546,7 @@ jobs:
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
             --parameters cidr_range="${{ env.cidr_range }}" \
-            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
-            --debug
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
 
       - name: 03_az_bicep_deploy_resources
         shell: bash
@@ -620,8 +615,7 @@ jobs:
             --parameters network_env="${{ env.network_env }}" \
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
-            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
-            --debug
+            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
   common-prod:
     name: Prod Common
@@ -787,8 +781,7 @@ jobs:
             --parameters useAdGroups="${{ env.useAdGroups }}" \
             --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
             --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
-            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
-            --debug
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
 
       - name: Debug networking inputs (before 02)
         shell: pwsh
@@ -854,8 +847,7 @@ jobs:
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
             --parameters cidr_range="${{ env.cidr_range }}" \
-            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
-            --debug
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
 
       - name: 03_az_bicep_deploy_resources
         shell: bash
@@ -924,5 +916,4 @@ jobs:
             --parameters network_env="${{ env.network_env }}" \
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
-            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
-            --debug
+            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"

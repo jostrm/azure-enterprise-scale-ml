@@ -2362,8 +2362,7 @@ steps:
      --parameters policyExemptionDefinitionReferenceIds='$(policyExemptionDefinitionReferenceIds)' \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters tags='$(tags)' \
-     --parameters tagsProject='$(tagsProject)' \
-     --debug
+     --parameters tagsProject='$(tagsProject)'
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '62-core-infrastructure'
@@ -2449,8 +2448,7 @@ steps:
      --parameters enableProjectVM="$(enableProjectVM)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
-     --parameters enableLogicApps="$(enableLogicApps)" \
-     --debug
+     --parameters enableLogicApps="$(enableLogicApps)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '63-cognitive-services'
@@ -2536,8 +2534,7 @@ steps:
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters addAISearch="$(addAISearch)" \
-     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)" \
-     --debug
+     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '64-databases'
@@ -2613,8 +2610,7 @@ steps:
      --parameters cmkKeyName="$(cmkKeyName)" \
      --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
-     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
-     --debug
+     --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '65-compute-services'
@@ -2704,8 +2700,7 @@ steps:
      --parameters aksSkuTier="$(aksSkuTier)" \
      --parameters aksEnablePrivateCluster="$(aksEnablePrivateCluster)" \
      --parameters aksOutboundType="$(aksOutboundType)" \
-     --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)" \
-     --debug
+     --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '66-ai-platform'
@@ -2791,8 +2786,7 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmkKeyName)" \
-     --parameters addAISearch="$(addAISearch)" \
-     --debug
+     --parameters addAISearch="$(addAISearch)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '67-data_ml_platform'
@@ -3136,8 +3130,7 @@ steps:
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAISearch="$(addAISearch)" \
-     --parameters skipExistingRoleAssignments="$(skipACRAssignments)" \
-     --debug
+     --parameters skipExistingRoleAssignments="$(skipACRAssignments)"
      echo "##vso[task.setvariable variable=pre_foundry_gate_passed]true"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
@@ -3202,8 +3195,7 @@ steps:
      --parameters aiHubExists="$(aiHubExists)" \
      --parameters existingAcrPushUserPrincipals="$(existingAcrPushUserPrincipals)" \
      --parameters existingAcrPushSPPrincipals="$(existingAcrPushSPPrincipals)" \
-     --parameters disableSubnetJoinAction="$(disableSubnetJoinAction)" \
-     --debug
+     --parameters disableSubnetJoinAction="$(disableSubnetJoinAction)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025-1stOption'
@@ -3257,8 +3249,7 @@ steps:
       --parameters aiFoundryV2Exists="$_aiFoundryV2Exists" \
       --parameters aiFoundryV2ProjectExists="$_aiFoundryV2ProjectExists" \
       --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
-      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
-      --debug
+      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)"
       
       # If the deployment succeeded, set a variable to skip the fallback option
       if [ $? -eq 0 ]; then
@@ -3636,8 +3627,7 @@ steps:
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
-     --no-wait \
-     --debug
+     --no-wait
      
      deploy_rc=$?
      if [ $deploy_rc -ne 0 ]; then

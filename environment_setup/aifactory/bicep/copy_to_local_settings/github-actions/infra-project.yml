@@ -840,8 +840,7 @@ jobs:
               --parameters sntDatabricksPrivExists="${{ env.sntDatabricksPrivExists }}" \
               --parameters sntDatabricksPubExists="${{ env.sntDatabricksPubExists }}" \
               --parameters aksOutboundType="${{ env.aksOutboundType }}" \
-              --parameters azureFirewallPrivateIp="${{ env.aksAzureFirewallPrivateIp }}" \
-              --debug
+              --parameters azureFirewallPrivateIp="${{ env.aksAzureFirewallPrivateIp }}"
 
       - name: 08_Remove_IP_From_Seeding_Keyvault_(Networking-END)
         if: always() && env.disable_whitelisting_for_build_agents != 'true'
@@ -1890,8 +1889,7 @@ jobs:
               --parameters policyExemptionDefinitionReferenceIds='${{ env.policyExemptionDefinitionReferenceIds }}' \
               --parameters tags='${{ env.tags }}' \
               --parameters tagsProject='${{ env.tagsProject }}' \
-              --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
-              --debug
+              --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}"
 
       - name: 06e-policy-exemptions-foundry-subnets
         # Best-effort: creates policy exemptions on the VNet RG so DINE/auditIfNotExists policies
@@ -2015,8 +2013,7 @@ jobs:
               --parameters enableProjectVM="${{ env.enableProjectVM }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters updateKeyvaultRbac="${{ env.updateKeyvaultRbac }}" \
-              --parameters enableLogicApps="${{ env.enableLogicApps }}" \
-              --debug
+              --parameters enableLogicApps="${{ env.enableLogicApps }}"
 
       - name: 63-cognitive-services
         if: env.deleteAllServicesForProject != 'true'
@@ -2095,8 +2092,7 @@ jobs:
               --parameters enableAISearchSharedPrivateLink="${{ env.enableAISearchSharedPrivateLink }}" \
               --parameters cmk="${{ env.cmk }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}" \
-              --parameters addAISearch="${{ env.addAISearch }}" \
-              --debug
+              --parameters addAISearch="${{ env.addAISearch }}"
 
       - name: 64-databases
         if: env.deleteAllServicesForProject != 'true'
@@ -2166,8 +2162,7 @@ jobs:
               --parameters enableAFoundryCaphost="${{ env.enableAFoundryCaphost }}" \
               --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
               --parameters cmk="${{ env.cmk }}" \
-              --parameters cmkKeyName="${{ env.cmkKeyName }}" \
-              --debug
+              --parameters cmkKeyName="${{ env.cmkKeyName }}"
 
       - name: 65-compute-services
         if: env.deleteAllServicesForProject != 'true'
@@ -2242,8 +2237,7 @@ jobs:
               --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
               --parameters disableAgentNetworkInjection="${{ env.disableAgentNetworkInjection }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
-              --parameters addAISearch="${{ env.addAISearch }}" \
-              --debug
+              --parameters addAISearch="${{ env.addAISearch }}"
 
       - name: 66-ai-platform
         if: env.deleteAllServicesForProject != 'true'
@@ -2320,8 +2314,7 @@ jobs:
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters cmk="${{ env.cmk }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}" \
-              --parameters addAISearch="${{ env.addAISearch }}" \
-              --debug
+              --parameters addAISearch="${{ env.addAISearch }}"
 
       - name: 67-data_ml_platform
         if: env.deleteAllServicesForProject != 'true'
@@ -2622,8 +2615,7 @@ jobs:
               --parameters miPrjExists="${{ env.miPrjExists }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters addAISearch="${{ env.addAISearch }}" \
-              --parameters skipExistingRoleAssignments="${{ env.skipACRAssignments }}" \
-              --debug
+              --parameters skipExistingRoleAssignments="${{ env.skipACRAssignments }}"
             echo "pre_foundry_gate_passed=true" >> $GITHUB_ENV
 
       - name: 101-rbac-common-rg
@@ -2686,8 +2678,7 @@ jobs:
               --parameters aiHubExists="${{ env.aiHubExists }}" \
               --parameters existingAcrPushUserPrincipals="${{ env.existingAcrPushUserPrincipals }}" \
               --parameters existingAcrPushSPPrincipals="${{ env.existingAcrPushSPPrincipals }}" \
-              --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}" \
-              --debug
+              --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}"
 
       - name: 69a-Validate-Subnet-For-NetworkInjection
         # Validates the AGENT subnet (aca2SubnetId) actually written into dynamicNetworkParams.json
@@ -2945,8 +2936,7 @@ jobs:
               --parameters updateAIFoundry="${{ env.updateAIFoundry }}" \
               --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
               --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
-              --parameters addAIFoundry="${{ env.addAIFoundry }}" \
-              --debug
+              --parameters addAIFoundry="${{ env.addAIFoundry }}"
 
       - name: 69a-Grant-NetworkContributor-For-Injection
         # Grants the Foundry account SystemAssigned MI 'Network Contributor' on the agent VNet + subnet

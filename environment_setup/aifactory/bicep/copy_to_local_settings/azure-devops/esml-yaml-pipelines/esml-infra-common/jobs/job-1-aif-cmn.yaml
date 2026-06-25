@@ -1,3 +1,7 @@
+parameters:
+  - name: serviceConnection
+    type: string
+
 steps:
 
 - checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
@@ -28,7 +32,7 @@ steps:
      --name "esml-cmn-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)$(admin_location)-DeplRG" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-common\main\11-rgCommon.bicep" \
+     --template-file "esml-common/main/11-rgCommon.bicep" \
      --parameters enableAdminVM="$(enableAdminVM)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
@@ -47,7 +51,7 @@ steps:
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmkKeyName)" \
-     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
@@ -62,7 +66,7 @@ steps:
      --name "esml-cmn$(dev_test_prod)$(admin_aifactorySuffixRG)$(admin_commonResourceSuffix)$(admin_location)-Subnets" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-common\main\12-networkCommon.bicep" \
+     --template-file "esml-common/main/12-networkCommon.bicep" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
@@ -99,8 +103,7 @@ steps:
      --parameters env="$(dev_test_prod)" \
      --parameters network_env="$(network_env)" \
      --parameters cidr_range="$(cidr_range)" \
-     --parameters IPwhiteList="$(project_IP_whitelist)" \
-     --debug
+     --parameters IPwhiteList="$(project_IP_whitelist)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
@@ -114,7 +117,7 @@ steps:
      --name "esml-cmn-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)$(admin_commonResourceSuffix)$(admin_location)-DeplRes" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-common\main\13-rgLevel.bicep" \
+     --template-file "esml-common/main/13-rgLevel.bicep" \
      --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
@@ -173,6 +176,5 @@ steps:
      --parameters network_env="$(network_env)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enableDatafactoryCommon="$(enableDatafactoryCommon)" \
-     --parameters commonResourceName="$(vnetResourceGroupBase)" \
-     --debug
+     --parameters commonResourceName="$(vnetResourceGroupBase)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
