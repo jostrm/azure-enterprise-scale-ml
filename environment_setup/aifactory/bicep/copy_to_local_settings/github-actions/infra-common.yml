@@ -106,6 +106,33 @@ jobs:
         with:
           submodules: true
 
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
       - name: Validate required configuration
         shell: pwsh
         run: |
@@ -408,6 +435,33 @@ jobs:
         with:
           submodules: true
 
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
       - name: Validate required configuration
         shell: pwsh
         run: |
@@ -708,6 +762,33 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
 
       - name: Validate required configuration
         shell: pwsh

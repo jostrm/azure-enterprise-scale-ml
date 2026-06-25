@@ -29,7 +29,17 @@
 #   ./delete-subnets-for-projects.sh \
 #       --projects-from 002 --projects-to 009 \
 #       --resource-group <vnet-rg> --vnet-name <vnet-name> \
-#       [--subscription <sub-id>] [--skip-nsg] [--whatif]
+#       [--subscription <sub-id>] [--skip-nsg] [--whatif] [--purpose <suffix>]
+#
+#   --purpose <suffix>  Optional. Restrict matching to ONE subnet purpose for
+#                       each project. Matching is a case-insensitive substring on
+#                       'prj{nnn}-<suffix>'. When omitted, ALL subnets/NSGs of
+#                       each project are processed (the original behaviour).
+#                       NOTE: a short suffix is a PREFIX-style match, so
+#                       --purpose aca matches BOTH snt-prj{nnn}-aca AND
+#                       snt-prj{nnn}-aca-002. To target ONLY the Foundry agent
+#                       (ACA) subnet, pass the fully-qualified suffix:
+#                       --purpose aca-002  ->  matches snt-prj{nnn}-aca-002 only.
 #
 # Example (single project 002):
 #   ./delete-subnets-for-projects.sh --projects-from 002 \
@@ -59,6 +69,7 @@ VNET_NAME=""
 SUBSCRIPTION_ID=""
 SKIP_NSG="false"
 WHATIF="false"
+PURPOSE=""
 
 usage() {
   grep '^#' "$0" | sed 's/^# \{0,1\}//'
@@ -74,6 +85,7 @@ while [ $# -gt 0 ]; do
     --subscription)   SUBSCRIPTION_ID="$2"; shift 2 ;;
     --skip-nsg)       SKIP_NSG="true";    shift 1 ;;
     --whatif)         WHATIF="true";      shift 1 ;;
+    --purpose)        PURPOSE="$2";       shift 2 ;;
     -h|--help)        usage ;;
     *) echo "Unknown argument: $1"; usage ;;
   esac
@@ -409,7 +421,9 @@ remove_project_networking() {
 # MAIN: loop over the project range, ONE project at a time.
 # -----------------------------------------------------------------------------
 for n in $(seq "$FROM_INT" "$TO_INT"); do
-  token="prj$(printf '%03d' "$n")-"
+  # Default token 'prj{nnn}-' matches all subnets of the project. A --purpose
+  # suffix narrows it to one purpose, e.g. 'prj{nnn}-aca' -> snt-prj{nnn}-aca*.
+  token="prj$(printf '%03d' "$n")-${PURPOSE}"
   remove_project_networking "$token"
   echo ""
 done
