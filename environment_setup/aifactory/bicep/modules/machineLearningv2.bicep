@@ -443,10 +443,10 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
-    // When the AKS cluster already exists, attach to it via its resourceId. When it is being created by the
-    // aksDev module (only deployed when !aksExists), reference that module's output id.
-    #disable-next-line BCP318
-    resourceId: aksExists ? aksResourceId : aksDev.outputs.aksId
+    // The AKS cluster id is deterministic whether it already exists or is created by the aksDev module
+    // (aksDev creates it with name=aksName in this resource group), so reference it by resourceId and avoid
+    // a module-output reference (which would add an unconditional dependsOn on a possibly-undeployed module).
+    resourceId: aksResourceId
     properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
@@ -477,10 +477,10 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
-    // When the AKS cluster already exists, attach to it via its resourceId. When it is being created by the
-    // aksTestProd module (only deployed when !aksExists), reference that module's output id.
-    #disable-next-line BCP318
-    resourceId: aksExists ? aksResourceId : aksTestProd.outputs.aksId
+    // The AKS cluster id is deterministic whether it already exists or is created by the aksTestProd module
+    // (aksTestProd creates it with name=aksName in this resource group), so reference it by resourceId and avoid
+    // a module-output reference (which would add an unconditional dependsOn on a possibly-undeployed module).
+    resourceId: aksResourceId
     properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
