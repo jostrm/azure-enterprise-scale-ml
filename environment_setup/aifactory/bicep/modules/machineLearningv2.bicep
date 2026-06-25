@@ -452,7 +452,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
       agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
       loadBalancerType: 'InternalLoadBalancer'
-    }, !aksExists ? {
+    }, !aksExists && enableAksForAzureML? {
       aksNetworkingConfiguration:  {
         subnetId: aksSubnetId
         dnsServiceIP:aksDnsServiceIP
@@ -463,7 +463,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     } : {})
   }
   dependsOn: [
-    ...(!aksExists ? [aksDev] : [])
+    ...(!aksExists && enableAksForAzureML? [aksDev] : [])
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
     azureMLv2Dev
   ]
@@ -486,7 +486,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
       agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
       loadBalancerType: 'InternalLoadBalancer'
-    }, !aksExists ? {
+    }, !aksExists && enableAksForAzureML? {
       aksNetworkingConfiguration:  {
         subnetId: aksSubnetId
         dnsServiceIP:aksDnsServiceIP
@@ -497,7 +497,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     } : {})
   }
   dependsOn: [
-    ...(!aksExists ? [aksTestProd] : [])
+    ...(!aksExists && enableAksForAzureML? [aksTestProd] : [])
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
     amlv2TestProd
   ]
