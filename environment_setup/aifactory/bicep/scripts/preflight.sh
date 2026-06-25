@@ -357,7 +357,7 @@ check_model_quota() { # $1 subId
     return 0
   fi
   for m in "${MODELS[@]}"; do
-    name="${m%%|*}"; sku="$(printf '%s' "$m" | cut -d'|' -f2)"; cap="${m##*|}"
+    name="${m%%|*}"; cap="${m##*|}"; sku="${m#*|}"; sku="${sku%|*}"
     qn="OpenAI.$sku.$name"
     line="$(printf '%s' "$usage" | az_jq_model "$qn")"
     if [ -z "$line" ]; then
@@ -403,7 +403,7 @@ check_cs_headroom() { # $1 subId
   payload="$(az rest --method get --url "$url" -o json 2>/dev/null)"
   [ -n "$payload" ] || { add_finding WARN CS_QUOTA_LOOKUP "Could not read Cognitive Services usage for '$LOCATION'." \
       "Verify Microsoft.CognitiveServices is registered and identity has Reader."; return 0; }
-  res="$(printf '%s' "$payload" | "$PYBIN" - <<'PY' 2>/dev/null || true
+  res="$(printf '%s' "$payload" | "$PYBIN" - <<'PY' 2>/dev/null
 import sys, json
 try: data = json.load(sys.stdin)
 except Exception: sys.exit(0)
@@ -442,8 +442,8 @@ PY
 )"
   [ -n "$count" ] || count=0
   echo "  Policy assignments on subscription $sub:"
-  printf '%s\n' "$count" | tail -n +2
-  echo "  ($(printf '%s' "$count" | head -n1) policy assignment(s) total)"
+  [ "$count" = "${count%%$'\n'*}" ] || printf '%s\n' "${count#*$'\n'}"
+  echo "  (${count%%$'\n'*} policy assignment(s) total)"
 }
 
 check_elasticsearch_block() { # $1 subId
@@ -459,7 +459,7 @@ check_elasticsearch_block() { # $1 subId
   # 2) Deny-policy heuristic: any assignment whose definition denies the Elastic
   #    resource type / Marketplace offer would block the deployment.
   json="$(az policy assignment list -o json 2>/dev/null)"
-  blocked="$(printf '%s' "$json" | "$PYBIN" - <<'PY' 2>/dev/null || true
+  blocked="$(printf '%s' "$json" | "$PYBIN" - <<'PY' 2>/dev/null
 import sys, json
 try: data = json.load(sys.stdin)
 except Exception: sys.exit(0)
