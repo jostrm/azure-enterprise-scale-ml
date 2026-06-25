@@ -50,6 +50,7 @@ jobs:
       # Project settings
       project_number_000: ${{ vars.PROJECT_NUMBER }}
       project_IP_whitelist: ${{ secrets.PROJECT_MEMBERS_IP_ADDRESS }}
+      acr_IP_whitelist: ${{ vars.ACR_IP_WHITELIST || '' }}
       technical_admins_ad_object_id: ${{ secrets.PROJECT_MEMBERS }}
       technical_admins_email: ${{ vars.PROJECT_MEMBERS_EMAILS }}
       project_service_principal_AppID_seeding_kv_name: ${{ vars.PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID }}

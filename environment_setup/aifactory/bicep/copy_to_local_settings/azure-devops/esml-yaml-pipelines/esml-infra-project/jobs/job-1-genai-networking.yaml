@@ -69,6 +69,62 @@ steps:
       echo "Resolved vnetResourceGroup: $VNET_RG"
       echo "Resolved vnetNameFull: $VNET_NAME"
       echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
+# ---------------------------------------------------------------------------
+# PREFLIGHT (config-only, fail-fast): validate CIDR sanity, BYO subnet names,
+# AKS networking and IP allowlists BEFORE this job creates the project subnets
+# (when BYO_subnets=false). Uses --skip-azure-lookups so it is fast/offline; the
+# heavier regional/quota/policy/model checks run later in job-2 (services).
+# Set preflight_skip=true to bypass; preflight_strict=true to also fail on warnings.
+# ---------------------------------------------------------------------------
+- task: AzureCLI@2
+  displayName: '00_preflight_network_cidr_checks'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh'
+    arguments: '--skip-azure-lookups --environment "$(dev_test_prod)" --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)"'
+  env:
+    PREFLIGHT_SKIP: $(preflight_skip)
+    admin_location: $(admin_location)
+    BYO_subnets: $(BYO_subnets)
+    common_vnet_cidr: $(common_vnet_cidr)
+    common_subnet_cidr: $(common_subnet_cidr)
+    common_subnet_scoring_cidr: $(common_subnet_scoring_cidr)
+    common_pbi_subnet_cidr: $(common_pbi_subnet_cidr)
+    common_bastion_subnet_cidr: $(common_bastion_subnet_cidr)
+    dev_cidr_range: $(dev_cidr_range)
+    test_cidr_range: $(test_cidr_range)
+    prod_cidr_range: $(prod_cidr_range)
+    subnetCommon: $(subnetCommon)
+    subnetCommonScoring: $(subnetCommonScoring)
+    subnetCommonPowerbiGw: $(subnetCommonPowerbiGw)
+    subnetProjGenAI: $(subnetProjGenAI)
+    subnetProjAKS: $(subnetProjAKS)
+    subnetProjAKS2: $(subnetProjAKS2)
+    subnetProjACA: $(subnetProjACA)
+    subnetProjACA2: $(subnetProjACA2)
+    subnetProjWebapp: $(subnetProjWebapp)
+    subnetProjDatabricksPublic: $(subnetProjDatabricksPublic)
+    subnetProjDatabricksPrivate: $(subnetProjDatabricksPrivate)
+    byoASEv3: $(byoASEv3)
+    byoAseFullResourceId: $(byoAseFullResourceId)
+    byoAseAppServicePlanResourceId: $(byoAseAppServicePlanResourceId)
+    aksEnablePrivateCluster: $(aksEnablePrivateCluster)
+    aksOutboundType: $(aksOutboundType)
+    aksPrivateDNSZone: $(aksPrivateDNSZone)
+    aksAzureFirewallPrivateIp: $(aksAzureFirewallPrivateIp)
+    enableAKS: $(enableAKS)
+    enableAksForAzureML: $(enableAksForAzureML)
+    enableAIFoundry: $(enableAIFoundry)
+    enableWebApp: $(enableWebApp)
+    enableFunction: $(enableFunction)
+    enableContainerApps: $(enableContainerApps)
+    enableDatabricks: $(enableDatabricks)
+    disableAgentNetworkInjection: $(disableAgentNetworkInjection)
+    project_IP_whitelist: $(project_IP_whitelist)
+    acr_IP_whitelist: $(acr_IP_whitelist)
 - task: AzureCLI@2
   displayName: '00_validate_byo_subnet_variables'
   condition: and(eq(variables['BYO_subnets'], 'true'), ne(variables['debug_disable_validation_tasks'], 'true'))
