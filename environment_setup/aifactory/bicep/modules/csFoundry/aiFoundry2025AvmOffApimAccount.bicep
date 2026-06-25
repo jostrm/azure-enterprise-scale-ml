@@ -190,20 +190,18 @@ var accountIdentity = useAgentInjectionUami ? {
 var ipRules = [for ip in ipAllowList: {
   value: contains(ip, '/') ? toLower(ip) : '${toLower(ip)}/24'
 }]
-var networkAclVirtualNetworkRules = concat(
-  !empty(privateEndpointSubnetResourceId) ? [
-    {
-      id: privateEndpointSubnetResourceId
-      ignoreMissingVnetServiceEndpoint: true // allow listed VNet without requiring service endpoint
-    }
-  ] : [],
-  agentNetworkInjectionEnabled ? [
-    {
-      id: agentSubnetResourceId
-      ignoreMissingVnetServiceEndpoint: true
-    }
-  ] : []
-)
+// NOTE: The agent subnet (delegated to Microsoft.App/environments) must NOT be added to
+// networkAcls.virtualNetworkRules. It is consumed ONLY via networkInjections (scenario=agent) below.
+// A delegated subnet is not a valid Cognitive Services VNet ACL rule; including it makes the account
+// PUT's network validation fail during agent capability host creation with:
+//   "Invalid vnet resource ID provided, or the virtual network could not be found."
+// This matches Microsoft's official standard-agent sample, which keeps virtualNetworkRules empty.
+var networkAclVirtualNetworkRules = !empty(privateEndpointSubnetResourceId) ? [
+  {
+    id: privateEndpointSubnetResourceId
+    ignoreMissingVnetServiceEndpoint: true // allow listed VNet without requiring service endpoint
+  }
+] : []
 var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(networkAclVirtualNetworkRules)
 var networkAcls = hasNetworkAcls ? {
   defaultAction: enablePublicGenAIAccess && empty(ipRules) ? 'Allow' : 'Deny'
