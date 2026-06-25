@@ -443,8 +443,10 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    // When the AKS cluster already exists, attach to it via its resourceId. When it is being created by the
+    // aksDev module (only deployed when !aksExists), reference that module's output id.
     #disable-next-line BCP318
-    resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
+    resourceId: aksExists ? aksResourceId : aksDev.outputs.aksId
     properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
@@ -461,6 +463,7 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     } : {})
   }
   dependsOn: [
+    ...(!aksExists ? [aksDev] : [])
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
     azureMLv2Dev
   ]
@@ -474,8 +477,10 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    // When the AKS cluster already exists, attach to it via its resourceId. When it is being created by the
+    // aksTestProd module (only deployed when !aksExists), reference that module's output id.
     #disable-next-line BCP318
-    resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
+    resourceId: aksExists ? aksResourceId : aksTestProd.outputs.aksId
     properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
@@ -492,6 +497,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     } : {})
   }
   dependsOn: [
+    ...(!aksExists ? [aksTestProd] : [])
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
     amlv2TestProd
   ]
