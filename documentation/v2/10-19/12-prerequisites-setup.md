@@ -74,6 +74,8 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
     - [How-to guide](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/initial-subscriptions): Create Azure subscriptions
     - [Read more](./14-networking-privateDNS.md) about AIFactory Enterprise Scale Landing Zones
 - B) Enable resource providers: Enable the resource providers as [specified here](./12-resourceproviders.md)
+    - This must be completed BEFORE running any AI Factory pipelines
+    - Without this, deployment will fail with "provider not registered" errors
     - [Tip: You can use the Powershell script to automate this](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1)
 
 ## 🔑 Step 3) Create an Azure keyvault for the admin of Microsoft Entra ID: The so called `seeding keyvault` (IaC purpose), and created Service principals
