@@ -3,15 +3,11 @@ param azureStorageConnection string
 param aiSearchConnection string
 param projectName string
 param accountName string
-@description('Optional name for the capability host. If omitted, a deterministic name is generated based on the selected level.')
+@description('Optional name for the project capability host. If omitted, a deterministic name is generated.')
 param projectCapHostName string = ''
-@description('When true, deploy the capability host at the account scope instead of the project scope.')
-param accountLevel bool = false
 
 var defaultProjectCapabilityHostName = 'chagent${replace(projectName, '-', '')}'
-var defaultAccountCapabilityHostName = 'chagent${replace(accountName, '-', '')}'
 var resolvedProjectCapabilityHostName = empty(projectCapHostName) ? defaultProjectCapabilityHostName : projectCapHostName
-var resolvedAccountCapabilityHostName = empty(projectCapHostName) ? defaultAccountCapabilityHostName : projectCapHostName
 
 // CRITICAL: Use API version 2025-07-01-preview for capability hosts (per AVM module)
 // AI Foundry resource (AI Services) - must use 2025-07-01-preview for capability host support
@@ -46,25 +42,16 @@ resource aiSearchConnectionResource 'Microsoft.CognitiveServices/accounts/projec
   parent: project
 }
 
-// Account-level capability host - Must be created BEFORE project capability host
-// NOTE: Name format follows AVM pattern - remove dashes from account name
-// IMPORTANT: Account capability host depends on project and connections per AVM pattern
-#disable-next-line BCP081
-resource accountCapabilityHost 'Microsoft.CognitiveServices/accounts/capabilityHosts@2025-07-01-preview' = if (accountLevel) {
-  name: resolvedAccountCapabilityHostName
-  parent: account
-  properties: {
-    capabilityHostKind: 'Agents'
-  }
-}
-
-// Project-level capability host - Created AFTER account capability host
-// NOTE: Name format follows AVM pattern - remove dashes from project name
+// Project-level capability host.
+// NOTE: The ACCOUNT-level capability host is intentionally NOT created here. In the agent network
+// injection scenario the platform auto-provisions it from the account's networkInjections; creating it
+// in Bicep would conflict/time out. For the non-injection (disableAgentNetworkInjection=true) path it is
+// created explicitly via aiFoundry2025AccountCaphost.bicep (which sets the matching customerSubnet).
 // NOTE: capabilityHostKind is NOT a valid property at project scope (only at account scope).
 //       Permissible project-level properties: vectorStoreConnections, threadStorageConnections,
 //       storageConnections, aiServicesConnections.
 #disable-next-line BCP081
-resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-09-01' = if (!accountLevel) {
+resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/capabilityHosts@2025-09-01' = {
   name: resolvedProjectCapabilityHostName
   parent: project
   properties: {
@@ -79,7 +66,4 @@ resource projectCapabilityHost 'Microsoft.CognitiveServices/accounts/projects/ca
   ]
 }
 
-#disable-next-line BCP318
-output projectCapHost string = !accountLevel ? string(projectCapabilityHost.name) : ''
-#disable-next-line BCP318
-output accountCapHost string = accountLevel ? string(accountCapabilityHost.name) : ''
+output projectCapHost string = projectCapabilityHost.name

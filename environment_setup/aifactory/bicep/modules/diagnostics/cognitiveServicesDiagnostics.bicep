@@ -16,8 +16,8 @@ param logAnalyticsWorkspaceId string
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
-@description('Optional. Cognitive Service name prefix for diagnostic setting')
-param diagnosticSettingName string = 'diag-${cognitiveServiceName}'
+@description('Optional. Name of the diagnostic setting. Defaults to "default" so PUT idempotently updates any pre-existing policy-created diagnostic setting that already pins the Log Analytics workspace (Azure rejects a second setting reusing the same sink + category).')
+param diagnosticSettingName string = 'default'
 
 // Reference to existing Cognitive Service
 resource cognitiveService 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {

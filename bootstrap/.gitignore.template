@@ -121,3 +121,7 @@ temp_data/
 02_update_templates_QUICK.ipynb
 01_init_templates_ALL.ipynb
 
+# Hidden dot-folders: ignore all (e.g. .tools, .idea, .vs) except .github
+.*/
+!.github/
+

@@ -62,12 +62,12 @@ variables:
   privDnsSubscription_param: "<todo>_SubscriptionID" # <optional>Hub DNS subscription ID<default><todo>_SubscriptionID<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity subscription ID where central private DNS zones are deployed.
   privDnsResourceGroup_param: "<todo>_ResourceGroup_name" # <optional>Hub DNS resource group<default><todo>_ResourceGroup_name<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity resource group where central private DNS zones are deployed.
   tenantId: "<todo>_TenantId" # <mandatory>Azure tenant ID<default><todo>_TenantId<ensure> find in Azure Portal > Entra ID > Overview (Directory ID).
-  databricksOID: "<todo>_ObjectID" # <optional>Databricks object ID<default><todo>_ObjectID<mandatory> if enableDatabricks:'true' <ensure> find Databricks object ID in Entra ID.
+  databricksOID: "<optional>_ObjectID" # <optional>Databricks object ID<default><todo>_ObjectID<mandatory> if enableDatabricks:'true' <ensure> find Databricks object ID in Entra ID.
   databricksPrivate: "true" # <optional>Databricks private control plane<default>true<keep-as-is> <otherwise> false, only data plane is private; control plane is public.
   AMLStudioUIPrivate: "true" # <optional>AML Studio UI private access<default>true<keep-as-is> <otherwise> false, only data plane is private; control plane is public.
-  inputCommonSPIDKey: "<todo>esml-common-sp-id" # <mandatory>Seeding KV secret name for common SP App ID<default>esml-common-sp-id<ensure> name matches the secret in your Seeding Keyvault.
-  inputCommonSPSecretKey: "<todo>esml-common-sp-secret" # <mandatory>Seeding KV secret name for common SP secret<default>esml-common-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
-  commonServicePrincipleOIDKey: "<todo>esml-common-sp-oid" # <mandatory>Seeding KV secret name for common SP OID<default>esml-common-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
+  inputCommonSPIDKey: "<optional>esml-common-sp-id" # <optional>Seeding KV secret name for common SP App ID<default>esml-common-sp-id<ensure> name matches the secret in your Seeding Keyvault.
+  inputCommonSPSecretKey: "<optional>esml-common-sp-secret" # <optional>Seeding KV secret name for common SP secret<default>esml-common-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
+  commonServicePrincipleOIDKey: "<optional>esml-common-sp-oid" # <optional>Seeding KV secret name for common SP OID<default>esml-common-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
    
   # ============================================================================
   # MANDATORY(CHANGE ONCE): Azure Devops
@@ -106,8 +106,6 @@ variables:
   # MANDATORY(CHANGE RARELY):Diagnostics - on all resources.
   # ============================================================================
   diagnosticSettingLevel: "gold" # <optional>Diagnostics level<default>gold<keep-as-is> <otherwise> silver or bronze for less verbose (lower cost) logging.
-  # ============================================================================
-
   # ============================================================================
   # MANDATORY(CHANGE RARELY): AI Factory scale set.
   # WHAT: 
@@ -159,9 +157,9 @@ variables:
 ## ============================================================================
 ## START - FOR EACH PROJECT (MANDATORY), PRE SETUP
 ## ============================================================================
-  project_service_principal_AppID_seeding_kv_name: "esml-project001-sp-id" # <mandatory>Project SP App ID secret name in seeding KV<default>esml-project001-sp-id<ensure> name matches the secret in your Seeding Keyvault.
-  project_service_principal_OID_seeding_kv_name: "esml-project001-sp-oid" # <mandatory>Project SP OID secret name in seeding KV<default>esml-project001-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
-  project_service_principal_Secret_seeding_kv_name: "esml-project001-sp-secret" # <mandatory>Project SP secret name in seeding KV<default>esml-project001-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_AppID_seeding_kv_name: "<optional>esml-project001-sp-id" # <optional>Project SP App ID secret name in seeding KV<default>esml-project001-sp-id<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_OID_seeding_kv_name: "<optional>esml-project001-sp-oid" # <optional>Project SP OID secret name in seeding KV<default>esml-project001-sp-oid<ensure> name matches the secret in your Seeding Keyvault.
+  project_service_principal_Secret_seeding_kv_name: "<optional>esml-project001-sp-secret" # <optional>Project SP secret name in seeding KV<default>esml-project001-sp-secret<ensure> name matches the secret in your Seeding Keyvault.
   project_number_000: "001" # <mandatory>Project number<default>001<keep-as-is> For 1st project. <otherwise> increment to '002', '003', etc.
   tag_costcenter: "1234" # <optional>Project cost center tag<default>1234<keep-as-is> Metadata for per-project cost tracking on resource group level.
   tagsProject: '{"CostCenter":"$(tag_costcenter)","Description":"RAG Chat 1","AIF-Branch":"$(tag_repository_branch)/project$(project_number_000)","AIF-Scaleset":"$(admin_aifactorySuffixRG)","AIF-Environment":"$(dev_test_prod)","AIF-Project Owners":"$(technical_admins_email)","AIFactory project":"$(project_number_000)","AIF-Networking":"$(allowPublicAccessWhenBehindVnet),$(enablePublicGenAIAccess),$(enablePublicAccessWithPerimeter)","AIF-enableAIFactoryCreatedDefaultProjectForAIFv2":"$(enableAIFactoryCreatedDefaultProjectForAIFv2)","AIF-disableAgentNetworkInjection":"$(disableAgentNetworkInjection)","AIF-byoASEv3":"$(byoASEv3)","AIF-BYO_subnets":"$(BYO_subnets)"}'
@@ -190,9 +188,10 @@ variables:
   # ============================================================================
   
   # === Complete mode vs Incremental mode ===
-  enableDeleteForDisabledResources: true # <optional>Delete disabled services<default>true<keep-as-is> <otherwise> false, keeps all existing resources regardless of ENABLE_* flags.
-  deleteAllServicesForProject: false # <optional>Delete all project services<default>false<keep-as-is> <otherwise> true, deletes all services in project RG in step 04 then quits pipeline (foundational services like KV, Storage, AppInsights are retained).
-  deleteAllForProject: false # <optional>ULTRA DELETE MODE - Delete ALL resources in project RG and networking resources (subnets, NSGs) in common RG. Use with extreme caution!
+  enableDeleteForDisabledResources: "true" # <optional>Delete disabled services<default>true<keep-as-is> <otherwise> false, keeps all existing resources regardless of ENABLE_* flags.
+  deleteAllServicesForProject: "false" # <optional>Delete all project services<default>false<keep-as-is> <otherwise> true, deletes all services in project RG in step 04 then quits pipeline (Key Vault retained by default; set deleteKeyvaultAlso:'true' to also delete it).
+  deleteKeyvaultAlso: "false" # <optional>Also delete Key Vault when deleteAllServicesForProject:'true'<default>false<recommended> false, retains Key Vault as a safety net (secrets, CMK keys, RBAC). <otherwise> true, also deletes the project Key Vault.
+  deleteAllForProject: "false" # <optional>ULTRA DELETE MODE - Delete ALL resources in project RG and networking resources (subnets, NSGs) in common RG. Use with extreme caution!
 
   # === Defender for Cloud: Defender for AI ===
   enableDefenderforAISubLevel: "false" # <optional>Defender for AI at subscription level<default>false<keep-as-is> <otherwise> true, enable Microsoft Defender for AI at subscription level.
@@ -317,8 +316,8 @@ variables:
   # ============================================================================
   # OPTIONAL: GENAI: Default Models to start with.
   # ============================================================================
-  deployModel_gpt_X: "false" # <optional>Deploy custom GPT-X model<default>false<keep-as-is> <otherwise> true, deploy the model defined in modelGPTXName.
-  modelGPTXName: "gpt-5-mini" # <optional>GPT-X model name<default>gpt-5-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
+  deployModel_gpt_X: "true" # <optional>Deploy custom GPT-X model<default>false<keep-as-is> <otherwise> true, deploy the model defined in modelGPTXName.
+  modelGPTXName: "gpt-5.1" # <optional>GPT-X model name<default>gpt-5-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
   modelGPTXVersion: "" # <optional>GPT-X model version<default>""<keep-as-is> <otherwise> pin to a specific version string.
   modelGPTXSku: "DataZoneStandard" # <optional>GPT-X deployment SKU<default>DataZoneStandard<keep-as-is> ['Standard','DataZoneStandard','GlobalStandard']
   modelGPTXCapacity: 30 # <optional>GPT-X TPM capacity (K)<default>30<keep-as-is> 30 = 30K tokens per minute.
@@ -333,7 +332,7 @@ variables:
   deployModel_gpt_54_mini: "false"
   default_gpt_54_mini_version: "2026-03-17"
 
-  deployModel_gpt_4o: "true" # <optional>Deploy gpt-4o<default>true<keep-as-is> <recommended> for general-purpose AI Foundry scenarios.
+  deployModel_gpt_4o: "false" # <optional>Deploy gpt-4o<default>true<keep-as-is> <recommended> for general-purpose AI Foundry scenarios.
   default_gpt_4o_version: "2024-11-20" # <optional>gpt-4o version<default>2024-11-20<keep-as-is> <otherwise> "2024-08-06".
 
   default_gpt_capacity: 40 # <optional>GPT model TPM capacity (K)<default>40<keep-as-is> 40 = 40K tokens per minute.
@@ -377,6 +376,7 @@ variables:
   subnetProjAKS2: "snt-<network_env>prj<xxx>-aks2" # <optional>BYO project secondary AKS subnet<default>snt-<network_env>prj<xxx>-aks2<mandatory> if BYO_subnets:'true' <ensure> subnet exists.
   subnetProjACA: "snt-prj<xxx>-aca" # <optional>ContainerApps subnet. BYO project Container Apps subnet<default>snt-prj<xxx>-aca<mandatory> if BYO_subnets:'true' <ensure> subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.
   subnetProjACA2: "snt-prj<xxx>-aca2" # <optional>Agent subnet. BYO project secondary Container Apps subnet<default>snt-prj<xxx>-aca2<mandatory> if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false'
+  subnetProjWebapp: "snt-prj<xxx>-webapp" # <optional>App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)<default>snt-prj<xxx>-webapp<mandatory> if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') <ensure> subnet exists.
   subnetProjDatabricksPublic: "snt-prj001-dbxpub" # <optional>BYO Databricks public subnet<default>snt-prj001-dbxpub<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # <optional>BYO Databricks private subnet<default>snt-prj<xxx>-dbxpriv<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   byoASEv3: "false" # <optional>Use BYO App Service Environment v3<default>false<keep-as-is> <otherwise> true, use an existing ASEv3 specified in byoAseFullResourceId.

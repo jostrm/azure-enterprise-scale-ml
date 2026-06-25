@@ -73,17 +73,17 @@ The below files will be updated via `bash` scripts:
     bash ./03-ADO-YAML-bootstrap-files-no-var-overwrite.sh
     ```
 
-4) Do a "file compare" (using VS code or similar) with  `variables.yaml` VS  `variables-template.yaml`
-    - Compare the file, to see if any new variables have been added, that you need to set, then set them
-    - Example below: 
-    ```yaml
-    # ============================================================================
-    # MANDATORY(CHANGE RARELY):RBAC restrictions
-    # ============================================================================
-  BYOContributorRoleID: "b24988ac-6180-42a0-ab88-20f7382dd24c" # <optional>Contributor role ID<default>b24988ac-6180-42a0-ab88-20f7382dd24c<keep-as-is> Azure built-in Contributor. <otherwise> provide a custom role ID for finer-grained access control.
-  disableContributorAccessForUsers: "false" # <optional>Disable Contributor for project users<default>false<recommended> false, enables users to create artifacts (managed online endpoints etc). <otherwise> true, restrict Contributor access.
-  disableRBACAdminOnRGForUsers: "true" # <optional>Disable RBAC Admin on RG for project users<default>true<recommended> true, restricts users from assigning RBAC at resource group scope.
-    ```
+4) Do a "file compare" (using VS code or similar) or Github copilot. Compare your `variables.yaml` VS `variables-template.yaml`
+
+
+**Github copilot prompt**
+
+`Compare the variables.yaml under my folder aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml with the newer variables-template.yaml in same folder. Copy all values from variables.yaml into the new template variables-template.yaml. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in variables-template.yaml. After this then rename variables.yaml to variables.bak and variables-template.yaml to variables.yaml`
+
+**Traditioanl compare tool**
+
+    - Compare the file with a file comparing tool such as VS Code, or Git, to see if any new variables have been added, that you need to set, then set them. 
+
 **Finished!**
 
 </details>
@@ -109,14 +109,21 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
     git submodule foreach 'git checkout "release/v1.24" && git pull origin "release/v1.24"'
     ```
 
-2) Run the START script - to ensure you have the latest bootstrap scripts. 
+2) Run the START script - to ensure you have the latest bootstrap bash scripts at your root.
     - friendly, will never overwrite anything exist .sh files at root
     
     ```bash
     bash ./azure-enterprise-scale-ml/00-start.sh
     ```
 
-3) Run the below - It will UPDATE Azure Devops pipeline templates, under `aifactory/esml-infa/azure-devops`
+3) Run BASH script - to copy files to your repo `aifactory/esml-infa/github-actions/bicep` from the submodule
+    - friendly, will never overwrite anything exist .sh files at root
+    
+    ```bash
+    bash 01-aif-copy-aifactory-templates.sh
+    ```
+
+4) Run BASH script, to UPDATE pipeline templates, under `.github\workflows` in your repo, from your repos  `aifactory/esml-infa/github-actions/bicep`
     - Friendly: 
         - It will NOT overwrite your `.env`. This will create a new variable file next to your `.env` called `.env.template`
         - It will NOT overwrite your `parameter` folder. 
@@ -126,29 +133,15 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
     bash ./03-GH-bootstrap-files-no-env-overwrite.sh
     ```
 
-4) Do a "file compare" (using VS code or similar) with  `.env` VS  `.env.template`
+4) Do a "file compare" (using VS code or similar) or with Github Copilot with  `.env` VS  `.env.template`
+
+**Github copilot prompt**
+
+`Compare the .env file at root, with the newer .env.template. Copy all values from .env into the new template .env.template. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in .env.template. After this , then rename .env to .env.bak and env.template to .env`
+
+**Traditioanl compare tool**
+
 Compare the file, to see if any new environment variables have been added, that you need to set, then set them
-
-Example below: 
-
-```yaml
-# Networking: Bring your own subnets (BYO_subnets=true) - optional (leave empty string to disable).  Otherwise, leave it empty and the pipeline will create new subnets, based on the CIDR in 12-esml-cmn-parameters.json
-BYO_subnets: "false" # false, the default subnets created by the pipeline. Azure Devops pipeline, will automatically not run Networking step, if true
-network_env_dev: "" # Example: "dev-" Default is empty string. Set to empty if  BYO_subnets: "false"
-network_env_stage: "" # Example: "stage-"
-network_env_prod: "" # # Example: "prod-"
-```
-
-5) `Rare cases`: Added or updated base `parameter` files, or parameters inside of files
-    - Friendly: It will NOT overwrie your `aifactory` folder. It will create a new folder at root called `aifactory-templates`
-    - TODO: Check the `release-notes` to see which file need to be updated. Example: Lately most changes is in 
-        - `10-esml-globals-override.json`
-        - `31-esgenai-default.json`
-    - You may also do a file compare on each file in `aifactory-template/parameters`, with your files `aifactory/parameters`, to see if any parameters are added or removed. 
-
-    ```bash
-    bash ./01-aif-copy-aifactory-templates.sh
-    ```
 
 **Finished!**
 </details>

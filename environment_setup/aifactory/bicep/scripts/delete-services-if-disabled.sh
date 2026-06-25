@@ -21,18 +21,26 @@ projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced
 
 echo "Target resource group: $projectResourceGroup"
 
-# Complete mode: deleteAllServicesForProject deletes EVERYTHING including KeyVault, Storage, AppInsights, and networking resources in common RG (subnets, NSGs)
+# Complete mode: deleteAllServicesForProject deletes EVERYTHING including KeyVault (if deleteKeyvaultAlso=true), Storage, AppInsights, and networking resources in common RG (subnets, NSGs)
 # Ultra mode: deleteAllForProject does everything from deleteAllServicesForProject PLUS deletes the project resource group itself
+# Safety flag: deleteKeyvaultAlso (default false) preserves the project Key Vault when deleteAllServicesForProject=true.
+#              Set to true to also delete the Key Vault (e.g. for a full teardown).
 # Normalize to lowercase because ADO serializes unquoted YAML booleans as "True"/"False" (capital T/F)
 # and all bash comparisons in this script use lowercase "true"/"false"
 deleteAllServicesForProject=$(echo "${deleteAllServicesForProject:-false}" | tr '[:upper:]' '[:lower:]')
 deleteAllForProject=$(echo "${deleteAllForProject:-false}" | tr '[:upper:]' '[:lower:]')
+deleteKeyvaultAlso=$(echo "${deleteKeyvaultAlso:-false}" | tr '[:upper:]' '[:lower:]')
 echo ""
 echo "=== Delete Mode ==="
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
 echo "deleteAllForProject: $deleteAllForProject"
+echo "deleteKeyvaultAlso: $deleteKeyvaultAlso"
 if [ "$deleteAllServicesForProject" = "true" ]; then
-  echo "🔥 deleteAllServicesForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources in common RG"
+  if [ "$deleteKeyvaultAlso" = "true" ]; then
+    echo "🔥 deleteAllServicesForProject=true + deleteKeyvaultAlso=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources in common RG"
+  else
+    echo "🔥 deleteAllServicesForProject=true (deleteKeyvaultAlso=false): EVERYTHING will be deleted EXCEPT KeyVault (Storage, AppInsights, and networking resources in common RG are deleted)"
+  fi
 fi
 if [ "$deleteAllForProject" = "true" ]; then
   echo "💀 deleteAllForProject=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, networking resources, AND the entire project resource group"
@@ -40,7 +48,8 @@ fi
 
 # =============================================================================
 # SERVICES THAT ARE ** NEVER ** DELETED BY THIS SCRIPT (any flag value):
-#   - Key Vault          (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
+#   - Key Vault          (deleted only when deleteAllServicesForProject=true AND deleteKeyvaultAlso=true,
+#                         OR when deleteAllForProject=true which removes the whole RG)
 #   - Storage Accounts   (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
 #   - Application Insights / Dashboard Insights (deleted only in deleteAllServicesForProject or deleteAllForProject mode)
 #   - AI Foundry Hub v1 (MachineLearningServices/workspaces kind=Hub)
@@ -656,16 +665,38 @@ if [ "$enableFunction" = "false" ] && [ "$functionAppExists" = "true" ]; then
     fi
     
     # STEP 3: Delete the Function App itself
+    # NOTE: az functionapp delete is known to spuriously print
+    #   "ERROR: Operation returned an invalid status 'Not Found'"
+    # even on a successful delete (the LRO polling URL 404s once the resource
+    # is gone). We therefore ignore the CLI exit code and instead VERIFY the
+    # resource is actually absent by re-querying ARM.
     echo "Deleting Function App: $func_name"
-    az functionapp delete \
+    delete_output=$(az functionapp delete \
       --resource-group "$projectResourceGroup" \
-      --name "$func_name" 2>&1
-    
-    if [ $? -eq 0 ]; then
-      echo "✅ Successfully deleted Function App"
+      --name "$func_name" 2>&1) || true
+    if [ -n "$delete_output" ]; then
+      echo "$delete_output"
+    fi
+
+    # Verify deletion (give ARM up to ~30s to propagate)
+    func_still_there=""
+    for attempt in 1 2 3 4 5 6; do
+      func_still_there=$(az functionapp show \
+        --resource-group "$projectResourceGroup" \
+        --name "$func_name" \
+        --query "id" -o tsv 2>/dev/null || echo "")
+      if [ -z "$func_still_there" ]; then
+        break
+      fi
+      sleep 5
+    done
+
+    if [ -z "$func_still_there" ]; then
+      echo "✅ Successfully deleted Function App: $func_name"
       echo "##vso[task.setvariable variable=functionAppExists]false"
     else
-      echo "❌ Failed to delete Function App"
+      echo "##[warning]❌ Function App still present after delete attempt: $func_still_there"
+      echo "##[warning]   CLI output was: ${delete_output:-<empty>}"
     fi
     
     # STEP 4: Delete App Service Plan (only if NOT using BYO ASE v3)
@@ -2279,11 +2310,22 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   # Step 2: Delete Application Insights
   echo ""
   echo "=== Step 2: Deleting Application Insights (all in resource group) ==="
-  app_insights=$(az monitor app-insights component list \
+  # Use 'az resource list' as the primary query — it doesn't require the application-insights CLI
+  # extension and reliably surfaces both classic and workspace-based AI components.
+  app_insights=$(az resource list \
     --resource-group "$projectResourceGroup" \
+    --resource-type "microsoft.insights/components" \
     --query "[].name" \
     -o tsv 2>/dev/null | tr -d '\r' || echo "")
-  
+
+  # Fallback to the extension-based list in case the resource provider query was filtered out
+  if [ -z "$app_insights" ]; then
+    app_insights=$(az monitor app-insights component list \
+      --resource-group "$projectResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null | tr -d '\r' || echo "")
+  fi
+
   if [ -n "$app_insights" ]; then
     ai_count=$(echo "$app_insights" | wc -l)
     echo "Found $ai_count Application Insights instance(s)"
@@ -2291,10 +2333,14 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     while IFS= read -r ai_name; do
       if [ -n "$ai_name" ]; then
         echo "  Deleting Application Insights: $ai_name"
-        if az monitor app-insights component delete \
+        # NOTE: 'az monitor app-insights component delete' requires the application-insights
+        # extension AND does NOT support --yes (it has no prompt, but rejects the flag).
+        # Use 'az resource delete' which is built-in, non-interactive, and works for both
+        # classic and workspace-based components.
+        if az resource delete \
           --resource-group "$projectResourceGroup" \
-          --app "$ai_name" \
-          --yes 2>&1; then
+          --resource-type "microsoft.insights/components" \
+          --name "$ai_name" 2>&1; then
           echo "    ✓ Successfully deleted: $ai_name"
         else
           echo "    ✗ Failed to delete: $ai_name"
@@ -2338,30 +2384,35 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     echo "No dashboards found"
   fi
   
-  # Step 4: Delete Key Vaults
+  # Step 4: Delete Key Vaults (gated by deleteKeyvaultAlso flag)
   echo ""
   echo "=== Step 4: Deleting Key Vaults ==="
-  keyvaults=$(az keyvault list \
-    --resource-group "$projectResourceGroup" \
-    --query "[].name" \
-    -o tsv 2>/dev/null || echo "")
-  
-  if [ -n "$keyvaults" ]; then
-    while IFS= read -r kv_name; do
-      if [ -n "$kv_name" ]; then
-        echo "Deleting Key Vault: $kv_name"
-        # Delete private endpoints first
-        delete_private_endpoints "$kv_name" "Microsoft.KeyVault/vaults"
-        # Delete the Key Vault (soft delete)
-        az keyvault delete \
-          --name "$kv_name" \
-          --resource-group "$projectResourceGroup" \
-          2>&1 || echo "  Warning: Failed to delete Key Vault $kv_name"
-      fi
-    done <<< "$keyvaults"
-    echo "✓ Key Vaults deleted (soft-deleted, use purge later if needed)"
+  if [ "$deleteKeyvaultAlso" != "true" ]; then
+    echo "⏭  Skipping Key Vault deletion: deleteKeyvaultAlso=false (Key Vault is preserved as a safety net)."
+    echo "   Set deleteKeyvaultAlso=true to also delete the project Key Vault."
   else
-    echo "No Key Vaults found"
+    keyvaults=$(az keyvault list \
+      --resource-group "$projectResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null || echo "")
+
+    if [ -n "$keyvaults" ]; then
+      while IFS= read -r kv_name; do
+        if [ -n "$kv_name" ]; then
+          echo "Deleting Key Vault: $kv_name"
+          # Delete private endpoints first
+          delete_private_endpoints "$kv_name" "Microsoft.KeyVault/vaults"
+          # Delete the Key Vault (soft delete)
+          az keyvault delete \
+            --name "$kv_name" \
+            --resource-group "$projectResourceGroup" \
+            2>&1 || echo "  Warning: Failed to delete Key Vault $kv_name"
+        fi
+      done <<< "$keyvaults"
+      echo "✓ Key Vaults deleted (soft-deleted, use purge later if needed)"
+    else
+      echo "No Key Vaults found"
+    fi
   fi
   
   # Step 4a: Delete AI Search Private Endpoints (aisearchprj*)
@@ -2457,16 +2508,48 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     -o tsv 2>/dev/null || echo "")
   
   if [ -n "$uamis" ]; then
+    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r uami_name; do
       if [ -n "$uami_name" ]; then
         echo "Deleting User Assigned Managed Identity: $uami_name"
-        az identity delete \
+
+        # Pre-step: remove any Federated Identity Credentials on the UAMI.
+        # A UAMI with attached FICs returns 'Bad Request' from az identity delete.
+        fic_names=$(az identity federated-credential list \
+          --identity-name "$uami_name" \
           --resource-group "$projectResourceGroup" \
-          --name "$uami_name" \
-          2>&1 || echo "  Warning: Failed to delete $uami_name"
+          --query "[].name" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        if [ -n "$fic_names" ]; then
+          while IFS= read -r fic_name; do
+            if [ -n "$fic_name" ]; then
+              echo "  Removing federated credential: $fic_name"
+              az identity federated-credential delete \
+                --identity-name "$uami_name" \
+                --resource-group "$projectResourceGroup" \
+                --name "$fic_name" \
+                --yes 2>&1 || echo "    Warning: failed to delete FIC $fic_name"
+            fi
+          done <<< "$fic_names"
+        fi
+
+        # Primary delete
+        if az identity delete \
+          --resource-group "$projectResourceGroup" \
+          --name "$uami_name" 2>&1; then
+          echo "  ✓ Deleted: $uami_name"
+        else
+          # REST API fallback (uses 2023-01-31 GA API)
+          echo "  Primary delete failed for $uami_name — attempting REST fallback"
+          rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${uami_name}?api-version=2023-01-31"
+          if az rest --method DELETE --url "$rest_url" 2>&1; then
+            echo "  ✓ REST delete succeeded: $uami_name"
+          else
+            echo "  ⚠️  Warning: Failed to delete $uami_name (likely still referenced by an Azure resource — check role assignments, ACA env, or AKS workload identity)"
+          fi
+        fi
       fi
     done <<< "$uamis"
-    echo "✓ User Assigned Managed Identities deleted"
+    echo "✓ User Assigned Managed Identities deletion completed"
   else
     echo "No User Assigned Managed Identities found with prefix mi-prj or mi-aca-prj"
   fi
@@ -2479,11 +2562,62 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     --resource-group "$projectResourceGroup" \
     --query "[].name" \
     -o tsv 2>/dev/null | tr -d '\r' || echo "")
-  
+
+  # When deleteKeyvaultAlso=false, build a list of Key Vault private endpoints to PRESERVE
+  # (and capture their NIC names so the Step 5a NIC sweep also skips them).
+  kv_pends_to_preserve=""
+  kv_nics_to_preserve=""
+  if [ "$deleteKeyvaultAlso" != "true" ]; then
+    kv_names_preserve=$(az keyvault list \
+      --resource-group "$projectResourceGroup" \
+      --query "[].name" \
+      -o tsv 2>/dev/null || echo "")
+    if [ -n "$kv_names_preserve" ]; then
+      while IFS= read -r _kv_name; do
+        if [ -n "$_kv_name" ]; then
+          # Match the same naming patterns as delete_private_endpoints()
+          _kv_pends=$(az network private-endpoint list \
+            --resource-group "$projectResourceGroup" \
+            --query "[?(name == '${_kv_name}' || starts_with(name, '${_kv_name}-pend') || starts_with(name, 'p-${_kv_name}') || starts_with(name, 'pend-${_kv_name}') || contains(name, '-${_kv_name}-') || contains(name, '-${_kv_name}'))].name" \
+            -o tsv 2>/dev/null | tr -d '\r' || echo "")
+          if [ -n "$_kv_pends" ]; then
+            kv_pends_to_preserve="${kv_pends_to_preserve}${_kv_pends}"$'\n'
+            # Capture NIC names attached to those PEs (PE NIC name pattern: <pend>.nic.<guid>)
+            while IFS= read -r _kv_pend; do
+              if [ -n "$_kv_pend" ]; then
+                _kv_pe_nics=$(az network private-endpoint show \
+                  --resource-group "$projectResourceGroup" \
+                  --name "$_kv_pend" \
+                  --query "networkInterfaces[].id" \
+                  -o tsv 2>/dev/null | awk -F'/' '{print $NF}' | tr -d '\r' || echo "")
+                if [ -n "$_kv_pe_nics" ]; then
+                  kv_nics_to_preserve="${kv_nics_to_preserve}${_kv_pe_nics}"$'\n'
+                fi
+              fi
+            done <<< "$_kv_pends"
+          fi
+        fi
+      done <<< "$kv_names_preserve"
+    fi
+    if [ -n "$kv_pends_to_preserve" ]; then
+      echo "⏭  Preserving Key Vault private endpoints (deleteKeyvaultAlso=false):"
+      echo "$kv_pends_to_preserve" | sed '/^$/d' | sed 's/^/    - /'
+    fi
+    if [ -n "$kv_nics_to_preserve" ]; then
+      echo "⏭  Preserving Key Vault NICs (deleteKeyvaultAlso=false):"
+      echo "$kv_nics_to_preserve" | sed '/^$/d' | sed 's/^/    - /'
+    fi
+  fi
+
   if [ -n "$all_pends" ]; then
     subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r pend_name; do
       if [ -n "$pend_name" ]; then
+        # Skip KV-related private endpoints when preserving the Key Vault
+        if [ -n "$kv_pends_to_preserve" ] && echo "$kv_pends_to_preserve" | grep -Fxq "$pend_name"; then
+          echo "⏭  Skipping Key Vault private endpoint: $pend_name (deleteKeyvaultAlso=false)"
+          continue
+        fi
         echo "Deleting private endpoint: $pend_name"
         # Try normal delete first (without --no-wait to detect failures)
         delete_output=$(az network private-endpoint delete \
@@ -2530,6 +2664,11 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   if [ -n "$all_nics" ]; then
     while IFS= read -r nic_name; do
       if [ -n "$nic_name" ]; then
+        # Skip NICs attached to Key Vault private endpoints when preserving the Key Vault
+        if [ -n "$kv_nics_to_preserve" ] && echo "$kv_nics_to_preserve" | grep -Fxq "$nic_name"; then
+          echo "⏭  Skipping Key Vault NIC: $nic_name (deleteKeyvaultAlso=false)"
+          continue
+        fi
         echo "Deleting NIC: $nic_name"
         az network nic delete \
           --resource-group "$projectResourceGroup" \
@@ -2572,8 +2711,21 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   echo "✓ Wait completed"
   
   # Step 7: Build common resource group name (with vnetResourceGroupBase)
-  # Match the naming convention from pipeline: ${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}
-  commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+  # Precedence:
+  #   1) BYO override: commonResourceGroup_param (full RG name) — used as-is when non-empty
+  #   2) Built name: ${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}
+  # Defensive fallback: if vnetResourceGroupBase is empty (e.g. missing from env block), default to "esml-common"
+  # to avoid building a malformed name like "ingka-aif--swe-dev-002".
+  if [ -z "${vnetResourceGroupBase:-}" ]; then
+    echo "⚠️  vnetResourceGroupBase is empty — defaulting to 'esml-common' (check that the 06b env block exports it)"
+    vnetResourceGroupBase="esml-common"
+  fi
+  if [ -n "${commonResourceGroup_param:-}" ]; then
+    commonResourceGroup="$commonResourceGroup_param"
+    echo "Using BYO commonResourceGroup_param: $commonResourceGroup"
+  else
+    commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+  fi
   echo ""
   echo "=== Step 7: Deleting Subnets in Common Resource Group ==="
   
@@ -2581,8 +2733,26 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     echo "⚠️  SKIPPED: Private endpoint/NIC deletion failures detected"
     echo "⚠️  Subnets cannot be deleted until all private endpoints and NICs are removed"
   else
+    # -----------------------------------------------------------------
+    # CASE-INSENSITIVE, SCOPE-TIGHT PROJECT FILTER
+    #
+    # Why: JMESPath contains() is case-sensitive. AI Foundry's capability
+    # host / network-injection auto-provisioning has been observed to
+    # rewrite the agent subnet name in uppercase (e.g. snt-prj012-genai
+    # comes back as SNT-PRJ012-GENAI). With the old filter
+    # contains(name, 'prj012') the GENAI subnet (and any other resource
+    # whose case was rewritten) silently dropped out of the match list,
+    # so Pass 1 / Pass 2 / Step 8 looked like they ran cleanly but only
+    # touched the one subnet/NSG that was still lowercase.
+    #
+    # Fix: lower-case the name on the server side AND require the
+    # 'prj{nnn}-' prefix (with trailing dash) so that e.g. prj012 cannot
+    # accidentally match prj0120-* in a multi-project shared VNet.
+    # -----------------------------------------------------------------
+    # Lowercase, dash-suffixed scope token: e.g. 'prj012-'
+    projectFilterToken="prj${projectNumber}-"
     echo "Common resource group: $commonResourceGroup"
-    echo "Looking for subnets containing: $projectName"
+    echo "Project filter token (case-insensitive substring): '$projectFilterToken'"
     echo "Debug - commonRGNamePrefix: $commonRGNamePrefix"
     echo "Debug - vnetResourceGroupBase: $vnetResourceGroupBase"
     echo "Debug - locationSuffix: $locationSuffix"
@@ -2596,31 +2766,234 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
       -o tsv 2>/dev/null || echo "")
     
     if [ -n "$vnets" ]; then
+      # ---------------------------------------------------------------
+      # PASS 1: Detach NSG / RouteTable / Delegations / ServiceEndpoints from
+      # every project subnet across all VNets. This MUST happen before we try
+      # to delete the NSGs (Step 8), otherwise NSG delete returns
+      # InUseNetworkSecurityGroupCannotBeDeleted. We do this even if the
+      # subnet itself ultimately can't be removed (e.g. Service Association
+      # Links from ACA / Foundry managed env — those only clear when the
+      # parent caphost / account fully deletes).
+      # ---------------------------------------------------------------
+      echo ""
+      echo "--- Pass 1/2: Detaching NSG / RouteTable / Delegations from project subnets ---"
+      # Helper: wait until the VNet is back at provisioningState=Succeeded
+      # before issuing the next PATCH/DELETE. Azure serializes operations on
+      # a single VNet — concurrent calls return "Bad Request". We poll up to
+      # ~2 min per op, which is plenty for subnet PATCH/DELETE in practice.
+      _wait_vnet_idle() {
+        local _rg="$1" _vn="$2" _label="$3"
+        local _max=24 _i=0 _state=""
+        while [ "$_i" -lt "$_max" ]; do
+          _state=$(az network vnet show -g "$_rg" -n "$_vn" --query "provisioningState" -o tsv 2>/dev/null || echo "")
+          if [ "$_state" = "Succeeded" ] || [ -z "$_state" ]; then
+            return 0
+          fi
+          # Updating / Deleting / Failed — back off
+          sleep 5
+          _i=$((_i + 1))
+        done
+        echo "    (waited $((_max * 5))s for vnet idle after $_label; last state=$_state — proceeding anyway)"
+        return 0
+      }
+
+      while IFS= read -r vnet_name; do
+        [ -z "$vnet_name" ] && continue
+        # Case-insensitive, prefix-bounded match.
+        # IMPORTANT: do the filter in bash (grep -i), NOT in JMESPath.
+        # `lower()` is NOT a built-in JMESPath function in the jmespath
+        # library azure-cli uses (only contains/starts_with/ends_with etc.
+        # are spec). Using `lower(name)` made --query throw, the error
+        # was swallowed by `2>/dev/null || echo ""`, and we got back an
+        # empty list — the exact "no subnets matched" symptom.
+        subnets=$(az network vnet subnet list \
+          --resource-group "$commonResourceGroup" \
+          --vnet-name "$vnet_name" \
+          --query "[].name" \
+          -o tsv 2>/dev/null | tr -d '\r' | grep -i -- "$projectFilterToken" || true)
+        if [ -z "$subnets" ]; then
+          echo "  (No project subnets matched in VNet $vnet_name for token '${projectFilterToken}')"
+          continue
+        fi
+        match_count=$(echo "$subnets" | sed '/^$/d' | wc -l | tr -d ' ')
+        echo "  Matched $match_count project subnet(s) in VNet $vnet_name:"
+        echo "$subnets" | sed '/^$/d' | sed 's/^/    - /'
+        # Make sure VNet is idle before we start the per-subnet PATCH cascade
+        _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-detach"
+        while IFS= read -r subnet_name; do
+          [ -z "$subnet_name" ] && continue
+          echo "  Detaching from subnet: $vnet_name/$subnet_name"
+
+          # -------------------------------------------------------------
+          # WHY WE USE `az resource update --set properties.X=null`
+          # AND NOT the dedicated `az network vnet subnet update` flags:
+          #
+          #   --network-security-group ""   builds an NSG resource ID
+          #   ending in '/networkSecurityGroups/' (empty name) and tries
+          #   to LOOK IT UP — returns 404 InvalidResourceReference.
+          #   Same bug for --route-table "".
+          #
+          #   --delegations ""              creates an array with one
+          #   empty-named entry → ServiceNameOnDelegationNotSpecified.
+          #   Same shape for --service-endpoints "".
+          #
+          # The reliable workaround (community-confirmed) is the generic
+          # `az resource update --set properties.X=null` form. It goes
+          # through the same authenticated CLI path that the network
+          # commands use — NOT through `az rest` — so it bypasses the
+          # tenant Conditional-Access policy that blocked our previous
+          # `az rest PATCH` attempt with UnauthorizedClientApplication.
+          # -------------------------------------------------------------
+
+          # 1. Show what's currently attached so the log tells the truth
+          #    (the previous error showed '.../networkSecurityGroups/'
+          #     with no name — that was the CLI's bogus lookup, NOT the
+          #     real attached NSG).
+          cur_nsg=$(az network vnet subnet show \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --name "$subnet_name" \
+            --query "networkSecurityGroup.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+          cur_rt=$(az network vnet subnet show \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --name "$subnet_name" \
+            --query "routeTable.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+          if [ -n "$cur_nsg" ] && [ "$cur_nsg" != "None" ]; then
+            echo "    Currently attached NSG : $cur_nsg"
+          else
+            echo "    Currently attached NSG : (none)"
+          fi
+          if [ -n "$cur_rt" ] && [ "$cur_rt" != "None" ]; then
+            echo "    Currently attached RT  : $cur_rt"
+          fi
+
+          # 2. Resolve the subnet ARM resource ID and PATCH all four
+          #    blockers to null/[] in a single update.
+          subnet_id=$(az network vnet subnet show \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --name "$subnet_name" \
+            --query "id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+
+          if [ -z "$subnet_id" ]; then
+            echo "    (could not resolve subnet ARM id — skipping detach)"
+          else
+            _detach_rc=0
+            _detach_out=$(az resource update \
+              --ids "$subnet_id" \
+              --set properties.networkSecurityGroup=null \
+                    properties.routeTable=null \
+                    properties.delegations='[]' \
+                    properties.serviceEndpoints='[]' \
+              2>&1) || _detach_rc=$?
+            if [ "$_detach_rc" -ne 0 ]; then
+              echo "    ⚠️  az resource update PATCH failed (exit=$_detach_rc):"
+              echo "$_detach_out" | sed 's/^/      | /'
+              # Fallback: try clearing them one property at a time. Some
+              # ARM RPs reject array-to-empty-array transitions in the
+              # same PATCH as a nullable-ref clear.
+              echo "    Retrying property-by-property..."
+              for _prop in networkSecurityGroup routeTable delegations serviceEndpoints; do
+                _val="null"
+                case "$_prop" in
+                  delegations|serviceEndpoints) _val='[]' ;;
+                esac
+                _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-clear-$_prop"
+                _p_rc=0
+                _p_out=$(az resource update --ids "$subnet_id" \
+                  --set "properties.${_prop}=${_val}" 2>&1) || _p_rc=$?
+                if [ "$_p_rc" -ne 0 ]; then
+                  echo "    (could not clear $_prop on $subnet_name — exit=$_p_rc)"
+                  echo "$_p_out" | sed 's/^/      | /'
+                else
+                  echo "    ✓ Cleared $_prop on $subnet_name"
+                fi
+              done
+            else
+              echo "    ✓ PATCH accepted (NSG / RT / delegations / serviceEndpoints cleared)"
+            fi
+            _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "post-detach-patch"
+          fi
+
+          # 3. Verify NSG is actually gone (this is the one that blocks Step 8)
+          remaining_nsg=$(az network vnet subnet show \
+            --resource-group "$commonResourceGroup" \
+            --vnet-name "$vnet_name" \
+            --name "$subnet_name" \
+            --query "networkSecurityGroup.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+          if [ -n "$remaining_nsg" ] && [ "$remaining_nsg" != "None" ]; then
+            echo "    ⚠️  NSG still attached to $subnet_name after PATCH: $remaining_nsg"
+            echo "    Diagnosis — remaining holders on $subnet_name:"
+            az network vnet subnet show \
+              --resource-group "$commonResourceGroup" \
+              --vnet-name "$vnet_name" \
+              --name "$subnet_name" \
+              --query "{pe:privateEndpoints, ipconfigs:ipConfigurations[].name, sal:serviceAssociationLinks[].name, deleg:delegations[].serviceName}" \
+              -o json 2>/dev/null || true
+          else
+            echo "    ✓ NSG cleared on $subnet_name (verified by GET)"
+          fi
+        done <<< "$subnets"
+      done <<< "$vnets"
+
+      # ---------------------------------------------------------------
+      # PASS 2: Try to delete subnets. Subnets with surviving Service
+      # Association Links (SALs) from ACA / Foundry managed environments
+      # cannot be force-removed — those only release when 06a/06c finish
+      # tearing down the parent service. We log and continue.
+      # IMPORTANT: subnets are deleted strictly SEQUENTIALLY per VNet, with
+      # an idle-wait between each, because a VNet can only process one
+      # write operation at a time (concurrent calls return Bad Request).
+      # ---------------------------------------------------------------
+      echo ""
+      echo "--- Pass 2/2: Deleting project subnets (sequential per VNet) ---"
       while IFS= read -r vnet_name; do
         if [ -n "$vnet_name" ]; then
           echo "Checking VNet: $vnet_name"
-          # List subnets containing project identifier
+          # Case-insensitive bash filter — same reason as Pass 1: JMESPath
+          # has no lower() builtin in the jmespath lib azure-cli uses.
           subnets=$(az network vnet subnet list \
             --resource-group "$commonResourceGroup" \
             --vnet-name "$vnet_name" \
-            --query "[?contains(name, '$projectName')].name" \
-            -o tsv 2>/dev/null || echo "")
+            --query "[].name" \
+            -o tsv 2>/dev/null | tr -d '\r' | grep -i -- "$projectFilterToken" || true)
           
           if [ -n "$subnets" ]; then
+            match_count=$(echo "$subnets" | sed '/^$/d' | wc -l | tr -d ' ')
+            echo "  Matched $match_count project subnet(s) to delete in VNet $vnet_name (one at a time):"
+            echo "$subnets" | sed '/^$/d' | sed 's/^/    - /'
+            # Wait for VNet idle before starting the sequential delete loop
+            _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "pre-subnet-delete"
             while IFS= read -r subnet_name; do
               if [ -n "$subnet_name" ]; then
                 echo "  Deleting subnet: $subnet_name from VNet: $vnet_name"
-                az network vnet subnet delete \
+                if ! az network vnet subnet delete \
                   --resource-group "$commonResourceGroup" \
                   --vnet-name "$vnet_name" \
-                  --name "$subnet_name" \
-                  2>&1 || echo "    Warning: Failed to delete subnet $subnet_name"
+                  --name "$subnet_name" 2>&1; then
+                  echo "    ⚠️  Warning: Failed to delete subnet $subnet_name"
+                  # Diagnose what's still holding it
+                  echo "    Diagnosis — remaining references on $subnet_name:"
+                  az network vnet subnet show \
+                    --resource-group "$commonResourceGroup" \
+                    --vnet-name "$vnet_name" \
+                    --name "$subnet_name" \
+                    --query "{pe:privateEndpoints, ipconfigs:ipConfigurations, sal:serviceAssociationLinks, deleg:delegations, nsg:networkSecurityGroup.id, rt:routeTable.id}" \
+                    -o json 2>/dev/null || true
+                else
+                  echo "    ✓ Subnet $subnet_name deleted"
+                fi
+                # CRITICAL: wait for the VNet to settle before deleting the next
+                # subnet. Without this, the next call hits the still-Updating
+                # VNet and returns "Bad Request".
+                _wait_vnet_idle "$commonResourceGroup" "$vnet_name" "delete-$subnet_name"
               fi
             done <<< "$subnets"
           fi
         fi
       done <<< "$vnets"
-      echo "✓ Subnets deleted"
+      echo "✓ Subnets deletion pass complete"
     else
       echo "No VNets found in common resource group"
     fi
@@ -2634,24 +3007,126 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     echo "⚠️  SKIPPED: Private endpoint/NIC deletion failures detected"
     echo "⚠️  NSGs cannot be deleted until all private endpoints and NICs are removed"
   else
-    echo "Looking for NSGs containing: $projectName"
+    # Reuse the same case-insensitive, prefix-bounded token defined in Step 7
+    # (it is always set when we reach here because Step 7 ran in the same
+    # 'else' branch above). Fallback just in case the script is partially
+    # re-executed: rebuild it here.
+    if [ -z "${projectFilterToken:-}" ]; then
+      projectFilterToken="prj${projectNumber}-"
+    fi
+    echo "NSG filter token (case-insensitive substring): '$projectFilterToken'"
+    # NOTE: Pass 1 of Step 7 already detached every project subnet from its NSG.
+    # If a subnet delete failed (e.g. surviving SAL), the NSG is still free
+    # because we explicitly --removed networkSecurityGroup from the subnet.
+    # The NSG list filter must ALSO be case-insensitive — otherwise an NSG
+    # whose name was rewritten in uppercase by an upstream PATCH would never
+    # be seen here, exactly the symptom that hid 5 of 6 project NSGs in the
+    # prj012 ULTRA delete run.
   
   nsgs=$(az network nsg list \
     --resource-group "$commonResourceGroup" \
-    --query "[?contains(name, '$projectName')].name" \
-    -o tsv 2>/dev/null || echo "")
+    --query "[].name" \
+    -o tsv 2>/dev/null | tr -d '\r' | grep -i -- "$projectFilterToken" || true)
+  if [ -n "$nsgs" ]; then
+    nsg_match_count=$(echo "$nsgs" | sed '/^$/d' | wc -l | tr -d ' ')
+    echo "Matched $nsg_match_count project NSG(s) to delete (in order, after subnets are detached):"
+    echo "$nsgs" | sed '/^$/d' | sed 's/^/  - /'
+  fi
   
   if [ -n "$nsgs" ]; then
     while IFS= read -r nsg_name; do
       if [ -n "$nsg_name" ]; then
         echo "Deleting NSG: $nsg_name"
-        az network nsg delete \
+
+        # -------------------------------------------------------------
+        # SELF-HEAL: re-detach any subnet still referencing this NSG.
+        # Pass 1 (Step 7) does this preemptively, but a silently-failed
+        # PATCH there leaves the NSG bound and the delete here returns
+        # InUseNetworkSecurityGroupCannotBeDeleted. So we look at
+        # nsg.subnets right now and explicitly clear each reference
+        # before the delete attempt.
+        # -------------------------------------------------------------
+        still_attached=$(az network nsg show \
           --resource-group "$commonResourceGroup" \
           --name "$nsg_name" \
-          2>&1 || echo "  Warning: Failed to delete NSG $nsg_name"
+          --query "subnets[].id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        if [ -n "$still_attached" ]; then
+          echo "  Self-heal: $nsg_name is still attached to subnets — detaching now"
+          while IFS= read -r subnet_id; do
+            [ -z "$subnet_id" ] && continue
+            # subnet_id form: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/virtualNetworks/{vnet}/subnets/{subnet}
+            s_rg=$(echo "$subnet_id"   | awk -F/ '{print $5}')
+            s_vnet=$(echo "$subnet_id" | awk -F/ '{print $9}')
+            s_sub=$(echo "$subnet_id"  | awk -F/ '{print $11}')
+            echo "    Detaching NSG from $s_rg / $s_vnet / $s_sub"
+            # Wait for VNet idle before PATCH
+            for _i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              _st=$(az network vnet show -g "$s_rg" -n "$s_vnet" --query provisioningState -o tsv 2>/dev/null || echo "")
+              [ "$_st" = "Succeeded" ] || [ -z "$_st" ] && break
+              sleep 5
+            done
+            # Use `az resource update --set properties.networkSecurityGroup=null`.
+            # The dedicated `--network-security-group ""` flag is bugged
+            # (builds an empty NSG name and 404s); `az rest` PATCH is
+            # blocked by the tenant's Conditional-Access policy
+            # (UnauthorizedClientApplication). `az resource update` goes
+            # through the same auth path as the network commands and works.
+            _sh_rc=0
+            _sh_out=$(az resource update --ids "$subnet_id" \
+              --set properties.networkSecurityGroup=null 2>&1) || _sh_rc=$?
+            if [ "$_sh_rc" -eq 0 ]; then
+              echo "    ✓ Detach PATCH accepted"
+            else
+              echo "    ⚠️  Detach PATCH failed (exit=$_sh_rc):"
+              echo "$_sh_out" | sed 's/^/      | /'
+            fi
+            # Wait for VNet idle after PATCH so the NSG delete that follows
+            # doesn't race on a still-Updating VNet
+            for _i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              _st=$(az network vnet show -g "$s_rg" -n "$s_vnet" --query provisioningState -o tsv 2>/dev/null || echo "")
+              [ "$_st" = "Succeeded" ] || [ -z "$_st" ] && break
+              sleep 5
+            done
+          done <<< "$still_attached"
+        fi
+
+        # -------------------------------------------------------------
+        # Delete NSG with retry. "Bad Request" here is almost always a
+        # transient race (parent VNet still in Updating state after the
+        # detach PATCH above). Retry with backoff before giving up.
+        # -------------------------------------------------------------
+        nsg_deleted=false
+        for attempt in 1 2 3 4; do
+          if az network nsg delete \
+            --resource-group "$commonResourceGroup" \
+            --name "$nsg_name" 2>&1; then
+            echo "  ✓ NSG $nsg_name deleted (attempt $attempt)"
+            nsg_deleted=true
+            break
+          fi
+          # Check whether it's already gone (NotFound on the show)
+          if ! az network nsg show -g "$commonResourceGroup" -n "$nsg_name" >/dev/null 2>&1; then
+            echo "  ✓ NSG $nsg_name no longer present (attempt $attempt)"
+            nsg_deleted=true
+            break
+          fi
+          echo "  Attempt $attempt failed for $nsg_name — backing off 20s and retrying"
+          sleep 20
+        done
+
+        if [ "$nsg_deleted" != "true" ]; then
+          echo "  ⚠️  Warning: Failed to delete NSG $nsg_name after retries"
+          # Diagnose remaining references (subnet/NIC associations)
+          echo "  Diagnosis — subnets/NICs still referencing $nsg_name:"
+          az network nsg show \
+            --resource-group "$commonResourceGroup" \
+            --name "$nsg_name" \
+            --query "{subnets:subnets[].id, nics:networkInterfaces[].id}" \
+            -o json 2>/dev/null || true
+        fi
       fi
     done <<< "$nsgs"
-    echo "✓ Network Security Groups deleted"
+    echo "✓ Network Security Groups deletion pass complete"
   else
     echo "No NSGs found containing $projectName"
   fi

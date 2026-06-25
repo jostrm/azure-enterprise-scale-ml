@@ -40,6 +40,7 @@ param (
     $defaultSubnetProjAKS2 = "snt-prj<xxx>-aks-002"
     $defaultSubnetProjACA = "snt-prj<xxx>-aca"
     $defaultSubnetProjACA2 = "snt-prj<xxx>-aca-002"
+    $defaultSubnetProjWebapp = "snt-prj<xxx>-webapp"
     $defaultSubnetProjDatabricksPublic = "snt-prj001-dbxpub"
     $defaultSubnetProjDatabricksPrivate = "snt-prj<xxx>-dbxpriv"
 
@@ -324,6 +325,7 @@ $subnetProjAKS_input = $subnetProjAKS
 $subnetProjAKS2_input = $subnetProjAKS2
 $subnetProjACA_input = $subnetProjACA
 $subnetProjACA2_input = $subnetProjACA2
+$subnetProjWebapp_input = $subnetProjWebapp
 $subnetProjDatabricksPublic_input = $subnetProjDatabricksPublic
 $subnetProjDatabricksPrivate_input = $subnetProjDatabricksPrivate
 
@@ -388,6 +390,7 @@ $subnetProjAKS = $defaultSubnetProjAKS
 $subnetProjAKS2 = $defaultSubnetProjAKS2
 $subnetProjACA = $defaultSubnetProjACA
 $subnetProjACA2 = $defaultSubnetProjACA2
+$subnetProjWebapp = $defaultSubnetProjWebapp
 $subnetProjDatabricksPublic = $defaultSubnetProjDatabricksPublic
 $subnetProjDatabricksPrivate = $defaultSubnetProjDatabricksPrivate
 
@@ -399,6 +402,7 @@ if ($BYO_subnets_bool) {
     if (-not [string]::IsNullOrEmpty($subnetProjAKS2_input)) { $subnetProjAKS2 = $subnetProjAKS2_input }
     if (-not [string]::IsNullOrEmpty($subnetProjACA_input)) { $subnetProjACA = $subnetProjACA_input }
     if (-not [string]::IsNullOrEmpty($subnetProjACA2_input)) { $subnetProjACA2 = $subnetProjACA2_input }
+    if (-not [string]::IsNullOrEmpty($subnetProjWebapp_input)) { $subnetProjWebapp = $subnetProjWebapp_input }
     if (-not [string]::IsNullOrEmpty($subnetProjDatabricksPublic_input)) { $subnetProjDatabricksPublic = $subnetProjDatabricksPublic_input }
     if (-not [string]::IsNullOrEmpty($subnetProjDatabricksPrivate_input)) { $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate_input }
 
@@ -408,6 +412,7 @@ if ($BYO_subnets_bool) {
     $subnetProjAKS2 = $subnetProjAKS2 -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
     $subnetProjACA = $subnetProjACA -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
     $subnetProjACA2 = $subnetProjACA2 -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    $subnetProjWebapp = $subnetProjWebapp -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
     $subnetProjDatabricksPublic  = $subnetProjDatabricksPublic  -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
     $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
 }
@@ -417,6 +422,7 @@ else {
     $subnetProjAKS2 = $subnetProjAKS2 -replace '<xxx>', $projectNumber
     $subnetProjACA = $subnetProjACA -replace '<xxx>', $projectNumber
     $subnetProjACA2 = $subnetProjACA2 -replace '<xxx>', $projectNumber
+    $subnetProjWebapp = $subnetProjWebapp -replace '<xxx>', $projectNumber
     $subnetProjDatabricksPrivate = $subnetProjDatabricksPrivate -replace '<xxx>', $projectNumber
 }
 
@@ -429,6 +435,7 @@ $dbxPrivSubnetId=""
 $genaiSubnetId=""
 $acaSubnetId=""
 $aca2SubnetId=""
+$webappSubnetId=""
 write-host "The following parameters are added to template"
 write-host "vnetResourceGroup is: $($vnetResourceGroup)"
 write-host "BYO_subnets_bool is: $($BYO_subnets_bool)"
@@ -486,6 +493,11 @@ if ($BYO_subnets_bool -eq $false) {
     -ResourceGroupName "$lookupResourceGroup" `
     -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aca2SubnetId.Value
     write-host "aca2SubnetId: $aca2SubnetId"
+
+    $webappSubnetId=(Get-AzResourceGroupDeployment `
+    -ResourceGroupName "$lookupResourceGroup" `
+    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.webappSubnetId.Value
+    write-host "webappSubnetId: $webappSubnetId"
 
     $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
     -ResourceGroupName "$lookupResourceGroup" `
@@ -626,6 +638,27 @@ if ($BYO_subnets_bool -eq $false) {
     }
 
     # -------------------------------------------------------------------------
+    # subnetProjWebapp — dedicated App Service / Function VNet integration subnet
+    # (delegated to Microsoft.Web/serverFarms). Required when enableWebApp=true or
+    # enableFunction=true. A subnet can hold only ONE delegation, so a dedicated
+    # subnet avoids collisions with AKS (no delegation) and ACA (Microsoft.App/environments).
+    # -------------------------------------------------------------------------
+    if ($enableWebApp_bool -or $enableFunction_bool) {
+        if (-not [string]::IsNullOrEmpty($subnetProjWebapp)) {
+            try {
+                $webappSubnetId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $subnetProjWebapp -projectNumber $projectNumber -networkEnv $network_env
+                write-host "webappSubnetId: $webappSubnetId (enableWebApp=$enableWebApp, enableFunction=$enableFunction)"
+            } catch {
+                write-host "AIF-WARNING: webappSubnetId could not be generated (catch). Please check variables.yaml."
+            }
+        } else {
+            write-host "##vso[task.logissue type=warning]enableWebApp=$enableWebApp or enableFunction=$enableFunction is true but subnetProjWebapp is not set. The subnet delegated to Microsoft.Web/serverFarms is needed for VNet integration. Please set subnetProjWebapp in variables.yaml."
+        }
+    } else {
+        write-host "INFO: subnetProjWebapp skipped (enableWebApp=false and enableFunction=false)"
+    }
+
+    # -------------------------------------------------------------------------
     # subnetProjDatabricksPublic / subnetProjDatabricksPrivate — mandatory only if enableDatabricks=true
     # -------------------------------------------------------------------------
     if ($enableDatabricks_bool) {
@@ -670,6 +703,9 @@ $templateAll = @"
         },
         "aca2SubnetId": {
             "value": "$aca2SubnetId"
+        },
+        "webappSubnetId": {
+            "value": "$webappSubnetId"
         },
         "dbxPubSubnetName": {
             "value": "$dbxPubSubnetName"

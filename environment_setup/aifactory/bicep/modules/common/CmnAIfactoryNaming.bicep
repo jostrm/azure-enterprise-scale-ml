@@ -47,6 +47,7 @@ param aksSubnetId string
 param aks2SubnetId string = ''
 param acaSubnetId string = ''
 param aca2SubnetId string = ''
+param webappSubnetId string = ''
 
 param postGresAdminEmails string = ''
 
@@ -110,16 +111,22 @@ var aifV1HubName = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-$
 var aifV1ProjectName = 'aif-p-${projectNumber}-1-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}' // TODO=DONE
 
 // AI Foundry V2 (2025)
-// Dont Add: aif2x46jfec0
-// Add: aif21ec07673
-var aifV2Name = take(replace(toLower('aif2${uniqueInAIFenv}${cleanRandomValue}'), '-', ''),12) // Dont Add: aif2x46jfec0
-var aifV2PrjName =take(toLower('aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}'),12) // aif2-p001x4d
+// Naming pattern: aif2 + envSalt(5) + cleanRandom(3) + projectNumber(3) + env(3-4)
+// Example: aif2h7amw6bc013dev  (18 chars). Max cap 20 to safely fit env='test'/'prod'.
+// Azure CognitiveServices/accounts limit is 2-64; caphost adds "caphost" (7) → max 27 → safe.
+// Keep cleanRandom inside the base name so we still survive soft-delete name collisions.
+var aifV2NameBase = take(replace(toLower('aif2${uniqueInAIFenv}${cleanRandomValue}'), '-', ''),12) // e.g. aif2h7amw6bc
+var aifV2PrjNameBase = take(toLower('aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}'),12) // e.g. aif2-p013h7a
+var aifV2Name = take(toLower('${aifV2NameBase}${projectNumber}${env}'),20) // e.g. aif2h7amw6bc013dev
+var aifV2PrjName = take(toLower('${aifV2PrjNameBase}${env}'),20)           // e.g. aif2-p013h7adev (projectNumber already in base)
 // Add
 var lastSuffixChar = (!empty(resourceSuffix) && length(resourceSuffix) > 0) ? substring(resourceSuffix, max(0, length(resourceSuffix) - 1), 1) : '' // Extract last character: -001 → 1
-var aif2Random = take('aif2${lastSuffixChar}${cleanRandomValue}',12)
-var aifp2Random = take('aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}',12)
-var aifV2NameAdd = aif2Random // Add: aif21ec07673
-var aifV2PrjNameAdd = aifp2Random // Add: aif2-p001xe1
+var aif2RandomBase = take('aif2${lastSuffixChar}${cleanRandomValue}',12)
+var aifp2RandomBase = take('aif2-p${projectNumber}${lastSuffixChar}${cleanRandomValue}',12)
+var aif2Random = take(toLower('${aif2RandomBase}${projectNumber}${env}'),20)
+var aifp2Random = take(toLower('${aifp2RandomBase}${env}'),20)
+var aifV2NameAdd = aif2Random
+var aifV2PrjNameAdd = aifp2Random
 
 var aoaiName = 'aoai-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
@@ -190,6 +197,8 @@ var segmentsACA = filter(split(acaSubnetId, '/'), s => !empty(s))
 var segmentsACA2 = filter(split(aca2SubnetId, '/'), s => !empty(s))
 var acaSubnetName = length(segmentsACA) > 0 ? segmentsACA[length(segmentsACA) - 1] : '' // Get the last segment, which is the subnet name
 var aca2SubnetName = length(segmentsACA2) > 0 ? segmentsACA2[length(segmentsACA2) - 1] : '' // Get the last segment, which is the subnet name
+var segmentsWebapp = filter(split(webappSubnetId, '/'), s => !empty(s))
+var webappSubnetName = length(segmentsWebapp) > 0 ? segmentsWebapp[length(segmentsWebapp) - 1] : '' // Get the last segment, which is the subnet name
 
 var adfName = 'adf-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv}${resourceSuffix}'
 
@@ -201,6 +210,7 @@ output aksSubnetName string = aksSubnetName
 output aks2SubnetName string = aks2SubnetName
 output acaSubnetName string = acaSubnetName
 output aca2SubnetName string = aca2SubnetName
+output webappSubnetName string = webappSubnetName
 output defaultSubnet string = defaultSubnet // pend subnet is genai
 
 output aoaiName string = aoaiName

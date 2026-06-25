@@ -16,6 +16,8 @@ param azureFirewallPrivateIp string = ''
 @description('Specifies cidr notation for Azure Container Apps subnet')
 param acaSubnetCidr string = ''
 param aca2SubnetCidr string = ''
+@description('Specifies cidr notation for the dedicated App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
+param webappSubnetCidr string = ''
 @description('Specifies cidr notation for databricks subnets')
 param dbxPrivSubnetCidr string = ''
 param dbxPubSubnetCidr string = ''
@@ -60,6 +62,7 @@ param subnetProjDatabricksPublic string = ''
 param subnetProjDatabricksPrivate string = ''
 param subnetProjACA string = ''
 param subnetProjACA2 string = ''
+param subnetProjWebapp string = ''
 
 // Subnet existence flags
 @description('Specifies whether GenAI subnet already exists')
@@ -68,6 +71,8 @@ param sntGenaiExists bool = false
 param sntAcaExists bool = false
 @description('Specifies whether ACA002 subnet already exists')
 param sntAca002Exists bool = false
+@description('Specifies whether the dedicated App Service / Function VNet integration subnet already exists')
+param sntWebappExists bool = false
 @description('Specifies whether AKS subnet already exists')
 param sntAksExists bool = false
 @description('Specifies whether AKS002 subnet already exists')
@@ -261,7 +266,14 @@ var acaSubnetSettings =   {
 var aca2SubnetSettings =   {
   cidr: aca2SubnetCidr
   name: 'aca2SubnetSettings'
-  delegations: []
+  // REQUIRED for AI Foundry agent network injection (auto-provisioned ACA env behind the agent service).
+  // Set at subnet-creation time so task '69a-Validate-Subnet-For-NetworkInjection' in job-2 does not have
+  // to mutate the subnet on the fly. The bicep 09-ai-foundry-2025-v4.bicep keeps a conditional
+  // subnetDelegationAca safety-net (idempotent) for upgrade scenarios where this snt-...-aca-002 subnet
+  // was created before this delegation was added.
+  delegations: [
+    'Microsoft.App/environments'
+  ]
   serviceEndpoints: [
     'Microsoft.KeyVault'
     'Microsoft.Storage'
@@ -318,13 +330,68 @@ module acaSnt2 '../modules/subnetWithNsg.bicep' = if (!empty(aca2SubnetCidr) && 
     addressPrefix: aca2SubnetSettings.cidr
     location: location
     serviceEndpoints: aca2SubnetSettings.serviceEndpoints
-    delegations: []
+    delegations: aca2SubnetSettings.delegations
     nsgId: !empty(aca2SubnetCidr) ? nsg2Aca!.outputs.nsgId : ''
     centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
     allowDefaultOutboundAccess: true
   }
   dependsOn: [
     ...(!sntAca002Exists && !empty(aca2SubnetCidr) ? [nsg2Aca] : [])
+    ...(!sntAcaExists ? [acaSnt] : [])
+    ...(!sntGenaiExists ? [genaiSnt] : [])
+    ...(!sntAksExists ? [aksSnt] : [])
+    ...(!sntAks002Exists && !empty(aks2SubnetCidr) ? [aks2Snt] : [])
+  ]
+}
+
+// Dedicated App Service / Function VNet integration subnet.
+// Regional VNet integration requires a subnet delegated to Microsoft.Web/serverFarms, and a subnet
+// can hold only ONE delegation. Using a dedicated subnet (instead of borrowing the AKS or ACA subnet)
+// avoids delegation collisions with AKS (no delegation) and Container Apps (Microsoft.App/environments).
+// The delegation is baked in at subnet-creation time so step 65 (05-compute-services.bicep) does not
+// have to mutate the subnet on the fly before App Service/Function VNet integration.
+var webappSubnetSettings = {
+  cidr: webappSubnetCidr
+  name: 'webappSubnetSettings'
+  delegations: [
+    'Microsoft.Web/serverFarms'
+  ]
+  serviceEndpoints: [
+    'Microsoft.KeyVault'
+    'Microsoft.Storage'
+    'Microsoft.CognitiveServices'
+    'Microsoft.ContainerRegistry'
+    'Microsoft.AzureCosmosDB'
+    'Microsoft.Web'
+  ]
+}
+
+module nsgWebapp '../modules/nsgGenAI.bicep' = if (!empty(webappSubnetCidr) && !sntWebappExists) {
+  name: take('nsgWebapp-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
+  params: {
+    name: 'webapp-nsg-${projectName}-${locationSuffix}-${env}'
+    location: location
+    tags:tags
+  }
+}
+
+module webappSnt '../modules/subnetWithNsg.bicep' = if (!empty(webappSubnetCidr) && !sntWebappExists) {
+  name: take('webappSnet-${deploymentProjSpecificUniqueSuffix}',64) // Max 64 chars
+  scope: resourceGroup(vnetResourceGroupScope)
+  params: {
+    name: 'snt-${projectName}-webapp'
+    virtualNetworkName: vnetNameFull
+    addressPrefix: webappSubnetSettings.cidr
+    location: location
+    serviceEndpoints: webappSubnetSettings.serviceEndpoints
+    delegations: webappSubnetSettings.delegations
+    nsgId: !empty(webappSubnetCidr) ? nsgWebapp!.outputs.nsgId : ''
+    centralDnsZoneByPolicyInHub:centralDnsZoneByPolicyInHub
+  }
+  dependsOn: [
+    ...(!sntWebappExists && !empty(webappSubnetCidr) ? [nsgWebapp] : [])
+    ...(!sntAca002Exists && !empty(aca2SubnetCidr) ? [acaSnt2] : [])
     ...(!sntAcaExists ? [acaSnt] : [])
     ...(!sntGenaiExists ? [genaiSnt] : [])
     ...(!sntAksExists ? [aksSnt] : [])
@@ -385,6 +452,7 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPubSubnetCidr) 
     ...(!sntDatabricksPubExists && !empty(dbxPubSubnetCidr) ? [nsgDbx] : [])
     ...(!sntAks002Exists ? [aks2Snt] : [])
     ...(!sntAcaExists || !sntAca002Exists ? [acaSnt2] : [])
+    ...(!sntWebappExists && !empty(webappSubnetCidr) ? [webappSnt] : [])
   ]
 }
 
@@ -403,7 +471,7 @@ module dbxPrivSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPrivSubnetCidr
   }
 
   // Make sure that no overlapping processes are created
-  // On some cases AzureRm will return an error if paralell
+  // On some cases AzureRm will return an error if parallel
   // subnet creation processes are started
   dependsOn: [
     ...(!sntDatabricksPrivExists && !empty(dbxPrivSubnetCidr) ? [nsgDbx] : [])
@@ -418,6 +486,7 @@ output aks2SubnetId string = (!sntAks002Exists && !empty(aks2SubnetCidr)) ? aks2
 output genaiSubnetId string = !sntGenaiExists ? genaiSnt!.outputs.subnetId : resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, !empty(subnetProjGenAI) ? replace(subnetProjGenAI, '<xxx>', projectNumber) : 'snt-${projectName}-genai')
 output acaSubnetId string = !sntAcaExists ? acaSnt!.outputs.subnetId : resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, !empty(subnetProjACA) ? replace(subnetProjACA, '<xxx>', projectNumber) : 'snt-${projectName}-aca')
 output aca2SubnetId string = (!sntAca002Exists && !empty(aca2SubnetCidr)) ? acaSnt2!.outputs.subnetId : (sntAca002Exists ? resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull,!empty(subnetProjACA2) ? replace(subnetProjACA2, '<xxx>', projectNumber) :  'snt-${projectName}-aca-002') : '')
+output webappSubnetId string = (!sntWebappExists && !empty(webappSubnetCidr)) ? webappSnt!.outputs.subnetId : (sntWebappExists ? resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, !empty(subnetProjWebapp) ? replace(subnetProjWebapp, '<xxx>', projectNumber) : 'snt-${projectName}-webapp') : '')
 output dbxPubSubnetName string = empty(dbxPubSubnetCidr) ? '' : (!empty(subnetProjDatabricksPublic) ? replace(subnetProjDatabricksPublic, '<xxx>', projectNumber) : 'snt-${projectName}-dbxpub')
 output dbxPrivSubnetName string = empty(dbxPrivSubnetCidr) ? '' : (!empty(subnetProjDatabricksPrivate) ? replace(subnetProjDatabricksPrivate, '<xxx>', projectNumber) : 'snt-${projectName}-dbxpriv')
 output aks2RouteTableId string = aks2RouteTableIdToUse

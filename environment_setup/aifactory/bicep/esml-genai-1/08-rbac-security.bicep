@@ -62,6 +62,8 @@ param acaSubnetId string
 @description('Optional subnets from subnet calculator')
 param aca2SubnetId string = ''
 param aks2SubnetId string = ''
+@description('App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
+param webappSubnetId string = ''
 @description('if projectype is not genai-1, but instead all')
 param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''
@@ -136,6 +138,8 @@ param bastionName string = ''
 param vnetNameFullBastion string = ''
 param disableContributorAccessForUsers bool = false
 param disableRBACAdminOnRGForUsers bool = false
+@description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
+param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
 // Required resource references. Networking parameters for calculation
 param vnetNameBase string
@@ -308,7 +312,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: enableLogicApps? '' : var_miPrj_PrincipalId
-    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    // SP removal support: ignore the SP OID seeding secret when its name is empty or a placeholder (<todo>/<optional>) -> spAndMiArray yields an MI-only array
+    servicePrincipleOIDFromSecret: (!empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) ? externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
     includeManagedIdentity: !enableLogicApps
   }
   dependsOn: [
@@ -321,8 +326,11 @@ var skipACRRoleAssignments = skipExistingRoleAssignments || miPrjExists
 
 #disable-next-line BCP318
 var spAndMiArray = spAndMI2ArrayModule.outputs.spAndMiArray
-// Extract only the service principal (first element) - MI already handled in file 02
-var servicePrincipalOnly = [spAndMiArray[0]]
+// Extract only the service principal (first element) - MI already handled in file 02.
+// SP removal support: when no SP is configured (empty/<todo>/<optional> name) the SP is NOT at index 0,
+// so emit an empty list instead of grabbing the managed identity by mistake.
+var var_useProjectSP = !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')
+var servicePrincipalOnly = var_useProjectSP ? [spAndMiArray[0]] : []
 
 // De-duplicate principals to avoid duplicate role assignments
 // - Ensure user list is unique
@@ -579,6 +587,7 @@ module rbacAihubRbacAmlRG '../modules/aihubRbacAmlRG.bicep' = if (!aiHubExists &
     aiHubPrincipalId: var_aiHubPrincipalId // Using computed variable for AI Hub principal ID
     aiHubProjectName: aifV1ProjectName
     aiHubProjectPrincipalId: var_aiHubProjectPrincipalId // Using computed variable for AI Hub project principal ID
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG
@@ -601,6 +610,7 @@ module rbacModuleUsers '../modules/aihubRbacUsers.bicep' = if ((!aiHubExists && 
     useAdGroups: useAdGroups
     disableContributorAccessForUsers: disableContributorAccessForUsers
     disableRBACAdminOnRGForUsers:disableRBACAdminOnRGForUsers
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG
@@ -637,6 +647,7 @@ module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if (!u
     disableContributorAccessForUsers: disableContributorAccessForUsers
     disableRBACAdminOnRGForUsers: disableRBACAdminOnRGForUsers
     aiHubName: enableAIFoundryHub ? aifV1HubName : ''
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG
@@ -667,6 +678,7 @@ module rbacDatafactory '../modules/datafactoryRBAC.bicep' = if(!dataFactoryExist
     servicePrincipleAndMIArray: spAndMiArray
     datafactoryName:namingConvention.outputs.dataFactoryName
     disableContributorAccessForUsers: disableContributorAccessForUsers
+    contributorRoleId: contributorRoleId
   }
   dependsOn: [
     existingTargetRG

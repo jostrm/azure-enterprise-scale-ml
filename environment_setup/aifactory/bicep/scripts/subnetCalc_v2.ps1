@@ -45,6 +45,7 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for Azure ML's AKS subnet when projectType=all")][string]$aks2SubnetCidrAll = '24',
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for ACA subnet when projectType=all")][string]$acaSubnetCidrAll = '23',
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for secondary ACA subnet when projectType=all")][string]$aca2SubnetCidrAll = '23',
+    [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for dedicated App Service/Function VNet integration subnet (Microsoft.Web/serverFarms). Min /28; /27 gives headroom")][string]$webappSubnetCidrAll = '27',
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX public subnet when projectType=all")][string]$dbxPubSubnetCidrAll = '26',
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX private subnet when projectType=all")][string]$dbxPrivSubnetCidrAll = '26'
 )
@@ -383,6 +384,7 @@ if ($(Get-AzContext).Subscription -ne "") {
                 genaiSubnetCidr  = $genaiSubnetCidrAll
                 aksSubnetCidr     = $aksSubnetCidrAll # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 acaSubnetCidr     = $acaSubnetCidrAll # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
+                webappSubnetCidr  = $webappSubnetCidrAll # Dedicated App Service/Function VNet integration subnet (Microsoft.Web/serverFarms delegation). Min /28; /27 = 32 addresses
             }
         }
         elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
@@ -393,6 +395,7 @@ if ($(Get-AzContext).Subscription -ne "") {
                 aks2SubnetCidr    = $aks2SubnetCidrAll # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 acaSubnetCidr     = $acaSubnetCidrAll # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
                 aca2SubnetCidr    = $aca2SubnetCidrAll # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment. Subnets smaller than /23 are rejected at provisioning time—the control plane can’t allocate enough addresses for the infrastructure scale sets—so the Cognitive Services RP keeps the account in Creating
+                webappSubnetCidr  = $webappSubnetCidrAll # Dedicated App Service/Function VNet integration subnet (Microsoft.Web/serverFarms delegation). Min /28; /27 = 32 addresses
                 dbxPubSubnetCidr  = $dbxPubSubnetCidrAll # 23-26
                 dbxPrivSubnetCidr = $dbxPrivSubnetCidrAll # 23-26
             }
@@ -405,6 +408,7 @@ if ($(Get-AzContext).Subscription -ne "") {
                 aks2SubnetCidr    = $aks2SubnetCidrAll # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
                 acaSubnetCidr     = $acaSubnetCidrAll # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
                 aca2SubnetCidr    = $aca2SubnetCidrAll # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment. Subnets smaller than /23 are rejected at provisioning time—the control plane can’t allocate enough addresses for the infrastructure scale sets—so the Cognitive Services RP keeps the account in Creating
+                webappSubnetCidr  = $webappSubnetCidrAll # Dedicated App Service/Function VNet integration subnet (Microsoft.Web/serverFarms delegation). Min /28; /27 = 32 addresses
                 dbxPubSubnetCidr  = $dbxPubSubnetCidrAll # 23-26
                 dbxPrivSubnetCidr = $dbxPrivSubnetCidrAll # 23-26
             }
@@ -524,6 +528,9 @@ if ($(Get-AzContext).Subscription -ne "") {
         "genaiSubnetCidr": {
             "value": "$($result["genaiSubnetCidr"])"
         },
+        "webappSubnetCidr": {
+            "value": "$($result["webappSubnetCidr"])"
+        },
         "vnetNameBase": {
             "value": "$vnetNameBase"
         },
@@ -569,6 +576,9 @@ if ($(Get-AzContext).Subscription -ne "") {
         "dbxPubSubnetCidr": {
             "value": "$($result["dbxPubSubnetCidr"])"
         },
+        "webappSubnetCidr": {
+            "value": "$($result["webappSubnetCidr"])"
+        },
         "vnetNameBase": {
             "value": "$vnetNameBase"
         },
@@ -603,6 +613,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         write-host "aksSubnetCidr    : $($result["aksSubnetCidr"])"
         write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
         write-host "acaSubnetCidr : $($result["acaSubnetCidr"])"
+        write-host "webappSubnetCidr : $($result["webappSubnetCidr"])"
     }
     elseif ($projectTypeADO.Trim().ToLower() -eq "all"){
         Write-host "Template for subnetParameters.json is projectType:all"
@@ -612,6 +623,7 @@ if ($(Get-AzContext).Subscription -ne "") {
         write-host "genaiSubnetCidr : $($result["genaiSubnetCidr"])"
         write-host "acaSubnetCidr : $($result["acaSubnetCidr"])"
         write-host "aca2SubnetCidr : $($result["aca2SubnetCidr"])"
+        write-host "webappSubnetCidr : $($result["webappSubnetCidr"])"
         write-host "dbxPrivSubnetCidr: $($result["dbxPrivSubnetCidr"])"
         write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
     }

@@ -126,6 +126,8 @@ param aca2SubnetId string = ''
 
 @description('Optional secondary AKS subnet resource ID.')
 param aks2SubnetId string = ''
+@description('App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
+param webappSubnetId string = ''
 param addAISearch bool = false
 
 @description('Disable agent network injection even when agent subnet inputs are provided.')

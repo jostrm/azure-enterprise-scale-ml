@@ -52,6 +52,8 @@ param acaSubnetId string
 @description('Optional subnets from subnet calculator')
 param aca2SubnetId string = ''
 param aks2SubnetId string = ''
+@description('App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
+param webappSubnetId string = ''
 param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''
 
@@ -190,7 +192,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
-    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    // SP removal support: ignore the SP OID seeding secret when its name is empty or a placeholder (<todo>/<optional>) -> spAndMiArray yields an MI-only array
+    servicePrincipleOIDFromSecret: (!empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) ? externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
   }
   dependsOn: [
       getProjectMIPrincipalId

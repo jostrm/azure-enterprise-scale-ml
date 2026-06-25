@@ -121,3 +121,5 @@ temp_data/
 02_update_templates_QUICK.ipynb
 01_init_templates_ALL.ipynb
 debug/
+# Local reference code (not part of the repo)
+aa_ref_code/

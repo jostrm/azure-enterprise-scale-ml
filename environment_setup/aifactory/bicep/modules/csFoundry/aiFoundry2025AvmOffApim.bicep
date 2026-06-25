@@ -32,6 +32,9 @@ param agentSubnetResourceId string = ''
 @description('Disable agent network injection even when an agent subnet is provided.')
 param disableAgentNetworkInjection bool = false
 
+@description('Resource ID of the pre-provisioned project User-Assigned Managed Identity that already holds Network Contributor on the agent VNet. When provided (and agent injection is enabled), it is attached to the account identity so injection joins the cross-RG VNet without a SystemAssigned-MI timing race. Leave empty to fall back to SystemAssigned only.')
+param agentInjectionUserAssignedIdentityResourceId string = ''
+
 @description('Existing AI Search service resource ID. Leave empty to create a new instance.')
 param aiSearchResourceId string = ''
 
@@ -199,38 +202,47 @@ var virtualNetworkResourceGroupName = vnetSegments[4]
 var virtualNetworkSubscriptionId = vnetSegments[2]
 
 var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agentSubnetResourceId)
+// When agent injection is enabled and a pre-provisioned project UAMI (already holding Network Contributor
+// on the agent VNet) is provided, attach it so Azure uses an identity that can read/join the cross-RG VNet
+// at injection time. SystemAssigned is retained for CMK RBAC (which depends on the SA principalId).
+var useAgentInjectionUami = agentNetworkInjectionEnabled && !empty(agentInjectionUserAssignedIdentityResourceId)
+var accountIdentity = useAgentInjectionUami ? {
+  type: 'SystemAssigned,UserAssigned'
+  userAssignedIdentities: {
+    '${agentInjectionUserAssignedIdentityResourceId}': {}
+  }
+} : {
+  type: 'SystemAssigned'
+}
 
 // For Cognitive Services, IP rules should be just the IP or IP/CIDR range without /32 suffix for single IPs
 var ipRules = [for ip in ipAllowList: {
   value: contains(ip, '/') ? toLower(ip) : toLower(ip)
 }]
-var networkAclVirtualNetworkRules = concat(
-  !empty(privateEndpointSubnetResourceId) ? [
-    {
-      id: privateEndpointSubnetResourceId
-      ignoreMissingVnetServiceEndpoint: true // allow listed VNet without requiring service endpoint
-    }
-  ] : [],
-  agentNetworkInjectionEnabled ? [
-    {
-      id: agentSubnetResourceId
-      ignoreMissingVnetServiceEndpoint: true
-    }
-  ] : []
-)
-var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(networkAclVirtualNetworkRules)
-var networkAcls = hasNetworkAcls ? {
+// Per Microsoft's official standard-agent sample, keep virtualNetworkRules EMPTY entirely.
+// The agent subnet (delegated to Microsoft.App/environments) is consumed ONLY via networkInjections
+// (scenario=agent) below — never as a VNet ACL rule. The private-endpoint subnet is also intentionally
+// omitted: private endpoints bypass networkAcls anyway, and listing ANY subnet whose VNet the Cognitive
+// Services RP cannot resolve (cross-RG, eventual consistency, or a missing service endpoint) can make the
+// account PUT network validation fail with:
+//   "Invalid vnet resource ID provided, or the virtual network could not be found."
+// bypass:'AzureServices' is retained so trusted Azure services (e.g. AI Search) can still reach the account.
+var networkAclVirtualNetworkRules = []
+var networkAcls = {
   defaultAction: enablePublicGenAIAccess && empty(ipRules) ? 'Allow' : 'Deny'
   virtualNetworkRules: networkAclVirtualNetworkRules
   ipRules: ipRules
-  bypass:'AzureServices'
-} : null
+  bypass: 'AzureServices'
+}
+// networkAcls is now always emitted (Deny + bypass:AzureServices in the private case), matching the sample.
+var hasNetworkAcls = true
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 var storageInCurrentRg = storageResourceGroupName == resourceGroup().name && storageSecondResourceGroupName == resourceGroup().name
 var searchInCurrentRg = aiSearchServiceResourceGroupName == resourceGroup().name
 var cosmosInCurrentRg = cosmosResourceGroupName == resourceGroup().name
 
-var defaultDeploymentName = take('${modelName}-${uniqueSuffix}', 64)
+// Deployment name must equal the model name exactly (no random suffix), e.g. 'text-embedding-3-large'
+var defaultDeploymentName = take(modelName, 64)
 
 #disable-next-line BCP036
 resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = if(foundryV22AccountOnly){
@@ -241,9 +253,7 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
   sku: {
     name: aiAccountSku
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: accountIdentity
   properties: {
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties
@@ -252,7 +262,8 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
     customSubDomainName: aiAccountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
-    disableLocalAuth: false
+    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample.
+    disableLocalAuth: true
     #disable-next-line BCP036
     networkInjections: agentNetworkInjectionEnabled ? [
       {
@@ -313,9 +324,7 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
   sku: {
     name: aiAccountSku
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: accountIdentity
   properties: {
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties
@@ -323,7 +332,8 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
     customSubDomainName: aiAccountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
-    disableLocalAuth: false
+    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample.
+    disableLocalAuth: true
     #disable-next-line BCP036
     networkInjections: agentNetworkInjectionEnabled ? [
       {

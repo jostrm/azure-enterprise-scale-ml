@@ -1,6 +1,6 @@
 @minLength(3)
-@maxLength(12)
-@description('The name of the environment. Use alphanumeric characters only.')
+@maxLength(20)
+@description('The name of the environment. Use alphanumeric characters only. Bumped from 12→20 to match aifV2PrjName naming pattern (aif2-p<num><salt><rand><env> ≈18–20 chars).')
 param name string
 
 @description('Specifies the location for all the Azure resources. Defaults to the location of the resource group.')

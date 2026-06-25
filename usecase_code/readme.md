@@ -61,23 +61,20 @@ Make sure your account has RBAC access to the AI Foundry account/project, AI Sea
 
 ## Step 4 – Run the code samples
 
-**Single-agent RAG example:**
+**Single prompt agent RAG example (Responses API):**
 
 ```bash
-python agent_01_rag_test.py --reindex
+python agent_04_prompt_rag_responses_api.py --reindex
 ```
 
-**Multi-agent example:**
+**Foundry Prompt agent with Microsoft Fabric data agent tool (Responses API):**
 
 ```bash
-python agent_02_multiagent.py
+python agent_05_fabric_data_agent.py
 ```
 
-**Run with a custom query:**
-
-```bash
-python agent_02_multiagent.py --query "top 5 fruits by calorie"
-```
+> Requires the `FABRIC_*` variables in `.env` (`FABRIC_WORKSPACE_ID`, `FABRIC_ARTIFACT_ID`,
+> and optionally `FABRIC_TOOL_CONNECTION` / `FABRIC_TOOL_QUESTION_ARRAY`).
 
 ## Notes
 

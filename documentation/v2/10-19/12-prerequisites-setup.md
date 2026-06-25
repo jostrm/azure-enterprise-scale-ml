@@ -19,7 +19,7 @@ The values from prerequisites, will be used to set the PARAMETERS in the AI Fact
 - ☁️ **Azure:**
     - **Steps: 2,3,4**
     - **Who:** 
-        - Step 2 and 3: A persona with Azure Owner on at least 1 Azure subscription (if only setting up DEV environment)
+        - Step 2 and 3: A persona with Azure role: `Owner` or `User Access Administrator` on at least 1 Azure subscription (if only setting up DEV environment)
         - *Step 4: Networking team. That has the IP-plan, to see that vNet ranges are not conflicting. This is not needed if running the AI Factory standalone mode
 - 🔐 **Entra ID**
     - **Steps: 5**
@@ -57,7 +57,7 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
 - **Mandatory:** Yes.
 - **What:** CODE repository: Create your Azure Devops project to store the AIFactory acceleration code (IaC, and templates) and Azure Devops Service Connections, based on Service principal "esml-common-bicep" (see step 3-7)
 - **TODO**: 
-    1) Create a new Azure Devops project (or reuse an existing). GOAL & REASON: Admin to Create a Service Connection, based on a Service Principal (step 5) with OWNER permission on subscription, and GET,LIST, SET access policies on seeding keyvault (step 3). The Service Connection should have access to "all pipelines" in Azure Devops (at creation step there is a checkbox for this)
+    1) Create a new Azure Devops project (or reuse an existing). GOAL & REASON: Admin to Create a Service Connection, based on a Service Principal (step 5) with Azure IAM role `Owner` or `User Access Administrator` permission on subscription, and GET,LIST, SET access policies on seeding keyvault (step 3). The Service Connection should have access to "all pipelines" in Azure Devops (at creation step there is a checkbox for this)
         - [How-to guide](https://learn.microsoft.com/en-us/azure/devops/organizations/projects/create-project?view=azure-devops&tabs=browser): Create Azure Devops project
     2) Create 2 GIT repositories, in your Azure Devops
         - ESML-AIFactory-Common

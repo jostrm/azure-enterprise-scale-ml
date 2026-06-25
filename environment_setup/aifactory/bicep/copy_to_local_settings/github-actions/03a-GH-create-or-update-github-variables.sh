@@ -113,6 +113,12 @@ create_or_update_secret() {
     return
   fi
   
+  # Check if the value is empty (prevents 'gh secret set' from prompting "Paste your secret" and hanging)
+  if [[ -z "$value" ]]; then
+    echo -e "${YELLOW}Skipping secret '$name' for environment '$env' because the value is empty.${NC}"
+    return
+  fi
+  
   increment_counter "secret $env/$name"
   if [[ "$run_current_op" != "true" ]]; then
     return
@@ -206,6 +212,9 @@ service_and_byo_vars=(
 
   "VNET_RESOURCE_GROUP_PARAM"
   "VNET_NAME_FULL_PARAM"
+  "COMMON_RESOURCE_GROUP_PARAM"
+  "DATALAKE_NAME_PARAM"
+  "KV_NAME_FROM_COMMON_PARAM"
   "SUBNET_COMMON"
   "SUBNET_COMMON_SCORING"
   "SUBNET_COMMON_POWERBI_GW"
@@ -214,6 +223,7 @@ service_and_byo_vars=(
   "SUBNET_PROJ_AKS2"
   "SUBNET_PROJ_ACA"
   "SUBNET_PROJ_ACA2"
+  "SUBNET_PROJ_WEBAPP"
   "SUBNET_PROJ_DATABRICKS_PUBLIC"
   "SUBNET_PROJ_DATABRICKS_PRIVATE"
   "BYO_ASEV3"
@@ -290,7 +300,10 @@ repo_level_vars=(
   "AIFACTORY_PREFIX"
   "TENANT_AZUREML_OID"
   "LAKE_PREFIX"
+  "LAKE_CONTAINER_NAME"
   "AISEARCH_SEMANTIC_TIER"
+  "DATABRICKS_PRIVATE"
+  "AML_STUDIO_UI_PRIVATE"
   
   # === RBAC model ===
   "USE_AD_GROUPS"
@@ -375,6 +388,7 @@ repo_level_vars=(
   # === Complete mode vs Incremental mode ===
   "ENABLE_DELETE_FOR_DISABLED_RESOURCES"
   "DELETE_ALL_SERVICES_FOR_PROJECT"
+  "DELETE_KEYVAULT_ALSO"
   "DELETE_ALL_FOR_PROJECT"
   # All ENABLE_* flags moved to repo-level
   "ENABLE_AI_SERVICES"
@@ -439,6 +453,9 @@ repo_level_vars=(
   "ADMIN_AISEARCH_TIER"
   "VNET_RESOURCE_GROUP_PARAM"
   "VNET_NAME_FULL_PARAM"
+  "COMMON_RESOURCE_GROUP_PARAM"
+  "DATALAKE_NAME_PARAM"
+  "KV_NAME_FROM_COMMON_PARAM"
   "SUBNET_COMMON"
   "SUBNET_COMMON_SCORING"
   "SUBNET_COMMON_POWERBI_GW"
@@ -447,6 +464,7 @@ repo_level_vars=(
   "SUBNET_PROJ_AKS2"
   "SUBNET_PROJ_ACA"
   "SUBNET_PROJ_ACA2"
+  "SUBNET_PROJ_WEBAPP"
   "SUBNET_PROJ_DATABRICKS_PUBLIC"
   "SUBNET_PROJ_DATABRICKS_PRIVATE"
   "BYO_ASEV3"

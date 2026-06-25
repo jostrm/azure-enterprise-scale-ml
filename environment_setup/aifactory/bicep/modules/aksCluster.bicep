@@ -131,4 +131,6 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-05-01' = if
 }
 
 output aksId string = aksCluster.id
-output clusterIdentity string = aksExists ? '' : aksCluster!.identity.principalId
+// For a UserAssigned identity the cluster's `identity` object only exposes `type` and
+// `userAssignedIdentities` (no top-level `principalId`), so only read `principalId` for SystemAssigned.
+output clusterIdentity string = aksExists ? '' : (aksCluster!.identity.type == 'SystemAssigned' ? aksCluster!.identity.principalId : '')

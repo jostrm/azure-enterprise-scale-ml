@@ -36,6 +36,7 @@ steps:
         echo "##vso[task.setvariable variable=subnetProjAKS2]"
         echo "##vso[task.setvariable variable=subnetProjACA]"
         echo "##vso[task.setvariable variable=subnetProjACA2]"
+        echo "##vso[task.setvariable variable=subnetProjWebapp]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
       fi
@@ -86,6 +87,7 @@ steps:
       #   subnetProjAKS2              -> enableAksForAzureML=true
       #   subnetProjACA               -> enableContainerApps=true
       #   subnetProjACA2              -> enableAIFoundry=true AND disableAgentNetworkInjection=false
+      #   subnetProjWebapp            -> enableWebApp=true OR enableFunction=true
       #   subnetProjDatabricksPublic  -> enableDatabricks=true
       #   subnetProjDatabricksPrivate -> enableDatabricks=true
       # ---------------------------------------------------------------
@@ -118,6 +120,10 @@ steps:
 
       if [ "$(enableAIFoundry)" = "true" ] && [ "$(disableAgentNetworkInjection)" != "true" ]; then
         check_subnet "subnetProjACA2" "$(subnetProjACA2)" "enableAIFoundry=true and disableAgentNetworkInjection=false"
+      fi
+
+      if [ "$(enableWebApp)" = "true" ] || [ "$(enableFunction)" = "true" ]; then
+        check_subnet "subnetProjWebapp" "$(subnetProjWebapp)" "enableWebApp=true or enableFunction=true"
       fi
 
       if [ "$(enableDatabricks)" = "true" ]; then
@@ -291,23 +297,43 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      # Get primary IP with fallback to multiple services
-      PRIMARY_IP=$(curl -s http://ipinfo.io/ip 2>/dev/null || curl -s https://api.ipify.org 2>/dev/null || curl -s https://checkip.amazonaws.com 2>/dev/null || curl -s https://icanhazip.com 2>/dev/null)
+      set -uo pipefail
+      # Detect the build agent's public IPv4. A bare `curl ... ||` chain is unreliable because
+      # ipinfo.io can return an EMPTY body while still exiting 0, leaving admin_ip_fw empty and
+      # breaking task 02 with "'' does not appear to be an IPv4 or IPv6 network". Validate each.
+      IPV4_RE='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+      PRIMARY_IP=""
+      for svc in "https://api.ipify.org" "https://checkip.amazonaws.com" "https://ifconfig.me/ip" "http://ipinfo.io/ip"; do
+        candidate=$(curl -s --max-time 10 "$svc" | tr -d '[:space:]')
+        echo "  $svc -> '${candidate}'"
+        if [[ "$candidate" =~ $IPV4_RE ]]; then
+          PRIMARY_IP="$candidate"
+          echo "Selected public IP '$PRIMARY_IP' from $svc"
+          break
+        fi
+      done
+
+      if [ -z "$PRIMARY_IP" ]; then
+        echo "##[error]Could not determine the build agent public IPv4 from any detection service."
+        echo "##[error]Whitelisting cannot proceed. Set disable_whitelisting_for_build_agents=true if the agent IP is already allowed, or retry."
+        exit 1
+      fi
+
       echo "Primary IP: $PRIMARY_IP"
       echo "##vso[task.setvariable variable=admin_ip_fw]$PRIMARY_IP"
-      
-      # Get all possible IPs that might be used
-      echo "All network interfaces:"
-      ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1
-      
-      # Try alternative IP detection services as backup
-      ALT_IP1=$(curl -s https://api.ipify.org 2>/dev/null)
-      ALT_IP2=$(curl -s https://checkip.amazonaws.com 2>/dev/null)
-      
+
+      # Diagnostics: list local interfaces (not used for whitelisting; the public IP above is authoritative).
+      # The `ip` command is absent on Windows-hosted agents, so guard it to avoid a spurious error line.
+      if command -v ip >/dev/null 2>&1; then
+        echo "All network interfaces:"
+        ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d'/' -f1
+      fi
+
+      # Keep alternates for visibility/debugging.
+      ALT_IP1=$(curl -s --max-time 10 https://api.ipify.org | tr -d '[:space:]')
+      ALT_IP2=$(curl -s --max-time 10 https://checkip.amazonaws.com | tr -d '[:space:]')
       echo "Alternative IP 1: $ALT_IP1"
       echo "Alternative IP 2: $ALT_IP2"
-      
-      # Set variables for all IPs
       echo "##vso[task.setvariable variable=admin_ip_fw_alt1]$ALT_IP1"
       echo "##vso[task.setvariable variable=admin_ip_fw_alt2]$ALT_IP2"
 
@@ -319,13 +345,19 @@ steps:
     scriptType: bash
     scriptLocation: 'inlineScript'
     inlineScript: |
+     set -uo pipefail
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
      
      az keyvault update --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --public-network-access Enabled --default-action Deny
      echo "Waiting for network rules to propagate..."
      sleep 10
      
-     az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
+     ip_to_add="$(admin_ip_fw)"
+     if [ -z "$ip_to_add" ]; then
+       echo "##[error]admin_ip_fw is empty; cannot add Key Vault network rule. Did task 01 fail to detect the agent public IP?"
+       exit 1
+     fi
+     az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$ip_to_add"
 - task: AzureKeyVault@2  
   displayName: '03_az_download_seeding_keyvault'
   inputs:
@@ -526,6 +558,7 @@ steps:
       SNT_ACA_002="snt-prj${projectNumber}-aca-002"
       SNT_AKS="snt-prj${projectNumber}-aks"
       SNT_AKS_002="snt-prj${projectNumber}-aks-002"
+      SNT_WEBAPP="snt-prj${projectNumber}-webapp"
       SNT_DATABRICKS_PRIV="snt-prj${projectNumber}-dbxpriv"
       SNT_DATABRICKS_PUB="snt-prj${projectNumber}-dbxpub"
       
@@ -550,6 +583,7 @@ steps:
       check_subnet_exists "$SNT_ACA_002" "sntAca002Exists"
       check_subnet_exists "$SNT_AKS" "sntAksExists"
       check_subnet_exists "$SNT_AKS_002" "sntAks002Exists"
+      check_subnet_exists "$SNT_WEBAPP" "sntWebappExists"
       check_subnet_exists "$SNT_DATABRICKS_PRIV" "sntDatabricksPrivExists"
       check_subnet_exists "$SNT_DATABRICKS_PUB" "sntDatabricksPubExists"
       
@@ -595,6 +629,7 @@ steps:
       -subnetProjAKS2 "$(subnetProjAKS2)"
       -subnetProjACA "$(subnetProjACA)"
       -subnetProjACA2 "$(subnetProjACA2)"
+      -subnetProjWebapp "$(subnetProjWebapp)"
       -subnetProjDatabricksPublic "$(subnetProjDatabricksPublic)"
       -subnetProjDatabricksPrivate "$(subnetProjDatabricksPrivate)"
       -byoASEv3 "$(byoASEv3)"
@@ -606,6 +641,7 @@ steps:
       -sntAca002Exists "$(sntAca002Exists)"
       -sntAksExists "$(sntAksExists)"
       -sntAks002Exists "$(sntAks002Exists)"
+      -sntWebappExists "$(sntWebappExists)"
       -sntDatabricksPrivExists "$(sntDatabricksPrivExists)"
       -sntDatabricksPubExists "$(sntDatabricksPubExists)"
       -aksOutboundType "$(aksOutboundType)"
@@ -613,11 +649,12 @@ steps:
     deploymentMode: 'Incremental'
     deploymentName: 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)$(admin_aifactorySuffixRG)SubnetDeplProj'
 
-- task: AzureCLI@1
+- task: AzureCLI@2
   displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: | 
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"

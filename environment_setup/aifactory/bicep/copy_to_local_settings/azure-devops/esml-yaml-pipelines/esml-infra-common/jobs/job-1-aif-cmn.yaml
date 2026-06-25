@@ -1,3 +1,7 @@
+parameters:
+  - name: serviceConnection
+    type: string
+
 steps:
 
 - checkout: self # Required as first property. Alias of the repository resource to check out or 'none'. 
@@ -6,6 +10,42 @@ steps:
   displayName: GIT # Human-readable name for the task. 
   enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
   name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
+
+# ---------------------------------------------------------------------------
+# PREFLIGHT (early, fail-fast): validate region support, resource-provider
+# registration and policy assignments for the common subscription BEFORE any
+# common resource is deployed. A non-zero exit aborts with a clear reason.
+# Set preflight_skip=true to bypass.
+# ---------------------------------------------------------------------------
+- task: AzureCLI@2
+  displayName: '00_preflight_quota_policy_checks'
+  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh'
+    arguments: '--environment "$(dev_test_prod)" --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)"'
+  env:
+    PREFLIGHT_SKIP: $(preflight_skip)
+    admin_location: $(admin_location)
+    admin_aiSearchTier: $(admin_aiSearchTier)
+    enableAISearch: $(enableAISearch)
+    enableAIFoundry: $(enableAIFoundry)
+    enableAzureOpenAI: $(enableAzureOpenAI)
+    enableCosmosDB: $(enableCosmosDB)
+    enableElasticsearch: $(enableElasticsearch)
+    deployModel_gpt_X: $(deployModel_gpt_X)
+    modelGPTXName: $(modelGPTXName)
+    modelGPTXSku: $(modelGPTXSku)
+    modelGPTXCapacity: $(modelGPTXCapacity)
+    deployModel_gpt_4o: $(deployModel_gpt_4o)
+    deployModel_text_embedding_3_large: $(deployModel_text_embedding_3_large)
+    deployModel_text_embedding_3_small: $(deployModel_text_embedding_3_small)
+    deployModel_text_embedding_ada_002: $(deployModel_text_embedding_ada_002)
+    default_model_sku: $(default_model_sku)
+    default_gpt_capacity: $(default_gpt_capacity)
+    default_embedding_capacity: $(default_embedding_capacity)
 
 - task: AzureCLI@2
   displayName: '00_pwsh_print_info'
@@ -28,7 +68,7 @@ steps:
      --name "esml-cmn-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)$(admin_location)-DeplRG" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-common\main\11-rgCommon.bicep" \
+     --template-file "esml-common/main/11-rgCommon.bicep" \
      --parameters enableAdminVM="$(enableAdminVM)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
@@ -47,7 +87,7 @@ steps:
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters cmk="$(cmk)" \
      --parameters cmkKeyName="$(cmkKeyName)" \
-     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
+     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
@@ -62,7 +102,7 @@ steps:
      --name "esml-cmn$(dev_test_prod)$(admin_aifactorySuffixRG)$(admin_commonResourceSuffix)$(admin_location)-Subnets" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-common\main\12-networkCommon.bicep" \
+     --template-file "esml-common/main/12-networkCommon.bicep" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
@@ -99,8 +139,7 @@ steps:
      --parameters env="$(dev_test_prod)" \
      --parameters network_env="$(network_env)" \
      --parameters cidr_range="$(cidr_range)" \
-     --parameters IPwhiteList="$(project_IP_whitelist)" \
-     --debug
+     --parameters IPwhiteList="$(project_IP_whitelist)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
 - task: AzureCLI@2
@@ -114,7 +153,7 @@ steps:
      --name "esml-cmn-$(dev_test_prod)$(admin_locationSuffix)$(admin_aifactorySuffixRG)$(admin_commonResourceSuffix)$(admin_location)-DeplRes" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
-     --template-file "esml-common\main\13-rgLevel.bicep" \
+     --template-file "esml-common/main/13-rgLevel.bicep" \
      --parameters adminPassword="$(date +%s | sha256sum | base64 | head -c 32 ; echo)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
@@ -173,6 +212,5 @@ steps:
      --parameters network_env="$(network_env)" \
      --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
      --parameters enableDatafactoryCommon="$(enableDatafactoryCommon)" \
-     --parameters commonResourceName="$(vnetResourceGroupBase)" \
-     --debug
+     --parameters commonResourceName="$(vnetResourceGroupBase)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'

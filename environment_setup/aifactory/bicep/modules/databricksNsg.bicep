@@ -13,73 +13,46 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   tags: tags
   properties: {
     securityRules: [
-      // --- Inbound ---
+      // IMPORTANT: Azure Databricks AUTO-PROVISIONS and MANAGES the required NSG rules for a
+      // VNet-injected workspace via subnet delegation to Microsoft.Databricks/workspaces. This
+      // includes ALL of the 'Microsoft.Databricks-workspaces_UseOnly_*' rules AND the
+      // VirtualNetwork -> VirtualNetwork allow-all inbound/outbound rules.
+      // Per Microsoft docs these rules must NOT be hand-authored or duplicated here:
+      // https://learn.microsoft.com/azure/databricks/security/network/classic/vnet-inject#network-security-group-rules
+      // Previously this module defined those rules manually, which caused a deployment-time
+      // SecurityRuleConflict ("Security rule Allow_VNet_Outbound conflicts with rule
+      // Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-databricks-webapp. Rules
+      // cannot have the same Priority and Direction") because the Databricks-injected rules
+      // collided with our duplicates.
+      // Only genuinely ADDITIONAL custom egress/ingress rules are defined below, placed in a high
+      // priority band (3900+) that never collides with the Databricks-managed rules.
+      // --- Inbound (custom additions only) ---
       {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-worker-inbound'
+        name: 'Allow_APIM'
         properties: {
-          description: 'Required for worker nodes communication within a cluster.'
-          protocol: '*'
+          description: 'Allow inbound from Azure API Management control plane (port 3443).'
+          protocol: 'Tcp'
           sourcePortRange: '*'
-          destinationPortRange: '*'
-          sourceAddressPrefix: 'VirtualNetwork'
-          destinationAddressPrefix: 'VirtualNetwork'
+          destinationPortRange: '3443'
+          sourceAddressPrefix: 'ApiManagement'
+          destinationAddressPrefix: '*'
           access: 'Allow'
-          priority: 100
+          priority: 3900
           direction: 'Inbound'
-          sourcePortRanges: []
-          destinationPortRanges: []
-          sourceAddressPrefixes: []
-          destinationAddressPrefixes: []
         }
       }
+      // --- Outbound (custom additions only) ---
       {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-control-plane-to-worker-ssh'
+        name: 'AzureFrontDoorFirstParty'
         properties: {
-            description: 'Required for Databricks control plane management of worker nodes.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '22'
-            sourceAddressPrefix: 'AzureDatabricks'
-            destinationAddressPrefix: 'VirtualNetwork'
-            access: 'Allow'
-            priority: 101
-            direction: 'Inbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-control-plane-to-worker-proxy'
-        properties: {
-            description: 'Required for Databricks control plane communication with worker nodes.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '5557'
-            sourceAddressPrefix: 'AzureDatabricks'
-            destinationAddressPrefix: 'VirtualNetwork'
-            access: 'Allow'
-            priority: 102
-            direction: 'Inbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      // --- Outbound --- 
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-databricks-webapp'
-        properties: {
-            description: 'Required for workers communication with Databricks Webapp.'
+            description: 'Required for MCR pulls — MCR layers/manifests are served via FrontDoor FirstParty backend.'
             protocol: 'Tcp'
             sourcePortRange: '*'
             destinationPortRange: '443'
             sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'AzureDatabricks'
+            destinationAddressPrefix: 'AzureFrontDoor.FirstParty'
             access: 'Allow'
-            priority: 100
+            priority: 3900
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []
@@ -88,70 +61,16 @@ resource dbxNsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
         }
       }
       {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-sql'
+        name: 'AzureMonitor'
         properties: {
-            description: 'Required for workers communication with Azure SQL services.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '3306'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'Sql'
-            access: 'Allow'
-            priority: 101
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-storage'
-        properties: {
-            description: 'Required for workers communication with Azure Storage services.'
+            description: 'Required for log + metric egress (Container Insights, Log Analytics, App Insights).'
             protocol: 'Tcp'
             sourcePortRange: '*'
             destinationPortRange: '443'
             sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'Storage'
+            destinationAddressPrefix: 'AzureMonitor'
             access: 'Allow'
-            priority: 102
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-      }
-      {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-worker-outbound'
-        properties: {
-            description: 'Required for worker nodes communication within a cluster.'
-            protocol: '*'
-            sourcePortRange: '*'
-            destinationPortRange: '*'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'VirtualNetwork'
-            access: 'Allow'
-            priority: 103
-            direction: 'Outbound'
-            sourcePortRanges: []
-            destinationPortRanges: []
-            sourceAddressPrefixes: []
-            destinationAddressPrefixes: []
-        }
-     }
-     {
-        name: 'Microsoft.Databricks-workspaces_UseOnly_databricks-worker-to-eventhub'
-        properties: {
-            description: 'Required for worker communication with Azure Eventhub services.'
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '9093'
-            sourceAddressPrefix: 'VirtualNetwork'
-            destinationAddressPrefix: 'EventHub'
-            access: 'Allow'
-            priority: 104
+            priority: 3910
             direction: 'Outbound'
             sourcePortRanges: []
             destinationPortRanges: []

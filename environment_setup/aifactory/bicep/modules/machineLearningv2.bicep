@@ -207,9 +207,9 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
     } : null
     
   }
-  dependsOn:[
-    ...(!aksExists ? [aksDev] : [])
-  ]
+  // No dependsOn on AKS: the workspace must never depend on the AKS cluster.
+  // The AKS attach-compute (machineLearningCompute) is a CHILD of the workspace and depends on it,
+  // not the other way around. Storage/KeyVault/ACR/AppInsights are 'existing' refs (implicit deps).
 }
 resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'  = if(env == 'test' || env == 'prod') {
   name: name
@@ -268,9 +268,9 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
     } : null
     
   }
-  dependsOn:[
-    ...(!aksExists ? [aksTestProd] : [])
-  ]
+  // No dependsOn on AKS: the workspace must never depend on the AKS cluster.
+  // The AKS attach-compute (machineLearningComputeTestProd) is a CHILD of the workspace and depends on it,
+  // not the other way around. Storage/KeyVault/ACR/AppInsights are 'existing' refs (implicit deps).
 }
 
 var pendName = '${name}-pend'
@@ -443,14 +443,16 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
-    #disable-next-line BCP318
-    resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
+    // The AKS cluster id is deterministic whether it already exists or is created by the aksDev module
+    // (aksDev creates it with name=aksName in this resource group), so reference it by resourceId and avoid
+    // a module-output reference (which would add an unconditional dependsOn on a possibly-undeployed module).
+    resourceId: aksResourceId
     properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
       agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
       loadBalancerType: 'InternalLoadBalancer'
-    }, !aksExists ? {
+    }, !aksExists && enableAksForAzureML? {
       aksNetworkingConfiguration:  {
         subnetId: aksSubnetId
         dnsServiceIP:aksDnsServiceIP
@@ -461,12 +463,13 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     } : {})
   }
   dependsOn: [
+    ...(!aksExists && enableAksForAzureML? [aksDev] : [])
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
     azureMLv2Dev
   ]
 }
 //AKS attach compute PRIVATE cluster, without SSL
-resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env=='test' || env=='prod'  && !empty(aksSubnetId) && enableAksForAzureML) {	
+resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && (env=='test' || env=='prod') && !empty(aksSubnetId) && enableAksForAzureML) {	
   name: aksName
   parent: amlv2TestProd
   location: location
@@ -474,14 +477,16 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     computeType: 'AKS'
     computeLocation: location
     description:'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
-    #disable-next-line BCP318
-    resourceId: ((env =='dev') ? (aksExists)? aksDev.outputs.aksId: aksResourceId  : (aksExists)? aksTestProd.outputs.aksId: aksResourceId)  
+    // The AKS cluster id is deterministic whether it already exists or is created by the aksTestProd module
+    // (aksTestProd creates it with name=aksName in this resource group), so reference it by resourceId and avoid
+    // a module-output reference (which would add an unconditional dependsOn on a possibly-undeployed module).
+    resourceId: aksResourceId
     properties: union({
       agentCount:  ((env =='dev') ? 1 :  3)
       clusterPurpose: ((env =='dev') ? 'DevTest' : 'FastProd') // 'DenseProd' also available
       agentVmSize: ((env =='dev') ? aksVmSku_dev : aksVmSku_testProd) // (2 cores, 8GB) VS (4 cores and 14GB)
       loadBalancerType: 'InternalLoadBalancer'
-    }, !aksExists ? {
+    }, !aksExists && enableAksForAzureML? {
       aksNetworkingConfiguration:  {
         subnetId: aksSubnetId
         dnsServiceIP:aksDnsServiceIP
@@ -492,6 +497,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     } : {})
   }
   dependsOn: [
+    ...(!aksExists && enableAksForAzureML? [aksTestProd] : [])
     ...(!enablePublicAccessWithPerimeter ? [machineLearningPrivateEndpoint] : [])
     amlv2TestProd
   ]

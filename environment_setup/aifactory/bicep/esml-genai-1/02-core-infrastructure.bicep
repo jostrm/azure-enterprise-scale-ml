@@ -80,6 +80,8 @@ param acaSubnetId string
 @description('Optional subnets from subnet calculator')
 param aca2SubnetId string = ''
 param aks2SubnetId string = ''
+@description('App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
+param webappSubnetId string = ''
 @description('if projectype is not genai-1, but instead all')
 param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''
@@ -734,9 +736,9 @@ module addSecret '../modules/kvSecretsPrj.bicep' = if(!keyvaultExists && !empty(
   name: take('02-kvSecretsS2P${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
-    spAppIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) ? externalKv!.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) : ''
-    spOIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) ? externalKv!.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
-    spSecretValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) ? externalKv!.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName) : ''
+    spAppIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleAppID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleAppID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleAppID_SeedingKeyvaultName), '<optional>')) ? externalKv!.getSecret(projectServicePrincipleAppID_SeedingKeyvaultName) : ''
+    spOIDValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) ? externalKv!.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
+    spSecretValue: (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleSecret_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleSecret_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleSecret_SeedingKeyvaultName), '<optional>')) ? externalKv!.getSecret(projectServicePrincipleSecret_SeedingKeyvaultName) : ''
     keyvaultName: keyvaultName
     keyvaultNameRG: targetResourceGroup
   }
@@ -798,7 +800,8 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!e
 }
 
 // Service principal access to common key vault (keeping access policy model)
-module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription)) {
+// SP removal support: skip entirely when the SP OID seeding secret name is empty or a placeholder (<todo>/<optional>).
+module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('02-spGetList${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

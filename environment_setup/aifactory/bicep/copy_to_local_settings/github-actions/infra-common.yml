@@ -106,6 +106,33 @@ jobs:
         with:
           submodules: true
 
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
       - name: Validate required configuration
         shell: pwsh
         run: |
@@ -181,8 +208,7 @@ jobs:
             --parameters useAdGroups="${{ env.useAdGroups }}" \
             --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
             --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
-            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
-            --debug
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
 
       - name: Debug networking inputs (before 02)
         shell: pwsh
@@ -248,8 +274,7 @@ jobs:
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
             --parameters cidr_range="${{ env.cidr_range }}" \
-            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
-            --debug
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
 
       - name: 03_az_bicep_deploy_resources
         shell: bash
@@ -318,8 +343,7 @@ jobs:
             --parameters network_env="${{ env.network_env }}" \
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
-            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
-            --debug
+            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
   common-stage:
     name: Stage Common
@@ -411,6 +435,33 @@ jobs:
         with:
           submodules: true
 
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
       - name: Validate required configuration
         shell: pwsh
         run: |
@@ -483,8 +534,7 @@ jobs:
             --parameters useAdGroups="${{ env.useAdGroups }}" \
             --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
             --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
-            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
-            --debug
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
 
       - name: Debug networking inputs (before 02)
         shell: pwsh
@@ -550,8 +600,7 @@ jobs:
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
             --parameters cidr_range="${{ env.cidr_range }}" \
-            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
-            --debug
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
 
       - name: 03_az_bicep_deploy_resources
         shell: bash
@@ -620,8 +669,7 @@ jobs:
             --parameters network_env="${{ env.network_env }}" \
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
-            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
-            --debug
+            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
   common-prod:
     name: Prod Common
@@ -715,6 +763,33 @@ jobs:
         with:
           submodules: true
 
+      # ---------------------------------------------------------------------
+      # PREFLIGHT (early, fail-fast): validate region support, resource-provider
+      # registration and policy assignments for the common subscription BEFORE
+      # any common resource is deployed. A non-zero exit aborts (::error::).
+      # Set repo var PREFLIGHT_SKIP=true to bypass.
+      # ---------------------------------------------------------------------
+      - name: Preflight quota & policy checks
+        if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
+        shell: bash
+        env:
+          PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
+          enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
+          enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
+          enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+        run: |
+          set -uo pipefail
+          PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
+          chmod +x "$PF" 2>/dev/null || true
+          STRICT_FLAG=""
+          if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
+          bash "$PF" $STRICT_FLAG \
+            --environment "${{ env.dev_test_prod }}" \
+            --subscription "${{ env.dev_test_prod_sub_id }}" \
+            --location "${{ env.admin_location }}"
+
       - name: Validate required configuration
         shell: pwsh
         run: |
@@ -787,8 +862,7 @@ jobs:
             --parameters useAdGroups="${{ env.useAdGroups }}" \
             --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
             --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
-            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
-            --debug
+            --parameters technicalAdminsEmail="${{ env.technical_admins_email }}"
 
       - name: Debug networking inputs (before 02)
         shell: pwsh
@@ -854,8 +928,7 @@ jobs:
             --parameters env="${{ env.dev_test_prod }}" \
             --parameters network_env="${{ env.network_env }}" \
             --parameters cidr_range="${{ env.cidr_range }}" \
-            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}" \
-            --debug
+            --parameters IPwhiteList="${{ env.technical_admins_bastion_IP_whitelist }}"
 
       - name: 03_az_bicep_deploy_resources
         shell: bash
@@ -924,5 +997,4 @@ jobs:
             --parameters network_env="${{ env.network_env }}" \
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
-            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
-            --debug
+            --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"

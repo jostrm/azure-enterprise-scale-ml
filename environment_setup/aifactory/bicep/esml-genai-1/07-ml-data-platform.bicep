@@ -83,6 +83,8 @@ param acaSubnetId string
 @description('Optional subnets from subnet calculator')
 param aca2SubnetId string = ''
 param aks2SubnetId string = ''
+@description('App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
+param webappSubnetId string = ''
 @description('if projectype is not genai-1, but instead all')
 param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''
@@ -98,6 +100,17 @@ param enableDatafactory bool = false
 param enableAzureMachineLearning bool = false
 param enableAksForAzureML bool = true
 param enableDatabricks bool = false
+
+@description('Bootstrap Azure Data Factory linked services (Key Vault, Storage 2001, Cosmos DB, Function) authenticated via the project UAMI.')
+param enableDatafactoryLinkedServices bool = true
+@description('Cosmos DB database name for the Data Factory CosmosDb linked service. Empty = skip the Cosmos linked service.')
+param datafactoryCosmosDbDatabase string = ''
+@description('Create the Data Factory AzureFunction linked service when the project Function App is enabled.')
+param enableFunction bool = false
+@description('AAD resource/audience (App ID URI or client ID) of the Function App for ADF MSI auth. Required to create the Function linked service.')
+param datafactoryFunctionResourceId string = ''
+@description('Create the Data Factory managed VNet + AutoResolve managed Integration Runtime + managed private endpoints to KV/Storage/Cosmos/Function. Defaults to private (when public access with perimeter is off).')
+param enableDatafactoryManagedVnet bool = !enablePublicAccessWithPerimeter
 
 @description('Enable public access with perimeter')
 param enablePublicAccessWithPerimeter bool = false
@@ -136,9 +149,10 @@ param dataFactoryExists bool = false
 param databricksExists bool = false
 
 // ================= DATARBRICKS PARAMETERS =================
-@description('Databricks SKU (trial, standard, premium)')
-@allowed(['trial','standard','premium'])
-param databricksSkuName string = 'standard'
+// NB! The 'standard' SKU is deprecated by Azure (DatabricksStandardSkuNotSupported). Use 'premium' (or 'trial').
+@description('Databricks SKU (trial, premium). The standard SKU is deprecated by Azure.')
+@allowed(['trial','premium'])
+param databricksSkuName string = 'premium'
 @description('Use custom VNet (customer-managed) for Databricks instead of managed networking')
 param useDatabricksCustomVNet bool = true
 
@@ -275,7 +289,9 @@ var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var aks2SubnetName = namingConvention.outputs.aks2SubnetName
 var genaiName = namingConvention.outputs.projectTypeGenAIName
 var storageAccount1001Name = namingConvention.outputs.storageAccount1001Name
-//var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
+var cosmosDBName = namingConvention.outputs.cosmosDBName
+var functionAppName = namingConvention.outputs.functionAppName
 var keyvaultName = namingConvention.outputs.keyvaultName
 var applicationInsightName = namingConvention.outputs.applicationInsightName
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
@@ -371,7 +387,8 @@ module spAndMI2ArrayModule '../modules/spAndMiArray.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd,targetResourceGroup)
   params: {
     managedIdentityOID: var_miPrj_PrincipalId
-    servicePrincipleOIDFromSecret: externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName)
+    // SP removal support: ignore the SP OID seeding secret when its name is empty or a placeholder (<todo>/<optional>) -> spAndMiArray yields an MI-only array
+    servicePrincipleOIDFromSecret: (!empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) ? externalKv.getSecret(projectServicePrincipleOID_SeedingKeyvaultName) : ''
   }
   dependsOn: [
     namingConvention
@@ -405,6 +422,22 @@ module dataFactory '../modules/dataFactory.bicep' = if (!dataFactoryExists && en
     cmk: cmk
     cmkKeyName: cmkKeyName
     keyVaultUri: externalKv.properties.vaultUri
+    // Linked services bootstrap (authenticated via the project UAMI)
+    projectUamiResourceId: miPrjREF.id
+    deployLinkedServices: enableDatafactoryLinkedServices
+    linkedServiceKeyVaultName: keyvaultName
+    linkedServiceStorageAccountName: storageAccount2001Name
+    linkedServiceCosmosDbName: cosmosDBName
+    linkedServiceCosmosDbDatabase: datafactoryCosmosDbDatabase
+    enableFunctionLinkedService: enableFunction
+    linkedServiceFunctionAppName: functionAppName
+    linkedServiceFunctionResourceId: datafactoryFunctionResourceId
+    // Managed VNet + AutoResolve managed IR + managed private endpoints (egress over Private Link)
+    enableManagedVnet: enableDatafactoryManagedVnet
+    managedPeKeyVaultResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.KeyVault/vaults', keyvaultName)
+    managedPeStorageResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount2001Name)
+    managedPeCosmosResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', cosmosDBName)
+    managedPeFunctionResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Web/sites', functionAppName)
   }
 }
 
@@ -580,6 +613,11 @@ output dataFactoryEnabled bool = enableDatafactory
 output dataFactoryId string = enableDatafactory ? dataFactory!.outputs.adfId : ''
 output dataFactoryName string = enableDatafactory ? dataFactory!.outputs.adfName : ''
 output dataFactoryPrincipalId string = enableDatafactory ? dataFactory!.outputs.principalId : ''
+
+// Data Factory managed VNet / managed private endpoints (egress). The managed PEs land
+// in 'Pending' and must be APPROVED on each target resource by a post-deploy pipeline step.
+output dataFactoryManagedVnetEnabled bool = (enableDatafactory && enableDatafactoryManagedVnet)
+output dataFactoryManagedPrivateEndpoints array = (enableDatafactory && enableDatafactoryManagedVnet) ? dataFactory!.outputs.managedPrivateEndpoints : []
 
 output azureMLDeployed bool = (!amlExists && enableAzureMachineLearning)
 output databricksDeployed bool = (!databricksExists && enableDatabricks)

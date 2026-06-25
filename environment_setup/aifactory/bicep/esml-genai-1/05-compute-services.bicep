@@ -167,6 +167,8 @@ param acaSubnetId string
 @description('Optional subnets from subnet calculator')
 param aca2SubnetId string = ''
 param aks2SubnetId string = ''
+@description('Optional dedicated App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms at creation)')
+param webappSubnetId string = ''
 @description('if projectype is not genai-1, but instead all')
 param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''
@@ -366,6 +368,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId:genaiSubnetId
     aca2SubnetId: aca2SubnetId
     aks2SubnetId: aks2SubnetId
+    webappSubnetId: webappSubnetId
   }
 }
 
@@ -431,6 +434,7 @@ var aksSubnetName = namingConvention.outputs.aksSubnetName
 var acaSubnetName = namingConvention.outputs.acaSubnetName
 var aca2SubnetName = namingConvention.outputs.aca2SubnetName
 var aks2SubnetName = namingConvention.outputs.aks2SubnetName
+var webappSubnetName = namingConvention.outputs.webappSubnetName
 var defaultSubnet = namingConvention.outputs.defaultSubnet
 
 // AKS naming from naming convention
@@ -459,8 +463,12 @@ var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_pr
 // AKS subnet selection: prefer aksSubnetId, fall back to aks2SubnetId
 var aksSubnetIdResolved = !empty(aksSubnetId) ? aksSubnetId : aks2SubnetId
 
-// VNet integration subnet: prefer aksSubnetName (dedicated, at least /28), fall back to acaSubnetName when AKS is disabled
-var vnetIntegrationSubnetName = !empty(aksSubnetName) ? aksSubnetName : acaSubnetName
+// VNet integration subnet for WebApp/Function.
+// Preferred: the dedicated 'webapp' subnet (snt-<proj>-webapp), pre-delegated to Microsoft.Web/serverFarms at creation (31-network.bicep).
+// Legacy fallback (no dedicated subnet provisioned yet): use aksSubnetName ONLY when AKS is NOT enabled
+// (AKS requires its subnet undelegated), otherwise acaSubnetName. The runtime subnetDelegationServerFarm
+// module below applies the serverFarms delegation only in the legacy fallback case.
+var vnetIntegrationSubnetName = !empty(webappSubnetName) ? webappSubnetName : ((!enableAKS && !empty(aksSubnetName)) ? aksSubnetName : acaSubnetName)
 
 // IP Rules processing
 var ipWhitelist_array = !empty(IPwhiteList) ? split(IPwhiteList, ',') : []
@@ -671,12 +679,17 @@ var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
-module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3 && !empty(aksSubnetId)) {
+// When a dedicated 'webapp' subnet is provisioned (webappSubnetId not empty), it is ALREADY delegated to
+// Microsoft.Web/serverFarms at subnet-creation time (31-network.bicep), so this runtime delegation is skipped.
+// Legacy fallback only: delegate the actual VNet-integration subnet (vnetIntegrationSubnetName), never the
+// AKS subnet when AKS is enabled. AKS requires an undelegated subnet, so vnetIntegrationSubnetName resolves
+// to acaSubnetName when enableAKS is true. Condition uses start-known params only.
+module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!functionAppExists && !webAppExists) && (enableWebApp || enableFunction) && !byoASEv3 && empty(webappSubnetId) && (enableAKS ? !empty(acaSubnetId) : !empty(aksSubnetId))) {
   name: take('05-snetDelegSF1${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
     vnetName: vnetNameFull
-    subnetName: aksSubnetName // TODO: Have a dedicated subnet for WebApp and FunctionApp
+    subnetName: vnetIntegrationSubnetName // delegate the WebApp/Function integration subnet (never the AKS subnet when AKS is enabled)
     location: location
     vnetResourceGroupName: vnetResourceGroupName
     delegations: [

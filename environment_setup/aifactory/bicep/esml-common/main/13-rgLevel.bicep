@@ -765,7 +765,12 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = if(!deploy
   name: inputKeyvault
   scope: resourceGroup(inputKeyvaultSubscription,inputKeyvaultResourcegroup)
 }
-module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking) {
+// SP removal support: a common Service Principal is used only when its seeding-KV secret name is set and is
+// not a placeholder (<todo>/<optional>). When absent, SP access policies and SP secret seeding are skipped.
+var var_useCommonSP_OID = !empty(commonServicePrincipleOIDKey) && !contains(toLower(commonServicePrincipleOIDKey), '<todo>') && !contains(toLower(commonServicePrincipleOIDKey), '<optional>')
+var var_useCommonSP_ID = !empty(inputCommonSPIDKey) && !contains(toLower(inputCommonSPIDKey), '<todo>') && !contains(toLower(inputCommonSPIDKey), '<optional>')
+var var_useCommonSP_Secret = !empty(inputCommonSPSecretKey) && !contains(toLower(inputCommonSPSecretKey), '<todo>') && !contains(toLower(inputCommonSPSecretKey), '<optional>')
+module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && var_useCommonSP_OID) {
   scope: esmlCommonResourceGroup
   name: 'spCmnAPGet${uniqueInAIFenv}'
   params: {
@@ -817,7 +822,7 @@ module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bi
   ]
 }
 
-module addSecret '../modules-common/kvSecretsCmn.bicep' = if(!deployOnlyAIGatewayNetworking){
+module addSecret '../modules-common/kvSecretsCmn.bicep' = if(!deployOnlyAIGatewayNetworking && var_useCommonSP_ID && var_useCommonSP_Secret && var_useCommonSP_OID){
   name: '${kvNameCommonNoDash}sec${uniqueInAIFenv}'
   scope: esmlCommonResourceGroup
   params: {
@@ -882,7 +887,7 @@ module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.
     kvAdmin
   ]
 }
-module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking){
+module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && var_useCommonSP_OID){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}AP2${uniqueInAIFenv}'
   params: {

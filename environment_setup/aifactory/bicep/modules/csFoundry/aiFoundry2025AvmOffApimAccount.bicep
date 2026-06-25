@@ -59,6 +59,9 @@ param agentSubnetResourceId string = ''
 @description('Disable agent network injection even when an agent subnet is provided.')
 param disableAgentNetworkInjection bool = false
 
+@description('Resource ID of the pre-provisioned project User-Assigned Managed Identity that already holds Network Contributor on the agent VNet. When provided (and agent injection is enabled), it is attached to the account identity so injection joins the cross-RG VNet without a SystemAssigned-MI timing race. Leave empty to fall back to SystemAssigned only.')
+param agentInjectionUserAssignedIdentityResourceId string = ''
+
 @description('Existing AI Search service resource ID. Leave empty to create a new instance.')
 param aiSearchResourceId string = ''
 
@@ -170,32 +173,40 @@ param aiAccountSku string = 'S0'
 //var accountName = length(overrideAccountName) >= 2 ? overrideAccountName : fallbackAccountName
 var accountName = aiAccountName
 var agentNetworkInjectionEnabled = !disableAgentNetworkInjection && !empty(agentSubnetResourceId)
+// When agent injection is enabled and a pre-provisioned project UAMI (already holding Network Contributor
+// on the agent VNet) is provided, attach it so Azure uses an identity that can read/join the cross-RG VNet
+// at injection time. SystemAssigned is retained for CMK RBAC (which depends on the SA principalId).
+var useAgentInjectionUami = agentNetworkInjectionEnabled && !empty(agentInjectionUserAssignedIdentityResourceId)
+var accountIdentity = useAgentInjectionUami ? {
+  type: 'SystemAssigned,UserAssigned'
+  userAssignedIdentities: {
+    '${agentInjectionUserAssignedIdentityResourceId}': {}
+  }
+} : {
+  type: 'SystemAssigned'
+}
 
 
 var ipRules = [for ip in ipAllowList: {
   value: contains(ip, '/') ? toLower(ip) : '${toLower(ip)}/24'
 }]
-var networkAclVirtualNetworkRules = concat(
-  !empty(privateEndpointSubnetResourceId) ? [
-    {
-      id: privateEndpointSubnetResourceId
-      ignoreMissingVnetServiceEndpoint: true // allow listed VNet without requiring service endpoint
-    }
-  ] : [],
-  agentNetworkInjectionEnabled ? [
-    {
-      id: agentSubnetResourceId
-      ignoreMissingVnetServiceEndpoint: true
-    }
-  ] : []
-)
-var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(networkAclVirtualNetworkRules)
-var networkAcls = hasNetworkAcls ? {
+// NOTE: The agent subnet (delegated to Microsoft.App/environments) must NOT be added to
+// networkAcls.virtualNetworkRules. It is consumed ONLY via networkInjections (scenario=agent) below.
+// A delegated subnet is not a valid Cognitive Services VNet ACL rule, and the private-endpoint subnet is
+// intentionally omitted too (private endpoints bypass networkAcls). Listing ANY subnet whose VNet the
+// Cognitive Services RP cannot resolve can make the account PUT network validation fail with:
+//   "Invalid vnet resource ID provided, or the virtual network could not be found."
+// This matches Microsoft's official standard-agent sample, which keeps virtualNetworkRules empty.
+// bypass:'AzureServices' is retained so trusted Azure services (e.g. AI Search) can still reach the account.
+var networkAclVirtualNetworkRules = []
+var networkAcls = {
   defaultAction: enablePublicGenAIAccess && empty(ipRules) ? 'Allow' : 'Deny'
   virtualNetworkRules: networkAclVirtualNetworkRules
   ipRules: ipRules
-  bypass:'AzureServices'
-} : null
+  bypass: 'AzureServices'
+}
+// networkAcls is now always emitted (Deny + bypass:AzureServices in the private case), matching the sample.
+var hasNetworkAcls = true
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 
 resource cMKKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = if (!empty(customerManagedKey.?keyVaultResourceId)) {
@@ -215,9 +226,7 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
   sku: {
     name: aiAccountSku
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: accountIdentity
   properties: {
     allowedFqdnList: allowedFqdnList
     apiProperties: apiProperties
@@ -225,7 +234,8 @@ resource aiAccount 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' = i
     customSubDomainName: accountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
-    disableLocalAuth: false
+    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample.
+    disableLocalAuth: true
     #disable-next-line BCP036
     networkInjections: agentNetworkInjectionEnabled ? [
       {
