@@ -219,25 +219,23 @@ var accountIdentity = useAgentInjectionUami ? {
 var ipRules = [for ip in ipAllowList: {
   value: contains(ip, '/') ? toLower(ip) : toLower(ip)
 }]
-// NOTE: The agent subnet (delegated to Microsoft.App/environments) must NOT be added to
-// networkAcls.virtualNetworkRules. It is consumed ONLY via networkInjections (scenario=agent) below.
-// A delegated subnet is not a valid Cognitive Services VNet ACL rule; including it makes the account
-// PUT's network validation fail during agent capability host creation with:
+// Per Microsoft's official standard-agent sample, keep virtualNetworkRules EMPTY entirely.
+// The agent subnet (delegated to Microsoft.App/environments) is consumed ONLY via networkInjections
+// (scenario=agent) below — never as a VNet ACL rule. The private-endpoint subnet is also intentionally
+// omitted: private endpoints bypass networkAcls anyway, and listing ANY subnet whose VNet the Cognitive
+// Services RP cannot resolve (cross-RG, eventual consistency, or a missing service endpoint) can make the
+// account PUT network validation fail with:
 //   "Invalid vnet resource ID provided, or the virtual network could not be found."
-// This matches Microsoft's official standard-agent sample, which keeps virtualNetworkRules empty.
-var networkAclVirtualNetworkRules = !empty(privateEndpointSubnetResourceId) ? [
-  {
-    id: privateEndpointSubnetResourceId
-    ignoreMissingVnetServiceEndpoint: true // allow listed VNet without requiring service endpoint
-  }
-] : []
-var hasNetworkAcls = !empty(ipRules) || enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet || !empty(networkAclVirtualNetworkRules)
-var networkAcls = hasNetworkAcls ? {
+// bypass:'AzureServices' is retained so trusted Azure services (e.g. AI Search) can still reach the account.
+var networkAclVirtualNetworkRules = []
+var networkAcls = {
   defaultAction: enablePublicGenAIAccess && empty(ipRules) ? 'Allow' : 'Deny'
   virtualNetworkRules: networkAclVirtualNetworkRules
   ipRules: ipRules
-  bypass:'AzureServices'
-} : null
+  bypass: 'AzureServices'
+}
+// networkAcls is now always emitted (Deny + bypass:AzureServices in the private case), matching the sample.
+var hasNetworkAcls = true
 var publicNetworkAccess = (enablePublicGenAIAccess || allowPublicAccessWhenBehindVnet) ? 'Enabled' : 'Disabled'
 var storageInCurrentRg = storageResourceGroupName == resourceGroup().name && storageSecondResourceGroupName == resourceGroup().name
 var searchInCurrentRg = aiSearchServiceResourceGroupName == resourceGroup().name
@@ -264,7 +262,8 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
     customSubDomainName: aiAccountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
-    disableLocalAuth: false
+    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample.
+    disableLocalAuth: true
     #disable-next-line BCP036
     networkInjections: agentNetworkInjectionEnabled ? [
       {
@@ -333,7 +332,8 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
     customSubDomainName: aiAccountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
-    disableLocalAuth: false
+    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample.
+    disableLocalAuth: true
     #disable-next-line BCP036
     networkInjections: agentNetworkInjectionEnabled ? [
       {
