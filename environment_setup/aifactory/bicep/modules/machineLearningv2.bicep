@@ -207,9 +207,9 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
     } : null
     
   }
-  dependsOn:[
-    ...(!aksExists ? [aksDev] : [])
-  ]
+  // No dependsOn on AKS: the workspace must never depend on the AKS cluster.
+  // The AKS attach-compute (machineLearningCompute) is a CHILD of the workspace and depends on it,
+  // not the other way around. Storage/KeyVault/ACR/AppInsights are 'existing' refs (implicit deps).
 }
 resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-preview'  = if(env == 'test' || env == 'prod') {
   name: name
@@ -268,9 +268,9 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
     } : null
     
   }
-  dependsOn:[
-    ...(!aksExists ? [aksTestProd] : [])
-  ]
+  // No dependsOn on AKS: the workspace must never depend on the AKS cluster.
+  // The AKS attach-compute (machineLearningComputeTestProd) is a CHILD of the workspace and depends on it,
+  // not the other way around. Storage/KeyVault/ACR/AppInsights are 'existing' refs (implicit deps).
 }
 
 var pendName = '${name}-pend'

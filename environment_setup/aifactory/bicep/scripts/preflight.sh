@@ -301,12 +301,42 @@ fi
 # -----------------------------------------------------------------------------
 norm_loc() { printf '%s' "$(lc "${1:-}" | tr -cd 'a-z0-9')"; }
 
+# Run an `az` command with retries on TRANSIENT failures (GatewayTimeout, 429,
+# 5xx, throttling, connection resets). On success: AZ_OUT holds stdout and
+# AZ_TRANSIENT is empty. If a transient failure survives all retries:
+# AZ_TRANSIENT=1 so the caller can emit a non-blocking "cannot validate right
+# now" WARN instead of a misleading hard FAIL. Read-only (GET/list calls only).
+# Tunables: PREFLIGHT_AZ_RETRIES (default 3), PREFLIGHT_AZ_BACKOFF (default 3s).
+AZ_OUT=""
+AZ_TRANSIENT=""
+az_capture() { # args: az subcommand + flags
+  local attempts="${PREFLIGHT_AZ_RETRIES:-3}" backoff="${PREFLIGHT_AZ_BACKOFF:-3}" i=1 errf emsg rc
+  AZ_OUT=""; AZ_TRANSIENT=""
+  while :; do
+    errf="$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/pf_az.$$.$i")"
+    AZ_OUT="$(az "$@" 2>"$errf")"; rc=$?
+    emsg="$(cat "$errf" 2>/dev/null)"; rm -f "$errf" 2>/dev/null
+    if [ "$rc" -eq 0 ] && [ -n "$AZ_OUT" ]; then return 0; fi
+    if printf '%s' "$emsg" | grep -qiE 'gateway.?timeout|timed?.?out|throttl|too many requests|\b(429|500|502|503|504)\b|temporarily unavailable|service unavailable|connection reset'; then
+      if [ "$i" -ge "$attempts" ]; then AZ_TRANSIENT=1; return 1; fi
+      sleep "$(( i * backoff ))"; i=$((i + 1)); continue
+    fi
+    # Non-transient (auth/not-found/empty-with-no-error) -> let the caller decide.
+    return "$rc"
+  done
+}
+
 check_ai_search_quota() { # $1 subId
   is_true "$ENABLE_AI_SEARCH" || return 0
   local sub="$1" sku url payload limit cur avail
   sku="$(lc "$AI_SEARCH_TIER")"
   url="https://management.azure.com/subscriptions/$sub/providers/Microsoft.Search/locations/$LOCATION/usages?api-version=2025-05-01"
-  payload="$(az rest --method get --url "$url" -o json 2>/dev/null)"
+  az_capture rest --method get --url "$url" -o json; payload="$AZ_OUT"
+  if [ -n "$AZ_TRANSIENT" ]; then
+    add_finding WARN SEARCH_QUOTA_UNVALIDATED "Cannot validate Azure AI Search quota in '$LOCATION' at this moment (transient Azure error/timeout after retries)." \
+      "Re-run preflight shortly. Manual check: az rest --method get --url '$url'"
+    return 0
+  fi
   if [ -z "$payload" ]; then
     add_finding WARN SEARCH_QUOTA_LOOKUP "Could not read Azure AI Search usage for '$LOCATION' (sub $sub)." \
       "Verify Microsoft.Search is registered and the identity has Reader on the subscription."
@@ -350,7 +380,12 @@ PY
 check_model_quota() { # $1 subId
   [ "${#MODELS[@]}" -gt 0 ] || return 0
   local sub="$1" usage failures="" m name sku cap qn line limit cur avail
-  usage="$(az cognitiveservices usage list --location "$LOCATION" -o json 2>/dev/null)"
+  az_capture cognitiveservices usage list --location "$LOCATION" -o json; usage="$AZ_OUT"
+  if [ -n "$AZ_TRANSIENT" ]; then
+    add_finding WARN MODEL_QUOTA_UNVALIDATED "Cannot validate AI model quota in '$LOCATION' at this moment (transient Azure error/timeout after retries)." \
+      "Re-run preflight shortly. Manual check: az cognitiveservices usage list --location $LOCATION"
+    return 0
+  fi
   if [ -z "$usage" ]; then
     add_finding WARN MODEL_QUOTA_LOOKUP "Could not read Cognitive Services usage/quota for '$LOCATION' (sub $sub)." \
       "Run: az cognitiveservices usage list --location $LOCATION ; verify Microsoft.CognitiveServices is registered."
@@ -400,7 +435,12 @@ check_cs_headroom() { # $1 subId
   is_true "$ENABLE_AI_FOUNDRY" || is_true "$ENABLE_AOAI" || [ "${#MODELS[@]}" -gt 0 ] || return 0
   local sub="$1" url payload res
   url="https://management.azure.com/subscriptions/$sub/providers/Microsoft.CognitiveServices/locations/$LOCATION/usages?api-version=2023-05-01"
-  payload="$(az rest --method get --url "$url" -o json 2>/dev/null)"
+  az_capture rest --method get --url "$url" -o json; payload="$AZ_OUT"
+  if [ -n "$AZ_TRANSIENT" ]; then
+    add_finding WARN CS_QUOTA_UNVALIDATED "Cannot validate Cognitive Services quota in '$LOCATION' at this moment (transient Azure error/timeout after retries)." \
+      "Re-run preflight shortly."
+    return 0
+  fi
   [ -n "$payload" ] || { add_finding WARN CS_QUOTA_LOOKUP "Could not read Cognitive Services usage for '$LOCATION'." \
       "Verify Microsoft.CognitiveServices is registered and identity has Reader."; return 0; }
   res="$(printf '%s' "$payload" | "$PYBIN" - <<'PY' 2>/dev/null
