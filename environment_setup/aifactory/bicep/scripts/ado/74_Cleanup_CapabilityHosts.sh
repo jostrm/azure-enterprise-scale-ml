@@ -52,17 +52,60 @@ API_VERSION="2025-04-01-preview"
 deleted_count=0
 project_caphosts_deleted=0
 
-# Helper: delete a caphost via az rest with error classification
+# Helper: delete a caphost via az rest with error classification.
+# A capability host can ONLY be DELETEd from a STABLE provisioningState
+# (Succeeded / Failed / Canceled). While Creating / Updating / Accepted /
+# Deleting the ARM DELETE is REJECTED with HTTP 409 Conflict:
+#   "Capability Host <name> is currently non deleting, retry after its complete".
+# So we first POLL (GET on the same URL) until the caphost is stable (or gone),
+# then issue DELETE, retrying on Conflict within the budget below.
 # Args: $1=full_delete_url $2=display_label
 # Returns: 0 if deleted/not-found, 1 if failed (non-fatal)
 delete_caphost_with_error_handling() {
   local delete_url="$1"
   local label="$2"
 
+  # ---- Phase 1: wait until the caphost reaches a STABLE state (or NotFound) ----
+  # GET uses the same URL as DELETE; budget ~30 min at 15s cadence.
+  local max_wait_iters=120
+  local i state get_output
+  for ((i = 1; i <= max_wait_iters; i++)); do
+    get_output=$(az rest --method GET --url "$delete_url" 2>&1) || true
+    if echo "$get_output" | grep -qi "ResourceNotFound\|ParentResourceNotFound\|NotFound\|Workspace not found"; then
+      echo "    ℹ️  $label not found before delete — already gone. Continuing."
+      return 0
+    fi
+    state=$(echo "$get_output" | grep -oE '"provisioningState"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"provisioningState"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+    case "$state" in
+      Succeeded|Failed|Canceled)
+        echo "    Caphost $label is stable (provisioningState=$state) — safe to delete."
+        break
+        ;;
+      "" )
+        # Could not parse state (transient/list-vs-item) — proceed to delete attempt.
+        echo "    Caphost $label state unknown (will attempt delete)."
+        break
+        ;;
+      * )
+        echo "    [$i/$max_wait_iters] Caphost $label is '$state' (non-stable) — waiting 15s before delete..."
+        sleep 15
+        ;;
+    esac
+  done
+
+  # ---- Phase 2: issue DELETE, retrying on Conflict ("currently non deleting") ----
   echo "    Deleting: $label ..."
-  local delete_output
-  delete_output=$(az rest --method DELETE --url "$delete_url" --headers "Content-Type=application/json" 2>&1) || true
-  
+  local delete_output max_del_retries=120 d
+  for ((d = 1; d <= max_del_retries; d++)); do
+    delete_output=$(az rest --method DELETE --url "$delete_url" --headers "Content-Type=application/json" 2>&1) || true
+    if echo "$delete_output" | grep -qi "currently non deleting\|Conflict"; then
+      echo "    [$d/$max_del_retries] DELETE rejected (caphost not yet in deletable state) — waiting 15s and retrying..."
+      sleep 15
+      continue
+    fi
+    break
+  done
+
   if echo "$delete_output" | grep -q "ParentResourceNotFound"; then
     echo "    ⚠️  ParentResourceNotFound: parent resource no longer exists (e.g., project deleted)."
     echo "       Caphost was implicitly removed. Continuing."
