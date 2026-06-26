@@ -405,13 +405,15 @@ check_ai_search_quota() { # $1 subId
     return 0
   fi
   # find usage entry whose name.value matches the sku (case-insensitive)
-  read -r limit cur < <(printf '%s' "$payload" | az_jq_search "$sku")
-  if [ -z "${limit:-}" ]; then
+  read -r limit cur < <(printf '%s' "$payload" | az_jq_search "$sku" | tr -d '\r')
+  # strip any stray non-digits (e.g. a CR from a Windows/Git-Bash python emitting CRLF)
+  limit="${limit//[^0-9]/}"; cur="${cur//[^0-9]/}"
+  if [ -z "$limit" ]; then
     add_finding WARN SEARCH_SKU_UNAVAILABLE "Azure AI Search SKU '$AI_SEARCH_TIER' is not listed for '$LOCATION'." \
       "Pick a supported SKU/region for Azure AI Search."
     return 0
   fi
-  avail=$((limit - cur))
+  avail=$(( limit - ${cur:-0} ))
   if [ "$limit" -le 0 ] || [ "$avail" -le 0 ]; then
     add_finding FAIL SEARCH_QUOTA_AT_LIMIT \
       "Azure AI Search SKU '$AI_SEARCH_TIER' quota in '$LOCATION' is exhausted (used $cur of $limit)." \
@@ -457,14 +459,15 @@ check_model_quota() { # $1 subId
   for m in "${MODELS[@]}"; do
     name="${m%%|*}"; cap="${m##*|}"; sku="${m#*|}"; sku="${sku%|*}"
     qn="OpenAI.$sku.$name"
-    line="$(printf '%s' "$usage" | az_jq_model "$qn")"
+    line="$(printf '%s' "$usage" | az_jq_model "$qn" | tr -d '\r')"
     if [ -z "$line" ]; then
       failures="$failures No quota entry '$qn'."
       continue
     fi
-    limit="$(printf '%s' "$line" | awk '{print $1}')"
-    cur="$(printf '%s' "$line" | awk '{print $2}')"
-    avail=$(( ${limit%.*} - ${cur%.*} ))
+    # sanitize to integer part only (drops decimals and any stray CR from CRLF)
+    limit="$(printf '%s' "$line" | awk '{print $1}')"; limit="${limit//[^0-9.]/}"; limit="${limit%.*}"; limit="${limit:-0}"
+    cur="$(printf '%s' "$line" | awk '{print $2}')"; cur="${cur//[^0-9.]/}"; cur="${cur%.*}"; cur="${cur:-0}"
+    avail=$(( limit - cur ))
     if [ "$avail" -lt "${cap%.*}" ]; then
       failures="$failures $qn needs $cap, $avail available (used ${cur%.*}/${limit%.*})."
     else
@@ -507,7 +510,7 @@ check_cs_headroom() { # $1 subId
   fi
   [ -n "$payload" ] || { add_finding WARN CS_QUOTA_LOOKUP "Could not read Cognitive Services usage for '$LOCATION'." \
       "Verify Microsoft.CognitiveServices is registered and identity has Reader."; return 0; }
-  res="$(PF_JSON="$payload" "$PYBIN" - <<'PY' 2>/dev/null
+  res="$(PF_JSON="$payload" "$PYBIN" - <<'PY' 2>/dev/null | tr -d '\r'
 import os, sys, json
 try: data = json.loads(os.environ.get("PF_JSON", "") or "")
 except Exception: sys.exit(0)
@@ -535,7 +538,7 @@ list_policy_assignments() { # $1 subId  (informational + elastic deny heuristic)
       "Verify the identity has Microsoft.Authorization/policyAssignments/read."
     return 0
   fi
-  count="$(PF_JSON="$json" "$PYBIN" - <<'PY' 2>/dev/null
+  count="$(PF_JSON="$json" "$PYBIN" - <<'PY' 2>/dev/null | tr -d '\r'
 import os, json
 try: data = json.loads(os.environ.get("PF_JSON", "") or "")
 except Exception: data = []
@@ -919,7 +922,7 @@ _provider_region_status() { # $1 ns  $2 resourceType
   az_capture provider show --namespace "$1" -o json
   [ -n "$AZ_TRANSIENT" ] && { echo "TRANSIENT"; return; }
   [ -z "$AZ_OUT" ] && { echo ""; return; }
-  PF_JSON="$AZ_OUT" "$PYBIN" - "$2" "$LOCATION" <<'PY' 2>/dev/null
+  PF_JSON="$AZ_OUT" "$PYBIN" - "$2" "$LOCATION" <<'PY' 2>/dev/null | tr -d '\r'
 import os, sys, json, re
 rt_want = sys.argv[1]
 loc = re.sub(r'[^a-z0-9]', '', sys.argv[2].lower())

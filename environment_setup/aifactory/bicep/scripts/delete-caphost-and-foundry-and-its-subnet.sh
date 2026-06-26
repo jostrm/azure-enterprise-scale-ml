@@ -49,6 +49,9 @@
 #       [--list-only]                        # only run the "ghost" detection, change nothing
 #       [--no-purge]                         # soft-delete the account but do NOT purge
 #       [--skip-account-delete]              # only clean caphosts (+ optional subnet)
+#       [--skip-caphost-delete]              # skip caphost delete; go straight to account
+#                                            #   teardown (cascades + force-clears a
+#                                            #   stuck-'Creating' ghost caphost)
 #       [--delete-subnet]                    # also delete snt-prj{nnn}-aca-002
 #         [--project-number       <nnn>]     #   required with --delete-subnet
 #         [--vnet-resource-group  <vnet-rg>] #   required with --delete-subnet
@@ -108,6 +111,7 @@ API_VERSION="2025-04-01-preview"
 LIST_ONLY="false"
 NO_PURGE="false"
 SKIP_ACCOUNT_DELETE="false"
+SKIP_CAPHOST_DELETE="false"
 DELETE_SUBNET="false"
 PROJECT_NUMBER=""
 VNET_RESOURCE_GROUP=""
@@ -135,6 +139,7 @@ while [ $# -gt 0 ]; do
     --list-only)            LIST_ONLY="true";          shift 1 ;;
     --no-purge)             NO_PURGE="true";           shift 1 ;;
     --skip-account-delete)  SKIP_ACCOUNT_DELETE="true";shift 1 ;;
+    --skip-caphost-delete)  SKIP_CAPHOST_DELETE="true";shift 1 ;;
     --delete-subnet)        DELETE_SUBNET="true";      shift 1 ;;
     --project-number)       PROJECT_NUMBER="$2";       shift 2 ;;
     --vnet-resource-group)  VNET_RESOURCE_GROUP="$2";  shift 2 ;;
@@ -274,6 +279,7 @@ echo "Location          : $LOCATION"
 echo "API Version       : $API_VERSION"
 echo "List only         : $LIST_ONLY"
 echo "Skip acct delete  : $SKIP_ACCOUNT_DELETE"
+echo "Skip caphost del  : $SKIP_CAPHOST_DELETE"
 echo "Purge after delete: $([ "$NO_PURGE" = "true" ] && echo false || echo true)"
 echo "Delete subnet     : $DELETE_SUBNET $([ "$DELETE_SUBNET" = "true" ] && echo "(snt-prj${PROJECT_NUMBER}-${SUBNET_PURPOSE})")"
 [ "$WHATIF" = "true" ] && echo "Mode              : WhatIf (no changes will be made)"
@@ -295,6 +301,65 @@ _leaf() { echo "${1##*/}"; }
 
 # URL-encode the single '@' in the account caphost name (e.g. acct@aml_aiagentservice).
 _enc_at() { echo "${1//@/%40}"; }
+
+# -----------------------------------------------------------------------------
+# Robustly delete ONE capability host (account- or project-level) by URL.
+#
+# WHY this is not a single DELETE:
+#   A caphost can ONLY be deleted from a STABLE provisioningState
+#   (Succeeded/Failed/Canceled). While it is still Creating/Updating/Accepted
+#   the ARM DELETE is rejected with:
+#       Conflict: "... is currently non deleting, retry after its complete"
+#   So we must: wait until the create/update finishes -> issue DELETE ->
+#   then wait until it is gone, retrying DELETE if a Conflict comes back.
+#
+# Loop (10s cadence, ~30 min budget):
+#   NotFound/empty            -> success
+#   Creating/Updating/Accepted-> create/update in flight: WAIT (do not delete)
+#   Deleting                  -> delete already running: WAIT
+#   Succeeded/Failed/Canceled -> STABLE: issue DELETE (retry on Conflict)
+#
+# Usage: _delete_caphost_robust <url> <label>
+# -----------------------------------------------------------------------------
+_delete_caphost_robust() {
+  local url="$1" label="$2"
+  local max=180 i=0 state out
+  while [ "$i" -lt "$max" ]; do
+    state=$(az rest --method GET --url "$url" \
+      --query "properties.provisioningState" -o tsv 2>/dev/null | tr -d '\r' || echo "NotFound")
+
+    if [ -z "$state" ] || [ "$state" = "NotFound" ]; then
+      echo "    $label fully deleted."
+      return 0
+    fi
+
+    case "$state" in
+      Creating|Updating|Accepted|Provisioning)
+        [ $((i % 6)) -eq 0 ] && echo "    $label still provisioning (state=$state) - waiting for a stable state before delete ($((i*10))s)"
+        ;;
+      Deleting)
+        [ $((i % 6)) -eq 0 ] && echo "    $label delete in progress (state=$state, $((i*10))s)"
+        ;;
+      *)
+        # Stable state -> attempt DELETE.
+        out=$(az rest --method DELETE --url "$url" --headers "Content-Type=application/json" 2>&1) || true
+        if echo "$out" | grep -qiE "non deleting|retry after|Conflict|currently"; then
+          [ $((i % 6)) -eq 0 ] && echo "    $label busy (Conflict) - retrying delete ($((i*10))s)"
+        elif echo "$out" | grep -qiE "ResourceNotFound|NotFound"; then
+          echo "    $label not found - already deleted."
+          return 0
+        else
+          echo "    $label delete accepted (was state=$state)."
+        fi
+        ;;
+    esac
+
+    sleep 10
+    i=$((i + 1))
+  done
+  echo "    WARNING: $label not confirmed deleted after $((max*10))s - proceeding anyway."
+  return 1
+}
 
 # -----------------------------------------------------------------------------
 # STEP 0 - LIST capability hosts ("ghost" detection): account + each project.
@@ -370,9 +435,9 @@ delete_project_caphosts() {
         continue
       fi
       echo "  Deleting project caphost: $proj/$ch"
-      az rest --method DELETE \
-        --url "${BASE_URL}/projects/${proj}/capabilityHosts/${ch}?api-version=${API_VERSION}" \
-        --headers "Content-Type=application/json" 2>&1 | sed 's/^/    /' || true
+      _delete_caphost_robust \
+        "${BASE_URL}/projects/${proj}/capabilityHosts/${ch}?api-version=${API_VERSION}" \
+        "project caphost '$proj/$ch'"
     done <<< "$pchs"
   done <<< "$projects"
   echo ""
@@ -403,33 +468,9 @@ delete_account_caphosts() {
       continue
     fi
     echo "  Deleting account caphost: $ch"
-    az rest --method DELETE \
-      --url "${BASE_URL}/capabilityHosts/${ch_enc}?api-version=${API_VERSION}" \
-      --headers "Content-Type=application/json" 2>&1 | sed 's/^/    /' || true
-
-    # Poll until the caphost GET returns NotFound (or terminal). Up to ~10 min.
-    local max=120 i=0 state
-    while [ "$i" -lt "$max" ]; do
-      state=$(az rest --method GET \
-        --url "${BASE_URL}/capabilityHosts/${ch_enc}?api-version=${API_VERSION}" \
-        --query "properties.provisioningState" -o tsv 2>/dev/null | tr -d '\r' || echo "NotFound")
-      if [ -z "$state" ] || [ "$state" = "NotFound" ]; then
-        echo "    Account caphost '$ch' fully deleted."
-        break
-      fi
-      if [ "$state" = "Failed" ] || [ "$state" = "Canceled" ]; then
-        echo "    Account caphost '$ch' in terminal state '$state' - proceeding."
-        break
-      fi
-      if [ $((i % 6)) -eq 0 ]; then
-        echo "    ...still deleting account caphost '$ch' (state=$state, $((i*5))s elapsed)"
-      fi
-      sleep 5
-      i=$((i + 1))
-    done
-    if [ "$i" -ge "$max" ]; then
-      echo "    WARNING: account caphost '$ch' not confirmed deleted after $((max*5))s - proceeding anyway."
-    fi
+    _delete_caphost_robust \
+      "${BASE_URL}/capabilityHosts/${ch_enc}?api-version=${API_VERSION}" \
+      "account caphost '$ch'"
   done <<< "$acct_chs"
   echo ""
 }
@@ -593,16 +634,21 @@ if [ "$LIST_ONLY" = "true" ]; then
 fi
 
 # 06a: caphosts in correct order (project -> wait -> account)
-delete_project_caphosts
-
-if [ -n "$BASE_URL" ] && [ "$WHATIF" = "false" ]; then
-  echo "[2/8] Waiting 60s before deleting account caphost (required ordering)..."
-  sleep 60
+if [ "$SKIP_CAPHOST_DELETE" = "true" ]; then
+  echo "[1-3/8] --skip-caphost-delete set: skipping caphost deletion. The account"
+  echo "        delete below will cascade and force-clear any stuck caphost."
 else
-  echo "[2/8] (skip 60s wait - whatif or no account)"
-fi
+  delete_project_caphosts
 
-delete_account_caphosts
+  if [ -n "$BASE_URL" ] && [ "$WHATIF" = "false" ]; then
+    echo "[2/8] Waiting 60s before deleting account caphost (required ordering)..."
+    sleep 60
+  else
+    echo "[2/8] (skip 60s wait - whatif or no account)"
+  fi
+
+  delete_account_caphosts
+fi
 
 # 06b: delete the Foundry account (projects -> PEs -> account) unless skipped
 if [ "$SKIP_ACCOUNT_DELETE" = "true" ]; then
