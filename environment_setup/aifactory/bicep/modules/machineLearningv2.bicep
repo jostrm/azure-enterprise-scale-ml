@@ -293,7 +293,9 @@ module machineLearningPrivateEndpoint 'machinelearningNetwork.bicep' = if(!enabl
 }
 
 var aksName = 'aks${projectNumber}-${locationSuffix}-${env}' // aks001-weu-prod (20/16) VS aks001-weu-prod (16/16)
-var aksResourceId = resourceId('Microsoft.ContainerService/managedClusters', aksName)
+// Build the AKS cluster resourceId as a plain string (NOT via resourceId()) so ARM never treats this
+// as a symbolic in-template reference. The id is deterministic (same RG/sub as this module's scope).
+var aksResourceId = '${subscription().id}/resourceGroups/${resourceGroup().name}/providers/Microsoft.ContainerService/managedClusters/${aksName}'
 var nodeResourceGroupName = 'aks-${resourceGroup().name}' // aks-abc-def-esml-project001-weu-dev-003-rg (unique within subscription)
 var desName = 'des-${name}'
 var desKeyName = '${cmkKeyName}-des'
