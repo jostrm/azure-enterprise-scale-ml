@@ -3140,8 +3140,10 @@ jobs:
             echo "=== Waiting for account-level capability host to reach Succeeded ==="
             echo "Account: $account_name  RG: $projectResourceGroup"
 
-            caphost_name="${account_name//\-/}caphost"
-            caphost_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${caphost_name}?api-version=2025-07-01-preview"
+            caphost_name="${account_name}%40aml_aiagentservice"
+            caphost_display_name="${account_name}@aml_aiagentservice"
+            caphost_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts/${caphost_name}?api-version=2025-04-01-preview"
+            echo "Account caphost: $caphost_display_name"
 
             max_attempts=45   # 45 x 20s = 15 min
             for i in $(seq 1 $max_attempts); do
