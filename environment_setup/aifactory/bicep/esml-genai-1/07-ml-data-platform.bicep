@@ -511,6 +511,44 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   ]
 }
 
+module amlv2Aks '../modules/machineLearningAks.bicep' = if(!amlExists && enableAzureMachineLearning && enableAksForAzureML) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('06-AzureMLAKS${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    name: amlName
+    cmk: cmk
+    cmkKeyName: cmkKeyName
+    aksExists: aksExists
+    aksOutboundType: aksOutboundType
+    aksPrivateDNSZone: aksPrivateDNSZone
+    aksSkuName: aksSkuName
+    aksSkuTier: aksSkuTier
+    aksLoadBalancerSku: aksLoadBalancerSku
+    aksEnablePrivateCluster: aksEnablePrivateCluster
+    aksManagedOutboundIPs: aksManagedOutboundIPs
+    uniqueDepl: deploymentProjSpecificUniqueSuffix
+    uniqueSalt5char: namingConvention.outputs.uniqueInAIFenv
+    projectNumber: projectNumber
+    location: location
+    locationSuffix: locationSuffix
+    env: env
+    aksSubnetId: aks2SubnetId
+    aksSubnetName: aks2SubnetName
+    aksDnsServiceIP: aksDnsServiceIP
+    aksServiceCidr: aksServiceCidr
+    tags: tagsProject
+    aksVmSku_dev: aksExists ? '' : aks_dev_sku_param
+    aksVmSku_testProd: aksExists ? '' : aks_test_prod_sku_param
+    aksNodes_dev: aksExists ? 0 : aks_dev_nodes_param
+    aksNodes_testProd: aksExists ? 0 : aks_test_prod_nodes_param
+    kubernetesVersionAndOrchestrator: aksExists ? '' : aks_version_param
+    kvName: keyvaultName
+  }
+  dependsOn: [
+    amlv2
+  ]
+}
+
 // Added: Azure Databricks Workspace (AVM) deployment
 module databricks 'br/public:avm/res/databricks/workspace:0.12.0' = if(!databricksExists && enableDatabricks) {
   name: take('07-Dbx-${deploymentProjSpecificUniqueSuffix}', 64)
