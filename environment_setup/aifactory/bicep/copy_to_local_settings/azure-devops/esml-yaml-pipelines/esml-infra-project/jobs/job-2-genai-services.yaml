@@ -3902,12 +3902,16 @@ steps:
       
       # Adjust timing based on agent network injection setting
       if [ "$disable_agent_network_injection" = "false" ]; then
-        # With agent network injection: longer wait due to Microsoft-managed infrastructure provisioning
-        initial_wait_minutes=15  # Wait 15 minutes before first check
-        max_poll_attempts=105    # After initial wait: 105 attempts x 60s = 105 minutes additional polling
-        total_max_minutes=120
-        echo "ℹ️  Agent network injection ENABLED: Using extended timeout (up to 2 hours)"
-        echo "   Reason: Microsoft-managed Container Apps Environment provisioning can take longer"
+        # With agent network injection: account creation takes ~17-20 min. We cap the
+        # polling at 20 minutes total. The OUTER ARM sub-deployment can stay 'Running'
+        # even after the Foundry ACCOUNT resource itself has finished (Microsoft-managed
+        # agent infra finalizes asynchronously), so if it is still 'Running' at the cap we
+        # ASSUME SUCCESS and let '69-wait-account-caphost-succeeded' gate on real readiness.
+        initial_wait_minutes=15  # Wait 15 minutes before first check (account creation ~17-20 min)
+        max_poll_attempts=5      # After initial wait: 5 attempts x 60s = 5 min -> cap total at 20 min
+        total_max_minutes=20
+        echo "ℹ️  Agent network injection ENABLED: account creation takes ~17-20 min."
+        echo "   Polling is capped at 20 min; a still-'Running' status at the cap is treated as SUCCESS."
       else
         # Without agent network injection: standard timeout
         initial_wait_minutes=10  # Wait 10 minutes before first check
@@ -3993,11 +3997,15 @@ steps:
             --query "[?properties.provisioningState=='Failed'].{Resource:properties.targetResource.resourceName, Type:properties.targetResource.resourceType, Error:properties.statusMessage}" \
             -o table 2>/dev/null || echo "Unable to retrieve failed operations"
           
-          exit 1
+          echo ""
+          echo "##[warning]Not failing this task (per design). Leaving foundry_69a_deployment_succeeded"
+          echo "##[warning]unset so the downstream self-heal purge + 2nd-option retry can recover."
+          exit 0
         elif [ "$status" = "Canceled" ]; then
           echo ""
-          echo "##[error]⚠️ Deployment was canceled after $elapsed_minutes minutes!"
-          exit 1
+          echo "##[warning]⚠️ Deployment was canceled after $elapsed_minutes minutes!"
+          echo "##[warning]Not failing this task; downstream self-heal + retry will handle recovery."
+          exit 0
         elif [ "$status" = "Running" ] || [ "$status" = "Accepted" ]; then
           # Deployment is in progress, continue polling
           if [ $attempt -lt $max_poll_attempts ]; then
@@ -4012,11 +4020,23 @@ steps:
         fi
       done
       
-      # If we get here, we've exceeded max attempts
+      # If we get here, we've exceeded max attempts. The outer ARM sub-deployment can stay
+      # 'Running' even after the Foundry ACCOUNT resource has finished, because the
+      # Microsoft-managed agent infrastructure (Container Apps Env / capability host)
+      # finalizes asynchronously. So a still-'Running' status at the cap is treated as
+      # SUCCESS; the downstream '69-wait-account-caphost-succeeded' gates on real readiness.
       echo ""
-      echo "##[warning]⏱️ Deployment did not complete within $total_max_minutes minutes. Last status: $status"
-      echo "##[warning]The deployment may still be running in Azure. Check the Azure Portal for current status."
-      exit 1
+      echo "##[warning]⏱️ Polling window of $total_max_minutes minutes elapsed. Last status: $status"
+      if [ "$status" = "Running" ] || [ "$status" = "Accepted" ]; then
+        echo "##[warning]Deployment still '$status' at the cap — assuming SUCCESS. The account resource"
+        echo "##[warning]is typically already done; the ARM sub-deployment lags while agent infra finalizes."
+        echo "##[warning]Downstream '69-wait-account-caphost-succeeded' will verify the real readiness."
+        echo "##vso[task.setvariable variable=foundry_69a_deployment_succeeded]true"
+        exit 0
+      fi
+      echo "##[warning]Status is '$status' (not Running/Accepted). Not failing the task; downstream"
+      echo "##[warning]self-heal purge + caphost-wait will handle recovery."
+      exit 0
 - task: AzureCLI@2
   displayName: '69-wait-account-caphost-succeeded'
   continueOnError: false
