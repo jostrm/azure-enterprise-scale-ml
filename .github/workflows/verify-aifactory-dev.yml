@@ -1,6 +1,13 @@
 name: verify-aifactory-dev
-on: 
-  #push
+on:
+  push:
+    paths:
+      - "environment_setup/aifactory/bicep/copy_to_local_settings/**"
+      - ".github/workflows/verify-aifactory-dev.yml"
+  pull_request:
+    paths:
+      - "environment_setup/aifactory/bicep/copy_to_local_settings/**"
+      - ".github/workflows/verify-aifactory-dev.yml"
   workflow_dispatch:
 env:
   admin_aiFactorySalt: "abcde" # AIFactory salt: abcde in any resource, such as kv-cmnadm-abcde-001
