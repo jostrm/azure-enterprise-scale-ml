@@ -2735,27 +2735,43 @@ jobs:
             echo "=== Purge soft-deleted AI Foundry / Cognitive Services accounts before create ==="
             echo "Target RG: $targetRG   Location: $location"
 
-            # list-deleted is location/subscription-wide; filter to the project RG.
+            # list-deleted is subscription-wide and returns resourceGroup in a NORMALIZED (often
+            # UPPERCASE) form, so a case-sensitive JMESPath filter like [?resourceGroup=='<rg>'] can
+            # silently match nothing — leaving the account soft-deleted and 69a failing with
+            # FlagMustBeSetForRestore. Fetch name + resourceGroup + location and compare case-insensitively
+            # in bash, and purge using each account's OWN location.
             deletedAccounts=$(az cognitiveservices account list-deleted \
-              --query "[?resourceGroup=='${targetRG}'].name" -o tsv 2>/dev/null || echo "")
+              --query "[].{name:name, rg:resourceGroup, loc:location}" -o tsv 2>/dev/null || echo "")
 
             if [ -z "$deletedAccounts" ]; then
-              echo "ℹ️  No soft-deleted Cognitive Services accounts found in $targetRG. Nothing to purge."
+              echo "ℹ️  No soft-deleted Cognitive Services accounts found in the subscription. Nothing to purge."
               exit 0
             fi
 
-            while IFS= read -r accountName; do
+            targetRG_lc=$(printf '%s' "$targetRG" | tr '[:upper:]' '[:lower:]')
+            purgedAny=false
+            while IFS=$'\t' read -r accountName accountRG accountLoc; do
               [ -z "$accountName" ] && continue
-              echo "🗑️  Purging soft-deleted Cognitive Services account: $accountName"
+              accountRG_lc=$(printf '%s' "$accountRG" | tr '[:upper:]' '[:lower:]')
+              if [ "$accountRG_lc" != "$targetRG_lc" ]; then
+                continue
+              fi
+              purgeLoc="${accountLoc:-$location}"
+              echo "🗑️  Purging soft-deleted Cognitive Services account: $accountName (RG=$accountRG, loc=$purgeLoc)"
               if az cognitiveservices account purge \
-                --location "$location" \
-                --resource-group "$targetRG" \
+                --location "$purgeLoc" \
+                --resource-group "$accountRG" \
                 --name "$accountName"; then
                 echo "✅ Purged: $accountName"
+                purgedAny=true
               else
                 echo "::warning::Failed to purge soft-deleted account '$accountName' — 69a may fail with FlagMustBeSetForRestore."
               fi
             done <<< "$deletedAccounts"
+
+            if [ "$purgedAny" != "true" ]; then
+              echo "ℹ️  No soft-deleted Cognitive Services accounts matched RG '$targetRG'. Nothing purged."
+            fi
 
             echo "=== 69-Purge-Soft-Deleted-Foundry-Before-Create complete ==="
 
