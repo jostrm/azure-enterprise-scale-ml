@@ -28,13 +28,18 @@ def storage_reachable(account: str) -> bool:
 
 
 def foundry_can_reach_search(foundry: str, search: str) -> bool:
-    """Foundry -> AI Search connection. Placeholder.
-
-    TODO: query foundry connections via `az` and assert AI Search target.
-    """
-    raise NotImplementedError("foundry_can_reach_search not yet implemented")
+    """Foundry has an AI Search connection and the search host is private."""
+    conns = cli.az_json(
+        ["cognitiveservices", "account", "connection", "list", "-n", foundry]
+    ) or []
+    has_conn = any(search in str(c.get("properties", {}).get("target", "")) for c in conns)
+    return has_conn and cli.resolves_to_private_ip(naming.search_host(search))
 
 
 def foundry_can_reach_storage(foundry: str, storage: str) -> bool:
-    """Foundry -> Storage connection. Placeholder."""
-    raise NotImplementedError("foundry_can_reach_storage not yet implemented")
+    """Foundry has a Storage connection and the blob host is private."""
+    conns = cli.az_json(
+        ["cognitiveservices", "account", "connection", "list", "-n", foundry]
+    ) or []
+    has_conn = any(storage in str(c.get("properties", {}).get("target", "")) for c in conns)
+    return has_conn and cli.resolves_to_private_ip(naming.storage_blob_host(storage))
