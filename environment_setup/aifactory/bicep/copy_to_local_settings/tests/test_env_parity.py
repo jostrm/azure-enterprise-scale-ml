@@ -43,6 +43,31 @@ ALIASES = {
     "admin_prjResourceSuffix": "ADMIN_PRJ_RESOURCE_SUFFIX",
     "use_ad_groups": "USE_AD_GROUPS",
     "disableLocalAuth": "DISABLE_LOCAL_AUTH",
+    "BYOContributorRoleID": "BYO_CONTRIBUTOR_ROLE_ID",
+    "disableSubnetJoinAction": "DISABLE_SUBNET_JOIN_ACTION",
+    "enableDeleteForDisabledResources": "ENABLE_DELETE_FOR_DISABLED_RESOURCES",
+    "deleteAllServicesForProject": "DELETE_ALL_SERVICES_FOR_PROJECT",
+    "deleteKeyvaultAlso": "DELETE_KEYVAULT_ALSO",
+    "deleteAllForProject": "DELETE_ALL_FOR_PROJECT",
+    "cmkDisableForAISearch": "CMK_DISABLE_FOR_AI_SEARCH",
+    "cmkDisableForFoundry": "CMK_DISABLE_FOR_FOUNDRY",
+    "cleanFoundryCaphost": "CLEAN_FOUNDRY_CAPHOST",
+    "policyExemptionAssignmentIds": "POLICY_EXEMPTION_ASSIGNMENT_IDS",
+    "policyExemptionDefinitionReferenceIds": "POLICY_EXEMPTION_DEFINITION_REFERENCE_IDS",
+    "enableAKS": "ENABLE_AKS",
+    "aksSkuName": "AKS_SKU_NAME",
+    "aksSkuTier": "AKS_SKU_TIER",
+    "aksEnablePrivateCluster": "AKS_ENABLE_PRIVATE_CLUSTER",
+    "enableElasticsearch": "ENABLE_ELASTICSEARCH",
+    "elasticType": "ELASTIC_TYPE",
+    "elasticEmail": "ELASTIC_EMAIL",
+    "elasticFirstName": "ELASTIC_FIRST_NAME",
+    "elasticLastName": "ELASTIC_LAST_NAME",
+    "elasticCompanyName": "ELASTIC_COMPANY_NAME",
+    "elasticDeploymentSize": "ELASTIC_DEPLOYMENT_SIZE",
+    "elasticSku": "ELASTIC_SKU",
+    "deployModel_gpt_54_mini": "DEPLOY_MODEL_GPT_54_MINI",
+    "subnetProjWebapp": "SUBNET_PROJ_WEBAPP",
     "tenantId": "TENANT_ID",
     "azure_machinelearning_sp_oid": "TENANT_AZUREML_OID",
     # Seeding key vault (ADO is per-env, GitHub template is single)
@@ -58,6 +83,13 @@ ALIASES = {
 }
 
 # ADO-only keys that have no GitHub equivalent and should not fail the parity check.
+# Variables whose example/default value intentionally differs between the
+# ADO variables.yaml and the GitHub .env.template (tenant-specific examples).
+DEFAULT_MISMATCH_ALLOWED = {
+    "admin_aifactoryPrefixRG",
+    "cleanFoundryCaphost",
+}
+
 KNOWN_MISSING = {
     "dev_service_connection",
     "test_service_connection",
@@ -197,6 +229,8 @@ KNOWN_MISSING = {
     "kvNameFromCOMMON_param",
     "useCommonACR_override",
     "network_env_dev",
+    "network_env_stage",
+    "network_env_prod",
     "subnetCommon",
     "subnetCommonScoring",
     "subnetCommonPowerbiGw",
@@ -311,6 +345,9 @@ class TestADOToGitHubEnvParity(unittest.TestCase):
 
             env_val = env_vars[env_key]
             if _is_placeholder(yaml_val) or _is_placeholder(env_val):
+                continue
+
+            if key in DEFAULT_MISMATCH_ALLOWED:
                 continue
 
             if yaml_val != env_val:

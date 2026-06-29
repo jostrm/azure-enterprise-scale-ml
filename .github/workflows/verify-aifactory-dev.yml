@@ -19,6 +19,17 @@ env:
   project_number_000: '001' #ESML Projectnumber, three digits: 001
   user_emails_comma_separated_list: "" # Comma-separated, email(s) of new user(s) to grant admin permissions"
 jobs:
+  verify-unit-tests:
+    name: Run AI Factory IaC unit tests (env/workflow parity, scenarios)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: "Run unit tests"
+        working-directory: environment_setup/aifactory/bicep/copy_to_local_settings
+        run: python -m unittest discover -s tests -p "test_*.py" -v
   verify-infra:
     env: 
       admin_storage_account: "adminstoracc123" # ESML AIFactory common datalake (storage account) name

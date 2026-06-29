@@ -31,8 +31,11 @@ def deploy_project(scenario: Scenario, env: dict[str, str]) -> DeployedProject:
 
 
 def cleanup_project(project: DeployedProject) -> bool:
-    """Delete the project resource group. Placeholder (idempotent)."""
-    raise NotImplementedError("cleanup_project not yet implemented")
+    """Delete the project resource group (idempotent: ok if already gone)."""
+    if not project_exists(project.resource_group):
+        return True
+    res = cli.az(["group", "delete", "-n", project.resource_group, "--yes", "--no-wait"])
+    return res.ok
 
 
 def project_exists(resource_group: str) -> bool:

@@ -30,12 +30,11 @@ def deploy_common(scenario: Scenario, env: dict[str, str]) -> DeployedCommon:
 
 
 def cleanup_common(common: DeployedCommon) -> bool:
-    """Delete the common resource group. Placeholder (idempotent).
-
-    TODO: `az group delete --name <rg> --yes --no-wait` and role-assignment
-    cleanup via cleanup-role-assignments.ps1 equivalent in bash.
-    """
-    raise NotImplementedError("cleanup_common not yet implemented")
+    """Delete the common resource group (idempotent: ok if already gone)."""
+    if not common_exists(common.resource_group):
+        return True
+    res = cli.az(["group", "delete", "-n", common.resource_group, "--yes", "--no-wait"])
+    return res.ok
 
 
 def common_exists(resource_group: str) -> bool:

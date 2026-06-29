@@ -70,11 +70,6 @@ jobs:
       AIFACTORY_SALT_RANDOM: ${{ vars.AIFACTORY_SALT_RANDOM }}
       deployment_random_value: ''
 
-      # Network env debug mirrors (match ADO debug params)
-      network_env_dev: ${{ vars.DEV_NETWORK_ENV || vars.NETWORK_ENV || 'dev' }}
-      network_env_stage: ${{ vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test' }}
-      network_env_prod: ${{ vars.PROD_NETWORK_ENV || vars.NETWORK_ENV || 'prod' }}
-
       # Project types are merged in ADO
       admin_projectType: all
 
@@ -1868,9 +1863,6 @@ jobs:
               --parameters DEBUG_enableRedisCache="${{ env.enableRedisCache }}" \
               --parameters DEBUG_enableSQLDatabase="${{ env.enableSQLDatabase }}" \
               --parameters DEBUG_BYO_subnets="${{ env.BYO_subnets }}" \
-              --parameters DEBUG_network_env_dev="${{ env.network_env_dev }}" \
-              --parameters DEBUG_network_env_stage="${{ env.network_env_stage }}" \
-              --parameters DEBUG_network_env_prod="${{ env.network_env_prod }}" \
               --parameters DEBUG_vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
               --parameters DEBUG_vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
               --parameters DEBUG_commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
